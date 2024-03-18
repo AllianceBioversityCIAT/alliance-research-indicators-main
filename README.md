@@ -80,5 +80,6 @@ Supertest is a high-level abstraction for testing HTTP servers in Node.js. It pr
 
 Swagger is an open-source framework for designing, building, and documenting RESTful APIs. It provides tools for generating interactive API documentation from OpenAPI specifications. Swagger simplifies API documentation by automatically generating documentation from code annotations and comments. Alternatives: RAML and API Blueprint are alternatives to Swagger but are less widely adopted.
 
+### Architecture Diagram
 
-![Architecture Diagram](./architecture.png)
+![Architecture Diagram](./Architecture.png)
