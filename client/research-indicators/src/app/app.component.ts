@@ -14,6 +14,5 @@ export class AppComponent {
     this.start();
   }
   start() {
-    console.log('start');
   }
 }
