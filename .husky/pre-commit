@@ -1,0 +1,2 @@
+cd client/research-indicators
+npm run lint
