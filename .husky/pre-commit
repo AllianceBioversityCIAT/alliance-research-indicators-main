@@ -2,3 +2,4 @@
 
 cd client/research-indicators
 npm run lint
+npm run s-lint
