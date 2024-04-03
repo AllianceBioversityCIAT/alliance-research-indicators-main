@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "ng lint",
     "s-lint": "stylelint '**/*.scss'"
   },
@@ -33,18 +35,39 @@
     "@angular-eslint/template-parser": "17.3.0",
     "@angular/cli": "^17.3.0",
     "@angular/compiler-cli": "^17.3.0",
-    "@types/jasmine": "~5.1.0",
+    "@types/jest": "^29.5.12",
     "@typescript-eslint/eslint-plugin": "7.2.0",
     "@typescript-eslint/parser": "7.2.0",
     "eslint": "^8.57.0",
-    "jasmine-core": "~5.1.0",
-    "karma": "~6.4.0",
-    "karma-chrome-launcher": "~3.2.0",
-    "karma-coverage": "~2.2.0",
-    "karma-jasmine": "~5.1.0",
-    "karma-jasmine-html-reporter": "~2.1.0",
+    "jest-preset-angular": "^14.0.3",
     "stylelint": "^16.3.1",
     "stylelint-config-standard-scss": "^13.0.0",
     "typescript": "~5.4.2"
+  },
+  "jest": {
+    "preset": "jest-preset-angular",
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/setup-jest.ts"
+    ],
+    "globalSetup": "jest-preset-angular/global-setup",
+    "collectCoverage": true,
+    "collectCoverageFrom": [
+      "./src/app/**/*.ts",
+      "./src/app/**/*.html",
+      "!./src/app/**/*routing.ts",
+      "!./src/app/**/*module.ts"
+    ],
+    "testPathIgnorePatterns": [
+      "<rootDir>/node_modules/",
+      "<rootDir>/dist/"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
   }
 }

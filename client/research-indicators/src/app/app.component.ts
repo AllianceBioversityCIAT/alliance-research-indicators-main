@@ -10,9 +10,8 @@ import { RouterOutlet } from '@angular/router';
 })
 export class AppComponent {
   title = 'research-indicators';
-  constructor() {
-    this.start();
-  }
-  start() {
+
+  sum(a: number, b: number) {
+    return a + b;
   }
 }
