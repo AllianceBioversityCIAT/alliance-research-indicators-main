@@ -12,6 +12,11 @@
     "lint": "ng lint",
     "s-lint": "stylelint '**/*.scss'"
   },
+  "lint-staged": {
+    "*.{ts,js,html,css}": [
+      "ng lint"
+    ]
+  },
   "private": true,
   "dependencies": {
     "@angular/animations": "^17.3.0",
@@ -40,6 +45,7 @@
     "@typescript-eslint/parser": "7.2.0",
     "eslint": "^8.57.0",
     "jest-preset-angular": "^14.0.3",
+    "lint-staged": "^15.2.2",
     "stylelint": "^16.3.1",
     "stylelint-config-standard-scss": "^13.0.0",
     "typescript": "~5.4.2"

@@ -1,4 +1,4 @@
 cd client/research-indicators
-npm run lint
+npx lint-staged
 npm run s-lint
 npm run test
