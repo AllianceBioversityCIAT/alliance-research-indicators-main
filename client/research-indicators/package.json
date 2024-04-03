@@ -61,6 +61,10 @@
       "<rootDir>/node_modules/",
       "<rootDir>/dist/"
     ],
+    "coveragePathIgnorePatterns": [
+      "<rootDir>/src/app/app.config.ts",
+      "<rootDir>/src/app/app.routes.ts"
+    ],
     "coverageThreshold": {
       "global": {
         "branches": 80,
