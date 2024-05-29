@@ -1,5 +1,5 @@
 {
-  "name": "research-indicators",
+  "name": "researchindicators",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
@@ -10,7 +10,14 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "ng lint",
-    "s-lint": "stylelint '**/*.scss'"
+    "s-lint": "stylelint '**/*.scss'",
+    "docker:build": "docker build -t research_indicatiors_client .",
+    "docker:run": "docker run --env-file ./.env -dti --name research_indicatiors_client_dev -p 4200:4200 research_indicatiors_client",
+    "docker:stop": "docker stop research_indicatiors_client_dev && docker rm research_indicatiors_client_dev",
+    "docker:logs": "docker logs research_indicatiors_client_dev",
+    "docker:exec": "docker exec -it research_indicatiors_client_dev /bin/bash",
+    "compose:up:dev": "docker-compose up dev -d",
+    "compose:up:prod": "docker-compose up prod -d"
   },
   "private": true,
   "dependencies": {
@@ -64,6 +71,11 @@
     "coveragePathIgnorePatterns": [
       "<rootDir>/src/app/app.config.ts",
       "<rootDir>/src/app/app.routes.ts"
+    ],
+    "coverageReporters": [
+      "text",
+      "cobertura",
+      "lcov"
     ],
     "coverageThreshold": {
       "global": {

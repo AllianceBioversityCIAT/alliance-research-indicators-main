@@ -3,7 +3,7 @@
 /node_modules
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
@@ -19,7 +19,7 @@ lerna-debug.log*
 /.nyc_output
 
 # IDEs and editors
-/.idea
+/.idea/
 .project
 .classpath
 .c9/
@@ -28,8 +28,13 @@ lerna-debug.log*
 *.sublime-workspace
 
 # IDE - VSCode
-.vscode/*
+.vscode/
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Environment variables
+.env.dev
+.env.production
+.env.testing

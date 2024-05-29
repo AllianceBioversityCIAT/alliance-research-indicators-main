@@ -18,8 +18,13 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./apps/researchindicators/test/jest-e2e.json",
-    "docker:build": "docker build -t researchindicators .",
-    "docker:run": "docker run -dti --name researchindicatorsapp -p 3001:3001 researchindicators"
+    "docker:build": "docker build -t research_indicatiors_server .",
+    "docker:run": "docker run --env-file ./.env -dti --name research_indicatiors_server_dev -p 4200:4200 research_indicatiors_server",
+    "docker:stop": "docker stop research_indicatiors_server_dev && docker rm research_indicatiors_server_dev",
+    "docker:logs": "docker logs research_indicatiors_server_dev",
+    "docker:exec": "docker exec -it research_indicatiors_server_dev /bin/bash",
+    "compose:up:dev": "docker-compose up dev -d",
+    "compose:up:prod": "docker-compose up prod -d"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -73,6 +78,19 @@
     "testEnvironment": "node",
     "roots": [
       "<rootDir>/apps/"
-    ]
+    ],
+    "coverageReporters": [
+      "text",
+      "cobertura",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
   }
 }
