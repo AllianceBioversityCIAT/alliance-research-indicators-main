@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 
 services:
     dev:
@@ -6,11 +6,9 @@ services:
         image: research_indicatiors_client:1.0.0
         build:
             context: .
-            target: development
             dockerfile: ./Dockerfile
-        command: npm run start
         ports:
-            - 4200:4200
+            - 4200:80
         volumes:
             - .:/usr/src/app
             - /usr/src/app/node_modules
