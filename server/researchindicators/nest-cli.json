@@ -1,32 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "apps/researchindicators/src",
+  "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true,
-    "webpack": true,
-    "tsConfigPath": "apps/researchindicators/tsconfig.app.json"
-  },
-  "monorepo": true,
-  "root": "apps/researchindicators",
-  "projects": {
-    "researchindicators": {
-      "type": "application",
-      "root": "apps/researchindicators",
-      "entryFile": "main",
-      "sourceRoot": "apps/researchindicators/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/researchindicators/tsconfig.app.json"
-      }
-    },
-    "notificationsapp": {
-      "type": "application",
-      "root": "apps/notificationsapp",
-      "entryFile": "main",
-      "sourceRoot": "apps/notificationsapp/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/notificationsapp/tsconfig.app.json"
-      }
-    }
+    "deleteOutDir": true
   }
 }

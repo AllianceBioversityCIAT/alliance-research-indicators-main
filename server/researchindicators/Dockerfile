@@ -1,6 +1,6 @@
 #################### DEVELOPMENT STAGE ####################
 # Base image
-FROM --platform=linux/amd64 node:20-alpine as development
+FROM --platform=linux/amd64 node:20-alpine AS development
 
 # Create app directory
 WORKDIR /usr/src/app
