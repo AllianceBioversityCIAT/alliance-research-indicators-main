@@ -5,9 +5,19 @@ import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggingInterceptor } from './domain/shared/Interceptors/logging.interceptor';
 import { ResponseInterceptor } from './domain/shared/Interceptors/response.interceptor';
 import { GlobalExceptions } from './domain/shared/error-management/global.exception';
+import { EntitiesModule } from './domain/entities/entities.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSourceOptions } from 'typeorm';
+import { getDataSource } from './db/config/mysql/orm.config';
+import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum';
 
 @Module({
-  imports: [],
+  imports: [
+    EntitiesModule,
+    TypeOrmModule.forRoot(
+      <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
+    ),
+  ],
   controllers: [AppController],
   providers: [
     AppService,
