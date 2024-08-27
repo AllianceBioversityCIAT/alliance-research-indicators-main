@@ -9,7 +9,9 @@ describe('AgressoContractCountriesService', () => {
       providers: [AgressoContractCountriesService],
     }).compile();
 
-    service = module.get<AgressoContractCountriesService>(AgressoContractCountriesService);
+    service = module.get<AgressoContractCountriesService>(
+      AgressoContractCountriesService,
+    );
   });
 
   it('should be defined', () => {

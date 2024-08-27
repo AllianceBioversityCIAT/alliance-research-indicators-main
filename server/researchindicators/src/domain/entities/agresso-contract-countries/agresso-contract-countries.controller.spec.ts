@@ -11,7 +11,9 @@ describe('AgressoContractCountriesController', () => {
       providers: [AgressoContractCountriesService],
     }).compile();
 
-    controller = module.get<AgressoContractCountriesController>(AgressoContractCountriesController);
+    controller = module.get<AgressoContractCountriesController>(
+      AgressoContractCountriesController,
+    );
   });
 
   it('should be defined', () => {

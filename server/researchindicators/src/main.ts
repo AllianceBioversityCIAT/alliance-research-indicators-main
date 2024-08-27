@@ -17,14 +17,17 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const port: number = parseInt(env.PORT);
+  const port: number = parseInt(env.ARI_PORT);
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('swagger', app, document);
+  const swaggerPath = 'swagger';
+  SwaggerModule.setup(swaggerPath, app, document);
   await app
     .listen(port)
     .then(() => {
       logger.debug(`Application is running http://localhost:${port}`);
-      logger.debug(`Documentation is running http://localhost:${port}/swagger`);
+      logger.debug(
+        `Documentation is running http://localhost:${port}/${swaggerPath}`,
+      );
     })
     .catch((err) => {
       const portValue: number | string = port || '<Not defined>';

@@ -1,27 +1,22 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Query, HttpStatus } from '@nestjs/common';
 import { AgressoContractService } from './agresso-contract.service';
-import { CreateAgressoContractDto } from './dto/create-agresso-contract.dto';
-import { UpdateAgressoContractDto } from './dto/update-agresso-contract.dto';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
-import { ApiProperty, ApiQuery } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 
-@Controller('agresso-contract')
+@ApiTags('Agresso Contracts')
+@Controller()
 export class AgressoContractController {
   constructor(
     private readonly agressoContractService: AgressoContractService,
   ) {}
 
+  @ApiOperation({
+    summary: 'Upload dummy data.',
+    description:
+      'These endpoints are for development only, they will be removed in future updates.',
+    tags: ['development'],
+  })
   @Get('upload-dummy-data')
   uploadDummyData() {
     this.agressoContractService.uploadAgressoContracts();
@@ -32,12 +27,33 @@ export class AgressoContractController {
   }
 
   @Get('contracts')
-  @ApiQuery({ name: 'project', required: false })
-  @ApiQuery({ name: 'funding_type', required: false })
-  @ApiQuery({ name: 'contract_status', required: false })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
-  @ApiQuery({ name: 'show_countries', required: false })
+  @ApiQuery({ name: 'project', required: false, description: 'Project ID' })
+  @ApiQuery({
+    name: 'funding_type',
+    required: false,
+    description: 'Funding type',
+  })
+  @ApiQuery({
+    name: 'contract_status',
+    required: false,
+    description: 'Contract status',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Is a reference to the page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Is a reference to the limit of items per page',
+  })
+  @ApiQuery({
+    name: 'show_countries',
+    required: false,
+    description: 'Show countries',
+  })
+  @ApiOperation({ summary: 'Find all contracts' })
   find(
     @Query('project') project: string,
     @Query('funding_type') fundingType: string,

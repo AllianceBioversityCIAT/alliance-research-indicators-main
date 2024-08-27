@@ -1,15 +1,13 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CreateAgressoContractDto } from './dto/create-agresso-contract.dto';
-import { UpdateAgressoContractDto } from './dto/update-agresso-contract.dto';
-import { Envelope } from './sources/example-data.json';
 import { AgressoContractRawDto } from './dto/agresso-contract-raw.dto';
 import { AgressoContractMapper } from '../../shared/mappers/agresso-contract.mapper';
-import { DataSource, FindManyOptions, FindOptionsRelations } from 'typeorm';
+import { DataSource, FindManyOptions } from 'typeorm';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { AgressoContractWhere } from './dto/agresso-contract.dto';
 import { cleanObject, parseBoolean } from '../../shared/utils/object.utils';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
+import { StringKeys } from '../../shared/global-dto/types-global';
 
 @Injectable()
 export class AgressoContractService {
@@ -22,7 +20,7 @@ export class AgressoContractService {
   ) {
     const whereClean = cleanObject<AgressoContractWhere>(where);
     const paginationClean = cleanObject<PaginationDto>(pagination);
-    let findQuery: FindManyOptions<AgressoContract> = {};
+    const findQuery: FindManyOptions<AgressoContract> = {};
 
     if (Object.keys(whereClean).length !== 0) findQuery.where = whereClean;
 
@@ -49,7 +47,8 @@ export class AgressoContractService {
   }
 
   async uploadAgressoContracts() {
-    const { return: dataResponse } = Envelope.Body.getAgreementsRMResponse;
+    //const { return: dataResponse } = Envelope.Body.getAgreementsRMResponse;
+    const dataResponse = JSON.parse('{"data":[]}');
     const agressoContract: AgressoContractRawDto[] =
       dataResponse as unknown as AgressoContractRawDto[];
 

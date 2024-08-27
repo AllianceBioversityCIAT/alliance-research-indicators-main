@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR, RouterModule } from '@nestjs/core';
 import { LoggingInterceptor } from './domain/shared/Interceptors/logging.interceptor';
 import { ResponseInterceptor } from './domain/shared/Interceptors/response.interceptor';
 import { GlobalExceptions } from './domain/shared/error-management/global.exception';
@@ -10,6 +10,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSourceOptions } from 'typeorm';
 import { getDataSource } from './db/config/mysql/orm.config';
 import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum';
+import { route as mainRoute } from './domain/routes/main.routes';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
+    RouterModule.register(mainRoute),
   ],
   controllers: [AppController],
   providers: [
