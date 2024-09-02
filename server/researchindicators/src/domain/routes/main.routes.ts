@@ -2,6 +2,7 @@ import { Routes } from '@nestjs/core';
 import { ResultsModule } from '../entities/results/results.module';
 import { AgressoContractModule } from '../entities/agresso-contract/agresso-contract.module';
 import { AgressoContractCountriesModule } from '../entities/agresso-contract-countries/agresso-contract-countries.module';
+import { UserAgressoContractsModule } from '../entities/user-agresso-contracts/user-agresso-contracts.module';
 
 const children: Routes = [
   {
@@ -15,6 +16,10 @@ const children: Routes = [
   {
     path: 'agresso-contract-countries',
     module: AgressoContractCountriesModule,
+  },
+  {
+    path: 'user-agresso-contracts',
+    module: UserAgressoContractsModule,
   },
 ];
 

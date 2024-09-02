@@ -18,6 +18,9 @@ import { route as mainRoute } from './domain/routes/main.routes';
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
+    TypeOrmModule.forRoot(
+      <DataSourceOptions>getDataSource(dataSourceTarget.SECONDARY, false),
+    ),
     RouterModule.register(mainRoute),
   ],
   controllers: [AppController],
