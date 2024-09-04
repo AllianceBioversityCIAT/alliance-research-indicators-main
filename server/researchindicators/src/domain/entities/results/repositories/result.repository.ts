@@ -6,7 +6,7 @@ import { Injectable } from '@nestjs/common';
 export class ResultRepository {
   constructor(private dataSource: DataSource) {}
 
-  async findResults(pagination: ResultPaginationWhere) {
+  async findResults(pagination: ResultPaginationWhere): Promise<Result[]> {
     const where: Record<string, string> = {
       limit: '',
     };
@@ -64,10 +64,7 @@ export class ResultRepository {
         ${where.limit};
     `;
 
-    return this.dataSource.query(query, [
-      pagination.limit,
-      pagination.offset,
-    ]) as Promise<Result[]>;
+    return this.dataSource.query(query, [pagination.limit, pagination.offset]);
   }
 }
 

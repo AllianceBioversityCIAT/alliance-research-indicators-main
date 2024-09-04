@@ -21,7 +21,7 @@ export class ResponseInterceptor implements NestInterceptor {
     const ctx = context.switchToHttp();
     const response: Response = ctx.getResponse<Response>();
     const request: Request = ctx.getRequest<Request>();
-    const ip = request.socket.remoteAddress;
+    const ip = request.socket?.remoteAddress;
 
     return next.handle().pipe(
       map((res: any) => {
@@ -51,7 +51,7 @@ export class ResponseInterceptor implements NestInterceptor {
 
         this.logBasedOnStatus(modifiedData.status, description, res?.stack);
 
-        response.status(modifiedData.status);
+        if (response?.status) response.status(modifiedData?.status);
         return modifiedData;
       }),
     );

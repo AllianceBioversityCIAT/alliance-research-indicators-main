@@ -1,17 +1,20 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AgressoContractRawDto } from './dto/agresso-contract-raw.dto';
 import { AgressoContractMapper } from '../../shared/mappers/agresso-contract.mapper';
 import { DataSource, FindManyOptions } from 'typeorm';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { AgressoContractWhere } from './dto/agresso-contract.dto';
 import { cleanObject, parseBoolean } from '../../shared/utils/object.utils';
-import { ResponseUtils } from '../../shared/utils/response.utils';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
 import { StringKeys } from '../../shared/global-dto/types-global';
+import { AgressoContractRepository } from './repositories/agresso-contract.repository';
 
 @Injectable()
 export class AgressoContractService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly _agressoContractRepository: AgressoContractRepository,
+  ) {}
 
   async findContracts(
     where: AgressoContractWhere,
@@ -34,20 +37,10 @@ export class AgressoContractService {
       findQuery.relations =
         parseBoolean<StringKeys<AgressoContract>>(relations);
     }
-    return this.dataSource
-      .getRepository(AgressoContract)
-      .find(findQuery)
-      .then((data) =>
-        ResponseUtils.format({
-          description: 'Contracts found',
-          status: HttpStatus.OK,
-          data: data,
-        }),
-      );
+    return this.dataSource.getRepository(AgressoContract).find(findQuery);
   }
 
-  async uploadAgressoContracts() {
-    //const { return: dataResponse } = Envelope.Body.getAgreementsRMResponse;
+  async uploadAgressoContracts(active: boolean = false) {
     const dataResponse = JSON.parse('{"data":[]}');
     const agressoContract: AgressoContractRawDto[] =
       dataResponse as unknown as AgressoContractRawDto[];
@@ -56,11 +49,19 @@ export class AgressoContractService {
       AgressoContractMapper(data),
     );
 
+    if (!active) return;
     this.dataSource.transaction(async (manager) => {
       for (let id = 0; id < prepareToSave.length; id += 100) {
         const data = prepareToSave.slice(id, id + 100);
         await manager.getRepository(AgressoContract).save(data);
       }
     });
+  }
+
+  async findByName(
+    first_name: string,
+    last_name: string,
+  ): Promise<AgressoContract[]> {
+    return this._agressoContractRepository.findByName(first_name, last_name);
   }
 }

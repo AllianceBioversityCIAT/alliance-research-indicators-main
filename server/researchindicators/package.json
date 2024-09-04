@@ -34,6 +34,8 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/swagger": "^7.4.0",
     "@nestjs/typeorm": "^10.0.2",
+    "amqp-connection-manager": "^4.1.14",
+    "amqplib": "^0.10.4",
     "cross-replace": "^0.2.0",
     "dotenv": "^16.4.5",
     "mysql2": "^3.11.0",

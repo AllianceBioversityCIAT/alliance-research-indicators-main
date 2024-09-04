@@ -3,6 +3,10 @@ import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import { AgressoFindNamePayload } from './dto/agresso-find-options.payload';
+import { ServiceResponseDto } from '../../shared/global-dto/service-response.dto';
+import { AgressoContract } from './entities/agresso-contract.entity';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -62,19 +66,43 @@ export class AgressoContractController {
     @Query('limit') limit: string,
     @Query('show_countries') showCountries: string,
   ) {
-    return this.agressoContractService.findContracts(
-      {
-        agreement_id: project,
-        funding_type: fundingType,
-        contract_status: contractStatus,
-      },
-      {
-        limit: +limit,
-        page: +page,
-      },
-      {
-        countries: showCountries,
-      },
-    );
+    return this.agressoContractService
+      .findContracts(
+        {
+          agreement_id: project,
+          funding_type: fundingType,
+          contract_status: contractStatus,
+        },
+        {
+          limit: +limit,
+          page: +page,
+        },
+        {
+          countries: showCountries,
+        },
+      )
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contracts found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @MessagePattern('find-contracts-by-name')
+  async findAgreementById(
+    @Payload() options: AgressoFindNamePayload,
+  ): Promise<ServiceResponseDto<AgressoContract[]>> {
+    const { first_name, last_name } = options;
+    return this.agressoContractService
+      .findByName(first_name, last_name)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contracts found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
   }
 }
