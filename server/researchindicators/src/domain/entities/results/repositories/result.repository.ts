@@ -1,10 +1,12 @@
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Result } from '../entities/result.entity';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export class ResultRepository {
-  constructor(private dataSource: DataSource) {}
+export class ResultRepository extends Repository<Result> {
+  constructor(private dataSource: DataSource) {
+    super(Result, dataSource.createEntityManager());
+  }
 
   async findResults(pagination: ResultPaginationWhere): Promise<Result[]> {
     const where: Record<string, string> = {

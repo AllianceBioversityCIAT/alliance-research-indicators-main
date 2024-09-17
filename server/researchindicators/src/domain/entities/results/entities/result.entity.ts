@@ -1,35 +1,72 @@
-export class Result {
-  public id: number;
-  public description: string;
-  public is_active: boolean;
-  public last_updated_date: Date;
-  public gender_tag_level_id: number;
-  public version_id: number;
-  public result_type_id: number;
-  public status: boolean;
-  public created_by: number;
-  public last_updated_by: number;
-  public reported_year_id: number;
-  public created_date: Date;
-  public result_level_id: number;
-  public title: string;
-  public legacy_id: string;
-  public krs_url: string;
-  public is_krs: boolean;
-  public climate_change_tag_level_id: number;
-  public no_applicable_partner: boolean;
-  public has_regions: boolean;
-  public has_countries: boolean;
-  public geographic_scope_id: number;
-  public lead_contact_person: string;
-  public result_code: number;
-  public status_id: number;
-  public nutrition_tag_level_id: number;
-  public environmental_biodiversity_tag_level_id: number;
-  public poverty_tag_level_id: number;
-  public is_discontinued: boolean;
-  public is_replicated: boolean;
-  public last_action_type: string;
-  public justification_action_type: string;
-  public in_qa: boolean;
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
+import { Indicator } from '../../indicators/entities/indicator.entity';
+import { ClarisaGeoScope } from '../../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
+import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
+import { ResultLever } from '../../result-levers/entities/result-lever.entity';
+
+@Entity('results')
+export class Result extends AuditableEntity {
+  @PrimaryGeneratedColumn({
+    name: 'result_id',
+    type: 'bigint',
+  })
+  result_id!: number;
+
+  @Column('bigint', {
+    name: 'result_official_code',
+    nullable: false,
+  })
+  result_official_code!: number;
+
+  @Column('bigint', {
+    name: 'version_id',
+    nullable: true,
+  })
+  version_id?: number;
+
+  @Column('text', {
+    name: 'title',
+    nullable: true,
+  })
+  title?: string;
+
+  @Column('text', {
+    name: 'description',
+    nullable: true,
+  })
+  description?: string;
+
+  @Column('bigint', {
+    name: 'indicator_id',
+    nullable: true,
+  })
+  indicator_id?: number;
+
+  @Column('bigint', {
+    name: 'geo_scope_id',
+    nullable: true,
+  })
+  geo_scope_id?: number;
+
+  @ManyToOne(() => Indicator, (indicator) => indicator.results)
+  @JoinColumn({ name: 'indicator_id' })
+  indicator!: Indicator;
+
+  @ManyToOne(() => ClarisaGeoScope, (indicator) => indicator.results)
+  @JoinColumn({ name: 'geo_scope_id' })
+  geo_scope!: ClarisaGeoScope;
+
+  @OneToMany(() => ResultContract, (resultContract) => resultContract.result)
+  result_contracts!: ResultContract[];
+
+  @OneToMany(() => ResultLever, (resultLever) => resultLever.result)
+  result_levers!: ResultLever[];
 }

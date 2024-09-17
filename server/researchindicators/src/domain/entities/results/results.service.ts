@@ -1,15 +1,24 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
+import { DataSource, Repository } from 'typeorm';
 import { ResultRepository } from './repositories/result.repository';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
-import { cleanObject } from '../../shared/utils/object.utils';
+import { cleanObject, validObject } from '../../shared/utils/object.utils';
 import { ResponseUtils } from '../../shared/utils/response.utils';
+import { Result } from './entities/result.entity';
+import { CreateResultDto } from './dto/create-result.dto';
+import { ResultContractsService } from '../result-contracts/result-contracts.service';
+import { ContractRolesEnum } from '../result-contracts/enum/lever-roles.enum';
+import { ResultLeversService } from '../result-levers/result-levers.service';
+import { LeverRole } from '../lever-roles/entities/lever-role.entity';
+import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 
 @Injectable()
 export class ResultsService {
   constructor(
     private dataSource: DataSource,
-    private readonly ResultRespository: ResultRepository,
+    private readonly mainRepo: ResultRepository,
+    private readonly _resultContractsService: ResultContractsService,
+    private readonly _resultLeversService: ResultLeversService,
   ) {}
 
   async findResults(pagination: PaginationDto) {
@@ -20,12 +29,62 @@ export class ResultsService {
       whereLimit.limit = paginationClean.limit;
       whereLimit.offset = offset;
     }
-    return this.ResultRespository.findResults(whereLimit).then((data) =>
+    return this.mainRepo.findResults(whereLimit).then((data) =>
       ResponseUtils.format({
         description: 'Results found',
         status: HttpStatus.OK,
         data: data,
       }),
     );
+  }
+
+  async createResult(createResult: CreateResultDto): Promise<Result> {
+    const vaidRequest: boolean = validObject(createResult, ['lever_id']);
+    if (!vaidRequest) throw new BadRequestException('Invalid request');
+
+    const { description, indicator_id, title, contract_id, lever_id } =
+      createResult;
+
+    await this.mainRepo.findOne({ where: { title } }).then((result) => {
+      if (result) {
+        throw ResponseUtils.format({
+          description: 'Result already exists',
+          status: HttpStatus.CONFLICT,
+        });
+      }
+    });
+
+    const newOfficialCode = await this.newOfficialCode();
+    const result = await this.mainRepo.save({
+      description,
+      indicator_id,
+      title,
+      result_official_code: newOfficialCode,
+    });
+
+    await this._resultContractsService.create(
+      result.result_id,
+      contract_id,
+      ContractRolesEnum.PRIMARY,
+    );
+
+    await this._resultLeversService.create(
+      result.result_id,
+      lever_id,
+      LeverRolesEnum.PRIMARY,
+    );
+
+    return result;
+  }
+
+  private async newOfficialCode() {
+    const firstInsertion: number = 1;
+    const lastCode: number = await this.mainRepo
+      .findOne({ order: { result_official_code: 'DESC' } })
+      .then(({ result_official_code }) =>
+        result_official_code ? result_official_code++ : firstInsertion,
+      );
+
+    return lastCode;
   }
 }

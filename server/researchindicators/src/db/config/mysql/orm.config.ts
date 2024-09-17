@@ -16,32 +16,37 @@ export const getDataSource = (
   let username: string;
   let password: string;
   let database: string;
-  let entities: string;
+  let entities: string[];
   let name: string;
 
   if ([dataSourceTarget.CORE, dataSourceTarget.SECONDARY].includes(target)) {
     host = env.ARI_MYSQL_HOST;
     username = env.ARI_MYSQL_USER_NAME;
     password = env.ARI_MYSQL_USER_PASS;
+    entities = [
+      `${__dirname}/../../../domain/entities/**/*.entity{.ts,.js}`,
+      `${__dirname}/../../../domain/tools/clarisa/entities/**/*.entity{.ts,.js}`,
+    ];
   }
 
   switch (target) {
     case dataSourceTarget.CORE:
       name = 'default';
       database = env.ARI_MYSQL_NAME;
-      entities = `${__dirname}/../../../domain/entities/**/*.entity{.ts,.js}`;
       break;
     case dataSourceTarget.TEST:
       host = env.ARI_TEST_MYSQL_HOST;
       username = env.ARI_TEST_MYSQL_USER_NAME;
       password = env.ARI_TEST_MYSQL_USER_PASS;
       database = env.ARI_TEST_MYSQL_NAME;
-      entities = `${__dirname}/../../../domain/entities/**/*.entity{.ts,.js}`;
+
       break;
     case dataSourceTarget.SECONDARY:
       name = 'secondary';
       database = env.ARI_SECONDARY_MYSQL_NAME;
-      entities = `${__dirname}/../../../domain/complementary-entities/secondary/**/*.entity{.ts,.js}`;
+      entities = [
+        `${__dirname}/../../../domain/complementary-entities/secondary/**/*.entity{.ts,.js}`,
+      ];
       break;
   }
 
@@ -53,7 +58,7 @@ export const getDataSource = (
     username: username,
     password: password,
     database: database,
-    entities: [entities],
+    entities: entities,
     synchronize: false,
     migrationsRun: false,
     bigNumberStrings: false,

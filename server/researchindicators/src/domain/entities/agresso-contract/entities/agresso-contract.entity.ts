@@ -2,6 +2,7 @@ import { Entity, Column, OneToMany } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { AgressoContractCountry } from '../../agresso-contract-countries/entities/agresso-contract-country.entity';
 import { UserAgressoContract } from '../../user-agresso-contracts/entities/user-agresso-contract.entity';
+import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
 
 @Entity('agresso_contracts')
 export class AgressoContract extends AuditableEntity {
@@ -212,4 +213,10 @@ export class AgressoContract extends AuditableEntity {
     (userAgressoContract) => userAgressoContract.agressoContract,
   )
   userAgressoContracts?: UserAgressoContract[];
+
+  @OneToMany(
+    () => ResultContract,
+    (resultContract) => resultContract.agresso_contract,
+  )
+  result_contracts?: ResultContract[];
 }

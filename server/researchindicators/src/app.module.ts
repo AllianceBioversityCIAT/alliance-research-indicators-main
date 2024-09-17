@@ -11,10 +11,11 @@ import { DataSourceOptions } from 'typeorm';
 import { getDataSource } from './db/config/mysql/orm.config';
 import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum';
 import { route as mainRoute } from './domain/routes/main.routes';
-
+import { ClarisaModule } from './domain/tools/clarisa/clarisa.module';
 @Module({
   imports: [
     EntitiesModule,
+    ClarisaModule,
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
