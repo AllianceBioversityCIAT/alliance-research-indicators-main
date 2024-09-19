@@ -24,11 +24,12 @@ export class ResultLever extends AuditableEntity {
   })
   result_id!: number;
 
-  @Column('bigint', {
+  @Column('varchar', {
     name: 'lever_id',
+    length: 20,
     nullable: false,
   })
-  lever_id!: number;
+  lever_id!: string;
 
   @Column('bigint', {
     name: 'lever_role_id',

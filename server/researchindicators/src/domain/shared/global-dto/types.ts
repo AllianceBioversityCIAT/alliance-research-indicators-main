@@ -1,7 +1,7 @@
 import { FindOptionsWhere } from 'typeorm';
 
 export type ValueOrArray<T> = {
-  [K in keyof T]: T[K] | T[K][];
+  [K in keyof T]?: T[K] | T[K][] | null;
 };
 
 export type TypeToBoolean<T> = {
@@ -9,6 +9,8 @@ export type TypeToBoolean<T> = {
 };
 
 export type BasicWhere<T> = {
-  not_in: FindOptionsWhere<ValueOrArray<T>>;
-  in: FindOptionsWhere<ValueOrArray<T>>;
+  [K in keyof T]?: {
+    value: T[K] | T[K][] | null;
+    not: boolean;
+  };
 };

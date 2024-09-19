@@ -1,8 +1,10 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { DataSource, In, Not, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { ResultContract } from './entities/result-contract.entity';
 import { ContractRolesEnum } from './enum/lever-roles.enum';
 import { ResultContractsRepository } from './repositories/result-contracts.repository';
+import { updateArray } from '../../shared/utils/array.util';
+import { selectManager } from '../../shared/utils/orm.util';
 
 @Injectable()
 export class ResultContractsService {
@@ -13,43 +15,46 @@ export class ResultContractsService {
 
   async create(
     result_id: number,
-    contract_id: string,
+    contract_id: string | string[],
     contract_role_id: ContractRolesEnum,
+    manager?: EntityManager,
   ) {
-    const existData = await this.mainRepo.findOne({
+    const entityManager: Repository<ResultContract> = selectManager(
+      manager,
+      ResultContract,
+      this.mainRepo,
+    );
+
+    let contractId = Array.isArray(contract_id) ? contract_id : [contract_id];
+
+    const existData = await this.mainRepo.find({
       where: {
         result_id: result_id,
-        contract_id: contract_id,
         contract_role_id: contract_role_id,
-        is_active: true,
       },
     });
 
-    await this.mainRepo.updateActiveStatus({
-      contract_id: contract_id,
-      result_id: result_id,
-      contract_role_id: contract_role_id,
-      not_in: { result_id: existData?.result_contract_id },
-    });
-
-    if (existData && existData.is_active) {
-      throw new ConflictException('Result contract already exists');
-    }
-
-    let tempProces: ResultContract;
-    if (existData && !existData.is_active) {
-      await this.mainRepo.update(existData.result_contract_id, {
-        is_active: true,
-      });
-      tempProces = { ...existData, is_active: true };
-    } else if (!existData) {
-      tempProces = await this.mainRepo.save({
-        result_id: result_id,
-        contract_id: contract_id,
+    const formatDataLever: Partial<ResultContract>[] = contractId.map(
+      (data) => ({
         contract_role_id: contract_role_id,
-      });
-    }
+        contract_id: data,
+      }),
+    );
 
-    return tempProces;
+    const updateResultLever = updateArray<ResultContract>(
+      formatDataLever,
+      existData,
+      'result_contract_id',
+      {
+        key: 'result_id',
+        value: result_id,
+      },
+    );
+
+    const response = (await entityManager.save(updateResultLever)).filter(
+      (data) => data.is_active === true,
+    );
+
+    return response;
   }
 }

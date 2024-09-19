@@ -8,6 +8,7 @@ import {
 import { ResultContract } from '../entities/result-contract.entity';
 import { UpdateResultContractWhereDto } from '../dto/update-result-contract-where.dto';
 import { updateQueryBuilderWhere } from '../../../shared/utils/queries.util';
+import { ValueOrArray } from '../../../shared/global-dto/types';
 
 @Injectable()
 export class ResultContractsRepository extends Repository<ResultContract> {
@@ -15,7 +16,7 @@ export class ResultContractsRepository extends Repository<ResultContract> {
     super(ResultContract, dataSource.createEntityManager());
   }
 
-  async updateActiveStatus(where: UpdateResultContractWhereDto) {
+  async updateActiveStatus(where: ValueOrArray<ResultContract>) {
     let update = this.createQueryBuilder()
       .update()
       .set({
@@ -23,17 +24,11 @@ export class ResultContractsRepository extends Repository<ResultContract> {
       })
       .where('result_id = :resultId', { resultId: where?.result_id });
 
-    updateQueryBuilderWhere<ResultContract>(
-      update,
-      { contract_role_id: where.contract_role_id },
-      '{{ATTR}} = {{VALUES}}',
-    );
-
-    updateQueryBuilderWhere<ResultContract>(
-      update,
-      where.not_in,
-      '{{ATTR}} NOT IN {{VALUES}}',
-    );
+    updateQueryBuilderWhere<ResultContract>(update, {
+      contract_role_id: { value: where.contract_role_id, not: false },
+      result_id: { value: where.result_id, not: false },
+      result_contract_id: { value: where.result_contract_id, not: true },
+    });
 
     return update.execute();
   }

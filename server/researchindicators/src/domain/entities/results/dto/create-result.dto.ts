@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AgressoContract } from '../../agresso-contract/entities/agresso-contract.entity';
+import { ClarisaLever } from '../../../tools/clarisa/entities/clarisa-levers/entities/clarisa-lever.entity';
 
 export class CreateResultDto {
   @ApiProperty({
@@ -13,14 +15,14 @@ export class CreateResultDto {
     required: false,
     description: 'It is the reference of the contract in agresso',
   })
-  public contract_id?: string;
+  public contracts?: AgressoContract[];
 
   @ApiProperty({
     type: Number,
     required: false,
     description: 'Is a reference to the contract role id',
   })
-  public lever_id?: number;
+  public levers?: ClarisaLever[];
 
   @ApiProperty({
     type: String,

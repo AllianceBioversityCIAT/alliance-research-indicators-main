@@ -9,7 +9,6 @@ import { CreateResultDto } from './dto/create-result.dto';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
 import { ContractRolesEnum } from '../result-contracts/enum/lever-roles.enum';
 import { ResultLeversService } from '../result-levers/result-levers.service';
-import { LeverRole } from '../lever-roles/entities/lever-role.entity';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 
 @Injectable()
@@ -39,10 +38,10 @@ export class ResultsService {
   }
 
   async createResult(createResult: CreateResultDto): Promise<Result> {
-    const vaidRequest: boolean = validObject(createResult, ['lever_id']);
+    const vaidRequest: boolean = validObject(createResult, ['levers']);
     if (!vaidRequest) throw new BadRequestException('Invalid request');
 
-    const { description, indicator_id, title, contract_id, lever_id } =
+    const { description, indicator_id, title, contracts, levers } =
       createResult;
 
     await this.mainRepo.findOne({ where: { title } }).then((result) => {
@@ -55,24 +54,31 @@ export class ResultsService {
     });
 
     const newOfficialCode = await this.newOfficialCode();
-    const result = await this.mainRepo.save({
-      description,
-      indicator_id,
-      title,
-      result_official_code: newOfficialCode,
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const result = await manager.withRepository(this.mainRepo).save({
+        description,
+        indicator_id,
+        title,
+        result_official_code: newOfficialCode,
+      });
+
+      await this._resultContractsService.create(
+        result.result_id,
+        contracts.map(({ agreement_id }) => agreement_id),
+        ContractRolesEnum.PRIMARY,
+        manager,
+      );
+
+      await this._resultLeversService.create(
+        result.result_id,
+        levers.map(({ code }) => code),
+        LeverRolesEnum.PRIMARY,
+        manager,
+      );
+
+      return result;
     });
-
-    await this._resultContractsService.create(
-      result.result_id,
-      contract_id,
-      ContractRolesEnum.PRIMARY,
-    );
-
-    await this._resultLeversService.create(
-      result.result_id,
-      lever_id,
-      LeverRolesEnum.PRIMARY,
-    );
 
     return result;
   }

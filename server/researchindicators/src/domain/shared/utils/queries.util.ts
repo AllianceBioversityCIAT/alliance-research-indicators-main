@@ -1,4 +1,9 @@
 import { FindOptionsWhere, UpdateQueryBuilder } from 'typeorm';
+import { BasicWhere } from '../global-dto/types';
+
+export type FindOptionWhere = {
+  not: boolean;
+};
 
 /**
  *
@@ -11,21 +16,21 @@ import { FindOptionsWhere, UpdateQueryBuilder } from 'typeorm';
  */
 export const updateQueryBuilderWhere = <Entity>(
   queryBuilder: UpdateQueryBuilder<Entity>,
-  options: FindOptionsWhere<Entity>,
-  template: string,
+  options: BasicWhere<Entity>,
 ) => {
   for (let key in options) {
-    let composed: string;
-    if (Array.isArray(options[key])) {
-      composed = template
-        .replace('{{ATTR}}', key)
-        .replace('{{VALUES}}', `(:...attr_${key})`);
-      queryBuilder.andWhere(composed, { [`attr_${key}`]: options[key] });
+    const isArray = Array.isArray(options[key].value);
+    const attr: string = `attr_${key}`;
+    if (isArray) {
+      const template = `${key} ${notOption(options[key].not, isArray)} IN (:...${attr})`;
+      queryBuilder.andWhere(template, { [attr]: options[key].value });
     } else {
-      composed = template
-        .replace('{{ATTR}}', key)
-        .replace('{{VALUES}}', `:attr_${key}`);
-      queryBuilder.andWhere(composed, { [`attr_${key}`]: options[key] });
+      const template = `${key} ${notOption(options[key].not, isArray)}= :${attr}`;
+      queryBuilder.andWhere(template, { [`attr_${key}`]: options[key].value });
     }
   }
+};
+
+export const notOption = (isNot: boolean, isArray: boolean) => {
+  return isNot ? (isArray ? 'NOT' : '!') : '';
 };

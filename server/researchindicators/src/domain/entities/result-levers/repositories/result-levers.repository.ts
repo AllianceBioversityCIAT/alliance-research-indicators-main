@@ -1,7 +1,7 @@
 import { DataSource, Repository } from 'typeorm';
 import { ResultLever } from '../entities/result-lever.entity';
 import { updateQueryBuilderWhere } from '../../../shared/utils/queries.util';
-import { BasicWhere } from '../../../shared/global-dto/types';
+import { BasicWhere, ValueOrArray } from '../../../shared/global-dto/types';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
@@ -10,7 +10,7 @@ export class ResultLeversRepository extends Repository<ResultLever> {
     super(ResultLever, dataSource.createEntityManager());
   }
 
-  async updateActiveStatus<T>(where: BasicWhere<T>) {
+  async updateActiveStatus(where: ValueOrArray<ResultLever>) {
     let update = this.createQueryBuilder()
       .update()
       .set({
@@ -18,17 +18,12 @@ export class ResultLeversRepository extends Repository<ResultLever> {
       })
       .where('1 = 1');
 
-    updateQueryBuilderWhere<ResultLever>(
-      update,
-      where.in,
-      '{{ATTR}} = {{VALUES}}',
-    );
-
-    updateQueryBuilderWhere<ResultLever>(
-      update,
-      where.not_in,
-      '{{ATTR}} NOT IN {{VALUES}}',
-    );
+    updateQueryBuilderWhere<ResultLever>(update, {
+      lever_id: { value: where.lever_id, not: false },
+      result_id: { value: where.result_id, not: false },
+      lever_role_id: { value: where.lever_role_id, not: false },
+      result_lever_id: { value: where.result_lever_id, not: true },
+    });
 
     return update.execute();
   }

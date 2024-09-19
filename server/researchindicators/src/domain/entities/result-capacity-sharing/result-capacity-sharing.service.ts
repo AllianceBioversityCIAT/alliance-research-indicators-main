@@ -8,19 +8,7 @@ export class ResultCapacitySharingService {
     return 'This action adds a new resultCapacitySharing';
   }
 
-  findAll() {
-    return `This action returns all resultCapacitySharing`;
-  }
+  private async individual() {}
 
-  findOne(id: number) {
-    return `This action returns a #${id} resultCapacitySharing`;
-  }
-
-  update(id: number, updateResultCapacitySharingDto: UpdateResultCapacitySharingDto) {
-    return `This action updates a #${id} resultCapacitySharing`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} resultCapacitySharing`;
-  }
+  private async group() {}
 }
