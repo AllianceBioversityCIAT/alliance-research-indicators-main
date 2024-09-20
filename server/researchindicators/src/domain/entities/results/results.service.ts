@@ -93,4 +93,6 @@ export class ResultsService {
 
     return lastCode;
   }
+
+  async updateGeneralInformation() {}
 }

@@ -1,5 +1,6 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, OneToMany } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
+import { ResultCountriesSubNational } from '../../../../../entities/result-countries-sub-nationals/entities/result-countries-sub-national.entity';
 
 @Entity('clarisa_sub_nationals')
 export class ClarisaSubNational extends AuditableEntity {
@@ -35,4 +36,10 @@ export class ClarisaSubNational extends AuditableEntity {
     nullable: true,
   })
   language_iso_2?: string;
+
+  @OneToMany(
+    () => ResultCountriesSubNational,
+    (resultCountrySubNational) => resultCountrySubNational.sub_national,
+  )
+  result_countries_sub_nationals!: ResultCountriesSubNational[];
 }

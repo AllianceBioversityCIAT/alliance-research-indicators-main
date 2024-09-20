@@ -24,6 +24,9 @@ import { DeliveryModalitiesModule } from './delivery-modalities/delivery-modalit
 import { ResultEvidencesModule } from './result-evidences/result-evidences.module';
 import { EvidenceRolesModule } from './evidence-roles/evidence-roles.module';
 import { ResultLanguagesModule } from './result-languages/result-languages.module';
+import { ResultInstitutionsModule } from './result-institutions/result-institutions.module';
+import { ResultUsersModule } from './result-users/result-users.module';
+import { UserRolesModule } from './user-roles/user-roles.module';
 
 @Module({
   imports: [
@@ -52,6 +55,9 @@ import { ResultLanguagesModule } from './result-languages/result-languages.modul
     ResultEvidencesModule,
     EvidenceRolesModule,
     ResultLanguagesModule,
+    ResultInstitutionsModule,
+    ResultUsersModule,
+    UserRolesModule,
   ],
   exports: [AgressoContractModule],
 })

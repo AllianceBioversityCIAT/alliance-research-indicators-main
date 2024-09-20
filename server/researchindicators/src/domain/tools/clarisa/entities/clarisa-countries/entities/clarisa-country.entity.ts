@@ -1,5 +1,6 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, OneToMany } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
+import { ResultCountry } from '../../../../../entities/result-countries/entities/result-country.entity';
 
 @Entity('clarisa_countries')
 export class ClarisaCountry extends AuditableEntity {
@@ -45,4 +46,7 @@ export class ClarisaCountry extends AuditableEntity {
     scale: 4,
   })
   latitude!: number;
+
+  @OneToMany(() => ResultCountry, (resultCountry) => resultCountry.country)
+  result_countries!: ResultCountry[];
 }

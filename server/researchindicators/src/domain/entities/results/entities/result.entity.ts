@@ -11,6 +11,12 @@ import { Indicator } from '../../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
 import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
 import { ResultLever } from '../../result-levers/entities/result-lever.entity';
+import { ResultRegion } from '../../result-regions/entities/result-region.entity';
+import { ResultCountry } from '../../result-countries/entities/result-country.entity';
+import { ResultLanguage } from '../../result-languages/entities/result-language.entity';
+import { ResultKeyword } from '../../result-keywords/entities/result-keyword.entity';
+import { ResultInstitution } from '../../result-institutions/entities/result-institution.entity';
+import { ResultUser } from '../../result-users/entities/result-user.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -69,4 +75,25 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultLever, (resultLever) => resultLever.result)
   result_levers!: ResultLever[];
+
+  @OneToMany(() => ResultRegion, (resultRegion) => resultRegion.result)
+  result_regions!: ResultRegion[];
+
+  @OneToMany(() => ResultCountry, (resultCountry) => resultCountry.result)
+  result_countries!: ResultCountry[];
+
+  @OneToMany(() => ResultLanguage, (resultLanguage) => resultLanguage.result)
+  result_languages!: ResultLanguage[];
+
+  @OneToMany(() => ResultKeyword, (resultKeyword) => resultKeyword.result)
+  result_keywords!: ResultKeyword[];
+
+  @OneToMany(
+    () => ResultInstitution,
+    (resultInstitution) => resultInstitution.result,
+  )
+  result_institutions!: ResultInstitution[];
+
+  @OneToMany(() => ResultUser, (resultUser) => resultUser.result)
+  result_users!: ResultUser[];
 }
