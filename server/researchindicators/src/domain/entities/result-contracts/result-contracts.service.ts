@@ -57,4 +57,18 @@ export class ResultContractsService {
 
     return response;
   }
+
+  async deleteAll(result_id: number, manager?: EntityManager) {
+    const entityManager: Repository<ResultContract> = selectManager(
+      manager,
+      ResultContract,
+      this.mainRepo,
+    );
+    return entityManager.update(
+      { result_id: result_id },
+      {
+        is_active: false,
+      },
+    );
+  }
 }

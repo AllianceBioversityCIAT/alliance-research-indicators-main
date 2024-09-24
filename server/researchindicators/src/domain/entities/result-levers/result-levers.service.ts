@@ -53,4 +53,19 @@ export class ResultLeversService {
 
     return response;
   }
+
+  async deleteAll(result_id: number, manager?: EntityManager) {
+    const entityManager: Repository<ResultLever> = selectManager(
+      manager,
+      ResultLever,
+      this.mainRepo,
+    );
+
+    const response = await entityManager.update(
+      { result_id: result_id },
+      { is_active: false },
+    );
+
+    return response;
+  }
 }

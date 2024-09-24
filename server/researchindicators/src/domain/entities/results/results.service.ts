@@ -94,5 +94,25 @@ export class ResultsService {
     return lastCode;
   }
 
-  async updateGeneralInformation() {}
+  async deleteResult(result_id: number): Promise<Result> {
+    const result = await this.mainRepo
+      .findOne({ where: { result_id } })
+      .then((result) => {
+        if (!result) {
+          throw ResponseUtils.format({
+            description: 'Result not found',
+            status: HttpStatus.NOT_FOUND,
+          });
+        }
+        return result;
+      });
+
+    await this.dataSource.transaction(async (manager) => {
+      await this._resultContractsService.deleteAll(result_id, manager);
+      await this._resultLeversService.deleteAll(result_id, manager);
+      await manager.withRepository(this.mainRepo).delete(result_id);
+    });
+
+    return result;
+  }
 }

@@ -1,6 +1,15 @@
-import { Body, Controller, Get, HttpStatus, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ResultsService } from './results.service';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CreateResultDto } from './dto/create-result.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 
@@ -35,6 +44,23 @@ export class ResultsController {
         description: 'Result created',
         status: HttpStatus.CREATED,
         data: result,
+      }),
+    );
+  }
+
+  @ApiOperation({ summary: 'Delete a result' })
+  @ApiParam({
+    name: 'resultId',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  @Patch('delete/:resultId')
+  async deleteResult(@Param('resultId') resultId: string) {
+    return this.resultsService.deleteResult(+resultId).then(() =>
+      ResponseUtils.format({
+        description: 'Result deleted',
+        status: HttpStatus.OK,
       }),
     );
   }
