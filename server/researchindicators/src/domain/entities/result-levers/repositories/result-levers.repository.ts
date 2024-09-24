@@ -1,7 +1,7 @@
 import { DataSource, Repository } from 'typeorm';
 import { ResultLever } from '../entities/result-lever.entity';
 import { updateQueryBuilderWhere } from '../../../shared/utils/queries.util';
-import { BasicWhere, ValueOrArray } from '../../../shared/global-dto/types';
+import { ValueOrArray } from '../../../shared/global-dto/types';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
@@ -11,7 +11,7 @@ export class ResultLeversRepository extends Repository<ResultLever> {
   }
 
   async updateActiveStatus(where: ValueOrArray<ResultLever>) {
-    let update = this.createQueryBuilder()
+    const update = this.createQueryBuilder()
       .update()
       .set({
         is_active: false,

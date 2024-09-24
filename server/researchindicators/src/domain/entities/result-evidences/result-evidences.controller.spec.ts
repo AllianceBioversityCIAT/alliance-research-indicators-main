@@ -11,7 +11,9 @@ describe('ResultEvidencesController', () => {
       providers: [ResultEvidencesService],
     }).compile();
 
-    controller = module.get<ResultEvidencesController>(ResultEvidencesController);
+    controller = module.get<ResultEvidencesController>(
+      ResultEvidencesController,
+    );
   });
 
   it('should be defined', () => {

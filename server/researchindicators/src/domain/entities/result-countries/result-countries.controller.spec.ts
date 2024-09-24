@@ -11,7 +11,9 @@ describe('ResultCountriesController', () => {
       providers: [ResultCountriesService],
     }).compile();
 
-    controller = module.get<ResultCountriesController>(ResultCountriesController);
+    controller = module.get<ResultCountriesController>(
+      ResultCountriesController,
+    );
   });
 
   it('should be defined', () => {

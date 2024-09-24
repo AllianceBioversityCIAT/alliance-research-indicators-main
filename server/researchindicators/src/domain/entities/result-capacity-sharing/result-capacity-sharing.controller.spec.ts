@@ -11,7 +11,9 @@ describe('ResultCapacitySharingController', () => {
       providers: [ResultCapacitySharingService],
     }).compile();
 
-    controller = module.get<ResultCapacitySharingController>(ResultCapacitySharingController);
+    controller = module.get<ResultCapacitySharingController>(
+      ResultCapacitySharingController,
+    );
   });
 
   it('should be defined', () => {

@@ -11,7 +11,9 @@ describe('ClarisaCountriesController', () => {
       providers: [ClarisaCountriesService],
     }).compile();
 
-    controller = module.get<ClarisaCountriesController>(ClarisaCountriesController);
+    controller = module.get<ClarisaCountriesController>(
+      ClarisaCountriesController,
+    );
   });
 
   it('should be defined', () => {

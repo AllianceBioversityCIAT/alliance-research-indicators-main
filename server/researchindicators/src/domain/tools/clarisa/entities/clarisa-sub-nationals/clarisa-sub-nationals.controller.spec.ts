@@ -11,7 +11,9 @@ describe('ClarisaSubNationalsController', () => {
       providers: [ClarisaSubNationalsService],
     }).compile();
 
-    controller = module.get<ClarisaSubNationalsController>(ClarisaSubNationalsController);
+    controller = module.get<ClarisaSubNationalsController>(
+      ClarisaSubNationalsController,
+    );
   });
 
   it('should be defined', () => {

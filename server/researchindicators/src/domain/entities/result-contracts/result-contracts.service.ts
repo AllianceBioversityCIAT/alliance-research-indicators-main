@@ -1,5 +1,5 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultContract } from './entities/result-contract.entity';
 import { ContractRolesEnum } from './enum/lever-roles.enum';
 import { ResultContractsRepository } from './repositories/result-contracts.repository';
@@ -25,7 +25,7 @@ export class ResultContractsService {
       this.mainRepo,
     );
 
-    let contractId = Array.isArray(contract_id) ? contract_id : [contract_id];
+    const contractId = Array.isArray(contract_id) ? contract_id : [contract_id];
 
     const existData = await this.mainRepo.find({
       where: {

@@ -9,7 +9,9 @@ describe('ResultCapacitySharingService', () => {
       providers: [ResultCapacitySharingService],
     }).compile();
 
-    service = module.get<ResultCapacitySharingService>(ResultCapacitySharingService);
+    service = module.get<ResultCapacitySharingService>(
+      ResultCapacitySharingService,
+    );
   });
 
   it('should be defined', () => {

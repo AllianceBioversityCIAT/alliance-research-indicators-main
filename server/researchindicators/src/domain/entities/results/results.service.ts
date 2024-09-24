@@ -1,5 +1,5 @@
 import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { ResultRepository } from './repositories/result.repository';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
 import { cleanObject, validObject } from '../../shared/utils/object.utils';

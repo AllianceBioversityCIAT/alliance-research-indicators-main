@@ -24,7 +24,7 @@ export class ResultLeversService {
       this.mainRepo,
     );
 
-    let leverId = Array.isArray(lever_id) ? lever_id : [lever_id];
+    const leverId = Array.isArray(lever_id) ? lever_id : [lever_id];
     const existData = await this.mainRepo.find({
       where: {
         result_id: result_id,

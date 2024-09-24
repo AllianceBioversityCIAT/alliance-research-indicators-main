@@ -1,12 +1,6 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import {
-  DataSource,
-  FindOptionsWhere,
-  Repository,
-  UpdateQueryBuilder,
-} from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { DataSource, Repository } from 'typeorm';
 import { ResultContract } from '../entities/result-contract.entity';
-import { UpdateResultContractWhereDto } from '../dto/update-result-contract-where.dto';
 import { updateQueryBuilderWhere } from '../../../shared/utils/queries.util';
 import { ValueOrArray } from '../../../shared/global-dto/types';
 
@@ -17,7 +11,7 @@ export class ResultContractsRepository extends Repository<ResultContract> {
   }
 
   async updateActiveStatus(where: ValueOrArray<ResultContract>) {
-    let update = this.createQueryBuilder()
+    const update = this.createQueryBuilder()
       .update()
       .set({
         is_active: false,

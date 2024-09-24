@@ -9,7 +9,9 @@ describe('ClarisaInstitutionsService', () => {
       providers: [ClarisaInstitutionsService],
     }).compile();
 
-    service = module.get<ClarisaInstitutionsService>(ClarisaInstitutionsService);
+    service = module.get<ClarisaInstitutionsService>(
+      ClarisaInstitutionsService,
+    );
   });
 
   it('should be defined', () => {

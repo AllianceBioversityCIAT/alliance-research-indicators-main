@@ -11,7 +11,9 @@ describe('ClarisaLanguagesController', () => {
       providers: [ClarisaLanguagesService],
     }).compile();
 
-    controller = module.get<ClarisaLanguagesController>(ClarisaLanguagesController);
+    controller = module.get<ClarisaLanguagesController>(
+      ClarisaLanguagesController,
+    );
   });
 
   it('should be defined', () => {

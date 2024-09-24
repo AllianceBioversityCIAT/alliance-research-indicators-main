@@ -1,4 +1,4 @@
-import { FindOptionsWhere, UpdateQueryBuilder } from 'typeorm';
+import { UpdateQueryBuilder } from 'typeorm';
 import { BasicWhere } from '../global-dto/types';
 
 export type FindOptionWhere = {
@@ -18,7 +18,7 @@ export const updateQueryBuilderWhere = <Entity>(
   queryBuilder: UpdateQueryBuilder<Entity>,
   options: BasicWhere<Entity>,
 ) => {
-  for (let key in options) {
+  for (const key in options) {
     const isArray = Array.isArray(options[key].value);
     const attr: string = `attr_${key}`;
     if (isArray) {

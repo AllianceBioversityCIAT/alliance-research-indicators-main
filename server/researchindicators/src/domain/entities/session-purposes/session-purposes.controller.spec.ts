@@ -11,7 +11,9 @@ describe('SessionPurposesController', () => {
       providers: [SessionPurposesService],
     }).compile();
 
-    controller = module.get<SessionPurposesController>(SessionPurposesController);
+    controller = module.get<SessionPurposesController>(
+      SessionPurposesController,
+    );
   });
 
   it('should be defined', () => {

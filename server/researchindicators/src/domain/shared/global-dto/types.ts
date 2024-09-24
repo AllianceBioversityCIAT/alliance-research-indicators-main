@@ -1,5 +1,3 @@
-import { FindOptionsWhere } from 'typeorm';
-
 export type ValueOrArray<T> = {
   [K in keyof T]?: T[K] | T[K][] | null;
 };

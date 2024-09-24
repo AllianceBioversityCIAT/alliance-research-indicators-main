@@ -1,5 +1,4 @@
 import { FindOptionsRelations } from 'typeorm';
-import { TypeToBoolean } from '../global-dto/types';
 
 export const cleanObject = <T>(obj: T): Partial<T> => {
   const cleanedObj: Partial<T> = {};

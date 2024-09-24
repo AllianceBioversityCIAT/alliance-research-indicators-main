@@ -11,7 +11,9 @@ describe('ResultCountriesSubNationalsController', () => {
       providers: [ResultCountriesSubNationalsService],
     }).compile();
 
-    controller = module.get<ResultCountriesSubNationalsController>(ResultCountriesSubNationalsController);
+    controller = module.get<ResultCountriesSubNationalsController>(
+      ResultCountriesSubNationalsController,
+    );
   });
 
   it('should be defined', () => {

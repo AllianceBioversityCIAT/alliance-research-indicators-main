@@ -11,7 +11,9 @@ describe('ResultLanguagesController', () => {
       providers: [ResultLanguagesService],
     }).compile();
 
-    controller = module.get<ResultLanguagesController>(ResultLanguagesController);
+    controller = module.get<ResultLanguagesController>(
+      ResultLanguagesController,
+    );
   });
 
   it('should be defined', () => {
