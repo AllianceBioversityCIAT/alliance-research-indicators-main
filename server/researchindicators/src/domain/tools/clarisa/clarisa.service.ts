@@ -9,4 +9,6 @@ export class ClarisaService {
   constructor(private readonly _http: HttpService) {
     this.connection = new Clarisa(this._http);
   }
+
+  private async cloneEntity() {}
 }

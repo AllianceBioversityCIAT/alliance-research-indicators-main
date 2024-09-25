@@ -27,6 +27,7 @@ import { ResultLanguagesModule } from './result-languages/result-languages.modul
 import { ResultInstitutionsModule } from './result-institutions/result-institutions.module';
 import { ResultUsersModule } from './result-users/result-users.module';
 import { UserRolesModule } from './user-roles/user-roles.module';
+import { IndicatorTypesModule } from './indicator-types/indicator-types.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { UserRolesModule } from './user-roles/user-roles.module';
     ResultInstitutionsModule,
     ResultUsersModule,
     UserRolesModule,
+    IndicatorTypesModule,
   ],
   exports: [AgressoContractModule],
 })
