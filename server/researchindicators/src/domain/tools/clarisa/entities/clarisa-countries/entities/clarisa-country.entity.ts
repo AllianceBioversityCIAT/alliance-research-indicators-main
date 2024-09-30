@@ -1,10 +1,10 @@
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ResultCountry } from '../../../../../entities/result-countries/entities/result-country.entity';
 
 @Entity('clarisa_countries')
 export class ClarisaCountry extends AuditableEntity {
-  @Column('bigint', {
+  @PrimaryColumn('bigint', {
     name: 'code',
     primary: true,
     nullable: false,
@@ -14,26 +14,26 @@ export class ClarisaCountry extends AuditableEntity {
   @Column('varchar', {
     length: 3,
     name: 'isoAlpha2',
-    nullable: false,
+    nullable: true,
   })
   isoAlpha2!: string;
 
   @Column('varchar', {
     length: 4,
     name: 'isoAlpha3',
-    nullable: false,
+    nullable: true,
   })
   isoAlpha3!: string;
 
   @Column('text', {
     name: 'name',
-    nullable: false,
+    nullable: true,
   })
   name!: string;
 
   @Column('decimal', {
     name: 'longitude',
-    nullable: false,
+    nullable: true,
     precision: 8,
     scale: 4,
   })
@@ -41,7 +41,7 @@ export class ClarisaCountry extends AuditableEntity {
 
   @Column('decimal', {
     name: 'latitude',
-    nullable: false,
+    nullable: true,
     precision: 8,
     scale: 4,
   })

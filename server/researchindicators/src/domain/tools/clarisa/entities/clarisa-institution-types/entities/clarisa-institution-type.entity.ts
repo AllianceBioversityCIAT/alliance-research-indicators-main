@@ -1,19 +1,25 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryColumn,
+} from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ClarisaInstitution } from '../../clarisa-institutions/entities/clarisa-institution.entity';
 
 @Entity('clarisa_institution_types')
 export class ClarisaInstitutionType extends AuditableEntity {
-  @Column('bigint', {
+  @PrimaryColumn('bigint', {
     name: 'code',
-    primary: true,
     nullable: false,
   })
   code!: number;
 
   @Column('text', {
     name: 'name',
-    nullable: false,
+    nullable: true,
   })
   name!: string;
 

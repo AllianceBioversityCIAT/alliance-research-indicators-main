@@ -79,9 +79,9 @@ export class ResponseInterceptor implements NestInterceptor {
 
   private isServiceResponseDto(arg: any): arg is ServiceResponseDto<unknown> {
     return (
-      arg?.data !== undefined &&
       arg?.status !== undefined &&
-      arg?.description !== undefined
+      arg?.description !== undefined &&
+      arg?.stack === undefined
     );
   }
 

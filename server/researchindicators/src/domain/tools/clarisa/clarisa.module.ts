@@ -9,9 +9,11 @@ import { ClarisaGeoScopeModule } from './entities/clarisa-geo-scope/clarisa-geo-
 import { ClarisaLanguagesModule } from './entities/clarisa-languages/clarisa-languages.module';
 import { HttpModule } from '@nestjs/axios';
 import { ClarisaInstitutionTypesModule } from './entities/clarisa-institution-types/clarisa-institution-types.module';
+import { ClarisaController } from './clarisa.controller';
 
 @Module({
   providers: [ClarisaService],
+  controllers: [ClarisaController],
   imports: [
     ClarisaGeoScopeModule,
     ClarisaInstitutionsModule,
@@ -23,5 +25,6 @@ import { ClarisaInstitutionTypesModule } from './entities/clarisa-institution-ty
     HttpModule,
     ClarisaInstitutionTypesModule,
   ],
+  exports: [ClarisaService],
 })
 export class ClarisaModule {}

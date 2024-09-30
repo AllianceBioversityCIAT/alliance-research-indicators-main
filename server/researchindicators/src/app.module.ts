@@ -12,17 +12,21 @@ import { getDataSource } from './db/config/mysql/orm.config';
 import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum';
 import { route as mainRoute } from './domain/routes/main.routes';
 import { ClarisaModule } from './domain/tools/clarisa/clarisa.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { CronModule } from './domain/tools/cron-jobs/cron.module';
 @Module({
   imports: [
+    RouterModule.register(mainRoute),
     EntitiesModule,
     ClarisaModule,
+    CronModule,
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.SECONDARY, false),
     ),
-    RouterModule.register(mainRoute),
   ],
   controllers: [AppController],
   providers: [

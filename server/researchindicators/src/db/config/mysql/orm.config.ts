@@ -62,7 +62,7 @@ export const getDataSource = (
     synchronize: false,
     migrationsRun: false,
     bigNumberStrings: false,
-    logging: true,
+    logging: false,
     migrations: [`${__dirname}/../../migrations/**/*{.ts,.js}`],
     migrationsTableName: 'migrations',
     metadataTableName: 'orm_metadata',

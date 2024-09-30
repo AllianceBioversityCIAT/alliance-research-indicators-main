@@ -1,20 +1,26 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryColumn,
+} from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ClarisaInstitutionType } from '../../clarisa-institution-types/entities/clarisa-institution-type.entity';
 import { ResultInstitution } from '../../../../../entities/result-institutions/entities/result-institution.entity';
 
 @Entity('clarisa_institutions')
 export class ClarisaInstitution extends AuditableEntity {
-  @Column('bigint', {
+  @PrimaryColumn('bigint', {
     name: 'code',
-    primary: true,
     nullable: false,
   })
   code!: number;
 
   @Column('text', {
     name: 'name',
-    nullable: false,
+    nullable: true,
   })
   name!: string;
 
@@ -32,13 +38,13 @@ export class ClarisaInstitution extends AuditableEntity {
 
   @Column('timestamp', {
     name: 'added',
-    nullable: false,
+    nullable: true,
   })
   added!: Date;
 
   @Column('bigint', {
     name: 'institution_type_id',
-    nullable: false,
+    nullable: true,
   })
   institution_type_id!: number;
 

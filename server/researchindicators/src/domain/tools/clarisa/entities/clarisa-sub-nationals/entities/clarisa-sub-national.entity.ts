@@ -1,25 +1,24 @@
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ResultCountriesSubNational } from '../../../../../entities/result-countries-sub-nationals/entities/result-countries-sub-national.entity';
 
 @Entity('clarisa_sub_nationals')
 export class ClarisaSubNational extends AuditableEntity {
-  @Column('bigint', {
+  @PrimaryColumn('bigint', {
     name: 'id',
-    primary: true,
     nullable: false,
   })
   id!: number;
 
   @Column('text', {
     name: 'code',
-    nullable: false,
+    nullable: true,
   })
   code!: string;
 
   @Column('text', {
     name: 'name',
-    nullable: false,
+    nullable: true,
   })
   name!: string;
 

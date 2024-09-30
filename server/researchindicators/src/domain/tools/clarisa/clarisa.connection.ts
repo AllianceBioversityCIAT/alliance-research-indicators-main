@@ -8,7 +8,7 @@ export class Clarisa {
   private token: string;
   private http: HttpService;
   constructor(http: HttpService) {
-    this.clarisaHost = env.MS_CLARISA_HOST + 'api/';
+    this.clarisaHost = env.ARI_CLARISA_HOST + 'api/';
     this.http = http;
   }
 
