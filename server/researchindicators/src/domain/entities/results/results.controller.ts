@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpStatus,
   Param,
@@ -12,6 +13,8 @@ import { ResultsService } from './results.service';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CreateResultDto } from './dto/create-result.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
+import { UpdateGeneralInformation } from './dto/update-general-information.dto';
+import { DataReturnEnum } from '../../shared/enum/queries.enum';
 
 @ApiTags('Results')
 @Controller()
@@ -32,8 +35,16 @@ export class ResultsController {
   })
   @ApiOperation({ summary: 'Find all results' })
   @Get()
-  find(@Query('page') page: string, @Query('limit') limit: string) {
-    return this.resultsService.findResults({ page: +page, limit: +limit });
+  async find(@Query('page') page: string, @Query('limit') limit: string) {
+    return this.resultsService
+      .findResults({ page: +page, limit: +limit })
+      .then((el) =>
+        ResponseUtils.format({
+          description: 'Results found',
+          status: HttpStatus.OK,
+          data: el,
+        }),
+      );
   }
 
   @ApiOperation({ summary: 'Create a result' })
@@ -55,11 +66,60 @@ export class ResultsController {
     type: Number,
     description: 'Is a reference to the result id',
   })
-  @Patch('delete/:resultId')
+  @Delete(':id/delete')
   async deleteResult(@Param('resultId') resultId: string) {
     return this.resultsService.deleteResult(+resultId).then(() =>
       ResponseUtils.format({
         description: 'Result deleted',
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  @ApiOperation({ summary: 'Update general information' })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  @ApiQuery({
+    name: 'return',
+    required: false,
+    type: String,
+    enum: DataReturnEnum,
+    description: 'Is a reference to return data',
+  })
+  @Patch(':id/general-information')
+  async updateGeneralInformation(
+    @Param('id') resultId: string,
+    @Query('return') returnData: DataReturnEnum,
+    @Body() generalInformation: UpdateGeneralInformation,
+  ) {
+    return this.resultsService
+      .updateGeneralInfo(+resultId, generalInformation, returnData)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'General information was updated correctly',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @ApiOperation({ summary: 'Find general information' })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  @Get(':id/general-information')
+  async findGeneralInformation(@Param('id') resultId: string) {
+    return this.resultsService.findGeneralInfo(+resultId).then((result) =>
+      ResponseUtils.format({
+        description: 'General information was found correctly',
+        data: result,
         status: HttpStatus.OK,
       }),
     );

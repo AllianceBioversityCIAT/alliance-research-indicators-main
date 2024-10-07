@@ -6,5 +6,6 @@ import { ResultContractsRepository } from './repositories/result-contracts.repos
 @Module({
   controllers: [ResultContractsController],
   providers: [ResultContractsService, ResultContractsRepository],
+  exports: [ResultContractsService, ResultContractsRepository],
 })
 export class ResultContractsModule {}

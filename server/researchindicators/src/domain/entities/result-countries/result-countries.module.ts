@@ -5,5 +5,6 @@ import { ResultCountriesController } from './result-countries.controller';
 @Module({
   controllers: [ResultCountriesController],
   providers: [ResultCountriesService],
+  exports: [ResultCountriesService],
 })
 export class ResultCountriesModule {}

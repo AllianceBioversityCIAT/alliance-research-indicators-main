@@ -1,11 +1,11 @@
-import { DataSource, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Result } from '../entities/result.entity';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class ResultRepository extends Repository<Result> {
-  constructor(private dataSource: DataSource) {
-    super(Result, dataSource.createEntityManager());
+  constructor(private entityManager: EntityManager) {
+    super(Result, entityManager);
   }
 
   async findResults(pagination: ResultPaginationWhere): Promise<Result[]> {
@@ -66,7 +66,10 @@ export class ResultRepository extends Repository<Result> {
         ${where.limit};
     `;
 
-    return this.dataSource.query(query, [pagination.limit, pagination.offset]);
+    return this.entityManager.query(query, [
+      pagination.limit,
+      pagination.offset,
+    ]);
   }
 }
 

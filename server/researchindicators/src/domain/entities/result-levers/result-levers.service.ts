@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ResultLeversRepository } from './repositories/result-levers.repository';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { ResultLever } from './entities/result-lever.entity';
-import { updateArray } from '../../shared/utils/array.util';
+import { filterPersistKey, updateArray } from '../../shared/utils/array.util';
 import { selectManager } from '../../shared/utils/orm.util';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class ResultLeversService {
 
   async create(
     result_id: number,
-    lever_id: string | string[],
+    levers: Partial<ResultLever> | Partial<ResultLever>[],
     lever_role_id: number,
     manager?: EntityManager,
   ) {
@@ -24,26 +24,45 @@ export class ResultLeversService {
       this.mainRepo,
     );
 
-    const leverId = Array.isArray(lever_id) ? lever_id : [lever_id];
+    const leversArray = Array.isArray(levers) ? levers : [levers];
     const existData = await this.mainRepo.find({
       where: {
         result_id: result_id,
         lever_role_id: lever_role_id,
+        lever_id: In(leversArray.map((data) => data.lever_id)),
       },
     });
 
-    const formatDataLever: Partial<ResultLever>[] = leverId.map((data) => ({
+    const formatDataLever: Partial<ResultLever>[] = leversArray.map((data) => ({
+      result_lever_id: data?.result_lever_id,
       lever_role_id: lever_role_id,
-      lever_id: data,
+      lever_id: data.lever_id,
     }));
 
     const updateResultLever = updateArray<ResultLever>(
       formatDataLever,
       existData,
-      'result_lever_id',
+      'lever_id',
       {
         key: 'result_id',
         value: result_id,
+      },
+      'result_lever_id',
+    );
+
+    const persistId = filterPersistKey<ResultLever>(
+      'result_lever_id',
+      updateResultLever,
+    );
+
+    await entityManager.update(
+      {
+        result_id: result_id,
+        result_lever_id: Not(In(persistId)),
+        lever_role_id: lever_role_id,
+      },
+      {
+        is_active: false,
       },
     );
 

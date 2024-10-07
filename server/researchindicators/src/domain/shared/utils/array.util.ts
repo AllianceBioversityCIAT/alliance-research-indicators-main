@@ -1,3 +1,5 @@
+import { AuditableEntity } from '../global-dto/auditable.entity';
+
 /**
  *
  * @param clientArray  The array to be updated
@@ -13,11 +15,12 @@
 export const updateArray = <T>(
   clientArray: Partial<T>[],
   backendArray: T[],
-  key: keyof T & string,
+  comparisonKey: keyof T & string,
   parent: {
     key: keyof T & string;
     value: any;
   },
+  primaryKey?: keyof T & string,
 ): Partial<T>[] => {
   clientArray = clientArray ?? [];
   clientArray = clientArray.map((item) => ({
@@ -26,16 +29,20 @@ export const updateArray = <T>(
   }));
   backendArray?.forEach((bItem) => {
     const clientArrayItemIndex = clientArray.findIndex(
-      (item) => item[key] === bItem[key],
+      (item) => item[comparisonKey] === bItem[comparisonKey],
     );
     if (clientArrayItemIndex !== -1) {
       const temp = clientArray[clientArrayItemIndex];
-      delete temp[key];
+      delete temp[comparisonKey];
       clientArray[clientArrayItemIndex] = {
         ...bItem,
         ...temp,
+        is_active: true,
         [parent.key]: parent.value,
       };
+      if (primaryKey) {
+        clientArray[clientArrayItemIndex][primaryKey] = bItem[primaryKey];
+      }
     } else {
       clientArray.push({
         ...bItem,
@@ -45,4 +52,17 @@ export const updateArray = <T>(
     }
   });
   return clientArray;
+};
+
+export const filterPersistKey = <T extends AuditableEntity>(
+  primaryKey: keyof T,
+  data: Partial<T>[],
+): T[keyof T][] => {
+  return data
+    .filter(
+      (data) =>
+        (data.is_active !== null || data.is_active !== undefined) &&
+        data[primaryKey] !== undefined,
+    )
+    .map((data) => data[primaryKey]);
 };

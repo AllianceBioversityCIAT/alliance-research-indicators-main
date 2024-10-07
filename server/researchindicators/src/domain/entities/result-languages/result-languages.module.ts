@@ -5,5 +5,6 @@ import { ResultLanguagesController } from './result-languages.controller';
 @Module({
   controllers: [ResultLanguagesController],
   providers: [ResultLanguagesService],
+  exports: [ResultLanguagesService],
 })
 export class ResultLanguagesModule {}

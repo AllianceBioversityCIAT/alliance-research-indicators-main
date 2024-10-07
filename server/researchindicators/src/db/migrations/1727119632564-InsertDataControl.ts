@@ -18,7 +18,7 @@ export class InsertDataControl1727119632564 implements MigrationInterface {
       `INSERT INTO session_lengths (session_length_id, name) VALUES (1, 'Short-term'), (2, 'Long-term')`,
     );
     await queryRunner.query(
-      `INSERT INTO session_purposes (session_purpose_id, name) VALUES (1, 'Research'), (2, 'Teaching'), (3, 'Other')`,
+      `INSERT INTO session_purposes (session_purpose_id, name) VALUES (1, 'Training enumerators'), (2, 'Engaging with change agents'), (3, 'Training of trainers'), (4, 'Other')`,
     );
   }
 
@@ -37,7 +37,7 @@ export class InsertDataControl1727119632564 implements MigrationInterface {
       `DELETE FROM session_lengths WHERE session_length_id IN (1, 2)`,
     );
     await queryRunner.query(
-      `DELETE FROM session_purposes WHERE session_purpose_id IN (1, 2, 3)`,
+      `DELETE FROM session_purposes WHERE session_purpose_id IN (1, 2, 3, 4)`,
     );
   }
 }

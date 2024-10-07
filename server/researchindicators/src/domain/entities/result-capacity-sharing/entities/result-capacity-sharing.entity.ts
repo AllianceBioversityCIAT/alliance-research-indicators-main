@@ -35,6 +35,12 @@ export class ResultCapacitySharing extends AuditableEntity {
   })
   training_title?: string;
 
+  @Column('text', {
+    name: 'trainee_name',
+    nullable: true,
+  })
+  trainee_name?: string;
+
   @Column('bigint', {
     name: 'session_format_id',
     nullable: true,
@@ -94,6 +100,12 @@ export class ResultCapacitySharing extends AuditableEntity {
     nullable: true,
   })
   session_participants_non_binary?: number;
+
+  @Column('bigint', {
+    name: 'session_participants_total',
+    nullable: true,
+  })
+  session_participants_total?: number;
 
   @Column('text', {
     name: 'session_description',

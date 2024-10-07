@@ -1,5 +1,10 @@
-import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { ResultRepository } from './repositories/result.repository';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
 import { cleanObject, validObject } from '../../shared/utils/object.utils';
@@ -10,6 +15,13 @@ import { ResultContractsService } from '../result-contracts/result-contracts.ser
 import { ContractRolesEnum } from '../result-contracts/enum/lever-roles.enum';
 import { ResultLeversService } from '../result-levers/result-levers.service';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
+import { UpdateGeneralInformation } from './dto/update-general-information.dto';
+import { ResultKeywordsService } from '../result-keywords/result-keywords.service';
+import { ResultUsersService } from '../result-users/result-users.service';
+import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
+import { ResultCapacitySharingService } from '../result-capacity-sharing/result-capacity-sharing.service';
+import { DataReturnEnum } from '../../shared/enum/queries.enum';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 
 @Injectable()
 export class ResultsService {
@@ -18,6 +30,9 @@ export class ResultsService {
     private readonly mainRepo: ResultRepository,
     private readonly _resultContractsService: ResultContractsService,
     private readonly _resultLeversService: ResultLeversService,
+    private readonly _resultKeywordsService: ResultKeywordsService,
+    private readonly _resultUsersService: ResultUsersService,
+    private readonly _resultCapacitySharingService: ResultCapacitySharingService,
   ) {}
 
   async findResults(pagination: PaginationDto) {
@@ -28,51 +43,54 @@ export class ResultsService {
       whereLimit.limit = paginationClean.limit;
       whereLimit.offset = offset;
     }
-    return this.mainRepo.findResults(whereLimit).then((data) =>
-      ResponseUtils.format({
-        description: 'Results found',
-        status: HttpStatus.OK,
-        data: data,
-      }),
-    );
+    return this.mainRepo.find({
+      ...whereLimit,
+      where: {
+        is_active: true,
+      },
+    });
   }
 
   async createResult(createResult: CreateResultDto): Promise<Result> {
-    const vaidRequest: boolean = validObject(createResult, ['levers']);
+    const vaidRequest: boolean = validObject(createResult, ['lever']);
     if (!vaidRequest) throw new BadRequestException('Invalid request');
 
-    const { description, indicator_id, title, contracts, levers } =
-      createResult;
+    const { description, indicator_id, title, contract, lever } = createResult;
 
     await this.mainRepo.findOne({ where: { title } }).then((result) => {
       if (result) {
-        throw ResponseUtils.format({
-          description: 'Result already exists',
-          status: HttpStatus.CONFLICT,
-        });
+        throw new ConflictException(
+          'The name of the result is already registered',
+        );
       }
     });
 
     const newOfficialCode = await this.newOfficialCode();
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const result = await manager.withRepository(this.mainRepo).save({
+      const result = await manager.getRepository(this.mainRepo.target).save({
         description,
         indicator_id,
         title,
         result_official_code: newOfficialCode,
       });
 
+      await this.createResultType(
+        result.result_id,
+        result.indicator_id,
+        manager,
+      );
+
       await this._resultContractsService.create(
         result.result_id,
-        contracts.map(({ agreement_id }) => agreement_id),
+        contract,
         ContractRolesEnum.PRIMARY,
         manager,
       );
 
       await this._resultLeversService.create(
         result.result_id,
-        levers.map(({ code }) => code),
+        lever,
         LeverRolesEnum.PRIMARY,
         manager,
       );
@@ -86,12 +104,31 @@ export class ResultsService {
   private async newOfficialCode() {
     const firstInsertion: number = 1;
     const lastCode: number = await this.mainRepo
-      .findOne({ order: { result_official_code: 'DESC' } })
-      .then(({ result_official_code }) =>
-        result_official_code ? result_official_code++ : firstInsertion,
-      );
+      .findOne({
+        where: { is_active: In([true, false]) },
+        order: { result_official_code: 'DESC' },
+      })
+      .then((result) => {
+        return result?.result_official_code
+          ? result.result_official_code
+          : firstInsertion;
+      });
 
     return lastCode;
+  }
+
+  private async createResultType(
+    resultId: number,
+    indicator: IndicatorsEnum,
+    manager?: EntityManager,
+  ) {
+    switch (indicator) {
+      case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
+        await this._resultCapacitySharingService.create(resultId, manager);
+        break;
+      default:
+        break;
+    }
   }
 
   async deleteResult(result_id: number): Promise<Result> {
@@ -114,5 +151,59 @@ export class ResultsService {
     });
 
     return result;
+  }
+
+  async updateGeneralInfo(
+    result_id: number,
+    generalInformation: UpdateGeneralInformation,
+    returnData: DataReturnEnum = DataReturnEnum.FALSE,
+  ) {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(this.mainRepo.target).update(result_id, {
+        title: generalInformation.title,
+        description: generalInformation.description,
+      });
+
+      await this._resultKeywordsService.create(
+        result_id,
+        generalInformation.keywords,
+        manager,
+      );
+
+      await this._resultUsersService.create(
+        result_id,
+        generalInformation.main_contract_person,
+        UserRolesEnum.MAIN_CONTACT,
+        manager,
+      );
+
+      if (returnData === DataReturnEnum.TRUE) {
+        return this.findGeneralInfo(result_id);
+      }
+
+      return undefined;
+    });
+  }
+
+  async findGeneralInfo(resultId: number) {
+    const result = await this.mainRepo.findOne({
+      select: ['title', 'description', 'result_id'],
+      where: { result_id: resultId, is_active: true },
+    });
+
+    const keywords =
+      await this._resultKeywordsService.findKeywordsByResultId(resultId);
+
+    const mainContractPerson = await this._resultUsersService
+      .findUsersByRoleRoesult(UserRolesEnum.MAIN_CONTACT, resultId, true)
+      .then((data) => (data?.length > 0 ? data[0] : null));
+
+    const generalInformation: UpdateGeneralInformation = {
+      ...result,
+      keywords: keywords,
+      main_contract_person: mainContractPerson,
+    };
+
+    return generalInformation;
   }
 }

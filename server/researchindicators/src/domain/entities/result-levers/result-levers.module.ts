@@ -6,5 +6,6 @@ import { ResultLeversRepository } from './repositories/result-levers.repository'
 @Module({
   controllers: [ResultLeversController],
   providers: [ResultLeversService, ResultLeversRepository],
+  exports: [ResultLeversService, ResultLeversRepository],
 })
 export class ResultLeversModule {}

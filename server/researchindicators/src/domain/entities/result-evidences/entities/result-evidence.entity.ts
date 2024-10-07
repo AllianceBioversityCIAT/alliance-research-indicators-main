@@ -1,5 +1,12 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
+import { EvidenceRole } from '../../evidence-roles/entities/evidence-role.entity';
 
 @Entity('result_evidences')
 export class ResultEvidence extends AuditableEntity {
@@ -27,9 +34,13 @@ export class ResultEvidence extends AuditableEntity {
   })
   evidence_url!: string;
 
-  @Column('text', {
+  @Column('bigint', {
     name: 'evidence_role_id',
     nullable: false,
   })
-  evidence_role_id!: string;
+  evidence_role_id!: number;
+
+  @ManyToOne(() => EvidenceRole, (role) => role.result_evidences)
+  @JoinColumn({ name: 'evidence_role_id' })
+  evidence_role!: EvidenceRole;
 }

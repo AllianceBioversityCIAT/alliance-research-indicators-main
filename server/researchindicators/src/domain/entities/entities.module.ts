@@ -28,6 +28,8 @@ import { ResultInstitutionsModule } from './result-institutions/result-instituti
 import { ResultUsersModule } from './result-users/result-users.module';
 import { UserRolesModule } from './user-roles/user-roles.module';
 import { IndicatorTypesModule } from './indicator-types/indicator-types.module';
+import { InstitutionRolesModule } from './institution-roles/institution-roles.module';
+import { LanguageRolesModule } from './language-roles/language-roles.module';
 
 @Module({
   imports: [
@@ -60,6 +62,8 @@ import { IndicatorTypesModule } from './indicator-types/indicator-types.module';
     ResultUsersModule,
     UserRolesModule,
     IndicatorTypesModule,
+    InstitutionRolesModule,
+    LanguageRolesModule,
   ],
   exports: [AgressoContractModule],
 })

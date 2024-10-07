@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { ResultContract } from './entities/result-contract.entity';
 import { ContractRolesEnum } from './enum/lever-roles.enum';
 import { ResultContractsRepository } from './repositories/result-contracts.repository';
-import { updateArray } from '../../shared/utils/array.util';
+import { filterPersistKey, updateArray } from '../../shared/utils/array.util';
 import { selectManager } from '../../shared/utils/orm.util';
 
 @Injectable()
@@ -15,7 +15,7 @@ export class ResultContractsService {
 
   async create(
     result_id: number,
-    contract_id: string | string[],
+    contract: Partial<ResultContract> | Partial<ResultContract>[],
     contract_role_id: ContractRolesEnum,
     manager?: EntityManager,
   ) {
@@ -25,29 +25,48 @@ export class ResultContractsService {
       this.mainRepo,
     );
 
-    const contractId = Array.isArray(contract_id) ? contract_id : [contract_id];
+    const contractArray = Array.isArray(contract) ? contract : [contract];
 
     const existData = await this.mainRepo.find({
       where: {
         result_id: result_id,
         contract_role_id: contract_role_id,
+        contract_id: In(contractArray.map((data) => data.contract_id)),
       },
     });
 
-    const formatDataLever: Partial<ResultContract>[] = contractId.map(
+    const formatContract: Partial<ResultContract>[] = contractArray.map(
       (data) => ({
+        result_contract_id: data?.result_contract_id,
         contract_role_id: contract_role_id,
-        contract_id: data,
+        contract_id: data.contract_id,
       }),
     );
 
     const updateResultLever = updateArray<ResultContract>(
-      formatDataLever,
+      formatContract,
       existData,
-      'result_contract_id',
+      'contract_id',
       {
         key: 'result_id',
         value: result_id,
+      },
+      'result_contract_id',
+    );
+
+    const persistId = filterPersistKey<ResultContract>(
+      'result_contract_id',
+      updateResultLever,
+    );
+
+    await entityManager.update(
+      {
+        result_id: result_id,
+        contract_role_id: contract_role_id,
+        result_contract_id: Not(In(persistId)),
+      },
+      {
+        is_active: false,
       },
     );
 

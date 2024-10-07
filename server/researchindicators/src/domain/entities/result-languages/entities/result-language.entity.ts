@@ -8,6 +8,7 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { ClarisaLanguage } from '../../../tools/clarisa/entities/clarisa-languages/entities/clarisa-language.entity';
+import { LanguageRole } from '../../language-roles/entities/language-role.entity';
 
 @Entity('result_languages')
 export class ResultLanguage extends AuditableEntity {
@@ -28,6 +29,16 @@ export class ResultLanguage extends AuditableEntity {
     nullable: false,
   })
   language_id!: number;
+
+  @Column('bigint', {
+    name: 'language_role_id',
+    nullable: false,
+  })
+  language_role_id!: number;
+
+  @ManyToOne(() => LanguageRole, (role) => role.result_languages)
+  @JoinColumn({ name: 'language_role_id' })
+  language_role!: LanguageRole;
 
   @ManyToOne(() => Result, (result) => result.result_languages)
   @JoinColumn({ name: 'result_id' })

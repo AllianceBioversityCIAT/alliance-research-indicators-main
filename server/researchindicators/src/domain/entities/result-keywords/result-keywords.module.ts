@@ -5,5 +5,6 @@ import { ResultKeywordsController } from './result-keywords.controller';
 @Module({
   controllers: [ResultKeywordsController],
   providers: [ResultKeywordsService],
+  exports: [ResultKeywordsService],
 })
 export class ResultKeywordsModule {}
