@@ -5,42 +5,28 @@ import { selectManager } from '../../shared/utils/orm.util';
 import { filterPersistKey, updateArray } from '../../shared/utils/array.util';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { UserService } from '../../complementary-entities/secondary/user/user.service';
+import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 @Injectable()
-export class ResultUsersService {
-  private readonly mainRepo: Repository<ResultUser>;
-
+export class ResultUsersService extends BaseServiceSimple<
+  ResultUser,
+  Repository<ResultUser>
+> {
   constructor(
     private dataSource: DataSource,
     private readonly _userService: UserService,
   ) {
-    this.mainRepo = dataSource.getRepository(ResultUser);
+    super(
+      ResultUser,
+      dataSource.getRepository(ResultUser),
+      'result_id',
+      'user_role_id',
+    );
   }
 
-  async create(
-    result_id: number,
-    users: Partial<ResultUser> | Partial<ResultUser>[],
-    user_role_id: UserRolesEnum,
-    manager?: EntityManager,
-  ) {
-    const entityManager: Repository<ResultUser> = selectManager(
-      manager,
-      ResultUser,
-      this.mainRepo,
-    );
-
-    const userArray = Array.isArray(users) ? users : [users];
-    const resulrUserIds: number[] = userArray.map(
-      (data) => data.result_user_id,
-    );
-    const existData = await this.mainRepo.find({
-      where: {
-        result_id: result_id,
-        user_role_id: user_role_id,
-        result_user_id: In(resulrUserIds),
-      },
-    });
-
-    const userIds: number[] = userArray.map((el) => el.user_id);
+  protected async createCustomValidation(
+    dataArray: Partial<ResultUser>[],
+  ): Promise<void> {
+    const userIds: number[] = dataArray.map((el) => el.user_id);
     const nonExistUser = await this._userService.existUsers(userIds);
 
     if (nonExistUser.length) {
@@ -48,45 +34,6 @@ export class ResultUsersService {
         `Users are not registered (${nonExistUser.join(', ')})`,
       );
     }
-
-    const formatDataUser: Partial<ResultUser>[] = userArray.map((data) => ({
-      result_user_id: data?.result_user_id,
-      user_role_id: user_role_id,
-      user_id: data.user_id,
-    }));
-
-    const updateResultUser = updateArray<ResultUser>(
-      formatDataUser,
-      existData,
-      'user_id',
-      {
-        key: 'result_id',
-        value: result_id,
-      },
-      'result_user_id',
-    );
-
-    const persistId = filterPersistKey<ResultUser>(
-      'result_user_id',
-      updateResultUser,
-    );
-
-    await entityManager.update(
-      {
-        result_id: result_id,
-        result_user_id: Not(In(persistId)),
-        user_role_id: user_role_id,
-      },
-      {
-        is_active: false,
-      },
-    );
-
-    const response = (await entityManager.save(updateResultUser)).filter(
-      (data) => data.is_active === true,
-    );
-
-    return response;
   }
 
   async findUsersByRoleRoesult(

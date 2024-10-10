@@ -81,16 +81,18 @@ export class ResultsService {
         manager,
       );
 
-      await this._resultContractsService.create(
+      await this._resultContractsService.create<ContractRolesEnum>(
         result.result_id,
         contract,
+        'contract_id',
         ContractRolesEnum.PRIMARY,
         manager,
       );
 
-      await this._resultLeversService.create(
+      await this._resultLeversService.create<LeverRolesEnum>(
         result.result_id,
         lever,
+        'lever_id',
         LeverRolesEnum.PRIMARY,
         manager,
       );
@@ -164,15 +166,18 @@ export class ResultsService {
         description: generalInformation.description,
       });
 
-      await this._resultKeywordsService.create(
+      await this._resultKeywordsService.create<null>(
         result_id,
         generalInformation.keywords,
+        'keyword',
+        null,
         manager,
       );
 
-      await this._resultUsersService.create(
+      await this._resultUsersService.create<UserRolesEnum>(
         result_id,
         generalInformation.main_contract_person,
+        'user_id',
         UserRolesEnum.MAIN_CONTACT,
         manager,
       );

@@ -5,14 +5,22 @@ import { selectManager } from '../../shared/utils/orm.util';
 import { filterPersistKey, updateArray } from '../../shared/utils/array.util';
 import { EvidenceRoleEnum } from '../evidence-roles/enums/evidence-role.enum';
 import { CreateResultEvidenceDto } from './dto/create-result-evidence.dto';
+import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 @Injectable()
-export class ResultEvidencesService {
-  private mainRepo: Repository<ResultEvidence>;
+export class ResultEvidencesService extends BaseServiceSimple<
+  ResultEvidence,
+  Repository<ResultEvidence>
+> {
   constructor(private dataSource: DataSource) {
-    this.mainRepo = dataSource.getRepository(ResultEvidence);
+    super(
+      ResultEvidence,
+      dataSource.getRepository(ResultEvidence),
+      'result_id',
+      'evidence_role_id',
+    );
   }
 
-  async create(
+  async create2(
     result_id: number,
     evidences: Partial<ResultEvidence> | Partial<ResultEvidence>[],
     evidence_role_id: EvidenceRoleEnum,
@@ -85,8 +93,10 @@ export class ResultEvidencesService {
       return await this.create(
         resultId,
         evidences,
+        'evidence_url',
         EvidenceRoleEnum.PRINCIPAL_EVIDENCE,
         manager,
+        ['evidence_description'],
       );
     });
   }

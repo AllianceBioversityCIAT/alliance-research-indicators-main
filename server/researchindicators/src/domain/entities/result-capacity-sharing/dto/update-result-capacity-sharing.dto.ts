@@ -96,23 +96,24 @@ export class CapDevGroupDto {
 export class UpdateResultCapacitySharingDto {
   @ApiProperty({
     type: Number,
-    name: 'result_id',
+    name: 'session_format_id',
   })
   session_format_id?: number;
+
   @ApiProperty({
-    type: String,
-    name: 'supervisor_name',
+    type: Number,
+    name: 'session_type_id',
   })
   session_type_id?: number;
 
   @ApiProperty({
-    type: Number,
+    type: ResultUser,
     name: 'training_supervisor',
   })
   training_supervisor?: ResultUser;
 
   @ApiProperty({
-    type: Number,
+    type: ResultLanguage,
     name: 'training_supervisor_languages',
   })
   training_supervisor_languages?: ResultLanguage;

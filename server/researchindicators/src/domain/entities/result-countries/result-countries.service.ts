@@ -3,15 +3,27 @@ import { ResultCountry } from './entities/result-country.entity';
 import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import { CountryRolesEnum } from '../country-roles/enums/country-roles.anum';
 import { selectManager } from '../../shared/utils/orm.util';
-import { updateArray, filterPersistKey } from '../../shared/utils/array.util';
+import {
+  updateArray,
+  filterPersistKey,
+  isNotEmpty,
+} from '../../shared/utils/array.util';
+import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 @Injectable()
-export class ResultCountriesService {
-  private mainRepo: Repository<ResultCountry>;
+export class ResultCountriesService extends BaseServiceSimple<
+  ResultCountry,
+  Repository<ResultCountry>
+> {
   constructor(private dataSource: DataSource) {
-    this.mainRepo = dataSource.getRepository(ResultCountry);
+    super(
+      ResultCountry,
+      dataSource.getRepository(ResultCountry),
+      'result_id',
+      'country_role_id',
+    );
   }
 
-  async create(
+  async create2(
     result_id: number,
     countries: ResultCountry | ResultCountry[],
     country_role_id: CountryRolesEnum,
@@ -22,6 +34,8 @@ export class ResultCountriesService {
       ResultCountry,
       this.mainRepo,
     );
+
+    if (!isNotEmpty(countries)) return [];
 
     const countriesArray = Array.isArray(countries) ? countries : [countries];
 

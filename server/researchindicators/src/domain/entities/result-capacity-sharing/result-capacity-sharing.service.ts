@@ -88,16 +88,18 @@ export class ResultCapacitySharingService {
           break;
       }
 
-      await this._resultUserService.create(
+      await this._resultUserService.create<UserRolesEnum>(
         result_id,
         updateData?.training_supervisor,
+        'user_id',
         UserRolesEnum.TRAINING_SUPERVISOR,
         manager,
       );
 
-      await this._resultLanguageService.create(
+      await this._resultLanguageService.create<LanguageRolesEnum>(
         resultId,
         updateData?.training_supervisor_languages,
+        'language_id',
         LanguageRolesEnum.TRAINING_SUPERVISOR,
         manager,
       );
@@ -123,9 +125,10 @@ export class ResultCapacitySharingService {
       session_participants_total: updateData.session_participants_total,
     });
 
-    await this._resultInsitutionService.create(
+    await this._resultInsitutionService.create<InstitutionRolesEnum>(
       resultId,
       updateData?.trainee_organization_representative,
+      'institution_id',
       InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE,
       manager,
     );
@@ -149,16 +152,18 @@ export class ResultCapacitySharingService {
       gender_id: updateData?.gender_id,
     });
 
-    await this._resultInsitutionService.create(
+    await this._resultInsitutionService.create<InstitutionRolesEnum>(
       resultId,
       updateData?.affiliation,
+      'institution_id',
       InstitutionRolesEnum.TRAINEE_AFFILIATION,
       manager,
     );
 
-    await this._resultCountryService.create(
+    await this._resultCountryService.create<CountryRolesEnum>(
       resultId,
       updateData?.nationality,
+      'country_id',
       CountryRolesEnum.TRAINEE_NATIONALITY,
       manager,
     );

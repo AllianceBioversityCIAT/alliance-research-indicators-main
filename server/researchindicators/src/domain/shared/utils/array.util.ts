@@ -54,6 +54,15 @@ export const updateArray = <T>(
   return clientArray;
 };
 
+/**
+ *
+ * @param primaryKey
+ * @param data
+ * @returns  The primary key of the data
+ * @description This method filters the primary key of the data provided and returns it
+ * @example  filterPersistKey('id', data)
+ * @example  filterPersistKey('user_id', data)
+ */
 export const filterPersistKey = <T extends AuditableEntity>(
   primaryKey: keyof T,
   data: Partial<T>[],
@@ -65,4 +74,18 @@ export const filterPersistKey = <T extends AuditableEntity>(
         data[primaryKey] !== undefined,
     )
     .map((data) => data[primaryKey]);
+};
+
+export const isNotEmpty = <T>(array: T | T[]): boolean => {
+  let response = true;
+  if (array === undefined || array === null) response = false;
+  if (Array.isArray(array) && !array.length) response = false;
+  return response;
+};
+
+export const formatDataToArray = <T>(data: T | T[]): T[] => {
+  if (isNotEmpty<T>(data)) {
+    return Array.isArray(data) ? data : [data];
+  }
+  return [];
 };
