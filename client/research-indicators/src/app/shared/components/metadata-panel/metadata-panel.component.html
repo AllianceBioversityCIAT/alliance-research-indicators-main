@@ -1,9 +1,17 @@
 <p-dialog [position]="'topright'" header="Edit Profile" [(visible)]="this.showModal" [style]="{ width: '25rem' }">
   @for (user of this.websocket.userList(); track $index) {
-  <p>{{ user.name }}</p>
+    <div class="user-info">
+      {{ user.name }} <span class="socket-uuid">{{ user.socketId }}</span>
+      <div class="tag">{{ user.platform }}</div>
+    </div>
+    <br />
   }
   <h3>Room {{ this.websocket.currentRoom().id }}</h3>
   @for (roomUser of this.websocket.currentRoom().userList; track $index) {
-  <p>{{ roomUser.name }}</p>
+    <div class="user-info">
+      {{ roomUser.name }} <span class="socket-uuid">{{ roomUser.socketId }}</span>
+      <div class="tag">{{ roomUser.platform }}</div>
+    </div>
+    <br />
   }
 </p-dialog>

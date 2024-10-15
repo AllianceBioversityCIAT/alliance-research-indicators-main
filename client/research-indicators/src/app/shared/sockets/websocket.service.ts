@@ -16,7 +16,7 @@ export class WebsocketService {
   public socketStatus = false;
   public user: User | null = null;
 
-  userList: WritableSignal<User[]> = signal([]);
+  userList: WritableSignal<SocketUser[]> = signal([]);
   currentRoom: WritableSignal<{ id: string; userList: SocketUser[] }> = signal({ id: '', userList: [] });
   platform = environment.platform;
   constructor() {
@@ -78,7 +78,7 @@ export class WebsocketService {
 
   getConnectedUsers() {
     this.listen(`all-connected-users-${this.platform}`).subscribe(resp => {
-      this.userList.set(resp as User[]);
+      this.userList.set(resp as SocketUser[]);
     });
   }
 

@@ -14,4 +14,6 @@ export interface SocketUser {
   id: number;
   name: string;
   room: string;
+  platform: string;
+  socketId: string;
 }
