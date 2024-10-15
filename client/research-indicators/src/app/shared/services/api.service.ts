@@ -2,6 +2,7 @@ import { Injectable, WritableSignal, inject } from '@angular/core';
 import { ToPromiseService } from './to-promise.service';
 import { LoginRes, MainResponse } from '../interfaces/responses.interface';
 import { GetViewComponents } from '../interfaces/api.interface';
+import { Result } from '../interfaces/result.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -9,7 +10,7 @@ import { GetViewComponents } from '../interfaces/api.interface';
 export class ApiService {
   TP = inject(ToPromiseService);
 
-  cleanBody(body: any) {
+  cleanBody(body: Record<string, unknown>) {
     for (const key in body) {
       if (typeof body[key] === 'string') {
         body[key] = '';
@@ -23,7 +24,7 @@ export class ApiService {
     }
   }
 
-  updateSignalBody(body: WritableSignal<any>, newBody: any) {
+  updateSignalBody(body: WritableSignal<Record<string, unknown>>, newBody: Record<string, unknown>) {
     for (const key in newBody) {
       if (newBody[key] !== null) {
         body.update(prev => ({ ...prev, [key]: newBody[key] }));
@@ -41,8 +42,8 @@ export class ApiService {
     return this.TP.get(url(), {});
   };
 
-  GET_results = (): Promise<any[]> => {
-    return new Promise((resolve, reject) => {
+  GET_results = (): Promise<MainResponse<Result[]>> => {
+    return new Promise(resolve => {
       const url = () => `http://localhost:4200/data/results.json`;
       fetch(url())
         .then(response => response.json())

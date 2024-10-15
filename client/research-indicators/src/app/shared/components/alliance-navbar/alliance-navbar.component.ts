@@ -6,13 +6,12 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { DynamicToastService } from '../../services/dynamic-toast.service';
 import { CacheService } from '../../services/cache.service';
 import { DarkModeService } from '../../services/dark-mode.service';
-import { MenuModule } from 'primeng/menu';
 import { AvatarModule } from 'primeng/avatar';
-
+import { AvatarGroupModule } from 'primeng/avatargroup';
 @Component({
   selector: 'alliance-navbar',
   standalone: true,
-  imports: [ButtonModule, BadgeModule, ChipModule, RouterLink, RouterLinkActive, MenuModule, AvatarModule],
+  imports: [ButtonModule, BadgeModule, ChipModule, RouterLink, RouterLinkActive, AvatarModule, AvatarGroupModule],
   templateUrl: './alliance-navbar.component.html',
   styleUrl: './alliance-navbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -26,8 +25,8 @@ export class AllianceNavbarComponent implements OnInit {
 
   options = [
     { label: 'Home', path: '/home' },
-    { label: 'My Results', path: '/about', options: [{}] },
-    { label: 'My Contracts', path: '/notifications' }
+    { label: 'My Results', path: '/settings', icon: 'keyboard_arrow_down' },
+    { label: 'My Contracts', path: '/profile', icon: 'keyboard_arrow_down' }
   ];
 
   ngOnInit() {

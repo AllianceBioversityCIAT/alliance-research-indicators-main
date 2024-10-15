@@ -11,17 +11,17 @@
 
 // H1 - Principal Title
 .h1 {
-  @include generate-typography('Space Grotesk', 700, 36px, -1.5px);
+  @include generate-typography('Space Grotesk', 700, 48px, -1.5px);
 }
 
 // H2 - Subtitle
 .h2 {
-  @include generate-typography('Space Grotesk', 700, 24px, 0.5px);
+  @include generate-typography('Space Grotesk', 700, 36px, 0.5px);
 }
 
 // H3 - Context Title
 .h3 {
-  @include generate-typography('Space Grotesk', 600, 18px, 0.15px);
+  @include generate-typography('Space Grotesk', 600, 19px, 0.15px);
 }
 
 // H4 - Action Title
@@ -31,22 +31,22 @@
 
 // Body 1 - Principal Text
 .body-1 {
-  @include generate-typography('Barlow', 400, 18px, 0.5px);
+  @include generate-typography('Barlow', 400, 19px, 0.5px);
 }
 
 // Body 2 - Secondary Text
 .body-2 {
-  @include generate-typography('Barlow', 400, 14px, 0.25px);
+  @include generate-typography('Barlow', 400, 16px, 0.25px);
 }
 
 // Caption - Annotations
 .caption {
-  @include generate-typography('Barlow', 400, 12px, 0.2px);
+  @include generate-typography('Barlow', 400, 14px, 0.2px);
 }
 
 // Label - Card Title
 .label {
-  @include generate-typography('Space Grotesk', 500, 15px, 0.15px);
+  @include generate-typography('Space Grotesk', 500, 24px, 0.15px);
 }
 
 // Medium Label - Context Title

@@ -10,6 +10,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { CardModule } from 'primeng/card';
 import { TabViewModule } from 'primeng/tabview';
+import { Result, ResultTable } from '../../interfaces/result.interface';
 
 @Component({
   selector: 'app-results-table',
@@ -20,12 +21,7 @@ import { TabViewModule } from 'primeng/tabview';
 })
 export class ResultsTableComponent implements OnInit {
   api = inject(ApiService);
-  results: WritableSignal<any[]> = signal([]);
-  customers: WritableSignal<any[]> = signal([]);
-
-  representatives!: any[];
-
-  statuses!: any[];
+  results: WritableSignal<Result[]> = signal([]);
 
   loading = signal(true);
 
@@ -33,7 +29,7 @@ export class ResultsTableComponent implements OnInit {
 
   searchValue: string | undefined;
 
-  columns = [
+  columns: ResultTable[] = [
     { attr: 'code', header: 'Code' },
     { attr: 'title', header: 'Title' },
     { attr: 'indicator', header: 'Indicator' },
@@ -46,35 +42,13 @@ export class ResultsTableComponent implements OnInit {
     { attr: 'creation_date', header: 'Creation Date' }
   ];
 
-  GET_results = async () => this.results.set(await this.api.GET_results());
+  GET_results = async () => this.results.set((await this.api.GET_results()).data);
 
   ngOnInit() {
     this.GET_results();
     setTimeout(() => {
       this.loading.set(false);
     }, 1000);
-
-    this.representatives = [
-      { name: 'Amy Elsner', image: 'amyelsner.png' },
-      { name: 'Anna Fali', image: 'annafali.png' },
-      { name: 'Asiya Javayant', image: 'asiyajavayant.png' },
-      { name: 'Bernardo Dominic', image: 'bernardodominic.png' },
-      { name: 'Elwin Sharvill', image: 'elwinsharvill.png' },
-      { name: 'Ioni Bowcher', image: 'ionibowcher.png' },
-      { name: 'Ivan Magalhaes', image: 'ivanmagalhaes.png' },
-      { name: 'Onyama Limba', image: 'onyamalimba.png' },
-      { name: 'Stephen Shaw', image: 'stephenshaw.png' },
-      { name: 'Xuxue Feng', image: 'xuxuefeng.png' }
-    ];
-
-    this.statuses = [
-      { label: 'Unqualified', value: 'unqualified' },
-      { label: 'Qualified', value: 'qualified' },
-      { label: 'New', value: 'new' },
-      { label: 'Negotiation', value: 'negotiation' },
-      { label: 'Renewal', value: 'renewal' },
-      { label: 'Proposal', value: 'proposal' }
-    ];
   }
 
   clear(table: Table) {

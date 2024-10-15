@@ -1,7 +1,6 @@
 import { Component, effect, inject } from '@angular/core';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
-import { CacheService } from '../../services/cache.service';
 import { DynamicToastService } from '../../services/dynamic-toast.service';
 
 @Component({
@@ -14,10 +13,14 @@ import { DynamicToastService } from '../../services/dynamic-toast.service';
 })
 export class DynamicToastComponent {
   messageService = inject(MessageService);
-  cache = inject(CacheService);
   dynamicToast = inject(DynamicToastService);
 
-  showToast = effect(() => {
-    this.dynamicToast.toastMessage().severity && this.messageService.add(this.dynamicToast.toastMessage());
-  });
+  constructor() {
+    effect(() => {
+      const { severity, ...message } = this.dynamicToast.toastMessage();
+      if (severity) {
+        this.messageService.add({ severity, ...message });
+      }
+    });
+  }
 }

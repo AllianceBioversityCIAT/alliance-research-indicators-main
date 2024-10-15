@@ -1,17 +1,31 @@
 <div class="container">
-  <div class="header ">
-    <h1 class="atc-light-blue-200">Explore key Indicators driving impact</h1>
+  <div class="header">
+    <h1 class="h2 atc-light-blue-200">Explore key Indicators driving impact</h1>
   </div>
   <div class="card-container">
-    <div class="card" *ngFor="let card of cards">
-      <div class="card-content">
-        <img [src]="card.icon" alt="{{ card.title }}" class="icon">
-        <h2>{{ card.title }}</h2>
-        <h3>{{ card.subtitle }}</h3>
-        <p>{{ card.description }}</p>
-      </div>
+    <div class="top-row">
+      @for (card of this.cardList().slice(0, 2); track $index) {
+        <div class="card">
+          <div class="card-content">
+            <img [src]="card.icon" alt="{{ card.title }}" class="icon" />
+            <h2 class="label atc-white-1">{{ card.title }}</h2>
+            <h3 class="body-1 atc-light-blue-200">{{ card.subtitle }}</h3>
+            <p class="body-2 atc-white-1">{{ card.description }}</p>
+          </div>
+        </div>
+      }
+    </div>
+    <div class="bottom-row">
+      @for (card of this.cardList().slice(2, 5); track $index) {
+        <div class="card">
+          <div class="card-content">
+            <img [src]="card.icon" alt="{{ card.title }}" class="icon" />
+            <h2 class="label atc-white-1">{{ card.title }}</h2>
+            <h3 class="body-1 atc-green-300">{{ card.subtitle }}</h3>
+            <p class="body-2 atc-white-1">{{ card.description }}</p>
+          </div>
+        </div>
+      }
     </div>
   </div>
 </div>
-
-

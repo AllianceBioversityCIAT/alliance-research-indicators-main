@@ -2,14 +2,13 @@
   display: flex;
   align-items: center;
   padding: 0 50px;
-  justify-content: space-between;
   box-shadow: 0 0 15px 0 #00000030;
-  border-radius: 10px;
 
   .logo {
     img {
       height: 45px;
       cursor: pointer;
+      margin-right: 70px;
     }
 
     transition: all ease-in-out 0.3s;
@@ -20,13 +19,15 @@
     gap: 35px;
     cursor: pointer;
     align-items: center;
+    flex-grow: 1;
+    justify-content: flex-start;
 
     .option {
       transition: all ease-in-out 0.3s;
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 20px 18px;
+      text-decoration: none;
+      padding: 25px;
       font-weight: 500;
       gap: 5px;
 
@@ -55,16 +56,88 @@
           height: 7px;
           background-color: #00b6ff;
           position: absolute;
-          bottom: 0;
+          bottom: 0px;
           left: 0;
           border-radius: 3px;
         }
+      }
+
+      .option-icon {
+        margin: -10px 0;
       }
     }
 
     .notification-icon {
       font-size: 1.3rem !important;
     }
+
+    .search-container {
+      padding: 0px;
+    }
+    .search-box {
+      background-color: rgba(255, 255, 255, 0.1); /* Fondo blanco con 50% de transparencia */
+      border-radius: 12px;
+      width: 300px;
+      display: flex;
+      align-items: center;
+
+      i {
+        font-size: 18px;
+        color: white;
+        margin: 6px;
+      }
+    }
+    .search-box input {
+      border: none;
+      outline: none;
+      color: white;
+      background: transparent;
+      flex-grow: 1;
+    }
+
+    .search-box input::placeholder {
+      color: var(--ac-grey-500);
+    }
+  }
+
+  .icons-container {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 35px;
+  }
+
+  .notification-dropdown-icon {
+    position: relative;
+
+    .notification-dropdown {
+      overflow: hidden;
+      opacity: 0;
+      position: absolute;
+      top: 22px;
+      right: 22px;
+      background-color: white;
+      box-shadow: 0 0 5px 0 #001b3130;
+      width: 0;
+      height: 0;
+      z-index: 100;
+      border-radius: 4px;
+      transition: all ease-in-out 0.3s;
+      padding: 20px;
+    }
+
+    &:hover {
+      .notification-dropdown {
+        opacity: 1;
+        display: block;
+        width: 450px;
+        height: 300px;
+      }
+    }
+  }
+
+  i {
+    cursor: pointer;
   }
 
   .actions {

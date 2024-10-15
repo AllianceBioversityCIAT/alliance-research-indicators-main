@@ -1,0 +1,23 @@
+.container {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  padding-bottom: 130px;
+
+  .content {
+    gap: 25px;
+
+    .accordions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    p-accordion {
+      width: 100%;
+    }
+
+    p-accordionTab {
+      margin: 10px;
+    }
+  }
+}

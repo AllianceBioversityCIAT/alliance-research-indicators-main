@@ -1,0 +1,16 @@
+<div class="container">
+  <div class="header">
+    <h1 class="h2 atc-light-blue-200">Do you have any questions?</h1>
+  </div>
+  <div class="content">
+    <p-accordion>
+      <div class="accordions">
+        @for (faqItem of this.faqList(); track $index) {
+          <p-accordionTab [header]="faqItem.question" class="body-2">
+            <p>{{ faqItem.answer }}</p>
+          </p-accordionTab>
+        }
+      </div>
+    </p-accordion>
+  </div>
+</div>

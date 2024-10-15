@@ -3,14 +3,45 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
-  padding: 20px;
-  border-radius: 10px;
+  padding: 30px;
+  transition: all 0.3s ease-in-out;
 
-  .sidebar-title {
-    color: #fff;
-    font-size: 18px;
-    margin-bottom: 20px;
-    font-weight: normal;
+  &.collapsed {
+    .sidebar-title,
+    .text {
+      display: none;
+    }
+
+    .option,
+    .sidebar-header {
+      justify-content: center;
+    }
+
+    .sidebar-icon {
+      margin-left: 15px 0;
+      rotate: 180deg;
+    }
+
+    .h4 {
+      text-align: center;
+    }
+  }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    .sidebar-title {
+      margin: 15px 0;
+    }
+
+    .sidebar-icon {
+      background-color: var(--ac-grey-200);
+      border-radius: 50%;
+      cursor: pointer;
+      margin: 15px 0;
+    }
   }
 
   .options {
@@ -25,12 +56,7 @@
       cursor: pointer;
       padding: 10px 0;
 
-      .text {
-        font-size: 16px;
-      }
-
       i {
-        color: #fff;
         font-size: 20px;
       }
     }

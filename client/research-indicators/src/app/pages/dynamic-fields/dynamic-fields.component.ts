@@ -30,7 +30,7 @@ export default class DynamicFieldsComponent implements OnInit {
     this.componentList = (await this.api.GET_ViewComponents()).data;
   };
   save() {
-    console.log(this.dynamicFieldsSE.formGroup.value);
-    console.log(this.dynamicFieldsSE.formGroup.valid);
+    // console.log(this.dynamicFieldsSE.formGroup.value);
+    // console.log(this.dynamicFieldsSE.formGroup.valid);
   }
 }

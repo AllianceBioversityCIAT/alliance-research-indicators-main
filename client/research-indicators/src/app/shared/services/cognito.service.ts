@@ -54,6 +54,7 @@ export class CognitoService {
     const response = await this.api.login(code);
     const { decoded, token } = this.decode(response.data.access_token);
 
+    this.cache.token.set(token);
     localStorage.setItem('token', token);
     localStorage.setItem('decoded', JSON.stringify(decoded));
 

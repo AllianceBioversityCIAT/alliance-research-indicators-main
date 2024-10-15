@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { CacheService } from '../../services/cache.service';
 
 @Component({
@@ -12,8 +12,19 @@ import { CacheService } from '../../services/cache.service';
 export class AllianceSidebarComponent {
   cache = inject(CacheService);
   options = [
-    { icon: 'home', label: 'Home', path: '/home' },
-    { icon: 'help', label: 'About', path: '/about' },
-    { icon: 'contact_phone', label: 'Contact', path: '/contact' }
+    { icon: 'finance', label: 'About indicators', path: '' },
+    { icon: 'info', label: 'About the tool', path: '' },
+    { icon: 'table_rows', label: 'Power BI dashboard', path: '' },
+    { icon: 'open_in_new', label: 'Other reporting tools', path: '' }
   ];
+
+  isCollapsed = signal(false);
+
+  collapse() {
+    this.isCollapsed.update(isCollapsed => !isCollapsed);
+  }
+
+  getSidebarWidth() {
+    return this.isCollapsed() ? '140px' : '250px';
+  }
 }

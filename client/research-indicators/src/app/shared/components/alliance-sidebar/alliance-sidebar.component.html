@@ -1,11 +1,15 @@
-<div class="sidebar abc-white-1">
-  <h2 class="sidebar-title">RESOURCES</h2>
+<div class="sidebar abc-white-1" [class.collapsed]="isCollapsed()" [style.width]="this.getSidebarWidth()">
+  <div class="sidebar-header">
+    <h2 class="h3 sidebar-title atc-primary-blue-600">Resources</h2>
+    <i class="material-symbols-rounded sidebar-icon atc-primary-blue-600" (click)="collapse()" (keydown.enter)="collapse()" tabindex="0" role="button">keyboard_double_arrow_left</i>
+  </div>
+  <h4 class="h4 atc-grey-600">LEARNING</h4>
   <div class="options">
     @for (option of this.options; track $index) {
-    <div class="option atc-primary-blue-400">
-      <i class="material-symbols-rounded">{{ option.icon }}</i>
-      <div class="text">{{ option.label }}</div>
-    </div>
+      <div class="option atc-primary-blue-400">
+        <i class="material-symbols-rounded">{{ option.icon }}</i>
+        <div class="body-2 text">{{ option.label }}</div>
+      </div>
     }
   </div>
 </div>

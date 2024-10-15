@@ -1,24 +1,38 @@
 .container {
-  margin-top: 130px;
+  margin: 110px 0;
 
   .header {
     text-align: center;
-    margin: 90px;
+    margin-bottom: 60px;
   }
 
   .card-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 40px;
+    gap: 30px;
     justify-content: center;
+    margin-bottom: 50px;
+
+    .bottom-row,
+    .top-row {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+    }
+
+    .bottom-row {
+      flex: 1;
+    }
   }
 
   .card {
     background: linear-gradient(135deg, white, #223b5e);
+    max-width: 33.3%;
     padding: 0.8px;
-    max-width: 450px;
     text-align: center;
     border-radius: 31px;
+    flex-basis: calc(33.33% - 40px);
+    flex-grow: 1;
 
     .card-content {
       background: linear-gradient(135deg, #60728b, #223b5e);
@@ -26,31 +40,17 @@
       position: relative;
       height: 100%;
       width: 100%;
-      padding: 40px;
+      padding: 25px;
+
+      .icon {
+        width: 35px;
+        height: auto;
+      }
+
+      h2,
+      h3 {
+        margin: 5px 0;
+      }
     }
-
-  }
-
-  .icon {
-    width: 50px;
-    height: 50px;
-    margin: 0 auto 10px;
-  }
-
-  h2 {
-    font-size: 20px;
-    margin: 10px 0;
-  }
-
-  h3 {
-    font-size: 16px;
-    color: #a0d3e8;
-    margin: 5px 0;
-  }
-
-  p {
-    font-size: 14px;
-    color: #ffffff;
   }
 }
-

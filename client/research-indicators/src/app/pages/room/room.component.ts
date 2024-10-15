@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Socket } from 'ngx-socket-io';
 import { Subscription } from 'rxjs';
 import { WebsocketService } from '../../shared/sockets/websocket.service';
+import { SocketUser } from '../../shared/interfaces/sockets.interface';
 
 @Component({
   selector: 'app-room',
@@ -18,20 +19,21 @@ export default class RoomComponent implements OnInit, OnDestroy {
   users: string[] = [];
   private subscriptions: Subscription[] = [];
 
-  constructor(private route: ActivatedRoute, private socket: Socket) {}
+  constructor(
+    private route: ActivatedRoute,
+    private socket: Socket
+  ) {}
 
   ngOnInit() {
     this.roomId = this.route.snapshot.paramMap.get('id') || '';
     this.socket.emit('join-room', this.roomId);
 
-    this.websocket.listen(`room-users-${this.websocket.platform}`).subscribe((userList: any) => {
-      console.log(userList);
-      this.websocket.currentRoom.set({ id: this.roomId, userList });
+    this.websocket.listen(`room-users-${this.websocket.platform}`).subscribe(userList => {
+      this.websocket.currentRoom.set({ id: this.roomId, userList: userList as SocketUser[] });
     });
   }
 
   cancel() {
-    console.log(this.roomId);
     this.socket.emit('leave-room', this.roomId);
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }

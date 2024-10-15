@@ -4,22 +4,32 @@
       <img routerLink="home" src="alliance-white.png" alt="" srcset="" />
     </div>
     @for (option of this.options; track $index) {
-      <div class="option">
-        <a [routerLink]="option.path" class="atc-white-1" routerLinkActive="active atc-light-blue-200-i">
-          {{ option.label }}
-        </a>
-        @if (option.options?.length) {
-          <i class="material-symbols-rounded"> keyboard_arrow_down </i>
-        }
-      </div>
+    <a [routerLink]="option.path" class="option atc-white-1" routerLinkActive="active atc-light-blue-200-i">
+      {{ option.label }}
+      <a class="option-icon material-symbols-rounded atc-white-1" routerLinkActive="active atc-light-blue-200-i">
+        {{ option.icon }}
+      </a>
+    </a>
     }
-    <p-button [rounded]="true" size="small" label="New result" />
-  </div>
-  <div class="actions">
-    <i class="material-symbols-rounded atc-white-1" (click)="this.darkModeService.toggleDarkMode()">{{ this.darkModeService.isDarkModeEnabled() ? 'light_mode' : 'dark_mode' }}</i>
-    <i class="material-symbols-rounded atc-white-1 notification-dropdown-icon" pBadge severity="danger" value="2">
-      notifications
-      <div class="notification-dropdown"><p-button size="small" label="Log out" icon="pi pi-sign-in" [loading]="this.cache.isValidatingToken()" (onClick)="logOut()" /></div>
-    </i>
+    <p-button label="New result" size="small" />
+    <div class="icons-container">
+      <div class="search-container">
+        <div class="search-box">
+          <i class="material-symbols-rounded">search</i>
+          <input type="text" placeholder="Search a result" />
+        </div>
+      </div>
+      <i class="material-symbols-rounded atc-white-1" (click)="this.darkModeService.toggleDarkMode()">{{ this.darkModeService.isDarkModeEnabled() ? 'light_mode' : 'dark_mode' }}</i>
+      <i class="material-symbols-rounded atc-white-1 notification-dropdown-icon" pBadge severity="danger" value="2">
+        notifications
+        <div class="notification-dropdown"></div>
+      </i>
+      <div class="notification-dropdown-icon">
+        <p-avatar label="P" styleClass="mr-2" />
+        <div class="notification-dropdown">
+          <p-button size="small" label="Log out" icon="pi pi-sign-in" [loading]="this.cache.isValidatingToken()" (onClick)="logOut()" />
+        </div>
+      </div>
+    </div>
   </div>
 </div>

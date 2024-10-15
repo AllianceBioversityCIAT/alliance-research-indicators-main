@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { ServicesComponent } from './services.component';
+import { VersionNumberComponent } from './version-number.component';
 
-describe('ServicesComponent', () => {
-  let component: ServicesComponent;
-  let fixture: ComponentFixture<ServicesComponent>;
+describe('VersionNumberComponent', () => {
+  let component: VersionNumberComponent;
+  let fixture: ComponentFixture<VersionNumberComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ServicesComponent]
+      imports: [VersionNumberComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(ServicesComponent);
+    fixture = TestBed.createComponent(VersionNumberComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
