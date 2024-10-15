@@ -1,8 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ResultUser } from './entities/result-user.entity';
-import { selectManager } from '../../shared/utils/orm.util';
-import { filterPersistKey, updateArray } from '../../shared/utils/array.util';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { UserService } from '../../complementary-entities/secondary/user/user.service';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';

@@ -1,5 +1,4 @@
 import {
-  DataSource,
   DeepPartial,
   EntityManager,
   FindOptionsWhere,
@@ -8,11 +7,9 @@ import {
   Repository,
 } from 'typeorm';
 import { selectManager } from '../utils/orm.util';
-import { RoleCompareDto } from './role-compare.dto';
 import {
   filterPersistKey,
   formatDataToArray,
-  isNotEmpty,
   updateArray,
 } from '../utils/array.util';
 import { AuditableEntity } from './auditable.entity';
@@ -162,6 +159,7 @@ export abstract class BaseServiceSimple<
   }
 
   protected async createCustomValidation(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     dataArray: Partial<Entity>[],
   ): Promise<void> {
     // Override this method to add custom validation

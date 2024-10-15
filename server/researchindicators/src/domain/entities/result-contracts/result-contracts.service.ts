@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultContract } from './entities/result-contract.entity';
-import { ContractRolesEnum } from './enum/lever-roles.enum';
 import { ResultContractsRepository } from './repositories/result-contracts.repository';
-import { filterPersistKey, updateArray } from '../../shared/utils/array.util';
 import { selectManager } from '../../shared/utils/orm.util';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 
