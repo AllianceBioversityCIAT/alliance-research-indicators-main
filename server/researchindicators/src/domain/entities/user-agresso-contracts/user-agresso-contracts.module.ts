@@ -6,10 +6,7 @@ import { AgressoContractRepository } from '../agresso-contract/repositories/agre
 
 @Module({
   controllers: [UserAgressoContractsController],
-  providers: [
-    UserAgressoContractsService,
-    UserService,
-    AgressoContractRepository,
-  ],
+  providers: [UserAgressoContractsService, AgressoContractRepository],
+  exports: [UserAgressoContractsService, AgressoContractRepository],
 })
 export class UserAgressoContractsModule {}

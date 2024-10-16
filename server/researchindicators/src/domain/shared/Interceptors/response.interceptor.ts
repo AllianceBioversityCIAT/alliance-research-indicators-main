@@ -22,9 +22,16 @@ export class ResponseInterceptor implements NestInterceptor {
     const response: Response = ctx.getResponse<Response>();
     const request: Request = ctx.getRequest<Request>();
     const ip = request.socket?.remoteAddress;
+    const contextType = context.getType();
 
     return next.handle().pipe(
       map((res: any) => {
+        if (contextType === 'rpc') {
+          const ctxRpc = context.switchToRpc();
+          const pattern = ctxRpc.getContext().getPattern();
+          this._logger.verbose(`[socket]: (${pattern}) - By Alliance Main`);
+          return res;
+        }
         let modifiedData: ServerResponseDto<unknown> = {
           data: [],
           status: HttpStatus.OK,
@@ -51,7 +58,7 @@ export class ResponseInterceptor implements NestInterceptor {
 
         this.logBasedOnStatus(modifiedData.status, description, res?.stack);
 
-        if (response?.status) response.status(modifiedData?.status);
+        response.status(modifiedData?.status);
         return modifiedData;
       }),
     );

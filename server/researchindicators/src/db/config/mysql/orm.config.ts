@@ -39,7 +39,6 @@ export const getDataSource = (
       username = env.ARI_TEST_MYSQL_USER_NAME;
       password = env.ARI_TEST_MYSQL_USER_PASS;
       database = env.ARI_TEST_MYSQL_NAME;
-
       break;
     case dataSourceTarget.SECONDARY:
       name = 'secondary';

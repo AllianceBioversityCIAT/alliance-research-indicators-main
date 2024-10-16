@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { APP_FILTER, APP_INTERCEPTOR, RouterModule } from '@nestjs/core';
@@ -14,6 +19,8 @@ import { route as mainRoute } from './domain/routes/main.routes';
 import { ClarisaModule } from './domain/tools/clarisa/clarisa.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CronModule } from './domain/tools/cron-jobs/cron.module';
+import { JwtMiddleware } from './domain/shared/middlewares/jwr.middleware';
+import { AlianceManagementApp } from './domain/tools/broker/aliance-management.app';
 @Module({
   imports: [
     RouterModule.register(mainRoute),
@@ -30,6 +37,8 @@ import { CronModule } from './domain/tools/cron-jobs/cron.module';
   ],
   controllers: [AppController],
   providers: [
+    AlianceManagementApp,
+    JwtMiddleware,
     AppService,
     {
       provide: APP_INTERCEPTOR,
@@ -45,4 +54,11 @@ import { CronModule } from './domain/tools/cron-jobs/cron.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(JwtMiddleware).forRoutes({
+      path: '*',
+      method: RequestMethod.ALL,
+    });
+  }
+}

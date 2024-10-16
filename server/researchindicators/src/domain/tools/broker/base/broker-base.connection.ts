@@ -1,11 +1,14 @@
+import { Logger } from '@nestjs/common';
 import {
   ClientProxy,
   ClientProxyFactory,
   Transport,
 } from '@nestjs/microservices';
 import { env } from 'process';
+import { firstValueFrom } from 'rxjs';
 
 export abstract class BrokerConnectionBase {
+  private readonly log: Logger = new Logger('Broker connection');
   protected client: ClientProxy;
 
   constructor(queueName: string) {
@@ -22,8 +25,36 @@ export abstract class BrokerConnectionBase {
     });
   }
 
-  async emitToPattern<T>(pattern: string, message: T) {
+  async emitToPattern<T, Y = T>(
+    pattern: string,
+    message: T,
+    logger: boolean = false,
+  ): Promise<Y> {
     const parsedMessage: string = JSON.stringify(message);
-    return this.client.emit(pattern, parsedMessage);
+    return firstValueFrom(this.client.emit(pattern, parsedMessage)).then(
+      (response: Y) => {
+        if (logger) {
+          this.log.log(`Message emitted to pattern: ${pattern}`);
+          this.log.log(`Message: ${JSON.stringify(response)}`);
+        }
+        return response;
+      },
+    );
+  }
+
+  async sendToPattern<T, Y = T>(
+    pattern: string,
+    message: T,
+    logger: boolean = false,
+  ): Promise<Y> {
+    return firstValueFrom(this.client.send(pattern, message)).then(
+      (response: Y) => {
+        if (logger) {
+          this.log.log(`Message sent to pattern: ${pattern}`);
+          this.log.log(`Message: ${JSON.stringify(response)}`);
+        }
+        return response;
+      },
+    );
   }
 }

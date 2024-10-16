@@ -10,13 +10,19 @@ import {
   Query,
 } from '@nestjs/common';
 import { ResultsService } from './results.service';
-import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CreateResultDto } from './dto/create-result.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { UpdateGeneralInformation } from './dto/update-general-information.dto';
 import { DataReturnEnum } from '../../shared/enum/queries.enum';
-
 @ApiTags('Results')
+@ApiBearerAuth()
 @Controller()
 export class ResultsController {
   constructor(private readonly resultsService: ResultsService) {}

@@ -6,5 +6,6 @@ import { AgressoContractRepository } from './repositories/agresso-contract.repos
 @Module({
   controllers: [AgressoContractController],
   providers: [AgressoContractService, AgressoContractRepository],
+  exports: [AgressoContractService, AgressoContractRepository],
 })
 export class AgressoContractModule {}
