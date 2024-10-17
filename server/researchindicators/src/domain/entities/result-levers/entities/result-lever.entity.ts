@@ -37,9 +37,8 @@ export class ResultLever extends AuditableEntity {
     type: String,
     name: 'lever_id',
   })
-  @Column('varchar', {
+  @Column('bigint', {
     name: 'lever_id',
-    length: 20,
     nullable: false,
   })
   lever_id!: string;

@@ -15,6 +15,7 @@ import { ClarisaInstitution } from './entities/clarisa-institutions/entities/cla
 import { institutionMapper } from './mappers/institution.mapper';
 import { CreateClarisaInstitutionDto } from './entities/clarisa-institutions/dto/create-clarisa-institution.dto';
 import { ClarisaInstitutionsService } from './entities/clarisa-institutions/clarisa-institutions.service';
+import { ClarisaLever } from './entities/clarisa-levers/entities/clarisa-lever.entity';
 
 @Injectable()
 export class ClarisaService {
@@ -98,6 +99,10 @@ export class ClarisaService {
       institutionsPath,
       ClarisaInstitution,
       (data) => institutionMapper(data),
+    );
+    await this.base<ClarisaLever, ClarisaLever>(
+      ClarisaPathEnum.LEVERS,
+      ClarisaLever,
     );
     this._logger.debug('All entities cloned');
   }

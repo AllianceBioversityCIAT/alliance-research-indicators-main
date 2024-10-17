@@ -1,37 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, FindManyOptions, FindOneOptions, In } from 'typeorm';
 import { User } from './user.entity';
+import { AlianceManagementApp } from '../../../tools/broker/aliance-management.app';
 
 @Injectable()
 export class UserService {
-  constructor(
-    @InjectDataSource('secondary') private readonly dataSource: DataSource,
-  ) {}
+  constructor(private readonly alianceManagementApp: AlianceManagementApp) {}
 
-  async find(options: FindManyOptions<User>) {
-    return this.dataSource.getRepository(User).find(options);
-  }
-
-  async findOne(options: FindOneOptions<User>) {
-    return this.dataSource.getRepository(User).findOne(options);
+  async find(ids: number[]): Promise<User[]> {
+    return this.alianceManagementApp.sendToPattern<number[], User[]>(
+      'user/find-by-id',
+      ids,
+    );
   }
 
   async existUsers(ids: number[]): Promise<number[]> {
-    return this.dataSource
-      .getRepository(User)
-      .find({
-        where: {
-          is_active: true,
-          sec_user_id: In(ids),
-        },
-      })
-      .then((users) => {
-        const existingUserIds = users.map((user) => user.sec_user_id);
-        const nonExistingUserIds = ids.filter(
-          (id) => !existingUserIds.includes(id),
-        );
-        return nonExistingUserIds;
-      });
+    return this.find(ids).then((users) => {
+      const existingUserIds = users.map((user) => user.sec_user_id);
+      const nonExistingUserIds = ids.filter(
+        (id) => !existingUserIds.includes(id),
+      );
+      return nonExistingUserIds;
+    });
   }
 }

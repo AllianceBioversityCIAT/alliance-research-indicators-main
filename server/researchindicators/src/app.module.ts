@@ -31,9 +31,6 @@ import { AlianceManagementApp } from './domain/tools/broker/aliance-management.a
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
-    TypeOrmModule.forRoot(
-      <DataSourceOptions>getDataSource(dataSourceTarget.SECONDARY, false),
-    ),
   ],
   controllers: [AppController],
   providers: [

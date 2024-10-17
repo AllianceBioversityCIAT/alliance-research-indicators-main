@@ -5,4 +5,5 @@ export enum ClarisaPathEnum {
   INSTITUTIONS = 'institutions',
   LANGUAGES = 'languages',
   REGIONS = 'regions/un-regions',
+  LEVERS = 'alliance-levers',
 }

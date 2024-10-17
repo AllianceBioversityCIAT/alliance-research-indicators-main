@@ -10,7 +10,7 @@ export class ResultUsersService extends BaseServiceSimple<
   Repository<ResultUser>
 > {
   constructor(
-    private dataSource: DataSource,
+    dataSource: DataSource,
     private readonly _userService: UserService,
   ) {
     super(
@@ -34,7 +34,7 @@ export class ResultUsersService extends BaseServiceSimple<
     }
   }
 
-  async findUsersByRoleRoesult(
+  async findUsersByRoleResult(
     role: UserRolesEnum,
     resultId: number,
     userRelation: boolean = false,
@@ -50,12 +50,7 @@ export class ResultUsersService extends BaseServiceSimple<
     let responseResultUsers = resultUsers;
     if (userRelation) {
       const ids = resultUsers.map((el) => el.user_id);
-      const users = await this._userService.find({
-        where: {
-          is_active: true,
-          sec_user_id: In(ids),
-        },
-      });
+      const users = await this._userService.find(ids);
 
       responseResultUsers = resultUsers.map((el) => {
         const user = users.find((user) => user.sec_user_id === el.user_id);

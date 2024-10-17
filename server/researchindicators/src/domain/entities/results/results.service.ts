@@ -200,7 +200,7 @@ export class ResultsService {
       await this._resultKeywordsService.findKeywordsByResultId(resultId);
 
     const mainContractPerson = await this._resultUsersService
-      .findUsersByRoleRoesult(UserRolesEnum.MAIN_CONTACT, resultId, true)
+      .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId, true)
       .then((data) => (data?.length > 0 ? data[0] : null));
 
     const generalInformation: UpdateGeneralInformation = {
