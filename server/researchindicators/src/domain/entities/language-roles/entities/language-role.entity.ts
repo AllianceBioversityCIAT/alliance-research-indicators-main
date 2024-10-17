@@ -10,7 +10,7 @@ export class LanguageRole extends AuditableEntity {
   })
   language_role_id!: number;
 
-  @Column('bigint', {
+  @Column('text', {
     name: 'name',
     nullable: false,
   })

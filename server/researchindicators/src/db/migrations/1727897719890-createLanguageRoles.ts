@@ -6,7 +6,7 @@ export class CreateLanguageRoles1727897719890 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `CREATE TABLE \`language_roles\` (\`created_at\` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`created_by\` bigint NULL, \`updated_at\` timestamp(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`updated_by\` bigint NULL, \`is_active\` tinyint NOT NULL DEFAULT 1, \`language_role_id\` bigint NOT NULL AUTO_INCREMENT, \`name\` bigint NOT NULL, PRIMARY KEY (\`language_role_id\`)) ENGINE=InnoDB`,
+      `CREATE TABLE \`language_roles\` (\`created_at\` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`created_by\` bigint NULL, \`updated_at\` timestamp(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`updated_by\` bigint NULL, \`is_active\` tinyint NOT NULL DEFAULT 1, \`language_role_id\` bigint NOT NULL AUTO_INCREMENT, \`name\` text NOT NULL, PRIMARY KEY (\`language_role_id\`)) ENGINE=InnoDB`,
     );
     await queryRunner.query(
       `ALTER TABLE \`result_languages\` ADD \`language_role_id\` bigint NOT NULL`,
@@ -27,8 +27,5 @@ export class CreateLanguageRoles1727897719890 implements MigrationInterface {
       `ALTER TABLE \`result_languages\` DROP COLUMN \`language_role_id\``,
     );
     await queryRunner.query(`DROP TABLE \`language_roles\``);
-    await queryRunner.query(
-      `DELETE FROM language_roles WHERE language_role_id = ${LanguageRolesEnum.TRAINING_SUPERVISOR}`,
-    );
   }
 }
