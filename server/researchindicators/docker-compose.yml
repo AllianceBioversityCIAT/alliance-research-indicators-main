@@ -1,18 +1,17 @@
 version: '3'
 
 services:
-    dev:
-        container_name: research_indicatiors_server
-        image: research_indicatiors_server:1.0.0
-        build:
-            context: .
-            target: development
-            dockerfile: ./Dockerfile
-        command: npm run start
-        ports:
-            - 3000:3000
-        volumes:
-            - .:/usr/src/app
-            - /usr/src/app/node_modules
-        restart: unless-stopped
-        
+  dev:
+    container_name: research_indicatiors_server
+    image: research_indicatiors_server:1.0.0
+    build:
+      context: .
+      target: development
+      dockerfile: ./Dockerfile
+    command: npm run start
+    ports:
+      - 3000:3000
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    restart: unless-stopped
