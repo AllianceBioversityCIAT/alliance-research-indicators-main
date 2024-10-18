@@ -7,6 +7,7 @@ import { clarisaRoutes } from '../tools/clarisa/routes/clarisa.routes';
 import { ResultInstitutionsModule } from '../entities/result-institutions/result-institutions.module';
 import { ResultEvidencesModule } from '../entities/result-evidences/result-evidences.module';
 import { ResultCapacitySharingModule } from '../entities/result-capacity-sharing/result-capacity-sharing.module';
+import { IndicatorsModule } from '../entities/indicators/indicators.module';
 
 const ResultsChildren: Routes = [
   {
@@ -40,6 +41,10 @@ const children: Routes = [
   {
     path: 'user-agresso-contracts',
     module: UserAgressoContractsModule,
+  },
+  {
+    path: 'indicators',
+    module: IndicatorsModule,
   },
   {
     path: 'clarisa',
