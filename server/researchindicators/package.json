@@ -24,7 +24,8 @@
     "migration:empty": "cross-replace npm run typeorm migration:create ./src/db/migrations/${npm_config_name}",
     "migration:generate": "cross-replace npm run typeorm migration:generate -- ./src/db/migrations/${npm_config_name} -d ./src/db/config/mysql/orm.config.ts",
     "migration:revert": "npm run typeorm migration:revert -- -d ./src/db/config/mysql/orm.config.ts",
-    "migration:execute": "npm run typeorm migration:run -- -d ./src/db/config/mysql/orm.config.ts",
+    "migration:execute": "npm run typeorm migration:run -- -d ./dist/db/config/mysql/orm.config.js",
+    "migration:dev:execute": "npm run typeorm migration:run -- -d ./src/db/config/mysql/orm.config.ts",
     "update:dependencies": "npx npm-check-updates -u"
   },
   "dependencies": {
