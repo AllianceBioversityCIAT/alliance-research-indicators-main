@@ -16,6 +16,12 @@ export class IndicatorType extends AuditableEntity {
   })
   name!: string;
 
+  @Column('text', {
+    name: 'long_description',
+    nullable: true,
+  })
+  long_description?: string;
+
   @OneToMany(() => Indicator, (indicator) => indicator.indicatorType)
   indicators!: Indicator[];
 }

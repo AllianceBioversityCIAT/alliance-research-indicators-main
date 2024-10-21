@@ -30,6 +30,12 @@ export class Indicator extends AuditableEntity {
   })
   description?: string;
 
+  @Column('text', {
+    name: 'long_description',
+    nullable: true,
+  })
+  long_description?: string;
+
   @Column('bigint', {
     name: 'indicator_type_id',
     nullable: false,

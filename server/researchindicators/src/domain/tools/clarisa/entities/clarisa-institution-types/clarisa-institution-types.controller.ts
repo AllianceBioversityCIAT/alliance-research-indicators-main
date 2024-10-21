@@ -1,8 +1,39 @@
-import { Controller } from '@nestjs/common';
+import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ClarisaInstitutionTypesService } from './clarisa-institution-types.service';
-@Controller('clarisa-institution-types')
+import { ResponseUtils } from '../../../../shared/utils/response.utils';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
+@ApiTags('Clarisa')
+@Controller()
+@ApiBearerAuth()
 export class ClarisaInstitutionTypesController {
   constructor(
     private readonly clarisaInstitutionTypesService: ClarisaInstitutionTypesService,
   ) {}
+
+  @Get()
+  async find() {
+    return this.clarisaInstitutionTypesService
+      .findAll()
+      .then((institutionTypes) =>
+        ResponseUtils.format({
+          data: institutionTypes,
+          description: 'Institution types found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @Get(':id')
+  async findById(id: string) {
+    return this.clarisaInstitutionTypesService
+      .findOne<number>(+id)
+      .then((institutionType) =>
+        ResponseUtils.format({
+          data: institutionType,
+          description: 'Institution type found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }

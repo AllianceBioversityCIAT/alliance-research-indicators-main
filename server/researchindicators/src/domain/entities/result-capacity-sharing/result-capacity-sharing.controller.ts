@@ -7,12 +7,13 @@ import {
   Patch,
 } from '@nestjs/common';
 import { ResultCapacitySharingService } from './result-capacity-sharing.service';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UpdateResultCapacitySharingDto } from './dto/update-result-capacity-sharing.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 
 @ApiTags('Result Capacity Sharing')
 @Controller()
+@ApiBearerAuth()
 export class ResultCapacitySharingController {
   constructor(
     private readonly resultCapacitySharingService: ResultCapacitySharingService,

@@ -5,7 +5,7 @@ import { Indicator } from './entities/indicator.entity';
 @Injectable()
 export class IndicatorsService {
   private readonly mainRepo: Repository<Indicator>;
-  constructor(private dataSource: DataSource) {
+  constructor(dataSource: DataSource) {
     this.mainRepo = dataSource.getRepository(Indicator);
   }
 
@@ -13,6 +13,9 @@ export class IndicatorsService {
     return await this.mainRepo.find({
       where: {
         is_active: true,
+      },
+      relations: {
+        indicatorType: true,
       },
     });
   }

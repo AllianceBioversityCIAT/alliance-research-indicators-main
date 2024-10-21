@@ -15,7 +15,7 @@ import {
 import { AuditableEntity } from './auditable.entity';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
-abstract class BaseServiceProperties<RepositoryData> {
+export abstract class BaseServiceProperties<RepositoryData> {
   protected mainRepo: RepositoryData;
 }
 

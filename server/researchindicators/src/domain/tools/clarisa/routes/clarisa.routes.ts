@@ -7,6 +7,7 @@ import { ClarisaLanguagesModule } from '../entities/clarisa-languages/clarisa-la
 import { ClarisaRegionsModule } from '../entities/clarisa-regions/clarisa-regions.module';
 import { ClarisaSubNationalsModule } from '../entities/clarisa-sub-nationals/clarisa-sub-nationals.module';
 import { ClarisaModule } from '../clarisa.module';
+import { ClarisaLeversModule } from '../entities/clarisa-levers/clarisa-levers.module';
 
 export const clarisaRoutes: Routes = [
   {
@@ -40,5 +41,9 @@ export const clarisaRoutes: Routes = [
   {
     path: 'manager',
     module: ClarisaModule,
+  },
+  {
+    path: 'levers',
+    module: ClarisaLeversModule,
   },
 ];

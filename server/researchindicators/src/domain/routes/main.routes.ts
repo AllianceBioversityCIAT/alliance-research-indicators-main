@@ -8,6 +8,7 @@ import { ResultInstitutionsModule } from '../entities/result-institutions/result
 import { ResultEvidencesModule } from '../entities/result-evidences/result-evidences.module';
 import { ResultCapacitySharingModule } from '../entities/result-capacity-sharing/result-capacity-sharing.module';
 import { IndicatorsModule } from '../entities/indicators/indicators.module';
+import { IndicatorTypesModule } from '../entities/indicator-types/indicator-types.module';
 
 const ResultsChildren: Routes = [
   {
@@ -45,6 +46,10 @@ const children: Routes = [
   {
     path: 'indicators',
     module: IndicatorsModule,
+  },
+  {
+    path: 'indicator-types',
+    module: IndicatorTypesModule,
   },
   {
     path: 'clarisa',

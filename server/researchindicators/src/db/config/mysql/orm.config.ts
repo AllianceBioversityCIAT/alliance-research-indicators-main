@@ -16,13 +16,11 @@ export const getDataSource = (
   let username: string;
   let password: string;
   let database: string;
-  let entities: string[];
-  let name: string;
-
-  entities = [
+  const entities: string[] = [
     `${__dirname}/../../../domain/entities/**/*.entity{.ts,.js}`,
     `${__dirname}/../../../domain/tools/clarisa/entities/**/*.entity{.ts,.js}`,
   ];
+  let name: string;
 
   switch (target) {
     case dataSourceTarget.CORE:

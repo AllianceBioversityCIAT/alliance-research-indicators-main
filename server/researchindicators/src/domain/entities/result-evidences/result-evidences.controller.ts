@@ -10,7 +10,12 @@ import {
 import { ResultEvidencesService } from './result-evidences.service';
 import { CreateResultEvidenceDto } from './dto/create-result-evidence.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   EvidenceRoleEnum,
   QueryEvidenceRoles,
@@ -19,6 +24,7 @@ import {
 
 @ApiTags('Result Evidences')
 @Controller()
+@ApiBearerAuth()
 export class ResultEvidencesController {
   constructor(
     private readonly resultEvidencesService: ResultEvidencesService,

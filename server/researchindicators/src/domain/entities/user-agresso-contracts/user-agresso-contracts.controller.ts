@@ -7,7 +7,13 @@ import {
   Body,
 } from '@nestjs/common';
 import { UserAgressoContractsService } from './user-agresso-contracts.service';
-import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { UserAgressoContract } from './entities/user-agresso-contract.entity';
 import { ServiceResponseDto } from '../../shared/global-dto/service-response.dto';
@@ -16,6 +22,7 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @ApiTags('User Agresso Contracts')
 @Controller()
+@ApiBearerAuth()
 export class UserAgressoContractsController {
   constructor(
     private readonly userAgressoContractsService: UserAgressoContractsService,

@@ -1,7 +1,12 @@
 import { Controller, Get, Query, HttpStatus } from '@nestjs/common';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
-import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { AgressoFindNamePayload } from './dto/agresso-find-options.payload';
@@ -10,6 +15,7 @@ import { AgressoContract } from './entities/agresso-contract.entity';
 
 @ApiTags('Agresso Contracts')
 @Controller()
+@ApiBearerAuth()
 export class AgressoContractController {
   constructor(
     private readonly agressoContractService: AgressoContractService,

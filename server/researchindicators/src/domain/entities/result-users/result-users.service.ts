@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ResultUser } from './entities/result-user.entity';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { UserService } from '../../complementary-entities/secondary/user/user.service';

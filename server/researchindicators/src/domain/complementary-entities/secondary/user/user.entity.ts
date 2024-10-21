@@ -1,4 +1,3 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ApiProperty } from '@nestjs/swagger';
 

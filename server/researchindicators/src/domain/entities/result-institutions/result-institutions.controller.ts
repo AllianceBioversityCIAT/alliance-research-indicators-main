@@ -10,7 +10,7 @@ import {
 import { ResultInstitutionsService } from './result-institutions.service';
 import { CreateResultInstitutionDto } from './dto/create-result-institution.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
-import { ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   QueryInstitutionsRoles,
   QueryInstitutionsRolesEnum,
@@ -18,6 +18,7 @@ import {
 
 @ApiTags('Result Institutions')
 @Controller()
+@ApiBearerAuth()
 export class ResultInstitutionsController {
   constructor(
     private readonly resultInstitutionsService: ResultInstitutionsService,
