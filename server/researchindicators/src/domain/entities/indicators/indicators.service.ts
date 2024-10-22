@@ -19,4 +19,16 @@ export class IndicatorsService {
       },
     });
   }
+
+  async findOne(id: number) {
+    return await this.mainRepo.findOne({
+      where: {
+        indicator_id: id,
+        is_active: true,
+      },
+      relations: {
+        indicatorType: true,
+      },
+    });
+  }
 }
