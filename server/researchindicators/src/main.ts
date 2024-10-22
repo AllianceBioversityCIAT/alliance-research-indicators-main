@@ -5,10 +5,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { env } from 'process';
 import { Logger } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const logger: Logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
+  app.enableCors();
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
   const config = new DocumentBuilder()
     .setTitle('Research Indicators API')
     .setDescription(
