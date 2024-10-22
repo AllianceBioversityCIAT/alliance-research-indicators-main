@@ -21,13 +21,22 @@ export class AddedDescriptionAndIconToIndicators1729611300485
       `UPDATE \`indicator_types\` SET \`description\` = 'A change in knowledge, skills, attitudes and/or relationships, which manifests as a change in behavior in particular actors, to which research outputs and related activities have contributed.' WHERE \`indicator_type_id\` = ${IndicatorTypeEnum.OUTCOME}`,
     );
     await queryRunner.query(
-      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTPUT}  WHERE \`indicator_type_id\` = ${IndicatorsEnum.KNOWLEDGE_PRODUCT}`,
+      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTPUT}, \`icon_src\` = 'lightbulb'  WHERE \`indicator_id\` = ${IndicatorsEnum.KNOWLEDGE_PRODUCT}`,
     );
     await queryRunner.query(
-      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTPUT}  WHERE \`indicator_type_id\` = ${IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}`,
+      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTPUT}, \`icon_src\` = 'group'  WHERE \`indicator_id\` = ${IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}`,
     );
     await queryRunner.query(
-      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTPUT}  WHERE \`indicator_type_id\` = ${IndicatorsEnum.INNOVATION_DEV}`,
+      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTPUT}, \`icon_src\` = 'flag'  WHERE \`indicator_id\` = ${IndicatorsEnum.INNOVATION_DEV}`,
+    );
+    await queryRunner.query(
+      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTCOME}, \`icon_src\` = 'wb_sunny'  WHERE \`indicator_id\` = ${IndicatorsEnum.INNOVATION_USE}`,
+    );
+    await queryRunner.query(
+      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTCOME}, \`icon_src\` = 'pie_chart'  WHERE \`indicator_id\` = ${IndicatorsEnum.OICR}`,
+    );
+    await queryRunner.query(
+      `UPDATE \`indicators\` SET \`indicator_type_id\` = ${IndicatorTypeEnum.OUTCOME}, \`icon_src\` = 'folder_open'  WHERE \`indicator_id\` = ${IndicatorsEnum.POLICY_CHANGE}`,
     );
   }
 
