@@ -42,6 +42,12 @@ export class Indicator extends AuditableEntity {
   })
   indicator_type_id!: number;
 
+  @Column('text', {
+    name: 'icon_src',
+    nullable: true,
+  })
+  icon_src?: string;
+
   @ManyToOne(() => IndicatorType, (indicatorType) => indicatorType.indicators)
   @JoinColumn({ name: 'indicator_type_id' })
   indicatorType!: IndicatorType;
