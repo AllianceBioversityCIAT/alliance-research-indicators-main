@@ -18,8 +18,9 @@ export const AgressoContractMapper = (
 };
 
 const mapCountries = (countries: string): AgressoContractCountry[] => {
+  console.log('countries', countries);
   const countryArray: AgressoContractCountry[] = countries
-    .split(',')
+    ?.split(',')
     .map((country) => {
       const newContry = new AgressoContractCountry();
       newContry.iso_alpha_2 = country.trim();

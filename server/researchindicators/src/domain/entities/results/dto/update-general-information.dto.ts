@@ -6,7 +6,7 @@ import { ResultUser } from '../../result-users/entities/result-user.entity';
 export class UpdateGeneralInformation extends OmitType(CreateResultDto, [
   'indicator_id',
   'contract',
-  'lever',
+  ,
 ]) {
   @ApiProperty({
     type: ResultKeyword,

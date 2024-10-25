@@ -1,3 +1,3 @@
 export enum LeverRolesEnum {
-  PRIMARY = 1,
+  ALIGNMENT = 1,
 }

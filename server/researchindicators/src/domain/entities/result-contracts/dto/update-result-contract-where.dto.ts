@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ContractRolesEnum } from '../enum/lever-roles.enum';
+import { ContractRolesEnum } from '../enum/contract-roles.enum';
 import { FindOptionsWhere } from 'typeorm';
 import { ResultContract } from '../entities/result-contract.entity';
 

@@ -2,8 +2,9 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, map } from 'rxjs';
 import { env } from 'process';
 import { BadRequestException } from '@nestjs/common';
+import { ConnectionInterface } from '../../shared/global-dto/base-control-list-save';
 
-export class Clarisa {
+export class Clarisa implements ConnectionInterface {
   private clarisaHost: string;
   private token: string;
   private http: HttpService;

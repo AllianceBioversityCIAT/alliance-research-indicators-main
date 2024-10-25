@@ -53,6 +53,17 @@ export class ResultContract extends AuditableEntity {
   })
   contract_role_id!: number;
 
+  @ApiProperty({
+    type: Boolean,
+    name: 'is_primary',
+  })
+  @Column('boolean', {
+    name: 'is_primary',
+    nullable: false,
+    default: false,
+  })
+  is_primary!: boolean;
+
   @ManyToOne(
     () => ContractRole,
     (contractRole) => contractRole.result_contracts,

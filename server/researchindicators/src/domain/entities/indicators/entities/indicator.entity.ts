@@ -25,6 +25,12 @@ export class Indicator extends AuditableEntity {
   name!: string;
 
   @Column('text', {
+    name: 'other_names',
+    nullable: true,
+  })
+  other_names?: string;
+
+  @Column('text', {
     name: 'description',
     nullable: true,
   })

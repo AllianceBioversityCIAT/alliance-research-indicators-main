@@ -1,18 +1,13 @@
-import {
-  BadRequestException,
-  ConflictException,
-  HttpStatus,
-  Injectable,
-} from '@nestjs/common';
+import { ConflictException, HttpStatus, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { ResultRepository } from './repositories/result.repository';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
-import { cleanObject, validObject } from '../../shared/utils/object.utils';
+import { cleanObject } from '../../shared/utils/object.utils';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { Result } from './entities/result.entity';
 import { CreateResultDto } from './dto/create-result.dto';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
-import { ContractRolesEnum } from '../result-contracts/enum/lever-roles.enum';
+import { ContractRolesEnum } from '../result-contracts/enum/contract-roles.enum';
 import { ResultLeversService } from '../result-levers/result-levers.service';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { UpdateGeneralInformation } from './dto/update-general-information.dto';
@@ -22,11 +17,13 @@ import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultCapacitySharingService } from '../result-capacity-sharing/result-capacity-sharing.service';
 import { DataReturnEnum } from '../../shared/enum/queries.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultAlignmentDto } from './dto/result-alignment.dto';
+import { UserRole } from '../user-roles/entities/user-role.entity';
 
 @Injectable()
 export class ResultsService {
   constructor(
-    private dataSource: DataSource,
+    private readonly dataSource: DataSource,
     private readonly mainRepo: ResultRepository,
     private readonly _resultContractsService: ResultContractsService,
     private readonly _resultLeversService: ResultLeversService,
@@ -52,10 +49,7 @@ export class ResultsService {
   }
 
   async createResult(createResult: CreateResultDto): Promise<Result> {
-    const vaidRequest: boolean = validObject(createResult, ['lever']);
-    if (!vaidRequest) throw new BadRequestException('Invalid request');
-
-    const { description, indicator_id, title, contract, lever } = createResult;
+    const { description, indicator_id, title, contract } = createResult;
 
     await this.mainRepo.findOne({ where: { title } }).then((result) => {
       if (result) {
@@ -85,16 +79,9 @@ export class ResultsService {
         result.result_id,
         contract,
         'contract_id',
-        ContractRolesEnum.PRIMARY,
+        ContractRolesEnum.ALIGNMENT,
         manager,
-      );
-
-      await this._resultLeversService.create<LeverRolesEnum>(
-        result.result_id,
-        lever,
-        'lever_id',
-        LeverRolesEnum.PRIMARY,
-        manager,
+        ['is_primary'],
       );
 
       return result;
@@ -173,10 +160,18 @@ export class ResultsService {
         null,
         manager,
       );
-
+      let mainContractPerson: Partial<UserRole> = null;
+      if (Array.isArray(generalInformation.main_contract_person)) {
+        mainContractPerson =
+          generalInformation.main_contract_person.length > 0
+            ? generalInformation.main_contract_person[0]
+            : null;
+      } else {
+        mainContractPerson = generalInformation.main_contract_person;
+      }
       await this._resultUsersService.create<UserRolesEnum>(
         result_id,
-        generalInformation.main_contract_person,
+        mainContractPerson,
         'user_id',
         UserRolesEnum.MAIN_CONTACT,
         manager,
@@ -210,5 +205,57 @@ export class ResultsService {
     };
 
     return generalInformation;
+  }
+
+  async updateResultAlignment(
+    resultId: number,
+    alignmentData: ResultAlignmentDto,
+    returnData: DataReturnEnum = DataReturnEnum.FALSE,
+  ) {
+    const { contracts, levers } = alignmentData;
+    this.dataSource.transaction(async (manager) => {
+      await this._resultContractsService.create<ContractRolesEnum>(
+        resultId,
+        contracts,
+        'contract_id',
+        ContractRolesEnum.ALIGNMENT,
+        manager,
+        ['is_primary'],
+      );
+
+      await this._resultLeversService.create<LeverRolesEnum>(
+        resultId,
+        levers,
+        'lever_id',
+        LeverRolesEnum.ALIGNMENT,
+        manager,
+        ['is_primary'],
+      );
+    });
+
+    if (returnData === DataReturnEnum.TRUE) {
+      return this.findResultAlignment(resultId);
+    }
+
+    return undefined;
+  }
+
+  async findResultAlignment(resultId: number) {
+    const contracts = await this._resultContractsService.find(
+      resultId,
+      ContractRolesEnum.ALIGNMENT,
+    );
+
+    const levers = await this._resultLeversService.find(
+      resultId,
+      LeverRolesEnum.ALIGNMENT,
+    );
+
+    const resultAlignment: ResultAlignmentDto = {
+      contracts,
+      levers,
+    };
+
+    return resultAlignment;
   }
 }

@@ -21,6 +21,7 @@ import { CreateResultDto } from './dto/create-result.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { UpdateGeneralInformation } from './dto/update-general-information.dto';
 import { DataReturnEnum } from '../../shared/enum/queries.enum';
+import { ResultAlignmentDto } from './dto/result-alignment.dto';
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller()
@@ -125,6 +126,55 @@ export class ResultsController {
     return this.resultsService.findGeneralInfo(+resultId).then((result) =>
       ResponseUtils.format({
         description: 'General information was found correctly',
+        data: result,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  @ApiOperation({ summary: 'Update alignments' })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  @ApiQuery({
+    name: 'return',
+    required: false,
+    type: String,
+    enum: DataReturnEnum,
+    description: 'Is a reference to return data',
+  })
+  @Patch(':id/aligments')
+  async updateResultAlignments(
+    @Param('id') resultId: string,
+    @Query('return') returnData: DataReturnEnum,
+    @Body() generalInformation: ResultAlignmentDto,
+  ) {
+    return this.resultsService
+      .updateResultAlignment(+resultId, generalInformation, returnData)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'Alignments was updated correctly',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @ApiOperation({ summary: 'Find alignments' })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  @Get(':id/alignments')
+  async findResultAlignments(@Param('id') resultId: string) {
+    return this.resultsService.findResultAlignment(+resultId).then((result) =>
+      ResponseUtils.format({
+        description: 'alignments was found correctly',
         data: result,
         status: HttpStatus.OK,
       }),

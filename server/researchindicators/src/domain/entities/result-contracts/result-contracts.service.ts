@@ -4,6 +4,7 @@ import { ResultContract } from './entities/result-contract.entity';
 import { ResultContractsRepository } from './repositories/result-contracts.repository';
 import { selectManager } from '../../shared/utils/orm.util';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
+import { ContractRolesEnum } from './enum/contract-roles.enum';
 
 @Injectable()
 export class ResultContractsService extends BaseServiceSimple<
@@ -29,5 +30,16 @@ export class ResultContractsService extends BaseServiceSimple<
         is_active: false,
       },
     );
+  }
+
+  protected lastRefactoredAftterSave<ContractRolesEnum>(
+    data: Partial<ResultContract>[],
+    roleId?: ContractRolesEnum,
+  ): Partial<ResultContract>[] {
+    let dataToSave: Partial<ResultContract>[] = null;
+    if (roleId === ContractRolesEnum.ALIGNMENT) {
+      dataToSave = this.unsetMultiplesPrimaryContracts<ResultContract>(data);
+    }
+    return dataToSave ?? data;
   }
 }

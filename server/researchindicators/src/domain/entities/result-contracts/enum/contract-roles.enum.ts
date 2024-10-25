@@ -1,3 +1,3 @@
 export enum ContractRolesEnum {
-  PRIMARY = 1,
+  ALIGNMENT = 1,
 }

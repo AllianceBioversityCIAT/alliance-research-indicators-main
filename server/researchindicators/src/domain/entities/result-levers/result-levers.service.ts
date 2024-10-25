@@ -4,6 +4,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { ResultLever } from './entities/result-lever.entity';
 import { selectManager } from '../../shared/utils/orm.util';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
+import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 
 @Injectable()
 export class ResultLeversService extends BaseServiceSimple<
@@ -27,5 +28,16 @@ export class ResultLeversService extends BaseServiceSimple<
     );
 
     return response;
+  }
+
+  protected lastRefactoredAftterSave<Enum>(
+    data: Partial<ResultLever>[],
+    roleId?: Enum,
+  ): Partial<ResultLever>[] {
+    let dataToSave: Partial<ResultLever>[] = null;
+    if (roleId === LeverRolesEnum.ALIGNMENT) {
+      dataToSave = this.unsetMultiplesPrimaryContracts<ResultLever>(data);
+    }
+    return dataToSave ?? data;
   }
 }

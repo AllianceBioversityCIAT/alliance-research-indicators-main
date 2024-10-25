@@ -121,8 +121,13 @@ export abstract class BaseServiceSimple<
 
     await entityManager.update(updateWhere, inactiveData);
 
+    const finalDataToSave = await this.lastRefactoredAftterSave(
+      newDataToSave,
+      dataRole,
+    );
+
     const response = (
-      await entityManager.save(newDataToSave as DeepPartial<Entity>[])
+      await entityManager.save(finalDataToSave as DeepPartial<Entity>[])
     ).filter((data) => data.is_active === true);
 
     return response;
@@ -158,10 +163,31 @@ export abstract class BaseServiceSimple<
     });
   }
 
+  protected unsetMultiplesPrimaryContracts<T extends { is_primary: boolean }>(
+    data: Partial<T>[],
+  ): Partial<T>[] {
+    const isPrimary = data.filter((item) => item.is_primary);
+    if (isPrimary.length > 1) {
+      data.forEach((item) => {
+        item.is_primary = false;
+      });
+    }
+    return data;
+  }
+
   protected async createCustomValidation(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     dataArray: Partial<Entity>[],
   ): Promise<void> {
     // Override this method to add custom validation
+  }
+
+  protected lastRefactoredAftterSave<Enum>(
+    data: Partial<Entity>[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    roleId: Enum = null,
+  ): Partial<Entity>[] {
+    // Override this method to add custom validation
+    return data;
   }
 }

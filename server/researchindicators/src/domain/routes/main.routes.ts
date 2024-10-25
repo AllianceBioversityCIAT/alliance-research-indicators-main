@@ -9,6 +9,8 @@ import { ResultEvidencesModule } from '../entities/result-evidences/result-evide
 import { ResultCapacitySharingModule } from '../entities/result-capacity-sharing/result-capacity-sharing.module';
 import { IndicatorsModule } from '../entities/indicators/indicators.module';
 import { IndicatorTypesModule } from '../entities/indicator-types/indicator-types.module';
+import { AgressoModule } from '../tools/agresso/agresso.module';
+import { ClarisaModule } from '../tools/clarisa/clarisa.module';
 
 const ResultsChildren: Routes = [
   {
@@ -53,7 +55,12 @@ const children: Routes = [
   },
   {
     path: 'clarisa',
+    module: ClarisaModule,
     children: clarisaRoutes,
+  },
+  {
+    path: 'agresso',
+    module: AgressoModule,
   },
 ];
 
