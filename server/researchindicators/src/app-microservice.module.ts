@@ -1,12 +1,6 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
-import { AppController } from './app.controller';
+import { Module } from '@nestjs/common';
 import { AppService } from './app.service';
-import { APP_FILTER, APP_INTERCEPTOR, RouterModule } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggingInterceptor } from './domain/shared/Interceptors/logging.interceptor';
 import { ResponseInterceptor } from './domain/shared/Interceptors/response.interceptor';
 import { GlobalExceptions } from './domain/shared/error-management/global.exception';
@@ -15,28 +9,21 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSourceOptions } from 'typeorm';
 import { getDataSource } from './db/config/mysql/orm.config';
 import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum';
-import { route as mainRoute } from './domain/routes/main.routes';
 import { ClarisaModule } from './domain/tools/clarisa/clarisa.module';
-import { CronModule } from './domain/tools/cron-jobs/cron.module';
-import { JwtMiddleware } from './domain/shared/middlewares/jwr.middleware';
 import { AlianceManagementApp } from './domain/tools/broker/aliance-management.app';
 import { AgressoModule } from './domain/tools/agresso/agresso.module';
 
 @Module({
   imports: [
-    RouterModule.register(mainRoute),
     EntitiesModule,
     ClarisaModule,
     AgressoModule,
-    CronModule,
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
   ],
-  controllers: [AppController],
   providers: [
     AlianceManagementApp,
-    JwtMiddleware,
     AppService,
     {
       provide: APP_INTERCEPTOR,
@@ -52,11 +39,4 @@ import { AgressoModule } from './domain/tools/agresso/agresso.module';
     },
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(JwtMiddleware).forRoutes({
-      path: '*',
-      method: RequestMethod.ALL,
-    });
-  }
-}
+export class AppMicroserviceModule {}

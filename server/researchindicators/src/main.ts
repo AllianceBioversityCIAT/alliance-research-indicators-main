@@ -6,9 +6,9 @@ import { env } from 'process';
 import { Logger } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { json, urlencoded } from 'express';
+import { AppMicroserviceModule } from './app-microservice.module';
 
-async function bootstrap() {
-  const logger: Logger = new Logger('Bootstrap');
+async function httpservice(logger: Logger) {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
   app.use(json({ limit: '50mb' }));
@@ -27,9 +27,25 @@ async function bootstrap() {
   const swaggerPath = 'swagger';
   SwaggerModule.setup(swaggerPath, app, document);
 
+  await app
+    .listen(port)
+    .then(() => {
+      logger.debug(`Application is running http://localhost:${port}`);
+      logger.debug(
+        `Documentation is running http://localhost:${port}/${swaggerPath}`,
+      );
+    })
+    .catch((err) => {
+      const portValue: number | string = port || '<Not defined>';
+      logger.error(`Application failed to start on port ${portValue}`);
+      logger.error(err);
+    });
+}
+
+async function microservice(logger: Logger) {
   const queueHost: string = `amqps://${env.ARI_MQ_USER}:${env.ARI_MQ_PASSWORD}@${env.ARI_MQ_HOST}`;
   const appSocket = await NestFactory.createMicroservice<MicroserviceOptions>(
-    AppModule,
+    AppMicroserviceModule,
     {
       transport: Transport.RMQ,
       options: {
@@ -42,30 +58,20 @@ async function bootstrap() {
     },
   );
 
-  if (env.ARI_SERVER_TYPE === 'http') {
-    await app
-      .listen(port)
-      .then(() => {
-        logger.debug(`Application is running http://localhost:${port}`);
-        logger.debug(
-          `Documentation is running http://localhost:${port}/${swaggerPath}`,
-        );
-      })
-      .catch((err) => {
-        const portValue: number | string = port || '<Not defined>';
-        logger.error(`Application failed to start on port ${portValue}`);
-        logger.error(err);
-      });
-  } else if (env.ARI_SERVER_TYPE === 'microservice') {
-    await appSocket
-      .listen()
-      .then(() => {
-        logger.debug(`Microservice is already listening`);
-      })
-      .catch((err) => {
-        logger.error(`Microservice present an error`);
-        logger.error(err);
-      });
-  }
+  await appSocket
+    .listen()
+    .then(() => {
+      logger.debug(`Microservice is already listening`);
+    })
+    .catch((err) => {
+      logger.error(`Microservice present an error`);
+      logger.error(err);
+    });
+}
+
+async function bootstrap() {
+  const logger: Logger = new Logger('Bootstrap');
+  await httpservice(logger);
+  await microservice(logger);
 }
 bootstrap();
