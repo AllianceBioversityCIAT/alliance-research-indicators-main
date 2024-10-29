@@ -26,19 +26,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   const swaggerPath = 'swagger';
   SwaggerModule.setup(swaggerPath, app, document);
-  await app
-    .listen(port)
-    .then(() => {
-      logger.debug(`Application is running http://localhost:${port}`);
-      logger.debug(
-        `Documentation is running http://localhost:${port}/${swaggerPath}`,
-      );
-    })
-    .catch((err) => {
-      const portValue: number | string = port || '<Not defined>';
-      logger.error(`Application failed to start on port ${portValue}`);
-      logger.error(err);
-    });
+
   const queueHost: string = `amqps://${env.ARI_MQ_USER}:${env.ARI_MQ_PASSWORD}@${env.ARI_MQ_HOST}`;
   const appSocket = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppModule,
@@ -54,14 +42,30 @@ async function bootstrap() {
     },
   );
 
-  await appSocket
-    .listen()
-    .then(() => {
-      logger.debug(`Microservice is already listening`);
-    })
-    .catch((err) => {
-      logger.error(`Microservice present an error`);
-      logger.error(err);
-    });
+  if (env.ARI_SERVER_TYPE === 'http') {
+    await app
+      .listen(port)
+      .then(() => {
+        logger.debug(`Application is running http://localhost:${port}`);
+        logger.debug(
+          `Documentation is running http://localhost:${port}/${swaggerPath}`,
+        );
+      })
+      .catch((err) => {
+        const portValue: number | string = port || '<Not defined>';
+        logger.error(`Application failed to start on port ${portValue}`);
+        logger.error(err);
+      });
+  } else if (env.ARI_SERVER_TYPE === 'microservice') {
+    await appSocket
+      .listen()
+      .then(() => {
+        logger.debug(`Microservice is already listening`);
+      })
+      .catch((err) => {
+        logger.error(`Microservice present an error`);
+        logger.error(err);
+      });
+  }
 }
 bootstrap();

@@ -5,8 +5,11 @@ import { AgressoService } from '../agresso/agresso.service';
 @Injectable()
 export class AgressoCron {
   constructor(private readonly _agressoService: AgressoService) {}
-  @Cron(CronExpression.EVERY_WEEK)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async cloneNormalEntities() {
-    this._agressoService.cloneAllAgressoEntities();
+    console.log('=============');
+    console.log('Cron job started: AgressoCron.cloneNormalEntities');
+    console.log('=============');
+    //this._agressoService.cloneAllAgressoEntities();
   }
 }

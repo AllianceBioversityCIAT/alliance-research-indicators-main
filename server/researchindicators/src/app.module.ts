@@ -17,19 +17,19 @@ import { getDataSource } from './db/config/mysql/orm.config';
 import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum';
 import { route as mainRoute } from './domain/routes/main.routes';
 import { ClarisaModule } from './domain/tools/clarisa/clarisa.module';
-import { ScheduleModule } from '@nestjs/schedule';
 import { CronModule } from './domain/tools/cron-jobs/cron.module';
 import { JwtMiddleware } from './domain/shared/middlewares/jwr.middleware';
 import { AlianceManagementApp } from './domain/tools/broker/aliance-management.app';
 import { AgressoModule } from './domain/tools/agresso/agresso.module';
+import { env } from 'process';
+
 @Module({
   imports: [
     RouterModule.register(mainRoute),
     EntitiesModule,
     ClarisaModule,
     AgressoModule,
-    CronModule,
-    ScheduleModule.forRoot(),
+    ...(env.ARI_SERVER_TYPE === 'http' ? [CronModule] : []),
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),

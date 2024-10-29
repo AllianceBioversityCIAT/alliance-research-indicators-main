@@ -17,6 +17,7 @@ export abstract class BaseControlListSave<
     path: string,
     entity: new () => Y,
     mapper?: (data: T) => DeepPartial<Y>,
+    iterator?: (data: T[]) => DeepPartial<Y>[],
   ): Promise<Y[]> {
     this._logger.log(`Fetching data from Clarisa API for ${entity.name}`);
     const data: T[] = await this.connection.get<T[]>(path).catch((err) => {
@@ -27,7 +28,9 @@ export abstract class BaseControlListSave<
       return [];
     });
     let modifyData: DeepPartial<Y>[];
-    if (mapper) {
+    if (iterator) {
+      modifyData = iterator(data);
+    } else if (mapper) {
       modifyData = data.map((item) => mapper(item));
     } else {
       modifyData = data as unknown as Y[];

@@ -6,8 +6,11 @@ import { ClarisaService } from '../clarisa/clarisa.service';
 export class ClarisaCron {
   constructor(private readonly _clarisaService: ClarisaService) {}
 
-  @Cron(CronExpression.EVERY_8_HOURS)
+  @Cron(CronExpression.EVERY_30_SECONDS)
   async cloneNormalEntities() {
-    this._clarisaService.cloneAllClarisaEntities();
+    console.log('=============');
+    console.log('Cron job started: 30 ClarisaCron.cloneNormalEntities');
+    console.log('=============');
+    //this._clarisaService.cloneAllClarisaEntities();
   }
 }
