@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
 
 export class CreateResultDto {
   @ApiProperty({
@@ -10,11 +9,11 @@ export class CreateResultDto {
   public indicator_id?: number;
 
   @ApiProperty({
-    type: ResultContract,
+    type: String,
     required: false,
     description: 'It is the reference of the contract in agresso',
   })
-  public contract!: Partial<ResultContract>;
+  public contract_id: string;
 
   @ApiProperty({
     type: String,

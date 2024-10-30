@@ -19,6 +19,7 @@ import { DataReturnEnum } from '../../shared/enum/queries.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
 import { UserRole } from '../user-roles/entities/user-role.entity';
+import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 
 @Injectable()
 export class ResultsService {
@@ -49,7 +50,7 @@ export class ResultsService {
   }
 
   async createResult(createResult: CreateResultDto): Promise<Result> {
-    const { description, indicator_id, title, contract } = createResult;
+    const { description, indicator_id, title, contract_id } = createResult;
 
     await this.mainRepo.findOne({ where: { title } }).then((result) => {
       if (result) {
@@ -75,9 +76,14 @@ export class ResultsService {
         manager,
       );
 
+      const primaryContract: Partial<ResultContract> = {
+        contract_id: contract_id,
+        is_primary: true,
+      };
+
       await this._resultContractsService.create<ContractRolesEnum>(
         result.result_id,
-        contract,
+        primaryContract,
         'contract_id',
         ContractRolesEnum.ALIGNMENT,
         manager,
@@ -153,9 +159,13 @@ export class ResultsService {
         description: generalInformation.description,
       });
 
+      const keywordsToSave = this._resultKeywordsService.transformData(
+        generalInformation.keywords,
+      );
+
       await this._resultKeywordsService.create<null>(
         result_id,
-        generalInformation.keywords,
+        keywordsToSave,
         'keyword',
         null,
         manager,
@@ -200,7 +210,7 @@ export class ResultsService {
 
     const generalInformation: UpdateGeneralInformation = {
       ...result,
-      keywords: keywords,
+      keywords: keywords.map((keyword) => keyword.keyword),
       main_contract_person: mainContractPerson,
     };
 
