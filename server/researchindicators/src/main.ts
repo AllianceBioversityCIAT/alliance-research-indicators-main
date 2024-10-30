@@ -3,12 +3,14 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { env } from 'process';
-import { Logger } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { json, urlencoded } from 'express';
 import { AppMicroserviceModule } from './app-microservice.module';
-
-async function httpservice(logger: Logger) {
+import { LoggerUtil } from './domain/shared/utils/logger.util';
+const logger: LoggerUtil = new LoggerUtil({
+  name: 'bootstrap',
+});
+async function httpservice() {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
   app.use(json({ limit: '50mb' }));
@@ -42,7 +44,7 @@ async function httpservice(logger: Logger) {
     });
 }
 
-async function microservice(logger: Logger) {
+async function microservice() {
   const queueHost: string = `amqps://${env.ARI_MQ_USER}:${env.ARI_MQ_PASSWORD}@${env.ARI_MQ_HOST}`;
   const appSocket = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppMicroserviceModule,
@@ -70,8 +72,7 @@ async function microservice(logger: Logger) {
 }
 
 async function bootstrap() {
-  const logger: Logger = new Logger('Bootstrap');
-  await httpservice(logger);
-  await microservice(logger);
+  await httpservice();
+  await microservice();
 }
 bootstrap();

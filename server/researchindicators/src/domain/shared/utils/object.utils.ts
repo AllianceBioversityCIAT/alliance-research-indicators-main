@@ -3,7 +3,11 @@ import { FindOptionsRelations } from 'typeorm';
 export const cleanObject = <T>(obj: T): Partial<T> => {
   const cleanedObj: Partial<T> = {};
   for (const key in obj) {
-    if (obj[key] !== null && obj[key] !== '') {
+    if (
+      obj[key] !== null &&
+      obj[key] !== '' &&
+      (typeof obj[key] == 'number' ? !isNaN(obj[key]) : true)
+    ) {
       cleanedObj[key] = obj[key];
     }
   }
@@ -23,7 +27,11 @@ export const validObject = <T>(
   valid: (keyof T)[],
 ): boolean => {
   for (const key of valid) {
-    if (obj[key] === null || obj[key] === '') {
+    if (
+      obj[key] === null ||
+      obj[key] === '' ||
+      (typeof obj[key] == 'number' ? isNaN(obj[key]) : false)
+    ) {
       return false;
     }
   }

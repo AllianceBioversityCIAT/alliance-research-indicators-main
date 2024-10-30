@@ -3,7 +3,6 @@ import {
   ExecutionContext,
   HttpStatus,
   InternalServerErrorException,
-  Logger,
   NestInterceptor,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
@@ -11,13 +10,16 @@ import { Observable, map } from 'rxjs';
 import { ServerResponseDto } from '../global-dto/server-response.dto';
 import { ServiceResponseDto } from '../global-dto/service-response.dto';
 import { ENV } from '../utils/env.utils';
+import { LoggerUtil } from '../utils/logger.util';
 
 export class ResponseInterceptor implements NestInterceptor {
-  private readonly _logger: Logger = new Logger('System');
   intercept(
     context: ExecutionContext,
     next: CallHandler,
   ): Observable<ServerResponseDto<unknown>> {
+    const _logger: LoggerUtil = new LoggerUtil({
+      context: context,
+    });
     const ctx = context.switchToHttp();
     const response: Response = ctx.getResponse<Response>();
     const request: Request = ctx.getRequest<Request>();
@@ -29,7 +31,10 @@ export class ResponseInterceptor implements NestInterceptor {
         if (contextType === 'rpc') {
           const ctxRpc = context.switchToRpc();
           const pattern = ctxRpc.getContext().getPattern();
-          this._logger.verbose(`[socket]: (${pattern}) - By Alliance Main`);
+          _logger.verbose(`- By Alliance Main`, {
+            method: 'socket',
+            url: pattern,
+          });
           return res;
         }
         let modifiedData: ServerResponseDto<unknown> = {
@@ -54,9 +59,15 @@ export class ResponseInterceptor implements NestInterceptor {
             errors: res.message,
           };
         }
-        const description: string = `[${request.method}]: ${request.url} status: ${modifiedData.status} - By ${ip}`;
-
-        this.logBasedOnStatus(modifiedData.status, description, res?.stack);
+        const description: string = `status: ${modifiedData.status} - By ${ip}`;
+        this.logBasedOnStatus(
+          modifiedData.status,
+          description,
+          _logger,
+          res?.stack,
+          request.method,
+          request.url,
+        );
 
         response.status(modifiedData?.status);
         return modifiedData;
@@ -64,23 +75,30 @@ export class ResponseInterceptor implements NestInterceptor {
     );
   }
 
-  private logBasedOnStatus(status: HttpStatus, message: string, error?: any) {
+  private logBasedOnStatus(
+    status: HttpStatus,
+    message: string,
+    logger: LoggerUtil,
+    error?: any,
+    method?: string,
+    url?: string,
+  ) {
     if (
       status >= HttpStatus.AMBIGUOUS &&
       status < HttpStatus.INTERNAL_SERVER_ERROR
     ) {
-      this._logger.warn(message);
-      this._logger.warn(error);
+      logger.warn(message, { method, url });
+      logger.warn(error, { method, url });
     } else if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      this._logger.error(message);
-      this._logger.error(error);
+      logger.error(message, { method, url });
+      logger.error(error, { method, url });
     } else if (
       !ENV.IS_PRODUCTION &&
       ENV.SEE_ALL_LOGS &&
       status >= HttpStatus.OK &&
       status < HttpStatus.AMBIGUOUS
     ) {
-      this._logger.verbose(message);
+      logger.verbose(message, { method, url });
     }
   }
 

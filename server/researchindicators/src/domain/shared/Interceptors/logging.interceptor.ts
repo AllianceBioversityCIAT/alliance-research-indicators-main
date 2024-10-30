@@ -3,32 +3,44 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
-  Logger,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { Request } from 'express';
 import { ENV } from '../utils/env.utils';
+import { LoggerUtil } from '../utils/logger.util';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-  private readonly _logger: Logger = new Logger('System');
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const _logger: LoggerUtil = new LoggerUtil({
+      context: context,
+    });
     const contextType = context.getType();
+    let method: string = '';
+    let url: string = '';
     let message: string = '';
     if (contextType === 'http') {
       const ctx = context.switchToHttp();
       const request: Request = ctx.getRequest<Request>();
       const ip = request.socket?.remoteAddress;
-      message = `[${request.method}]: ${request.url} - By ${ip}`;
+      method = request.method;
+      url = request.url;
+      message = `- By ${ip}`;
     } else if (contextType === 'rpc') {
       const ctx = context.switchToRpc();
       const pattern = ctx.getContext().getPattern();
-      message = `[socket]: (${pattern}) - By Alliance Main`;
+      method = 'socket';
+      url = pattern;
+      message = ` - By Alliance Main`;
     }
 
     return next
       .handle()
-      .pipe(finalize(() => ENV.SEE_ALL_LOGS && this._logger.log(message)));
+      .pipe(
+        finalize(
+          () => ENV.SEE_ALL_LOGS && _logger.log(message, { method, url }),
+        ),
+      );
   }
 }

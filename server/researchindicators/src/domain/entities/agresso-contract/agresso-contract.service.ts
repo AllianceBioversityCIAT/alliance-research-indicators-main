@@ -32,7 +32,6 @@ export class AgressoContractService {
       findQuery.take = paginationClean.limit;
       findQuery.skip = offset;
     }
-
     if (Object.keys(relations).length !== 0) {
       findQuery.relations =
         parseBoolean<StringKeys<AgressoContract>>(relations);
