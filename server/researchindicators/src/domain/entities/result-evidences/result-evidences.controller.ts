@@ -71,4 +71,18 @@ export class ResultEvidencesController {
         }),
       );
   }
+
+  @ApiOperation({ summary: 'Find principal evidence by result ID' })
+  @Get('principal/:resultId')
+  async getPrincipalEvidence(@Param('resultId') resultId: string) {
+    return this.resultEvidencesService
+      .findPrincipalEvidence(+resultId)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'Principal evidence found',
+          status: HttpStatus.OK,
+          data: result,
+        }),
+      );
+  }
 }
