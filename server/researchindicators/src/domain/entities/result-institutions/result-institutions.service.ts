@@ -62,19 +62,32 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     });
   }
 
-  async findAll(resultId: number, institution_role_id?: InstitutionRolesEnum) {
+  async findAll(
+    resultId: number,
+    institution_role_id?: InstitutionRolesEnum,
+  ): Promise<CreateResultInstitutionDto> {
     const where: FindOptionsWhere<ResultInstitution> = {};
 
     if (institution_role_id) {
       where.institution_role_id = institution_role_id;
     }
 
-    return this.mainRepo.find({
+    const institutio = await this.mainRepo.find({
       where: {
         ...where,
         result_id: resultId,
         is_active: true,
       },
+      relations: {
+        institution: {
+          country_office: true,
+          institution_type: true,
+        },
+      },
     });
+
+    return {
+      institutions: institutio,
+    };
   }
 }
