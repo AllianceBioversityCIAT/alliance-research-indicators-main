@@ -8,5 +8,5 @@ export class CreateResultEvidenceDto {
     description: 'Is a reference to the indicator id',
     isArray: true,
   })
-  evidences: ResultEvidence[];
+  evidence: ResultEvidence[];
 }

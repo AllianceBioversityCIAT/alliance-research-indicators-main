@@ -23,10 +23,10 @@ export class ResultEvidencesService extends BaseServiceSimple<
     resultEvidences: CreateResultEvidenceDto,
   ) {
     return this.dataSource.transaction(async (manager) => {
-      const { evidences } = resultEvidences;
+      const { evidence } = resultEvidences;
       return await this.create(
         resultId,
-        evidences,
+        evidence,
         'evidence_url',
         EvidenceRoleEnum.PRINCIPAL_EVIDENCE,
         manager,
@@ -47,7 +47,7 @@ export class ResultEvidencesService extends BaseServiceSimple<
     });
 
     return {
-      evidences: resultEvidences,
+      evidence: resultEvidences,
     };
   }
 }
