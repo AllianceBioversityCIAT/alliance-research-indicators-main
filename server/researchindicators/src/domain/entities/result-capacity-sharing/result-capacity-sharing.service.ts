@@ -163,7 +163,7 @@ export class ResultCapacitySharingService {
     await this._resultCountryService.create<CountryRolesEnum>(
       resultId,
       updateData?.nationality,
-      'country_id',
+      'isoAlpha2',
       CountryRolesEnum.TRAINEE_NATIONALITY,
       manager,
     );

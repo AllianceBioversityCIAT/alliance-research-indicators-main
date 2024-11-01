@@ -90,7 +90,6 @@ export class ResultInstitutionsService extends BaseServiceSimple<
       },
       relations: {
         institution: {
-          country_office: true,
           institution_type: true,
         },
       },

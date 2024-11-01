@@ -26,11 +26,12 @@ export class ResultCountry extends AuditableEntity {
   })
   result_id!: number;
 
-  @Column('bigint', {
-    name: 'country_id',
+  @Column('varchar', {
+    length: 3,
+    name: 'isoAlpha2',
     nullable: false,
   })
-  country_id!: number;
+  isoAlpha2!: string;
 
   @Column('bigint', {
     name: 'country_role_id',
@@ -47,7 +48,7 @@ export class ResultCountry extends AuditableEntity {
   result!: Result;
 
   @ManyToOne(() => ClarisaCountry, (country) => country.result_countries)
-  @JoinColumn({ name: 'country_id' })
+  @JoinColumn({ name: 'isoAlpha2' })
   country!: ClarisaCountry;
 
   @OneToMany(

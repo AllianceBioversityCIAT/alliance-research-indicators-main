@@ -4,6 +4,7 @@ import {
   CreateClarisaInstitutionDto,
 } from '../entities/clarisa-institutions/dto/create-clarisa-institution.dto';
 import { ClarisaInstitution } from '../entities/clarisa-institutions/entities/clarisa-institution.entity';
+import { ClarisaInstitutionLocation } from '../entities/clarisa-institution-locations/entities/clarisa-institution-location.entity';
 
 export const institutionMapper = (
   data: CreateClarisaInstitutionDto,
@@ -14,9 +15,18 @@ export const institutionMapper = (
   name: data?.name,
   websiteLink: data?.websiteLink,
   institution_type_id: data?.institutionType?.code,
-  country_office_id: hqInstitutionsMapper(data.countryOfficeDTO),
+  institution_locations: hqInstitutionsMapper(data.countryOfficeDTO),
 });
 
-const hqInstitutionsMapper = (hq: countryOfficeDTO[]): number => {
-  return hq.find((el) => el.isHeadquarter == 1).code;
+const hqInstitutionsMapper = (
+  hq: countryOfficeDTO[],
+): Partial<ClarisaInstitutionLocation>[] => {
+  return hq.map(
+    (hq): Partial<ClarisaInstitutionLocation> => ({
+      code: hq.code,
+      name: hq.name,
+      isoAlpha2: hq.isoAlpha2,
+      isHeadquarter: hq.isHeadquarter == 1,
+    }),
+  );
 };

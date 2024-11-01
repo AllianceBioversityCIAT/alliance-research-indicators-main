@@ -9,7 +9,7 @@ import {
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ClarisaInstitutionType } from '../../clarisa-institution-types/entities/clarisa-institution-type.entity';
 import { ResultInstitution } from '../../../../../entities/result-institutions/entities/result-institution.entity';
-import { ClarisaCountry } from '../../clarisa-countries/entities/clarisa-country.entity';
+import { ClarisaInstitutionLocation } from '../../clarisa-institution-locations/entities/clarisa-institution-location.entity';
 
 @Entity('clarisa_institutions')
 export class ClarisaInstitution extends AuditableEntity {
@@ -49,19 +49,6 @@ export class ClarisaInstitution extends AuditableEntity {
   })
   institution_type_id!: number;
 
-  @Column('bigint', {
-    name: 'country_office_id',
-    nullable: true,
-  })
-  country_office_id!: number;
-
-  @ManyToOne(
-    () => ClarisaCountry,
-    (clarisaCountry) => clarisaCountry.institutions,
-  )
-  @JoinColumn({ name: 'country_office_id' })
-  country_office!: ClarisaCountry;
-
   @ManyToOne(
     () => ClarisaInstitutionType,
     (clarisaInstitutionType) => clarisaInstitutionType.institutions,
@@ -74,4 +61,11 @@ export class ClarisaInstitution extends AuditableEntity {
     (resultInstitution) => resultInstitution.institution,
   )
   result_institutions!: ResultInstitution[];
+
+  @OneToMany(
+    () => ClarisaInstitutionLocation,
+    (clarisaCountry) => clarisaCountry.institution,
+    { cascade: true },
+  )
+  institution_locations!: ClarisaInstitutionLocation[];
 }

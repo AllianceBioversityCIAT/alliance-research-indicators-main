@@ -1,21 +1,13 @@
 import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ResultCountry } from '../../../../../entities/result-countries/entities/result-country.entity';
-import { ClarisaInstitution } from '../../clarisa-institutions/entities/clarisa-institution.entity';
+import { ClarisaInstitutionLocation } from '../../clarisa-institution-locations/entities/clarisa-institution-location.entity';
 
 @Entity('clarisa_countries')
 export class ClarisaCountry extends AuditableEntity {
-  @PrimaryColumn('bigint', {
-    name: 'code',
-    primary: true,
-    nullable: false,
-  })
-  code!: number;
-
-  @Column('varchar', {
+  @PrimaryColumn('varchar', {
     length: 3,
     name: 'isoAlpha2',
-    nullable: true,
   })
   isoAlpha2!: string;
 
@@ -52,8 +44,8 @@ export class ClarisaCountry extends AuditableEntity {
   result_countries!: ResultCountry[];
 
   @OneToMany(
-    () => ClarisaInstitution,
-    (clarisaInstitution) => clarisaInstitution.country_office,
+    () => ClarisaInstitutionLocation,
+    (clarisaInstitution) => clarisaInstitution.country,
   )
-  institutions!: ClarisaInstitution[];
+  institution_locations!: ClarisaInstitutionLocation[];
 }

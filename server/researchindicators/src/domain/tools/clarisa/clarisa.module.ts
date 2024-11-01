@@ -10,6 +10,7 @@ import { ClarisaLanguagesModule } from './entities/clarisa-languages/clarisa-lan
 import { HttpModule } from '@nestjs/axios';
 import { ClarisaInstitutionTypesModule } from './entities/clarisa-institution-types/clarisa-institution-types.module';
 import { ClarisaController } from './clarisa.controller';
+import { ClarisaInstitutionLocationsModule } from './entities/clarisa-institution-locations/clarisa-institution-locations.module';
 
 @Module({
   providers: [ClarisaService],
@@ -24,6 +25,7 @@ import { ClarisaController } from './clarisa.controller';
     ClarisaLanguagesModule,
     HttpModule,
     ClarisaInstitutionTypesModule,
+    ClarisaInstitutionLocationsModule,
   ],
   exports: [ClarisaService],
 })

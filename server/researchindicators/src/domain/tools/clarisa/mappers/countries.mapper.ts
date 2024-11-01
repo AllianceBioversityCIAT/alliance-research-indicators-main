@@ -8,7 +8,6 @@ export const countryMapper = (
   isoAlpha2: data?.isoAlpha2,
   isoAlpha3: data?.isoAlpha3,
   name: data?.name,
-  code: data.code,
   latitude: data?.locationDTO?.latitude,
   longitude: data?.locationDTO?.longitude,
 });
