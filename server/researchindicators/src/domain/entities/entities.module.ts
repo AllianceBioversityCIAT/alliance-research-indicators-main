@@ -30,6 +30,11 @@ import { UserRolesModule } from './user-roles/user-roles.module';
 import { IndicatorTypesModule } from './indicator-types/indicator-types.module';
 import { InstitutionRolesModule } from './institution-roles/institution-roles.module';
 import { LanguageRolesModule } from './language-roles/language-roles.module';
+import { ResultPolicyChangeModule } from './result-policy-change/result-policy-change.module';
+import { PolicyTypesModule } from './policy-types/policy-types.module';
+import { PolicyStagesModule } from './policy-stages/policy-stages.module';
+import { LinkResultsModule } from './link-results/link-results.module';
+import { LinkResultRolesModule } from './link-result-roles/link-result-roles.module';
 
 @Module({
   imports: [
@@ -64,6 +69,11 @@ import { LanguageRolesModule } from './language-roles/language-roles.module';
     IndicatorTypesModule,
     InstitutionRolesModule,
     LanguageRolesModule,
+    ResultPolicyChangeModule,
+    PolicyTypesModule,
+    PolicyStagesModule,
+    LinkResultsModule,
+    LinkResultRolesModule,
   ],
   exports: [AgressoContractModule],
 })

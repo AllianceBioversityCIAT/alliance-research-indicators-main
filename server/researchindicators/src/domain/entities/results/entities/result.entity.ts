@@ -17,6 +17,8 @@ import { ResultLanguage } from '../../result-languages/entities/result-language.
 import { ResultKeyword } from '../../result-keywords/entities/result-keyword.entity';
 import { ResultInstitution } from '../../result-institutions/entities/result-institution.entity';
 import { ResultUser } from '../../result-users/entities/result-user.entity';
+import { ResultPolicyChange } from '../../result-policy-change/entities/result-policy-change.entity';
+import { LinkResult } from '../../link-results/entities/link-result.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -96,4 +98,16 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultUser, (resultUser) => resultUser.result)
   result_users!: ResultUser[];
+
+  @OneToMany(
+    () => ResultPolicyChange,
+    (resultPolicyChange) => resultPolicyChange.result,
+  )
+  results_policy_change!: ResultPolicyChange[];
+
+  @OneToMany(() => LinkResult, (linkResult) => linkResult.result)
+  link_results!: LinkResult[];
+
+  @OneToMany(() => LinkResult, (linkResult) => linkResult.other_result)
+  link_other_results!: LinkResult[];
 }

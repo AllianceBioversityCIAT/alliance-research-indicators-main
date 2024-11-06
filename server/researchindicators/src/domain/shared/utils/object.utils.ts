@@ -25,15 +25,25 @@ export const parseBoolean = <T>(obj: Partial<T>): FindOptionsRelations<T> => {
 export const validObject = <T>(
   obj: Partial<T>,
   valid: (keyof T)[],
-): boolean => {
+): ValidationResult => {
+  const invalidFields: string[] = [];
+
   for (const key of valid) {
     if (
       obj[key] === null ||
       obj[key] === '' ||
-      (typeof obj[key] == 'number' ? isNaN(obj[key]) : false)
+      (typeof obj[key] === 'number' && isNaN(obj[key]))
     ) {
-      return false;
+      invalidFields.push(key as string);
     }
   }
-  return true;
+  return {
+    isValid: invalidFields.length === 0,
+    invalidFields,
+  };
 };
+
+export interface ValidationResult {
+  isValid: boolean;
+  invalidFields: string[];
+}

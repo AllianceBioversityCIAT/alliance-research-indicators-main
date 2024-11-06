@@ -1,8 +1,13 @@
-import { ConflictException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { ResultRepository } from './repositories/result.repository';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
-import { cleanObject } from '../../shared/utils/object.utils';
+import { cleanObject, validObject } from '../../shared/utils/object.utils';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { Result } from './entities/result.entity';
 import { CreateResultDto } from './dto/create-result.dto';
@@ -50,6 +55,16 @@ export class ResultsService {
   }
 
   async createResult(createResult: CreateResultDto): Promise<Result> {
+    const { invalidFields, isValid } = validObject(createResult, [
+      'contract_id',
+      'indicator_id',
+      'title',
+    ]);
+
+    if (!isValid) {
+      throw new BadRequestException(`Invalid fields: ${invalidFields}`);
+    }
+
     const { description, indicator_id, title, contract_id } = createResult;
 
     await this.mainRepo.findOne({ where: { title } }).then((result) => {
@@ -105,7 +120,7 @@ export class ResultsService {
       })
       .then((result) => {
         return result?.result_official_code
-          ? result.result_official_code
+          ? result.result_official_code + 1
           : firstInsertion;
       });
 
