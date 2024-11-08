@@ -2,12 +2,14 @@ export enum InstitutionRolesEnum {
   TRAINEE_AFFILIATION = 1,
   TRAINEE_ORGANIZATION_REPRESENTATIVE = 2,
   PARTNERS = 3,
+  POLICY_CHANGE = 4,
 }
 
 export enum QueryInstitutionsRolesEnum {
   TRAINEE_AFFILIATION = 'trainee-affiliation',
   TRAINEE_ORGANIZATION_REPRESENTATIVE = 'trainee-organization-representative',
   PARTNERS = 'partners',
+  POLICY_CHANGE = 'policy-change',
 }
 
 export class QueryInstitutionsRoles {
@@ -25,6 +27,11 @@ export class QueryInstitutionsRoles {
   public static readonly partners = new QueryInstitutionsRoles(
     QueryInstitutionsRolesEnum.PARTNERS,
     InstitutionRolesEnum.PARTNERS,
+  );
+
+  public static readonly policyChange = new QueryInstitutionsRoles(
+    QueryInstitutionsRolesEnum.POLICY_CHANGE,
+    InstitutionRolesEnum.POLICY_CHANGE,
   );
 
   constructor(

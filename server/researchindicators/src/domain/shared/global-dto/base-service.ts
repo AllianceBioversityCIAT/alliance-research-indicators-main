@@ -121,7 +121,7 @@ export abstract class BaseServiceSimple<
 
     await entityManager.update(updateWhere, inactiveData);
 
-    const finalDataToSave = await this.lastRefactoredAftterSave(
+    const finalDataToSave = await this.lastRefactoredAfterSave(
       newDataToSave,
       dataRole,
     );
@@ -143,6 +143,33 @@ export abstract class BaseServiceSimple<
     });
 
     return dataWithOtherAttributes;
+  }
+
+  /**
+   *
+   * @param data
+   * @param defaultData
+   * @returns Partial<Entity>[]
+   * @description This method is used only to transform an array of numbers or strings into an array
+   * of objects to save in the database.
+   * Example: [1, 2, 3] => [{result_id: 1}, {result_id: 2}, {result_id: 3}]
+   * If you want to add more data to the object, you can pass a second parameter with the data you want
+   * to add.
+   * Example: [1, 2, 3] => [{result_id: 1, role: 'role'}, {result_id: 2, role: 'role'}, {result_id: 3, role: 'role'}]
+   */
+  public transformArrayToSaveObject(
+    data: (number | string)[],
+    defaultData: {
+      [K in keyof Entity]?: [K];
+    } = {},
+  ): Partial<Entity>[] {
+    return data.map(
+      (item) =>
+        ({
+          [this.primaryKey]: item,
+          ...defaultData,
+        }) as Partial<Entity>,
+    );
   }
 
   public async find<Enum extends string | number>(
@@ -182,7 +209,7 @@ export abstract class BaseServiceSimple<
     // Override this method to add custom validation
   }
 
-  protected lastRefactoredAftterSave<Enum>(
+  protected lastRefactoredAfterSave<Enum>(
     data: Partial<Entity>[],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     roleId: Enum = null,

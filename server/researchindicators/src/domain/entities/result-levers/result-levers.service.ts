@@ -30,7 +30,7 @@ export class ResultLeversService extends BaseServiceSimple<
     return response;
   }
 
-  protected lastRefactoredAftterSave<Enum>(
+  protected lastRefactoredAfterSave<Enum>(
     data: Partial<ResultLever>[],
     roleId?: Enum,
   ): Partial<ResultLever>[] {

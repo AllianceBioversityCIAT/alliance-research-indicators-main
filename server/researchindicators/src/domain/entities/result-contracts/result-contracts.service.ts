@@ -32,7 +32,7 @@ export class ResultContractsService extends BaseServiceSimple<
     );
   }
 
-  protected lastRefactoredAftterSave<ContractRolesEnum>(
+  protected lastRefactoredAfterSave<ContractRolesEnum>(
     data: Partial<ResultContract>[],
     roleId?: ContractRolesEnum,
   ): Partial<ResultContract>[] {

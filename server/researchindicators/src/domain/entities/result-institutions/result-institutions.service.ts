@@ -21,19 +21,13 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     );
   }
 
-  private transformData(data: number[]): Partial<ResultInstitution>[] {
-    return data.map((item) => ({
-      institution_id: item,
-    }));
-  }
-
   async updatePartners(
     resultId: number,
     resultInstitution: CreateResultInstitutionDto,
   ) {
     return this.dataSource.transaction(async (manager) => {
       const { institutions } = resultInstitution;
-      const dataToSave = this.transformData(institutions);
+      const dataToSave = this.transformArrayToSaveObject(institutions);
       const resResultInstitution = await this.create<InstitutionRolesEnum>(
         resultId,
         dataToSave,

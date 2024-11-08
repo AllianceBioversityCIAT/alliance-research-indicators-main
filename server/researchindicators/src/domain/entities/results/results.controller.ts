@@ -146,7 +146,7 @@ export class ResultsController {
     enum: DataReturnEnum,
     description: 'Is a reference to return data',
   })
-  @Patch(':id/aligments')
+  @Patch(':id/alignments')
   async updateResultAlignments(
     @Param('id') resultId: string,
     @Query('return') returnData: DataReturnEnum,
