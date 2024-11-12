@@ -12,6 +12,12 @@ import { IndicatorTypesModule } from '../entities/indicator-types/indicator-type
 import { AgressoModule } from '../tools/agresso/agresso.module';
 import { ClarisaModule } from '../tools/clarisa/clarisa.module';
 import { ResultPolicyChangeModule } from '../entities/result-policy-change/result-policy-change.module';
+import { SessionFormatsModule } from '../entities/session-formats/session-formats.module';
+import { SessionTypesModule } from '../entities/session-types/session-types.module';
+import { SessionLengthsModule } from '../entities/session-lengths/session-lengths.module';
+import { SessionPurposesModule } from '../entities/session-purposes/session-purposes.module';
+import { DegreesModule } from '../entities/degrees/degrees.module';
+import { DeliveryModalitiesModule } from '../entities/delivery-modalities/delivery-modalities.module';
 
 const ResultsChildren: Routes = [
   {
@@ -29,6 +35,25 @@ const ResultsChildren: Routes = [
   {
     path: 'policy-change',
     module: ResultPolicyChangeModule,
+  },
+];
+
+const sessionChildren: Routes = [
+  {
+    path: 'format',
+    module: SessionFormatsModule,
+  },
+  {
+    path: 'type',
+    module: SessionTypesModule,
+  },
+  {
+    path: 'length',
+    module: SessionLengthsModule,
+  },
+  {
+    path: 'purpose',
+    module: SessionPurposesModule,
   },
 ];
 
@@ -66,6 +91,18 @@ const children: Routes = [
   {
     path: 'agresso',
     module: AgressoModule,
+  },
+  {
+    path: 'session',
+    children: sessionChildren,
+  },
+  {
+    path: 'degree',
+    module: DegreesModule,
+  },
+  {
+    path: 'delivery-modalities',
+    module: DeliveryModalitiesModule,
   },
 ];
 
