@@ -18,6 +18,7 @@ import { SessionLengthsModule } from '../entities/session-lengths/session-length
 import { SessionPurposesModule } from '../entities/session-purposes/session-purposes.module';
 import { DegreesModule } from '../entities/degrees/degrees.module';
 import { DeliveryModalitiesModule } from '../entities/delivery-modalities/delivery-modalities.module';
+import { GendersModule } from '../entities/genders/genders.module';
 
 const ResultsChildren: Routes = [
   {
@@ -103,6 +104,10 @@ const children: Routes = [
   {
     path: 'delivery-modalities',
     module: DeliveryModalitiesModule,
+  },
+  {
+    path: 'gender',
+    module: GendersModule,
   },
 ];
 
