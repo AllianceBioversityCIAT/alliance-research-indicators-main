@@ -17,6 +17,8 @@ import { CreateClarisaInstitutionDto } from './entities/clarisa-institutions/dto
 import { ClarisaInstitutionsService } from './entities/clarisa-institutions/clarisa-institutions.service';
 import { ClarisaLever } from './entities/clarisa-levers/entities/clarisa-lever.entity';
 import { BaseControlListSave } from '../../shared/global-dto/base-control-list-save';
+import { ClarisaLeversRawDto } from './entities/clarisa-levers/dto/clarisa-levers-raw.dto';
+import { leversMappers } from './mappers/levers.mappers';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -62,9 +64,10 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
       ClarisaInstitution,
       (data) => institutionMapper(data),
     );
-    await this.base<ClarisaLever, ClarisaLever>(
+    await this.base<ClarisaLeversRawDto, ClarisaLever>(
       ClarisaPathEnum.LEVERS,
       ClarisaLever,
+      (data) => leversMappers(data),
     );
     this._logger.debug('All entities cloned');
   }

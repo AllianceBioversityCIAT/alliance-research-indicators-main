@@ -11,6 +11,7 @@ import { IndicatorsModule } from '../entities/indicators/indicators.module';
 import { IndicatorTypesModule } from '../entities/indicator-types/indicator-types.module';
 import { AgressoModule } from '../tools/agresso/agresso.module';
 import { ClarisaModule } from '../tools/clarisa/clarisa.module';
+import { ResultPolicyChangeModule } from '../entities/result-policy-change/result-policy-change.module';
 
 const ResultsChildren: Routes = [
   {
@@ -24,6 +25,10 @@ const ResultsChildren: Routes = [
   {
     path: 'capacity-sharing',
     module: ResultCapacitySharingModule,
+  },
+  {
+    path: 'policy-change',
+    module: ResultPolicyChangeModule,
   },
 ];
 
