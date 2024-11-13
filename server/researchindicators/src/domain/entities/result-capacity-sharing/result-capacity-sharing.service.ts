@@ -182,7 +182,7 @@ export class ResultCapacitySharingService {
     let groupResponse: CapDevGroupDto = undefined;
     let individualResponse: CapDevIndividualDto = undefined;
 
-    if (resultCapDev.session_format_id === SessionFormatEnum.GROUP) {
+    if (resultCapDev?.session_format_id === SessionFormatEnum.GROUP) {
       const institution =
         await this._resultInsitutionService.findInstitutionsByRoleResult(
           resultCapDev.result_id,
@@ -201,7 +201,7 @@ export class ResultCapacitySharingService {
         trainee_organization_representative: institution,
       };
     } else if (
-      resultCapDev.session_format_id === SessionFormatEnum.INDIVIDUAL
+      resultCapDev?.session_format_id === SessionFormatEnum.INDIVIDUAL
     ) {
       const institution =
         await this._resultInsitutionService.findOneInstitutionByRoleResult(
