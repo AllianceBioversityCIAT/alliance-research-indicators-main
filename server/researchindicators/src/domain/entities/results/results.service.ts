@@ -25,6 +25,7 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
 import { UserRole } from '../user-roles/entities/user-role.entity';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
+import { MetadataResultDto } from './dto/metadata-result.dto';
 
 @Injectable()
 export class ResultsService {
@@ -282,5 +283,32 @@ export class ResultsService {
     };
 
     return resultAlignment;
+  }
+
+  async findMetadataResult(result_id: number): Promise<MetadataResultDto> {
+    const result = await this.mainRepo.findOne({
+      where: { result_id, is_active: true },
+      relations: {
+        indicator: true,
+      },
+    });
+
+    return {
+      indicator_id: result.indicator.indicator_id,
+      indicator_name: result.indicator.name,
+      result_id: result.result_id,
+      result_official_code: result.result_official_code,
+      status_id: 1, //TODO: Change this to the real status
+      status_name: 'Editing', //TODO: Change this to the real status
+    };
+  }
+
+  async validateIndicator(
+    result_id: number,
+    indicator: IndicatorsEnum,
+  ): Promise<boolean> {
+    return this.mainRepo
+      .findOne({ where: { result_id, indicator_id: indicator } })
+      .then((result) => result != null);
   }
 }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import { ResultsController } from './results.controller';
 import { ResultRepository } from './repositories/result.repository';
@@ -16,7 +16,7 @@ import { ResultCapacitySharingModule } from '../result-capacity-sharing/result-c
     ResultContractsModule,
     ResultKeywordsModule,
     ResultUsersModule,
-    ResultCapacitySharingModule,
+    forwardRef(() => ResultCapacitySharingModule),
   ],
   providers: [ResultsService, ResultRepository],
   exports: [ResultsService, ResultRepository],

@@ -29,11 +29,7 @@ export const validObject = <T>(
   const invalidFields: string[] = [];
 
   for (const key of valid) {
-    if (
-      obj[key] === null ||
-      obj[key] === '' ||
-      (typeof obj[key] === 'number' && isNaN(obj[key]))
-    ) {
+    if (isEmpty(obj[key])) {
       invalidFields.push(key as string);
     }
   }
@@ -41,6 +37,12 @@ export const validObject = <T>(
     isValid: invalidFields.length === 0,
     invalidFields,
   };
+};
+
+export const isEmpty = <T>(attr: T) => {
+  return (
+    attr === null || attr === '' || (typeof attr === 'number' && isNaN(attr))
+  );
 };
 
 export interface ValidationResult {

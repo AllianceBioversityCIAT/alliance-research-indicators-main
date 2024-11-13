@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ResultInstitution } from './entities/result-institution.entity';
 import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
-import {
-  CreateResultInstitutionDto,
-  FindResultInstitutionDto,
-} from './dto/create-result-institution.dto';
+import { CreateResultInstitutionDto } from './dto/create-result-institution.dto';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 @Injectable()
 export class ResultInstitutionsService extends BaseServiceSimple<
@@ -27,14 +24,9 @@ export class ResultInstitutionsService extends BaseServiceSimple<
   ) {
     return this.dataSource.transaction(async (manager) => {
       const { institutions } = resultInstitution;
-      const dataToSave: Partial<ResultInstitution>[] = institutions.map(
-        (institution) => ({
-          institution_id: institution,
-        }),
-      );
       const resResultInstitution = await this.create<InstitutionRolesEnum>(
         resultId,
-        dataToSave,
+        institutions,
         'institution_id',
         InstitutionRolesEnum.PARTNERS,
         manager,
@@ -73,7 +65,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
   async findAll(
     resultId: number,
     institution_role_id?: InstitutionRolesEnum,
-  ): Promise<FindResultInstitutionDto> {
+  ): Promise<CreateResultInstitutionDto> {
     const where: FindOptionsWhere<ResultInstitution> = {};
 
     if (institution_role_id) {
@@ -94,8 +86,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     });
 
     return {
-      institutions: institutio.map((item) => item.institution_id),
-      metadata_institutions: institutio,
+      institutions: institutio,
     };
   }
 }

@@ -13,13 +13,17 @@ export class ClarisaInstitutionsController {
 
   @Get()
   async find() {
-    return this.clarisaInstitutionsService.findAll().then((institutions) =>
-      ResponseUtils.format({
-        description: 'Institutions found',
-        data: institutions,
-        status: HttpStatus.OK,
-      }),
-    );
+    return this.clarisaInstitutionsService
+      .findAll({
+        institution_type: true,
+      })
+      .then((institutions) =>
+        ResponseUtils.format({
+          description: 'Institutions found',
+          data: institutions,
+          status: HttpStatus.OK,
+        }),
+      );
   }
 
   @Get(':id')

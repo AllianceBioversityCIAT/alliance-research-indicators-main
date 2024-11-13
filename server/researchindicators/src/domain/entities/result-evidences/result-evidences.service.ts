@@ -4,6 +4,7 @@ import { ResultEvidence } from './entities/result-evidence.entity';
 import { EvidenceRoleEnum } from '../evidence-roles/enums/evidence-role.enum';
 import { CreateResultEvidenceDto } from './dto/create-result-evidence.dto';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
+import { isEmpty } from '../../shared/utils/object.utils';
 @Injectable()
 export class ResultEvidencesService extends BaseServiceSimple<
   ResultEvidence,
@@ -24,9 +25,13 @@ export class ResultEvidencesService extends BaseServiceSimple<
   ) {
     return this.dataSource.transaction(async (manager) => {
       const { evidence } = resultEvidences;
+      const filterEvidence = evidence.filter(
+        (el) =>
+          !isEmpty(el?.evidence_description) || !isEmpty(el?.evidence_url),
+      );
       return await this.create(
         resultId,
-        evidence,
+        filterEvidence,
         'evidence_url',
         EvidenceRoleEnum.PRINCIPAL_EVIDENCE,
         manager,
