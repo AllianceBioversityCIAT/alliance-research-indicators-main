@@ -27,7 +27,11 @@ export class ResultInstitutionsService extends BaseServiceSimple<
   ) {
     return this.dataSource.transaction(async (manager) => {
       const { institutions } = resultInstitution;
-      const dataToSave = this.transformArrayToSaveObject(institutions);
+      const dataToSave: Partial<ResultInstitution>[] = institutions.map(
+        (institution) => ({
+          institution_id: institution,
+        }),
+      );
       const resResultInstitution = await this.create<InstitutionRolesEnum>(
         resultId,
         dataToSave,
