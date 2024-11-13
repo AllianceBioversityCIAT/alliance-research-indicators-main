@@ -180,4 +180,22 @@ export class ResultsController {
       }),
     );
   }
+
+  @ApiOperation({ summary: 'Update metadata' })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  @Get(':id/metadata')
+  async findMetadata(@Param('id') resultId: string) {
+    return this.resultsService.findMetadataResult(+resultId).then((result) =>
+      ResponseUtils.format({
+        description: 'Metadata was found correctly',
+        data: result,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
 }
