@@ -35,6 +35,8 @@ import { PolicyTypesModule } from './policy-types/policy-types.module';
 import { PolicyStagesModule } from './policy-stages/policy-stages.module';
 import { LinkResultsModule } from './link-results/link-results.module';
 import { LinkResultRolesModule } from './link-result-roles/link-result-roles.module';
+import { AllianceUserStaffModule } from './alliance-user-staff/alliance-user-staff.module';
+import { ResultStatusModule } from './result-status/result-status.module';
 
 @Module({
   imports: [
@@ -74,6 +76,8 @@ import { LinkResultRolesModule } from './link-result-roles/link-result-roles.mod
     PolicyStagesModule,
     LinkResultsModule,
     LinkResultRolesModule,
+    AllianceUserStaffModule,
+    ResultStatusModule,
   ],
   exports: [AgressoContractModule],
 })

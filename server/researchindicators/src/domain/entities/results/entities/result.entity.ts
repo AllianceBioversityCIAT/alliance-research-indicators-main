@@ -19,6 +19,8 @@ import { ResultInstitution } from '../../result-institutions/entities/result-ins
 import { ResultUser } from '../../result-users/entities/result-user.entity';
 import { ResultPolicyChange } from '../../result-policy-change/entities/result-policy-change.entity';
 import { LinkResult } from '../../link-results/entities/link-result.entity';
+import { ResultStatus } from '../../result-status/entities/result-status.entity';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -63,6 +65,17 @@ export class Result extends AuditableEntity {
     nullable: true,
   })
   geo_scope_id?: number;
+
+  @Column('bigint', {
+    name: 'result_status_id',
+    default: ResultStatusEnum.EDITING,
+    nullable: true,
+  })
+  result_status_id?: number;
+
+  @ManyToOne(() => ResultStatus, (resultStatus) => resultStatus.results)
+  @JoinColumn({ name: 'result_status_id' })
+  result_status!: ResultStatus;
 
   @ManyToOne(() => Indicator, (indicator) => indicator.results)
   @JoinColumn({ name: 'indicator_id' })

@@ -290,6 +290,7 @@ export class ResultsService {
       where: { result_id, is_active: true },
       relations: {
         indicator: true,
+        result_status: true,
       },
     });
 
@@ -298,8 +299,8 @@ export class ResultsService {
       indicator_name: result.indicator.name,
       result_id: result.result_id,
       result_official_code: result.result_official_code,
-      status_id: 1, //TODO: Change this to the real status
-      status_name: 'Editing', //TODO: Change this to the real status
+      status_id: result.result_status_id,
+      status_name: result.result_status.name,
     };
   }
 

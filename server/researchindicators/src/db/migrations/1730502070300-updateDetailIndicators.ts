@@ -4,7 +4,7 @@ import { IndicatorsEnum } from '../../domain/entities/indicators/enum/indicators
 export class UpdateDetailIndicators1730502070300 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`UPDATE \`indicators\` SET \`long_description\` = '<div class="content">
-  <div class="indicator-title">Capacity Sharing for Development (individual and group activities) and engagement</div>
+  <div class="indicator-title">General description</div>
   <div class="indicator-description">
     <br />Number of individuals trained or engaged by Alliance staff, aiming to lead to behavioral changes in knowledge, attitude, skills, and practice among CGIAR and non-CGIAR personnel <br /><br />
     Reference - <a href="https://drive.google.com/file/d/1543weLW5YqyUFLHWOGRIOSqowtdWrBcb/view" target="_blank">CGIAR Standard Indicator Description Sheet, 2023</a>
@@ -50,7 +50,7 @@ export class UpdateDetailIndicators1730502070300 implements MigrationInterface {
     );
     await queryRunner.query(
       `UPDATE \`indicators\` SET \`long_description\` = '<div class="content">
-  <div class="indicator-title">Outcome Impact Case Report</div>
+  <div class="indicator-title">General description</div>
   <div class="indicator-description">
     <br />An evidence-based report detailing any outcome or impact that has resulted from the work of one or more CGIAR programs, initiatives, or centers. Outcome impact case reports must cite robust evidence to demonstrate the contribution of the CGIAR entity’s research findings or innovations to the outcome or impact. They are used to demonstrate results to funders.<br /><br />
     Reference - <a href="https://drive.google.com/file/d/1v0O5wt4z3bgs_wCYa7H2FifTVSAXAVjl/view" target="_blank">One CGIAR PRMF Glossary</a><br /><br />

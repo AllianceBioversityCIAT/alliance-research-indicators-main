@@ -19,6 +19,7 @@ import { SessionPurposesModule } from '../entities/session-purposes/session-purp
 import { DegreesModule } from '../entities/degrees/degrees.module';
 import { DeliveryModalitiesModule } from '../entities/delivery-modalities/delivery-modalities.module';
 import { GendersModule } from '../entities/genders/genders.module';
+import { ResultStatusModule } from '../entities/result-status/result-status.module';
 
 const ResultsChildren: Routes = [
   {
@@ -36,6 +37,10 @@ const ResultsChildren: Routes = [
   {
     path: 'policy-change',
     module: ResultPolicyChangeModule,
+  },
+  {
+    path: 'status',
+    module: ResultStatusModule,
   },
 ];
 
