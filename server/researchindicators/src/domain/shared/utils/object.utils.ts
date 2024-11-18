@@ -41,7 +41,10 @@ export const validObject = <T>(
 
 export const isEmpty = <T>(attr: T) => {
   return (
-    attr === null || attr === '' || (typeof attr === 'number' && isNaN(attr))
+    attr === null ||
+    attr === '' ||
+    (typeof attr === 'number' && isNaN(attr)) ||
+    attr === undefined
   );
 };
 

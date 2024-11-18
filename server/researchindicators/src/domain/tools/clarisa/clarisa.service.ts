@@ -3,7 +3,6 @@ import { Clarisa } from './clarisa.connection';
 import { HttpService } from '@nestjs/axios';
 import { ClarisaPathEnum } from './anum/path.enum';
 import { DataSource } from 'typeorm';
-import { ClarisaLanguage } from './entities/clarisa-languages/entities/clarisa-language.entity';
 import { ClarisaRegion } from './entities/clarisa-regions/entities/clarisa-region.entity';
 import { ClarisaCountry } from './entities/clarisa-countries/entities/clarisa-country.entity';
 import { countryMapper } from './mappers/countries.mapper';
@@ -39,10 +38,10 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
   async cloneAllClarisaEntities(): Promise<void> {
     this._logger.debug('Cloning all entities from Clarisa API');
 
-    await this.base<ClarisaLanguage>(
+    /*await this.base<ClarisaLanguage>(
       ClarisaPathEnum.LANGUAGES,
       ClarisaLanguage,
-    );
+    );*/
 
     await this.base<ClarisaRegion>(ClarisaPathEnum.REGIONS, ClarisaRegion);
 

@@ -20,6 +20,7 @@ import { DegreesModule } from '../entities/degrees/degrees.module';
 import { DeliveryModalitiesModule } from '../entities/delivery-modalities/delivery-modalities.module';
 import { GendersModule } from '../entities/genders/genders.module';
 import { ResultStatusModule } from '../entities/result-status/result-status.module';
+import { AllianceUserStaffModule } from '../entities/alliance-user-staff/alliance-user-staff.module';
 
 const ResultsChildren: Routes = [
   {
@@ -41,6 +42,10 @@ const ResultsChildren: Routes = [
   {
     path: 'status',
     module: ResultStatusModule,
+  },
+  {
+    path: 'alliance-user-staff',
+    module: AllianceUserStaffModule,
   },
 ];
 

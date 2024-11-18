@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { AgressoContractRawDto } from './dto/agresso-contract-raw.dto';
-import { AgressoContractMapper } from '../../shared/mappers/agresso-contract.mapper';
 import { DataSource, FindManyOptions } from 'typeorm';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { AgressoContractWhere } from './dto/agresso-contract.dto';
@@ -37,24 +35,6 @@ export class AgressoContractService {
         parseBoolean<StringKeys<AgressoContract>>(relations);
     }
     return this.dataSource.getRepository(AgressoContract).find(findQuery);
-  }
-
-  async uploadAgressoContracts(active: boolean = false) {
-    const dataResponse = JSON.parse('{"data":[]}');
-    const agressoContract: AgressoContractRawDto[] =
-      dataResponse as unknown as AgressoContractRawDto[];
-
-    const prepareToSave = agressoContract.map((data) =>
-      AgressoContractMapper(data),
-    );
-
-    if (!active) return;
-    this.dataSource.transaction(async (manager) => {
-      for (let id = 0; id < prepareToSave.length; id += 100) {
-        const data = prepareToSave.slice(id, id + 100);
-        await manager.getRepository(AgressoContract).save(data);
-      }
-    });
   }
 
   async findByName(

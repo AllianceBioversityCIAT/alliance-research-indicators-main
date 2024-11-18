@@ -18,5 +18,5 @@ export class UpdateGeneralInformation extends OmitType(CreateResultDto, [
     type: ResultUser,
     name: 'main_contract_person',
   })
-  public main_contract_person?: ResultUser;
+  public main_contact_person?: ResultUser;
 }

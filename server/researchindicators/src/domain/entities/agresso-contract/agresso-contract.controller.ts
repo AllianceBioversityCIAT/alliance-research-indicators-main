@@ -21,21 +21,6 @@ export class AgressoContractController {
     private readonly agressoContractService: AgressoContractService,
   ) {}
 
-  @ApiOperation({
-    summary: 'Upload dummy data.',
-    description:
-      'These endpoints are for development only, they will be removed in future updates.',
-    tags: ['development'],
-  })
-  @Get('upload-dummy-data')
-  uploadDummyData() {
-    this.agressoContractService.uploadAgressoContracts();
-    return ResponseUtils.format({
-      description: 'The data is being uploaded',
-      status: HttpStatus.OK,
-    });
-  }
-
   @Get('contracts')
   @ApiQuery({ name: 'project', required: false, description: 'Project ID' })
   @ApiQuery({

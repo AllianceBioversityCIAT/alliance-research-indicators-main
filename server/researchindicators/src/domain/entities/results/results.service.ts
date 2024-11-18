@@ -23,7 +23,6 @@ import { ResultCapacitySharingService } from '../result-capacity-sharing/result-
 import { DataReturnEnum } from '../../shared/enum/queries.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
-import { UserRole } from '../user-roles/entities/user-role.entity';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 import { MetadataResultDto } from './dto/metadata-result.dto';
 
@@ -186,18 +185,10 @@ export class ResultsService {
         null,
         manager,
       );
-      let mainContractPerson: Partial<UserRole> = null;
-      if (Array.isArray(generalInformation.main_contract_person)) {
-        mainContractPerson =
-          generalInformation.main_contract_person.length > 0
-            ? generalInformation.main_contract_person[0]
-            : null;
-      } else {
-        mainContractPerson = generalInformation.main_contract_person;
-      }
+
       await this._resultUsersService.create<UserRolesEnum>(
         result_id,
-        mainContractPerson,
+        generalInformation.main_contact_person,
         'user_id',
         UserRolesEnum.MAIN_CONTACT,
         manager,
@@ -220,14 +211,14 @@ export class ResultsService {
     const keywords =
       await this._resultKeywordsService.findKeywordsByResultId(resultId);
 
-    const mainContractPerson = await this._resultUsersService
-      .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId, true)
+    const mainContactPerson = await this._resultUsersService
+      .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
       .then((data) => (data?.length > 0 ? data[0] : null));
 
     const generalInformation: UpdateGeneralInformation = {
       ...result,
       keywords: keywords.map((keyword) => keyword.keyword),
-      main_contract_person: mainContractPerson,
+      main_contact_person: mainContactPerson,
     };
 
     return generalInformation;

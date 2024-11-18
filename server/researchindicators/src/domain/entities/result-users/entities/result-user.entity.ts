@@ -9,6 +9,7 @@ import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { UserRole } from '../../user-roles/entities/user-role.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 
 @Entity('result_users')
 export class ResultUser extends AuditableEntity {
@@ -36,11 +37,12 @@ export class ResultUser extends AuditableEntity {
     type: Number,
     name: 'user_id',
   })
-  @Column('bigint', {
+  @Column('varchar', {
     name: 'user_id',
+    length: 10,
     nullable: false,
   })
-  user_id!: number;
+  user_id!: string;
 
   @ApiProperty({
     type: Number,
@@ -51,6 +53,10 @@ export class ResultUser extends AuditableEntity {
     nullable: false,
   })
   user_role_id!: number;
+
+  @ManyToOne(() => AllianceUserStaff, (user) => user.result_users)
+  @JoinColumn({ name: 'user_id' })
+  user!: AllianceUserStaff;
 
   @ManyToOne(() => Result, (result) => result.result_users)
   @JoinColumn({ name: 'result_id' })

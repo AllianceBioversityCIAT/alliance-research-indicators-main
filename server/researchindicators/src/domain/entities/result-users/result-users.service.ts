@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { ResultUser } from './entities/result-user.entity';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
@@ -21,46 +21,18 @@ export class ResultUsersService extends BaseServiceSimple<
     );
   }
 
-  protected async createCustomValidation(
-    dataArray: Partial<ResultUser>[],
-  ): Promise<void> {
-    const userIds: number[] = dataArray.map((el) => el.user_id);
-    const nonExistUser = await this._userService.existUsers(userIds);
-
-    if (nonExistUser.length) {
-      throw new NotFoundException(
-        `Users are not registered (${nonExistUser.join(', ')})`,
-      );
-    }
-  }
-
-  async findUsersByRoleResult(
-    role: UserRolesEnum,
-    resultId: number,
-    userRelation: boolean = false,
-  ) {
+  async findUsersByRoleResult(role: UserRolesEnum, resultId: number) {
     const resultUsers = await this.mainRepo.find({
       where: {
         user_role_id: role,
         result_id: resultId,
         is_active: true,
       },
+      relations: {
+        user: true,
+      },
     });
 
-    let responseResultUsers = resultUsers;
-    if (userRelation) {
-      const ids = resultUsers.map((el) => el.user_id);
-      const users = await this._userService.find(ids);
-
-      responseResultUsers = resultUsers.map((el) => {
-        const user = users.find((user) => user.sec_user_id === el.user_id);
-        return {
-          ...el,
-          user,
-        };
-      });
-    }
-
-    return responseResultUsers;
+    return resultUsers;
   }
 }
