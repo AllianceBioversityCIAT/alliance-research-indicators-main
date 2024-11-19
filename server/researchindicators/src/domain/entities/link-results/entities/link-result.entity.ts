@@ -8,27 +8,44 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { LinkResultRole } from '../../link-result-roles/entities/link-result-role.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('link_results')
 export class LinkResult extends AuditableEntity {
+  @ApiProperty({
+    type: Number,
+    name: 'link_result_id',
+  })
   @PrimaryGeneratedColumn({
     name: 'link_result_id',
     type: 'bigint',
   })
   link_result_id!: number;
 
+  @ApiProperty({
+    type: Number,
+    name: 'result_id',
+  })
   @Column('bigint', {
     name: 'result_id',
     nullable: false,
   })
   result_id!: number;
 
+  @ApiProperty({
+    type: Number,
+    name: 'other_result_id',
+  })
   @Column('bigint', {
     name: 'other_result_id',
     nullable: false,
   })
   other_result_id!: number;
 
+  @ApiProperty({
+    type: Number,
+    name: 'link_result_role_id',
+  })
   @Column('bigint', {
     name: 'link_result_role_id',
     nullable: false,

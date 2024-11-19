@@ -1,12 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { CreateResultPolicyChangeDto } from './dto/create-result-policy-change.dto';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { ResultPolicyChange } from './entities/result-policy-change.entity';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { selectManager } from '../../shared/utils/orm.util';
 
 @Injectable()
 export class ResultPolicyChangeService {
@@ -18,6 +19,31 @@ export class ResultPolicyChangeService {
     private readonly resultInstitutionsService: ResultInstitutionsService,
   ) {
     this.mainRepo = dataSource.getRepository(ResultPolicyChange);
+  }
+
+  //TODO: Refactor this method to use the BaseServiceSimple class
+  //Is preferable to use the BaseServiceSimple class because it has a lot of methods that can be reused
+  async create(result_id: number, manager?: EntityManager) {
+    const entityManager: Repository<ResultPolicyChange> = selectManager(
+      manager,
+      ResultPolicyChange,
+      this.mainRepo,
+    );
+
+    const existResult = await entityManager.findOne({
+      where: {
+        result_id: result_id,
+      },
+    });
+
+    if (existResult) {
+      throw new ConflictException('Result Policy Change already exists');
+    }
+
+    const resultPolicyChange = entityManager.save({
+      result_id: result_id,
+    });
+    return resultPolicyChange;
   }
 
   async save(
@@ -33,10 +59,7 @@ export class ResultPolicyChangeService {
       policy_type_id,
     } = createResultPolicyChangeDto;
 
-    const innoSave = this.linkResultsService.transformArrayToSaveObject([
-      ...innovation_development,
-      ...innovation_use,
-    ]);
+    const innoSave = [...innovation_development, ...innovation_use];
 
     return this.dataSource.transaction(async (manager) => {
       await this.linkResultsService.create(
@@ -47,14 +70,9 @@ export class ResultPolicyChangeService {
         manager,
       );
 
-      const institutionSave =
-        this.resultInstitutionsService.transformArrayToSaveObject(
-          implementing_organization,
-        );
-
       await this.resultInstitutionsService.create(
         result_id,
-        institutionSave,
+        implementing_organization,
         'institution_id',
         LinkResultRolesEnum.POLICY_CHANGE,
         manager,
@@ -82,8 +100,6 @@ export class ResultPolicyChangeService {
         InstitutionRolesEnum.POLICY_CHANGE,
       );
 
-    const onlyIdsInstitutions = institutions.map((el) => el.institution_id);
-
     const linkResults = await this.linkResultsService.findAndDetails(
       result_id,
       LinkResultRolesEnum.POLICY_CHANGE,
@@ -97,17 +113,13 @@ export class ResultPolicyChangeService {
       (el) => el.other_result.indicator_id === IndicatorsEnum.INNOVATION_USE,
     );
 
-    const onlyIdsInnoDev = innoDev.map((el) => el.other_result_id);
-
-    const onlyIdsInnoUse = innoUse.map((el) => el.other_result_id);
-
     return {
       evidence_stage: policyChange.evidence_stage,
       policy_stage_id: policyChange.policy_stage_id,
       policy_type_id: policyChange.policy_type_id,
-      implementing_organization: onlyIdsInstitutions,
-      innovation_development: onlyIdsInnoDev,
-      innovation_use: onlyIdsInnoUse,
+      implementing_organization: institutions,
+      innovation_development: innoDev,
+      innovation_use: innoUse,
     };
   }
 }

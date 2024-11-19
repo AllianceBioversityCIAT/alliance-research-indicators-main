@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ResultInstitution } from '../../result-institutions/entities/result-institution.entity';
+import { LinkResult } from '../../link-results/entities/link-result.entity';
 
 export class CreateResultPolicyChangeDto {
   @ApiProperty({
@@ -28,24 +30,24 @@ export class CreateResultPolicyChangeDto {
   @ApiProperty({
     name: 'implementing_organization',
     description: 'Link Result Role ID',
-    type: Number,
+    type: ResultInstitution,
     isArray: true,
   })
-  public implementing_organization: number[];
+  public implementing_organization: ResultInstitution[];
 
   @ApiProperty({
     name: 'innovation_development',
     description: 'Innovation Development',
-    type: Number,
+    type: LinkResult,
     isArray: true,
   })
-  public innovation_development: number[];
+  public innovation_development: LinkResult[];
 
   @ApiProperty({
     name: 'innovation_use',
     description: 'Innovation Use',
-    type: Number,
+    type: LinkResult,
     isArray: true,
   })
-  public innovation_use: number[];
+  public innovation_use: LinkResult[];
 }
