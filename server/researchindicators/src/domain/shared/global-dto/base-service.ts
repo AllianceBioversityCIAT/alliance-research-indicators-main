@@ -114,6 +114,7 @@ export abstract class BaseServiceSimple<
     dataRole?: Enum,
     manager?: EntityManager,
     otherAttributes?: (keyof Entity & string)[],
+    deleteOthersAttributes?: { [K in keyof Entity]?: Entity[K] },
   ) {
     const entityManager: RepositoryData | Repository<Entity> = selectManager<
       Entity,
@@ -170,6 +171,10 @@ export abstract class BaseServiceSimple<
     const inactiveData: QueryDeepPartialEntity<any> = {
       is_active: false,
     };
+
+    Object.keys(deleteOthersAttributes).forEach((key) => {
+      inactiveData[key] = deleteOthersAttributes[key];
+    });
 
     await entityManager.update(updateWhere, inactiveData);
 
@@ -242,10 +247,10 @@ export abstract class BaseServiceSimple<
     });
   }
 
-  protected unsetMultiplesPrimaryContracts<T extends { is_primary: boolean }>(
+  protected unsetMultiplesPrimary<T extends { is_primary: boolean }>(
     data: Partial<T>[],
   ): Partial<T>[] {
-    const isPrimary = data.filter((item) => item.is_primary);
+    const isPrimary = data.filter((item) => item.is_primary == true);
     if (isPrimary.length > 1) {
       data.forEach((item) => {
         item.is_primary = false;

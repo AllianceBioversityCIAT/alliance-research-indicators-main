@@ -238,6 +238,9 @@ export class ResultsService {
         ContractRolesEnum.ALIGNMENT,
         manager,
         ['is_primary'],
+        {
+          is_primary: false,
+        },
       );
 
       await this._resultLeversService.create<LeverRolesEnum>(
@@ -247,6 +250,9 @@ export class ResultsService {
         LeverRolesEnum.ALIGNMENT,
         manager,
         ['is_primary'],
+        {
+          is_primary: false,
+        },
       );
     });
 

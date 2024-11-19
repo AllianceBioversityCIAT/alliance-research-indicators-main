@@ -36,7 +36,7 @@ export class ResultLeversService extends BaseServiceSimple<
   ): Partial<ResultLever>[] {
     let dataToSave: Partial<ResultLever>[] = null;
     if (roleId === LeverRolesEnum.ALIGNMENT) {
-      dataToSave = this.unsetMultiplesPrimaryContracts<ResultLever>(data);
+      dataToSave = this.unsetMultiplesPrimary<ResultLever>(data);
     }
     return dataToSave ?? data;
   }

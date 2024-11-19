@@ -38,7 +38,7 @@ export class ResultContractsService extends BaseServiceSimple<
   ): Partial<ResultContract>[] {
     let dataToSave: Partial<ResultContract>[] = null;
     if (roleId === ContractRolesEnum.ALIGNMENT) {
-      dataToSave = this.unsetMultiplesPrimaryContracts<ResultContract>(data);
+      dataToSave = this.unsetMultiplesPrimary<ResultContract>(data);
     }
     return dataToSave ?? data;
   }
