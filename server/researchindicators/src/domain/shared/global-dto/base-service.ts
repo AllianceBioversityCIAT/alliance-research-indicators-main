@@ -114,7 +114,7 @@ export abstract class BaseServiceSimple<
     dataRole?: Enum,
     manager?: EntityManager,
     otherAttributes?: (keyof Entity & string)[],
-    deleteOthersAttributes?: { [K in keyof Entity]?: Entity[K] },
+    deleteOthersAttributes: { [K in keyof Entity]?: Entity[K] } = {},
   ) {
     const entityManager: RepositoryData | Repository<Entity> = selectManager<
       Entity,
@@ -172,7 +172,7 @@ export abstract class BaseServiceSimple<
       is_active: false,
     };
 
-    Object.keys(deleteOthersAttributes).forEach((key) => {
+    Object.keys(deleteOthersAttributes)?.forEach((key) => {
       inactiveData[key] = deleteOthersAttributes[key];
     });
 
