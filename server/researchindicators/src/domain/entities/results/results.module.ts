@@ -7,6 +7,7 @@ import { ResultLeversModule } from '../result-levers/result-levers.module';
 import { ResultContractsModule } from '../result-contracts/result-contracts.module';
 import { ResultUsersModule } from '../result-users/result-users.module';
 import { ResultCapacitySharingModule } from '../result-capacity-sharing/result-capacity-sharing.module';
+import { ResultPolicyChangeModule } from '../result-policy-change/result-policy-change.module';
 
 @Module({
   controllers: [ResultsController],
@@ -17,6 +18,7 @@ import { ResultCapacitySharingModule } from '../result-capacity-sharing/result-c
     ResultKeywordsModule,
     ResultUsersModule,
     forwardRef(() => ResultCapacitySharingModule),
+    ResultPolicyChangeModule,
   ],
   providers: [ResultsService, ResultRepository],
   exports: [ResultsService, ResultRepository],

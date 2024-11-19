@@ -25,6 +25,7 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 import { MetadataResultDto } from './dto/metadata-result.dto';
+import { ResultPolicyChangeService } from '../result-policy-change/result-policy-change.service';
 
 @Injectable()
 export class ResultsService {
@@ -36,6 +37,7 @@ export class ResultsService {
     private readonly _resultKeywordsService: ResultKeywordsService,
     private readonly _resultUsersService: ResultUsersService,
     private readonly _resultCapacitySharingService: ResultCapacitySharingService,
+    private readonly _resultPolicyChangeService: ResultPolicyChangeService,
   ) {}
 
   async findResults(pagination: PaginationDto) {
@@ -135,6 +137,9 @@ export class ResultsService {
     switch (indicator) {
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
         await this._resultCapacitySharingService.create(resultId, manager);
+        break;
+      case IndicatorsEnum.POLICY_CHANGE:
+        await this._resultPolicyChangeService.create(resultId, manager);
         break;
       default:
         break;

@@ -8,5 +8,6 @@ import { ResultInstitutionsModule } from '../result-institutions/result-institut
   controllers: [ResultPolicyChangeController],
   providers: [ResultPolicyChangeService],
   imports: [LinkResultsModule, ResultInstitutionsModule],
+  exports: [ResultPolicyChangeService],
 })
 export class ResultPolicyChangeModule {}
