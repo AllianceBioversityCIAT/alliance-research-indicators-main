@@ -14,9 +14,64 @@ import {
 } from '../utils/array.util';
 import { AuditableEntity } from './auditable.entity';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { isEmpty } from '../utils/object.utils';
 
-export abstract class BaseServiceProperties<RepositoryData> {
-  protected mainRepo: RepositoryData;
+export abstract class BaseServiceProperties<
+  Entity extends AuditableEntity,
+  RepositoryData extends Repository<Entity>,
+> {
+  protected primaryKey: keyof Entity & string;
+  constructor(
+    protected readonly mainRepo: RepositoryData,
+    protected readonly resultKey: keyof Entity & string = null,
+    protected readonly roleKey: keyof Entity & string = null,
+  ) {
+    this.primaryKey = this.mainRepo.metadata.primaryColumns?.[0]
+      .propertyName as keyof Entity & string;
+  }
+}
+
+export abstract class BaseDeleteService<
+  Entity extends AuditableEntity,
+  RepositoryData extends Repository<Entity>,
+> extends BaseServiceProperties<Entity, RepositoryData> {
+  constructor(
+    mainRepo: RepositoryData,
+    resultKey: keyof Entity & string = null,
+    roleKey: keyof Entity & string = null,
+  ) {
+    super(mainRepo, resultKey, roleKey);
+  }
+  /**
+   * @param resultId (required)
+   * @param roleId (optional)
+   * @returns Promise<void>
+   * @description This method is used to delete data from the database, it receives the resultId and the roleId.
+   * If the roleId is not passed, it will delete all the data that has the resultId.
+   * Example: delete(1, 2) => Delete all the data that has the resultId 1 and the roleId 2.
+   * Example: delete(1) => Delete all the data that has the resultId 1.
+   */
+  protected async delete<Enum extends string | number>(
+    resultId: number,
+    roleId?: Enum,
+    date?: Date,
+  ): Promise<void> {
+    const whereData: any = {
+      [this.resultKey]: resultId,
+      is_active: true,
+    };
+
+    if (!isEmpty(roleId) && !isEmpty(this.roleKey)) {
+      whereData[this.roleKey] = roleId;
+    }
+
+    const updateData: any = {
+      is_active: false,
+      deleted_at: date,
+    };
+
+    await this.mainRepo.update(whereData, updateData);
+  }
 }
 
 /**
@@ -31,17 +86,14 @@ export abstract class BaseServiceProperties<RepositoryData> {
 export abstract class BaseServiceSimple<
   Entity extends AuditableEntity,
   RepositoryData extends Repository<Entity>,
-> extends BaseServiceProperties<RepositoryData> {
-  private readonly primaryKey: keyof Entity & string;
+> extends BaseDeleteService<Entity, RepositoryData> {
   constructor(
     protected readonly entity: new () => Entity,
-    protected readonly mainRepo: RepositoryData,
-    private readonly resultKey: keyof Entity & string,
-    private readonly roleKey: keyof Entity & string = null,
+    mainRepo: RepositoryData,
+    resultKey: keyof Entity & string,
+    roleKey: keyof Entity & string = null,
   ) {
-    super();
-    this.primaryKey = this.mainRepo.metadata.primaryColumns?.[0]
-      .propertyName as keyof Entity & string;
+    super(mainRepo, resultKey, roleKey);
   }
 
   /**

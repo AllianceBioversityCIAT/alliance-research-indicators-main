@@ -5,13 +5,12 @@ import { BaseServiceProperties } from './base-service';
 export abstract class ControlListBaseService<
   Entity extends AuditableEntity,
   RepositoryData extends Repository<Entity>,
-> extends BaseServiceProperties<RepositoryData> {
-  private readonly primaryKey: keyof Entity & string;
+> extends BaseServiceProperties<Entity, RepositoryData> {
   constructor(
     protected readonly entity: new () => Entity,
     protected readonly mainRepo: RepositoryData,
   ) {
-    super();
+    super(mainRepo);
     this.primaryKey = this.mainRepo.metadata.primaryColumns?.[0]
       .propertyName as keyof Entity & string;
   }

@@ -41,4 +41,12 @@ export abstract class AuditableEntity {
     select: true,
   })
   is_active?: boolean;
+
+  @Column({
+    name: 'deleted_at',
+    type: 'timestamp',
+    nullable: true,
+    select: false,
+  })
+  deleted_at?: Date;
 }
