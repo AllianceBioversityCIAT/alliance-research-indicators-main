@@ -127,11 +127,11 @@ export class ResultCapacitySharingService {
     );
 
     await entityManager.update(resultId, {
-      session_participants_female: updateData.session_participants_female,
-      session_participants_male: updateData.session_participants_male,
+      session_participants_female: updateData?.session_participants_female,
+      session_participants_male: updateData?.session_participants_male,
       session_participants_non_binary:
-        updateData.session_participants_non_binary,
-      session_participants_total: updateData.session_participants_total,
+        updateData?.session_participants_non_binary,
+      session_participants_total: updateData?.session_participants_total,
     });
 
     await this._resultInsitutionService.create<InstitutionRolesEnum>(

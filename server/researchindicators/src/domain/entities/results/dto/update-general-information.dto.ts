@@ -16,7 +16,7 @@ export class UpdateGeneralInformation extends OmitType(CreateResultDto, [
 
   @ApiProperty({
     type: ResultUser,
-    name: 'main_contract_person',
+    name: 'main_contact_person',
   })
   public main_contact_person?: ResultUser;
 }
