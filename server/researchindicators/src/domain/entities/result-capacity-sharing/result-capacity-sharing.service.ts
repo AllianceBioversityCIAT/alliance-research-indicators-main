@@ -224,7 +224,13 @@ export class ResultCapacitySharingService {
       const institution =
         await this._resultInsitutionService.findOneInstitutionByRoleResult(
           resultCapDev.result_id,
-          InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE,
+          InstitutionRolesEnum.TRAINEE_AFFILIATION,
+        );
+
+      const nationality =
+        await this._resultCountryService.findOneCountryByRoleResult(
+          resultCapDev.result_id,
+          CountryRolesEnum.TRAINEE_NATIONALITY,
         );
       individualResponse = {
         degree_id: resultCapDev.degree_id,
@@ -232,6 +238,7 @@ export class ResultCapacitySharingService {
         trainee_name: resultCapDev.trainee_name,
         session_length_id: resultCapDev.session_length_id,
         affiliation: institution,
+        nationality: nationality,
       };
     }
 

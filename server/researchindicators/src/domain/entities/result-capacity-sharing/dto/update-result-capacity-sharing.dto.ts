@@ -30,14 +30,14 @@ export class CapDevIndividualDto {
   gender_id?: number;
 
   @ApiProperty({
-    type: Number,
-    name: 'affiliation_id',
+    type: ResultInstitution,
+    name: 'affiliation',
   })
   affiliation?: ResultInstitution;
 
   @ApiProperty({
-    type: Number,
-    name: 'nationality_id',
+    type: ResultCountry,
+    name: 'nationality',
   })
   nationality?: ResultCountry;
 }
