@@ -14,7 +14,6 @@ import { ResultsModule } from '../results/results.module';
     ResultLanguagesModule,
     ResultInstitutionsModule,
     ResultCountriesModule,
-    forwardRef(() => ResultsModule),
   ],
   providers: [ResultCapacitySharingService],
   exports: [ResultCapacitySharingService],

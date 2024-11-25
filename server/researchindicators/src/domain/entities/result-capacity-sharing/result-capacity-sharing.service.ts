@@ -27,6 +27,7 @@ import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
+import { Result } from '../results/entities/result.entity';
 @Injectable()
 export class ResultCapacitySharingService {
   private mainRepo: Repository<ResultCapacitySharing>;
@@ -36,8 +37,6 @@ export class ResultCapacitySharingService {
     private readonly _resultLanguageService: ResultLanguagesService,
     private readonly _resultInsitutionService: ResultInstitutionsService,
     private readonly _resultCountryService: ResultCountriesService,
-    @Inject(forwardRef(() => ResultsService))
-    private readonly _resultService: ResultsService,
     private readonly _currentUser: CurrentUserUtil,
   ) {
     this.mainRepo = dataSource.getRepository(ResultCapacitySharing);
@@ -232,10 +231,16 @@ export class ResultCapacitySharingService {
   async findByResultId(
     resultId: number,
   ): Promise<Partial<UpdateResultCapacitySharingDto>> {
-    const validateIndicator = await this._resultService.validateIndicator(
-      resultId,
-      IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
-    );
+    const validateIndicator = await this.dataSource
+      .getRepository(Result)
+      .findOne({
+        where: {
+          result_id: resultId,
+          indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+          is_active: true,
+        },
+      })
+      .then((result) => result !== null);
     if (!validateIndicator) {
       throw new ConflictException(
         'The result does not have the capacity sharing for development indicator',
