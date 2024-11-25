@@ -17,7 +17,7 @@ import { ResultPolicyChangeModule } from '../result-policy-change/result-policy-
     ResultContractsModule,
     ResultKeywordsModule,
     ResultUsersModule,
-    forwardRef(() => ResultCapacitySharingModule),
+    ResultCapacitySharingModule,
     ResultPolicyChangeModule,
   ],
   providers: [ResultsService, ResultRepository],
