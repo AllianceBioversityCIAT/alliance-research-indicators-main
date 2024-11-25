@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  forwardRef,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultCapacitySharing } from './entities/result-capacity-sharing.entity';
 import { selectManager } from '../../shared/utils/orm.util';
@@ -21,7 +16,6 @@ import { InstitutionRolesEnum } from '../institution-roles/enums/institution-rol
 import { ResultCountriesService } from '../result-countries/result-countries.service';
 import { CountryRolesEnum } from '../country-roles/enums/country-roles.anum';
 import { SessionFormatEnum } from '../session-formats/enums/session-format.enum';
-import { ResultsService } from '../results/results.service';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import {
   CurrentUserUtil,
