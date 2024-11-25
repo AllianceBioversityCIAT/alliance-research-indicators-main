@@ -5,14 +5,21 @@ import { ResultLever } from './entities/result-lever.entity';
 import { selectManager } from '../../shared/utils/orm.util';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
+import {
+  CurrentUserUtil,
+  SetAutitEnum,
+} from '../../shared/utils/current-user.util';
 
 @Injectable()
 export class ResultLeversService extends BaseServiceSimple<
   ResultLever,
   ResultLeversRepository
 > {
-  constructor(customRepo: ResultLeversRepository) {
-    super(ResultLever, customRepo, 'result_id', 'lever_role_id');
+  constructor(
+    customRepo: ResultLeversRepository,
+    currentUser: CurrentUserUtil,
+  ) {
+    super(ResultLever, customRepo, 'result_id', currentUser, 'lever_role_id');
   }
 
   async deleteAll(result_id: number, manager?: EntityManager) {
@@ -24,7 +31,7 @@ export class ResultLeversService extends BaseServiceSimple<
 
     const response = await entityManager.update(
       { result_id: result_id },
-      { is_active: false },
+      { is_active: false, ...this.currentUser.audit(SetAutitEnum.UPDATE) },
     );
 
     return response;

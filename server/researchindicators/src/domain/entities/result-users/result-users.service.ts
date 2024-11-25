@@ -4,6 +4,7 @@ import { ResultUser } from './entities/result-user.entity';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { UserService } from '../../complementary-entities/secondary/user/user.service';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 @Injectable()
 export class ResultUsersService extends BaseServiceSimple<
   ResultUser,
@@ -12,11 +13,13 @@ export class ResultUsersService extends BaseServiceSimple<
   constructor(
     dataSource: DataSource,
     private readonly _userService: UserService,
+    currentUser: CurrentUserUtil,
   ) {
     super(
       ResultUser,
       dataSource.getRepository(ResultUser),
       'result_id',
+      currentUser,
       'user_role_id',
     );
   }

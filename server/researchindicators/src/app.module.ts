@@ -21,10 +21,12 @@ import { CronModule } from './domain/tools/cron-jobs/cron.module';
 import { JwtMiddleware } from './domain/shared/middlewares/jwr.middleware';
 import { AlianceManagementApp } from './domain/tools/broker/aliance-management.app';
 import { AgressoModule } from './domain/tools/agresso/agresso.module';
+import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
 
 @Module({
   imports: [
     RouterModule.register(mainRoute),
+    GlobalUtilsModule,
     EntitiesModule,
     ClarisaModule,
     AgressoModule,

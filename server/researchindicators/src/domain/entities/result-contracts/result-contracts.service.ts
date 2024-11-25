@@ -5,6 +5,7 @@ import { ResultContractsRepository } from './repositories/result-contracts.repos
 import { selectManager } from '../../shared/utils/orm.util';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { ContractRolesEnum } from './enum/contract-roles.enum';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 
 @Injectable()
 export class ResultContractsService extends BaseServiceSimple<
@@ -14,8 +15,15 @@ export class ResultContractsService extends BaseServiceSimple<
   constructor(
     private readonly dataSource: DataSource,
     customRepo: ResultContractsRepository,
+    currentUser: CurrentUserUtil,
   ) {
-    super(ResultContract, customRepo, 'result_id', 'contract_role_id');
+    super(
+      ResultContract,
+      customRepo,
+      'result_id',
+      currentUser,
+      'contract_role_id',
+    );
   }
 
   async deleteAll(result_id: number, manager?: EntityManager) {
