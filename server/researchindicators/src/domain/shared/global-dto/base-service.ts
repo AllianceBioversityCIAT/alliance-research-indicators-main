@@ -15,6 +15,7 @@ import {
 import { AuditableEntity } from './auditable.entity';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { isEmpty } from '../utils/object.utils';
+import { CurrentUserUtil, SetAutitEnum } from '../utils/current-user.util';
 
 export abstract class BaseServiceProperties<
   Entity extends AuditableEntity,
@@ -25,6 +26,7 @@ export abstract class BaseServiceProperties<
     protected readonly mainRepo: RepositoryData,
     protected readonly resultKey: keyof Entity & string = null,
     protected readonly roleKey: keyof Entity & string = null,
+    protected readonly currentUser: CurrentUserUtil,
   ) {
     this.primaryKey = this.mainRepo.metadata.primaryColumns?.[0]
       .propertyName as keyof Entity & string;
@@ -37,10 +39,11 @@ export abstract class BaseDeleteService<
 > extends BaseServiceProperties<Entity, RepositoryData> {
   constructor(
     mainRepo: RepositoryData,
+    currentUser: CurrentUserUtil,
     resultKey: keyof Entity & string = null,
     roleKey: keyof Entity & string = null,
   ) {
-    super(mainRepo, resultKey, roleKey);
+    super(mainRepo, resultKey, roleKey, currentUser);
   }
   /**
    * @param resultId (required)
@@ -91,9 +94,10 @@ export abstract class BaseServiceSimple<
     protected readonly entity: new () => Entity,
     mainRepo: RepositoryData,
     resultKey: keyof Entity & string,
+    currentUser: CurrentUserUtil,
     roleKey: keyof Entity & string = null,
   ) {
-    super(mainRepo, resultKey, roleKey);
+    super(mainRepo, currentUser, resultKey, roleKey);
   }
 
   /**
@@ -183,7 +187,10 @@ export abstract class BaseServiceSimple<
     const finalDataToSave = await this.lastRefactoredAfterSave(
       newDataToSave,
       dataRole,
-    );
+    ).map((data) => ({
+      ...data,
+      ...this.currentUser.audit(SetAutitEnum.BOTH),
+    }));
 
     const response = (
       await entityManager.save(finalDataToSave as DeepPartial<Entity>[])

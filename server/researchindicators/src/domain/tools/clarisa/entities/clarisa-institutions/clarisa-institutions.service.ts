@@ -3,13 +3,17 @@ import { ClarisaInstitutionsRepository } from './repositories/clarisa-institutio
 import { ClarisaPathEnum } from '../../anum/path.enum';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
 import { ClarisaInstitution } from './entities/clarisa-institution.entity';
+import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
 @Injectable()
 export class ClarisaInstitutionsService extends ControlListBaseService<
   ClarisaInstitution,
   ClarisaInstitutionsRepository
 > {
-  constructor(customRepo: ClarisaInstitutionsRepository) {
-    super(ClarisaInstitution, customRepo);
+  constructor(
+    customRepo: ClarisaInstitutionsRepository,
+    currentUser: CurrentUserUtil,
+  ) {
+    super(ClarisaInstitution, customRepo, currentUser);
   }
 
   async clonePath() {

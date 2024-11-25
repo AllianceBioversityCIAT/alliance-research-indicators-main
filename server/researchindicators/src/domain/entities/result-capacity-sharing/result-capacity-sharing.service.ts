@@ -23,6 +23,10 @@ import { CountryRolesEnum } from '../country-roles/enums/country-roles.anum';
 import { SessionFormatEnum } from '../session-formats/enums/session-format.enum';
 import { ResultsService } from '../results/results.service';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import {
+  CurrentUserUtil,
+  SetAutitEnum,
+} from '../../shared/utils/current-user.util';
 @Injectable()
 export class ResultCapacitySharingService {
   private mainRepo: Repository<ResultCapacitySharing>;
@@ -34,6 +38,7 @@ export class ResultCapacitySharingService {
     private readonly _resultCountryService: ResultCountriesService,
     @Inject(forwardRef(() => ResultsService))
     private readonly _resultService: ResultsService,
+    private readonly _currentUser: CurrentUserUtil,
   ) {
     this.mainRepo = dataSource.getRepository(ResultCapacitySharing);
   }
@@ -57,6 +62,7 @@ export class ResultCapacitySharingService {
 
     const resultCapSharing = entityManager.save({
       result_id: result_id,
+      ...this._currentUser.audit(SetAutitEnum.NEW),
     });
     return resultCapSharing;
   }
@@ -82,6 +88,7 @@ export class ResultCapacitySharingService {
         delivery_modality_id: updateData?.delivery_modality_id,
         start_date: updateData?.start_date,
         end_date: updateData?.end_date,
+        ...this._currentUser.audit(SetAutitEnum.UPDATE),
       });
 
       switch (updateData?.session_format_id) {
@@ -140,6 +147,7 @@ export class ResultCapacitySharingService {
       trainee_name: null,
       degree_id: null,
       gender_id: null,
+      ...this._currentUser.audit(SetAutitEnum.UPDATE),
     });
 
     await this._resultInsitutionService.create<InstitutionRolesEnum>(
@@ -184,6 +192,7 @@ export class ResultCapacitySharingService {
       trainee_name: updateData?.trainee_name,
       degree_id: updateData?.degree_id,
       gender_id: updateData?.gender_id,
+      ...this._currentUser.audit(SetAutitEnum.UPDATE),
       //Unnecessary fields null asignation
       session_participants_female: null,
       session_participants_male: null,

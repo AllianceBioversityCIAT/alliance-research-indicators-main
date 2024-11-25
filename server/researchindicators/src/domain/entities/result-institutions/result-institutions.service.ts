@@ -4,16 +4,21 @@ import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { CreateResultInstitutionDto } from './dto/create-result-institution.dto';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 @Injectable()
 export class ResultInstitutionsService extends BaseServiceSimple<
   ResultInstitution,
   Repository<ResultInstitution>
 > {
-  constructor(private dataSource: DataSource) {
+  constructor(
+    private dataSource: DataSource,
+    currentUser: CurrentUserUtil,
+  ) {
     super(
       ResultInstitution,
       dataSource.getRepository(ResultInstitution),
       'result_id',
+      currentUser,
       'institution_role_id',
     );
   }

@@ -26,6 +26,10 @@ import { ResultAlignmentDto } from './dto/result-alignment.dto';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 import { MetadataResultDto } from './dto/metadata-result.dto';
 import { ResultPolicyChangeService } from '../result-policy-change/result-policy-change.service';
+import {
+  CurrentUserUtil,
+  SetAutitEnum,
+} from '../../shared/utils/current-user.util';
 
 @Injectable()
 export class ResultsService {
@@ -38,6 +42,7 @@ export class ResultsService {
     private readonly _resultUsersService: ResultUsersService,
     private readonly _resultCapacitySharingService: ResultCapacitySharingService,
     private readonly _resultPolicyChangeService: ResultPolicyChangeService,
+    private readonly currentUser: CurrentUserUtil,
   ) {}
 
   async findResults(pagination: PaginationDto) {
@@ -85,6 +90,7 @@ export class ResultsService {
         indicator_id,
         title,
         result_official_code: newOfficialCode,
+        ...this.currentUser.audit(SetAutitEnum.NEW),
       });
 
       await this.createResultType(
@@ -177,6 +183,7 @@ export class ResultsService {
       await manager.getRepository(this.mainRepo.target).update(result_id, {
         title: generalInformation.title,
         description: generalInformation.description,
+        ...this.currentUser.audit(SetAutitEnum.BOTH),
       });
 
       const keywordsToSave = this._resultKeywordsService.transformData(

@@ -12,6 +12,7 @@ import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum
 import { ClarisaModule } from './domain/tools/clarisa/clarisa.module';
 import { AlianceManagementApp } from './domain/tools/broker/aliance-management.app';
 import { AgressoModule } from './domain/tools/agresso/agresso.module';
+import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AgressoModule } from './domain/tools/agresso/agresso.module';
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
+    GlobalUtilsModule,
   ],
   providers: [
     AlianceManagementApp,

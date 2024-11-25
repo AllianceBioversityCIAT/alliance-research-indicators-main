@@ -8,6 +8,10 @@ import { ResultPolicyChange } from './entities/result-policy-change.entity';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { selectManager } from '../../shared/utils/orm.util';
+import {
+  CurrentUserUtil,
+  SetAutitEnum,
+} from '../../shared/utils/current-user.util';
 
 @Injectable()
 export class ResultPolicyChangeService {
@@ -17,6 +21,7 @@ export class ResultPolicyChangeService {
     private readonly dataSource: DataSource,
     private readonly linkResultsService: LinkResultsService,
     private readonly resultInstitutionsService: ResultInstitutionsService,
+    private readonly currentUser: CurrentUserUtil,
   ) {
     this.mainRepo = dataSource.getRepository(ResultPolicyChange);
   }
@@ -82,6 +87,7 @@ export class ResultPolicyChangeService {
         policy_type_id: policy_type_id,
         policy_stage_id: policy_stage_id,
         evidence_stage: evidence_stage,
+        ...this.currentUser.audit(SetAutitEnum.BOTH),
       });
 
       return undefined;
