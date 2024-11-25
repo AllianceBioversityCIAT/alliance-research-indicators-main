@@ -47,6 +47,7 @@ export class ResultPolicyChangeService {
 
     const resultPolicyChange = entityManager.save({
       result_id: result_id,
+      ...this.currentUser.audit(SetAutitEnum.NEW),
     });
     return resultPolicyChange;
   }
