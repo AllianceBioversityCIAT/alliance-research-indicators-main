@@ -121,7 +121,9 @@ export abstract class BaseServiceSimple<
       RepositoryData
     >(manager, this.entity, this.mainRepo);
 
-    const dataToSaveArray = formatDataToArray<Partial<Entity>>(dataToSave);
+    const dataToSaveArray = formatDataToArray<Partial<Entity>>(
+      dataToSave,
+    ).filter((el) => !isEmpty(el?.[generalCompareKey]));
 
     await this.createCustomValidation(dataToSaveArray);
 

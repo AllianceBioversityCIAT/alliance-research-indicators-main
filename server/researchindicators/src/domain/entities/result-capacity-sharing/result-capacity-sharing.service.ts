@@ -135,6 +135,11 @@ export class ResultCapacitySharingService {
       session_purpose_id: updateData?.session_purpose_id,
       session_purpose_description: updateData?.session_purpose_description,
       is_attending_organization: updateData?.is_attending_organization,
+      //Unnecessary fields null asignation
+      session_length_id: null,
+      trainee_name: null,
+      degree_id: null,
+      gender_id: null,
     });
 
     await this._resultInsitutionService.create<InstitutionRolesEnum>(
@@ -142,6 +147,23 @@ export class ResultCapacitySharingService {
       updateData?.trainee_organization_representative,
       'institution_id',
       InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE,
+      manager,
+    );
+
+    //Unnecessary Data inactivate for group
+    await this._resultInsitutionService.create<InstitutionRolesEnum>(
+      resultId,
+      null,
+      'institution_id',
+      InstitutionRolesEnum.TRAINEE_AFFILIATION,
+      manager,
+    );
+
+    await this._resultCountryService.create<CountryRolesEnum>(
+      resultId,
+      null,
+      'isoAlpha2',
+      CountryRolesEnum.TRAINEE_NATIONALITY,
       manager,
     );
   }
@@ -162,6 +184,14 @@ export class ResultCapacitySharingService {
       trainee_name: updateData?.trainee_name,
       degree_id: updateData?.degree_id,
       gender_id: updateData?.gender_id,
+      //Unnecessary fields null asignation
+      session_participants_female: null,
+      session_participants_male: null,
+      session_participants_non_binary: null,
+      session_participants_total: null,
+      session_purpose_id: null,
+      session_purpose_description: null,
+      is_attending_organization: null,
     });
 
     await this._resultInsitutionService.create<InstitutionRolesEnum>(
@@ -177,6 +207,15 @@ export class ResultCapacitySharingService {
       updateData?.nationality,
       'isoAlpha2',
       CountryRolesEnum.TRAINEE_NATIONALITY,
+      manager,
+    );
+
+    //Unnecessary Data inactivate for individual
+    await this._resultInsitutionService.create<InstitutionRolesEnum>(
+      resultId,
+      null,
+      'institution_id',
+      InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE,
       manager,
     );
   }
