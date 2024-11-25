@@ -242,10 +242,21 @@ export class ResultCapacitySharingService {
       };
     }
 
-    await this._resultInsitutionService.findOneInstitutionByRoleResult(
-      resultCapDev.result_id,
-      InstitutionRolesEnum.TRAINEE_AFFILIATION,
-    );
+    const trainingSupervisor = await this._resultUserService
+      .findUsersByRoleResult(
+        UserRolesEnum.TRAINING_SUPERVISOR,
+        resultCapDev.result_id,
+      )
+      .then((user) => (user && user.length > 0 ? user[0] : null));
+
+    const training_supervisor_languages = await this._resultLanguageService
+      .findLanguageByRoleResult(
+        LanguageRolesEnum.TRAINING_SUPERVISOR,
+        resultCapDev.result_id,
+      )
+      .then((language) =>
+        language && language.length > 0 ? language[0] : null,
+      );
 
     const response: UpdateResultCapacitySharingDto = {
       delivery_modality_id: resultCapDev.delivery_modality_id,
@@ -255,6 +266,8 @@ export class ResultCapacitySharingService {
       start_date: resultCapDev.start_date,
       group: groupResponse,
       individual: individualResponse,
+      training_supervisor: trainingSupervisor,
+      training_supervisor_languages: training_supervisor_languages,
     };
 
     return response;
