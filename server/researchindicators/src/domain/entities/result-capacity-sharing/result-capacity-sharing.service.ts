@@ -134,6 +134,7 @@ export class ResultCapacitySharingService {
       session_participants_total: updateData?.session_participants_total,
       session_purpose_id: updateData?.session_purpose_id,
       session_purpose_description: updateData?.session_purpose_description,
+      is_attending_organization: updateData?.is_attending_organization,
     });
 
     await this._resultInsitutionService.create<InstitutionRolesEnum>(
