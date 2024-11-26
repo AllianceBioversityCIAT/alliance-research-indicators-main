@@ -14,21 +14,21 @@ export class ResultPolicyChange extends AuditableEntity {
 
   @Column('bigint', {
     name: 'policy_type_id',
-    nullable: false,
+    nullable: true,
   })
-  policy_type_id!: number;
+  policy_type_id?: number;
 
   @Column('bigint', {
     name: 'policy_stage_id',
-    nullable: false,
+    nullable: true,
   })
-  policy_stage_id!: number;
+  policy_stage_id?: number;
 
   @Column('text', {
     name: 'evidence_stage',
-    nullable: false,
+    nullable: true,
   })
-  evidence_stage!: string;
+  evidence_stage?: string;
 
   @ManyToOne(() => Result, (result) => result.results_policy_change)
   @JoinColumn({ name: 'result_id' })
