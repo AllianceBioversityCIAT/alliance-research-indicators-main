@@ -30,6 +30,7 @@ import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
+import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
 
 @Injectable()
 export class ResultsService {
@@ -43,9 +44,10 @@ export class ResultsService {
     private readonly _resultCapacitySharingService: ResultCapacitySharingService,
     private readonly _resultPolicyChangeService: ResultPolicyChangeService,
     private readonly currentUser: CurrentUserUtil,
+    private readonly _aiRoarMiningApp: AiRoarMiningApp,
   ) {}
 
-  async findResults(pagination: PaginationDto) {
+  async findResults(pagination: PaginationDto, type?: IndicatorsEnum) {
     const paginationClean = cleanObject<PaginationDto>(pagination);
     const whereLimit: Record<string, number> = {};
     if (Object.keys(paginationClean).length === 2) {
@@ -56,6 +58,7 @@ export class ResultsService {
     return this.mainRepo.find({
       ...whereLimit,
       where: {
+        ...(type ? { indicator_id: type } : {}),
         is_active: true,
       },
     });
@@ -320,5 +323,10 @@ export class ResultsService {
     return this.mainRepo
       .findOne({ where: { result_id, indicator_id: indicator } })
       .then((result) => result != null);
+  }
+
+  async createResultFromAiRoar(file: Express.Multer.File) {
+    console.log('file', file);
+    return this._aiRoarMiningApp.create(file);
   }
 }

@@ -8,10 +8,14 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -22,6 +26,11 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 import { UpdateGeneralInformation } from './dto/update-general-information.dto';
 import { DataReturnEnum } from '../../shared/enum/queries.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  QueryIndicators,
+  QueryIndicatorsEnum,
+} from '../indicators/enum/indicators.enum';
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller()
@@ -40,11 +49,25 @@ export class ResultsController {
     type: Number,
     description: 'Is a reference to the limit of items per page',
   })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    type: String,
+    enum: QueryIndicatorsEnum,
+    description: 'Is a reference to the type of indicator',
+  })
   @ApiOperation({ summary: 'Find all results' })
   @Get()
-  async find(@Query('page') page: string, @Query('limit') limit: string) {
+  async find(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query('type') type: QueryIndicatorsEnum,
+  ) {
     return this.resultsService
-      .findResults({ page: +page, limit: +limit })
+      .findResults(
+        { page: +page, limit: +limit },
+        QueryIndicators.getFromName(type)?.value,
+      )
       .then((el) =>
         ResponseUtils.format({
           description: 'Results found',
@@ -195,6 +218,31 @@ export class ResultsController {
         description: 'Metadata was found correctly',
         data: result,
         status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  @Post('ai/create')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File to upload',
+        },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async createAIResult(@UploadedFile() file: Express.Multer.File) {
+    return this.resultsService.createResultFromAiRoar(file).then((data) =>
+      ResponseUtils.format({
+        data: data,
+        description: 'AI Result created',
+        status: HttpStatus.CREATED,
       }),
     );
   }
