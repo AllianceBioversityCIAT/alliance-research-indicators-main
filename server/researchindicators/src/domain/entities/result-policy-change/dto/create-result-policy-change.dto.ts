@@ -39,15 +39,13 @@ export class CreateResultPolicyChangeDto {
     name: 'innovation_development',
     description: 'Innovation Development',
     type: LinkResult,
-    isArray: true,
   })
-  public innovation_development: LinkResult[];
+  public innovation_development: LinkResult;
 
   @ApiProperty({
     name: 'innovation_use',
     description: 'Innovation Use',
     type: LinkResult,
-    isArray: true,
   })
-  public innovation_use: LinkResult[];
+  public innovation_use: LinkResult;
 }
