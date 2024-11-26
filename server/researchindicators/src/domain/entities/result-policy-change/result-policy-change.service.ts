@@ -65,7 +65,7 @@ export class ResultPolicyChangeService {
       policy_type_id,
     } = createResultPolicyChangeDto;
 
-    const innoSave = [...innovation_development, ...innovation_use];
+    const innoSave = [innovation_development, innovation_use];
 
     return this.dataSource.transaction(async (manager) => {
       await this.linkResultsService.create(
@@ -112,11 +112,11 @@ export class ResultPolicyChangeService {
       LinkResultRolesEnum.POLICY_CHANGE,
     );
 
-    const innoDev = linkResults.filter(
+    const innoDev = linkResults.find(
       (el) => el.other_result.indicator_id === IndicatorsEnum.INNOVATION_DEV,
     );
 
-    const innoUse = linkResults.filter(
+    const innoUse = linkResults.find(
       (el) => el.other_result.indicator_id === IndicatorsEnum.INNOVATION_USE,
     );
 
