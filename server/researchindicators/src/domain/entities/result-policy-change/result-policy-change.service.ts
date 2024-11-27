@@ -80,7 +80,7 @@ export class ResultPolicyChangeService {
         result_id,
         implementing_organization,
         'institution_id',
-        LinkResultRolesEnum.POLICY_CHANGE,
+        InstitutionRolesEnum.POLICY_CHANGE,
         manager,
       );
 
@@ -121,9 +121,9 @@ export class ResultPolicyChangeService {
     );
 
     return {
-      evidence_stage: policyChange.evidence_stage,
-      policy_stage_id: policyChange.policy_stage_id,
-      policy_type_id: policyChange.policy_type_id,
+      evidence_stage: policyChange?.evidence_stage,
+      policy_stage_id: policyChange?.policy_stage_id,
+      policy_type_id: policyChange?.policy_type_id,
       implementing_organization: institutions,
       innovation_development: innoDev,
       innovation_use: innoUse,
