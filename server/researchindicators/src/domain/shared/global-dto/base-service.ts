@@ -172,6 +172,7 @@ export abstract class BaseServiceSimple<
     const updateWhere: FindOptionsWhere<any> = {
       [this.resultKey]: resultId,
       [this.primaryKey]: Not(In(persistId)),
+      ...(dataRole ? { [this.roleKey]: dataRole } : {}),
     };
 
     const inactiveData: QueryDeepPartialEntity<any> = {

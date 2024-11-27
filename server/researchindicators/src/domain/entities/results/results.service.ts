@@ -326,7 +326,6 @@ export class ResultsService {
   }
 
   async createResultFromAiRoar(file: Express.Multer.File) {
-    console.log('file', file);
     return this._aiRoarMiningApp.create(file);
   }
 }

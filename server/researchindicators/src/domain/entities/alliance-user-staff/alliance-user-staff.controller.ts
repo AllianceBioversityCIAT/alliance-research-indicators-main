@@ -55,7 +55,6 @@ export class AllianceUserStaffController {
     @Query('limit') limit: string = '10',
     @Query('name') name: string,
   ) {
-    console.log('name');
     return this.allianceUserStaffService
       .findWithFilters(
         {
