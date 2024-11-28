@@ -7,7 +7,7 @@ export class ReportYearService {
   constructor(private readonly dataSource: DataSource) {}
 
   async activeReportYear() {
-    return this.dataSource.getRepository(ReportYear).find({
+    return this.dataSource.getRepository(ReportYear).findOne({
       where: { is_active: true },
     });
   }

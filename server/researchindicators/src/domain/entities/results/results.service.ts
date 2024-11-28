@@ -33,6 +33,7 @@ import {
 import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { ReportYearService } from '../report-year/report-year.service';
 
 @Injectable()
 export class ResultsService {
@@ -48,6 +49,7 @@ export class ResultsService {
     private readonly currentUser: CurrentUserUtil,
     private readonly _aiRoarMiningApp: AiRoarMiningApp,
     private readonly _alianceManagementApp: AlianceManagementApp,
+    private readonly _reportYearService: ReportYearService,
   ) {}
 
   async findResults(pagination: PaginationDto, type?: IndicatorsEnum) {
@@ -89,6 +91,7 @@ export class ResultsService {
     });
 
     const newOfficialCode = await this.newOfficialCode();
+    const reportYear = await this._reportYearService.activeReportYear();
 
     const result = await this.dataSource.transaction(async (manager) => {
       const result = await manager
@@ -98,6 +101,7 @@ export class ResultsService {
           indicator_id,
           title,
           result_official_code: newOfficialCode,
+          report_year_id: reportYear.report_year,
           ...this.currentUser.audit(SetAutitEnum.NEW),
         })
         .then((result) => {
