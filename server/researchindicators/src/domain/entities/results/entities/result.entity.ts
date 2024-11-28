@@ -21,6 +21,7 @@ import { ResultPolicyChange } from '../../result-policy-change/entities/result-p
 import { LinkResult } from '../../link-results/entities/link-result.entity';
 import { ResultStatus } from '../../result-status/entities/result-status.entity';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
+import { ReportYear } from '../../report-year/entities/report-year.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -67,11 +68,21 @@ export class Result extends AuditableEntity {
   geo_scope_id?: number;
 
   @Column('bigint', {
+    name: 'report_year_id',
+    nullable: true,
+  })
+  report_year_id?: number;
+
+  @Column('bigint', {
     name: 'result_status_id',
     default: ResultStatusEnum.EDITING,
     nullable: true,
   })
   result_status_id?: number;
+
+  @ManyToOne(() => ReportYear, (reportYear) => reportYear.results)
+  @JoinColumn({ name: 'report_year_id' })
+  report_year!: ReportYear;
 
   @ManyToOne(() => ResultStatus, (resultStatus) => resultStatus.results)
   @JoinColumn({ name: 'result_status_id' })

@@ -21,6 +21,7 @@ import { DeliveryModalitiesModule } from '../entities/delivery-modalities/delive
 import { GendersModule } from '../entities/genders/genders.module';
 import { ResultStatusModule } from '../entities/result-status/result-status.module';
 import { AllianceUserStaffModule } from '../entities/alliance-user-staff/alliance-user-staff.module';
+import { ResultContractsModule } from '../entities/result-contracts/result-contracts.module';
 
 const ResultsChildren: Routes = [
   {
@@ -46,6 +47,10 @@ const ResultsChildren: Routes = [
   {
     path: 'alliance-user-staff',
     module: AllianceUserStaffModule,
+  },
+  {
+    path: 'contracts',
+    module: ResultContractsModule,
   },
 ];
 

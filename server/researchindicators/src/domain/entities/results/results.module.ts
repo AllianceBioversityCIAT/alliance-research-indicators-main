@@ -10,6 +10,7 @@ import { ResultCapacitySharingModule } from '../result-capacity-sharing/result-c
 import { ResultPolicyChangeModule } from '../result-policy-change/result-policy-change.module';
 import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
+import { ReportYearModule } from '../report-year/report-year.module';
 
 @Module({
   controllers: [ResultsController],
@@ -21,6 +22,7 @@ import { AlianceManagementApp } from '../../tools/broker/aliance-management.app'
     ResultUsersModule,
     ResultCapacitySharingModule,
     ResultPolicyChangeModule,
+    ReportYearModule,
   ],
   providers: [
     ResultsService,
