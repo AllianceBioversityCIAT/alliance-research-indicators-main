@@ -9,6 +9,7 @@ import { ResultUsersModule } from '../result-users/result-users.module';
 import { ResultCapacitySharingModule } from '../result-capacity-sharing/result-capacity-sharing.module';
 import { ResultPolicyChangeModule } from '../result-policy-change/result-policy-change.module';
 import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
+import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 
 @Module({
   controllers: [ResultsController],
@@ -21,7 +22,12 @@ import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
     ResultCapacitySharingModule,
     ResultPolicyChangeModule,
   ],
-  providers: [ResultsService, ResultRepository, AiRoarMiningApp],
+  providers: [
+    ResultsService,
+    ResultRepository,
+    AiRoarMiningApp,
+    AlianceManagementApp,
+  ],
   exports: [ResultsService, ResultRepository],
 })
 export class ResultsModule {}

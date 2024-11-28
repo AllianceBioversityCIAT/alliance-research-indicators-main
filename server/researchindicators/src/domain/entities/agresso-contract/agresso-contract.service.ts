@@ -6,12 +6,14 @@ import { cleanObject, parseBoolean } from '../../shared/utils/object.utils';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
 import { StringKeys } from '../../shared/global-dto/types-global';
 import { AgressoContractRepository } from './repositories/agresso-contract.repository';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 
 @Injectable()
 export class AgressoContractService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly _agressoContractRepository: AgressoContractRepository,
+    private readonly currentUser: CurrentUserUtil,
   ) {}
 
   async findContracts(
@@ -42,5 +44,11 @@ export class AgressoContractService {
     last_name: string,
   ): Promise<AgressoContract[]> {
     return this._agressoContractRepository.findByName(first_name, last_name);
+  }
+
+  async findContractsByCurrentUser() {
+    return this._agressoContractRepository.findContractsByUser(
+      this.currentUser.user_id,
+    );
   }
 }
