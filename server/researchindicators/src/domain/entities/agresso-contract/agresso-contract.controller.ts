@@ -1,4 +1,4 @@
-import { Controller, Get, Query, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Query, HttpStatus, Param } from '@nestjs/common';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
 import {
@@ -97,11 +97,25 @@ export class AgressoContractController {
       );
   }
 
-  @Get('contracts/current-user')
+  @Get('contracts/results/current-user')
   @ApiOperation({ summary: 'Find all contracts by current user' })
-  findContractsByCurrentUser() {
+  async findContractsByCurrentUser() {
     return this.agressoContractService
-      .findContractsByCurrentUser()
+      .findContractsResultByCurrentUser()
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contracts found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get(':agreementId/results/count')
+  @ApiOperation({ summary: 'Find all contracts by contract id' })
+  async findContractsByContractId(@Param('agreementId') agreementId: string) {
+    return this.agressoContractService
+      .findContratResultByContractId(agreementId)
       .then((response) =>
         ResponseUtils.format({
           description: 'Contracts found',

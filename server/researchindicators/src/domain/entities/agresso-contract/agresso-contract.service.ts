@@ -46,9 +46,13 @@ export class AgressoContractService {
     return this._agressoContractRepository.findByName(first_name, last_name);
   }
 
-  async findContractsByCurrentUser() {
+  async findContractsResultByCurrentUser() {
     return this._agressoContractRepository.findContractsByUser(
       this.currentUser.user_id,
     );
+  }
+
+  async findContratResultByContractId(contract_id: string) {
+    return this._agressoContractRepository.findOneContract(contract_id);
   }
 }

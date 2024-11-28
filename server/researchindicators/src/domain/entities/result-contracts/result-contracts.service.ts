@@ -50,4 +50,8 @@ export class ResultContractsService extends BaseServiceSimple<
     }
     return dataToSave ?? data;
   }
+
+  async findAllResultByContractId(contract_id: string) {
+    return this.mainRepo.findAllResultsByContractId(contract_id);
+  }
 }
