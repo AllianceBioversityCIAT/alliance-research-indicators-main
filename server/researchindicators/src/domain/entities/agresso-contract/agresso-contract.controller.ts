@@ -96,4 +96,18 @@ export class AgressoContractController {
         }),
       );
   }
+
+  @Get('contracts/current-user')
+  @ApiOperation({ summary: 'Find all contracts by current user' })
+  findContractsByCurrentUser() {
+    return this.agressoContractService
+      .findContractsByCurrentUser()
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contracts found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
 }

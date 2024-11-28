@@ -31,6 +31,8 @@ import {
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
 import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
+import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 @Injectable()
 export class ResultsService {
@@ -45,6 +47,7 @@ export class ResultsService {
     private readonly _resultPolicyChangeService: ResultPolicyChangeService,
     private readonly currentUser: CurrentUserUtil,
     private readonly _aiRoarMiningApp: AiRoarMiningApp,
+    private readonly _alianceManagementApp: AlianceManagementApp,
   ) {}
 
   async findResults(pagination: PaginationDto, type?: IndicatorsEnum) {
@@ -88,13 +91,23 @@ export class ResultsService {
     const newOfficialCode = await this.newOfficialCode();
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const result = await manager.getRepository(this.mainRepo.target).save({
-        description,
-        indicator_id,
-        title,
-        result_official_code: newOfficialCode,
-        ...this.currentUser.audit(SetAutitEnum.NEW),
-      });
+      const result = await manager
+        .getRepository(this.mainRepo.target)
+        .save({
+          description,
+          indicator_id,
+          title,
+          result_official_code: newOfficialCode,
+          ...this.currentUser.audit(SetAutitEnum.NEW),
+        })
+        .then((result) => {
+          this._alianceManagementApp.linkUserToContract(
+            this.currentUser.user_id,
+            contract_id,
+            SecRolesEnum.CONTRACT_CONTRIBUTOR,
+          );
+          return result;
+        });
 
       await this.createResultType(
         result.result_id,
