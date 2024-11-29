@@ -34,6 +34,15 @@ import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ReportYearService } from '../report-year/report-year.service';
+import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
+import { ResultCountriesService } from '../result-countries/result-countries.service';
+import { ResultRegionsService } from '../result-regions/result-regions.service';
+import { ResultCountriesSubNationalsService } from '../result-countries-sub-nationals/result-countries-sub-nationals.service';
+import { ClarisaGeoScopeService } from '../../tools/clarisa/entities/clarisa-geo-scope/clarisa-geo-scope.service';
+import { ClarisaGeoScopeEnum } from '../../tools/clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { CountryRolesEnum } from '../country-roles/enums/country-roles.anum';
+import { ResultCountry } from '../result-countries/entities/result-country.entity';
+import { ResultCountriesSubNational } from '../result-countries-sub-nationals/entities/result-countries-sub-national.entity';
 
 @Injectable()
 export class ResultsService {
@@ -50,6 +59,10 @@ export class ResultsService {
     private readonly _aiRoarMiningApp: AiRoarMiningApp,
     private readonly _alianceManagementApp: AlianceManagementApp,
     private readonly _reportYearService: ReportYearService,
+    private readonly _resultCountriesService: ResultCountriesService,
+    private readonly _resultRegionsService: ResultRegionsService,
+    private readonly _resultCountriesSubNationalsService: ResultCountriesSubNationalsService,
+    private readonly _clarisaGeoScopeService: ClarisaGeoScopeService,
   ) {}
 
   async findResults(pagination: PaginationDto, type?: IndicatorsEnum) {
@@ -344,5 +357,69 @@ export class ResultsService {
 
   async createResultFromAiRoar(file: Express.Multer.File) {
     return this._aiRoarMiningApp.create(file);
+  }
+
+  async saveGeoLocation(
+    resultId: number,
+    saveGeoLocationDto: SaveGeoLocationDto,
+  ) {
+    return this.dataSource.transaction(async (manager) => {
+      const geoScopeId: ClarisaGeoScopeEnum =
+        await this._clarisaGeoScopeService.transformGeoScope(
+          saveGeoLocationDto.geo_scope_id,
+          saveGeoLocationDto.countries,
+        );
+      await manager.getRepository(this.mainRepo.target).update(resultId, {
+        geo_scope_id: geoScopeId,
+      });
+
+      if (
+        [ClarisaGeoScopeEnum.GLOBAL, ClarisaGeoScopeEnum.REGIONAL].includes(
+          geoScopeId,
+        )
+      ) {
+        await this._resultRegionsService.create(
+          resultId,
+          saveGeoLocationDto.regions,
+          'region_id',
+          null,
+          manager,
+        );
+      }
+
+      let saveContries: ResultCountry[];
+      if (
+        [
+          ClarisaGeoScopeEnum.GLOBAL,
+          ClarisaGeoScopeEnum.NATIONAL,
+          ClarisaGeoScopeEnum.MULTI_NATIONAL,
+          ClarisaGeoScopeEnum.SUB_NATIONAL,
+        ].includes(geoScopeId)
+      ) {
+        saveContries = await this._resultCountriesService.create(
+          resultId,
+          saveGeoLocationDto.countries,
+          'result_id',
+          CountryRolesEnum.GEO_lOCATION,
+          manager,
+        );
+      }
+
+      if (geoScopeId === ClarisaGeoScopeEnum.SUB_NATIONAL) {
+        for (const country of saveContries) {
+          const subNational: ResultCountriesSubNational[] =
+            saveGeoLocationDto.countries.find(
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals;
+          await this._resultCountriesSubNationalsService.create(
+            country.result_country_id,
+            subNational,
+            'sub_national_id',
+            null,
+            manager,
+          );
+        }
+      }
+    });
   }
 }

@@ -3,6 +3,8 @@ import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-ba
 import { ClarisaGeoScope } from './entities/clarisa-geo-scope.entity';
 import { DataSource, Repository } from 'typeorm';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
+import { ResultCountry } from '../../../../entities/result-countries/entities/result-country.entity';
+import { ClarisaGeoScopeEnum } from './enum/clarisa-geo-scope.enum';
 @Injectable()
 export class ClarisaGeoScopeService extends ControlListBaseService<
   ClarisaGeoScope,
@@ -14,5 +16,25 @@ export class ClarisaGeoScopeService extends ControlListBaseService<
       dataSource.getRepository(ClarisaGeoScope),
       currentUser,
     );
+  }
+
+  async transformGeoScope(
+    id: ClarisaGeoScopeEnum,
+    countryData: ResultCountry[],
+    isCliToServ: boolean = true,
+  ) {
+    let tempId = id;
+
+    if (
+      isCliToServ &&
+      id == ClarisaGeoScopeEnum.NATIONAL &&
+      countryData.length > 1
+    ) {
+      tempId = ClarisaGeoScopeEnum.MULTI_NATIONAL;
+    } else if (!isCliToServ && id == ClarisaGeoScopeEnum.MULTI_NATIONAL) {
+      tempId = ClarisaGeoScopeEnum.NATIONAL;
+    }
+
+    return tempId;
   }
 }

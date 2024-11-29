@@ -1,6 +1,14 @@
-import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryColumn,
+} from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ResultCountriesSubNational } from '../../../../../entities/result-countries-sub-nationals/entities/result-countries-sub-national.entity';
+import { ClarisaCountry } from '../../clarisa-countries/entities/clarisa-country.entity';
 
 @Entity('clarisa_sub_nationals')
 export class ClarisaSubNational extends AuditableEntity {
@@ -22,9 +30,15 @@ export class ClarisaSubNational extends AuditableEntity {
   })
   name!: string;
 
+  @Column('json', {
+    name: 'other_names',
+    nullable: true,
+  })
+  other_names: JSON;
+
   @Column('varchar', {
     length: 3,
-    name: 'definition',
+    name: 'country_iso_alpha_2',
     nullable: true,
   })
   country_iso_alpha_2?: string;
@@ -35,6 +49,13 @@ export class ClarisaSubNational extends AuditableEntity {
     nullable: true,
   })
   language_iso_2?: string;
+
+  @ManyToOne(
+    () => ClarisaCountry,
+    (clarisaCountry) => clarisaCountry.clarisa_sub_nationals,
+  )
+  @JoinColumn({ name: 'country_iso_alpha_2' })
+  clarisa_country!: ClarisaCountry;
 
   @OneToMany(
     () => ResultCountriesSubNational,

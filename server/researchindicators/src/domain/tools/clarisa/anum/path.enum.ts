@@ -6,4 +6,5 @@ export enum ClarisaPathEnum {
   LANGUAGES = 'languages',
   REGIONS = 'regions/un-regions',
   LEVERS = 'alliance-levers',
+  SUB_NATIONAL = 'subnational-scope',
 }

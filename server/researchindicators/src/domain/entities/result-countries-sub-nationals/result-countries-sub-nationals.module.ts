@@ -5,5 +5,6 @@ import { ResultCountriesSubNationalsController } from './result-countries-sub-na
 @Module({
   controllers: [ResultCountriesSubNationalsController],
   providers: [ResultCountriesSubNationalsService],
+  exports: [ResultCountriesSubNationalsService],
 })
 export class ResultCountriesSubNationalsModule {}

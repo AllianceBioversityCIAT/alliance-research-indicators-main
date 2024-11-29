@@ -11,6 +11,10 @@ import { ResultPolicyChangeModule } from '../result-policy-change/result-policy-
 import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { ReportYearModule } from '../report-year/report-year.module';
+import { ResultRegionsModule } from '../result-regions/result-regions.module';
+import { ResultCountriesSubNationalsModule } from '../result-countries-sub-nationals/result-countries-sub-nationals.module';
+import { ResultCountriesModule } from '../result-countries/result-countries.module';
+import { ClarisaGeoScopeModule } from '../../tools/clarisa/entities/clarisa-geo-scope/clarisa-geo-scope.module';
 
 @Module({
   controllers: [ResultsController],
@@ -23,6 +27,10 @@ import { ReportYearModule } from '../report-year/report-year.module';
     ResultCapacitySharingModule,
     ResultPolicyChangeModule,
     ReportYearModule,
+    ResultRegionsModule,
+    ResultCountriesModule,
+    ResultCountriesSubNationalsModule,
+    ClarisaGeoScopeModule,
   ],
   providers: [
     ResultsService,
