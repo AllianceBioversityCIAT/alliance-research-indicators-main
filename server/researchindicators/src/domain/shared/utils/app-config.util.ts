@@ -42,6 +42,16 @@ export class AppConfig {
     return process.env.ARI_CLARISA_HOST;
   }
 
+  //CLARISA user
+  get ARI_CLARISA_USER(): string {
+    return process.env.ARI_CLARISA_USER;
+  }
+
+  //CLARISA password
+  get ARI_CLARISA_PASS(): string {
+    return process.env.ARI_CLARISA_PASS;
+  }
+
   //Mysql host
   get ARI_MYSQL_HOST(): string {
     return process.env.ARI_MYSQL_HOST;

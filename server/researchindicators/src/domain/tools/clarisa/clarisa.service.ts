@@ -18,6 +18,10 @@ import { ClarisaLever } from './entities/clarisa-levers/entities/clarisa-lever.e
 import { BaseControlListSave } from '../../shared/global-dto/base-control-list-save';
 import { ClarisaLeversRawDto } from './entities/clarisa-levers/dto/clarisa-levers-raw.dto';
 import { leversMappers } from './mappers/levers.mappers';
+import { ClarisaSubNationalRawDto } from './entities/clarisa-sub-nationals/dto/clarisa-sub-national-raw.dto';
+import { ClarisaSubNational } from './entities/clarisa-sub-nationals/entities/clarisa-sub-national.entity';
+import { subNationalMapper } from './mappers/sub-national.mapper';
+import { ClarisaGeoScope } from './entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -63,10 +67,22 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
       ClarisaInstitution,
       (data) => institutionMapper(data),
     );
+
     await this.base<ClarisaLeversRawDto, ClarisaLever>(
       ClarisaPathEnum.LEVERS,
       ClarisaLever,
       (data) => leversMappers(data),
+    );
+
+    await this.base<ClarisaSubNationalRawDto, ClarisaSubNational>(
+      ClarisaPathEnum.SUB_NATIONAL,
+      ClarisaSubNational,
+      (data) => subNationalMapper(data),
+    );
+
+    await this.base<ClarisaGeoScope>(
+      ClarisaPathEnum.GEO_SCOPES,
+      ClarisaGeoScope,
     );
     this._logger.debug('All entities cloned');
   }

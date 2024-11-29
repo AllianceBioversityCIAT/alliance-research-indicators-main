@@ -13,6 +13,23 @@ export class Clarisa implements ConnectionInterface {
     this.http = http;
   }
 
+  public async getToken(): Promise<string> {
+    return firstValueFrom(
+      this.http
+        .post<{ access_token: string }>(env.ARI_CLARISA_HOST + 'auth/login', {
+          login: env.ARI_CLARISA_USER,
+          password: env.ARI_CLARISA_PASSWORD,
+        })
+        .pipe(
+          map(({ data }) => {
+            return data.access_token;
+          }),
+        ),
+    ).catch((err) => {
+      throw new BadRequestException(err);
+    });
+  }
+
   public async post<T, X = T>(path: string, data: T): Promise<X> {
     return firstValueFrom(
       this.http.post<X>(this.clarisaHost + path, data).pipe(

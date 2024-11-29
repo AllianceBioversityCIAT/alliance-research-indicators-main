@@ -5,6 +5,7 @@ import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { ContractResultCountDto } from '../dto/contract-result-count.dto';
+import { isEmpty } from '../../../shared/utils/object.utils';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -46,6 +47,10 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       tempUserId,
       SecRolesEnum.CONTRACT_CONTRIBUTOR,
     );
+
+    if (!contract || contract.length === 0) {
+      return [];
+    }
 
     const contractIds = contract.map((c) => c.contract_id);
 
@@ -89,6 +94,10 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
   }
 
   async findOneContract(contract_id: string) {
+    if (isEmpty(contract_id)) {
+      return null;
+    }
+
     const query = `
     SELECT 
       ac.agreement_id, 

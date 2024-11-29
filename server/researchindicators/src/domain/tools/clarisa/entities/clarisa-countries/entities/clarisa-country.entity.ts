@@ -2,6 +2,7 @@ import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ResultCountry } from '../../../../../entities/result-countries/entities/result-country.entity';
 import { ClarisaInstitutionLocation } from '../../clarisa-institution-locations/entities/clarisa-institution-location.entity';
+import { ClarisaSubNational } from '../../clarisa-sub-nationals/entities/clarisa-sub-national.entity';
 
 @Entity('clarisa_countries')
 export class ClarisaCountry extends AuditableEntity {
@@ -48,4 +49,10 @@ export class ClarisaCountry extends AuditableEntity {
     (clarisaInstitution) => clarisaInstitution.country,
   )
   institution_locations!: ClarisaInstitutionLocation[];
+
+  @OneToMany(
+    () => ClarisaSubNational,
+    (clarisaSubNational) => clarisaSubNational.clarisa_country,
+  )
+  clarisa_sub_nationals!: ClarisaSubNational[];
 }
