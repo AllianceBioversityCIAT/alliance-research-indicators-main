@@ -31,6 +31,7 @@ import {
   QueryIndicators,
   QueryIndicatorsEnum,
 } from '../indicators/enum/indicators.enum';
+import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller()
@@ -243,6 +244,47 @@ export class ResultsController {
         data: data,
         description: 'AI Result created',
         status: HttpStatus.CREATED,
+      }),
+    );
+  }
+
+  @ApiOperation({ summary: 'Save data for Geo Location' })
+  @Patch(':id/geo-location')
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  async saveGeoLocation(
+    @Param('id') resultId: string,
+    @Body() geoLocation: SaveGeoLocationDto,
+  ) {
+    return this.resultsService
+      .saveGeoLocation(+resultId, geoLocation)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'Geo Location was saved correctly',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @ApiOperation({ summary: 'Find data for Geo Location' })
+  @Get(':id/geo-location')
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  async findGeoLocation(@Param('id') resultId: string) {
+    return this.resultsService.findGeoLocation(+resultId).then((result) =>
+      ResponseUtils.format({
+        description: 'Geo Location was found correctly',
+        data: result,
+        status: HttpStatus.OK,
       }),
     );
   }

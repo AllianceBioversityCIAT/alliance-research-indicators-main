@@ -5,7 +5,8 @@ import { ResultRegion } from '../../result-regions/entities/result-region.entity
 
 export class SaveGeoLocationDto {
   @ApiProperty({
-    type: ClarisaGeoScopeEnum,
+    type: Number,
+    enum: ClarisaGeoScopeEnum,
     description: 'Geo scope id',
   })
   geo_scope_id: ClarisaGeoScopeEnum;

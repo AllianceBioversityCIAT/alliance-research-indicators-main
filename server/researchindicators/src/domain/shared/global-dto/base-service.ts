@@ -240,11 +240,13 @@ export abstract class BaseServiceSimple<
   }
 
   public async find<Enum extends string | number>(
-    resultId: number,
+    resultId: number | number[],
     dataRole?: Enum,
   ) {
+    const dataToFind = Array.isArray(resultId) ? In(resultId) : resultId;
+
     const whereData = {
-      [this.resultKey]: resultId,
+      [this.resultKey]: dataToFind,
       is_active: true,
     } as FindOptionsWhere<Entity>;
 

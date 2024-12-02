@@ -38,6 +38,7 @@ export class ResultCountry extends AuditableEntity {
   @ApiProperty({
     type: String,
     name: 'isoAlpha2',
+    required: true,
   })
   @Column('varchar', {
     length: 3,
@@ -68,6 +69,10 @@ export class ResultCountry extends AuditableEntity {
   @JoinColumn({ name: 'isoAlpha2' })
   country!: ClarisaCountry;
 
+  @ApiProperty({
+    type: ResultCountriesSubNational,
+    isArray: true,
+  })
   @OneToMany(
     () => ResultCountriesSubNational,
     (resultCountrySubNational) => resultCountrySubNational.result_country,
