@@ -356,7 +356,8 @@ export class ResultsService {
   }
 
   async createResultFromAiRoar(file: Express.Multer.File) {
-    return this._aiRoarMiningApp.create(file);
+    const model = await this._aiRoarMiningApp.create(file);
+    return model;
   }
 
   async saveGeoLocation(
