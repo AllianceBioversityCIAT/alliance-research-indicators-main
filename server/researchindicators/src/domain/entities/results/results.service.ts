@@ -403,6 +403,13 @@ export class ResultsService {
           CountryRolesEnum.GEO_lOCATION,
           manager,
         );
+        await this._resultRegionsService.create(
+          resultId,
+          [],
+          'region_id',
+          null,
+          manager,
+        );
       }
 
       if (geoScopeId === ClarisaGeoScopeEnum.SUB_NATIONAL) {
@@ -419,6 +426,14 @@ export class ResultsService {
             manager,
           );
         }
+
+        await this._resultRegionsService.create(
+          resultId,
+          [],
+          'region_id',
+          null,
+          manager,
+        );
       }
     });
   }
