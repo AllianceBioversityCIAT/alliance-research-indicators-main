@@ -18,7 +18,7 @@ export class ClarisaGeoScopeService extends ControlListBaseService<
     );
   }
 
-  async transformGeoScope(
+  transformGeoScope(
     id: ClarisaGeoScopeEnum,
     countryData: ResultCountry[],
     isCliToServ: boolean = true,
@@ -28,7 +28,7 @@ export class ClarisaGeoScopeService extends ControlListBaseService<
     if (
       isCliToServ &&
       id == ClarisaGeoScopeEnum.NATIONAL &&
-      countryData.length > 1
+      countryData?.length > 1
     ) {
       tempId = ClarisaGeoScopeEnum.MULTI_NATIONAL;
     } else if (!isCliToServ && id == ClarisaGeoScopeEnum.MULTI_NATIONAL) {

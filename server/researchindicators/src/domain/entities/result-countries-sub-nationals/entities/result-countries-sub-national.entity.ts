@@ -8,21 +8,31 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ResultCountry } from '../../result-countries/entities/result-country.entity';
 import { ClarisaSubNational } from '../../../tools/clarisa/entities/clarisa-sub-nationals/entities/clarisa-sub-national.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('result_countries_sub_nationals')
 export class ResultCountriesSubNational extends AuditableEntity {
+  @ApiProperty({
+    type: Number,
+  })
   @PrimaryGeneratedColumn({
     name: 'result_country_sub_national_id',
     type: 'bigint',
   })
   result_country_sub_national_id!: number;
 
+  @ApiProperty({
+    type: Number,
+  })
   @Column('bigint', {
     name: 'result_country_id',
     nullable: false,
   })
   result_country_id!: number;
 
+  @ApiProperty({
+    type: Number,
+  })
   @Column('bigint', {
     name: 'sub_national_id',
     nullable: false,

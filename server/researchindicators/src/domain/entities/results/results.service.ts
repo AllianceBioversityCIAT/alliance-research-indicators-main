@@ -356,7 +356,8 @@ export class ResultsService {
   }
 
   async createResultFromAiRoar(file: Express.Multer.File) {
-    return this._aiRoarMiningApp.create(file);
+    const model = await this._aiRoarMiningApp.create(file);
+    return model;
   }
 
   async saveGeoLocation(
@@ -365,7 +366,7 @@ export class ResultsService {
   ) {
     return this.dataSource.transaction(async (manager) => {
       const geoScopeId: ClarisaGeoScopeEnum =
-        await this._clarisaGeoScopeService.transformGeoScope(
+        this._clarisaGeoScopeService.transformGeoScope(
           saveGeoLocationDto.geo_scope_id,
           saveGeoLocationDto.countries,
         );
@@ -436,5 +437,43 @@ export class ResultsService {
         );
       }
     });
+  }
+
+  async findGeoLocation(resultId: number): Promise<SaveGeoLocationDto> {
+    const geoScopeId = await this.mainRepo
+      .findOne({
+        where: { result_id: resultId, is_active: true },
+        select: ['geo_scope_id'],
+      })
+      .then((result) => result?.geo_scope_id);
+
+    const cliGeoScope = this._clarisaGeoScopeService.transformGeoScope(
+      geoScopeId,
+      undefined,
+      false,
+    );
+
+    const countries = await this._resultCountriesService.find(
+      resultId,
+      CountryRolesEnum.GEO_lOCATION,
+    );
+
+    const subNational = await this._resultCountriesSubNationalsService.find(
+      countries.map((el) => el.result_country_id),
+    );
+
+    countries.forEach((country) => {
+      country.result_countries_sub_nationals = subNational.filter(
+        (el) => el.result_country_id === country.result_country_id,
+      );
+    });
+
+    const regions = await this._resultRegionsService.find(resultId);
+
+    return {
+      geo_scope_id: cliGeoScope,
+      regions,
+      countries,
+    };
   }
 }
