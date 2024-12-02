@@ -59,6 +59,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       ac.agreement_id, 
       ac.projectDescription, 
       ac.project_lead_description, 
+      ac.description,
       ac.start_date, 
       ac.end_date, 
       JSON_ARRAYAGG(
@@ -102,6 +103,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     SELECT 
       ac.agreement_id, 
       ac.projectDescription, 
+      ac.description,
       ac.project_lead_description, 
       ac.start_date, 
       ac.end_date, 
