@@ -46,7 +46,8 @@ export class Clarisa implements ConnectionInterface {
         }),
       ),
     ).catch((err) => {
-      throw new BadRequestException(err);
+      const message = err?.response?.data?.message || err;
+      throw new BadRequestException(message);
     });
   }
 
