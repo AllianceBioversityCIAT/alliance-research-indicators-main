@@ -9,6 +9,7 @@ export enum ClarisaPathEnum {
   SUB_NATIONAL = 'api/subnational-scope',
   OS_COUNTRIES = 'integration/open-search/countries/search',
   OS_INSTITUTIONS = 'integration/open-search/institutions/search',
+  PARTNER_REQUEST_CREATE = 'api/partner-requests/create',
 }
 
 export enum SearchToOpenSearchEnum {

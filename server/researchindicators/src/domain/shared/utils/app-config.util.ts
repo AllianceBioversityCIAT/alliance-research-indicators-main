@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
+/**
+ * Class to get all application configurations from environment variables or .env file
+ * @export AppConfig
+ * @class AppConfig
+ */
 @Injectable()
 export class AppConfig {
   //RabbitMQ host
@@ -130,5 +135,9 @@ export class AppConfig {
   //Application name
   get ARI_APP_NAME(): string {
     return process.env.ARI_APP_NAME;
+  }
+
+  get ARI_MIS(): string {
+    return process.env.ARI_MIS;
   }
 }

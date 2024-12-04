@@ -36,4 +36,17 @@ export class ClarisaInstitutionTypesController {
         }),
       );
   }
+
+  @Get('partner/request')
+  async findInstitutionTypeToPartner() {
+    return this.clarisaInstitutionTypesService
+      .findInstitutionTypeToPartner()
+      .then((institutionTypes) =>
+        ResponseUtils.format({
+          data: institutionTypes,
+          description: 'Institution types found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }

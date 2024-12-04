@@ -1,18 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
 import { ClarisaInstitutionType } from './entities/clarisa-institution-type.entity';
-import { DataSource, Repository } from 'typeorm';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
+import { ClarisaInstitutionTypesRepository } from './repositories/clarisa-institution-types.repository';
 @Injectable()
 export class ClarisaInstitutionTypesService extends ControlListBaseService<
   ClarisaInstitutionType,
-  Repository<ClarisaInstitutionType>
+  ClarisaInstitutionTypesRepository
 > {
-  constructor(dataSource: DataSource, currentUser: CurrentUserUtil) {
+  constructor(
+    currentUser: CurrentUserUtil,
+    clarisaInstitutionTypesRepository: ClarisaInstitutionTypesRepository,
+  ) {
     super(
       ClarisaInstitutionType,
-      dataSource.getRepository(ClarisaInstitutionType),
+      clarisaInstitutionTypesRepository,
       currentUser,
     );
+  }
+
+  async findInstitutionTypeToPartner() {
+    return this.mainRepo.findActiveWithNoChildren();
   }
 }

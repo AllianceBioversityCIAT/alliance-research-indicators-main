@@ -22,6 +22,10 @@ import { ClarisaSubNationalRawDto } from './entities/clarisa-sub-nationals/dto/c
 import { ClarisaSubNational } from './entities/clarisa-sub-nationals/entities/clarisa-sub-national.entity';
 import { subNationalMapper } from './mappers/sub-national.mapper';
 import { ClarisaGeoScope } from './entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
+import { PartnerRequestCreate } from '../dto/partner-request-create.dto';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { AppConfig } from '../../shared/utils/app-config.util';
+import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -29,6 +33,8 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
     dataSource: DataSource,
     private readonly ciService: ClarisaInstitutionsService,
     _http: HttpService,
+    private readonly currentUser: CurrentUserUtil,
+    private readonly appConfig: AppConfig,
   ) {
     super(dataSource, new Clarisa(_http), new Logger(ClarisaService.name));
   }
@@ -41,6 +47,27 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
       dataSearch = ClarisaPathEnum.OS_INSTITUTIONS;
     }
     return this.connection.get(dataSearch + `?query=${query}`);
+  }
+
+  async partnerRequest(partnerRequest: PartnerRequestCliDataDto) {
+    const { email, first_name, last_name, sec_user_id } = this.currentUser.user;
+    const fullName = `${last_name}, ${first_name}`;
+    return this.connection.post<PartnerRequestCreate, any>(
+      ClarisaPathEnum.PARTNER_REQUEST_CREATE,
+      {
+        externalUserMail: email,
+        externalUserName: fullName,
+        userId: sec_user_id,
+        misAcronym: this.appConfig.ARI_MIS,
+        hqCountryIso: partnerRequest.hqCountryIso,
+        institutionTypeCode: partnerRequest.institutionTypeCode,
+        name: partnerRequest.name,
+        websiteLink: partnerRequest.websiteLink,
+        category_1: partnerRequest?.category_1,
+        category_2: partnerRequest?.category_2,
+        externalUserComments: partnerRequest?.externalUserComments,
+      },
+    );
   }
 
   /**

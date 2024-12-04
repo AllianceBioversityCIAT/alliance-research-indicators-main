@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
 import { ClarisaService } from './clarisa.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import {
@@ -8,6 +8,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SearchToOpenSearchEnum } from './anum/path.enum';
+import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
 
 @ApiBearerAuth()
 @ApiTags('Clarisa')
@@ -48,6 +49,21 @@ export class ClarisaController {
       ResponseUtils.format({
         description: 'Countries found',
         data: countries,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      'This enpoint is in charge of the connection with CLARISA and allows the creation of a partner request.',
+  })
+  @Post('partner-request/create')
+  async partnerRequest(@Body() partnerRequest: PartnerRequestCliDataDto) {
+    return this.clarisaService.partnerRequest(partnerRequest).then((response) =>
+      ResponseUtils.format({
+        description: 'Partner request created',
+        data: response,
         status: HttpStatus.OK,
       }),
     );
