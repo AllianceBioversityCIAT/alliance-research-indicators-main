@@ -16,4 +16,13 @@ export class ClarisaSubNationalsService extends ControlListBaseService<
       currentUser,
     );
   }
+
+  async findSubNationalsByCountryIso2(isoAlpha2: string) {
+    return this.mainRepo.find({
+      where: {
+        country_iso_alpha_2: isoAlpha2,
+        is_active: true,
+      },
+    });
+  }
 }

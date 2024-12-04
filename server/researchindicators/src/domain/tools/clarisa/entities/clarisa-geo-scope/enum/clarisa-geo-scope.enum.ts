@@ -4,4 +4,5 @@ export enum ClarisaGeoScopeEnum {
   MULTI_NATIONAL = 3,
   NATIONAL = 4,
   SUB_NATIONAL = 5,
+  THIS_IS_YET_TO_BE_DETERMINED = 50,
 }

@@ -18,14 +18,14 @@ export class ResultContractsController {
 
   @ApiOperation({ summary: 'Find all results by contract id' })
   @ApiParam({
-    name: 'contract_id',
+    name: 'contractId',
     required: true,
     description: 'Contract ID',
   })
-  @Get(':contract_id')
-  async findAllResultsByContractId(@Param('contract_id') contract_id: string) {
+  @Get(':contractId')
+  async findAllResultsByContractId(@Param('contractId') contractId: string) {
     return this.resultContractsService
-      .findAllResultByContractId(contract_id)
+      .findAllResultByContractId(contractId)
       .then((response) =>
         ResponseUtils.format({
           description: 'Results found',

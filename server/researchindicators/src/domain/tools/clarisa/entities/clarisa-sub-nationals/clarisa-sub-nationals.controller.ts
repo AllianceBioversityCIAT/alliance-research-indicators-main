@@ -34,4 +34,17 @@ export class ClarisaSubNationalsController {
         }),
       );
   }
+
+  @Get('country/:isoAlpha2')
+  async findSubNationalsByCountryIso2(@Param('isoAlpha2') isoAlpha2: string) {
+    return this.clarisaSubNationalsService
+      .findSubNationalsByCountryIso2(isoAlpha2)
+      .then((subNationals) =>
+        ResponseUtils.format({
+          description: 'Subnationals found',
+          data: subNationals,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }

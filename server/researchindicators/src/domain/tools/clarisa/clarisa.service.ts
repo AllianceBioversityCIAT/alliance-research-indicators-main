@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Clarisa } from './clarisa.connection';
 import { HttpService } from '@nestjs/axios';
-import { ClarisaPathEnum } from './anum/path.enum';
+import { ClarisaPathEnum, SearchToOpenSearchEnum } from './anum/path.enum';
 import { DataSource } from 'typeorm';
 import { ClarisaRegion } from './entities/clarisa-regions/entities/clarisa-region.entity';
 import { ClarisaCountry } from './entities/clarisa-countries/entities/clarisa-country.entity';
@@ -31,6 +31,16 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
     _http: HttpService,
   ) {
     super(dataSource, new Clarisa(_http), new Logger(ClarisaService.name));
+  }
+
+  async searchToOS(query: string, target: SearchToOpenSearchEnum) {
+    let dataSearch: string;
+    if (target === SearchToOpenSearchEnum.COUNTRY) {
+      dataSearch = ClarisaPathEnum.OS_COUNTRIES;
+    } else if (target === SearchToOpenSearchEnum.INSTITUTION) {
+      dataSearch = ClarisaPathEnum.OS_INSTITUTIONS;
+    }
+    return this.connection.get(dataSearch + `?query=${query}`);
   }
 
   /**
