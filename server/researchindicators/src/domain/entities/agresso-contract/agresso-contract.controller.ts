@@ -111,11 +111,11 @@ export class AgressoContractController {
       );
   }
 
-  @Get(':agreementId/results/count')
+  @Get(':contractId/results/count')
   @ApiOperation({ summary: 'Find all contracts by contract id' })
-  async findContractsByContractId(@Param('agreementId') agreementId: string) {
+  async findContractsByContractId(@Param('contractId') contractId: string) {
     return this.agressoContractService
-      .findContratResultByContractId(agreementId)
+      .findContratResultByContractId(contractId)
       .then((response) =>
         ResponseUtils.format({
           description: 'Contracts found',

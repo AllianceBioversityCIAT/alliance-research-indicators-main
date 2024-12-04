@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BrokerConnectionBase } from './base/broker-base.connection';
 import { env } from 'process';
 import { PayloadAiRoarDto } from './dto/payload-ai-roar.dto';
-import { MsResponseIaRoarDto } from './dto/ms-response-ia-roar.dto';
 
 @Injectable()
 export class AiRoarMiningApp extends BrokerConnectionBase {
@@ -22,9 +21,6 @@ export class AiRoarMiningApp extends BrokerConnectionBase {
       file: file,
       credentials: this.authHeaderMs6,
     };
-    return this.sendToPattern<PayloadAiRoarDto>(
-      'mining-create',
-      payload,
-    );
+    return this.sendToPattern<PayloadAiRoarDto>('mining-create', payload);
   }
 }

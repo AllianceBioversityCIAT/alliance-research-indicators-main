@@ -6,19 +6,16 @@ import { ConnectionInterface } from '../../shared/global-dto/base-control-list-s
 
 export class Clarisa implements ConnectionInterface {
   private clarisaHost: string;
-  private token: string;
-  private http: HttpService;
-  constructor(http: HttpService) {
-    this.clarisaHost = env.ARI_CLARISA_HOST + 'api/';
-    this.http = http;
+  constructor(private http: HttpService) {
+    this.clarisaHost = env.ARI_CLARISA_HOST;
   }
 
-  public async getToken(): Promise<string> {
+  private async getToken(): Promise<string> {
     return firstValueFrom(
       this.http
-        .post<{ access_token: string }>(env.ARI_CLARISA_HOST + 'auth/login', {
+        .post<{ access_token: string }>(this.clarisaHost + 'auth/login', {
           login: env.ARI_CLARISA_USER,
-          password: env.ARI_CLARISA_PASSWORD,
+          password: env.ARI_CLARISA_PASS,
         })
         .pipe(
           map(({ data }) => {
@@ -30,9 +27,20 @@ export class Clarisa implements ConnectionInterface {
     });
   }
 
+  private async setAuth() {
+    const token = await this.getToken();
+    if (!token) return undefined;
+    return {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+  }
+
   public async post<T, X = T>(path: string, data: T): Promise<X> {
+    const auth = await this.setAuth();
     return firstValueFrom(
-      this.http.post<X>(this.clarisaHost + path, data).pipe(
+      this.http.post<X>(this.clarisaHost + path, data, auth).pipe(
         map(({ data }) => {
           return data;
         }),
@@ -43,8 +51,9 @@ export class Clarisa implements ConnectionInterface {
   }
 
   public async get<T>(path: string): Promise<T> {
+    const auth = await this.setAuth();
     return firstValueFrom(
-      this.http.get<T>(this.clarisaHost + path).pipe(
+      this.http.get<T>(this.clarisaHost + path, auth).pipe(
         map(({ data }) => {
           return data;
         }),
