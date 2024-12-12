@@ -5,12 +5,12 @@ export abstract class BaseControlListSave<
   Connection extends ConnectionInterface,
 > {
   protected readonly _logger: Logger;
-  protected readonly connection: Connection;
-  protected readonly dataSource: DataSource;
-  constructor(dataSource: DataSource, connection: Connection, logger: Logger) {
+  constructor(
+    protected readonly dataSource: DataSource,
+    protected readonly connection: Connection,
+    logger: Logger,
+  ) {
     this._logger = logger;
-    this.dataSource = dataSource;
-    this.connection = connection;
   }
 
   protected async base<T, Y = T>(
@@ -19,14 +19,15 @@ export abstract class BaseControlListSave<
     mapper?: (data: T) => DeepPartial<Y>,
     iterator?: (data: T[]) => DeepPartial<Y>[],
   ): Promise<Y[]> {
-    this._logger.log(`Fetching data from Clarisa API for ${entity.name}`);
+    this._logger.log(`Fetching data from ${entity.name}`);
     const data: T[] = await this.connection.get<T[]>(path).catch((err) => {
       this._logger.error(
-        `Error fetching data from Clarisa API for ${entity.name} path: ${path}`,
+        `Error fetching data from ${entity.name} path: ${path}`,
       );
       this._logger.error(err);
       return [];
     });
+
     let modifyData: DeepPartial<Y>[];
     if (iterator) {
       modifyData = iterator(data);

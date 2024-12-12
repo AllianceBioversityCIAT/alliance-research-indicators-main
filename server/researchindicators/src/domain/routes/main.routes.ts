@@ -9,7 +9,7 @@ import { ResultEvidencesModule } from '../entities/result-evidences/result-evide
 import { ResultCapacitySharingModule } from '../entities/result-capacity-sharing/result-capacity-sharing.module';
 import { IndicatorsModule } from '../entities/indicators/indicators.module';
 import { IndicatorTypesModule } from '../entities/indicator-types/indicator-types.module';
-import { AgressoModule } from '../tools/agresso/agresso.module';
+import { AgressoToolsModule } from '../tools/agresso/agresso-tools.module';
 import { ClarisaModule } from '../tools/clarisa/clarisa.module';
 import { ResultPolicyChangeModule } from '../entities/result-policy-change/result-policy-change.module';
 import { SessionFormatsModule } from '../entities/session-formats/session-formats.module';
@@ -22,6 +22,7 @@ import { GendersModule } from '../entities/genders/genders.module';
 import { ResultStatusModule } from '../entities/result-status/result-status.module';
 import { AllianceUserStaffModule } from '../entities/alliance-user-staff/alliance-user-staff.module';
 import { ResultContractsModule } from '../entities/result-contracts/result-contracts.module';
+import { AgressoStaffModule } from '../tools/agresso/staff/agresso-staff-tools.module';
 
 const ResultsChildren: Routes = [
   {
@@ -73,6 +74,40 @@ const sessionChildren: Routes = [
   },
 ];
 
+const agressiChildren: Routes = [
+  {
+    path: 'contracts',
+    module: AgressoContractModule,
+  },
+  {
+    path: 'staff',
+    module: AllianceUserStaffModule,
+  },
+];
+
+const agressotoolsChildren: Routes = [
+  {
+    path: 'staff',
+    module: AgressoStaffModule,
+  },
+  {
+    path: 'contracts',
+    module: AgressoToolsModule,
+  },
+];
+
+const toolsChildren: Routes = [
+  {
+    path: 'clarisa',
+    module: ClarisaModule,
+    children: clarisaRoutes,
+  },
+  {
+    path: 'agresso',
+    children: agressotoolsChildren,
+  },
+];
+
 const children: Routes = [
   {
     path: 'results',
@@ -80,8 +115,8 @@ const children: Routes = [
     module: ResultsModule,
   },
   {
-    path: 'agresso-contract',
-    module: AgressoContractModule,
+    path: 'agresso',
+    children: agressiChildren,
   },
   {
     path: 'agresso-contract-countries',
@@ -100,13 +135,8 @@ const children: Routes = [
     module: IndicatorTypesModule,
   },
   {
-    path: 'clarisa',
-    module: ClarisaModule,
-    children: clarisaRoutes,
-  },
-  {
-    path: 'agresso',
-    module: AgressoModule,
+    path: 'tools',
+    children: toolsChildren,
   },
   {
     path: 'session',
