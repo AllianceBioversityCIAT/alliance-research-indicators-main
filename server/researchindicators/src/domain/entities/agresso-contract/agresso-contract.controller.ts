@@ -21,7 +21,7 @@ export class AgressoContractController {
     private readonly agressoContractService: AgressoContractService,
   ) {}
 
-  @Get('contracts')
+  @Get()
   @ApiQuery({ name: 'project', required: false, description: 'Project ID' })
   @ApiQuery({
     name: 'funding_type',
@@ -97,7 +97,7 @@ export class AgressoContractController {
       );
   }
 
-  @Get('contracts/results/current-user')
+  @Get('results/current-user')
   @ApiOperation({ summary: 'Find all contracts by current user' })
   async findContractsByCurrentUser() {
     return this.agressoContractService
