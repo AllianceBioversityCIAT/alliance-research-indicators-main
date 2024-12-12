@@ -22,11 +22,11 @@ export class ServerGateway
   }
 
   afterInit(server: Server) {
-    this.logger.debug('Init');
+    this.logger.debug('Init' + server);
   }
 
   handleConnection(client: Socket, ...args: any[]) {
-    this.logger.log(`Client connected: ${client.id}`);
+    this.logger.log(`Client connected: ${client.id}` + args);
   }
 
   handleDisconnect(client: Socket) {

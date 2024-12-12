@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { AgressoService } from '../agresso/agresso.service';
+import { AgressoToolsService } from '../agresso/agresso-tools.service';
 
 @Injectable()
 export class AgressoCron {
-  constructor(private readonly _agressoService: AgressoService) {}
+  constructor(private readonly _agressoToolsService: AgressoToolsService) {}
   @Cron(CronExpression.EVERY_WEEK)
   async cloneNormalEntities() {
-    this._agressoService.cloneAllAgressoEntities();
+    this._agressoToolsService.cloneAllAgressoEntities();
   }
 }

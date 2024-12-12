@@ -25,9 +25,21 @@ export class AllianceUserStaff extends AuditableEntity {
 
   @Column('text', {
     name: 'email',
-    nullable: false,
+    nullable: true,
   })
   email!: string;
+
+  @Column('text', {
+    name: 'status',
+    nullable: true,
+  })
+  status?: string;
+
+  @Column('text', {
+    name: 'center',
+    nullable: true,
+  })
+  center?: string;
 
   @OneToMany(() => ResultUser, (result_user) => result_user.user)
   result_users!: ResultUser[];
