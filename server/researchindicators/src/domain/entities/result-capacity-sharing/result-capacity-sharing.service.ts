@@ -22,6 +22,7 @@ import {
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
 import { Result } from '../results/entities/result.entity';
+import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 @Injectable()
 export class ResultCapacitySharingService {
   private mainRepo: Repository<ResultCapacitySharing>;
@@ -32,6 +33,7 @@ export class ResultCapacitySharingService {
     private readonly _resultInsitutionService: ResultInstitutionsService,
     private readonly _resultCountryService: ResultCountriesService,
     private readonly _currentUser: CurrentUserUtil,
+    private readonly _updateDataUtil: UpdateDataUtil,
   ) {
     this.mainRepo = dataSource.getRepository(ResultCapacitySharing);
   }
@@ -112,6 +114,8 @@ export class ResultCapacitySharingService {
         LanguageRolesEnum.TRAINING_SUPERVISOR,
         manager,
       );
+
+      await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
     });
   }
 

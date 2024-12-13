@@ -43,6 +43,7 @@ import { ClarisaGeoScopeEnum } from '../../tools/clarisa/entities/clarisa-geo-sc
 import { CountryRolesEnum } from '../country-roles/enums/country-roles.anum';
 import { ResultCountry } from '../result-countries/entities/result-country.entity';
 import { ResultCountriesSubNational } from '../result-countries-sub-nationals/entities/result-countries-sub-national.entity';
+import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 
 @Injectable()
 export class ResultsService {
@@ -63,6 +64,7 @@ export class ResultsService {
     private readonly _resultRegionsService: ResultRegionsService,
     private readonly _resultCountriesSubNationalsService: ResultCountriesSubNationalsService,
     private readonly _clarisaGeoScopeService: ClarisaGeoScopeService,
+    private readonly _updateDataUtil: UpdateDataUtil,
   ) {}
 
   async findResults(pagination: PaginationDto, type?: IndicatorsEnum) {
@@ -216,7 +218,7 @@ export class ResultsService {
       await manager.getRepository(this.mainRepo.target).update(result_id, {
         title: generalInformation.title,
         description: generalInformation.description,
-        ...this.currentUser.audit(SetAutitEnum.BOTH),
+        ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 
       const keywordsToSave = this._resultKeywordsService.transformData(
@@ -299,6 +301,8 @@ export class ResultsService {
           is_primary: false,
         },
       );
+
+      await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
     });
 
     if (returnData === DataReturnEnum.TRUE) {
@@ -372,6 +376,7 @@ export class ResultsService {
         );
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
+        ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 
       if (
@@ -436,6 +441,8 @@ export class ResultsService {
           manager,
         );
       }
+
+      await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
     });
   }
 
