@@ -32,4 +32,18 @@ export class ResultStatusController {
       }),
     );
   }
+
+  @ApiOperation({ summary: 'Find amount of results by status' })
+  @Get('result-amount/current-user')
+  async findAmountOfResultsByStatusCurrentUser() {
+    return this.resultStatusService
+      .findAmountOfResultsByStatusCurrentUser()
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Result status found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
 }

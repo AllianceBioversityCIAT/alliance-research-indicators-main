@@ -288,4 +288,24 @@ export class ResultsController {
       }),
     );
   }
+
+  @ApiOperation({ summary: 'Find last updated results' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Is a reference to the limit of items per page',
+  })
+  @Get('last-updated/current-user')
+  async findLastUpdatedResults(@Query('limit') limit: number = 3) {
+    return this.resultsService
+      .findLastUpdatedResultByCurrentUser(limit)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'Results found',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }

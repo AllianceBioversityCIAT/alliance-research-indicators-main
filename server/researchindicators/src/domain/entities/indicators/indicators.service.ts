@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
-import { Indicator } from './entities/indicator.entity';
+import { DataSource } from 'typeorm';
+import { IndicatorRepository } from './repository/indicators.repository';
 
 @Injectable()
 export class IndicatorsService {
-  private readonly mainRepo: Repository<Indicator>;
-  constructor(dataSource: DataSource) {
-    this.mainRepo = dataSource.getRepository(Indicator);
-  }
+  constructor(
+    dataSource: DataSource,
+    private readonly mainRepo: IndicatorRepository,
+  ) {}
 
   async findAll() {
     return await this.mainRepo.find({
@@ -30,5 +30,9 @@ export class IndicatorsService {
         indicatorType: true,
       },
     });
+  }
+
+  async findResultsAmountByIndicatorCurrentUser() {
+    return this.mainRepo.findAmountResultsByIndicatorCurrentUser();
   }
 }

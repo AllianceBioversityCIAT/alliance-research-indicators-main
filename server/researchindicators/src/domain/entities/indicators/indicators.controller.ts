@@ -32,4 +32,18 @@ export class IndicatorsController {
       }),
     );
   }
+
+  @Get('results-amount/current-user')
+  @ApiOperation({ summary: 'Find all results amount by current user' })
+  async findResultsAmountByCurrentUser() {
+    return this.indicatorsService
+      .findResultsAmountByIndicatorCurrentUser()
+      .then((indicators) =>
+        ResponseUtils.format({
+          data: indicators,
+          description: 'Results amount found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }

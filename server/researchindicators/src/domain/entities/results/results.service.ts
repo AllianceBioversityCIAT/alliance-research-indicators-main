@@ -483,4 +483,34 @@ export class ResultsService {
       countries,
     };
   }
+
+  async findLastUpdatedResultByCurrentUser(take: number) {
+    return this.mainRepo.find({
+      select: [
+        'updated_at',
+        'is_active',
+        'result_id',
+        'result_official_code',
+        'title',
+        'description',
+        'result_contracts',
+        'indicator_id',
+        'indicator',
+      ],
+      where: {
+        created_by: this.currentUser.user_id,
+        is_active: true,
+      },
+      relations: {
+        result_contracts: {
+          agresso_contract: true,
+        },
+        indicator: true,
+      },
+      order: {
+        updated_at: 'DESC',
+      },
+      take: take,
+    });
+  }
 }
