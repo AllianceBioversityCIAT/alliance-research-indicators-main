@@ -12,6 +12,7 @@ import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
+import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 
 @Injectable()
 export class ResultPolicyChangeService {
@@ -22,6 +23,7 @@ export class ResultPolicyChangeService {
     private readonly linkResultsService: LinkResultsService,
     private readonly resultInstitutionsService: ResultInstitutionsService,
     private readonly currentUser: CurrentUserUtil,
+    private readonly _updateDataUtil: UpdateDataUtil,
   ) {
     this.mainRepo = dataSource.getRepository(ResultPolicyChange);
   }
@@ -91,6 +93,7 @@ export class ResultPolicyChangeService {
         ...this.currentUser.audit(SetAutitEnum.BOTH),
       });
 
+      await this._updateDataUtil.updateLastUpdatedDate(result_id, manager);
       return undefined;
     });
   }

@@ -21,7 +21,7 @@ export class ResultKeywordsService extends BaseServiceSimple<
   }
 
   transformData(data: string[]): Partial<ResultKeyword>[] {
-    return data.map((keyword) => {
+    return data?.map((keyword) => {
       return {
         keyword: keyword,
       } as Partial<ResultKeyword>;

@@ -6,6 +6,7 @@ import { CreateResultEvidenceDto } from './dto/create-result-evidence.dto';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { isEmpty } from '../../shared/utils/object.utils';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 @Injectable()
 export class ResultEvidencesService extends BaseServiceSimple<
   ResultEvidence,
@@ -14,6 +15,7 @@ export class ResultEvidencesService extends BaseServiceSimple<
   constructor(
     private dataSource: DataSource,
     currentUser: CurrentUserUtil,
+    private readonly _updateDataUtil: UpdateDataUtil,
   ) {
     super(
       ResultEvidence,
@@ -41,7 +43,10 @@ export class ResultEvidencesService extends BaseServiceSimple<
         EvidenceRoleEnum.PRINCIPAL_EVIDENCE,
         manager,
         ['evidence_description'],
-      );
+      ).then(async (result) => {
+        await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
+        return result;
+      });
     });
   }
 

@@ -5,6 +5,7 @@ import { InstitutionRolesEnum } from '../institution-roles/enums/institution-rol
 import { CreateResultInstitutionDto } from './dto/create-result-institution.dto';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 @Injectable()
 export class ResultInstitutionsService extends BaseServiceSimple<
   ResultInstitution,
@@ -13,6 +14,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
   constructor(
     private dataSource: DataSource,
     currentUser: CurrentUserUtil,
+    private readonly _updateDataUtil: UpdateDataUtil,
   ) {
     super(
       ResultInstitution,
@@ -36,6 +38,8 @@ export class ResultInstitutionsService extends BaseServiceSimple<
         InstitutionRolesEnum.PARTNERS,
         manager,
       );
+
+      this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
 
       return resResultInstitution;
     });
