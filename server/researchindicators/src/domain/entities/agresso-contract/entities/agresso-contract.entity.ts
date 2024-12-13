@@ -18,6 +18,7 @@ export class AgressoContract extends AuditableEntity {
     scale: 3,
     name: 'center_amount',
     default: 0,
+    select: false,
   })
   center_amount: number;
 
@@ -26,12 +27,14 @@ export class AgressoContract extends AuditableEntity {
     scale: 3,
     default: 0,
     name: 'center_amount_usd',
+    select: false,
   })
   center_amount_usd: number;
 
   @Column('text', {
     name: 'client',
     nullable: true,
+    select: false,
   })
   client?: string;
 
@@ -44,12 +47,14 @@ export class AgressoContract extends AuditableEntity {
   @Column('text', {
     name: 'department',
     nullable: true,
+    select: false,
   })
   department?: string;
 
   @Column('text', {
     name: 'departmentId',
     nullable: true,
+    select: false,
   })
   departmentId?: string;
 
@@ -68,6 +73,7 @@ export class AgressoContract extends AuditableEntity {
   @Column('text', {
     name: 'divisionId',
     nullable: true,
+    select: false,
   })
   divisionId?: string;
 
@@ -124,6 +130,7 @@ export class AgressoContract extends AuditableEntity {
     scale: 3,
     default: 0,
     name: 'grant_amount',
+    select: false,
   })
   grant_amount: number;
 
@@ -132,6 +139,7 @@ export class AgressoContract extends AuditableEntity {
     scale: 3,
     default: 0,
     name: 'grant_amount_usd',
+    select: false,
   })
   grant_amount_usd: number;
 
@@ -180,6 +188,7 @@ export class AgressoContract extends AuditableEntity {
   @Column('text', {
     name: 'unitId',
     nullable: true,
+    select: false,
   })
   unitId?: string;
 
@@ -192,6 +201,7 @@ export class AgressoContract extends AuditableEntity {
   @Column('text', {
     name: 'officeId',
     nullable: true,
+    select: false,
   })
   officeId?: string;
 
