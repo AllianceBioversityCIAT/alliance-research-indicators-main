@@ -1,10 +1,19 @@
-import { Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ClarisaService } from './clarisa.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { SearchToOpenSearchEnum } from './anum/path.enum';
@@ -25,8 +34,8 @@ export class ClarisaController {
     });
   }
 
-  @ApiParam({
-    name: 'search',
+  @ApiQuery({
+    name: 'query',
     required: true,
     description: 'Search term',
   })
@@ -40,12 +49,18 @@ export class ClarisaController {
     summary:
       'This enpoint is in charge of the connection with CLARISA and allows the search of information in opensearch.',
   })
-  @Get('opensearch/:scope/:search')
+  @Get('opensearch/:scope/search')
   async openSearch(
-    @Param('search') search: string,
+    @Query('query') query: string,
     @Param('scope') scope: SearchToOpenSearchEnum,
   ) {
-    return this.clarisaService.searchToOS(search, scope).then((countries) =>
+    if (!query) {
+      return ResponseUtils.format({
+        description: 'Query is required',
+        status: HttpStatus.BAD_REQUEST,
+      });
+    }
+    return this.clarisaService.searchToOS(query, scope).then((countries) =>
       ResponseUtils.format({
         description: 'Countries found',
         data: countries,
