@@ -42,4 +42,11 @@ export class MetadataResultDto {
     required: true,
   })
   status_name: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The result title',
+    required: true,
+  })
+  result_title: string;
 }

@@ -3,6 +3,7 @@ import {
   ConflictException,
   HttpStatus,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { ResultRepository } from './repositories/result.repository';
@@ -340,13 +341,18 @@ export class ResultsService {
       },
     });
 
+    if (!result) {
+      throw new NotFoundException('Result not found');
+    }
+
     return {
-      indicator_id: result.indicator.indicator_id,
-      indicator_name: result.indicator.name,
-      result_id: result.result_id,
-      result_official_code: result.result_official_code,
-      status_id: result.result_status_id,
-      status_name: result.result_status.name,
+      indicator_id: result?.indicator?.indicator_id,
+      indicator_name: result?.indicator?.name,
+      result_id: result?.result_id,
+      result_official_code: result?.result_official_code,
+      status_id: result?.result_status_id,
+      status_name: result?.result_status?.name,
+      result_title: result?.title,
     };
   }
 
