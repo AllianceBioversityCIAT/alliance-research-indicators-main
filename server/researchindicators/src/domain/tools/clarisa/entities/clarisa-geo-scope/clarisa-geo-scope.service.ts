@@ -23,7 +23,7 @@ export class ClarisaGeoScopeService extends ControlListBaseService<
     countryData: ResultCountry[],
     isCliToServ: boolean = true,
   ) {
-    let tempId = id;
+    let tempId = typeof id === 'string' ? parseInt(id) : id;
 
     if (
       isCliToServ &&
