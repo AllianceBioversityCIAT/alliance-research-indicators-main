@@ -132,7 +132,7 @@ export abstract class BaseServiceSimple<
     await this.createCustomValidation(dataToSaveArray);
 
     const whereData: FindOptionsWhere<any> = {
-      result_id: resultId,
+      [this.resultKey]: resultId,
       [generalCompareKey]: In(
         dataToSaveArray.map((data) => data[generalCompareKey]),
       ),
