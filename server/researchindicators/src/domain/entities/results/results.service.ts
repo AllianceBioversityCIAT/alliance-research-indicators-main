@@ -386,7 +386,7 @@ export class ResultsService {
       });
 
       let resultCountry: Partial<ResultCountry>[];
-      if (geoScopeId != ClarisaGeoScopeEnum.REGIONAL) {
+      if (geoScopeId == ClarisaGeoScopeEnum.SUB_NATIONAL) {
         const tempData =
           await this._resultCountriesService.comparerClientToServerCountry(
             resultId,
