@@ -12,7 +12,7 @@ export class ResultRegionsService extends BaseServiceSimple<
     super(
       ResultRegion,
       dataSource.getRepository(ResultRegion),
-      'region_id',
+      'result_id',
       currentUser,
     );
   }
