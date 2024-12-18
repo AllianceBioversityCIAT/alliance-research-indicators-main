@@ -385,23 +385,20 @@ export class ResultsService {
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 
-      let resultCountry: Partial<ResultCountry>[];
-      if (geoScopeId == ClarisaGeoScopeEnum.SUB_NATIONAL) {
-        const tempData =
-          await this._resultCountriesService.comparerClientToServerCountry(
-            resultId,
-            saveGeoLocationDto.countries,
-          );
+      const tempData =
+        await this._resultCountriesService.comparerClientToServerCountry(
+          resultId,
+          saveGeoLocationDto.countries,
+        );
 
-        resultCountry = tempData.map((country) => {
-          country.result_countries_sub_nationals = country?.is_active
-            ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
-            : [];
-          return country;
-        });
-      }
+      let resultCountry: Partial<ResultCountry>[] = tempData.map((country) => {
+        country.result_countries_sub_nationals = country?.is_active
+          ? saveGeoLocationDto.countries.find(
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
+          : [];
+        return country;
+      });
 
       if (
         [ClarisaGeoScopeEnum.GLOBAL, ClarisaGeoScopeEnum.REGIONAL].includes(
@@ -417,7 +414,6 @@ export class ResultsService {
         );
       }
 
-      let saveContries: ResultCountry[];
       if (
         [
           ClarisaGeoScopeEnum.GLOBAL,
@@ -431,13 +427,6 @@ export class ResultsService {
           saveGeoLocationDto.countries,
           'result_id',
           CountryRolesEnum.GEO_lOCATION,
-          manager,
-        );
-        await this._resultRegionsService.create(
-          resultId,
-          [],
-          'region_id',
-          null,
           manager,
         );
       }
@@ -456,7 +445,33 @@ export class ResultsService {
             manager,
           );
         }
+      }
 
+      if (ClarisaGeoScopeEnum.REGIONAL === geoScopeId) {
+        await this._resultCountriesService.create(
+          resultId,
+          [],
+          'result_id',
+          CountryRolesEnum.GEO_lOCATION,
+          manager,
+        );
+
+        for (const country of resultCountry) {
+          await this._resultCountriesSubNationalsService.create(
+            country.result_country_id,
+            [],
+            'sub_national_id',
+            null,
+            manager,
+          );
+        }
+      }
+
+      if (
+        ![ClarisaGeoScopeEnum.GLOBAL, ClarisaGeoScopeEnum.REGIONAL].includes(
+          geoScopeId,
+        )
+      ) {
         await this._resultRegionsService.create(
           resultId,
           [],
