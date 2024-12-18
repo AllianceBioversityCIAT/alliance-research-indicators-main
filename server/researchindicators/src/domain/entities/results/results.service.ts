@@ -425,7 +425,7 @@ export class ResultsService {
         await this._resultCountriesService.create(
           resultId,
           saveGeoLocationDto.countries,
-          'result_id',
+          'isoAlpha2',
           CountryRolesEnum.GEO_lOCATION,
           manager,
         );
@@ -451,7 +451,7 @@ export class ResultsService {
         await this._resultCountriesService.create(
           resultId,
           [],
-          'result_id',
+          'isoAlpha2',
           CountryRolesEnum.GEO_lOCATION,
           manager,
         );
