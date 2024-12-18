@@ -426,7 +426,7 @@ export class ResultsService {
           ClarisaGeoScopeEnum.SUB_NATIONAL,
         ].includes(geoScopeId)
       ) {
-        saveContries = await this._resultCountriesService.create(
+        await this._resultCountriesService.create(
           resultId,
           saveGeoLocationDto.countries,
           'result_id',
