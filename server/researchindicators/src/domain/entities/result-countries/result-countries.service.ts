@@ -4,6 +4,7 @@ import { DataSource, Repository } from 'typeorm';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { CountryRolesEnum } from '../country-roles/enums/country-roles.anum';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { updateArray } from '../../shared/utils/array.util';
 @Injectable()
 export class ResultCountriesService extends BaseServiceSimple<
   ResultCountry,
@@ -33,5 +34,28 @@ export class ResultCountriesService extends BaseServiceSimple<
         is_active: true,
       },
     });
+  }
+
+  async comparerClientToServerCountry(
+    resultId: number,
+    clientCountry: ResultCountry[],
+  ) {
+    const serverCountry = await this.mainRepo.find({
+      where: {
+        result_id: resultId,
+        is_active: true,
+      },
+    });
+
+    return updateArray(
+      clientCountry,
+      serverCountry,
+      'isoAlpha2',
+      {
+        key: 'result_id',
+        value: resultId,
+      },
+      'result_country_id',
+    );
   }
 }

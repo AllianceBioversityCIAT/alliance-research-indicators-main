@@ -385,6 +385,24 @@ export class ResultsService {
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 
+      let resultCountry: Partial<ResultCountry>[];
+      if (geoScopeId != ClarisaGeoScopeEnum.REGIONAL) {
+        const tempData =
+          await this._resultCountriesService.comparerClientToServerCountry(
+            resultId,
+            saveGeoLocationDto.countries,
+          );
+
+        resultCountry = tempData.map((country) => {
+          country.result_countries_sub_nationals = country?.is_active
+            ? saveGeoLocationDto.countries.find(
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
+            : [];
+          return country;
+        });
+      }
+
       if (
         [ClarisaGeoScopeEnum.GLOBAL, ClarisaGeoScopeEnum.REGIONAL].includes(
           geoScopeId,
@@ -425,7 +443,7 @@ export class ResultsService {
       }
 
       if (geoScopeId === ClarisaGeoScopeEnum.SUB_NATIONAL) {
-        for (const country of saveContries) {
+        for (const country of resultCountry) {
           const subNational: ResultCountriesSubNational[] =
             saveGeoLocationDto.countries.find(
               (el) => el.isoAlpha2 === country.isoAlpha2,
