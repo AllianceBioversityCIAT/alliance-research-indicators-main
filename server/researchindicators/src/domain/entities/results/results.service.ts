@@ -524,32 +524,54 @@ export class ResultsService {
   }
 
   async findLastUpdatedResultByCurrentUser(take: number) {
-    return this.mainRepo.find({
-      select: [
-        'updated_at',
-        'is_active',
-        'result_id',
-        'result_official_code',
-        'title',
-        'description',
-        'result_contracts',
-        'indicator_id',
-        'indicator',
-      ],
-      where: {
-        created_by: this.currentUser.user_id,
-        is_active: true,
-      },
-      relations: {
-        result_contracts: {
-          agresso_contract: true,
+    return this.mainRepo
+      .find({
+        select: [
+          'updated_at',
+          'is_active',
+          'result_id',
+          'result_official_code',
+          'title',
+          'description',
+          'result_contracts',
+          'indicator_id',
+          'indicator',
+        ],
+        where: {
+          created_by: this.currentUser.user_id,
+          is_active: true,
         },
-        indicator: true,
-      },
-      order: {
-        updated_at: 'DESC',
-      },
-      take: take,
-    });
+        relations: {
+          indicator: true,
+        },
+        order: {
+          updated_at: 'DESC',
+        },
+        take: take,
+      })
+      .then(async (results) => {
+        const results_contract = await this.dataSource
+          .getRepository(ResultContract)
+          .find({
+            where: {
+              result_id: In(results.map((el) => el.result_id)),
+              is_primary: true,
+              is_active: true,
+            },
+            relations: {
+              agresso_contract: true,
+            },
+          });
+
+        return results.map((result) => {
+          const contract = results_contract.find(
+            (el) => el.result_id === result.result_id,
+          );
+          return {
+            ...result,
+            result_contracts: contract || null,
+          };
+        });
+      });
   }
 }
