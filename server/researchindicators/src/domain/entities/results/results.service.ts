@@ -21,7 +21,7 @@ import { ResultKeywordsService } from '../result-keywords/result-keywords.servic
 import { ResultUsersService } from '../result-users/result-users.service';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultCapacitySharingService } from '../result-capacity-sharing/result-capacity-sharing.service';
-import { DataReturnEnum } from '../../shared/enum/queries.enum';
+import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
@@ -213,7 +213,7 @@ export class ResultsService {
   async updateGeneralInfo(
     result_id: number,
     generalInformation: UpdateGeneralInformation,
-    returnData: DataReturnEnum = DataReturnEnum.FALSE,
+    returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
     return this.dataSource.transaction(async (manager) => {
       await manager.getRepository(this.mainRepo.target).update(result_id, {
@@ -242,7 +242,7 @@ export class ResultsService {
         manager,
       );
 
-      if (returnData === DataReturnEnum.TRUE) {
+      if (returnData === TrueFalseEnum.TRUE) {
         return this.findGeneralInfo(result_id);
       }
 
@@ -275,7 +275,7 @@ export class ResultsService {
   async updateResultAlignment(
     resultId: number,
     alignmentData: ResultAlignmentDto,
-    returnData: DataReturnEnum = DataReturnEnum.FALSE,
+    returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
     const { contracts, levers } = alignmentData;
     this.dataSource.transaction(async (manager) => {
@@ -306,7 +306,7 @@ export class ResultsService {
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
     });
 
-    if (returnData === DataReturnEnum.TRUE) {
+    if (returnData === TrueFalseEnum.TRUE) {
       return this.findResultAlignment(resultId);
     }
 

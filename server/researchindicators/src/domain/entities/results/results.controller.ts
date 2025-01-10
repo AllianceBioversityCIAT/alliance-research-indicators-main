@@ -24,7 +24,7 @@ import {
 import { CreateResultDto } from './dto/create-result.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { UpdateGeneralInformation } from './dto/update-general-information.dto';
-import { DataReturnEnum } from '../../shared/enum/queries.enum';
+import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -118,13 +118,13 @@ export class ResultsController {
     name: 'return',
     required: false,
     type: String,
-    enum: DataReturnEnum,
+    enum: TrueFalseEnum,
     description: 'Is a reference to return data',
   })
   @Patch(':id/general-information')
   async updateGeneralInformation(
     @Param('id') resultId: string,
-    @Query('return') returnData: DataReturnEnum,
+    @Query('return') returnData: TrueFalseEnum,
     @Body() generalInformation: UpdateGeneralInformation,
   ) {
     return this.resultsService
@@ -167,13 +167,13 @@ export class ResultsController {
     name: 'return',
     required: false,
     type: String,
-    enum: DataReturnEnum,
+    enum: TrueFalseEnum,
     description: 'Is a reference to return data',
   })
   @Patch(':id/alignments')
   async updateResultAlignments(
     @Param('id') resultId: string,
-    @Query('return') returnData: DataReturnEnum,
+    @Query('return') returnData: TrueFalseEnum,
     @Body() generalInformation: ResultAlignmentDto,
   ) {
     return this.resultsService
