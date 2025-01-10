@@ -22,4 +22,23 @@ export class ClarisaInstitutionsService extends ControlListBaseService<
     if (date) path += `&from=${date}`;
     return path;
   }
+
+  async getInstitutionsByCountry(isHeadquarter?: string) {
+    const query = this.mainRepo
+      .createQueryBuilder('institution')
+      .leftJoinAndSelect(
+        'institution.institution_locations',
+        'institution_locations',
+      )
+      .where('1=1')
+      .orderBy('institution.code', 'ASC');
+
+    if (isHeadquarter == 'true') {
+      query.andWhere('institution_locations.isHeadquarter = :isHeadquarter', {
+        isHeadquarter: true,
+      });
+    }
+
+    return query.getMany();
+  }
 }

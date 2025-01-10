@@ -1,7 +1,15 @@
-import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
+import {
+  Controller,
+  DefaultValuePipe,
+  Get,
+  HttpStatus,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { ClarisaInstitutionsService } from './clarisa-institutions.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ResponseUtils } from '../../../../shared/utils/response.utils';
+import { DataReturnEnum } from '../../../../shared/enum/queries.enum';
 
 @ApiTags('Clarisa')
 @Controller()
@@ -26,7 +34,31 @@ export class ClarisaInstitutionsController {
       );
   }
 
-  @Get(':id')
+  @ApiQuery({
+    name: 'only-headquarters',
+    required: false,
+    type: String,
+    enum: DataReturnEnum,
+    default: DataReturnEnum.FALSE,
+    description: 'Only headquarters',
+  })
+  @Get('locations')
+  async findLocations(
+    @Query('only-headquarters', new DefaultValuePipe('false'))
+    onlyHeadquarters: string,
+  ) {
+    return this.clarisaInstitutionsService
+      .getInstitutionsByCountry(onlyHeadquarters)
+      .then((institutions) =>
+        ResponseUtils.format({
+          description: 'Locations found',
+          data: institutions,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @Get(':id(\\d+)')
   async findById(@Param('id') id: string) {
     return this.clarisaInstitutionsService
       .findOne<number>(+id)

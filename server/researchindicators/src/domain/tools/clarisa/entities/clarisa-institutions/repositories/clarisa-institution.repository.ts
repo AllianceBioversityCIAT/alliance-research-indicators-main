@@ -4,7 +4,7 @@ import { ClarisaInstitution } from '../entities/clarisa-institution.entity';
 
 @Injectable()
 export class ClarisaInstitutionsRepository extends Repository<ClarisaInstitution> {
-  constructor(private dataSource: DataSource) {
+  constructor(dataSource: DataSource) {
     super(ClarisaInstitution, dataSource.createEntityManager());
   }
 

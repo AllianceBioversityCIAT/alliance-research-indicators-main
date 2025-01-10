@@ -391,14 +391,16 @@ export class ResultsService {
           saveGeoLocationDto.countries,
         );
 
-      let resultCountry: Partial<ResultCountry>[] = tempData.map((country) => {
-        country.result_countries_sub_nationals = country?.is_active
-          ? saveGeoLocationDto.countries.find(
-              (el) => el.isoAlpha2 === country.isoAlpha2,
-            )?.result_countries_sub_nationals
-          : [];
-        return country;
-      });
+      const resultCountry: Partial<ResultCountry>[] = tempData.map(
+        (country) => {
+          country.result_countries_sub_nationals = country?.is_active
+            ? saveGeoLocationDto.countries.find(
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
+            : [];
+          return country;
+        },
+      );
 
       if (
         [ClarisaGeoScopeEnum.GLOBAL, ClarisaGeoScopeEnum.REGIONAL].includes(
