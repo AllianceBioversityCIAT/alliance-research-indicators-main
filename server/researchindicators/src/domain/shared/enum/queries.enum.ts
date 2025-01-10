@@ -1,4 +1,4 @@
-export enum DataReturnEnum {
+export enum TrueFalseEnum {
   TRUE = 'true',
   FALSE = 'false',
 }

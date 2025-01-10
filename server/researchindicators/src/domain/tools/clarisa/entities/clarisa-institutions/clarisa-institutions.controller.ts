@@ -9,7 +9,7 @@ import {
 import { ClarisaInstitutionsService } from './clarisa-institutions.service';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ResponseUtils } from '../../../../shared/utils/response.utils';
-import { DataReturnEnum } from '../../../../shared/enum/queries.enum';
+import { TrueFalseEnum } from '../../../../shared/enum/queries.enum';
 
 @ApiTags('Clarisa')
 @Controller()
@@ -19,39 +19,44 @@ export class ClarisaInstitutionsController {
     private readonly clarisaInstitutionsService: ClarisaInstitutionsService,
   ) {}
 
+  @ApiQuery({
+    name: 'only-hq',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    default: TrueFalseEnum.FALSE,
+    description: 'Only headquarters',
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    default: TrueFalseEnum.FALSE,
+    description: 'Have type',
+  })
+  @ApiQuery({
+    name: 'location',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    default: TrueFalseEnum.FALSE,
+    description: 'Have location',
+  })
   @Get()
-  async find() {
+  async findLocations(
+    @Query('only-hq', new DefaultValuePipe(TrueFalseEnum.FALSE))
+    onlyHeadquarters: string,
+    @Query('type', new DefaultValuePipe(TrueFalseEnum.FALSE))
+    haveType: string,
+    @Query('location', new DefaultValuePipe(TrueFalseEnum.FALSE))
+    haveLocation: string,
+  ) {
     return this.clarisaInstitutionsService
-      .findAll({
-        institution_type: true,
-      })
+      .getInstitutionsByCountry(haveLocation, onlyHeadquarters, haveType)
       .then((institutions) =>
         ResponseUtils.format({
           description: 'Institutions found',
-          data: institutions,
-          status: HttpStatus.OK,
-        }),
-      );
-  }
-
-  @ApiQuery({
-    name: 'only-headquarters',
-    required: false,
-    type: String,
-    enum: DataReturnEnum,
-    default: DataReturnEnum.FALSE,
-    description: 'Only headquarters',
-  })
-  @Get('locations')
-  async findLocations(
-    @Query('only-headquarters', new DefaultValuePipe('false'))
-    onlyHeadquarters: string,
-  ) {
-    return this.clarisaInstitutionsService
-      .getInstitutionsByCountry(onlyHeadquarters)
-      .then((institutions) =>
-        ResponseUtils.format({
-          description: 'Locations found',
           data: institutions,
           status: HttpStatus.OK,
         }),

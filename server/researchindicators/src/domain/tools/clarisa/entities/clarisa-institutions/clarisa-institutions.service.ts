@@ -4,6 +4,7 @@ import { ClarisaPathEnum } from '../../anum/path.enum';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
 import { ClarisaInstitution } from './entities/clarisa-institution.entity';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
+import { TrueFalseEnum } from '../../../../shared/enum/queries.enum';
 @Injectable()
 export class ClarisaInstitutionsService extends ControlListBaseService<
   ClarisaInstitution,
@@ -23,20 +24,31 @@ export class ClarisaInstitutionsService extends ControlListBaseService<
     return path;
   }
 
-  async getInstitutionsByCountry(isHeadquarter?: string) {
+  async getInstitutionsByCountry(
+    location?: string,
+    isHeadquarter?: string,
+    type?: string,
+  ) {
     const query = this.mainRepo
       .createQueryBuilder('institution')
-      .leftJoinAndSelect(
-        'institution.institution_locations',
-        'institution_locations',
-      )
       .where('1=1')
       .orderBy('institution.code', 'ASC');
 
-    if (isHeadquarter == 'true') {
-      query.andWhere('institution_locations.isHeadquarter = :isHeadquarter', {
-        isHeadquarter: true,
-      });
+    if (location == TrueFalseEnum.TRUE) {
+      query.leftJoinAndSelect(
+        'institution.institution_locations',
+        'institution_locations',
+      );
+
+      if (isHeadquarter == TrueFalseEnum.TRUE) {
+        query.andWhere('institution_locations.isHeadquarter = :isHeadquarter', {
+          isHeadquarter: true,
+        });
+      }
+    }
+
+    if (type == TrueFalseEnum.TRUE) {
+      query.leftJoinAndSelect('institution.institution_type', 'type');
     }
 
     return query.getMany();
