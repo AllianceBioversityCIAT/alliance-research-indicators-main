@@ -25,6 +25,7 @@ export class ResultRepository
       relations: {
         indicator: true,
         result_status: true,
+        result_keywords: true,
       },
     });
   }
