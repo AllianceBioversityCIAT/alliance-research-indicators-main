@@ -16,6 +16,6 @@ export class OpenSearchResultApi extends BaseOpenSearchApi<
     countryRepository: ResultRepository,
     appConfig: AppConfig,
   ) {
-    super(httpService, countryRepository, appConfig);
+    super(httpService, countryRepository, appConfig, undefined, Result);
   }
 }

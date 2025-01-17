@@ -1,6 +1,7 @@
 export type OpenSearchPropertyOptions = {
   type: OpenSearchDataType;
   analyzer?: OpenSearchAnalyzer;
+  fielddata?: boolean;
   nestedType?: new () => unknown;
 };
 
