@@ -38,6 +38,7 @@ import { LinkResultRolesModule } from './link-result-roles/link-result-roles.mod
 import { AllianceUserStaffModule } from './alliance-user-staff/alliance-user-staff.module';
 import { ResultStatusModule } from './result-status/result-status.module';
 import { ReportYearModule } from './report-year/report-year.module';
+import { ConnectionsModule } from './connections/connections.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { ReportYearModule } from './report-year/report-year.module';
     AllianceUserStaffModule,
     ResultStatusModule,
     ReportYearModule,
+    ConnectionsModule,
   ],
   exports: [AgressoContractModule],
 })

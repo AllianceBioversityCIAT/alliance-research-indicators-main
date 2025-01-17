@@ -22,6 +22,7 @@ import { LinkResult } from '../../link-results/entities/link-result.entity';
 import { ResultStatus } from '../../result-status/entities/result-status.entity';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportYear } from '../../report-year/entities/report-year.entity';
+import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -29,11 +30,17 @@ export class Result extends AuditableEntity {
     name: 'result_id',
     type: 'bigint',
   })
+  @OpenSearchProperty({
+    type: 'integer',
+  })
   result_id!: number;
 
   @Column('bigint', {
     name: 'result_official_code',
     nullable: false,
+  })
+  @OpenSearchProperty({
+    type: 'integer',
   })
   result_official_code!: number;
 
@@ -41,11 +48,17 @@ export class Result extends AuditableEntity {
     name: 'version_id',
     nullable: true,
   })
+  @OpenSearchProperty({
+    type: 'integer',
+  })
   version_id?: number;
 
   @Column('text', {
     name: 'title',
     nullable: true,
+  })
+  @OpenSearchProperty({
+    type: 'text',
   })
   title?: string;
 
@@ -53,11 +66,17 @@ export class Result extends AuditableEntity {
     name: 'description',
     nullable: true,
   })
+  @OpenSearchProperty({
+    type: 'text',
+  })
   description?: string;
 
   @Column('bigint', {
     name: 'indicator_id',
     nullable: true,
+  })
+  @OpenSearchProperty({
+    type: 'integer',
   })
   indicator_id?: number;
 
@@ -65,11 +84,17 @@ export class Result extends AuditableEntity {
     name: 'geo_scope_id',
     nullable: true,
   })
+  @OpenSearchProperty({
+    type: 'integer',
+  })
   geo_scope_id?: number;
 
   @Column('bigint', {
     name: 'report_year_id',
     nullable: true,
+  })
+  @OpenSearchProperty({
+    type: 'integer',
   })
   report_year_id?: number;
 
@@ -77,6 +102,9 @@ export class Result extends AuditableEntity {
     name: 'result_status_id',
     default: ResultStatusEnum.EDITING,
     nullable: true,
+  })
+  @OpenSearchProperty({
+    type: 'integer',
   })
   result_status_id?: number;
 
@@ -86,10 +114,18 @@ export class Result extends AuditableEntity {
 
   @ManyToOne(() => ResultStatus, (resultStatus) => resultStatus.results)
   @JoinColumn({ name: 'result_status_id' })
+  @OpenSearchProperty({
+    type: 'object',
+    nestedType: ResultStatus,
+  })
   result_status!: ResultStatus;
 
   @ManyToOne(() => Indicator, (indicator) => indicator.results)
   @JoinColumn({ name: 'indicator_id' })
+  @OpenSearchProperty({
+    type: 'object',
+    nestedType: Indicator,
+  })
   indicator!: Indicator;
 
   @ManyToOne(() => ClarisaGeoScope, (indicator) => indicator.results)

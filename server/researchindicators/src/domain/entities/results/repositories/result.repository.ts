@@ -1,11 +1,32 @@
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { Result } from '../entities/result.entity';
 import { Injectable } from '@nestjs/common';
+import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
+import { FindAllOptions } from '../../../shared/enum/find-all-options';
 
 @Injectable()
-export class ResultRepository extends Repository<Result> {
+export class ResultRepository
+  extends Repository<Result>
+  implements ElasticFindEntity<Result>
+{
   constructor(private entityManager: EntityManager) {
     super(Result, entityManager);
+  }
+
+  findDataForOpenSearch(
+    option: FindAllOptions,
+    ids?: number[],
+  ): Promise<Result[]> {
+    return this.find({
+      where: {
+        ...(option !== FindAllOptions.SHOW_ALL ? { is_active: true } : {}),
+        ...(ids && ids.length > 0 ? { id: In(ids) } : {}),
+      },
+      relations: {
+        indicator: true,
+        result_status: true,
+      },
+    });
   }
 
   async findResults(pagination: ResultPaginationWhere): Promise<Result[]> {

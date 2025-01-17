@@ -9,10 +9,14 @@ import {
 } from '@nestjs/common';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
+import { RoarManagementService } from '../../tools/roar-management/roar-management.service';
 
 @Injectable()
 export class JwtMiddleware implements NestMiddleware {
-  constructor(private readonly alianceManagementApp: AlianceManagementApp) {}
+  constructor(
+    private readonly alianceManagementApp: AlianceManagementApp,
+    private readonly roarManagementService: RoarManagementService,
+  ) {}
 
   async use(
     @Req() req: RequestWithCustomAttrs,
@@ -34,7 +38,7 @@ export class JwtMiddleware implements NestMiddleware {
 
     try {
       const responseService =
-        await this.alianceManagementApp.validJwtToken(token);
+        await this.roarManagementService.validateToken(token);
 
       if (responseService.isValid === false)
         throw new UnauthorizedException('Invalid token');

@@ -22,6 +22,8 @@ import { JwtMiddleware } from './domain/shared/middlewares/jwr.middleware';
 import { AlianceManagementApp } from './domain/tools/broker/aliance-management.app';
 import { AgressoToolsModule } from './domain/tools/agresso/agresso-tools.module';
 import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
+import { RoarManagementModule } from './domain/tools/roar-management/roar-management.module';
+import { ResultOpenSearchModule } from './domain/tools/open-search/results/result.opensearch.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
+    RoarManagementModule,
+    ResultOpenSearchModule,
   ],
   controllers: [AppController],
   providers: [

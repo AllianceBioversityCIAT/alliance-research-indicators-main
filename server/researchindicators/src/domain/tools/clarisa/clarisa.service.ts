@@ -26,6 +26,7 @@ import { PartnerRequestCreate } from '../dto/partner-request-create.dto';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
+import { CreateSecretDto, MisSimpleInfoDto } from './dto/clarisa.types';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -39,14 +40,23 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
     super(dataSource, new Clarisa(_http), new Logger(ClarisaService.name));
   }
 
-  async searchToOS(query: string, target: SearchToOpenSearchEnum) {
+  async searchToOS(
+    query: string,
+    country: string,
+    target: SearchToOpenSearchEnum,
+  ) {
     let dataSearch: string;
     if (target === SearchToOpenSearchEnum.COUNTRY) {
       dataSearch = ClarisaPathEnum.OS_COUNTRIES;
     } else if (target === SearchToOpenSearchEnum.INSTITUTION) {
       dataSearch = ClarisaPathEnum.OS_INSTITUTIONS;
+    } else if (target === SearchToOpenSearchEnum.SUBNATIONAL) {
+      dataSearch = ClarisaPathEnum.OS_SUBNATIONAL;
     }
-    return this.connection.get(dataSearch + `?query=${query}`);
+    console.log(dataSearch + `?query=${query}&country=${country}`);
+    return this.connection.get(
+      dataSearch + `?query=${query}&country=${country}`,
+    );
   }
 
   async partnerRequest(partnerRequest: PartnerRequestCliDataDto) {
@@ -122,5 +132,20 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
       ClarisaGeoScope,
     );
     this._logger.debug('All entities cloned');
+  }
+
+  async createPermission(newMisInfo: MisSimpleInfoDto) {
+    const { acronym, environment } = newMisInfo;
+    const configData: CreateSecretDto = {
+      receiver_mis: {
+        acronym: this.appConfig.ARI_MIS,
+        environment: this.appConfig.ARI_MIS_ENV,
+      },
+      sender_mis: {
+        acronym,
+        environment,
+      },
+    };
+    return this.connection.post(ClarisaPathEnum.CREATE_SECRET, configData);
   }
 }
