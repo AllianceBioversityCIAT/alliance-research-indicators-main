@@ -89,3 +89,12 @@ export const formatDataToArray = <T>(data: T | T[]): T[] => {
   }
   return [];
 };
+
+export const isArrayOfType = <T>(
+  arr: unknown[],
+  typeChecker: (element: unknown) => element is T,
+): arr is T[] => {
+  return arr.every(typeChecker);
+};
+
+export type ArrayType<T> = T extends (infer U)[] ? U : T;

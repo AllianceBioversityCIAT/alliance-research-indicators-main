@@ -39,6 +39,11 @@ export class ClarisaController {
     required: true,
     description: 'Search term',
   })
+  @ApiQuery({
+    name: 'country',
+    required: false,
+    description: 'Country code',
+  })
   @ApiParam({
     name: 'scope',
     enum: SearchToOpenSearchEnum,
@@ -52,6 +57,7 @@ export class ClarisaController {
   @Get('opensearch/:scope/search')
   async openSearch(
     @Query('query') query: string,
+    @Query('country') isoAlpha2: string,
     @Param('scope') scope: SearchToOpenSearchEnum,
   ) {
     if (!query) {
@@ -60,13 +66,15 @@ export class ClarisaController {
         status: HttpStatus.BAD_REQUEST,
       });
     }
-    return this.clarisaService.searchToOS(query, scope).then((countries) =>
-      ResponseUtils.format({
-        description: 'Countries found',
-        data: countries,
-        status: HttpStatus.OK,
-      }),
-    );
+    return this.clarisaService
+      .searchToOS(query, isoAlpha2, scope)
+      .then((countries) =>
+        ResponseUtils.format({
+          description: 'Countries found',
+          data: countries,
+          status: HttpStatus.OK,
+        }),
+      );
   }
 
   @ApiOperation({

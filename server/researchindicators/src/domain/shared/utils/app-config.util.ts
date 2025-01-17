@@ -140,4 +140,64 @@ export class AppConfig {
   get ARI_MIS(): string {
     return process.env.ARI_MIS;
   }
+
+  /**
+   * Get the environment
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get ARI_MIS_ENV(): string {
+    return process.env.ARI_MIS_ENV;
+  }
+
+  /**
+   * Get the OpenSearch URL
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_URL(): string {
+    return process.env.ARI_OPENSEARCH_URL;
+  }
+
+  /**
+   * Get the OpenSearch user
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_USER(): string {
+    return process.env.ARI_OPENSEARCH_USERNAME;
+  }
+
+  /**
+   * Get the OpenSearch password
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_PASS(): string {
+    return process.env.ARI_OPENSEARCH_PASSWORD;
+  }
+
+  /**
+   * Get the OpenSearch base index
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_BASE_INDEX(): string {
+    return process.env.ARI_OPENSEARCH_BASE_INDEX;
+  }
+
+  /**
+   * Get the OpenSearch base index
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get ROAR_MANAGEMENT_HOST(): string {
+    return process.env.ARI_ROAR_MANAGEMENT_HOST;
+  }
 }

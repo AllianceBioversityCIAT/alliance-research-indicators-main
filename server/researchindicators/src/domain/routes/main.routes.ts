@@ -23,6 +23,8 @@ import { ResultStatusModule } from '../entities/result-status/result-status.modu
 import { AllianceUserStaffModule } from '../entities/alliance-user-staff/alliance-user-staff.module';
 import { ResultContractsModule } from '../entities/result-contracts/result-contracts.module';
 import { AgressoStaffModule } from '../tools/agresso/staff/agresso-staff-tools.module';
+import { ConnectionsModule } from '../entities/connections/connections.module';
+import { openSearchRoutes } from '../tools/open-search/opensearch.routes';
 
 const ResultsChildren: Routes = [
   {
@@ -139,6 +141,10 @@ const children: Routes = [
     children: toolsChildren,
   },
   {
+    path: 'connection',
+    module: ConnectionsModule,
+  },
+  {
     path: 'session',
     children: sessionChildren,
   },
@@ -153,6 +159,10 @@ const children: Routes = [
   {
     path: 'gender',
     module: GendersModule,
+  },
+  {
+    path: 'opensearch',
+    children: openSearchRoutes,
   },
 ];
 
