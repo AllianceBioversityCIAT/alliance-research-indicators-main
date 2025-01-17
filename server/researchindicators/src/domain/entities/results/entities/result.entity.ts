@@ -40,7 +40,7 @@ export class Result extends AuditableEntity {
     nullable: false,
   })
   @OpenSearchProperty({
-    type: 'integer',
+    type: 'keyword',
   })
   result_official_code!: number;
 
@@ -59,6 +59,7 @@ export class Result extends AuditableEntity {
   })
   @OpenSearchProperty({
     type: 'text',
+    fielddata: true,
   })
   title?: string;
 
@@ -148,6 +149,10 @@ export class Result extends AuditableEntity {
   result_languages!: ResultLanguage[];
 
   @OneToMany(() => ResultKeyword, (resultKeyword) => resultKeyword.result)
+  @OpenSearchProperty({
+    type: 'nested',
+    nestedType: ResultKeyword,
+  })
   result_keywords!: ResultKeyword[];
 
   @OneToMany(

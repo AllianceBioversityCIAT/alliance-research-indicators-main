@@ -8,6 +8,7 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
 
 @Entity('result_keywords')
 export class ResultKeyword extends AuditableEntity {
@@ -19,6 +20,9 @@ export class ResultKeyword extends AuditableEntity {
     name: 'result_keyword_id',
     type: 'bigint',
   })
+  @OpenSearchProperty({
+    type: 'integer',
+  })
   result_keyword_id!: number;
 
   @ApiProperty({
@@ -29,6 +33,9 @@ export class ResultKeyword extends AuditableEntity {
     name: 'result_id',
     nullable: false,
   })
+  @OpenSearchProperty({
+    type: 'integer',
+  })
   result_id!: number;
 
   @ApiProperty({
@@ -38,6 +45,9 @@ export class ResultKeyword extends AuditableEntity {
   @Column('text', {
     name: 'keyword',
     nullable: false,
+  })
+  @OpenSearchProperty({
+    type: 'text',
   })
   keyword!: string;
 

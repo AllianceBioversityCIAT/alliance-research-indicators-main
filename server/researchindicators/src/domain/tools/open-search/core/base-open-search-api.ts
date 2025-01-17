@@ -299,16 +299,19 @@ export abstract class BaseOpenSearchApi<
     };
 
     for (const { propertyKey, options } of properties) {
+      const propertyType: any = {};
       if (options?.type) {
-        const propertyType = {
-          type: options.type,
-        };
+        propertyType.type = options.type;
         if (options.nestedType) {
           propertyType['properties'] = this._iterateProperties(
             options.nestedType,
           );
         }
         schema.mappings.properties[propertyKey] = propertyType;
+      }
+
+      if (options?.fielddata !== undefined) {
+        propertyType.fielddata = options.fielddata;
       }
     }
 
