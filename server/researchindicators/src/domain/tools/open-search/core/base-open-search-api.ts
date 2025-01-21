@@ -357,7 +357,6 @@ export abstract class BaseOpenSearchApi<
       fieldToFilterOn,
     );
 
-    console.log(JSON.stringify(elasticQuery));
     return lastValueFrom(
       this.postRequest<
         ElasticQueryDto<OpenSearchEntity>,

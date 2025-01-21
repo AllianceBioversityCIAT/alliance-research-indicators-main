@@ -53,7 +53,6 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
     } else if (target === SearchToOpenSearchEnum.SUBNATIONAL) {
       dataSearch = ClarisaPathEnum.OS_SUBNATIONAL;
     }
-    console.log(dataSearch + `?query=${query}&country=${country}`);
     return this.connection.get(
       dataSearch + `?query=${query}&country=${country}`,
     );
