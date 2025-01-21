@@ -185,7 +185,7 @@ export abstract class BaseServiceSimple<
 
     await entityManager.update(updateWhere, inactiveData);
 
-    const finalDataToSave = await this.lastRefactoredAfterSave(
+    const finalDataToSave = this.lastRefactoredAfterSave(
       newDataToSave,
       dataRole,
     ).map((data) => ({

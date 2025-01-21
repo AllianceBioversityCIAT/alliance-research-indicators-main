@@ -13,7 +13,10 @@ import { Repository } from 'typeorm';
 import { ElasticResponse } from '../dto/elastic-response.dto';
 import { forkJoin, lastValueFrom } from 'rxjs';
 import { ElasticFindEntity } from '../dto/elastic-find-entity.dto';
-import { ElasticOperationDto } from '../dto/elastic-operation.dto';
+import {
+  ElasticOperationDto,
+  ElasticOperationEnum,
+} from '../dto/elastic-operation.dto';
 import { OpenSearchMetadataName } from '../decorators/opensearch-property.decorator';
 import { SchemaOpenSearch } from '../dto/opensearch-schema';
 import { FindAllOptions } from '../../../shared/enum/find-all-options';
@@ -70,7 +73,8 @@ export abstract class BaseOpenSearchApi<
   }
 
   async uploadSingleToOpenSearch(
-    data: number | OpenSearchEntity,
+    data: number | Partial<OpenSearchEntity>,
+    method: ElasticOperationEnum = ElasticOperationEnum.PATCH,
   ): Promise<void> {
     const isId = typeof data === 'number';
     const promise = isId
@@ -78,7 +82,7 @@ export abstract class BaseOpenSearchApi<
       : Promise.resolve([
           this.getSingleElasticOperation(
             this._index,
-            new ElasticOperationDto('PATCH', data),
+            new ElasticOperationDto(method, data),
             true,
           ),
         ]);
@@ -105,7 +109,9 @@ export abstract class BaseOpenSearchApi<
       : Promise.resolve(
           this.getBulkElasticOperation(
             this._index,
-            data.map((i) => new ElasticOperationDto('PATCH', i)),
+            data.map(
+              (i) => new ElasticOperationDto(ElasticOperationEnum.PATCH, i),
+            ),
           ),
         );
 
@@ -146,16 +152,36 @@ export abstract class BaseOpenSearchApi<
     operation: ElasticOperationDto<OpenSearchEntity>,
     fromBulk = false,
   ): string {
-    const isPatch: boolean = operation.operation === 'PATCH';
+    const isDelete: boolean = operation.operation === 'DELETE';
+    function setOperation() {
+      switch (operation.operation) {
+        case 'PATCH':
+          return 'index';
+        case 'DELETE':
+          return 'delete';
+        case 'PUT':
+        default:
+          return 'update';
+      }
+    }
 
-    let elasticOperation = `{ "${
-      isPatch ? 'index' : 'delete'
-    }" : { "_index" : "${documentName}", "_id" : "${
+    let dataToSave: unknown;
+    if (operation.operation === ElasticOperationEnum.PUT) {
+      dataToSave = {
+        doc: operation.data,
+      };
+    } else {
+      dataToSave = operation.data;
+    }
+
+    let elasticOperation = `{ "${setOperation()}" : { "_index" : "${documentName}", "_id" : "${
       operation.data[this._primaryKey as string]
-    }"  } }\n${isPatch ? JSON.stringify(operation.data) : ''}`;
+    }"  } }\n${!isDelete ? JSON.stringify(dataToSave) : ''}`;
     if (fromBulk) {
       elasticOperation = elasticOperation.concat('\n');
     }
+
+    console.log(elasticOperation);
 
     return elasticOperation;
   }
@@ -275,7 +301,9 @@ export abstract class BaseOpenSearchApi<
         }
 
         const operations: ElasticOperationDto<OpenSearchEntity>[] =
-          queryResult.map((r) => new ElasticOperationDto('PATCH', r));
+          queryResult.map(
+            (r) => new ElasticOperationDto(ElasticOperationEnum.PATCH, r),
+          );
 
         const elasticJson: string[] = this.getBulkElasticOperation(
           documentName,
@@ -357,7 +385,6 @@ export abstract class BaseOpenSearchApi<
       fieldToFilterOn,
     );
 
-    console.log(JSON.stringify(elasticQuery));
     return lastValueFrom(
       this.postRequest<
         ElasticQueryDto<OpenSearchEntity>,

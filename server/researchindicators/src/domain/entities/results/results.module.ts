@@ -15,6 +15,7 @@ import { ResultRegionsModule } from '../result-regions/result-regions.module';
 import { ResultCountriesSubNationalsModule } from '../result-countries-sub-nationals/result-countries-sub-nationals.module';
 import { ResultCountriesModule } from '../result-countries/result-countries.module';
 import { ClarisaGeoScopeModule } from '../../tools/clarisa/entities/clarisa-geo-scope/clarisa-geo-scope.module';
+import { ResultOpenSearchModule } from '../../tools/open-search/results/result.opensearch.module';
 
 @Module({
   controllers: [ResultsController],
@@ -31,6 +32,7 @@ import { ClarisaGeoScopeModule } from '../../tools/clarisa/entities/clarisa-geo-
     ResultCountriesModule,
     ResultCountriesSubNationalsModule,
     ClarisaGeoScopeModule,
+    ResultOpenSearchModule,
   ],
   providers: [
     ResultsService,

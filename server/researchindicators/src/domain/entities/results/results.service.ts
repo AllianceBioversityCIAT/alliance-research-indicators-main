@@ -45,6 +45,8 @@ import { CountryRolesEnum } from '../country-roles/enums/country-roles.anum';
 import { ResultCountry } from '../result-countries/entities/result-country.entity';
 import { ResultCountriesSubNational } from '../result-countries-sub-nationals/entities/result-countries-sub-national.entity';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
+import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
+import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
 
 @Injectable()
 export class ResultsService {
@@ -66,6 +68,7 @@ export class ResultsService {
     private readonly _resultCountriesSubNationalsService: ResultCountriesSubNationalsService,
     private readonly _clarisaGeoScopeService: ClarisaGeoScopeService,
     private readonly _updateDataUtil: UpdateDataUtil,
+    private readonly _openSearchResultApi: OpenSearchResultApi,
   ) {}
 
   async findResults(pagination: PaginationDto, type?: IndicatorsEnum) {
@@ -226,7 +229,7 @@ export class ResultsService {
         generalInformation.keywords,
       );
 
-      await this._resultKeywordsService.create<null>(
+      const keywords = await this._resultKeywordsService.create<null>(
         result_id,
         keywordsToSave,
         'keyword',
@@ -240,6 +243,16 @@ export class ResultsService {
         'user_id',
         UserRolesEnum.MAIN_CONTACT,
         manager,
+      );
+
+      this._openSearchResultApi.uploadSingleToOpenSearch(
+        {
+          result_id,
+          title: generalInformation.title,
+          description: generalInformation.description,
+          keywords: keywords.map((el) => el.keyword),
+        },
+        ElasticOperationEnum.PUT,
       );
 
       if (returnData === TrueFalseEnum.TRUE) {

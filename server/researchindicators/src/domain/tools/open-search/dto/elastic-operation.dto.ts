@@ -1,6 +1,12 @@
 export class ElasticOperationDto<T> {
   constructor(
-    public operation: 'DELETE' | 'PATCH',
-    public data: T,
+    public operation: ElasticOperationEnum,
+    public data: Partial<T>,
   ) {}
+}
+
+export enum ElasticOperationEnum {
+  DELETE = 'DELETE',
+  PATCH = 'PATCH',
+  PUT = 'PUT',
 }
