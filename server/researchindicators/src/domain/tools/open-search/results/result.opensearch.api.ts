@@ -4,11 +4,12 @@ import { BaseOpenSearchApi } from '../core/base-open-search-api';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { Result } from '../../../entities/results/entities/result.entity';
+import { ResultOpensearchDto } from './dto/result.opensearch.dto';
 
 @Injectable()
 export class OpenSearchResultApi extends BaseOpenSearchApi<
   Result,
-  Result,
+  ResultOpensearchDto,
   ResultRepository
 > {
   constructor(
@@ -16,6 +17,12 @@ export class OpenSearchResultApi extends BaseOpenSearchApi<
     countryRepository: ResultRepository,
     appConfig: AppConfig,
   ) {
-    super(httpService, countryRepository, appConfig, undefined, Result);
+    super(
+      httpService,
+      countryRepository,
+      appConfig,
+      undefined,
+      ResultOpensearchDto,
+    );
   }
 }
