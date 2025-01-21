@@ -36,7 +36,15 @@ export class ResultOpenSearchController {
     return this.openSearchResultApi
       .search(
         query,
-        ['title', 'description', 'result_official_code'],
+        {
+          title: true,
+          description: true,
+          result_official_code: true,
+          indicator: {
+            name: true,
+          },
+          keywords: true,
+        },
         [
           {
             title: { order: 'asc' },

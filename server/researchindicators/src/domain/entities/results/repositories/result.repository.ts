@@ -1,33 +1,63 @@
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Result } from '../entities/result.entity';
 import { Injectable } from '@nestjs/common';
 import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
 import { FindAllOptions } from '../../../shared/enum/find-all-options';
+import { ResultOpensearchDto } from '../../../tools/open-search/results/dto/result.opensearch.dto';
 
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
-  implements ElasticFindEntity<Result>
+  implements ElasticFindEntity<ResultOpensearchDto>
 {
-  constructor(private entityManager: EntityManager) {
+  constructor(private readonly entityManager: EntityManager) {
     super(Result, entityManager);
   }
 
   findDataForOpenSearch(
     option: FindAllOptions,
     ids?: number[],
-  ): Promise<Result[]> {
-    return this.find({
-      where: {
-        ...(option !== FindAllOptions.SHOW_ALL ? { is_active: true } : {}),
-        ...(ids && ids.length > 0 ? { id: In(ids) } : {}),
-      },
-      relations: {
-        indicator: true,
-        result_status: true,
-        result_keywords: true,
-      },
-    });
+  ): Promise<ResultOpensearchDto[]> {
+    const query: string = `
+	select 
+		r.result_id,
+		r.result_official_code,
+		r.version_id,
+		r.title,
+		r.description,
+		r.indicator_id,
+		r.geo_scope_id,
+		r.report_year_id,
+		r.result_status_id,
+		JSON_OBJECT('result_status_id', rs.result_status_id,
+					'name', rs.name,
+					'description', rs.description) as result_status,
+		JSON_OBJECT('indicator_id', i.indicator_id,
+					'name', i.name,
+					'other_names', i.other_names,
+					'description', i.description,
+					'long_description', i.long_description,
+					'indicator_type_id', i.indicator_type_id,
+					'icon_src', i.icon_src) as \`indicator\`,
+		if(count(rk.keyword) = 0 , JSON_ARRAY(), JSON_ARRAYAGG(rk.keyword)) as keywords
+		from results r
+			inner join indicators i on r.indicator_id = i.indicator_id 
+			inner join result_status rs on rs.result_status_id = r.result_status_id 
+			left join result_keywords rk on rk.result_id = r.result_id 
+		where 1 = 1
+		${ids && ids.length > 0 ? `and r.result_id in (${ids.join(',')})` : ''}
+		${option !== FindAllOptions.SHOW_ALL ? 'and r.is_active = 1' : ''}
+		GROUP by r.result_id,
+			r.result_official_code,
+			r.version_id,
+			r.title,
+			r.description,
+			r.indicator_id,
+			r.geo_scope_id,
+			r.report_year_id,
+			r.result_status_id
+	`;
+    return this.query(query);
   }
 
   async findResults(pagination: ResultPaginationWhere): Promise<Result[]> {

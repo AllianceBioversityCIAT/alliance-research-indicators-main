@@ -14,14 +14,15 @@ import { ElasticResponse } from '../dto/elastic-response.dto';
 import { forkJoin, lastValueFrom } from 'rxjs';
 import { ElasticFindEntity } from '../dto/elastic-find-entity.dto';
 import { ElasticOperationDto } from '../dto/elastic-operation.dto';
-import {
-  OpenSearchMetadataName,
-  OpenSearchPropertyOptions,
-} from '../decorators/opensearch-property.decorator';
+import { OpenSearchMetadataName } from '../decorators/opensearch-property.decorator';
 import { SchemaOpenSearch } from '../dto/opensearch-schema';
 import { FindAllOptions } from '../../../shared/enum/find-all-options';
 import { isArrayOfType } from '../../../shared/utils/array.util';
 import { AppConfig } from '../../../shared/utils/app-config.util';
+import {
+  PropertyDescriptor,
+  SearchFields,
+} from './types/base-open-search.types';
 
 export abstract class BaseOpenSearchApi<
   Entity,
@@ -286,10 +287,7 @@ export abstract class BaseOpenSearchApi<
   }
 
   private _getMappingForSchema() {
-    const properties: {
-      propertyKey: string;
-      options: OpenSearchPropertyOptions;
-    }[] =
+    const properties: PropertyDescriptor[] =
       Reflect.getMetadata(OpenSearchMetadataName, this._openSearchEntity) || [];
     const schema: SchemaOpenSearch<OpenSearchEntity> = {
       mappings: {
@@ -319,10 +317,8 @@ export abstract class BaseOpenSearchApi<
   }
 
   private _iterateProperties(opensearchObject?: new () => unknown) {
-    const properties: {
-      propertyKey: string;
-      options: OpenSearchPropertyOptions;
-    }[] = Reflect.getMetadata(OpenSearchMetadataName, opensearchObject) || [];
+    const properties: PropertyDescriptor[] =
+      Reflect.getMetadata(OpenSearchMetadataName, opensearchObject) || [];
     const schema = {};
     for (const { propertyKey, options } of properties) {
       if (options?.type) {
@@ -345,16 +341,17 @@ export abstract class BaseOpenSearchApi<
 
   async search(
     query: string,
-    fieldsToSearchOn: (keyof OpenSearchEntity)[],
+    fieldsToSearchOn: SearchFields<OpenSearchEntity>,
     fieldsToSortOn: TypeSort<OpenSearchEntity>[],
     size: number = 20,
     filter?: string,
     fieldToFilterOn?: keyof OpenSearchEntity,
   ): Promise<(OpenSearchEntity & { score: number })[]> {
+    const listOfFieldsToSearch = this._getDeepKeys(fieldsToSearchOn);
     const elasticQuery = this._getElasticQuery<OpenSearchEntity>(
       query,
       size,
-      fieldsToSearchOn,
+      listOfFieldsToSearch,
       fieldsToSortOn,
       filter,
       fieldToFilterOn,
@@ -392,7 +389,7 @@ export abstract class BaseOpenSearchApi<
   protected _getElasticQuery<T>(
     toFind: string,
     size: number,
-    fieldsToSearchOn: (keyof T)[],
+    fieldsToSearchOn: string[],
     fieldsToSortOn: TypeSort<T>[],
     toFilter?: string,
     fieldToFilterOn?: keyof T,
@@ -449,5 +446,20 @@ export abstract class BaseOpenSearchApi<
     );
 
     return query;
+  }
+
+  private _getDeepKeys(data: any, prefix: string = ''): string[] {
+    let keys: string[] = [];
+    for (const key in data) {
+      if (data.hasOwnProperty(key)) {
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        if (typeof data[key] === 'object' && data[key] !== null) {
+          keys = keys.concat(this._getDeepKeys(data[key], newKey));
+        } else {
+          keys.push(newKey);
+        }
+      }
+    }
+    return keys;
   }
 }
