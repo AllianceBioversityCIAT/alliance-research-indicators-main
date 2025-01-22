@@ -13,6 +13,7 @@ import {
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
+import { LinkResult } from '../link-results/entities/link-result.entity';
 
 @Injectable()
 export class ResultPolicyChangeService {
@@ -67,7 +68,14 @@ export class ResultPolicyChangeService {
       policy_type_id,
     } = createResultPolicyChangeDto;
 
-    const innoSave = [innovation_development, innovation_use];
+    const innoSave: Partial<LinkResult>[] = [
+      {
+        other_result_id: innovation_development,
+      },
+      {
+        other_result_id: innovation_use,
+      },
+    ];
 
     return this.dataSource.transaction(async (manager) => {
       await this.linkResultsService.create(
@@ -128,8 +136,8 @@ export class ResultPolicyChangeService {
       policy_stage_id: policyChange?.policy_stage_id,
       policy_type_id: policyChange?.policy_type_id,
       implementing_organization: institutions,
-      innovation_development: innoDev,
-      innovation_use: innoUse,
+      innovation_development: innoDev?.other_result_id,
+      innovation_use: innoUse?.other_result_id,
     };
   }
 }
