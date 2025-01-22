@@ -181,8 +181,6 @@ export abstract class BaseOpenSearchApi<
       elasticOperation = elasticOperation.concat('\n');
     }
 
-    console.log(elasticOperation);
-
     return elasticOperation;
   }
 

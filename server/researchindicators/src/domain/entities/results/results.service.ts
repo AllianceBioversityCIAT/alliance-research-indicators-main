@@ -155,6 +155,11 @@ export class ResultsService {
       return result;
     });
 
+    this._openSearchResultApi.uploadSingleToOpenSearch(
+      result.result_id,
+      ElasticOperationEnum.PATCH,
+    );
+
     return result;
   }
 
