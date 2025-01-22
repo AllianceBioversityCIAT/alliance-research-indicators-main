@@ -38,14 +38,14 @@ export class CreateResultPolicyChangeDto {
   @ApiProperty({
     name: 'innovation_development',
     description: 'Innovation Development',
-    type: LinkResult,
+    type: Number,
   })
-  public innovation_development: LinkResult;
+  public innovation_development: number;
 
   @ApiProperty({
     name: 'innovation_use',
     description: 'Innovation Use',
-    type: LinkResult,
+    type: Number,
   })
-  public innovation_use: LinkResult;
+  public innovation_use: number;
 }
