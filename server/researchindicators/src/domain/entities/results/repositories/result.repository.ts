@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
 import { FindAllOptions } from '../../../shared/enum/find-all-options';
 import { ResultOpensearchDto } from '../../../tools/open-search/results/dto/result.opensearch.dto';
+import { formatArrayToQuery } from '../../../shared/utils/queries.util';
 
 @Injectable()
 export class ResultRepository
@@ -87,6 +88,20 @@ export class ResultRepository
       },
     };
 
+    const haveContractsCodes =
+      filters?.contract_codes && filters.contract_codes.length > 0;
+
+    const haveLeversCodes =
+      filters?.lever_codes && filters.lever_codes.length > 0;
+
+    const haveIndicatorsCodes =
+      filters?.indicator_code && filters.indicator_code.length > 0;
+
+    const haveStatusCodes =
+      filters?.status_codes && filters.status_codes.length > 0;
+
+    const haveYears = filters?.years && filters.years.length > 0;
+
     let limit: string = '';
 
     if (filters?.page && filters?.limit) {
@@ -142,7 +157,9 @@ export class ResultRepository
       if (filters?.primary_contract) {
         queryParts.contracts.groupBy = `,rc.result_contract_id`;
       }
+    }
 
+    if (filters?.contracts || haveContractsCodes) {
       queryParts.contracts.join = `
 	  	LEFT JOIN result_contracts rc ON rc.result_id = r.result_id 
 									AND rc.is_active = TRUE 
@@ -172,12 +189,14 @@ export class ResultRepository
       if (filters?.primary_lever) {
         queryParts.levers.groupBy = `,rl.result_lever_id`;
       }
+    }
 
+    if (haveLeversCodes || filters?.levers) {
       queryParts.levers.join = `
-		  	LEFT JOIN result_levers rl ON rl.result_id = r.result_id
-									AND rl.is_active = TRUE 
-									${filters?.primary_lever ? `AND rl.is_primary = TRUE` : ''}
-			LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id`;
+		LEFT JOIN result_levers rl ON rl.result_id = r.result_id
+							  AND rl.is_active = TRUE 
+							  ${filters?.primary_lever ? `AND rl.is_primary = TRUE` : ''}
+	  LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id`;
     }
 
     if (filters?.indicators) {
@@ -257,7 +276,11 @@ export class ResultRepository
 		${queryParts.levers?.join}
 		WHERE 1 = 1
 		AND r.is_active = TRUE
-		${filters?.result_indicator ? `AND r.indicator_id = '${filters.result_indicator}'` : ''}
+		${haveContractsCodes ? `AND ac.agreement_id IN (${formatArrayToQuery<string>(filters.contract_codes)})` : ''}
+		${haveLeversCodes ? `AND cl.id IN (${formatArrayToQuery<string>(filters.lever_codes)})` : ``}
+		${haveIndicatorsCodes ? `AND r.indicator_id IN (${formatArrayToQuery<string>(filters.indicator_code)})` : ''}
+		${haveStatusCodes ? `AND r.result_status_id IN (${formatArrayToQuery<string>(filters.status_codes)})` : ''}
+		${haveYears ? `AND r.report_year_id IN (${formatArrayToQuery<string>(filters.years)})` : ''}
 	GROUP BY r.result_id,
 		r.result_official_code,
 		r.version_id,
@@ -274,6 +297,8 @@ export class ResultRepository
 		ORDER BY r.result_official_code ${sort_order}
 		${limit}
 	`;
+
+    console.log(mainQeury);
     return this.query(mainQeury);
   }
 }
@@ -281,7 +306,7 @@ export class ResultRepository
 export interface ResultFiltersInterface {
   limit?: number;
   page?: number;
-  result_indicator: number;
+  indicator_code: string[];
   result_audit_data: boolean;
   contracts: boolean;
   primary_contract: boolean;
@@ -291,6 +316,10 @@ export interface ResultFiltersInterface {
   result_status: boolean;
   result_audit_data_objects: boolean;
   sort_order: string;
+  contract_codes: string[];
+  lever_codes: string[];
+  status_codes: string[];
+  years: string[];
 }
 
 export interface CreateResultQueryInterface {

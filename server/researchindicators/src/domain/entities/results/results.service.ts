@@ -85,8 +85,12 @@ export class ResultsService {
       primary_contract: filters?.primary_contract,
       primary_lever: filters?.primary_lever,
       result_audit_data_objects: filters?.result_audit_data_objects,
-      result_indicator: filters?.result_indicator,
+      indicator_code: filters?.indicator_code,
       sort_order: filters?.sort_order,
+      contract_codes: filters?.contract_codes,
+      lever_codes: filters?.lever_codes,
+      status_codes: filters?.status_codes,
+      years: filters?.years,
     });
   }
 
