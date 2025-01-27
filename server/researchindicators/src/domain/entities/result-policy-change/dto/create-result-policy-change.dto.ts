@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ResultInstitution } from '../../result-institutions/entities/result-institution.entity';
-import { LinkResult } from '../../link-results/entities/link-result.entity';
 
 export class CreateResultPolicyChangeDto {
   @ApiProperty({
