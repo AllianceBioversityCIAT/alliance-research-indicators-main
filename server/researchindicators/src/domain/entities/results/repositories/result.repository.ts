@@ -256,6 +256,7 @@ export class ResultRepository
 		${queryParts.contracts?.join}
 		${queryParts.levers?.join}
 		WHERE 1 = 1
+		AND r.is_active = TRUE
 		${filters?.result_indicator ? `AND r.indicator_id = '${filters.result_indicator}'` : ''}
 	GROUP BY r.result_id,
 		r.result_official_code,
