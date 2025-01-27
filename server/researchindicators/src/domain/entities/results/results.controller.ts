@@ -5,7 +5,6 @@ import {
   Get,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -131,8 +130,8 @@ export class ResultsController {
   @ApiOperation({ summary: 'Find all results' })
   @Get()
   async find(
-    @Query('page', ParseIntPipe) page: number,
-    @Query('limit', ParseIntPipe) limit: number,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
     @Query('contracts', QueryParseBool) contracts: boolean,
     @Query('primary-contract', QueryParseBool) primaryContract: boolean,
     @Query('levers', QueryParseBool) levers: boolean,
@@ -155,8 +154,8 @@ export class ResultsController {
         primary_lever: primaryLever,
         result_audit_data_objects: auditDataObject,
         result_indicator: QueryIndicators.getFromName(resultIndicator)?.value,
-        page,
-        limit,
+        page: +page,
+        limit: +limit,
         sort_order: sortOrder,
       })
       .then((el) =>
