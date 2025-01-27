@@ -6,9 +6,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { ResultRepository } from './repositories/result.repository';
-import { PaginationDto } from '../../shared/global-dto/pagination.dto';
-import { cleanObject, validObject } from '../../shared/utils/object.utils';
+import {
+  ResultFiltersInterface,
+  ResultRepository,
+} from './repositories/result.repository';
+import { validObject } from '../../shared/utils/object.utils';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { Result } from './entities/result.entity';
 import { CreateResultDto } from './dto/create-result.dto';
@@ -71,20 +73,20 @@ export class ResultsService {
     private readonly _openSearchResultApi: OpenSearchResultApi,
   ) {}
 
-  async findResults(pagination: PaginationDto, type?: IndicatorsEnum) {
-    const paginationClean = cleanObject<PaginationDto>(pagination);
-    const whereLimit: Record<string, number> = {};
-    if (Object.keys(paginationClean).length === 2) {
-      const offset = (paginationClean.page - 1) * paginationClean.limit;
-      whereLimit.limit = paginationClean.limit;
-      whereLimit.offset = offset;
-    }
-    return this.mainRepo.find({
-      ...whereLimit,
-      where: {
-        ...(type ? { indicator_id: type } : {}),
-        is_active: true,
-      },
+  async findResults(filters: Partial<ResultFiltersInterface>) {
+    return this.mainRepo.findResultsFilters({
+      limit: filters.limit,
+      page: filters.page,
+      contracts: filters?.contracts,
+      levers: filters?.levers,
+      indicators: filters?.indicators,
+      result_status: filters?.result_status,
+      result_audit_data: filters?.result_audit_data,
+      primary_contract: filters?.primary_contract,
+      primary_lever: filters?.primary_lever,
+      result_audit_data_objects: filters?.result_audit_data_objects,
+      result_indicator: filters?.result_indicator,
+      sort_order: filters?.sort_order,
     });
   }
 

@@ -5,6 +5,7 @@ import {
   Get,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -32,6 +33,7 @@ import {
   QueryIndicatorsEnum,
 } from '../indicators/enum/indicators.enum';
 import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
+import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller()
@@ -51,24 +53,112 @@ export class ResultsController {
     description: 'Is a reference to the limit of items per page',
   })
   @ApiQuery({
-    name: 'type',
+    name: 'contracts',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description: 'Is a reference to the contract',
+  })
+  @ApiQuery({
+    name: 'primary-contract',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description:
+      'This parameter allows you to display the primary contract of the result.',
+  })
+  @ApiQuery({
+    name: 'levers',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description:
+      'This parameter allows you to display the levers to which the result is linked.',
+  })
+  @ApiQuery({
+    name: 'primary-lever',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description:
+      'This parameter allows you to display the primary lever of the result.',
+  })
+  @ApiQuery({
+    name: 'indicators',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description:
+      'This parameter allows you to display the indicators to which the result is linked.',
+  })
+  @ApiQuery({
+    name: 'result-status',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description:
+      'This parameter allows you to display the status of the result.',
+  })
+  @ApiQuery({
+    name: 'audit-data',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description:
+      'This parameter allows you to display the audit data of the result.',
+  })
+  @ApiQuery({
+    name: 'audit-data-object',
+    required: false,
+    type: String,
+    description: 'This parameter allows you to display the audit data object.',
+    enum: TrueFalseEnum,
+  })
+  @ApiQuery({
+    name: 'result-indicator',
     required: false,
     type: String,
     enum: QueryIndicatorsEnum,
     description: 'Is a reference to the type of indicator',
   })
+  @ApiQuery({
+    name: 'sort-order',
+    required: false,
+    type: String,
+    enum: ['asc', 'desc'],
+    description: 'Is a reference to the sort order',
+  })
   @ApiOperation({ summary: 'Find all results' })
   @Get()
   async find(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
-    @Query('type') type: QueryIndicatorsEnum,
+    @Query('page', ParseIntPipe) page: number,
+    @Query('limit', ParseIntPipe) limit: number,
+    @Query('contracts', QueryParseBool) contracts: boolean,
+    @Query('primary-contract', QueryParseBool) primaryContract: boolean,
+    @Query('levers', QueryParseBool) levers: boolean,
+    @Query('primary-lever', QueryParseBool) primaryLever: boolean,
+    @Query('indicators', QueryParseBool) indicators: boolean,
+    @Query('result-status', QueryParseBool) resultStatus: boolean,
+    @Query('audit-data', QueryParseBool) auditData: boolean,
+    @Query('audit-data-object', QueryParseBool) auditDataObject: boolean,
+    @Query('result-indicator') resultIndicator: QueryIndicatorsEnum,
+    @Query('sort-order') sortOrder: string,
   ) {
     return this.resultsService
-      .findResults(
-        { page: +page, limit: +limit },
-        QueryIndicators.getFromName(type)?.value,
-      )
+      .findResults({
+        contracts: contracts,
+        levers: levers,
+        indicators: indicators,
+        result_status: resultStatus,
+        result_audit_data: auditData,
+        primary_contract: primaryContract,
+        primary_lever: primaryLever,
+        result_audit_data_objects: auditDataObject,
+        result_indicator: QueryIndicators.getFromName(resultIndicator)?.value,
+        page,
+        limit,
+        sort_order: sortOrder,
+      })
       .then((el) =>
         ResponseUtils.format({
           description: 'Results found',
