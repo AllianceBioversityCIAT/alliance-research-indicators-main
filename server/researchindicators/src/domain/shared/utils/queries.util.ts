@@ -31,6 +31,10 @@ export const updateQueryBuilderWhere = <Entity>(
   }
 };
 
+export const formatArrayToQuery = <T>(array: T[]): string => {
+  return array.map((item) => `'${item}'`).join(',');
+};
+
 export const notOption = (isNot: boolean, isArray: boolean) => {
   return isNot ? (isArray ? 'NOT' : '!') : '';
 };

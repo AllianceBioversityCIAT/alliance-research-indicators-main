@@ -27,12 +27,9 @@ import { UpdateGeneralInformation } from './dto/update-general-information.dto';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  QueryIndicators,
-  QueryIndicatorsEnum,
-} from '../indicators/enum/indicators.enum';
 import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
 import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
+import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller()
@@ -114,18 +111,41 @@ export class ResultsController {
     enum: TrueFalseEnum,
   })
   @ApiQuery({
-    name: 'result-indicator',
-    required: false,
-    type: String,
-    enum: QueryIndicatorsEnum,
-    description: 'Is a reference to the type of indicator',
-  })
-  @ApiQuery({
     name: 'sort-order',
     required: false,
     type: String,
     enum: ['asc', 'desc'],
     description: 'Is a reference to the sort order',
+  })
+  @ApiQuery({
+    name: 'indicator-codes',
+    required: false,
+    type: String,
+    description: 'Is a reference to the type of indicator',
+  })
+  @ApiQuery({
+    name: 'contract-codes',
+    required: false,
+    type: String,
+    description: 'filter by contract codes',
+  })
+  @ApiQuery({
+    name: 'lever-codes',
+    required: false,
+    type: String,
+    description: 'filter by lever codes',
+  })
+  @ApiQuery({
+    name: 'status-codes',
+    required: false,
+    type: String,
+    description: 'filter by status codes',
+  })
+  @ApiQuery({
+    name: 'years',
+    required: false,
+    type: String,
+    description: 'filter by years',
   })
   @ApiOperation({ summary: 'Find all results' })
   @Get()
@@ -140,8 +160,12 @@ export class ResultsController {
     @Query('result-status', QueryParseBool) resultStatus: boolean,
     @Query('audit-data', QueryParseBool) auditData: boolean,
     @Query('audit-data-object', QueryParseBool) auditDataObject: boolean,
-    @Query('result-indicator') resultIndicator: QueryIndicatorsEnum,
     @Query('sort-order') sortOrder: string,
+    @Query('indicator-codes', ListParseToArrayPipe) resultIndicator: string[],
+    @Query('contract-codes', ListParseToArrayPipe) contractCodes: string[],
+    @Query('lever-codes', ListParseToArrayPipe) leverCodes: string[],
+    @Query('status-codes', ListParseToArrayPipe) statusCodes: string[],
+    @Query('years', ListParseToArrayPipe) years: string[],
   ) {
     return this.resultsService
       .findResults({
@@ -153,10 +177,14 @@ export class ResultsController {
         primary_contract: primaryContract,
         primary_lever: primaryLever,
         result_audit_data_objects: auditDataObject,
-        result_indicator: QueryIndicators.getFromName(resultIndicator)?.value,
+        indicator_code: resultIndicator,
         page: +page,
         limit: +limit,
         sort_order: sortOrder,
+        contract_codes: contractCodes,
+        lever_codes: leverCodes,
+        status_codes: statusCodes,
+        years: years,
       })
       .then((el) =>
         ResponseUtils.format({
