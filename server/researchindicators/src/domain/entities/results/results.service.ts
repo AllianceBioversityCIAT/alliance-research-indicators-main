@@ -90,6 +90,7 @@ export class ResultsService {
       contract_codes: filters?.contract_codes,
       lever_codes: filters?.lever_codes,
       status_codes: filters?.status_codes,
+      user_codes: filters?.user_codes,
       years: filters?.years,
     });
   }

@@ -76,6 +76,12 @@ export const filterPersistKey = <T extends AuditableEntity>(
     .map((data) => data[primaryKey]);
 };
 
+export const validTypeOfArray = (array: any[]): string[] => {
+  return array.map((item) => {
+    return `${item}`.replace(/[^a-zA-Z0-9]/g, '');
+  });
+};
+
 export const isNotEmpty = <T>(array: T | T[]): boolean => {
   let response = true;
   if (array === undefined || array === null) response = false;
