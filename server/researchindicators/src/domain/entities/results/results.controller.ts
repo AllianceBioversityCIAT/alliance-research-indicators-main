@@ -147,6 +147,12 @@ export class ResultsController {
     type: String,
     description: 'filter by years',
   })
+  @ApiQuery({
+    name: 'create-user-codes',
+    required: false,
+    type: String,
+    description: 'filter by user codes',
+  })
   @ApiOperation({ summary: 'Find all results' })
   @Get()
   async find(
@@ -165,6 +171,7 @@ export class ResultsController {
     @Query('contract-codes', ListParseToArrayPipe) contractCodes: string[],
     @Query('lever-codes', ListParseToArrayPipe) leverCodes: string[],
     @Query('status-codes', ListParseToArrayPipe) statusCodes: string[],
+    @Query('create-user-codes', ListParseToArrayPipe) userCode: string[],
     @Query('years', ListParseToArrayPipe) years: string[],
   ) {
     return this.resultsService
@@ -184,6 +191,7 @@ export class ResultsController {
         contract_codes: contractCodes,
         lever_codes: leverCodes,
         status_codes: statusCodes,
+        user_codes: userCode,
         years: years,
       })
       .then((el) =>

@@ -44,7 +44,8 @@ export const isEmpty = <T>(attr: T) => {
     attr === null ||
     attr === '' ||
     (typeof attr === 'number' && isNaN(attr)) ||
-    attr === undefined
+    attr === undefined ||
+    (Array.isArray(attr) && attr.length === 0)
   );
 };
 

@@ -5,6 +5,7 @@ import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-e
 import { FindAllOptions } from '../../../shared/enum/find-all-options';
 import { ResultOpensearchDto } from '../../../tools/open-search/results/dto/result.opensearch.dto';
 import { formatArrayToQuery } from '../../../shared/utils/queries.util';
+import { isEmpty } from '../../../shared/utils/object.utils';
 
 @Injectable()
 export class ResultRepository
@@ -88,19 +89,12 @@ export class ResultRepository
       },
     };
 
-    const haveContractsCodes =
-      filters?.contract_codes && filters.contract_codes.length > 0;
-
-    const haveLeversCodes =
-      filters?.lever_codes && filters.lever_codes.length > 0;
-
-    const haveIndicatorsCodes =
-      filters?.indicator_code && filters.indicator_code.length > 0;
-
-    const haveStatusCodes =
-      filters?.status_codes && filters.status_codes.length > 0;
-
-    const haveYears = filters?.years && filters.years.length > 0;
+    const haveContractsCodes = !isEmpty(filters?.contract_codes);
+    const haveLeversCodes = !isEmpty(filters?.lever_codes);
+    const haveIndicatorsCodes = !isEmpty(filters?.indicator_code);
+    const haveStatusCodes = !isEmpty(filters?.status_codes);
+    const haveUsersCodes = !isEmpty(filters?.user_codes);
+    const haveYears = !isEmpty(filters?.years);
 
     let limit: string = '';
 
@@ -281,6 +275,7 @@ export class ResultRepository
 		${haveIndicatorsCodes ? `AND r.indicator_id IN (${formatArrayToQuery<string>(filters.indicator_code)})` : ''}
 		${haveStatusCodes ? `AND r.result_status_id IN (${formatArrayToQuery<string>(filters.status_codes)})` : ''}
 		${haveYears ? `AND r.report_year_id IN (${formatArrayToQuery<string>(filters.years)})` : ''}
+		${haveUsersCodes ? `AND r.created_by IN (${formatArrayToQuery<string>(filters.user_codes)})` : ''}
 	GROUP BY r.result_id,
 		r.result_official_code,
 		r.version_id,
@@ -298,7 +293,6 @@ export class ResultRepository
 		${limit}
 	`;
 
-    console.log(mainQeury);
     return this.query(mainQeury);
   }
 }
@@ -319,6 +313,7 @@ export interface ResultFiltersInterface {
   contract_codes: string[];
   lever_codes: string[];
   status_codes: string[];
+  user_codes: string[];
   years: string[];
 }
 
