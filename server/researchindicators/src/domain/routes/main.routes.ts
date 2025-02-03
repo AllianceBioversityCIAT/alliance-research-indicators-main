@@ -25,6 +25,7 @@ import { ResultContractsModule } from '../entities/result-contracts/result-contr
 import { AgressoStaffModule } from '../tools/agresso/staff/agresso-staff-tools.module';
 import { ConnectionsModule } from '../entities/connections/connections.module';
 import { openSearchRoutes } from '../tools/open-search/opensearch.routes';
+import { AnnouncementSettingsModule } from '../entities/announcement-settings/announcement-settings.module';
 
 const ResultsChildren: Routes = [
   {
@@ -163,6 +164,10 @@ const children: Routes = [
   {
     path: 'opensearch',
     children: openSearchRoutes,
+  },
+  {
+    path: 'announcement-setting',
+    module: AnnouncementSettingsModule,
   },
 ];
 
