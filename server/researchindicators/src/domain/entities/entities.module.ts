@@ -39,6 +39,7 @@ import { AllianceUserStaffModule } from './alliance-user-staff/alliance-user-sta
 import { ResultStatusModule } from './result-status/result-status.module';
 import { ReportYearModule } from './report-year/report-year.module';
 import { ConnectionsModule } from './connections/connections.module';
+import { AnnouncementSettingsModule } from './announcement-settings/announcement-settings.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { ConnectionsModule } from './connections/connections.module';
     ResultStatusModule,
     ReportYearModule,
     ConnectionsModule,
+    AnnouncementSettingsModule,
   ],
   exports: [AgressoContractModule],
 })
