@@ -303,7 +303,7 @@ export class ResultsService {
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
     const { contracts, levers } = alignmentData;
-    this.dataSource.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       await this._resultContractsService.create<ContractRolesEnum>(
         resultId,
         contracts,
