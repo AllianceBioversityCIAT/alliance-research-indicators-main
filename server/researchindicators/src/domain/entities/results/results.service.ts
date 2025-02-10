@@ -529,10 +529,17 @@ export class ResultsService {
     const countries = await this._resultCountriesService.find(
       resultId,
       CountryRolesEnum.GEO_lOCATION,
+      {
+        country: true,
+      },
     );
 
     const subNational = await this._resultCountriesSubNationalsService.find(
       countries.map((el) => el.result_country_id),
+      undefined,
+      {
+        sub_national: true,
+      },
     );
 
     countries.forEach((country) => {
@@ -541,7 +548,9 @@ export class ResultsService {
       );
     });
 
-    const regions = await this._resultRegionsService.find(resultId);
+    const regions = await this._resultRegionsService.find(resultId, undefined, {
+      region: true,
+    });
 
     return {
       geo_scope_id: cliGeoScope,

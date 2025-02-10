@@ -1,6 +1,7 @@
 import {
   DeepPartial,
   EntityManager,
+  FindOptionsRelations,
   FindOptionsWhere,
   In,
   Not,
@@ -242,9 +243,9 @@ export abstract class BaseServiceSimple<
   public async find<Enum extends string | number>(
     resultId: number | number[],
     dataRole?: Enum,
+    relations?: FindOptionsRelations<Entity>,
   ) {
     const dataToFind = Array.isArray(resultId) ? In(resultId) : resultId;
-
     const whereData = {
       [this.resultKey]: dataToFind,
       is_active: true,
@@ -256,6 +257,7 @@ export abstract class BaseServiceSimple<
 
     return this.mainRepo.find({
       where: whereData,
+      relations,
     });
   }
 
