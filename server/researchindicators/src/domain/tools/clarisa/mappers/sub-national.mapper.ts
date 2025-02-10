@@ -8,7 +8,7 @@ export const subNationalMapper = (
   return {
     id: subNational.id,
     code: subNational.code,
-    name: subNational.local_name,
+    name: subNational.name,
     other_names: subNational.other_names,
     country_iso_alpha_2: subNational.country_iso_alpha_2,
     language_iso_2: subNational.language_iso_2,
