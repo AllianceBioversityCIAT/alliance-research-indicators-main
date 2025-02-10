@@ -18,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { SearchToOpenSearchEnum } from './anum/path.enum';
 import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
+import { MessagePattern } from '@nestjs/microservices';
 
 @ApiBearerAuth()
 @ApiTags('Clarisa')
@@ -27,6 +28,15 @@ export class ClarisaController {
 
   @Get('clone/execute')
   runCloneClarisa() {
+    this.clarisaService.cloneAllClarisaEntities();
+    return ResponseUtils.format({
+      description: 'The clone process has been started',
+      status: HttpStatus.OK,
+    });
+  }
+
+  @MessagePattern('clone-normal-entities')
+  executeCloneNormalEntities() {
     this.clarisaService.cloneAllClarisaEntities();
     return ResponseUtils.format({
       description: 'The clone process has been started',

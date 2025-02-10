@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { ClarisaService } from '../clarisa/clarisa.service';
+import { SelfApp } from '../broker/self.app';
 
 @Injectable()
 export class ClarisaCron {
-  constructor(private readonly _clarisaService: ClarisaService) {}
+  constructor(private readonly _selfApp: SelfApp) {}
 
   @Cron(CronExpression.EVERY_8_HOURS)
-  async cloneNormalEntities() {
-    this._clarisaService.cloneAllClarisaEntities();
+  cloneNormalEntities() {
+    this._selfApp.executeCloneNormalEntities();
   }
 }

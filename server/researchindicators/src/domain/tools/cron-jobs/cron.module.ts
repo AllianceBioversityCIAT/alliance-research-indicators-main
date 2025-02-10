@@ -1,14 +1,17 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ClarisaCron } from './clarisa.cron';
-import { ClarisaModule } from '../clarisa/clarisa.module';
 import { AgressoToolsModule } from '../agresso/agresso-tools.module';
 import { AgressoCron } from './agresso.cron';
 import { ScheduleModule } from '@nestjs/schedule';
+import { SelfApp } from '../broker/self.app';
 
-@Global()
 @Module({
-  imports: [ClarisaModule, AgressoToolsModule, ScheduleModule.forRoot()],
-  providers: [ClarisaCron, AgressoCron],
-  exports: [ClarisaCron, AgressoCron],
+  imports: [
+    AgressoToolsModule,
+    ScheduleModule.forRoot({
+      cronJobs: true,
+    }),
+  ],
+  providers: [ClarisaCron, AgressoCron, SelfApp],
 })
 export class CronModule {}
