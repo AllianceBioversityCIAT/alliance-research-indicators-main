@@ -144,7 +144,7 @@ export class ResultRepository
 
       queryParts.contracts.select = `,${
         filters?.primary_contract
-          ? tempQuery
+          ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
           : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
       } as result_contracts`;
 
@@ -176,7 +176,7 @@ export class ResultRepository
 		`;
       queryParts.levers.select = `,${
         filters?.primary_lever
-          ? tempQuery
+          ? `if(rl.result_lever_id is not null ,${tempQuery}, NULL)`
           : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
       } as result_levers`;
 
