@@ -474,7 +474,12 @@ export class ResultsService {
         }
       }
 
-      if (ClarisaGeoScopeEnum.REGIONAL === geoScopeId) {
+      if (
+        [
+          ClarisaGeoScopeEnum.REGIONAL,
+          ClarisaGeoScopeEnum.THIS_IS_YET_TO_BE_DETERMINED,
+        ].includes(geoScopeId)
+      ) {
         await this._resultCountriesService.create(
           resultId,
           [],
