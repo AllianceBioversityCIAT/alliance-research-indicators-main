@@ -441,6 +441,7 @@ export class ResultsService {
         );
       }
 
+      let saveCountries: Partial<ResultCountry>[] = [];
       if (
         [
           ClarisaGeoScopeEnum.GLOBAL,
@@ -449,7 +450,7 @@ export class ResultsService {
           ClarisaGeoScopeEnum.SUB_NATIONAL,
         ].includes(geoScopeId)
       ) {
-        await this._resultCountriesService.create(
+        saveCountries = await this._resultCountriesService.create(
           resultId,
           saveGeoLocationDto.countries,
           'isoAlpha2',
@@ -459,7 +460,7 @@ export class ResultsService {
       }
 
       if (geoScopeId === ClarisaGeoScopeEnum.SUB_NATIONAL) {
-        for (const country of resultCountry) {
+        for (const country of saveCountries) {
           const subNational: ResultCountriesSubNational[] =
             saveGeoLocationDto.countries.find(
               (el) => el.isoAlpha2 === country.isoAlpha2,
