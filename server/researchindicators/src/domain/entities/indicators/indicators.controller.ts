@@ -46,4 +46,18 @@ export class IndicatorsController {
         }),
       );
   }
+
+  @Get('with/result')
+  @ApiOperation({ summary: 'Find all indicators by amount results' })
+  async findIndicatorByAmmountResults() {
+    return this.indicatorsService
+      .findIndicatorByAmmountResults()
+      .then((indicators) =>
+        ResponseUtils.format({
+          data: indicators,
+          description: 'Indicators found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }
