@@ -32,6 +32,10 @@ export class IndicatorsService {
     });
   }
 
+  async findIndicatorByAmmountResults() {
+    return this.mainRepo.findIndicatorByAmmountResults();
+  }
+
   async findResultsAmountByIndicatorCurrentUser() {
     return this.mainRepo.findAmountResultsByIndicatorCurrentUser();
   }

@@ -43,4 +43,32 @@ export class IndicatorRepository extends Repository<Indicator> {
 
     return this.query(query) as Promise<FindResultAmountDto[]>;
   }
+
+  async findIndicatorByAmmountResults() {
+    const query = `
+	SELECT
+		i.indicator_id,
+		i.name,
+		i.indicator_type_id,
+		i.description,
+		i.long_description,
+		i.icon_src,
+		i.other_names
+	FROM
+		indicators i
+		INNER JOIN results r on r.indicator_id = i.indicator_id
+		  						AND r.is_active = 1
+	WHERE
+		i.is_active = TRUE
+	GROUP BY
+		i.indicator_id,
+		i.name,
+		i.indicator_type_id,
+		i.description,
+		i.long_description,
+		i.icon_src,
+		i.other_names;
+	`;
+    return this.query(query) as Promise<Indicator[]>;
+  }
 }
