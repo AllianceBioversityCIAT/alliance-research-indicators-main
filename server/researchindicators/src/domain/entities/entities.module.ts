@@ -40,6 +40,7 @@ import { ResultStatusModule } from './result-status/result-status.module';
 import { ReportYearModule } from './report-year/report-year.module';
 import { ConnectionsModule } from './connections/connections.module';
 import { AnnouncementSettingsModule } from './announcement-settings/announcement-settings.module';
+import { GreenChecksModule } from './green-checks/green-checks.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { AnnouncementSettingsModule } from './announcement-settings/announcement
     ReportYearModule,
     ConnectionsModule,
     AnnouncementSettingsModule,
+    GreenChecksModule,
   ],
   exports: [AgressoContractModule],
 })

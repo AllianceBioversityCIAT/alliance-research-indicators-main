@@ -27,6 +27,7 @@ import { ConnectionsModule } from '../entities/connections/connections.module';
 import { openSearchRoutes } from '../tools/open-search/opensearch.routes';
 import { AnnouncementSettingsModule } from '../entities/announcement-settings/announcement-settings.module';
 import { ReportYearModule } from '../entities/report-year/report-year.module';
+import { GreenChecksModule } from '../entities/green-checks/green-checks.module';
 
 const ResultsChildren: Routes = [
   {
@@ -60,6 +61,10 @@ const ResultsChildren: Routes = [
   {
     path: 'year',
     module: ReportYearModule,
+  },
+  {
+    path: 'green-checks',
+    module: GreenChecksModule,
   },
 ];
 
