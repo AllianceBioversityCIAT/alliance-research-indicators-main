@@ -322,6 +322,8 @@ export class ResultCapacitySharingService {
       individual: individualResponse,
       training_supervisor: trainingSupervisor,
       training_supervisor_languages: training_supervisor_languages,
+      created_at: resultCapDev.created_at,
+      updated_at: resultCapDev.updated_at,
     };
 
     return response;

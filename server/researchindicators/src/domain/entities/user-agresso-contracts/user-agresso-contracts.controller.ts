@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Post,
   Body,
+  UseGuards,
 } from '@nestjs/common';
 import { UserAgressoContractsService } from './user-agresso-contracts.service';
 import {
@@ -19,6 +20,7 @@ import { UserAgressoContract } from './entities/user-agresso-contract.entity';
 import { ServiceResponseDto } from '../../shared/global-dto/service-response.dto';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 @ApiTags('User Agresso Contracts')
 @Controller()
@@ -43,6 +45,7 @@ export class UserAgressoContractsController {
     description:
       'Link user to contractThese endpoints are for development only, they will be removed in future updates.',
   })
+  @UseGuards(ResultStatusGuard)
   @Patch('link/user/:userId/contract/:agreementId')
   async linkUserToContract(
     @Param('userId') userId: string,

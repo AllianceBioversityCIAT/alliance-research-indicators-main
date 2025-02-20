@@ -9,6 +9,7 @@ import {
   Post,
   Query,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ResultsService } from './results.service';
@@ -30,6 +31,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
 import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller()
@@ -222,7 +224,7 @@ export class ResultsController {
     type: Number,
     description: 'Is a reference to the result id',
   })
-  @Delete(':id/delete')
+  @Delete(':resultId/delete')
   async deleteResult(@Param('resultId') resultId: string) {
     return this.resultsService.deleteResult(+resultId).then(() =>
       ResponseUtils.format({
@@ -232,9 +234,10 @@ export class ResultsController {
     );
   }
 
+  @UseGuards(ResultStatusGuard)
   @ApiOperation({ summary: 'Update general information' })
   @ApiParam({
-    name: 'id',
+    name: 'resultId',
     required: true,
     type: Number,
     description: 'Is a reference to the result id',
@@ -246,9 +249,9 @@ export class ResultsController {
     enum: TrueFalseEnum,
     description: 'Is a reference to return data',
   })
-  @Patch(':id/general-information')
+  @Patch(':resultId/general-information')
   async updateGeneralInformation(
-    @Param('id') resultId: string,
+    @Param('resultId') resultId: string,
     @Query('return') returnData: TrueFalseEnum,
     @Body() generalInformation: UpdateGeneralInformation,
   ) {
@@ -265,13 +268,13 @@ export class ResultsController {
 
   @ApiOperation({ summary: 'Find general information' })
   @ApiParam({
-    name: 'id',
+    name: 'resultId',
     required: true,
     type: Number,
     description: 'Is a reference to the result id',
   })
-  @Get(':id/general-information')
-  async findGeneralInformation(@Param('id') resultId: string) {
+  @Get(':resultId/general-information')
+  async findGeneralInformation(@Param('resultId') resultId: string) {
     return this.resultsService.findGeneralInfo(+resultId).then((result) =>
       ResponseUtils.format({
         description: 'General information was found correctly',
@@ -283,7 +286,7 @@ export class ResultsController {
 
   @ApiOperation({ summary: 'Update alignments' })
   @ApiParam({
-    name: 'id',
+    name: 'resultId',
     required: true,
     type: Number,
     description: 'Is a reference to the result id',
@@ -295,9 +298,10 @@ export class ResultsController {
     enum: TrueFalseEnum,
     description: 'Is a reference to return data',
   })
-  @Patch(':id/alignments')
+  @UseGuards(ResultStatusGuard)
+  @Patch(':resultId/alignments')
   async updateResultAlignments(
-    @Param('id') resultId: string,
+    @Param('resultId') resultId: string,
     @Query('return') returnData: TrueFalseEnum,
     @Body() generalInformation: ResultAlignmentDto,
   ) {
@@ -314,13 +318,13 @@ export class ResultsController {
 
   @ApiOperation({ summary: 'Find alignments' })
   @ApiParam({
-    name: 'id',
+    name: 'resultId',
     required: true,
     type: Number,
     description: 'Is a reference to the result id',
   })
-  @Get(':id/alignments')
-  async findResultAlignments(@Param('id') resultId: string) {
+  @Get(':resultId/alignments')
+  async findResultAlignments(@Param('resultId') resultId: string) {
     return this.resultsService.findResultAlignment(+resultId).then((result) =>
       ResponseUtils.format({
         description: 'alignments was found correctly',
@@ -332,13 +336,13 @@ export class ResultsController {
 
   @ApiOperation({ summary: 'Update metadata' })
   @ApiParam({
-    name: 'id',
+    name: 'resultId',
     required: true,
     type: Number,
     description: 'Is a reference to the result id',
   })
-  @Get(':id/metadata')
-  async findMetadata(@Param('id') resultId: string) {
+  @Get(':resultId/metadata')
+  async findMetadata(@Param('resultId') resultId: string) {
     return this.resultsService.findMetadataResult(+resultId).then((result) =>
       ResponseUtils.format({
         description: 'Metadata was found correctly',
@@ -374,15 +378,16 @@ export class ResultsController {
   }
 
   @ApiOperation({ summary: 'Save data for Geo Location' })
-  @Patch(':id/geo-location')
+  @UseGuards(ResultStatusGuard)
+  @Patch(':resultId/geo-location')
   @ApiParam({
-    name: 'id',
+    name: 'resultId',
     required: true,
     type: Number,
     description: 'Is a reference to the result id',
   })
   async saveGeoLocation(
-    @Param('id') resultId: string,
+    @Param('resultId') resultId: string,
     @Body() geoLocation: SaveGeoLocationDto,
   ) {
     return this.resultsService
@@ -397,14 +402,14 @@ export class ResultsController {
   }
 
   @ApiOperation({ summary: 'Find data for Geo Location' })
-  @Get(':id/geo-location')
+  @Get(':resultId/geo-location')
   @ApiParam({
-    name: 'id',
+    name: 'resultId',
     required: true,
     type: Number,
     description: 'Is a reference to the result id',
   })
-  async findGeoLocation(@Param('id') resultId: string) {
+  async findGeoLocation(@Param('resultId') resultId: string) {
     return this.resultsService.findGeoLocation(+resultId).then((result) =>
       ResponseUtils.format({
         description: 'Geo Location was found correctly',

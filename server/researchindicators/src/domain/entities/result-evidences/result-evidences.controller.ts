@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ResultEvidencesService } from './result-evidences.service';
 import { CreateResultEvidenceDto } from './dto/create-result-evidence.dto';
@@ -21,6 +22,7 @@ import {
   QueryEvidenceRoles,
   QueryEvidenceRolesEnum,
 } from '../evidence-roles/enums/evidence-role.enum';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 @ApiTags('Result Evidences')
 @Controller()
@@ -31,6 +33,7 @@ export class ResultEvidencesController {
   ) {}
 
   @ApiOperation({ summary: 'Update result evidences by result ID' })
+  @UseGuards(ResultStatusGuard)
   @Patch('by-result-id/:resultId')
   async updateResultEvidences(
     @Param('resultId') resultId: string,
