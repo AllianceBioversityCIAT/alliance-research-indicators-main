@@ -5,11 +5,13 @@ import {
   HttpStatus,
   Param,
   Patch,
+  UseGuards,
 } from '@nestjs/common';
 import { ResultPolicyChangeService } from './result-policy-change.service';
 import { CreateResultPolicyChangeDto } from './dto/create-result-policy-change.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 @ApiTags('Policy Change')
 @ApiBearerAuth()
@@ -19,6 +21,7 @@ export class ResultPolicyChangeController {
     private readonly resultPolicyChangeService: ResultPolicyChangeService,
   ) {}
 
+  @UseGuards(ResultStatusGuard)
   @Patch('by-result-id/:resultId')
   async updateByResultId(
     @Param('resultId') resultId: string,

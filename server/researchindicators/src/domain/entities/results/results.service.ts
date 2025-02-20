@@ -277,7 +277,7 @@ export class ResultsService {
 
   async findGeneralInfo(resultId: number) {
     const result = await this.mainRepo.findOne({
-      select: ['title', 'description', 'result_id'],
+      select: ['title', 'description', 'result_id', 'created_at', 'updated_at'],
       where: { result_id: resultId, is_active: true },
     });
 

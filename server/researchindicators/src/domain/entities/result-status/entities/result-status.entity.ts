@@ -2,6 +2,7 @@ import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
+import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
 
 @Entity('result_status')
 export class ResultStatus extends AuditableEntity {
@@ -34,4 +35,10 @@ export class ResultStatus extends AuditableEntity {
 
   @OneToMany(() => Result, (result) => result.result_status)
   results!: Result[];
+
+  @OneToMany(
+    () => SubmissionHistory,
+    (submissionHistory) => submissionHistory.submission_status,
+  )
+  submission_histories!: SubmissionHistory[];
 }

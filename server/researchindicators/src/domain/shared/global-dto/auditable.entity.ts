@@ -5,7 +5,6 @@ export abstract class AuditableEntity {
     type: 'timestamp',
     name: 'created_at',
     nullable: false,
-    select: false,
   })
   created_at?: Date;
 
@@ -21,7 +20,6 @@ export abstract class AuditableEntity {
     type: 'timestamp',
     name: 'updated_at',
     nullable: true,
-    select: false,
   })
   updated_at?: Date;
 

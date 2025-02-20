@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { FindGreenChecksDto } from '../dto/find-green-checks.dto';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -33,7 +34,7 @@ export class GreenCheckRepository {
     return `policy_change_validation(${result_key}) as policy_change`;
   }
 
-  async calculateGreenChecks(result_id: number) {
+  async calculateGreenChecks(result_id: number): Promise<FindGreenChecksDto> {
     const result_key = 'r.result_id';
     const query = `
             SELECT
@@ -50,6 +51,8 @@ export class GreenCheckRepository {
             LIMIT 1;
         `;
 
-    return this.dataSource.query(query, [result_id]);
+    return this.dataSource
+      .query(query, [result_id])
+      .then((result) => (result.length ? result[0] : null));
   }
 }

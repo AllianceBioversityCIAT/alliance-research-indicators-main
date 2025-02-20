@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ResultInstitutionsService } from './result-institutions.service';
 import { CreateResultInstitutionDto } from './dto/create-result-institution.dto';
@@ -15,6 +16,7 @@ import {
   QueryInstitutionsRoles,
   QueryInstitutionsRolesEnum,
 } from '../institution-roles/enums/institution-roles.enum';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 @ApiTags('Result Institutions')
 @Controller()
@@ -24,6 +26,7 @@ export class ResultInstitutionsController {
     private readonly resultInstitutionsService: ResultInstitutionsService,
   ) {}
 
+  @UseGuards(ResultStatusGuard)
   @Patch('partners/by-result-id/:resultId')
   async updateResultInstitutions(
     @Param('resultId') resultId: string,

@@ -5,11 +5,13 @@ import {
   HttpStatus,
   Param,
   Patch,
+  UseGuards,
 } from '@nestjs/common';
 import { ResultCapacitySharingService } from './result-capacity-sharing.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UpdateResultCapacitySharingDto } from './dto/update-result-capacity-sharing.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 @ApiTags('Result Capacity Sharing')
 @Controller()
@@ -19,6 +21,7 @@ export class ResultCapacitySharingController {
     private readonly resultCapacitySharingService: ResultCapacitySharingService,
   ) {}
 
+  @UseGuards(ResultStatusGuard)
   @Patch('by-result-id/:resultId')
   async updateResultCapacitySharing(
     @Param('resultId') resultId: string,

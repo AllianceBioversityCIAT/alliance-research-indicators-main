@@ -147,4 +147,8 @@ export class UpdateResultCapacitySharingDto {
     name: 'group',
   })
   group?: CapDevGroupDto;
+
+  created_at?: Date;
+
+  updated_at?: Date;
 }

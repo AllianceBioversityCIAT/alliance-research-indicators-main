@@ -23,6 +23,7 @@ import { ResultStatus } from '../../result-status/entities/result-status.entity'
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportYear } from '../../report-year/entities/report-year.entity';
 import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
+import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -175,4 +176,10 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => LinkResult, (linkResult) => linkResult.other_result)
   link_other_results!: LinkResult[];
+
+  @OneToMany(
+    () => SubmissionHistory,
+    (submissionHistory) => submissionHistory.result,
+  )
+  submission_histories!: SubmissionHistory[];
 }
