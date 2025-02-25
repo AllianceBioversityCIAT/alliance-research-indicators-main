@@ -6,13 +6,17 @@ import { FindAllOptions } from '../../../shared/enum/find-all-options';
 import { ResultOpensearchDto } from '../../../tools/open-search/results/dto/result.opensearch.dto';
 import { formatArrayToQuery } from '../../../shared/utils/queries.util';
 import { isEmpty } from '../../../shared/utils/object.utils';
+import { AppConfig } from '../../../shared/utils/app-config.util';
 
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
   implements ElasticFindEntity<ResultOpensearchDto>
 {
-  constructor(private readonly entityManager: EntityManager) {
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly appConfig: AppConfig,
+  ) {
     super(Result, entityManager);
   }
 
@@ -235,8 +239,8 @@ export class ResultRepository
 					'last_name', su2.last_name, 
 					'is_active', su2.is_active), NULL) as updated_by_user
 		`;
-        queryParts.result_audit_data.join = `LEFT JOIN alliancereportingdb.sec_users su1 ON su1.sec_user_id = r.created_by 
-		LEFT JOIN alliancereportingdb.sec_users su2 ON su2.sec_user_id = r.updated_by `;
+        queryParts.result_audit_data.join = `LEFT JOIN ${this.appConfig.ARI_MYSQL_NAME}.sec_users su1 ON su1.sec_user_id = r.created_by 
+		LEFT JOIN ${this.appConfig.ARI_MYSQL_NAME}.sec_users su2 ON su2.sec_user_id = r.updated_by `;
       }
     }
 

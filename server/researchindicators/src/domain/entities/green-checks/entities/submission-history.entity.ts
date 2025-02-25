@@ -26,10 +26,17 @@ export class SubmissionHistory extends AuditableEntity {
 
   @Column({
     type: 'bigint',
-    name: 'submission_status_id',
+    name: 'from_status_id',
     nullable: false,
   })
-  public submission_status_id: number;
+  public from_status_id: number;
+
+  @Column({
+    type: 'bigint',
+    name: 'to_status_id',
+    nullable: false,
+  })
+  public to_status_id: number;
 
   @Column({
     type: 'text',
@@ -44,8 +51,15 @@ export class SubmissionHistory extends AuditableEntity {
 
   @ManyToOne(
     () => ResultStatus,
-    (resultStatus) => resultStatus.submission_histories,
+    (resultStatus) => resultStatus.submission_histories_from,
   )
-  @JoinColumn({ name: 'submission_status_id' })
-  public submission_status: ResultStatus;
+  @JoinColumn({ name: 'from_status_id' })
+  public from_status: ResultStatus;
+
+  @ManyToOne(
+    () => ResultStatus,
+    (resultStatus) => resultStatus.submission_histories_to,
+  )
+  @JoinColumn({ name: 'to_status_id' })
+  public to_status: ResultStatus;
 }
