@@ -118,7 +118,8 @@ export class GreenCheckRepository {
           INNER JOIN result_status rs2 on rs2.result_status_id = sh.to_status_id 
           INNER JOIN ${this.appConfig.ARI_MYSQL_NAME}.sec_users su1 on su1.sec_user_id = sh.created_by 
           WHERE r.is_active = TRUE
-          	AND r.result_id = ?;`;
+          	AND r.result_id = ?
+          ORDER BY sh.submission_history_id DESC;`;
 
     return this.dataSource.query(query, [resultId]);
   }
