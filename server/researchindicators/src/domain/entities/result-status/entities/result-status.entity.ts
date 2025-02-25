@@ -38,7 +38,13 @@ export class ResultStatus extends AuditableEntity {
 
   @OneToMany(
     () => SubmissionHistory,
-    (submissionHistory) => submissionHistory.submission_status,
+    (submissionHistory) => submissionHistory.from_status,
   )
-  submission_histories!: SubmissionHistory[];
+  submission_histories_from!: SubmissionHistory[];
+
+  @OneToMany(
+    () => SubmissionHistory,
+    (submissionHistory) => submissionHistory.to_status,
+  )
+  submission_histories_to!: SubmissionHistory[];
 }
