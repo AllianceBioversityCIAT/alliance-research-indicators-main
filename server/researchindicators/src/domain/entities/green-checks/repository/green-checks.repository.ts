@@ -90,6 +90,8 @@ export class GreenCheckRepository {
           sh.submission_comment,
           sh.is_active,
           sh.created_by,
+          sh.created_at,
+          sh.updated_at,
           JSON_OBJECT(
           	'result_id',r.result_id,
           	'result_official_code', r.result_official_code,
