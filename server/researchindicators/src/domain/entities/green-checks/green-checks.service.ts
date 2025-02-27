@@ -31,8 +31,16 @@ export class GreenChecksService {
     return greenChecks;
   }
 
-  //TODO: REFACTOR THIS METHOD
   async submmitedAndUnsubmmitedProcess(resultId: number, comment: string) {
+    const validation = await this.greenCheckRepository.canSubmit(
+      this.currentUserUtil.user_id,
+      resultId,
+    );
+
+    if (!validation) {
+      throw new ConflictException('You are not allowed to submit this result');
+    }
+
     const status: number = await this.dataSource
       .getRepository(Result)
       .findOne({

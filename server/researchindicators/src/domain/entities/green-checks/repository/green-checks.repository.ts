@@ -125,4 +125,34 @@ export class GreenCheckRepository {
 
     return this.dataSource.query(query, [resultId]);
   }
+
+  async canSubmit(userId: number, resultId: number, needRoles?: number[]) {
+    const query = `
+    SELECT 
+    	COUNT(sur.sec_user_role_id) > 0 AS validation
+    FROM ${this.appConfig.ARI_MYSQL_NAME}.sec_user_roles sur 
+    WHERE sur.user_id = ?
+    	AND (sur.is_active = TRUE
+    	${needRoles?.length > 0 ? `AND sur.role_id IN (${needRoles.join(',')})` : ''})
+    	OR sur.role_id = 1`;
+
+    const queryResult = `
+    SELECT 
+    	count(r.result_id) = 1 as validation
+    FROM results r 
+    WHERE r.result_id = ?
+    	AND r.created_by = ?
+    	AND r.is_active = TRUE;      
+    `;
+
+    const roles = await this.dataSource
+      .query(query, [userId])
+      .then((result) => result?.[0]?.validation);
+
+    const result = await this.dataSource
+      .query(queryResult, [resultId, userId])
+      .then((result) => result?.[0]?.validation);
+
+    return roles == 1 && result == 1;
+  }
 }
