@@ -20,8 +20,6 @@ export class ResultStatusGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const resultId = request.params.resultId;
 
-    console.log(resultId);
-
     const result = await this.dataSource.getRepository(Result).findOne({
       where: {
         result_id: resultId,
