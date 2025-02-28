@@ -299,6 +299,11 @@ export class ResultRepository
 
     return this.query(mainQeury);
   }
+
+  async deleteResult(result_id: number) {
+    const query = `SELECT delete_result(?);`;
+    return this.query(query, [result_id]);
+  }
 }
 
 export interface ResultFiltersInterface {
