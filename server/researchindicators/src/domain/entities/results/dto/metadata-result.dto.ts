@@ -49,4 +49,11 @@ export class MetadataResultDto {
     required: true,
   })
   result_title: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The created user',
+    required: true,
+  })
+  created_by: number;
 }
