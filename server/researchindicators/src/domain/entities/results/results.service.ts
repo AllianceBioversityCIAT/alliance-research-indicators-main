@@ -359,6 +359,20 @@ export class ResultsService {
 
   async findMetadataResult(result_id: number): Promise<MetadataResultDto> {
     const result = await this.mainRepo.findOne({
+      select: {
+        indicator: {
+          name: true,
+          indicator_id: true,
+        },
+        result_id: true,
+        result_official_code: true,
+        result_status_id: true,
+        title: true,
+        result_status: {
+          name: true,
+        },
+        created_by: true,
+      },
       where: { result_id, is_active: true },
       relations: {
         indicator: true,
@@ -378,6 +392,7 @@ export class ResultsService {
       status_id: result?.result_status_id,
       status_name: result?.result_status?.name,
       result_title: result?.title,
+      created_by: result?.created_by,
     };
   }
 
