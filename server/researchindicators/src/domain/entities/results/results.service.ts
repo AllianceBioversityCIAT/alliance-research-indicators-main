@@ -49,6 +49,7 @@ import { ResultCountriesSubNational } from '../result-countries-sub-nationals/en
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 
 @Injectable()
 export class ResultsService {
@@ -205,23 +206,29 @@ export class ResultsService {
 
   async deleteResult(result_id: number): Promise<Result> {
     const result = await this.mainRepo
-      .findOne({ where: { result_id } })
+      .findOne({
+        select: {
+          result_id: true,
+          result_status_id: true,
+          created_by: true,
+        },
+        where: { result_id },
+      })
       .then((result) => {
         if (!result) {
-          throw ResponseUtils.format({
-            description: 'Result not found',
-            status: HttpStatus.NOT_FOUND,
-          });
+          throw new NotFoundException('Result not found');
         }
+
+        if (result.result_status_id !== ResultStatusEnum.EDITING) {
+          throw new ConflictException(
+            'Only results in editing status can be deleted',
+          );
+        }
+
         return result;
       });
 
-    await this.dataSource.transaction(async (manager) => {
-      await this._resultContractsService.deleteAll(result_id, manager);
-      await this._resultLeversService.deleteAll(result_id, manager);
-      await manager.withRepository(this.mainRepo).delete(result_id);
-    });
-
+    await this.mainRepo.deleteResult(result.result_id);
     return result;
   }
 
