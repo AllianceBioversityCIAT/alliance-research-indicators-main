@@ -264,7 +264,7 @@ export class ResultCapacitySharingService {
       groupResponse = {
         is_attending_organization: resultCapDev.is_attending_organization,
         session_participants_female: resultCapDev.session_participants_female,
-        session_participants_male: resultCapDev.session_participants_female,
+        session_participants_male: resultCapDev.session_participants_male,
         session_participants_non_binary:
           resultCapDev.session_participants_non_binary,
         session_participants_total: resultCapDev.session_participants_total,
