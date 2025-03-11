@@ -9,6 +9,13 @@ export class PartnerRequestCreate {
   public name!: string;
 
   @ApiProperty({
+    type: String,
+    required: true,
+    description: 'Acronym of the institution',
+  })
+  public acronym!: string;
+
+  @ApiProperty({
     type: Number,
     required: true,
     description: 'Type of institution',

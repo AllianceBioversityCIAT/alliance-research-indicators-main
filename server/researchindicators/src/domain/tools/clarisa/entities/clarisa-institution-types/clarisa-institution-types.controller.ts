@@ -24,7 +24,7 @@ export class ClarisaInstitutionTypesController {
       );
   }
 
-  @Get(':id')
+  @Get(':id(\\d+)')
   async findById(id: string) {
     return this.clarisaInstitutionTypesService
       .findOne<number>(+id)
@@ -41,6 +41,19 @@ export class ClarisaInstitutionTypesController {
   async findInstitutionTypeToPartner() {
     return this.clarisaInstitutionTypesService
       .findInstitutionTypeToPartner()
+      .then((institutionTypes) =>
+        ResponseUtils.format({
+          data: institutionTypes,
+          description: 'Institution types found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @Get('childless')
+  async getChildlessInstitutionTypes() {
+    return this.clarisaInstitutionTypesService
+      .getChildlessInstitutionTypes()
       .then((institutionTypes) =>
         ResponseUtils.format({
           data: institutionTypes,
