@@ -22,4 +22,18 @@ export class ClarisaInstitutionTypesService extends ControlListBaseService<
   async findInstitutionTypeToPartner() {
     return this.mainRepo.findActiveWithNoChildren();
   }
+
+  async getChildlessInstitutionTypes() {
+    const institutionsType = await this.mainRepo.find({
+      where: { is_active: true },
+      relations: { children: true },
+    });
+
+    return institutionsType
+      .filter((el) => !el.children.length)
+      .map((el) => {
+        delete el.children;
+        return el;
+      });
+  }
 }

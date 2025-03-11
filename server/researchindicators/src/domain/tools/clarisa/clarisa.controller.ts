@@ -11,6 +11,7 @@ import { ClarisaService } from './clarisa.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -90,6 +91,9 @@ export class ClarisaController {
   @ApiOperation({
     summary:
       'This enpoint is in charge of the connection with CLARISA and allows the creation of a partner request.',
+  })
+  @ApiBody({
+    type: PartnerRequestCliDataDto,
   })
   @Post('partner-request/create')
   async partnerRequest(@Body() partnerRequest: PartnerRequestCliDataDto) {
