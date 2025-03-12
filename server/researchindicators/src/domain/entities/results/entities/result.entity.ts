@@ -102,13 +102,19 @@ export class Result extends AuditableEntity {
 
   @Column('bigint', {
     name: 'result_status_id',
-    default: ResultStatusEnum.EDITING,
+    default: ResultStatusEnum.DRAFT,
     nullable: true,
   })
   @OpenSearchProperty({
     type: 'integer',
   })
   result_status_id?: number;
+
+  @Column('bigint', {
+    name: 'tip_id',
+    nullable: true,
+  })
+  tip_id?: number;
 
   @ManyToOne(() => ReportYear, (reportYear) => reportYear.results)
   @JoinColumn({ name: 'report_year_id' })

@@ -27,7 +27,11 @@ export class ResultStatusGuard implements CanActivate {
       },
     });
 
-    if (result.result_status_id !== ResultStatusEnum.EDITING) {
+    if (
+      ![ResultStatusEnum.DRAFT, ResultStatusEnum.REVISED].includes(
+        result.result_status_id,
+      )
+    ) {
       throw new BadRequestException(
         'Only results in editing status can be edited',
       );

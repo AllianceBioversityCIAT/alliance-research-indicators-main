@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,7 +10,6 @@ import {
   ResultRepository,
 } from './repositories/result.repository';
 import { validObject } from '../../shared/utils/object.utils';
-import { ResponseUtils } from '../../shared/utils/response.utils';
 import { Result } from './entities/result.entity';
 import { CreateResultDto } from './dto/create-result.dto';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
@@ -219,7 +217,7 @@ export class ResultsService {
           throw new NotFoundException('Result not found');
         }
 
-        if (result.result_status_id !== ResultStatusEnum.EDITING) {
+        if (result.result_status_id !== ResultStatusEnum.DRAFT) {
           throw new ConflictException(
             'Only results in editing status can be deleted',
           );
@@ -600,6 +598,8 @@ export class ResultsService {
           'result_contracts',
           'indicator_id',
           'indicator',
+          'result_status_id',
+          'result_status',
         ],
         where: {
           created_by: this.currentUser.user_id,
@@ -607,6 +607,7 @@ export class ResultsService {
         },
         relations: {
           indicator: true,
+          result_status: true,
         },
         order: {
           updated_at: 'DESC',

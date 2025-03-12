@@ -57,7 +57,7 @@ export class GreenChecksService {
 
     const result_status_id =
       status === ResultStatusEnum.SUBMITTED
-        ? ResultStatusEnum.EDITING
+        ? ResultStatusEnum.DRAFT
         : ResultStatusEnum.SUBMITTED;
 
     const { completness } = await this.findByResultId(resultId);
