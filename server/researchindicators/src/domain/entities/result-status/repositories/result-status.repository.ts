@@ -25,6 +25,7 @@ export class ResultStatusRepository extends Repository<ResultStatus> {
         LEFT JOIN results r on
         	r.result_status_id = rs.result_status_id
         	AND r.created_by = ${this.currentUser.user_id}
+        WHERE rs.is_active = true
         GROUP by
         	rs.result_status_id,
         	rs.name,
