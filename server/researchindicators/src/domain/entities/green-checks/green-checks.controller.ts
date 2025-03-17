@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { GreenChecksService } from './green-checks.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
-import { ApiBearerAuth, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 
 @ApiTags('Results')
 @ApiBearerAuth()
@@ -27,11 +28,17 @@ export class GreenChecksController {
     );
   }
 
-  @Patch('submit/:resultId(\\d+)')
-  @ApiParam({
+  @Patch('change/status')
+  @ApiQuery({
     name: 'resultId',
     description: 'Result id',
     type: 'number',
+    required: true,
+  })
+  @ApiQuery({
+    name: 'status',
+    description: 'Status',
+    type: 'string',
     required: true,
   })
   @ApiQuery({
@@ -41,14 +48,15 @@ export class GreenChecksController {
     required: false,
   })
   async submitResult(
-    @Param('resultId') resultId: string,
+    @Query('resultId') resultId: string,
     @Query('comment') comment: string,
+    @Query('status') statusId: string,
   ) {
     return this.greenChecksService
-      .submmitedAndUnsubmmitedProcess(+resultId, comment)
+      .changeStatus(+resultId, +statusId, comment)
       .then(() =>
         ResponseUtils.format({
-          description: 'Result submitted',
+          description: 'Status changed to ' + ResultStatusEnum[+statusId],
           status: HttpStatus.OK,
         }),
       );
