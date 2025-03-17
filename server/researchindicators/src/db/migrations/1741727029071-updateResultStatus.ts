@@ -8,7 +8,7 @@ export class UpdateResultStatus1741727029071 implements MigrationInterface {
     );
 
     await queryRunner.query(
-      `UPDATE result_status SET is_active = 0 WHERE result_status_id IN (${ResultStatusEnum.EDITING}, ${ResultStatusEnum.SUBMITTED})`,
+      `UPDATE result_status SET is_active = 0 WHERE result_status_id IN (${ResultStatusEnum.EDITING}, ${ResultStatusEnum.ACCEPTED})`,
     );
 
     await queryRunner.query(
