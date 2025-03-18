@@ -10,4 +10,5 @@ export const countryMapper = (
   name: data?.name,
   latitude: data?.locationDTO?.latitude,
   longitude: data?.locationDTO?.longitude,
+  code: data?.code,
 });
