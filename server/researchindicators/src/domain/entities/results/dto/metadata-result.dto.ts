@@ -56,4 +56,11 @@ export class MetadataResultDto {
     required: true,
   })
   created_by: number;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Is principal investigator',
+    required: true,
+  })
+  is_principal_investigator: boolean;
 }

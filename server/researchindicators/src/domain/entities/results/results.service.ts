@@ -385,6 +385,9 @@ export class ResultsService {
       },
     });
 
+    const { is_principal } =
+      await this.mainRepo.metadataPrincipalInvestigator(result_id);
+
     if (!result) {
       throw new NotFoundException('Result not found');
     }
@@ -398,6 +401,7 @@ export class ResultsService {
       status_name: result?.result_status?.name,
       result_title: result?.title,
       created_by: result?.created_by,
+      is_principal_investigator: is_principal == 1,
     };
   }
 

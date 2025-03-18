@@ -8,6 +8,7 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { EvidenceRole } from '../../evidence-roles/entities/evidence-role.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { Result } from '../../results/entities/result.entity';
 
 @Entity('result_evidences')
 export class ResultEvidence extends AuditableEntity {
@@ -64,4 +65,8 @@ export class ResultEvidence extends AuditableEntity {
   @ManyToOne(() => EvidenceRole, (role) => role.result_evidences)
   @JoinColumn({ name: 'evidence_role_id' })
   evidence_role!: EvidenceRole;
+
+  @ManyToOne(() => Result, (result) => result.result_evidences)
+  @JoinColumn({ name: 'result_id' })
+  result!: Result;
 }
