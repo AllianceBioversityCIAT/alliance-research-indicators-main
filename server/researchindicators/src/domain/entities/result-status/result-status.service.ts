@@ -3,6 +3,8 @@ import { ControlListBaseService } from '../../shared/global-dto/clarisa-base-ser
 import { ResultStatus } from './entities/result-status.entity';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { ResultStatusRepository } from './repositories/result-status.repository';
+import { In } from 'typeorm';
+import { ResultStatusEnum } from './enum/result-status.enum';
 
 @Injectable()
 export class ResultStatusService extends ControlListBaseService<
@@ -18,5 +20,18 @@ export class ResultStatusService extends ControlListBaseService<
 
   async findAmountOfResultsByStatusCurrentUser() {
     return this.mainRepo.findAmountOfResultsByStatusCurrentUser();
+  }
+
+  async findReviewStatuses() {
+    return this.mainRepo.find({
+      where: {
+        is_active: true,
+        result_status_id: In([
+          ResultStatusEnum.APPROVED,
+          ResultStatusEnum.REJECTED,
+          ResultStatusEnum.REVISED,
+        ]),
+      },
+    });
   }
 }
