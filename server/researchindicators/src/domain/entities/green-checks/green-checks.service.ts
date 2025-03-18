@@ -148,7 +148,7 @@ export class GreenChecksService {
         ? ResultStatusEnum.DRAFT
         : ResultStatusEnum.SUBMITTED;
 
-    if (result_status_id === ResultStatusEnum.SUBMITTED && isEmpty(comment))
+    if (result_status_id === ResultStatusEnum.DRAFT && isEmpty(comment))
       throw new BadRequestException('Comment is required');
 
     const { completness } = await this.findByResultId(resultId);
