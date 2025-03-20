@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+    dev:
+        container_name: research_indicatiors_client
+        image: research_indicatiors_client:1.0.0
+        build:
+            context: .
+            dockerfile: ./Dockerfile
+        ports:
+            - 4200:80
+        volumes:
+            - .:/usr/src/app
+            - /usr/src/app/node_modules
+        restart: unless-stopped

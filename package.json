@@ -1,0 +1,19 @@
+{
+  "name": "husky-management",
+  "version": "1.0.0",
+  "description": "Husky management",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20.11.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "husky": "^9.0.11"
+  }
+}

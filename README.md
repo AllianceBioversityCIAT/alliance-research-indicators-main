@@ -1,68 +1,21 @@
-# ALLIANCE RESEARCH INDICATORS
+# ALLIANCE RESEARCH INDICATORS MAIN
 
 # Table of Contents
-1. [Frontend Tech Stack](#frontend-tech-stack)
-    - [Programming language](#programming-language)
-    - [Framework](#framework)
-    - [Build tool](#build-tool)
-    - [Code coverage tool](#code-coverage-tool)
-    - [Dependency management](#dependency-management)
-    - [Dependency vulnerability scanning](#dependency-vulnerability-scanning)
-    - [Static code analysis](#static-code-analysis)
-    - [Unit testing](#unit-testing)
-    - [UI testing](#ui-testing)
-2. [Backend API Tech Stack](#backend-api-tech-stack)
-    - [Programming language](#programming-language-1)
-    - [Framework](#framework-1)
-    - [Build tool](#build-tool-1)
-    - [Code coverage tool](#code-coverage-tool-1)
-    - [Static code analysis](#static-code-analysis-1)
-    - [Dependency management](#dependency-management-1)
-    - [Dependency vulnerability scanning](#dependency-vulnerability-scanning-1)
-    - [Unit testing](#unit-testing-1)
-    - [API testing framework](#api-testing-framework)
-    - [API documentation](#api-documentation)
-3. [Architecture Diagram](#architecture-diagram)
-4. [Cross-Functional Requirements](#cross-functional-requirements)
-    - [Scalability](#scalability)
 
-## Frontend Tech Stack
-
-### Programming language
-
-TypeScript is a statically typed superset of JavaScript that compiles to plain JavaScript. It offers static type checking, which enhances code quality and developer productivity. TypeScript provides type safety, allowing early error detection and better code maintainability. Alternatives: JavaScript lacks static typing, which can lead to more runtime errors.
-
-### Framework
-
-Angular is a comprehensive framework for building web applications. It provides features like two-way data binding, dependency injection, and modular architecture. Angular offers a complete solution with strong support for building large-scale applications and extensive tooling. Alternatives: React is another popular framework, but Angular is preferred for its opinionated structure and built-in features.
-
-### Build tool
-
-Webpack is a module bundler for JavaScript applications. It bundles modules and assets into optimized bundles for deployment. Webpack offers powerful features like code splitting, hot module replacement, and tree shaking for efficient bundling. Alternatives: Parcel is simpler to configure but lacks some advanced features of Webpack.
-
-### Code coverage tool
-
-Istanbul is a code coverage tool for JavaScript applications. It instruments code to track which parts have been executed during testing. Istanbul provides accurate code coverage metrics and integrates well with testing frameworks like Jest. Alternatives: Blanket.js is another code coverage tool, but Istanbul is more widely used and supported.
-
-### Dependency management
-
-npm is the default package manager for Node.js. It manages dependencies and facilitates package installation, versioning, and dependency resolution. npm has a vast ecosystem of packages and is tightly integrated with Node.js development workflows. Alternatives: Yarn is another package manager, but npm is preferred for its widespread adoption and compatibility.
-
-### Dependency vulnerability scanning
-
-npm Audit is a built-in feature of npm that scans dependencies for known vulnerabilities. It provides actionable insights and recommendations for securing the application. npm Audit seamlessly integrates with npm and provides comprehensive vulnerability scanning without additional setup. Alternatives: Snyk offers similar functionality but requires additional configuration and integration.
-
-### Static code analysis
-
-ESLint is a highly configurable static analysis tool for identifying problematic patterns in JavaScript code. It enforces consistent coding styles and helps catch errors early. ESLint offers extensive customization options and supports TypeScript out of the box. Alternatives: JSHint is simpler to configure but lacks some advanced features of ESLint.
-
-### Unit testing
-
-Jest is a popular testing framework for JavaScript applications. It provides a delightful testing experience with features like snapshot testing, mocking, and code coverage. Jest offers an all-in-one solution for unit testing with built-in assertion libraries and comprehensive test reporting. Alternatives: Mocha requires additional configuration and setup compared to Jest.
-
-### UI testing
-
-Cypress is a modern end-to-end testing framework for web applications. It offers a simple and intuitive API, automatic waiting, and real-time test feedback. Cypress provides fast and reliable UI testing with built-in features like time-traveling, debugging, and automatic retries. Alternatives: Selenium WebDriver is more complex to set up and maintain compared to Cypress.
+1. [Backend API Tech Stack](#backend-api-tech-stack)
+   - [Programming language](#programming-language)
+   - [Framework](#framework)
+   - [Build tool](#build-tool)
+   - [Code coverage tool](#code-coverage-tool)
+   - [Static code analysis](#static-code-analysis)
+   - [Dependency management](#dependency-management)
+   - [Dependency vulnerability scanning](#dependency-vulnerability-scanning)
+   - [Unit testing](#unit-testing)
+   - [API testing framework](#api-testing-framework)
+   - [API documentation](#api-documentation)
+2. [Architecture Diagram](#architecture-diagram)
+3. [Cross-Functional Requirements](#cross-functional-requirements)
+   - [Scalability](#scalability)
 
 ## Backend API Tech Stack
 
@@ -117,6 +70,7 @@ Swagger is an open-source framework for designing, building, and documenting RES
 Description: The system should be able to handle increasing loads and user traffic without compromising performance or availability.
 
 Best Practices:
+
 - Use auto-scaling features provided by AWS Elastic Beanstalk to automatically adjust the number of instances based on demand.
 - Implement efficient caching mechanisms to reduce the load on backend services.
 
@@ -129,6 +83,7 @@ Tools: AWS Elastic Beanstalk, AWS Auto Scaling, Redis for caching.
 Description: The system should ensure the confidentiality, integrity, and availability of data and resources.
 
 Best Practices:
+
 - Implement encryption for data in transit and at rest using SSL/TLS and encryption at the database level.
 - Implement role-based access control (RBAC) to restrict access to sensitive resources.
 
@@ -141,6 +96,7 @@ Tools: AWS Cognito, AWS IAM, SSL/TLS certificates, AWS Key Management Service (K
 Description: The system should be highly reliable, with minimal downtime and disruptions.
 
 Best Practices:
+
 - Implement fault-tolerant architecture with redundancy at different levels of the system.
 - Set up automated backups and disaster recovery mechanisms for critical data and services.
 
@@ -153,6 +109,7 @@ Tools: AWS Elastic Beanstalk, AWS RDS Multi-AZ deployment, AWS Backup.
 Description: The system should deliver fast response times and low latency for user requests.
 
 Best Practices:
+
 - Optimize frontend and backend code for efficiency and speed.
 - Use content delivery networks (CDNs) to cache and deliver static assets closer to users.
 
@@ -165,6 +122,7 @@ Tools: Performance monitoring tools like AWS CloudWatch, New Relic, CDN provider
 Description: The system should be easy to maintain, update, and troubleshoot.
 
 Best Practices:
+
 - Follow coding standards and best practices for clean, modular, and well-documented code.
 - Use automation for deployment, testing, and infrastructure management.
 
@@ -177,6 +135,7 @@ Tools: Code quality tools like ESLint, automated testing frameworks like Jest, i
 Description: The system should provide comprehensive monitoring and logging capabilities to track performance, detect issues, and troubleshoot problems.
 
 Best Practices:
+
 - Set up centralized logging to capture and analyze logs from different components of the system.
 - Use monitoring tools to monitor key metrics, set up alerts, and respond to incidents proactively.
 
@@ -189,6 +148,7 @@ Tools: AWS CloudWatch, ELK Stack (Elasticsearch, Logstash, Kibana), Prometheus.
 Description: The system should be cost-effective, with efficient resource utilization and minimal waste.
 
 Best Practices:
+
 - Optimize resource provisioning based on actual usage and demand patterns.
 - Use cost management tools to analyze spending, identify cost-saving opportunities, and optimize resource allocation.
 
@@ -201,6 +161,7 @@ Tools: AWS Cost Explorer, AWS Trusted Advisor, Cloud cost optimization platforms
 Description: The system should ensure continuous availability and resilience to failures.
 
 Best Practices:
+
 - Deploy resources across multiple availability zones (AZs) to distribute traffic and mitigate single points of failure.
 - Implement load balancing and failover mechanisms to reroute traffic in case of failures.
 
@@ -213,6 +174,7 @@ Tools: AWS Elastic Load Balancing (ELB), AWS Route 53, Multi-AZ deployments for 
 Description: The system should maintain the accuracy and consistency of data across different components and interactions.
 
 Best Practices:
+
 - Implement data validation and verification mechanisms to ensure the correctness of input and output data.
 - Use transactions and database constraints to enforce data integrity constraints.
 
@@ -225,6 +187,7 @@ Tools: Database management systems like MySQL, CockroachDB, data validation libr
 Description: The system should utilize version control to manage and track changes to source code and configurations.
 
 Best Practices:
+
 - Use a version control system (e.g., Git) to manage source code repositories and track changes over time.
 - Implement branching strategies and merge workflows to facilitate collaboration and code review.
 
@@ -237,6 +200,7 @@ Tools: Git, GitHub.
 Description: The system should be well-documented to facilitate understanding, usage, and maintenance.
 
 Best Practices:
+
 - Document architectural decisions, design patterns, and system components.
 - Provide developer documentation, API references, and deployment guides.
 
@@ -249,6 +213,7 @@ Tools: Notion, Confluence (JIRA), Swagger/OpenAPI for API documentation.
 Description: The system should adhere to relevant laws, regulations, and industry standards.
 
 Best Practices:
+
 - Stay updated with legal and regulatory requirements relevant to the system and industry.
 - Implement security and privacy measures to protect sensitive data and ensure compliance with standards like GDPR, HIPAA, etc.
 
@@ -261,6 +226,7 @@ Tools: Compliance management frameworks, auditing tools, legal consultation.
 Description: The system should be compatible and able to communicate with external systems and services.
 
 Best Practices:
+
 - Follow standard protocols and formats for data exchange and integration (e.g., RESTful APIs, JSON).
 - Use industry-standard authentication and authorization mechanisms for secure integration.
 
@@ -273,6 +239,7 @@ Tools: RESTful API standards, OAuth 2.0 for authentication, API gateways.
 Description: The system should undergo performance testing to validate its ability to meet performance requirements under expected loads.
 
 Best Practices:
+
 - Define performance metrics and scenarios based on expected usage patterns and peak loads.
 - Conduct load testing, stress testing, and scalability testing to assess system performance and identify bottlenecks.
 
@@ -285,6 +252,7 @@ Tools: Apache JMeter, Gatling, Locust.
 Description: The system should implement CI/CD pipelines to automate the build, test, and deployment processes.
 
 Best Practices:
+
 - Set up automated build and test pipelines to validate changes before deployment.
 - Use deployment automation tools to deploy changes to production with minimal manual intervention.
 

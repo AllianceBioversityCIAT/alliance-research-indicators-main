@@ -1,0 +1,6 @@
+export enum SessionPurposeEnum {
+  TRAINING_ENUMERATORS = 1,
+  ENGAGING_WITH_CHANGE_AGENTS = 2,
+  TRAINING_OF_TRAINERS = 3,
+  OTHER = 4,
+}
