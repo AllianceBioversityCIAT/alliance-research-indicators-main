@@ -322,7 +322,7 @@ export class ResultRepository
 	`;
     return this.query(query, [this.currentUserUtil.user_id, result_id]).then(
       (res: { result_id: number; is_principal: number }[]) =>
-        res?.length ? res[0] : null,
+        res?.length ? res[0] : { result_id: result_id, is_principal: 0 },
     );
   }
 }

@@ -396,7 +396,7 @@ export class ResultsService {
       indicator_id: result?.indicator?.indicator_id,
       indicator_name: result?.indicator?.name,
       result_id: result?.result_id,
-      result_official_code: result?.result_official_code,
+      result_official_code: result?.result_id,
       status_id: result?.result_status_id,
       status_name: result?.result_status?.name,
       result_title: result?.title,
