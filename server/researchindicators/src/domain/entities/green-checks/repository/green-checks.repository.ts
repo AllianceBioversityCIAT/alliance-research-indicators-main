@@ -4,6 +4,9 @@ import { FindGreenChecksDto } from '../dto/find-green-checks.dto';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import { Result } from '../../results/entities/result.entity';
 import { AppConfig } from '../../../shared/utils/app-config.util';
+import { FindGreenChecksUserDto } from '../dto/find-green-checks-user.dto';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
+import { FindGeneralDataTemplateDto } from '../dto/find-general-data-template.dto';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -154,5 +157,56 @@ export class GreenCheckRepository {
       .then((result) => result?.[0]?.validation);
 
     return roles == 1 && result == 1;
+  }
+
+  async getDataForReviseResult(
+    resultId: number,
+    toStatusId: ResultStatusEnum,
+    fromStatusId: ResultStatusEnum,
+  ): Promise<FindGeneralDataTemplateDto> {
+    const query = `
+    select sh.*,
+    	JSON_OBJECT('sec_user_id', su.sec_user_id,
+    				'first_name', su.first_name,
+    				'last_name', su.last_name,
+    				'email', su.email) as user
+    from submission_history sh 
+    inner join sec_users su on su.sec_user_id = sh.created_by 
+    where sh.result_id = ?
+    	and sh.is_active = true
+    order by sh.created_at desc
+    limit 2;
+    `;
+
+    const queryResult = `
+    select r.result_id, r.title 
+    from results r 
+    where r.result_id = ?
+    	and r.is_active = true
+    limit 1;
+    `;
+    const result = await this.dataSource
+      .query<{ result_id: number; title: string }[]>(queryResult, [resultId])
+      .then((result) => (result?.length ? result[0] : null));
+
+    const history = await this.dataSource.query<FindGreenChecksUserDto[]>(
+      query,
+      [resultId],
+    );
+
+    const subData = history.find((d) => d.to_status_id === toStatusId);
+    const revData = history.find((d) => d.to_status_id === fromStatusId);
+
+    return {
+      sub_last_name: subData.user.last_name,
+      sub_first_name: subData.user.first_name,
+      sub_email: subData.user.email,
+      rev_last_name: revData.user.last_name,
+      rev_first_name: revData.user.first_name,
+      rev_email: revData.user.email,
+      description: revData.submission_comment,
+      result_id: result.result_id,
+      title: result.title,
+    };
   }
 }

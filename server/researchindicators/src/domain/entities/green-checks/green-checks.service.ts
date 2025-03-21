@@ -15,6 +15,10 @@ import {
 } from '../../shared/utils/current-user.util';
 import { ResultStatus } from '../result-status/entities/result-status.entity';
 import { isEmpty } from '../../shared/utils/object.utils';
+import { MessageMicroservice } from '../../tools/broker/message.microservice';
+import { TemplateService } from '../../shared/auxiliar/template/template.service';
+import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
+import { FindGeneralDataTemplateDto } from './dto/find-general-data-template.dto';
 
 @Injectable()
 export class GreenChecksService {
@@ -22,6 +26,8 @@ export class GreenChecksService {
     private readonly greenCheckRepository: GreenCheckRepository,
     private readonly dataSource: DataSource,
     private readonly currentUserUtil: CurrentUserUtil,
+    private readonly messageMicroservice: MessageMicroservice,
+    private readonly templateService: TemplateService,
   ) {}
 
   async findByResultId(resultId: number) {
@@ -92,7 +98,43 @@ export class GreenChecksService {
       )
         throw new BadRequestException('Comment is required');
 
-      return this.saveHistory(resultId, tempComment, currentStatus, status);
+      return this.saveHistory(
+        resultId,
+        tempComment,
+        currentStatus,
+        status,
+      ).then((data) => {
+        switch (status) {
+          case ResultStatusEnum.REVISED:
+            this.prepareEmail(
+              resultId,
+              ResultStatusEnum.SUBMITTED,
+              ResultStatusEnum.REVISED,
+              TemplateEnum.REVISE_RESULT,
+              (data) =>
+                `[ROAR] Action Required: Revision Requested for Result ${data.title}`,
+            );
+            break;
+          case ResultStatusEnum.REJECTED:
+            this.prepareEmail(
+              resultId,
+              ResultStatusEnum.SUBMITTED,
+              ResultStatusEnum.REJECTED,
+              TemplateEnum.REJECTED_RESULT,
+              (data) => `[ROAR] Result ${data.result_id} Rejected`,
+            );
+            break;
+          case ResultStatusEnum.APPROVED:
+            this.prepareEmail(
+              resultId,
+              ResultStatusEnum.SUBMITTED,
+              ResultStatusEnum.APPROVED,
+              TemplateEnum.APPROVAL_RESULT,
+              (data) => `[ROAR] Result ${data.result_id} has been approved`,
+            );
+        }
+        return data;
+      });
     }
   }
 
@@ -160,7 +202,42 @@ export class GreenChecksService {
       throw new ConflictException('The result is not complete');
     }
 
-    return this.saveHistory(resultId, comment, currentStatus, result_status_id);
+    return this.saveHistory(
+      resultId,
+      comment,
+      currentStatus,
+      result_status_id,
+    ).then(async (res) => {
+      return res;
+    });
+  }
+
+  async prepareEmail(
+    resultId: number,
+    toStatusId: ResultStatusEnum,
+    fromStatusId: ResultStatusEnum,
+    templateName: TemplateEnum,
+    subject: (data: FindGeneralDataTemplateDto) => string,
+  ) {
+    await this.greenCheckRepository
+      .getDataForReviseResult(resultId, toStatusId, fromStatusId)
+      .then(async (data) => {
+        const template = await this.templateService._getTemplate(
+          templateName,
+          data,
+        );
+        return { template, data };
+      })
+      .then(({ data, template }) =>
+        this.messageMicroservice.sendEmail({
+          to: data.sub_email,
+          cc: data.rev_email,
+          subject: subject(data),
+          message: {
+            socketFile: Buffer.from(template),
+          },
+        }),
+      );
   }
 
   async getSubmissionHistory(resultId: number): Promise<SubmissionHistory[]> {
