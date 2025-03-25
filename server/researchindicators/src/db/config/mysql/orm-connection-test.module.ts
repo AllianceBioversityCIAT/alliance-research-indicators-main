@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { getDataSource } from './orm.config';
 import { dataSourceTarget } from './enum/data-source-target.enum';
 import { DataSourceOptions } from 'typeorm';
+import { Result } from '../../../domain/entities/results/entities/result.entity';
 @Module({
   imports: [
     TypeOrmModule.forRoot(

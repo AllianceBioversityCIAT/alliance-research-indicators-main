@@ -48,6 +48,7 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class ResultsService {
@@ -539,6 +540,8 @@ export class ResultsService {
       }
 
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
+
+      return this.findGeoLocation(resultId);
     });
   }
 
