@@ -2,42 +2,23 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ResultsService } from './results.service';
 import { OrmConfigTestModule } from '../../../db/config/mysql/orm-connection-test.module';
 import { GlobalUtilsModule } from '../../shared/utils/global-utils.module';
-import { ResultRepository } from './repositories/result.repository';
-import { ResultKeywordsModule } from '../result-keywords/result-keywords.module';
-import { ResultLeversModule } from '../result-levers/result-levers.module';
-import { ResultContractsModule } from '../result-contracts/result-contracts.module';
-import { ResultUsersModule } from '../result-users/result-users.module';
-import { ResultCapacitySharingModule } from '../result-capacity-sharing/result-capacity-sharing.module';
-import { ReportYearModule } from '../report-year/report-year.module';
-import { ResultPolicyChangeModule } from '../result-policy-change/result-policy-change.module';
-import { ResultRegionsModule } from '../result-regions/result-regions.module';
-import { ResultCountriesModule } from '../result-countries/result-countries.module';
-import { ResultCountriesSubNationalsModule } from '../result-countries-sub-nationals/result-countries-sub-nationals.module';
-import { ClarisaGeoScopeModule } from '../../tools/clarisa/entities/clarisa-geo-scope/clarisa-geo-scope.module';
-import { ResultOpenSearchModule } from '../../tools/open-search/results/result.opensearch.module';
-import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
-import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
-import { DataSource } from 'typeorm';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Result } from './entities/result.entity';
-import { CreateResultDto } from './dto/create-result.dto';
-import { ResultStatus } from '../result-status/entities/result-status.entity';
+import { ResultsModule } from './results.module';
+import { ClarisaGeoScopeEnum } from '../../tools/clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { ResultCountry } from '../result-countries/entities/result-country.entity';
+import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
+import { ResultRegion } from '../result-regions/entities/result-region.entity';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
-import { UpdateGeneralInformation } from './dto/update-general-information.dto';
-import { ResultUser } from '../result-users/entities/result-user.entity';
+import { DataSource } from 'typeorm';
+import { Result } from './entities/result.entity';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
-import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
-import { ClarisaGeoScopeEnum } from '../../tools/clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
-import { ResultCountry } from '../result-countries/entities/result-country.entity';
-import { ResultRegion } from '../result-regions/entities/result-region.entity';
-import { ResultsModule } from './results.module';
-import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { ResultUser } from '../result-users/entities/result-user.entity';
+import { UpdateGeneralInformation } from './dto/update-general-information.dto';
+import { CreateResultDto } from './dto/create-result.dto';
 
 describe('ResultService', () => {
   let service: ResultsService;
-  let resultRepository: ResultRepository;
   let resultIdGlobal: number;
   let dataSource: DataSource;
 
@@ -46,7 +27,6 @@ describe('ResultService', () => {
       imports: [OrmConfigTestModule, ResultsModule, GlobalUtilsModule],
     }).compile();
 
-    resultRepository = module.get<ResultRepository>(ResultRepository);
     service = module.get<ResultsService>(ResultsService);
     dataSource = module.get<DataSource>(DataSource);
   });

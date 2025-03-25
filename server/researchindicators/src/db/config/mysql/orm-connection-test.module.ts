@@ -4,11 +4,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { getDataSource } from './orm.config';
 import { dataSourceTarget } from './enum/data-source-target.enum';
 import { DataSourceOptions } from 'typeorm';
-import { Result } from '../../../domain/entities/results/entities/result.entity';
 @Module({
   imports: [
     TypeOrmModule.forRoot(
-      getDataSource(dataSourceTarget.TEST, false) as DataSourceOptions,
+      getDataSource(dataSourceTarget.CORE, false) as DataSourceOptions,
     ),
   ],
   providers: [],
