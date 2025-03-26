@@ -539,6 +539,8 @@ export class ResultsService {
       }
 
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
+
+      return this.findGeoLocation(resultId);
     });
   }
 

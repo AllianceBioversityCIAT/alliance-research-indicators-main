@@ -25,7 +25,6 @@ export const getDataSource = (
 
   switch (target) {
     case dataSourceTarget.CORE:
-      name = 'default';
       database = env.ARI_MYSQL_NAME;
       host = env.ARI_MYSQL_HOST;
       username = env.ARI_MYSQL_USER_NAME;

@@ -17,7 +17,6 @@ import { getDataSource } from './db/config/mysql/orm.config';
 import { dataSourceTarget } from './db/config/mysql/enum/data-source-target.enum';
 import { route as mainRoute } from './domain/routes/main.routes';
 import { ClarisaModule } from './domain/tools/clarisa/clarisa.module';
-import { CronModule } from './domain/tools/cron-jobs/cron.module';
 import { JwtMiddleware } from './domain/shared/middlewares/jwr.middleware';
 import { AlianceManagementApp } from './domain/tools/broker/aliance-management.app';
 import { AgressoToolsModule } from './domain/tools/agresso/agresso-tools.module';
@@ -32,7 +31,6 @@ import { ResultOpenSearchModule } from './domain/tools/open-search/results/resul
     EntitiesModule,
     ClarisaModule,
     AgressoToolsModule,
-    CronModule,
     TypeOrmModule.forRoot(
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
