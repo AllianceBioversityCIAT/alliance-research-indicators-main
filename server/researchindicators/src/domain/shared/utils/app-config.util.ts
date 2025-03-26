@@ -236,4 +236,13 @@ export class AppConfig {
   get ARI_FROM_EMAIL_NAME(): string {
     return process.env.ARI_FROM_EMAIL_NAME;
   }
+
+  /**
+   * Get the message service url
+   * @readonly
+   * @type {string}
+   */
+  get ARI_MESSAGE_QUEUE(): string {
+    return process.env.ARI_MESSAGE_QUEUE;
+  }
 }

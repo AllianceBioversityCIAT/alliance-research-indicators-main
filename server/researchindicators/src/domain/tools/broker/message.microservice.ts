@@ -11,7 +11,7 @@ export class MessageMicroservice extends BrokerConnectionBase {
   });
 
   constructor(private readonly _appConfig: AppConfig) {
-    super('cgiar_ms_prod_mailer_queue');
+    super(_appConfig.ARI_MESSAGE_QUEUE);
   }
 
   get auth() {
