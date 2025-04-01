@@ -76,6 +76,7 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
         category_2: partnerRequest?.category_2,
         externalUserComments: partnerRequest?.externalUserComments,
         acronym: partnerRequest.acronym,
+        platformUrl: partnerRequest.platformUrl,
       },
     );
   }

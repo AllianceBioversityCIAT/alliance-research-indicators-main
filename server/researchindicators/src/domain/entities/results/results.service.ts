@@ -48,6 +48,11 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { IndicatorsService } from '../indicators/indicators.service';
+import { Indicator } from '../indicators/entities/indicator.entity';
+import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
+import { ResultAiDto, RootAi } from './dto/result-ai.dto';
+import { TempResultAi } from './entities/temp-result-ai.entity';
 
 @Injectable()
 export class ResultsService {
@@ -70,6 +75,7 @@ export class ResultsService {
     private readonly _clarisaGeoScopeService: ClarisaGeoScopeService,
     private readonly _updateDataUtil: UpdateDataUtil,
     private readonly _openSearchResultApi: OpenSearchResultApi,
+    private readonly _indicatorsService: IndicatorsService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -415,8 +421,55 @@ export class ResultsService {
   }
 
   async createResultFromAiRoar(file: Express.Multer.File) {
-    const model = await this._aiRoarMiningApp.create(file);
-    return model;
+    const dataTemp: RootAi = await this._aiRoarMiningApp.create(file);
+
+    for (const [index, result] of dataTemp.results.entries()) {
+      const tmpNewData: ResultAiDto = new ResultAiDto();
+      {
+        const newResult: CreateResultDto = new CreateResultDto();
+        newResult.title = result.title;
+        newResult.description = result.description;
+        const indicator: Indicator = await this._indicatorsService.findByName(
+          result.indicator,
+        );
+        newResult.indicator_id = indicator?.indicator_id;
+
+        tmpNewData.result = newResult;
+      }
+
+      {
+        const tempGeneralInformation: UpdateGeneralInformation =
+          new UpdateGeneralInformation();
+        tempGeneralInformation.title = result.title;
+        tempGeneralInformation.description = result.description;
+        tempGeneralInformation.keywords = result.keywords;
+        tempGeneralInformation.main_contact_person = undefined;
+
+        tmpNewData.generalInformation = tempGeneralInformation;
+      }
+
+      {
+        const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
+        const geoscope: ClarisaGeoScope =
+          await this._clarisaGeoScopeService.findByName(result.geoscope.level);
+        tempGeoscope.geo_scope_id = geoscope?.code;
+
+        tmpNewData.geoScope = tempGeoscope;
+      }
+
+      tmpNewData.capSharing =
+        await this._resultCapacitySharingService.processedAiInfo(result);
+
+      const tempResultAi = await this.dataSource
+        .getRepository(TempResultAi)
+        .save({
+          processed_object: tmpNewData,
+          raw_object: result,
+          ...this.currentUser.audit(SetAutitEnum.BOTH),
+        });
+      dataTemp.results[index]['temp_result_ai'] = tempResultAi.id;
+    }
+    return dataTemp;
   }
 
   async saveGeoLocation(

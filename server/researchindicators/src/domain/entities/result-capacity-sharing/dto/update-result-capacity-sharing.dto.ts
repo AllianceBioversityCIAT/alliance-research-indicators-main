@@ -140,13 +140,13 @@ export class UpdateResultCapacitySharingDto {
     type: CapDevIndividualDto,
     name: 'individual',
   })
-  individual?: CapDevIndividualDto;
+  individual?: CapDevIndividualDto = new CapDevIndividualDto();
 
   @ApiProperty({
     type: CapDevGroupDto,
     name: 'group',
   })
-  group?: CapDevGroupDto;
+  group?: CapDevGroupDto = new CapDevGroupDto();
 
   created_at?: Date;
 

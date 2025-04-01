@@ -24,7 +24,7 @@ export class IndicatorsController {
   @Get(':id')
   @ApiOperation({ summary: 'Find indicator by id' })
   async findOne(@Param('id') id: number) {
-    return this.indicatorsService.findOne(id).then((indicator) =>
+    return this.indicatorsService.customFindOne(id).then((indicator) =>
       ResponseUtils.format({
         data: indicator,
         description: 'Indicator found',

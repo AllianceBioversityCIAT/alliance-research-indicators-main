@@ -5,5 +5,6 @@ import { SessionFormatsController } from './session-formats.controller';
 @Module({
   controllers: [SessionFormatsController],
   providers: [SessionFormatsService],
+  exports: [SessionFormatsService],
 })
 export class SessionFormatsModule {}

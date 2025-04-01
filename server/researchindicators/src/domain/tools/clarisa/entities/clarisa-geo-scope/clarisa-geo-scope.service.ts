@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
 import { ClarisaGeoScope } from './entities/clarisa-geo-scope.entity';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Like, Repository } from 'typeorm';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
 import { ResultCountry } from '../../../../entities/result-countries/entities/result-country.entity';
 import { ClarisaGeoScopeEnum } from './enum/clarisa-geo-scope.enum';
@@ -36,5 +36,13 @@ export class ClarisaGeoScopeService extends ControlListBaseService<
     }
 
     return tempId;
+  }
+
+  async findByName(name: string) {
+    return this.mainRepo.findOne({
+      where: {
+        name: Like(`%${name}%`),
+      },
+    });
   }
 }

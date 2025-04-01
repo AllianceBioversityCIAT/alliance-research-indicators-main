@@ -85,4 +85,11 @@ export class PartnerRequestCreate {
     description: 'The category 2 of the institution',
   })
   public category_2?: string;
+
+  @ApiProperty({
+    type: String,
+    required: true,
+    description: 'The url of the platform',
+  })
+  platformUrl?: string;
 }
