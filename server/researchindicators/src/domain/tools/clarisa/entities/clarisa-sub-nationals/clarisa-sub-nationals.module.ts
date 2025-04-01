@@ -5,5 +5,6 @@ import { ClarisaSubNationalsController } from './clarisa-sub-nationals.controlle
 @Module({
   controllers: [ClarisaSubNationalsController],
   providers: [ClarisaSubNationalsService],
+  exports: [ClarisaSubNationalsService],
 })
 export class ClarisaSubNationalsModule {}

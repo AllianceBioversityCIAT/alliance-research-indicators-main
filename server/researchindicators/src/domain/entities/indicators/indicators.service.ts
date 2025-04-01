@@ -1,13 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
 import { IndicatorRepository } from './repository/indicators.repository';
+import { ControlListBaseService } from '../../shared/global-dto/clarisa-base-service';
+import { Indicator } from './entities/indicator.entity';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 
 @Injectable()
-export class IndicatorsService {
-  constructor(
-    dataSource: DataSource,
-    private readonly mainRepo: IndicatorRepository,
-  ) {}
+export class IndicatorsService extends ControlListBaseService<
+  Indicator,
+  IndicatorRepository
+> {
+  constructor(currentUser: CurrentUserUtil, customRepo: IndicatorRepository) {
+    super(Indicator, customRepo, currentUser);
+  }
 
   async findAll() {
     return await this.mainRepo.find({
@@ -20,7 +24,7 @@ export class IndicatorsService {
     });
   }
 
-  async findOne(id: number) {
+  async customFindOne(id: number) {
     return await this.mainRepo.findOne({
       where: {
         indicator_id: id,

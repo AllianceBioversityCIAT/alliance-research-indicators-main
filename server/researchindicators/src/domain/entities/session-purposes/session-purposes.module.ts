@@ -5,5 +5,6 @@ import { SessionPurposesController } from './session-purposes.controller';
 @Module({
   controllers: [SessionPurposesController],
   providers: [SessionPurposesService],
+  exports: [SessionPurposesService],
 })
 export class SessionPurposesModule {}

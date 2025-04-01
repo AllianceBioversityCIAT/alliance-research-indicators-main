@@ -5,5 +5,6 @@ import { SessionLengthsController } from './session-lengths.controller';
 @Module({
   controllers: [SessionLengthsController],
   providers: [SessionLengthsService],
+  exports: [SessionLengthsService],
 })
 export class SessionLengthsModule {}

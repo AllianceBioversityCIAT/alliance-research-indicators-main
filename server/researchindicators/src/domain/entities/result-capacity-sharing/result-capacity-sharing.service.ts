@@ -23,6 +23,12 @@ import {
 } from '../../shared/utils/current-user.util';
 import { Result } from '../results/entities/result.entity';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
+import { ResultRawAi } from '../results/dto/result-ai.dto';
+import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
+import { SessionTypesService } from '../session-types/session-types.service';
+import { SessionLengthsService } from '../session-lengths/session-lengths.service';
+import { DeliveryModalitiesService } from '../delivery-modalities/delivery-modalities.service';
+import { DeliveryModality } from '../delivery-modalities/entities/delivery-modality.entity';
 @Injectable()
 export class ResultCapacitySharingService {
   private mainRepo: Repository<ResultCapacitySharing>;
@@ -34,8 +40,94 @@ export class ResultCapacitySharingService {
     private readonly _resultCountryService: ResultCountriesService,
     private readonly _currentUser: CurrentUserUtil,
     private readonly _updateDataUtil: UpdateDataUtil,
+    private readonly _aiRoarMiningApp: AiRoarMiningApp,
+    private readonly _sessionTypesService: SessionTypesService,
+    private readonly _sessionLengthsService: SessionLengthsService,
+    private readonly _deliveryModalitiesService: DeliveryModalitiesService,
   ) {
     this.mainRepo = dataSource.getRepository(ResultCapacitySharing);
+  }
+
+  async processedAiInfo(
+    rawData: ResultRawAi,
+  ): Promise<UpdateResultCapacitySharingDto> {
+    const tempCapSharing: UpdateResultCapacitySharingDto =
+      new UpdateResultCapacitySharingDto();
+    tempCapSharing.end_date = <Date>(
+      this._aiRoarMiningApp.cleanDataNotProvided(rawData.end_date, 'date')
+    );
+    tempCapSharing.start_date = <Date>(
+      this._aiRoarMiningApp.cleanDataNotProvided(rawData.start_date, 'date')
+    );
+
+    const clean_trainingType = <string>(
+      this._aiRoarMiningApp.cleanDataNotProvided(
+        rawData.training_type,
+        'string',
+      )
+    );
+    const trainingType =
+      await this._sessionTypesService.findByName(clean_trainingType);
+    tempCapSharing.session_type_id = trainingType?.session_type_id;
+
+    const clean_sessionLength = <string>(
+      this._aiRoarMiningApp.cleanDataNotProvided(
+        rawData.length_of_training,
+        'string',
+      )
+    );
+
+    const sessionLength =
+      await this._sessionLengthsService.findByName(clean_sessionLength);
+    tempCapSharing.individual.session_length_id =
+      sessionLength?.session_length_id;
+
+    const clean_sessionFormat = <string>(
+      this._aiRoarMiningApp.cleanDataNotProvided(
+        rawData.training_modality,
+        'string',
+      )
+    );
+    const deliveryModality: DeliveryModality =
+      await this._deliveryModalitiesService.findByName(clean_sessionFormat);
+    tempCapSharing.delivery_modality_id =
+      deliveryModality?.delivery_modality_id;
+
+    tempCapSharing.group = this.processedAiInfoGroup(rawData);
+
+    return tempCapSharing;
+  }
+
+  processedAiInfoGroup(rawData: ResultRawAi): CapDevGroupDto {
+    const tempCapSharing: CapDevGroupDto = new CapDevGroupDto();
+    tempCapSharing.session_participants_female = <number>(
+      this._aiRoarMiningApp.cleanDataNotProvided(
+        rawData.female_participants,
+        'number',
+      )
+    );
+
+    tempCapSharing.session_participants_male = <number>(
+      this._aiRoarMiningApp.cleanDataNotProvided(
+        rawData.male_participants,
+        'number',
+      )
+    );
+    tempCapSharing.session_participants_non_binary = <number>(
+      this._aiRoarMiningApp.cleanDataNotProvided(
+        rawData.non_binary_participants,
+        'number',
+      )
+    );
+
+    tempCapSharing.session_participants_total = <number>(
+      this._aiRoarMiningApp.cleanDataNotProvided(
+        rawData.total_participants,
+        'number',
+      )
+    );
+
+    return tempCapSharing;
   }
 
   async create(result_id: number, manager?: EntityManager) {

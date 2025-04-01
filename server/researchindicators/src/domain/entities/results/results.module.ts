@@ -16,6 +16,12 @@ import { ResultCountriesSubNationalsModule } from '../result-countries-sub-natio
 import { ResultCountriesModule } from '../result-countries/result-countries.module';
 import { ClarisaGeoScopeModule } from '../../tools/clarisa/entities/clarisa-geo-scope/clarisa-geo-scope.module';
 import { ResultOpenSearchModule } from '../../tools/open-search/results/result.opensearch.module';
+import { IndicatorsModule } from '../indicators/indicators.module';
+import { SessionFormatsModule } from '../session-formats/session-formats.module';
+import { SessionLengthsModule } from '../session-lengths/session-lengths.module';
+import { SessionPurposesModule } from '../session-purposes/session-purposes.module';
+import { SessionTypesModule } from '../session-types/session-types.module';
+import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modalities.module';
 
 @Module({
   controllers: [ResultsController],
@@ -33,6 +39,12 @@ import { ResultOpenSearchModule } from '../../tools/open-search/results/result.o
     ResultCountriesSubNationalsModule,
     ClarisaGeoScopeModule,
     ResultOpenSearchModule,
+    IndicatorsModule,
+    SessionFormatsModule,
+    SessionLengthsModule,
+    SessionPurposesModule,
+    SessionTypesModule,
+    DeliveryModalitiesModule,
   ],
   providers: [
     ResultsService,
