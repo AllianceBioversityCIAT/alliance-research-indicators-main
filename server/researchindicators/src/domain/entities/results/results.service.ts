@@ -420,6 +420,36 @@ export class ResultsService {
       .then((result) => result != null);
   }
 
+  async formalizeResult(resultAi: number) {
+    const result = await this.dataSource.getRepository(TempResultAi).findOne({
+      where: { id: resultAi, is_active: true },
+    });
+
+    if (!result) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const processedResult = result?.processed_object as ResultAiDto;
+    const newResult = await this.createResult(processedResult.result);
+    await this.updateGeneralInfo(
+      newResult.result_id,
+      processedResult.generalInformation,
+    );
+    await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
+    await this._resultCapacitySharingService.update(
+      newResult.result_id,
+      processedResult.capSharing,
+    );
+
+    await this.dataSource.getRepository(TempResultAi).update(resultAi, {
+      result_id: newResult.result_id,
+      is_active: false,
+      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+    });
+
+    return newResult;
+  }
+
   async createResultFromAiRoar(file: Express.Multer.File) {
     const dataTemp: RootAi = await this._aiRoarMiningApp.create(file);
 
