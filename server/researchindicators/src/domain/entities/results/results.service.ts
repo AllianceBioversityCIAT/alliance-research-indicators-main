@@ -474,6 +474,7 @@ export class ResultsService {
           result.indicator,
         );
         newResult.indicator_id = indicator?.indicator_id;
+        newResult.contract_id = 'A100'; //TODO: This is a placeholder, need to be changed
 
         tmpNewData.result = newResult;
       }
