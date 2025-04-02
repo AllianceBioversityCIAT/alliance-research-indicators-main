@@ -22,7 +22,7 @@ export class AiRoarMiningApp extends BrokerConnectionBase {
       file: file,
       credentials: this.authHeaderMs6,
     };
-    return this.sendToPattern<PayloadAiRoarDto, RootAi>(
+    return this.sendToPattern<PayloadAiRoarDto, ResponseAiRoarDto<RootAi>>(
       'mining-create',
       payload,
     );
@@ -49,4 +49,11 @@ export class AiRoarMiningApp extends BrokerConnectionBase {
         return data;
     }
   }
+}
+
+export class ResponseAiRoarDto<T> {
+  status: number;
+  description: string;
+  data: T;
+  errors: string;
 }
