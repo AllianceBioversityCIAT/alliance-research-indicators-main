@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -31,7 +32,10 @@ import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
-import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
+import {
+  AiRoarMiningApp,
+  ResponseAiRoarDto,
+} from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ReportYearService } from '../report-year/report-year.service';
@@ -451,9 +455,16 @@ export class ResultsService {
   }
 
   async createResultFromAiRoar(file: Express.Multer.File) {
-    const dataTemp: RootAi = await this._aiRoarMiningApp.create(file);
+    const dataTemp: RootAi = await this._aiRoarMiningApp
+      .create(file)
+      .then((response: ResponseAiRoarDto<RootAi>) => {
+        if (response.status !== HttpStatus.CREATED) {
+          throw new BadRequestException(response.errors);
+        }
+        return response.data;
+      });
 
-    for (const [index, result] of dataTemp.results.entries()) {
+    for (const [index, result] of dataTemp?.results?.entries()) {
       const tmpNewData: ResultAiDto = new ResultAiDto();
       {
         const newResult: CreateResultDto = new CreateResultDto();
