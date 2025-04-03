@@ -79,8 +79,7 @@ export class ResultCapacitySharingService {
 
     const sessionLength =
       await this._sessionLengthsService.findByName(clean_sessionLength);
-    tempCapSharing.individual.session_length_id =
-      sessionLength?.session_length_id;
+    tempCapSharing.session_length_id = sessionLength?.session_length_id;
 
     const clean_sessionFormat = <string>(
       this._aiRoarMiningApp.cleanDataNotProvided(
@@ -175,6 +174,8 @@ export class ResultCapacitySharingService {
         delivery_modality_id: updateData?.delivery_modality_id,
         start_date: updateData?.start_date,
         end_date: updateData?.end_date,
+        degree_id: updateData?.degree_id,
+        session_length_id: updateData?.session_length_id,
         ...this._currentUser.audit(SetAutitEnum.UPDATE),
       });
 
@@ -277,9 +278,7 @@ export class ResultCapacitySharingService {
     );
 
     await entityManager.update(resultId, {
-      session_length_id: updateData?.session_length_id,
       trainee_name: updateData?.trainee_name,
-      degree_id: updateData?.degree_id,
       gender_id: updateData?.gender_id,
       ...this._currentUser.audit(SetAutitEnum.UPDATE),
       //Unnecessary fields null asignation
@@ -379,10 +378,8 @@ export class ResultCapacitySharingService {
           CountryRolesEnum.TRAINEE_NATIONALITY,
         );
       individualResponse = {
-        degree_id: resultCapDev.degree_id,
         gender_id: resultCapDev.gender_id,
         trainee_name: resultCapDev.trainee_name,
-        session_length_id: resultCapDev.session_length_id,
         affiliation: institution,
         nationality: nationality,
       };
@@ -410,6 +407,8 @@ export class ResultCapacitySharingService {
       session_format_id: resultCapDev.session_format_id,
       session_type_id: resultCapDev.session_type_id,
       start_date: resultCapDev.start_date,
+      degree_id: resultCapDev.degree_id,
+      session_length_id: resultCapDev.session_length_id,
       group: groupResponse,
       individual: individualResponse,
       training_supervisor: trainingSupervisor,
