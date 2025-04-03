@@ -97,7 +97,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
       where.institution_role_id = institution_role_id;
     }
 
-    const institutio = await this.mainRepo.find({
+    let institutio = await this.mainRepo.find({
       where: {
         ...where,
         result_id: resultId,
@@ -110,8 +110,37 @@ export class ResultInstitutionsService extends BaseServiceSimple<
       },
     });
 
+    if (
+      institution_role_id &&
+      institution_role_id == InstitutionRolesEnum.PARTNERS
+    ) {
+      institutio = this.filterInstitutions(institutio);
+    }
+
     return {
       institutions: institutio,
     };
+  }
+
+  private filterInstitutions(
+    institutions: ResultInstitution[],
+  ): ResultInstitution[] {
+    const institutionMap = new Map<number, ResultInstitution>();
+
+    for (const institution of institutions) {
+      const existing = institutionMap.get(institution.institution_id);
+      if (!existing) {
+        institutionMap.set(institution.institution_id, institution);
+      } else {
+        if (
+          institution.institution_role_id === InstitutionRolesEnum.PARTNERS &&
+          existing.institution_role_id !== InstitutionRolesEnum.PARTNERS
+        ) {
+          institutionMap.set(institution.institution_id, institution);
+        }
+      }
+    }
+
+    return Array.from(institutionMap.values());
   }
 }
