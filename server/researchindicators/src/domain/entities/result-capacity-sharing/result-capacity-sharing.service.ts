@@ -233,9 +233,7 @@ export class ResultCapacitySharingService {
       session_purpose_description: updateData?.session_purpose_description,
       is_attending_organization: updateData?.is_attending_organization,
       //Unnecessary fields null asignation
-      session_length_id: null,
       trainee_name: null,
-      degree_id: null,
       gender_id: null,
       ...this._currentUser.audit(SetAutitEnum.UPDATE),
     });
