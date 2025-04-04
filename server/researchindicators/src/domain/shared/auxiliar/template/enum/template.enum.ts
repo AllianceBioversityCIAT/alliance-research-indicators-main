@@ -3,6 +3,7 @@ export enum TemplateEnum {
   REVISE_RESULT = 'revise-result',
   REJECTED_RESULT = 'rejected-result',
   APPROVAL_RESULT = 'approval-result',
+  SUBMITTED_RESULT = 'submitted-result',
 }
 
 export type WelcomeEmailTemplate = {

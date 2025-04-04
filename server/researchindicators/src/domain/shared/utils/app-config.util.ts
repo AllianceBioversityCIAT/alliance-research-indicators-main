@@ -245,4 +245,22 @@ export class AppConfig {
   get ARI_MESSAGE_QUEUE(): string {
     return process.env.ARI_MESSAGE_QUEUE;
   }
+
+  /**
+   * Get the client host
+   * @readonly
+   * @type {string}
+   */
+  get ARI_CLIENT_HOST(): string {
+    return process.env.ARI_CLIENT_HOST;
+  }
+
+  /**
+   * Get the support email
+   * @readonly
+   * @type {string}
+   */
+  get ARI_SUPPORT_EMAIL(): string {
+    return process.env.ARI_SUPPORT_EMAIL;
+  }
 }
