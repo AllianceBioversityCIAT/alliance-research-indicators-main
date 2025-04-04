@@ -201,12 +201,12 @@ export class GreenChecksService {
 
     const { completness } = await this.findByResultId(resultId);
 
-    /*if (
+    if (
       ResultStatusEnum.SUBMITTED === result_status_id &&
       completness == false
     ) {
       throw new ConflictException('The result is not complete');
-    }*/
+    }
 
     return this.saveHistory(
       resultId,
