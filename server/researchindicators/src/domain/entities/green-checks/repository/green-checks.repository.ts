@@ -6,7 +6,10 @@ import { Result } from '../../results/entities/result.entity';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { FindGreenChecksUserDto } from '../dto/find-green-checks-user.dto';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
-import { FindGeneralDataTemplateDto } from '../dto/find-general-data-template.dto';
+import {
+  FindDataForSubmissionDto,
+  FindGeneralDataTemplateDto,
+} from '../dto/find-general-data-template.dto';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -157,6 +160,36 @@ export class GreenCheckRepository {
       .then((result) => result?.[0]?.validation);
 
     return roles == 1 && result == 1;
+  }
+
+  async getDataForSubmissionResult(
+    resultId: number,
+  ): Promise<FindDataForSubmissionDto> {
+    const query = `
+        select 
+          su.sec_user_id as contributor_id,
+        	su.email as contributor_email,
+        	ac.project_lead_description as pi_name,
+        	null as pi_email,
+        	r.result_id,
+        	r.title,
+        	ac.description as project_name  
+        from results r 
+        	left join result_contracts rc on rc.result_id = r.result_id 
+        									and rc.is_primary = true
+        									and rc.is_active = true
+        	left join agresso_contracts ac on ac.agreement_id = rc.contract_id 
+        	left join sec_users su on su.sec_user_id = r.created_by 
+        where r.is_active = true
+        	and r.result_id = ?
+        limit 1;
+    `;
+
+    const result: FindDataForSubmissionDto = await this.dataSource
+      .query(query, [resultId])
+      .then((result) => (result?.length ? result[0] : null));
+
+    return result;
   }
 
   async getDataForReviseResult(
