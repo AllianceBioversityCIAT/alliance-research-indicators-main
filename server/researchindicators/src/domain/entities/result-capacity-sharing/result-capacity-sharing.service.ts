@@ -405,7 +405,8 @@ export class ResultCapacitySharingService {
       session_format_id: resultCapDev.session_format_id,
       session_type_id: resultCapDev.session_type_id,
       start_date: resultCapDev.start_date,
-      degree_id: resultCapDev.degree_id,
+      degree_id:
+        resultCapDev.session_length_id == 2 ? resultCapDev.degree_id : null,
       session_length_id: resultCapDev.session_length_id,
       group: groupResponse,
       individual: individualResponse,
