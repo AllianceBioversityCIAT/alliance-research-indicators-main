@@ -22,6 +22,7 @@ import { SessionLengthsModule } from '../session-lengths/session-lengths.module'
 import { SessionPurposesModule } from '../session-purposes/session-purposes.module';
 import { SessionTypesModule } from '../session-types/session-types.module';
 import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modalities.module';
+import { ClarisaSubNationalsModule } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.module';
 
 @Module({
   controllers: [ResultsController],
@@ -45,6 +46,7 @@ import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modali
     SessionPurposesModule,
     SessionTypesModule,
     DeliveryModalitiesModule,
+    ClarisaSubNationalsModule,
   ],
   providers: [
     ResultsService,
