@@ -7,6 +7,8 @@ import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { isEmpty } from '../../shared/utils/object.utils';
+import { SessionFormatEnum } from '../session-formats/enums/session-format.enum';
+import { ResultCapacitySharing } from '../result-capacity-sharing/entities/result-capacity-sharing.entity';
 @Injectable()
 export class ResultInstitutionsService extends BaseServiceSimple<
   ResultInstitution,
@@ -114,7 +116,19 @@ export class ResultInstitutionsService extends BaseServiceSimple<
       institution_role_id &&
       institution_role_id == InstitutionRolesEnum.PARTNERS
     ) {
-      institutio = this.filterInstitutions(institutio);
+      const capSharingType: SessionFormatEnum = await this.dataSource
+        .getRepository(ResultCapacitySharing)
+        .findOne({
+          where: {
+            result_id: resultId,
+            is_active: true,
+          },
+          select: {
+            session_format_id: true,
+          },
+        })
+        .then((result) => result?.session_format_id ?? null);
+      institutio = this.filterInstitutions(institutio, capSharingType);
     }
 
     return {
@@ -124,8 +138,23 @@ export class ResultInstitutionsService extends BaseServiceSimple<
 
   private filterInstitutions(
     institutions: ResultInstitution[],
+    session_type?: SessionFormatEnum,
   ): ResultInstitution[] {
     const institutionMap = new Map<number, ResultInstitution>();
+    let comparerInstitutionRole: InstitutionRolesEnum;
+
+    switch (session_type) {
+      case SessionFormatEnum.GROUP:
+        comparerInstitutionRole =
+          InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE;
+        break;
+      case SessionFormatEnum.INDIVIDUAL:
+        comparerInstitutionRole = InstitutionRolesEnum.TRAINEE_AFFILIATION;
+        break;
+      default:
+        comparerInstitutionRole = InstitutionRolesEnum.PARTNERS;
+        break;
+    }
 
     for (const institution of institutions) {
       const existing = institutionMap.get(institution.institution_id);
@@ -133,8 +162,8 @@ export class ResultInstitutionsService extends BaseServiceSimple<
         institutionMap.set(institution.institution_id, institution);
       } else {
         if (
-          institution.institution_role_id === InstitutionRolesEnum.PARTNERS &&
-          existing.institution_role_id !== InstitutionRolesEnum.PARTNERS
+          institution.institution_role_id === comparerInstitutionRole &&
+          existing.institution_role_id !== comparerInstitutionRole
         ) {
           institutionMap.set(institution.institution_id, institution);
         }
