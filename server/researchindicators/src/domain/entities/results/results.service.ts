@@ -57,6 +57,7 @@ import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
 import { ResultAiDto, RootAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
+import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 
 @Injectable()
 export class ResultsService {
@@ -80,6 +81,7 @@ export class ResultsService {
     private readonly _updateDataUtil: UpdateDataUtil,
     private readonly _openSearchResultApi: OpenSearchResultApi,
     private readonly _indicatorsService: IndicatorsService,
+    private readonly _clarisaSubNationalsService: ClarisaSubNationalsService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -495,6 +497,27 @@ export class ResultsService {
         const geoscope: ClarisaGeoScope =
           await this._clarisaGeoScopeService.findByName(result.geoscope.level);
         tempGeoscope.geo_scope_id = geoscope?.code;
+
+        const tempCountries: ResultCountry[] = [];
+        for (const country of result.geoscope.sub_list) {
+          const tempCountry: ResultCountry = new ResultCountry();
+          tempCountry.isoAlpha2 = country.country_code;
+          tempCountry.result_countries_sub_nationals;
+          const tempSubNational: ResultCountriesSubNational[] =
+            await this._clarisaSubNationalsService
+              .findByNames(country.areas)
+              .then((response) =>
+                response.map(
+                  (el) =>
+                    ({
+                      sub_national_id: el.id,
+                    }) as ResultCountriesSubNational,
+                ),
+              );
+          tempCountry.result_countries_sub_nationals = tempSubNational;
+          tempCountries.push(tempCountry);
+        }
+        tempGeoscope.countries = tempCountries;
 
         tmpNewData.geoScope = tempGeoscope;
       }

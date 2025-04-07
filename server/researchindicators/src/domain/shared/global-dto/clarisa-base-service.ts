@@ -1,4 +1,9 @@
-import { FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
+import {
+  FindOptionsRelations,
+  FindOptionsWhere,
+  In,
+  Repository,
+} from 'typeorm';
 import { AuditableEntity } from './auditable.entity';
 import { BaseServiceProperties } from './base-service';
 import { CurrentUserUtil } from '../utils/current-user.util';
@@ -27,6 +32,16 @@ export abstract class ControlListBaseService<
       [this.findByNameKey]: name,
     } as FindOptionsWhere<Entity>;
     return this.mainRepo.findOne({
+      where: where,
+    });
+  }
+
+  async findByNames(name: string[]): Promise<Entity[]> {
+    const where: FindOptionsWhere<Entity> = {
+      is_active: true,
+      [this.findByNameKey]: In(name),
+    } as FindOptionsWhere<Entity>;
+    return this.mainRepo.find({
       where: where,
     });
   }

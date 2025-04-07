@@ -31,9 +31,17 @@ export class ResultRawAi {
   length_of_training: string;
   alliance_main_contact_person_first_name: string;
   alliance_main_contact_person_last_name: string;
+  evidence_for_stage: string;
+  policy_type: string;
+  stage_in_policy_process: string;
 }
 
 export class GeoscopeRawAi {
   level: string;
-  sub_list?: string[];
+  sub_list?: CountryAreas[];
+}
+
+export class CountryAreas {
+  country_code: string;
+  areas: string[];
 }
