@@ -333,9 +333,14 @@ export class ResultsService {
         },
       );
 
+      const primaryLevers =
+        levers?.length == 1
+          ? levers.map((el) => ({ ...el, is_primary: true }))
+          : levers;
+
       await this._resultLeversService.create<LeverRolesEnum>(
         resultId,
-        levers,
+        primaryLevers,
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         manager,
