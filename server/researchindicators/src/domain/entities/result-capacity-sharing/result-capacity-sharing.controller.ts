@@ -22,7 +22,7 @@ export class ResultCapacitySharingController {
   ) {}
 
   @UseGuards(ResultStatusGuard)
-  @Patch('by-result-id/:resultId')
+  @Patch('by-result-id/:resultId(\\d+)')
   async updateResultCapacitySharing(
     @Param('resultId') resultId: string,
     @Body() capacitySharing: UpdateResultCapacitySharingDto,
@@ -38,7 +38,7 @@ export class ResultCapacitySharingController {
       );
   }
 
-  @Get('by-result-id/:resultId')
+  @Get('by-result-id/:resultId(\\d+)')
   async getCapacitySharing(@Param('resultId') resultId: string) {
     return this.resultCapacitySharingService
       .findByResultId(+resultId)
