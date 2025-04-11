@@ -28,6 +28,14 @@ import { openSearchRoutes } from '../tools/open-search/opensearch.routes';
 import { AnnouncementSettingsModule } from '../entities/announcement-settings/announcement-settings.module';
 import { ReportYearModule } from '../entities/report-year/report-year.module';
 import { GreenChecksModule } from '../entities/green-checks/green-checks.module';
+import { IntellectualPropertyOwnersModule } from '../entities/intellectual-property-owners/intellectual-property-owners.module';
+
+const capSharingChildren: Routes = [
+  {
+    path: 'ip-owners',
+    module: IntellectualPropertyOwnersModule,
+  },
+];
 
 const ResultsChildren: Routes = [
   {
@@ -41,6 +49,7 @@ const ResultsChildren: Routes = [
   {
     path: 'capacity-sharing',
     module: ResultCapacitySharingModule,
+    children: capSharingChildren,
   },
   {
     path: 'policy-change',

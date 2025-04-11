@@ -41,6 +41,8 @@ import { ReportYearModule } from './report-year/report-year.module';
 import { ConnectionsModule } from './connections/connections.module';
 import { AnnouncementSettingsModule } from './announcement-settings/announcement-settings.module';
 import { GreenChecksModule } from './green-checks/green-checks.module';
+import { ResultCapSharingIpModule } from './result-cap-sharing-ip/result-cap-sharing-ip.module';
+import { IntellectualPropertyOwnersModule } from './intellectual-property-owners/intellectual-property-owners.module';
 
 @Module({
   imports: [
@@ -86,6 +88,8 @@ import { GreenChecksModule } from './green-checks/green-checks.module';
     ConnectionsModule,
     AnnouncementSettingsModule,
     GreenChecksModule,
+    ResultCapSharingIpModule,
+    IntellectualPropertyOwnersModule,
   ],
   exports: [AgressoContractModule],
 })
