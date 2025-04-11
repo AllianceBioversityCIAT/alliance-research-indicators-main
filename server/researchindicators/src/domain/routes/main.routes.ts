@@ -29,11 +29,16 @@ import { AnnouncementSettingsModule } from '../entities/announcement-settings/an
 import { ReportYearModule } from '../entities/report-year/report-year.module';
 import { GreenChecksModule } from '../entities/green-checks/green-checks.module';
 import { IntellectualPropertyOwnersModule } from '../entities/intellectual-property-owners/intellectual-property-owners.module';
+import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/result-cap-sharing-ip.module';
 
 const capSharingChildren: Routes = [
   {
     path: 'ip-owners',
     module: IntellectualPropertyOwnersModule,
+  },
+  {
+    path: 'ip',
+    module: ResultCapSharingIpModule,
   },
 ];
 

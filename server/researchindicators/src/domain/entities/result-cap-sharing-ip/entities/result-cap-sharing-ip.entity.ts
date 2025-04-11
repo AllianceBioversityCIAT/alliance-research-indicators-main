@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { IntellectualPropertyOwner } from '../../intellectual-property-owners/entities/intellectual-property-owner.entity';
+import { Result } from '../../results/entities/result.entity';
 
 @Entity('result_cap_sharing_ip')
 export class ResultCapSharingIp extends AuditableEntity {
@@ -38,10 +39,21 @@ export class ResultCapSharingIp extends AuditableEntity {
   })
   asset_ip_owner_description?: string;
 
+  @Column({
+    name: 'potential_asset',
+    type: 'boolean',
+    nullable: true,
+  })
+  potential_asset?: boolean;
+
   @ManyToOne(
     () => IntellectualPropertyOwner,
     (ipo) => ipo.result_cap_sharing_ip,
   )
   @JoinColumn({ name: 'asset_ip_owner_id' })
   intellectualPropertyOwner: IntellectualPropertyOwner;
+
+  @ManyToOne(() => Result, (result) => result.result_cap_sharing_ip)
+  @JoinColumn({ name: 'result_cap_sharing_ip_id' })
+  result: Result;
 }

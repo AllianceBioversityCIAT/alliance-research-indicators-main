@@ -58,6 +58,7 @@ import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/
 import { ResultAiDto, RootAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
+import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-sharing-ip.service';
 
 @Injectable()
 export class ResultsService {
@@ -82,6 +83,7 @@ export class ResultsService {
     private readonly _openSearchResultApi: OpenSearchResultApi,
     private readonly _indicatorsService: IndicatorsService,
     private readonly _clarisaSubNationalsService: ClarisaSubNationalsService,
+    private readonly _resultCapSharingIpService: ResultCapSharingIpService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -205,6 +207,7 @@ export class ResultsService {
     switch (indicator) {
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
         await this._resultCapacitySharingService.create(resultId, manager);
+        await this._resultCapSharingIpService.create(resultId, manager);
         break;
       case IndicatorsEnum.POLICY_CHANGE:
         await this._resultPolicyChangeService.create(resultId, manager);
