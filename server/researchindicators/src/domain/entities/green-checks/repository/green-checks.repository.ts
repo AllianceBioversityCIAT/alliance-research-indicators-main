@@ -42,6 +42,10 @@ export class GreenCheckRepository {
     return `cap_sharing_validation(${result_key}) as cap_sharing`;
   }
 
+  capSharingIpValidation(result_key: string) {
+    return `cap_sharing_ip_validation(${result_key}) as cap_sharing_ip`;
+  }
+
   policyChangeValidation(result_key: string) {
     return `policy_change_validation(${result_key}) as policy_change`;
   }
@@ -64,7 +68,8 @@ export class GreenCheckRepository {
         spesificQuery = this.policyChangeValidation(result_key);
         break;
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
-        spesificQuery = this.capSharingValidation(result_key);
+        spesificQuery = `${this.capSharingIpValidation(result_key)},
+            ${this.capSharingValidation(result_key)}`;
         break;
     }
 
