@@ -507,23 +507,25 @@ export class ResultsService {
         tempGeoscope.geo_scope_id = geoscope?.code;
 
         const tempCountries: ResultCountry[] = [];
-        for (const country of result.geoscope.sub_list) {
-          const tempCountry: ResultCountry = new ResultCountry();
-          tempCountry.isoAlpha2 = country.country_code;
-          tempCountry.result_countries_sub_nationals;
-          const tempSubNational: ResultCountriesSubNational[] =
-            await this._clarisaSubNationalsService
-              .findByNames(country.areas)
-              .then((response) =>
-                response.map(
-                  (el) =>
-                    ({
-                      sub_national_id: el.id,
-                    }) as ResultCountriesSubNational,
-                ),
-              );
-          tempCountry.result_countries_sub_nationals = tempSubNational;
-          tempCountries.push(tempCountry);
+        if (result.geoscope?.sub_list.length > 0) {
+          for (const country of result.geoscope.sub_list) {
+            const tempCountry: ResultCountry = new ResultCountry();
+            tempCountry.isoAlpha2 = country.country_code;
+            tempCountry.result_countries_sub_nationals;
+            const tempSubNational: ResultCountriesSubNational[] =
+              await this._clarisaSubNationalsService
+                .findByNames(country.areas)
+                .then((response) =>
+                  response.map(
+                    (el) =>
+                      ({
+                        sub_national_id: el.id,
+                      }) as ResultCountriesSubNational,
+                  ),
+                );
+            tempCountry.result_countries_sub_nationals = tempSubNational;
+            tempCountries.push(tempCountry);
+          }
         }
         tempGeoscope.countries = tempCountries;
 
