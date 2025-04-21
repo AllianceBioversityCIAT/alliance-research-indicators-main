@@ -48,11 +48,19 @@ export abstract class ControlListBaseService<
 
   async findAll(
     relations: FindOptionsRelations<Entity> = {},
+    where?: FindOptionsWhere<Entity>,
   ): Promise<Entity[]> {
-    const where = { is_active: true } as FindOptionsWhere<Entity>;
+    let customWhere = {};
+    if (where) {
+      customWhere = {
+        ...where,
+      } as FindOptionsWhere<Entity>;
+    } else {
+      customWhere = { is_active: true } as FindOptionsWhere<Entity>;
+    }
 
     return this.mainRepo.find({
-      where,
+      where: customWhere,
       relations,
     });
   }
