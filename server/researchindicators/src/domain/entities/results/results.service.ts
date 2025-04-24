@@ -474,7 +474,13 @@ export class ResultsService {
         return response.data;
       });
 
-    for (const [index, result] of dataTemp?.results?.entries()) {
+    if (!dataTemp?.results?.length) {
+      throw new BadRequestException(
+        'No se encontraron resultados para procesar',
+      );
+    }
+
+    for (const [index, result] of dataTemp.results.entries()) {
       const tmpNewData: ResultAiDto = new ResultAiDto();
       {
         const newResult: CreateResultDto = new CreateResultDto();
@@ -484,7 +490,7 @@ export class ResultsService {
           result.indicator,
         );
         newResult.indicator_id = indicator?.indicator_id;
-        newResult.contract_id = 'A100'; //TODO: This is a placeholder, need to be changed
+        newResult.contract_id = 'A100';
 
         tmpNewData.result = newResult;
       }
@@ -511,7 +517,6 @@ export class ResultsService {
           for (const country of result.geoscope.sub_list) {
             const tempCountry: ResultCountry = new ResultCountry();
             tempCountry.isoAlpha2 = country.country_code;
-            tempCountry.result_countries_sub_nationals;
             const tempSubNational: ResultCountriesSubNational[] =
               await this._clarisaSubNationalsService
                 .findByNames(country.areas)
@@ -768,7 +773,7 @@ export class ResultsService {
           );
           return {
             ...result,
-            result_contracts: contract || null,
+            result_contracts: contract ?? null,
           };
         });
       });

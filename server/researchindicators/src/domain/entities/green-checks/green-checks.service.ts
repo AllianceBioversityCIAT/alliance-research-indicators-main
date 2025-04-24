@@ -19,7 +19,6 @@ import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
 import {
-  FindDataForSubmissionDto,
   FindGeneralDataTemplateDto,
   SubmissionEmailTemplateDataDto,
 } from './dto/find-general-data-template.dto';
@@ -255,7 +254,6 @@ export class GreenChecksService {
       );
   }
 
-  //TODO: this method has to be reviewed once the email microservices are modified.
   async prepareEmailForSubmission(
     resultId: number,
     subject: (data: SubmissionEmailTemplateDataDto) => string,
@@ -280,7 +278,7 @@ export class GreenChecksService {
           result_id: data.result_id,
           title: data.title,
           project_name: data.project_name,
-          support_email: this.appConfig.ARI_SUPPORT_EMAIL, //TODO: Generate a support email
+          support_email: this.appConfig.ARI_SUPPORT_EMAIL,
           rev_email:
             data.contributor_id == this.currentUserUtil.user_id
               ? data.contributor_email

@@ -39,7 +39,8 @@ export class IndicatorRepository extends Repository<Indicator> {
         	i.description,
         	i.long_description,
         	i.icon_src,
-        	i.other_names;`;
+        	i.other_names
+		ORDER BY i.position ASC;`;
 
     return this.query(query) as Promise<FindResultAmountDto[]>;
   }
@@ -67,7 +68,8 @@ export class IndicatorRepository extends Repository<Indicator> {
 		i.description,
 		i.long_description,
 		i.icon_src,
-		i.other_names;
+		i.other_names
+	ORDER BY i.position ASC;
 	`;
     return this.query(query) as Promise<Indicator[]>;
   }

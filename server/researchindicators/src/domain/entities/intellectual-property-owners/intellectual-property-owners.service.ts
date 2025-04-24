@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { CreateIntellectualPropertyOwnerDto } from './dto/create-intellectual-property-owner.dto';
-import { UpdateIntellectualPropertyOwnerDto } from './dto/update-intellectual-property-owner.dto';
 import { ControlListBaseService } from '../../shared/global-dto/clarisa-base-service';
 import { IntellectualPropertyOwner } from './entities/intellectual-property-owner.entity';
 import { DataSource, Repository } from 'typeorm';
