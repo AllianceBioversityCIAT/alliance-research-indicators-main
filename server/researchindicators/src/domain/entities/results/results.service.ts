@@ -474,7 +474,13 @@ export class ResultsService {
         return response.data;
       });
 
-    for (const [index, result] of dataTemp?.results?.entries()) {
+    if (!dataTemp || !dataTemp.results) {
+      throw new BadRequestException(
+        'No se encontraron resultados para procesar',
+      );
+    }
+
+    for (const [index, result] of dataTemp.results.entries()) {
       const tmpNewData: ResultAiDto = new ResultAiDto();
       {
         const newResult: CreateResultDto = new CreateResultDto();
@@ -511,7 +517,6 @@ export class ResultsService {
           for (const country of result.geoscope.sub_list) {
             const tempCountry: ResultCountry = new ResultCountry();
             tempCountry.isoAlpha2 = country.country_code;
-            tempCountry.result_countries_sub_nationals;
             const tempSubNational: ResultCountriesSubNational[] =
               await this._clarisaSubNationalsService
                 .findByNames(country.areas)
