@@ -29,7 +29,6 @@ export class ResultPolicyChangeService {
     this.mainRepo = dataSource.getRepository(ResultPolicyChange);
   }
 
-  //TODO: Refactor this method to use the BaseServiceSimple class
   //Is preferable to use the BaseServiceSimple class because it has a lot of methods that can be reused
   async create(result_id: number, manager?: EntityManager) {
     const entityManager: Repository<ResultPolicyChange> = selectManager(

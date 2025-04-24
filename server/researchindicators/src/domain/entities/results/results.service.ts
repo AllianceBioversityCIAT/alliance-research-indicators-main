@@ -474,7 +474,7 @@ export class ResultsService {
         return response.data;
       });
 
-    if (!dataTemp || !dataTemp.results) {
+    if (!dataTemp?.results?.length) {
       throw new BadRequestException(
         'No se encontraron resultados para procesar',
       );
@@ -490,7 +490,7 @@ export class ResultsService {
           result.indicator,
         );
         newResult.indicator_id = indicator?.indicator_id;
-        newResult.contract_id = 'A100'; //TODO: This is a placeholder, need to be changed
+        newResult.contract_id = 'A100';
 
         tmpNewData.result = newResult;
       }
@@ -773,7 +773,7 @@ export class ResultsService {
           );
           return {
             ...result,
-            result_contracts: contract || null,
+            result_contracts: contract ?? null,
           };
         });
       });

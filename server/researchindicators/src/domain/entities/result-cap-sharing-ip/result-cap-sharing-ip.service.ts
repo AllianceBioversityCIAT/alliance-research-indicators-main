@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultCapSharingIp } from './entities/result-cap-sharing-ip.entity';
 import {
