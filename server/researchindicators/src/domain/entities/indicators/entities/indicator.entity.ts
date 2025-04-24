@@ -76,6 +76,15 @@ export class Indicator extends AuditableEntity {
   })
   icon_src?: string;
 
+  @Column('bigint', {
+    name: 'position',
+    nullable: true,
+  })
+  @OpenSearchProperty({
+    type: 'integer',
+  })
+  position: number;
+
   @ManyToOne(() => IndicatorType, (indicatorType) => indicatorType.indicators)
   @JoinColumn({ name: 'indicator_type_id' })
   indicatorType!: IndicatorType;

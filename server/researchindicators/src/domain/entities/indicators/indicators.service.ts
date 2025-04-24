@@ -21,6 +21,9 @@ export class IndicatorsService extends ControlListBaseService<
       relations: {
         indicatorType: true,
       },
+      order: {
+        position: 'ASC',
+      },
     });
   }
 
@@ -32,6 +35,9 @@ export class IndicatorsService extends ControlListBaseService<
       },
       relations: {
         indicatorType: true,
+      },
+      order: {
+        position: 'ASC',
       },
     });
   }
