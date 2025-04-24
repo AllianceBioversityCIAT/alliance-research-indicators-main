@@ -377,6 +377,24 @@ export class ResultsController {
     );
   }
 
+  @ApiOperation({ summary: 'The result created from the ia is formalized' })
+  @ApiParam({
+    name: 'resultAi',
+    required: true,
+    type: Number,
+    description: 'Is a reference to the result id',
+  })
+  @Patch('ai/:resultAi/formalize')
+  async formalizeAIResult(@Param('resultAi') resultAi: string) {
+    return this.resultsService.formalizeResult(+resultAi).then((data) =>
+      ResponseUtils.format({
+        data: data,
+        description: 'AI Result created',
+        status: HttpStatus.CREATED,
+      }),
+    );
+  }
+
   @ApiOperation({ summary: 'Save data for Geo Location' })
   @UseGuards(ResultStatusGuard)
   @Patch(':resultId/geo-location')

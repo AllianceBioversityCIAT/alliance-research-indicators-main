@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -31,7 +32,10 @@ import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
-import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
+import {
+  AiRoarMiningApp,
+  ResponseAiRoarDto,
+} from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ReportYearService } from '../report-year/report-year.service';
@@ -48,6 +52,13 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { IndicatorsService } from '../indicators/indicators.service';
+import { Indicator } from '../indicators/entities/indicator.entity';
+import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
+import { ResultAiDto, RootAi } from './dto/result-ai.dto';
+import { TempResultAi } from './entities/temp-result-ai.entity';
+import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
+import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-sharing-ip.service';
 
 @Injectable()
 export class ResultsService {
@@ -70,6 +81,9 @@ export class ResultsService {
     private readonly _clarisaGeoScopeService: ClarisaGeoScopeService,
     private readonly _updateDataUtil: UpdateDataUtil,
     private readonly _openSearchResultApi: OpenSearchResultApi,
+    private readonly _indicatorsService: IndicatorsService,
+    private readonly _clarisaSubNationalsService: ClarisaSubNationalsService,
+    private readonly _resultCapSharingIpService: ResultCapSharingIpService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -193,6 +207,7 @@ export class ResultsService {
     switch (indicator) {
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
         await this._resultCapacitySharingService.create(resultId, manager);
+        await this._resultCapSharingIpService.create(resultId, manager);
         break;
       case IndicatorsEnum.POLICY_CHANGE:
         await this._resultPolicyChangeService.create(resultId, manager);
@@ -321,9 +336,14 @@ export class ResultsService {
         },
       );
 
+      const primaryLevers =
+        levers?.length == 1
+          ? levers.map((el) => ({ ...el, is_primary: true }))
+          : levers;
+
       await this._resultLeversService.create<LeverRolesEnum>(
         resultId,
-        levers,
+        primaryLevers,
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         manager,
@@ -385,6 +405,9 @@ export class ResultsService {
       },
     });
 
+    const { is_principal } =
+      await this.mainRepo.metadataPrincipalInvestigator(result_id);
+
     if (!result) {
       throw new NotFoundException('Result not found');
     }
@@ -393,11 +416,12 @@ export class ResultsService {
       indicator_id: result?.indicator?.indicator_id,
       indicator_name: result?.indicator?.name,
       result_id: result?.result_id,
-      result_official_code: result?.result_official_code,
+      result_official_code: result?.result_id,
       status_id: result?.result_status_id,
       status_name: result?.result_status?.name,
       result_title: result?.title,
       created_by: result?.created_by,
+      is_principal_investigator: is_principal == 1,
     };
   }
 
@@ -410,9 +434,122 @@ export class ResultsService {
       .then((result) => result != null);
   }
 
+  async formalizeResult(resultAi: number) {
+    const result = await this.dataSource.getRepository(TempResultAi).findOne({
+      where: { id: resultAi, is_active: true },
+    });
+
+    if (!result) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const processedResult = result?.processed_object as ResultAiDto;
+    const newResult = await this.createResult(processedResult.result);
+    await this.updateGeneralInfo(
+      newResult.result_id,
+      processedResult.generalInformation,
+    );
+    await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
+    await this._resultCapacitySharingService.update(
+      newResult.result_id,
+      processedResult.capSharing,
+    );
+
+    await this.dataSource.getRepository(TempResultAi).update(resultAi, {
+      result_id: newResult.result_id,
+      is_active: false,
+      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+    });
+
+    return newResult;
+  }
+
   async createResultFromAiRoar(file: Express.Multer.File) {
-    const model = await this._aiRoarMiningApp.create(file);
-    return model;
+    const dataTemp: RootAi = await this._aiRoarMiningApp
+      .create(file)
+      .then((response: ResponseAiRoarDto<RootAi>) => {
+        if (response.status !== HttpStatus.CREATED) {
+          throw new BadRequestException(response.errors);
+        }
+        return response.data;
+      });
+
+    if (!dataTemp?.results?.length) {
+      throw new BadRequestException(
+        'No se encontraron resultados para procesar',
+      );
+    }
+
+    for (const [index, result] of dataTemp.results.entries()) {
+      const tmpNewData: ResultAiDto = new ResultAiDto();
+      {
+        const newResult: CreateResultDto = new CreateResultDto();
+        newResult.title = result.title;
+        newResult.description = result.description;
+        const indicator: Indicator = await this._indicatorsService.findByName(
+          result.indicator,
+        );
+        newResult.indicator_id = indicator?.indicator_id;
+        newResult.contract_id = 'A100';
+
+        tmpNewData.result = newResult;
+      }
+
+      {
+        const tempGeneralInformation: UpdateGeneralInformation =
+          new UpdateGeneralInformation();
+        tempGeneralInformation.title = result.title;
+        tempGeneralInformation.description = result.description;
+        tempGeneralInformation.keywords = result.keywords;
+        tempGeneralInformation.main_contact_person = undefined;
+
+        tmpNewData.generalInformation = tempGeneralInformation;
+      }
+
+      {
+        const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
+        const geoscope: ClarisaGeoScope =
+          await this._clarisaGeoScopeService.findByName(result.geoscope.level);
+        tempGeoscope.geo_scope_id = geoscope?.code;
+
+        const tempCountries: ResultCountry[] = [];
+        if (result.geoscope?.sub_list.length > 0) {
+          for (const country of result.geoscope.sub_list) {
+            const tempCountry: ResultCountry = new ResultCountry();
+            tempCountry.isoAlpha2 = country.country_code;
+            const tempSubNational: ResultCountriesSubNational[] =
+              await this._clarisaSubNationalsService
+                .findByNames(country.areas)
+                .then((response) =>
+                  response.map(
+                    (el) =>
+                      ({
+                        sub_national_id: el.id,
+                      }) as ResultCountriesSubNational,
+                  ),
+                );
+            tempCountry.result_countries_sub_nationals = tempSubNational;
+            tempCountries.push(tempCountry);
+          }
+        }
+        tempGeoscope.countries = tempCountries;
+
+        tmpNewData.geoScope = tempGeoscope;
+      }
+
+      tmpNewData.capSharing =
+        await this._resultCapacitySharingService.processedAiInfo(result);
+
+      const tempResultAi = await this.dataSource
+        .getRepository(TempResultAi)
+        .save({
+          processed_object: tmpNewData,
+          raw_object: result,
+          ...this.currentUser.audit(SetAutitEnum.BOTH),
+        });
+      dataTemp.results[index]['temp_result_ai'] = tempResultAi.id;
+    }
+    return dataTemp;
   }
 
   async saveGeoLocation(
@@ -535,6 +672,8 @@ export class ResultsService {
       }
 
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
+
+      return this.findGeoLocation(resultId);
     });
   }
 
@@ -634,7 +773,7 @@ export class ResultsService {
           );
           return {
             ...result,
-            result_contracts: contract || null,
+            result_contracts: contract ?? null,
           };
         });
       });

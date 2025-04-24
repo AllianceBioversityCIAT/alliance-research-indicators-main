@@ -22,7 +22,7 @@ export class ResultStatusController {
   }
 
   @ApiOperation({ summary: 'Find result status by id' })
-  @Get(':id')
+  @Get(':id(\\d+)')
   async findOne(@Param('id') id: string) {
     return this.resultStatusService.findOne(+id).then((result) =>
       ResponseUtils.format({
@@ -45,5 +45,16 @@ export class ResultStatusController {
           data: response,
         }),
       );
+  }
+
+  @Get('review-statuses')
+  async findReviewStatuses() {
+    return this.resultStatusService.findReviewStatuses().then((result) =>
+      ResponseUtils.format({
+        description: 'Review statuses found',
+        status: HttpStatus.OK,
+        data: result,
+      }),
+    );
   }
 }

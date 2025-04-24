@@ -24,6 +24,9 @@ import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportYear } from '../../report-year/entities/report-year.entity';
 import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
 import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
+import { ResultEvidence } from '../../result-evidences/entities/result-evidence.entity';
+import { TempResultAi } from './temp-result-ai.entity';
+import { ResultCapSharingIp } from '../../result-cap-sharing-ip/entities/result-cap-sharing-ip.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -188,4 +191,16 @@ export class Result extends AuditableEntity {
     (submissionHistory) => submissionHistory.result,
   )
   submission_histories!: SubmissionHistory[];
+
+  @OneToMany(() => ResultEvidence, (resultEvidence) => resultEvidence.result)
+  result_evidences!: ResultEvidence[];
+
+  @OneToMany(() => TempResultAi, (tempResultAi) => tempResultAi.result)
+  temp_result_ai!: TempResultAi[];
+
+  @OneToMany(
+    () => ResultCapSharingIp,
+    (resultCapSharingIp) => resultCapSharingIp.result,
+  )
+  result_cap_sharing_ip!: ResultCapSharingIp[];
 }

@@ -19,12 +19,12 @@ export const getDataSource = (
   const entities: string[] = [
     `${__dirname}/../../../domain/entities/**/*.entity{.ts,.js}`,
     `${__dirname}/../../../domain/tools/clarisa/entities/**/*.entity{.ts,.js}`,
+    `${__dirname}/../../../domain/shared/auxiliar/**/*.entity{.ts,.js}`,
   ];
   let name: string;
 
   switch (target) {
     case dataSourceTarget.CORE:
-      name = 'default';
       database = env.ARI_MYSQL_NAME;
       host = env.ARI_MYSQL_HOST;
       username = env.ARI_MYSQL_USER_NAME;

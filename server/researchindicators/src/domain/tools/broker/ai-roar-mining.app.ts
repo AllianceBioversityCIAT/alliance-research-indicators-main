@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BrokerConnectionBase } from './base/broker-base.connection';
 import { env } from 'process';
 import { PayloadAiRoarDto } from './dto/payload-ai-roar.dto';
+import { RootAi } from '../../entities/results/dto/result-ai.dto';
 
 @Injectable()
 export class AiRoarMiningApp extends BrokerConnectionBase {
@@ -21,6 +22,38 @@ export class AiRoarMiningApp extends BrokerConnectionBase {
       file: file,
       credentials: this.authHeaderMs6,
     };
-    return this.sendToPattern<PayloadAiRoarDto>('mining-create', payload);
+    return this.sendToPattern<PayloadAiRoarDto, ResponseAiRoarDto<RootAi>>(
+      'mining-create',
+      payload,
+    );
   }
+
+  cleanDataNotProvided<T>(
+    data: T,
+    parse: 'date' | 'string' | 'number' | 'boolean' | 'any' = 'any',
+  ) {
+    if (data == 'Not collected') {
+      return null;
+    }
+
+    switch (parse) {
+      case 'date':
+        return new Date(data as string);
+      case 'string':
+        return String(data);
+      case 'number':
+        return Number(data);
+      case 'boolean':
+        return Boolean(data);
+      default:
+        return data;
+    }
+  }
+}
+
+export class ResponseAiRoarDto<T> {
+  status: number;
+  description: string;
+  data: T;
+  errors: string;
 }

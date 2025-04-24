@@ -7,7 +7,7 @@ import { DataSourceOptions } from 'typeorm';
 @Module({
   imports: [
     TypeOrmModule.forRoot(
-      getDataSource(dataSourceTarget.TEST, false) as DataSourceOptions,
+      getDataSource(dataSourceTarget.CORE, false) as DataSourceOptions,
     ),
   ],
   providers: [],

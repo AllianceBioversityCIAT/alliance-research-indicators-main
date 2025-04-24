@@ -200,4 +200,67 @@ export class AppConfig {
   get ROAR_MANAGEMENT_HOST(): string {
     return process.env.ARI_ROAR_MANAGEMENT_HOST;
   }
+
+  /**
+   * Get the secret for the message service
+   * @readonly
+   * @type {string}
+   */
+  get ARI_MS_MESSAGE_SECRET(): string {
+    return process.env.ARI_MS_MESSAGE_SECRET;
+  }
+
+  /**
+   * Get the client id for the message service
+   * @readonly
+   * @type {string}
+   */
+  get ARI_MS_MESSAGE_CLIENT_ID(): string {
+    return process.env.ARI_MS_MESSAGE_CLIENT_ID;
+  }
+
+  /**
+   * Get the from email for the message service
+   * @readonly
+   * @type {string}
+   */
+  get ARI_FROM_EMAIL(): string {
+    return process.env.ARI_FROM_EMAIL;
+  }
+
+  /**
+   * Get the from name for the message service
+   * @readonly
+   * @type {string}
+   */
+  get ARI_FROM_EMAIL_NAME(): string {
+    return process.env.ARI_FROM_EMAIL_NAME;
+  }
+
+  /**
+   * Get the message service url
+   * @readonly
+   * @type {string}
+   */
+  get ARI_MESSAGE_QUEUE(): string {
+    return process.env.ARI_MESSAGE_QUEUE;
+  }
+
+  /**
+   * Get the client host
+   * @readonly
+   * @type {string}
+   */
+  get ARI_CLIENT_HOST(): string {
+    return process.env.ARI_CLIENT_HOST;
+  }
+
+  /**
+   * Get the support email
+   * @readonly
+   * @type {string}
+   */
+  get ARI_SUPPORT_EMAIL(): string {
+    return process.env.ARI_SUPPORT_EMAIL;
+  }
 }

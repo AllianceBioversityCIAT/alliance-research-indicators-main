@@ -18,18 +18,6 @@ export class ResultCapacitySharing extends AuditableEntity {
   result_id!: number;
 
   @Column('text', {
-    name: 'supervisor_name',
-    nullable: true,
-  })
-  supervisor_name?: string;
-
-  @Column('text', {
-    name: 'supervisor_email',
-    nullable: true,
-  })
-  supervisor_email?: string;
-
-  @Column('text', {
     name: 'training_title',
     nullable: true,
   })
@@ -136,12 +124,6 @@ export class ResultCapacitySharing extends AuditableEntity {
     nullable: true,
   })
   delivery_modality_id?: number;
-
-  @Column('bigint', {
-    name: 'language_id',
-    nullable: true,
-  })
-  language_id?: number;
 
   @ManyToOne(
     () => SessionFormat,

@@ -12,6 +12,12 @@ export class ClarisaCountry extends AuditableEntity {
   })
   isoAlpha2!: string;
 
+  @Column('bigint', {
+    name: 'code',
+    nullable: true,
+  })
+  code!: number;
+
   @Column('varchar', {
     length: 4,
     name: 'isoAlpha3',

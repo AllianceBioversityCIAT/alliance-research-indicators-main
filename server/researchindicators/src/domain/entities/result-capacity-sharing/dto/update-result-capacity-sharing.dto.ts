@@ -6,22 +6,10 @@ import { ResultLanguage } from '../../result-languages/entities/result-language.
 
 export class CapDevIndividualDto {
   @ApiProperty({
-    type: Number,
-    name: 'session_length_id',
-  })
-  session_length_id?: number;
-
-  @ApiProperty({
     type: String,
     name: 'trainee_name',
   })
   trainee_name?: string;
-
-  @ApiProperty({
-    type: Number,
-    name: 'degree_id',
-  })
-  degree_id?: number;
 
   @ApiProperty({
     type: Number,
@@ -96,6 +84,18 @@ export class CapDevGroupDto {
 export class UpdateResultCapacitySharingDto {
   @ApiProperty({
     type: Number,
+    name: 'session_length_id',
+  })
+  session_length_id?: number;
+
+  @ApiProperty({
+    type: Number,
+    name: 'degree_id',
+  })
+  degree_id?: number;
+
+  @ApiProperty({
+    type: Number,
     name: 'session_format_id',
   })
   session_format_id?: number;
@@ -140,13 +140,13 @@ export class UpdateResultCapacitySharingDto {
     type: CapDevIndividualDto,
     name: 'individual',
   })
-  individual?: CapDevIndividualDto;
+  individual?: CapDevIndividualDto = new CapDevIndividualDto();
 
   @ApiProperty({
     type: CapDevGroupDto,
     name: 'group',
   })
-  group?: CapDevGroupDto;
+  group?: CapDevGroupDto = new CapDevGroupDto();
 
   created_at?: Date;
 
