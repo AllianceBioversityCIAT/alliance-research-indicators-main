@@ -158,11 +158,10 @@ export class ResultInstitutionsService extends BaseServiceSimple<
 
     for (const institution of institutions) {
       const existing = institutionMap.get(institution.institution_id);
-      if (!existing) {
-        institutionMap.set(institution.institution_id, institution);
-      } else if (
-        institution.institution_role_id === comparerInstitutionRole &&
-        existing.institution_role_id !== comparerInstitutionRole
+      if (
+        !existing ||
+        (institution.institution_role_id === comparerInstitutionRole &&
+          existing.institution_role_id !== comparerInstitutionRole)
       ) {
         institutionMap.set(institution.institution_id, institution);
       }
