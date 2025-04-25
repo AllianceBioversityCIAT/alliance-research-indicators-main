@@ -34,9 +34,16 @@ export class LoggerUtil {
   }
 
   private getComponentNameFromStack(stack: string): string {
-    const className = stack.match(/at\s(.*?)\./)?.[1] || 'UnknownClass';
-    const handlerName =
-      stack.match(/\.([a-zA-Z0-9_]+)\s\(/)?.[1] || 'UnknownMethod';
+    if (!stack) return '[UnknownClass] [UnknownMethod]';
+
+    const classRegex = /at\s(.*?)\./;
+    const handlerRegex = /\.(\w+)\s\(/;
+
+    const classMatch = classRegex.exec(stack || '');
+    const handlerMatch = handlerRegex.exec(stack || '');
+
+    const className = classMatch?.[1] || 'UnknownClass';
+    const handlerName = handlerMatch?.[1] || 'UnknownMethod';
     return `[${className}] [${handlerName}]`;
   }
 

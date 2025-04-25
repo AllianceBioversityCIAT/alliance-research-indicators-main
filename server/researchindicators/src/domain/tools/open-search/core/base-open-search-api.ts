@@ -314,7 +314,7 @@ export abstract class BaseOpenSearchApi<
 
   private _getMappingForSchema() {
     const properties: PropertyDescriptor[] =
-      Reflect.getMetadata(OpenSearchMetadataName, this._openSearchEntity) || [];
+      Reflect.getMetadata(OpenSearchMetadataName, this._openSearchEntity) ?? [];
     const schema: SchemaOpenSearch<OpenSearchEntity> = {
       mappings: {
         dynamic: true,
@@ -344,7 +344,7 @@ export abstract class BaseOpenSearchApi<
 
   private _iterateProperties(opensearchObject?: new () => unknown) {
     const properties: PropertyDescriptor[] =
-      Reflect.getMetadata(OpenSearchMetadataName, opensearchObject) || [];
+      Reflect.getMetadata(OpenSearchMetadataName, opensearchObject) ?? [];
     const schema = {};
     for (const { propertyKey, options } of properties) {
       if (options?.type) {

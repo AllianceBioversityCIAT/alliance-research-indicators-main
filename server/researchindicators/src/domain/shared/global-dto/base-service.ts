@@ -264,7 +264,7 @@ export abstract class BaseServiceSimple<
   protected unsetMultiplesPrimary<T extends { is_primary: boolean }>(
     data: Partial<T>[],
   ): Partial<T>[] {
-    const isPrimary = data.filter((item) => item.is_primary == true);
+    const isPrimary = data.filter((item) => item.is_primary);
     if (isPrimary.length > 1) {
       data.forEach((item) => {
         item.is_primary = false;

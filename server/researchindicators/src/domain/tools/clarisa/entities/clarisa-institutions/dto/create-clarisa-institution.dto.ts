@@ -4,14 +4,14 @@ export class CreateClarisaInstitutionDto {
   public acronym: string;
   public websiteLink: string;
   public added: Date;
-  public countryOfficeDTO: countryOfficeDTO[];
+  public countryOfficeDTO: CountryOfficeDTO[];
   public institutionType: {
     code: number;
     name: string;
   };
 }
 
-export class countryOfficeDTO {
+export class CountryOfficeDTO {
   public code: number;
   public name: string;
   public isoAlpha2: string;

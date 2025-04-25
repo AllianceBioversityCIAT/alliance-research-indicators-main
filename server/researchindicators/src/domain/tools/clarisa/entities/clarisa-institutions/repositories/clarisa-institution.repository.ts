@@ -21,7 +21,7 @@ export class ClarisaInstitutionsRepository extends Repository<ClarisaInstitution
       order: { updated_at: 'DESC' },
     }).then((result) => result?.updated_at);
 
-    const latestDate: Date = updatedAt || createdAt;
+    const latestDate: Date = updatedAt ?? createdAt;
     const baseMilliseconds: number = 1000;
     const dateNumber: number = Math.round(
       new Date(latestDate).getTime() / baseMilliseconds,
