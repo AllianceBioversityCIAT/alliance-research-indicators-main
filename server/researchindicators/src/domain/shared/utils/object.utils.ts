@@ -17,7 +17,7 @@ export const cleanObject = <T>(obj: T): Partial<T> => {
 export const parseBoolean = <T>(obj: Partial<T>): FindOptionsRelations<T> => {
   const parsedObj: unknown = {};
   for (const key in obj) {
-    parsedObj[key] = obj[key] === 'true' ? true : false;
+    parsedObj[key] = obj[key] === 'true';
   }
   return parsedObj as FindOptionsRelations<T>;
 };

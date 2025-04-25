@@ -5,7 +5,7 @@ import { ClarisaLever } from '../entities/clarisa-levers/entities/clarisa-lever.
 export const leversMappers = (
   data: ClarisaLeversRawDto,
 ): DeepPartial<ClarisaLever> => {
-  const partitions = data.full_name?.split(/[0-9]: /)[1];
+  const partitions = data.full_name?.split(/\d+: /)[1];
   return {
     id: data.id,
     short_name: data.short_name,

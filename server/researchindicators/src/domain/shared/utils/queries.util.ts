@@ -36,5 +36,6 @@ export const formatArrayToQuery = <T>(array: T[]): string => {
 };
 
 export const notOption = (isNot: boolean, isArray: boolean) => {
-  return isNot ? (isArray ? 'NOT' : '!') : '';
+  if (!isNot) return '';
+  return isArray ? 'NOT' : '!';
 };

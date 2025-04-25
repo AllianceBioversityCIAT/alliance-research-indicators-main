@@ -41,7 +41,7 @@ export const OpenSearchProperty = (options: OpenSearchPropertyOptions) => {
   return (target: object, propertyKey: string | symbol) => {
     const constructor = target.constructor;
     const existingMetadata =
-      Reflect.getMetadata(OpenSearchMetadataName, constructor) || [];
+      Reflect.getMetadata(OpenSearchMetadataName, constructor) ?? [];
     Reflect.defineMetadata(
       OpenSearchMetadataName,
       [...existingMetadata, { propertyKey, options }],

@@ -90,11 +90,6 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
   async cloneAllClarisaEntities(): Promise<void> {
     this._logger.debug('Cloning all entities from Clarisa API');
 
-    /*await this.base<ClarisaLanguage>(
-      ClarisaPathEnum.LANGUAGES,
-      ClarisaLanguage,
-    );*/
-
     await this.base<ClarisaRegion>(ClarisaPathEnum.REGIONS, ClarisaRegion);
 
     await this.base<CreateClarisaCountryDto, ClarisaCountry>(

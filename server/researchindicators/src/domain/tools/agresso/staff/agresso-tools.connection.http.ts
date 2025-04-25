@@ -46,12 +46,12 @@ export class AgressoToolsHttp implements ConnectionInterface {
     });
   }
 
-  async get<T>(path: string): Promise<T> {
+  async get<T extends { content? }>(path: string): Promise<T> {
     const auth = await this.setAuth();
     return firstValueFrom(
       this.http
         .get<T>(this.agressoHost + path, auth)
-        .pipe(map(({ data }) => (data as any).content)),
+        .pipe(map(({ data }) => data.content)),
     ).catch((err) => {
       throw new BadRequestException(err);
     });

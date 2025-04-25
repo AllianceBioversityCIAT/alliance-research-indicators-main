@@ -200,10 +200,7 @@ export class GreenChecksService {
 
     const { completness } = await this.findByResultId(resultId);
 
-    if (
-      ResultStatusEnum.SUBMITTED === result_status_id &&
-      completness == false
-    ) {
+    if (ResultStatusEnum.SUBMITTED === result_status_id && !completness) {
       throw new ConflictException('The result is not complete');
     }
 

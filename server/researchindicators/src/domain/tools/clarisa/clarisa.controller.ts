@@ -20,24 +20,27 @@ import {
 import { SearchToOpenSearchEnum } from './anum/path.enum';
 import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
 import { MessagePattern } from '@nestjs/microservices';
+import { LoggerUtil } from '../../shared/utils/logger.util';
 
 @ApiBearerAuth()
 @ApiTags('Clarisa')
 @Controller()
 export class ClarisaController {
+  private readonly logger = new LoggerUtil({ name: ClarisaController.name });
   constructor(private readonly clarisaService: ClarisaService) {}
 
   @Get('clone/execute')
   runCloneClarisa() {
-    this.clarisaService.cloneAllClarisaEntities();
-    return ResponseUtils.format({
-      description: 'The clone process has been started',
-      status: HttpStatus.OK,
-    });
+    return this.executeCloneEntities('HTTP Request');
   }
 
   @MessagePattern('clone-normal-entities')
   executeCloneNormalEntities() {
+    return this.executeCloneEntities('Queue Execution');
+  }
+
+  private executeCloneEntities(type: string) {
+    this.logger.log(`Starting clone process for ${type}`);
     this.clarisaService.cloneAllClarisaEntities();
     return ResponseUtils.format({
       description: 'The clone process has been started',
