@@ -51,9 +51,9 @@ export class AllianceUserStaffController {
   })
   @Get('data/filters')
   async findWithFilters(
+    @Query('name') name: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
-    @Query('name') name: string,
   ) {
     return this.allianceUserStaffService
       .findWithFilters(

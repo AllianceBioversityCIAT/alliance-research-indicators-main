@@ -1,6 +1,6 @@
 import { DeepPartial } from 'typeorm';
 import {
-  countryOfficeDTO,
+  CountryOfficeDTO,
   CreateClarisaInstitutionDto,
 } from '../entities/clarisa-institutions/dto/create-clarisa-institution.dto';
 import { ClarisaInstitution } from '../entities/clarisa-institutions/entities/clarisa-institution.entity';
@@ -19,7 +19,7 @@ export const institutionMapper = (
 });
 
 const hqInstitutionsMapper = (
-  hq: countryOfficeDTO[],
+  hq: CountryOfficeDTO[],
 ): Partial<ClarisaInstitutionLocation>[] => {
   return hq.map(
     (hq): Partial<ClarisaInstitutionLocation> => ({
