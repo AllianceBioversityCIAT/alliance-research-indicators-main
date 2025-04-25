@@ -213,6 +213,7 @@ export class GreenChecksService {
       if (result_status_id === ResultStatusEnum.SUBMITTED) {
         this.prepareEmailForSubmission(
           resultId,
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           (data) =>
             `[ROAR] Result ${resultId}, Action Required: Review New Result Submission`,
         );

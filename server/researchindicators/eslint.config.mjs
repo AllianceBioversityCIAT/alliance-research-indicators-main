@@ -39,8 +39,7 @@ export default [
 
       parserOptions: {
         project: 'tsconfig.json',
-        tsconfigRootDir:
-          'D:\\Repositories\\alliance-research-indicators-main\\server\\researchindicators',
+        tsconfigRootDir: __dirname,
       },
     },
 
