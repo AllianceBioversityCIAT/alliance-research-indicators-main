@@ -513,7 +513,7 @@ export class ResultsService {
         tempGeoscope.geo_scope_id = geoscope?.code;
 
         const tempCountries: ResultCountry[] = [];
-        if (result.geoscope?.sub_list.length > 0) {
+        if (result.geoscope?.sub_list?.length > 0) {
           for (const country of result.geoscope.sub_list) {
             const tempCountry: ResultCountry = new ResultCountry();
             tempCountry.isoAlpha2 = country.country_code;
