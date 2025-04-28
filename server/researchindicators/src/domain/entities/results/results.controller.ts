@@ -8,15 +8,11 @@ import {
   Patch,
   Post,
   Query,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import {
   ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -27,11 +23,11 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 import { UpdateGeneralInformation } from './dto/update-general-information.dto';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { ResultAlignmentDto } from './dto/result-alignment.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
 import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
 import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
+import { ResultRawAi } from './dto/result-ai.dto';
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller()
@@ -352,41 +348,10 @@ export class ResultsController {
     );
   }
 
-  @Post('ai/create')
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-          description: 'File to upload',
-        },
-      },
-    },
-  })
-  @UseInterceptors(FileInterceptor('file'))
-  async createAIResult(@UploadedFile() file: Express.Multer.File) {
-    return this.resultsService.createResultFromAiRoar(file).then((data) =>
-      ResponseUtils.format({
-        data: data,
-        description: 'AI Result created',
-        status: HttpStatus.CREATED,
-      }),
-    );
-  }
-
   @ApiOperation({ summary: 'The result created from the ia is formalized' })
-  @ApiParam({
-    name: 'resultAi',
-    required: true,
-    type: Number,
-    description: 'Is a reference to the result id',
-  })
-  @Patch('ai/:resultAi/formalize')
-  async formalizeAIResult(@Param('resultAi') resultAi: string) {
-    return this.resultsService.formalizeResult(+resultAi).then((data) =>
+  @Post('ai/formalize')
+  async formalizeAIResult(@Body() resultAi: ResultRawAi) {
+    return this.resultsService.formalizeResult(resultAi).then((data) =>
       ResponseUtils.format({
         data: data,
         description: 'AI Result created',

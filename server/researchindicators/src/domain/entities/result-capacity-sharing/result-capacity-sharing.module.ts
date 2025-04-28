@@ -9,6 +9,7 @@ import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
 import { SessionLengthsModule } from '../session-lengths/session-lengths.module';
 import { SessionTypesModule } from '../session-types/session-types.module';
 import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modalities.module';
+import { SessionFormatsModule } from '../session-formats/session-formats.module';
 
 @Module({
   controllers: [ResultCapacitySharingController],
@@ -19,6 +20,7 @@ import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modali
     ResultCountriesModule,
     SessionLengthsModule,
     SessionTypesModule,
+    SessionFormatsModule,
     DeliveryModalitiesModule,
   ],
   providers: [ResultCapacitySharingService, AiRoarMiningApp],

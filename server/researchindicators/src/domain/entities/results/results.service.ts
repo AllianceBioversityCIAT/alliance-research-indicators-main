@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -32,10 +31,7 @@ import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
-import {
-  AiRoarMiningApp,
-  ResponseAiRoarDto,
-} from '../../tools/broker/ai-roar-mining.app';
+import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ReportYearService } from '../report-year/report-year.service';
@@ -55,7 +51,7 @@ import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
-import { ResultAiDto, RootAi } from './dto/result-ai.dto';
+import { CountryAreas, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-sharing-ip.service';
@@ -121,13 +117,15 @@ export class ResultsService {
 
     const { description, indicator_id, title, contract_id } = createResult;
 
-    await this.mainRepo.findOne({ where: { title } }).then((result) => {
-      if (result) {
-        throw new ConflictException(
-          'The name of the result is already registered',
-        );
-      }
-    });
+    await this.mainRepo
+      .findOne({ where: { title, is_active: true } })
+      .then((result) => {
+        if (result) {
+          throw new ConflictException(
+            'The name of the result is already registered',
+          );
+        }
+      });
 
     const newOfficialCode = await this.newOfficialCode();
     const reportYear = await this._reportYearService.activeReportYear();
@@ -434,122 +432,111 @@ export class ResultsService {
       .then((result) => result != null);
   }
 
-  async formalizeResult(resultAi: number) {
-    const result = await this.dataSource.getRepository(TempResultAi).findOne({
-      where: { id: resultAi, is_active: true },
-    });
-
-    if (!result) {
-      throw new NotFoundException('Result not found');
-    }
-
-    const processedResult = result?.processed_object as ResultAiDto;
+  async formalizeResult(result: ResultRawAi) {
+    const processedResult = await this.createResultFromAiRoar(result);
     const newResult = await this.createResult(processedResult.result);
     await this.updateGeneralInfo(
       newResult.result_id,
       processedResult.generalInformation,
     );
     await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
-    await this._resultCapacitySharingService.update(
-      newResult.result_id,
-      processedResult.capSharing,
-    );
-
-    await this.dataSource.getRepository(TempResultAi).update(resultAi, {
-      result_id: newResult.result_id,
-      is_active: false,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
-    });
+    switch (newResult.indicator_id) {
+      case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
+        await this._resultCapacitySharingService.update(
+          newResult.result_id,
+          processedResult.capSharing,
+        );
+        break;
+      case IndicatorsEnum.POLICY_CHANGE:
+        await this._resultPolicyChangeService.update(
+          newResult.result_id,
+          processedResult.policyChange,
+        );
+        break;
+    }
 
     return newResult;
   }
 
-  async createResultFromAiRoar(file: Express.Multer.File) {
-    const dataTemp: RootAi = await this._aiRoarMiningApp
-      .create(file)
-      .then((response: ResponseAiRoarDto<RootAi>) => {
-        if (response.status !== HttpStatus.CREATED) {
-          throw new BadRequestException(response.errors);
-        }
-        return response.data;
-      });
-
-    if (!dataTemp?.results?.length) {
-      throw new BadRequestException(
-        'No se encontraron resultados para procesar',
+  async createResultFromAiRoar(result: ResultRawAi) {
+    const tmpNewData: ResultAiDto = new ResultAiDto();
+    {
+      const newResult: CreateResultDto = new CreateResultDto();
+      newResult.title = result.title;
+      newResult.description = result.description;
+      const indicator: Indicator = await this._indicatorsService.findByName(
+        result.indicator,
       );
+      newResult.indicator_id = indicator?.indicator_id;
+      newResult.contract_id = result.contract_code;
+
+      tmpNewData.result = newResult;
     }
 
-    for (const [index, result] of dataTemp.results.entries()) {
-      const tmpNewData: ResultAiDto = new ResultAiDto();
-      {
-        const newResult: CreateResultDto = new CreateResultDto();
-        newResult.title = result.title;
-        newResult.description = result.description;
-        const indicator: Indicator = await this._indicatorsService.findByName(
-          result.indicator,
-        );
-        newResult.indicator_id = indicator?.indicator_id;
-        newResult.contract_id = 'A100';
+    {
+      const tempGeneralInformation: UpdateGeneralInformation =
+        new UpdateGeneralInformation();
+      tempGeneralInformation.title = result.title;
+      tempGeneralInformation.description = result.description;
+      tempGeneralInformation.keywords = result.keywords;
+      tempGeneralInformation.main_contact_person = undefined;
 
-        tmpNewData.result = newResult;
-      }
+      tmpNewData.generalInformation = tempGeneralInformation;
+    }
 
-      {
-        const tempGeneralInformation: UpdateGeneralInformation =
-          new UpdateGeneralInformation();
-        tempGeneralInformation.title = result.title;
-        tempGeneralInformation.description = result.description;
-        tempGeneralInformation.keywords = result.keywords;
-        tempGeneralInformation.main_contact_person = undefined;
+    {
+      const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
+      const geoscope: ClarisaGeoScope =
+        await this._clarisaGeoScopeService.findByName(result.geoscope.level);
+      tempGeoscope.geo_scope_id = geoscope?.code;
 
-        tmpNewData.generalInformation = tempGeneralInformation;
-      }
-
-      {
-        const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
-        const geoscope: ClarisaGeoScope =
-          await this._clarisaGeoScopeService.findByName(result.geoscope.level);
-        tempGeoscope.geo_scope_id = geoscope?.code;
-
-        const tempCountries: ResultCountry[] = [];
-        if (result.geoscope?.sub_list?.length > 0) {
-          for (const country of result.geoscope.sub_list) {
-            const tempCountry: ResultCountry = new ResultCountry();
-            tempCountry.isoAlpha2 = country.country_code;
-            const tempSubNational: ResultCountriesSubNational[] =
-              await this._clarisaSubNationalsService
-                .findByNames(country.areas)
-                .then((response) =>
-                  response.map(
-                    (el) =>
-                      ({
-                        sub_national_id: el.id,
-                      }) as ResultCountriesSubNational,
-                  ),
-                );
-            tempCountry.result_countries_sub_nationals = tempSubNational;
-            tempCountries.push(tempCountry);
-          }
+      const tempCountries: ResultCountry[] = [];
+      if (result.geoscope?.sub_list?.length > 0) {
+        const tempParseCountries: Partial<CountryAreas>[] =
+          result.geoscope.sub_list.map((el) =>
+            typeof el === 'string' ? { country_code: el } : el,
+          );
+        for (const country of tempParseCountries) {
+          const tempCountry: ResultCountry = new ResultCountry();
+          tempCountry.isoAlpha2 = country.country_code;
+          const tempCountryAreas: string[] = country?.areas ?? [];
+          const tempSubNational: ResultCountriesSubNational[] =
+            await this._clarisaSubNationalsService
+              .findByNames(tempCountryAreas)
+              .then((response) =>
+                response.map(
+                  (el) =>
+                    ({
+                      sub_national_id: el.id,
+                    }) as ResultCountriesSubNational,
+                ),
+              );
+          tempCountry.result_countries_sub_nationals = tempSubNational;
+          tempCountries.push(tempCountry);
         }
-        tempGeoscope.countries = tempCountries;
-
-        tmpNewData.geoScope = tempGeoscope;
       }
+      tempGeoscope.countries = tempCountries;
 
-      tmpNewData.capSharing =
-        await this._resultCapacitySharingService.processedAiInfo(result);
-
-      const tempResultAi = await this.dataSource
-        .getRepository(TempResultAi)
-        .save({
-          processed_object: tmpNewData,
-          raw_object: result,
-          ...this.currentUser.audit(SetAutitEnum.BOTH),
-        });
-      dataTemp.results[index]['temp_result_ai'] = tempResultAi.id;
+      tmpNewData.geoScope = tempGeoscope;
     }
-    return dataTemp;
+
+    switch (tmpNewData.result.indicator_id) {
+      case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
+        tmpNewData.capSharing =
+          await this._resultCapacitySharingService.processedAiInfo(result);
+        break;
+      case IndicatorsEnum.POLICY_CHANGE:
+        tmpNewData.policyChange =
+          await this._resultPolicyChangeService.processedAiInfo(result);
+        break;
+    }
+
+    this.dataSource.getRepository(TempResultAi).save({
+      processed_object: tmpNewData,
+      raw_object: result,
+      ...this.currentUser.audit(SetAutitEnum.BOTH),
+    });
+    return tmpNewData;
   }
 
   async saveGeoLocation(
