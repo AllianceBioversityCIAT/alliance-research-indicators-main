@@ -14,6 +14,11 @@ import {
 } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { LinkResult } from '../link-results/entities/link-result.entity';
+import { ResultRawAi } from '../results/dto/result-ai.dto';
+import { PolicyStagesService } from '../policy-stages/policy-stages.service';
+import { PolicyStage } from '../policy-stages/entities/policy-stage.entity';
+import { PolicyTypesService } from '../policy-types/policy-types.service';
+import { PolicyType } from '../policy-types/entities/policy-type.entity';
 
 @Injectable()
 export class ResultPolicyChangeService {
@@ -25,6 +30,8 @@ export class ResultPolicyChangeService {
     private readonly resultInstitutionsService: ResultInstitutionsService,
     private readonly currentUser: CurrentUserUtil,
     private readonly _updateDataUtil: UpdateDataUtil,
+    private readonly _policyStagesService: PolicyStagesService,
+    private readonly _policyTypesService: PolicyTypesService,
   ) {
     this.mainRepo = dataSource.getRepository(ResultPolicyChange);
   }
@@ -54,27 +61,41 @@ export class ResultPolicyChangeService {
     return resultPolicyChange;
   }
 
-  async save(
+  async processedAiInfo(
+    rawData: ResultRawAi,
+  ): Promise<CreateResultPolicyChangeDto> {
+    const newData = new CreateResultPolicyChangeDto();
+    newData.evidence_stage = rawData.evidence_for_stage;
+    const regex: RegExp = /stage\s{1}\d[1-2]?/i;
+    const match = regex.exec(rawData.stage_in_policy_process);
+    if (match) {
+      const policyStage: PolicyStage =
+        await this._policyStagesService.findByName(match[0]);
+      newData.policy_stage_id = policyStage?.policy_stage_id;
+    }
+
+    const policyType: PolicyType = await this._policyTypesService.findByName(
+      rawData.policy_type,
+    );
+    newData.policy_type_id = policyType?.policy_type_id;
+
+    return newData;
+  }
+
+  async update(
     result_id: number,
     createResultPolicyChangeDto: CreateResultPolicyChangeDto,
   ) {
-    const {
-      innovation_development,
-      innovation_use,
-      implementing_organization,
-      evidence_stage,
-      policy_stage_id,
-      policy_type_id,
-    } = createResultPolicyChangeDto;
+    const innoSave: Partial<LinkResult>[] = [];
+    if (createResultPolicyChangeDto?.innovation_development)
+      innoSave.push({
+        other_result_id: createResultPolicyChangeDto.innovation_development,
+      });
 
-    const innoSave: Partial<LinkResult>[] = [
-      {
-        other_result_id: innovation_development,
-      },
-      {
-        other_result_id: innovation_use,
-      },
-    ];
+    if (createResultPolicyChangeDto?.innovation_use)
+      innoSave.push({
+        other_result_id: createResultPolicyChangeDto.innovation_use,
+      });
 
     return this.dataSource.transaction(async (manager) => {
       await this.linkResultsService.create(
@@ -87,16 +108,16 @@ export class ResultPolicyChangeService {
 
       await this.resultInstitutionsService.create(
         result_id,
-        implementing_organization,
+        createResultPolicyChangeDto?.implementing_organization ?? [],
         'institution_id',
         InstitutionRolesEnum.POLICY_CHANGE,
         manager,
       );
 
       await manager.getRepository(ResultPolicyChange).update(result_id, {
-        policy_type_id: policy_type_id,
-        policy_stage_id: policy_stage_id,
-        evidence_stage: evidence_stage,
+        policy_type_id: createResultPolicyChangeDto?.policy_type_id,
+        policy_stage_id: createResultPolicyChangeDto?.policy_stage_id,
+        evidence_stage: createResultPolicyChangeDto?.evidence_stage,
         ...this.currentUser.audit(SetAutitEnum.BOTH),
       });
 

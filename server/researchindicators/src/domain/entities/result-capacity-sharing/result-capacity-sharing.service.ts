@@ -29,6 +29,7 @@ import { SessionTypesService } from '../session-types/session-types.service';
 import { SessionLengthsService } from '../session-lengths/session-lengths.service';
 import { DeliveryModalitiesService } from '../delivery-modalities/delivery-modalities.service';
 import { DeliveryModality } from '../delivery-modalities/entities/delivery-modality.entity';
+import { SessionFormatsService } from '../session-formats/session-formats.service';
 @Injectable()
 export class ResultCapacitySharingService {
   private mainRepo: Repository<ResultCapacitySharing>;
@@ -44,6 +45,7 @@ export class ResultCapacitySharingService {
     private readonly _sessionTypesService: SessionTypesService,
     private readonly _sessionLengthsService: SessionLengthsService,
     private readonly _deliveryModalitiesService: DeliveryModalitiesService,
+    private readonly _sessionFormatsService: SessionFormatsService,
   ) {
     this.mainRepo = dataSource.getRepository(ResultCapacitySharing);
   }
@@ -67,8 +69,8 @@ export class ResultCapacitySharingService {
       )
     );
     const trainingType =
-      await this._sessionTypesService.findByName(clean_trainingType);
-    tempCapSharing.session_type_id = trainingType?.session_type_id;
+      await this._sessionFormatsService.findByName(clean_trainingType);
+    tempCapSharing.session_format_id = trainingType?.session_format_id;
 
     const clean_sessionLength = <string>(
       this._aiRoarMiningApp.cleanDataNotProvided(

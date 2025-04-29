@@ -28,7 +28,7 @@ export class ResultPolicyChangeController {
     @Body() CreatePolicyChange: CreateResultPolicyChangeDto,
   ) {
     return this.resultPolicyChangeService
-      .save(+resultId, CreatePolicyChange)
+      .update(+resultId, CreatePolicyChange)
       .then((result) =>
         ResponseUtils.format({
           description: 'Result policy change updated',
