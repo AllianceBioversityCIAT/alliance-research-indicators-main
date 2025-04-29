@@ -31,7 +31,6 @@ import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
-import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ReportYearService } from '../report-year/report-year.service';
@@ -55,6 +54,9 @@ import { CountryAreas, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-sharing-ip.service';
+import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
+import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
+import { ResultUser } from '../result-users/entities/result-user.entity';
 
 @Injectable()
 export class ResultsService {
@@ -68,7 +70,6 @@ export class ResultsService {
     private readonly _resultCapacitySharingService: ResultCapacitySharingService,
     private readonly _resultPolicyChangeService: ResultPolicyChangeService,
     private readonly currentUser: CurrentUserUtil,
-    private readonly _aiRoarMiningApp: AiRoarMiningApp,
     private readonly _alianceManagementApp: AlianceManagementApp,
     private readonly _reportYearService: ReportYearService,
     private readonly _resultCountriesService: ResultCountriesService,
@@ -80,6 +81,7 @@ export class ResultsService {
     private readonly _indicatorsService: IndicatorsService,
     private readonly _clarisaSubNationalsService: ClarisaSubNationalsService,
     private readonly _resultCapSharingIpService: ResultCapSharingIpService,
+    private readonly _agressoUserStaffService: AllianceUserStaffService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -479,7 +481,15 @@ export class ResultsService {
       tempGeneralInformation.title = result.title;
       tempGeneralInformation.description = result.description;
       tempGeneralInformation.keywords = result.keywords;
-      tempGeneralInformation.main_contact_person = undefined;
+      const userStaff: AllianceUserStaff =
+        await this._agressoUserStaffService.findUserByFirstAndLastName(
+          result.alliance_main_contact_person_first_name,
+          result.alliance_main_contact_person_last_name,
+        );
+      if (userStaff)
+        tempGeneralInformation.main_contact_person = {
+          user_id: userStaff.carnet,
+        } as ResultUser;
 
       tmpNewData.generalInformation = tempGeneralInformation;
     }

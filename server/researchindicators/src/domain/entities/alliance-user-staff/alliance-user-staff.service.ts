@@ -23,6 +23,14 @@ export class AllianceUserStaffService extends ControlListBaseService<
     );
   }
 
+  findUserByFirstAndLastName(first_name: string, last_name: string) {
+    return this.mainRepo
+      .createQueryBuilder('user')
+      .where('user.first_name = :first_name', { first_name })
+      .orWhere('user.last_name = :last_name', { last_name })
+      .getOne();
+  }
+
   async findWithFilters(pagination: PaginationDto, name?: string) {
     const paginationClean = cleanObject<PaginationDto>(pagination);
     const queryBuilder = this.mainRepo.createQueryBuilder('user');
