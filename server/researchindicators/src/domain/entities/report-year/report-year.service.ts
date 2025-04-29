@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { Between, DataSource, Repository } from 'typeorm';
 import { ReportYear } from './entities/report-year.entity';
 import { ControlListBaseService } from '../../shared/global-dto/clarisa-base-service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
@@ -23,6 +23,14 @@ export class ReportYearService extends ControlListBaseService<
   }
 
   async getReportYear() {
-    return this.mainRepo.find();
+    const currentYear = new Date().getFullYear();
+    const fromYear = currentYear - 5;
+    const toYear = currentYear + 2;
+    return this.mainRepo.find({
+      where: {
+        is_active: true,
+        report_year: Between(fromYear, toYear),
+      },
+    });
   }
 }

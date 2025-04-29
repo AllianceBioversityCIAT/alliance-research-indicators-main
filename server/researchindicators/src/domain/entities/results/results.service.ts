@@ -111,13 +111,15 @@ export class ResultsService {
       'contract_id',
       'indicator_id',
       'title',
+      'year',
     ]);
 
     if (!isValid) {
       throw new BadRequestException(`Invalid fields: ${invalidFields}`);
     }
 
-    const { description, indicator_id, title, contract_id } = createResult;
+    const { description, indicator_id, title, contract_id, year } =
+      createResult;
 
     await this.mainRepo
       .findOne({ where: { title, is_active: true } })
@@ -130,7 +132,6 @@ export class ResultsService {
       });
 
     const newOfficialCode = await this.newOfficialCode();
-    const reportYear = await this._reportYearService.activeReportYear();
 
     const result = await this.dataSource.transaction(async (manager) => {
       const result = await manager
@@ -140,7 +141,7 @@ export class ResultsService {
           indicator_id,
           title,
           result_official_code: newOfficialCode,
-          report_year_id: reportYear.report_year,
+          report_year_id: year,
           ...this.currentUser.audit(SetAutitEnum.NEW),
         })
         .then((result) => {
@@ -310,6 +311,7 @@ export class ResultsService {
 
     const generalInformation: UpdateGeneralInformation = {
       ...result,
+      year: result.report_year_id,
       keywords: keywords.map((keyword) => keyword.keyword),
       main_contact_person: mainContactPerson,
     };
@@ -481,10 +483,11 @@ export class ResultsService {
       tempGeneralInformation.title = result.title;
       tempGeneralInformation.description = result.description;
       tempGeneralInformation.keywords = result.keywords;
+      tempGeneralInformation.year = 2025;
       const userStaff: AllianceUserStaff =
         await this._agressoUserStaffService.findUserByFirstAndLastName(
-          result.alliance_main_contact_person_first_name,
-          result.alliance_main_contact_person_last_name,
+          result?.alliance_main_contact_person_first_name,
+          result?.alliance_main_contact_person_last_name,
         );
       if (userStaff)
         tempGeneralInformation.main_contact_person = {
