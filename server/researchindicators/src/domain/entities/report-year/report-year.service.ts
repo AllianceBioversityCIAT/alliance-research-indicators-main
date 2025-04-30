@@ -31,6 +31,7 @@ export class ReportYearService extends ControlListBaseService<
         is_active: true,
         report_year: Between(fromYear, toYear),
       },
+      order: { report_year: 'DESC' },
     });
   }
 }

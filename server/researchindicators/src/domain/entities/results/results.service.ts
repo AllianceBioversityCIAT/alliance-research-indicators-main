@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager, In, Not } from 'typeorm';
 import {
   ResultFiltersInterface,
   ResultRepository,
@@ -252,6 +252,21 @@ export class ResultsService {
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
     return this.dataSource.transaction(async (manager) => {
+      const existsResult = await manager
+        .getRepository(this.mainRepo.target)
+        .findOne({
+          where: {
+            result_id: Not(result_id),
+            title: generalInformation.title,
+            is_active: true,
+          },
+        });
+
+      if (existsResult) {
+        throw new ConflictException(
+          'The name of the result is already registered',
+        );
+      }
       await manager.getRepository(this.mainRepo.target).update(result_id, {
         title: generalInformation.title,
         description: generalInformation.description,
