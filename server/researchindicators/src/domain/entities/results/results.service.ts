@@ -473,6 +473,7 @@ export class ResultsService {
       );
       newResult.indicator_id = indicator?.indicator_id;
       newResult.contract_id = result.contract_code;
+      newResult.year = result?.year ?? new Date().getFullYear();
 
       tmpNewData.result = newResult;
     }
@@ -483,7 +484,6 @@ export class ResultsService {
       tempGeneralInformation.title = result.title;
       tempGeneralInformation.description = result.description;
       tempGeneralInformation.keywords = result.keywords;
-      tempGeneralInformation.year = 2025;
       const userStaff: AllianceUserStaff =
         await this._agressoUserStaffService.findUserByFirstAndLastName(
           result?.alliance_main_contact_person_first_name,
