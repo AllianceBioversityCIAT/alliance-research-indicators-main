@@ -63,4 +63,11 @@ export class MetadataResultDto {
     required: true,
   })
   is_principal_investigator: boolean;
+
+  @ApiProperty({
+    type: Number,
+    description: 'The report year',
+    required: true,
+  })
+  report_year: number;
 }
