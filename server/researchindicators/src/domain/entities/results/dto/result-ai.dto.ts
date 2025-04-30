@@ -57,6 +57,12 @@ export class ResultRawAi {
   contract_code: string;
 
   @ApiProperty({
+    type: Number,
+    description: 'The year of the result',
+  })
+  year: number;
+
+  @ApiProperty({
     type: String,
     description: 'The indicator type of the result',
   })

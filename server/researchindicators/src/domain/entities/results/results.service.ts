@@ -473,6 +473,7 @@ export class ResultsService {
       );
       newResult.indicator_id = indicator?.indicator_id;
       newResult.contract_id = result.contract_code;
+      newResult.year = result?.year ?? new Date().getFullYear();
 
       tmpNewData.result = newResult;
     }
