@@ -315,10 +315,11 @@ export class ResultsService {
     const mainContactPerson = await this._resultUsersService
       .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
       .then((data) => (data?.length > 0 ? data[0] : null));
-
+    const year = result.report_year_id;
+    delete result.report_year_id;
     const generalInformation: UpdateGeneralInformation = {
       ...result,
-      year: result.report_year_id,
+      year,
       keywords: keywords.map((keyword) => keyword.keyword),
       main_contact_person: mainContactPerson,
     };
