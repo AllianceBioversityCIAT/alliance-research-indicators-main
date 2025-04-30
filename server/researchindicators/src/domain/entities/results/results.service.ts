@@ -255,6 +255,7 @@ export class ResultsService {
       await manager.getRepository(this.mainRepo.target).update(result_id, {
         title: generalInformation.title,
         description: generalInformation.description,
+        report_year_id: generalInformation.year,
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 
@@ -298,10 +299,16 @@ export class ResultsService {
 
   async findGeneralInfo(resultId: number) {
     const result = await this.mainRepo.findOne({
-      select: ['title', 'description', 'result_id', 'created_at', 'updated_at'],
+      select: {
+        title: true,
+        description: true,
+        report_year_id: true,
+        result_id: true,
+        created_at: true,
+        updated_at: true,
+      },
       where: { result_id: resultId, is_active: true },
     });
-
     const keywords =
       await this._resultKeywordsService.findKeywordsByResultId(resultId);
 
@@ -391,6 +398,7 @@ export class ResultsService {
           name: true,
           indicator_id: true,
         },
+        report_year_id: true,
         result_id: true,
         result_official_code: true,
         result_status_id: true,
@@ -423,6 +431,7 @@ export class ResultsService {
       status_name: result?.result_status?.name,
       result_title: result?.title,
       created_by: result?.created_by,
+      report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
     };
   }
