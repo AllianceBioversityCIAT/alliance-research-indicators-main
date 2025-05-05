@@ -421,4 +421,20 @@ export class ResultsController {
         }),
       );
   }
+
+  @Get('transform/result-code/:resultCode(\\d+)')
+  async transformResultCode(
+    @Param('resultCode') resultCode: string,
+    @Query('year') year?: string,
+  ) {
+    return this.resultsService
+      .getResultIdByOfficialCode(+resultCode, +year)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'Result code transformed',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }
