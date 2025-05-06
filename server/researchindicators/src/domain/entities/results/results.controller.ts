@@ -422,6 +422,12 @@ export class ResultsController {
       );
   }
 
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description: 'Is a reference to the year',
+  })
   @Get('transform/result-code/:resultCode(\\d+)')
   async transformResultCode(
     @Param('resultCode') resultCode: string,

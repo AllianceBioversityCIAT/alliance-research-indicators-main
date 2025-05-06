@@ -140,6 +140,7 @@ export class ResultsService {
           description,
           indicator_id,
           title,
+          is_ai: createResult.is_ai ?? false,
           result_official_code: newOfficialCode,
           report_year_id: year,
           is_snapshot: false,
@@ -544,6 +545,7 @@ export class ResultsService {
       );
       newResult.indicator_id = indicator?.indicator_id;
       newResult.contract_id = result.contract_code;
+      newResult.is_ai = true;
       newResult.year = result?.year ?? new Date().getFullYear();
 
       tmpNewData.result = newResult;
