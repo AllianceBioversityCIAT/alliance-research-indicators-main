@@ -125,6 +125,13 @@ export class Result extends AuditableEntity {
   })
   is_snapshot?: boolean;
 
+  @Column('boolean', {
+    name: 'is_ai',
+    nullable: true,
+    default: false,
+  })
+  is_ai?: boolean;
+
   @ManyToOne(() => ReportYear, (reportYear) => reportYear.results)
   @JoinColumn({ name: 'report_year_id' })
   report_year!: ReportYear;

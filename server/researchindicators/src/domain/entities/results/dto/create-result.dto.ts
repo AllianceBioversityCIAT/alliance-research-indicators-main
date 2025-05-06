@@ -35,4 +35,11 @@ export class CreateResultDto {
     description: 'Is a reference to the session type',
   })
   public year: number;
+
+  @ApiProperty({
+    type: Boolean,
+    required: false,
+    description: 'Is a reference to the ai model',
+  })
+  is_ai?: boolean;
 }
