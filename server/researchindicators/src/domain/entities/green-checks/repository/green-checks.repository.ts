@@ -179,7 +179,7 @@ export class GreenCheckRepository {
       .query(queryResult, [resultId, userId])
       .then((result) => result?.[0]?.validation);
 
-    return (principal == 1 || roles == 1) && result == 1;
+    return principal == 1 || (roles == 1 && result == 1);
   }
 
   async getDataForSubmissionResult(

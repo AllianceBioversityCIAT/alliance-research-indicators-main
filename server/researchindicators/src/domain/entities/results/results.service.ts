@@ -389,6 +389,38 @@ export class ResultsService {
     return generalInformation;
   }
 
+  async findResultVersions(resultCode: number) {
+    const select = {
+      result_id: true,
+      result_official_code: true,
+      report_year_id: true,
+    };
+    const where = {
+      result_official_code: resultCode,
+      is_active: true,
+    };
+    const versions = await this.mainRepo.find({
+      select,
+      where: {
+        ...where,
+        is_snapshot: true,
+      },
+    });
+
+    const live = await this.mainRepo.find({
+      select,
+      where: {
+        ...where,
+        is_snapshot: false,
+      },
+    });
+
+    return {
+      live,
+      versions: versions ?? [],
+    };
+  }
+
   async updateResultAlignment(
     resultId: number,
     alignmentData: ResultAlignmentDto,
