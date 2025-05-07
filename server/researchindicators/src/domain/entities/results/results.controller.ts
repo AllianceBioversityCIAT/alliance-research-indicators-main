@@ -201,6 +201,18 @@ export class ResultsController {
       );
   }
 
+  @Get('versions/:resultCode(\\d+)')
+  @ApiOperation({ summary: 'Find all results versions' })
+  async findAllVersions(@Param('resultCode') resultCode: string) {
+    return this.resultsService.findResultVersions(+resultCode).then((el) =>
+      ResponseUtils.format({
+        description: 'Results versions found',
+        status: HttpStatus.OK,
+        data: el,
+      }),
+    );
+  }
+
   @ApiOperation({ summary: 'Create a result' })
   @Post()
   async createResult(@Body() createResult: CreateResultDto) {
