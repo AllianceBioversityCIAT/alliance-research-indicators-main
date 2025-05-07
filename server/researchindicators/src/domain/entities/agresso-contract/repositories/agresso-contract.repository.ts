@@ -28,7 +28,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       offset = (pagination.page - 1) * pagination.limit;
     }
     const filterWhere = Object.entries(where).filter(
-      ([key, value]) => !isEmpty(value),
+      (data) => !isEmpty(data[1]),
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
