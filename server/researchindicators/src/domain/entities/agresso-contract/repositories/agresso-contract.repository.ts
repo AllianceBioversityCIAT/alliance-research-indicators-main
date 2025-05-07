@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
 import { AgressoContract } from '../entities/agresso-contract.entity';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { ContractResultCountDto } from '../dto/contract-result-count.dto';
 import { isEmpty } from '../../../shared/utils/object.utils';
+import { StringKeys } from '../../../shared/global-dto/types-global';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -15,6 +16,48 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     private readonly alianceManagementApp: AlianceManagementApp,
   ) {
     super(AgressoContract, dataSource.createEntityManager());
+  }
+
+  async findAllContracts(
+    pagination?: { page: number; limit: number },
+    where?: FindOptionsWhere<AgressoContract>,
+    relations?: Partial<StringKeys<AgressoContract>>,
+  ) {
+    let offset: number = null;
+    if (!isEmpty(pagination?.limit) && !isEmpty(pagination?.page)) {
+      offset = (pagination.page - 1) * pagination.limit;
+    }
+    const filterWhere = Object.entries(where).filter(
+      ([key, value]) => !isEmpty(value),
+    );
+    const whereClause = filterWhere.length
+      ? `WHERE ${filterWhere
+          .map(([key, value]) => `ac.${key} like '%${value}%'`)
+          .join(' AND ')}`
+      : '';
+    const query = `
+    select ac.*
+    ${
+      relations?.countries
+        ? `,JSON_ARRAYAGG(
+            JSON_OBJECT(
+                'agreement_id', acc.agreement_id,
+                'iso_alpha_2', acc.iso_alpha_2,
+                'is_active', acc.is_active
+            )
+        ) AS countries`
+        : ''
+    }
+    from agresso_contracts ac 
+    LEFT JOIN 
+        agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
+    ${whereClause}
+    GROUP BY 
+      	ac.agreement_id
+    order by FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')
+    ${!isEmpty(offset) ? `LIMIT ${pagination.limit} OFFSET ${offset}` : ''};
+    `;
+    return this.query(query);
   }
 
   async findByName(first_name: string, last_name: string) {
