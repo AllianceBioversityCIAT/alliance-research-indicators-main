@@ -1,4 +1,5 @@
 import { Inject, Injectable, Scope } from '@nestjs/common';
+import { Request } from 'express';
 import { REQUEST } from '@nestjs/core';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { AuditableEntity } from '../global-dto/auditable.entity';

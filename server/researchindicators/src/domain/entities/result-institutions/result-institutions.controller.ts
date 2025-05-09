@@ -3,37 +3,42 @@ import {
   Controller,
   Get,
   HttpStatus,
-  Param,
   Patch,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ResultInstitutionsService } from './result-institutions.service';
 import { CreateResultInstitutionDto } from './dto/create-result-institution.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
-import { ApiBearerAuth, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
   QueryInstitutionsRoles,
   QueryInstitutionsRolesEnum,
 } from '../institution-roles/enums/institution-roles.enum';
 import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 
 @ApiTags('Result Institutions')
+@UseInterceptors(SetUpInterceptor)
 @Controller()
 @ApiBearerAuth()
 export class ResultInstitutionsController {
   constructor(
     private readonly resultInstitutionsService: ResultInstitutionsService,
+    private readonly _resultsUtil: ResultsUtil,
   ) {}
 
   @UseGuards(ResultStatusGuard)
-  @Patch('partners/by-result-id/:resultId')
+  @GetResultVersion()
+  @Patch(`partners/by-result-id/${RESULT_CODE}`)
   async updateResultInstitutions(
-    @Param('resultId') resultId: string,
     @Body() institutions: CreateResultInstitutionDto,
   ) {
     return this.resultInstitutionsService
-      .updatePartners(+resultId, institutions)
+      .updatePartners(this._resultsUtil.resultId, institutions)
       .then((result) =>
         ResponseUtils.format({
           description: 'Result institutions updated',
@@ -48,16 +53,14 @@ export class ResultInstitutionsController {
     name: 'role',
     required: false,
   })
-  @ApiParam({
-    name: 'resultId',
-  })
-  @Get('by-result-id/:resultId')
-  async getInstitutions(
-    @Param('resultId') resultId: string,
-    @Query('role') role: QueryInstitutionsRolesEnum,
-  ) {
+  @GetResultVersion()
+  @Get(`by-result-id/${RESULT_CODE}`)
+  async getInstitutions(@Query('role') role: QueryInstitutionsRolesEnum) {
     return this.resultInstitutionsService
-      .findAll(+resultId, QueryInstitutionsRoles.getFromName(role)?.value)
+      .findAll(
+        this._resultsUtil.resultId,
+        QueryInstitutionsRoles.getFromName(role)?.value,
+      )
       .then((result) =>
         ResponseUtils.format({
           description: `Result institutions by role ${role} found`,

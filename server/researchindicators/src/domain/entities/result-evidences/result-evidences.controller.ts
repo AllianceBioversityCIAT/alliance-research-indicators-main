@@ -3,10 +3,10 @@ import {
   Controller,
   Get,
   HttpStatus,
-  Param,
   Patch,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ResultEvidencesService } from './result-evidences.service';
 import { CreateResultEvidenceDto } from './dto/create-result-evidence.dto';
@@ -23,24 +23,27 @@ import {
   QueryEvidenceRolesEnum,
 } from '../evidence-roles/enums/evidence-role.enum';
 import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 
 @ApiTags('Result Evidences')
+@UseInterceptors(SetUpInterceptor)
 @Controller()
 @ApiBearerAuth()
 export class ResultEvidencesController {
   constructor(
     private readonly resultEvidencesService: ResultEvidencesService,
+    private readonly _resultsUtil: ResultsUtil,
   ) {}
 
   @ApiOperation({ summary: 'Update result evidences by result ID' })
+  @GetResultVersion()
   @UseGuards(ResultStatusGuard)
-  @Patch('by-result-id/:resultId')
-  async updateResultEvidences(
-    @Param('resultId') resultId: string,
-    @Body() evidences: CreateResultEvidenceDto,
-  ) {
+  @Patch(`by-result-id/${RESULT_CODE}`)
+  async updateResultEvidences(@Body() evidences: CreateResultEvidenceDto) {
     return this.resultEvidencesService
-      .updateResultEvidences(+resultId, evidences)
+      .updateResultEvidences(this._resultsUtil.resultId, evidences)
       .then((result) =>
         ResponseUtils.format({
           description: 'Result evidences updated',
@@ -56,14 +59,12 @@ export class ResultEvidencesController {
     required: false,
     enum: QueryEvidenceRolesEnum,
   })
-  @Get('by-result-id/:resultId')
-  async getEvidences(
-    @Param('resultId') resultId: string,
-    @Query('role') role: QueryEvidenceRolesEnum,
-  ) {
+  @GetResultVersion()
+  @Get(`by-result-id/${RESULT_CODE}`)
+  async getEvidences(@Query('role') role: QueryEvidenceRolesEnum) {
     return this.resultEvidencesService
       .find<EvidenceRoleEnum>(
-        +resultId,
+        this._resultsUtil.resultId,
         QueryEvidenceRoles.getFromName(role)?.value,
       )
       .then((result) =>
@@ -76,10 +77,11 @@ export class ResultEvidencesController {
   }
 
   @ApiOperation({ summary: 'Find principal evidence by result ID' })
-  @Get('principal/:resultId')
-  async getPrincipalEvidence(@Param('resultId') resultId: string) {
+  @GetResultVersion()
+  @Get(`principal/${RESULT_CODE}`)
+  async getPrincipalEvidence() {
     return this.resultEvidencesService
-      .findPrincipalEvidence(+resultId)
+      .findPrincipalEvidence(this._resultsUtil.resultId)
       .then((result) =>
         ResponseUtils.format({
           description: 'Principal evidence found',

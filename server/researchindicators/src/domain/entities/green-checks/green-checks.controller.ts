@@ -2,30 +2,40 @@ import {
   Controller,
   Get,
   HttpStatus,
-  Param,
   Patch,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { GreenChecksService } from './green-checks.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
+import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 
 @ApiTags('Results')
 @ApiBearerAuth()
+@UseInterceptors(SetUpInterceptor)
 @Controller()
 export class GreenChecksController {
-  constructor(private readonly greenChecksService: GreenChecksService) {}
+  constructor(
+    private readonly greenChecksService: GreenChecksService,
+    private readonly _resultsUtil: ResultsUtil,
+  ) {}
 
-  @Get(':resultId(\\d+)')
-  async findGreenChecksByResultId(@Param('resultId') resultId: string) {
-    return this.greenChecksService.findByResultId(+resultId).then((result) =>
-      ResponseUtils.format({
-        data: result,
-        description: 'Green checks found',
-        status: HttpStatus.OK,
-      }),
-    );
+  @Get(RESULT_CODE)
+  @GetResultVersion()
+  async findGreenChecksByResultId() {
+    return this.greenChecksService
+      .findByResultId(this._resultsUtil.resultId)
+      .then((result) =>
+        ResponseUtils.format({
+          data: result,
+          description: 'Green checks found',
+          status: HttpStatus.OK,
+        }),
+      );
   }
 
   @Patch('change/status')
@@ -62,10 +72,11 @@ export class GreenChecksController {
       );
   }
 
-  @Get('history/:resultId(\\d+)')
-  async findSubmissionHistoryByResultId(@Param('resultId') resultId: string) {
+  @Get(`history/${RESULT_CODE}`)
+  @GetResultVersion()
+  async findSubmissionHistoryByResultId() {
     return this.greenChecksService
-      .getSubmissionHistory(+resultId)
+      .getSubmissionHistory(this._resultsUtil.resultId)
       .then((result) =>
         ResponseUtils.format({
           data: result,
