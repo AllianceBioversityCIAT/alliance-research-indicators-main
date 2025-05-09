@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, FindOptionsWhere, In, Not } from 'typeorm';
+import { DataSource, EntityManager, In, Not } from 'typeorm';
 import {
   ResultFiltersInterface,
   ResultRepository,
@@ -33,7 +33,6 @@ import {
 } from '../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
-import { ReportYearService } from '../report-year/report-year.service';
 import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
 import { ResultCountriesService } from '../result-countries/result-countries.service';
 import { ResultRegionsService } from '../result-regions/result-regions.service';
@@ -71,7 +70,6 @@ export class ResultsService {
     private readonly _resultPolicyChangeService: ResultPolicyChangeService,
     private readonly currentUser: CurrentUserUtil,
     private readonly _alianceManagementApp: AlianceManagementApp,
-    private readonly _reportYearService: ReportYearService,
     private readonly _resultCountriesService: ResultCountriesService,
     private readonly _resultRegionsService: ResultRegionsService,
     private readonly _resultCountriesSubNationalsService: ResultCountriesSubNationalsService,
@@ -184,51 +182,6 @@ export class ResultsService {
     );
 
     return result;
-  }
-
-  getResultIdByOfficialCode(
-    officialCode: number,
-    year?: number,
-  ): Promise<{
-    result_id: number;
-    result_official_code: number;
-    report_year_id: number;
-  }> {
-    const where: FindOptionsWhere<Result> = {};
-
-    if (!officialCode) {
-      throw new BadRequestException('Official code is required');
-    }
-
-    if (year) {
-      where.report_year_id = year;
-    } else {
-      where.is_snapshot = false;
-    }
-
-    return this.mainRepo
-      .findOne({
-        select: {
-          result_id: true,
-          result_official_code: true,
-          report_year_id: true,
-        },
-        where: {
-          ...where,
-          result_official_code: officialCode,
-          is_active: true,
-        },
-      })
-      .then((result) => {
-        if (!result) {
-          throw new NotFoundException('Result not found');
-        }
-        return {
-          result_id: result.result_id,
-          result_official_code: result.result_official_code,
-          report_year_id: result.report_year_id,
-        };
-      });
   }
 
   private async newOfficialCode() {

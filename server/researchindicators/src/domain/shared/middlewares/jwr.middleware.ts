@@ -10,12 +10,14 @@ import {
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 import { RoarManagementService } from '../../tools/roar-management/roar-management.service';
+import { ResultsUtil } from '../utils/results.util';
 
 @Injectable()
 export class JwtMiddleware implements NestMiddleware {
   constructor(
     private readonly alianceManagementApp: AlianceManagementApp,
     private readonly roarManagementService: RoarManagementService,
+    private readonly resultsUtil: ResultsUtil,
   ) {}
 
   async use(
