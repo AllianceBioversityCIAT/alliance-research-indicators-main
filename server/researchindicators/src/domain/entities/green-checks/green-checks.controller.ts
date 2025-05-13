@@ -40,12 +40,6 @@ export class GreenChecksController {
 
   @Patch('change/status')
   @ApiQuery({
-    name: 'resultId',
-    description: 'Result id',
-    type: 'number',
-    required: true,
-  })
-  @ApiQuery({
     name: 'status',
     description: 'Status',
     type: 'string',
@@ -57,13 +51,13 @@ export class GreenChecksController {
     type: 'string',
     required: false,
   })
+  @GetResultVersion()
   async submitResult(
-    @Query('resultId') resultId: string,
     @Query('comment') comment: string,
     @Query('status') statusId: string,
   ) {
     return this.greenChecksService
-      .changeStatus(+resultId, +statusId, comment)
+      .changeStatus(this._resultsUtil.resultId, +statusId, comment)
       .then(() =>
         ResponseUtils.format({
           description: 'Status changed to ' + ResultStatusEnum[+statusId],
