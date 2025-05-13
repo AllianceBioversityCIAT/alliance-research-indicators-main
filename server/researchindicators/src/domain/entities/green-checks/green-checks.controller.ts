@@ -11,7 +11,10 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
-import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import {
+  GetResultVersion,
+  ParamOrQueryEnum,
+} from '../../shared/decorators/versioning.decorator';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 
 @ApiTags('Results')
@@ -51,7 +54,7 @@ export class GreenChecksController {
     type: 'string',
     required: false,
   })
-  @GetResultVersion()
+  @GetResultVersion(ParamOrQueryEnum.QUERY)
   async submitResult(
     @Query('comment') comment: string,
     @Query('status') statusId: string,
