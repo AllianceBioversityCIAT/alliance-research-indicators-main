@@ -10,6 +10,7 @@ import {
   FindDataForSubmissionDto,
   FindGeneralDataTemplateDto,
 } from '../dto/find-general-data-template.dto';
+import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -156,19 +157,8 @@ export class GreenCheckRepository {
     	AND r.is_active = TRUE;      
     `;
 
-    const queryPrincipal = `select r.result_id, 
-			ifnull(su.sec_user_id = ?, false) as is_principal
-		from results r
-			inner join result_contracts rc on r.result_id = rc.result_id 
-											and rc.is_primary = true
-			inner join agresso_contracts ac on ac.agreement_id = rc.contract_id 
-			left join sec_users su on su.first_name like concat('%',trim(SUBSTRING_INDEX(ac.project_lead_description , ',', -1)),'%')
-									and su.last_name  like concat('%',trim(SUBSTRING_INDEX(ac.project_lead_description , ',', 1)),'%')
-		where r.result_id = ?
-		limit 1;`;
-
     const principal = await this.dataSource
-      .query(queryPrincipal, [userId, resultId])
+      .query(queryPrincipalInvestigator(), [userId, resultId])
       .then((result) => result?.[0]?.is_principal ?? 0);
 
     const roles = await this.dataSource
