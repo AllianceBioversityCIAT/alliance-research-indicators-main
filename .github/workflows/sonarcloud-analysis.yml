@@ -1,0 +1,85 @@
+name: SonarCloud Analysis - NestJS Backend
+
+on:
+  push:
+    branches: [dev, staging, main, staging-action]
+  pull_request:
+    branches: [dev, staging, main, staging-action]
+
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Set up Java 17 for SonarCloud
+      - name: Set up JDK 17 for SonarCloud analysis
+        uses: actions/setup-java@v2
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      # Step 2: Verify Java version
+      - name: Verify Java version
+        run: java -version
+
+      # Step 3: Set JAVA_HOME and SONAR_JAVA_HOME
+      - name: Set JAVA_HOME and SONAR_JAVA_HOME
+        run: |
+          echo "JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))" >> $GITHUB_ENV
+          echo "SONAR_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      # Step 4: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Step 5: Set up Node.js 22
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v3
+        with:
+          node-version: "22"
+
+      # Step 6: Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Step 7: Load environment variables from AWS Secrets Manager
+      - name: Load .env from AWS Secrets Manager
+        run: |
+          aws secretsmanager get-secret-value \
+            --secret-id dev/app/backend/roar/main \
+            --query SecretString \
+            --output text > .env
+        working-directory: ./server/researchindicators
+
+      # Step 8: Install dependencies
+      - name: Install NestJS dependencies
+        run: npm install
+        working-directory: ./server/researchindicators
+
+      # Step 9: Build the NestJS project
+      - name: Build the NestJS project
+        run: npm run build
+        working-directory: ./server/researchindicators
+
+      # Step 10: Install SonarScanner globally
+      - name: Install SonarScanner
+        run: npm install -g sonar-scanner
+
+      # Step 11: Run SonarCloud analysis
+      - name: Run SonarCloud analysis
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=AllianceBioversityCIAT_alliance-research-indicators-main \
+            -Dsonar.organization=alliancebioversityciat \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.spec.ts \
+            -Dsonar.coverage.exclusions=** \
+            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
+        working-directory: ./server/researchindicators
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
