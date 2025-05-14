@@ -43,6 +43,7 @@ import { AnnouncementSettingsModule } from './announcement-settings/announcement
 import { GreenChecksModule } from './green-checks/green-checks.module';
 import { ResultCapSharingIpModule } from './result-cap-sharing-ip/result-cap-sharing-ip.module';
 import { IntellectualPropertyOwnersModule } from './intellectual-property-owners/intellectual-property-owners.module';
+import { ReportingFeedbackModule } from './reporting-feedback/reporting-feedback.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { IntellectualPropertyOwnersModule } from './intellectual-property-owners
     GreenChecksModule,
     ResultCapSharingIpModule,
     IntellectualPropertyOwnersModule,
+    ReportingFeedbackModule,
   ],
   exports: [AgressoContractModule],
 })
