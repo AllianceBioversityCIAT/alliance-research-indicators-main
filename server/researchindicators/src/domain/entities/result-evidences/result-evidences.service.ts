@@ -42,7 +42,7 @@ export class ResultEvidencesService extends BaseServiceSimple<
         'evidence_url',
         EvidenceRoleEnum.PRINCIPAL_EVIDENCE,
         manager,
-        ['evidence_description'],
+        ['evidence_description', 'is_private'],
       ).then(async (result) => {
         await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
         return result;
