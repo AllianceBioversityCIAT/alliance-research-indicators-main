@@ -20,11 +20,11 @@ export class ReportingFeedbackService {
 
     if (feedbackData.type == AskForHelpTypeEnum.TECHNICAL_SUPPORT) {
       templateName = TemplateEnum.ASK_HELP_TECHNICAL;
-      subject = ` Technical Support Request Simulation`;
+      subject = `[STAR] Technical Support Request Simulation`;
       emailTo = this._appConfig.TECHNICAL_SUPPORT;
     } else if (feedbackData.type == AskForHelpTypeEnum.CONTENT_SUPPORT) {
       templateName = TemplateEnum.ASK_HELP_CONTENT;
-      subject = `Content Support Request`;
+      subject = `[STAR] Content Support Request`;
       emailTo = this._appConfig.CONTENT_SUPPORT;
     }
 
