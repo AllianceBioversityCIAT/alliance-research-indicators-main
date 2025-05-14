@@ -13,7 +13,9 @@ export class ResultsUtil {
   ) {}
 
   async setup() {
-    const resultCode = this.request.params?.[RESULT_CODE_PARAM];
+    const resultCode =
+      this.request.params?.[RESULT_CODE_PARAM] ??
+      this.request.query?.[RESULT_CODE_PARAM];
     const reportYear = this.request.query?.[REPORT_YEAR_PARAM];
     const where: FindOptionsWhere<Result> = {};
     if (!resultCode) return null;
