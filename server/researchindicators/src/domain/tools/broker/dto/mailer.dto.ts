@@ -33,6 +33,8 @@ export class ConfigMessageDto {
   from?: FromBody;
   @ApiProperty()
   emailBody: EmailBody;
+
+  environment?: string;
 }
 
 export class ConfigMessageSocketDto {

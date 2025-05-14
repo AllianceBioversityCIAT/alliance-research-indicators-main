@@ -2,39 +2,46 @@ import {
   Controller,
   Get,
   HttpStatus,
-  Param,
   Patch,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { GreenChecksService } from './green-checks.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
+import {
+  GetResultVersion,
+  ParamOrQueryEnum,
+} from '../../shared/decorators/versioning.decorator';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 
 @ApiTags('Results')
 @ApiBearerAuth()
+@UseInterceptors(SetUpInterceptor)
 @Controller()
 export class GreenChecksController {
-  constructor(private readonly greenChecksService: GreenChecksService) {}
+  constructor(
+    private readonly greenChecksService: GreenChecksService,
+    private readonly _resultsUtil: ResultsUtil,
+  ) {}
 
-  @Get(':resultId(\\d+)')
-  async findGreenChecksByResultId(@Param('resultId') resultId: string) {
-    return this.greenChecksService.findByResultId(+resultId).then((result) =>
-      ResponseUtils.format({
-        data: result,
-        description: 'Green checks found',
-        status: HttpStatus.OK,
-      }),
-    );
+  @Get(RESULT_CODE)
+  @GetResultVersion()
+  async findGreenChecksByResultId() {
+    return this.greenChecksService
+      .findByResultId(this._resultsUtil.resultId)
+      .then((result) =>
+        ResponseUtils.format({
+          data: result,
+          description: 'Green checks found',
+          status: HttpStatus.OK,
+        }),
+      );
   }
 
   @Patch('change/status')
-  @ApiQuery({
-    name: 'resultId',
-    description: 'Result id',
-    type: 'number',
-    required: true,
-  })
   @ApiQuery({
     name: 'status',
     description: 'Status',
@@ -47,13 +54,13 @@ export class GreenChecksController {
     type: 'string',
     required: false,
   })
+  @GetResultVersion(ParamOrQueryEnum.QUERY)
   async submitResult(
-    @Query('resultId') resultId: string,
     @Query('comment') comment: string,
     @Query('status') statusId: string,
   ) {
     return this.greenChecksService
-      .changeStatus(+resultId, +statusId, comment)
+      .changeStatus(this._resultsUtil.resultId, +statusId, comment)
       .then(() =>
         ResponseUtils.format({
           description: 'Status changed to ' + ResultStatusEnum[+statusId],
@@ -62,10 +69,11 @@ export class GreenChecksController {
       );
   }
 
-  @Get('history/:resultId(\\d+)')
-  async findSubmissionHistoryByResultId(@Param('resultId') resultId: string) {
+  @Get(`history/${RESULT_CODE}`)
+  @GetResultVersion()
+  async findSubmissionHistoryByResultId() {
     return this.greenChecksService
-      .getSubmissionHistory(+resultId)
+      .getSubmissionHistory(this._resultsUtil.resultId)
       .then((result) =>
         ResponseUtils.format({
           data: result,

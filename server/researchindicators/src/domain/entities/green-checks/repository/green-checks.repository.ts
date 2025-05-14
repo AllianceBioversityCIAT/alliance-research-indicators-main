@@ -10,6 +10,7 @@ import {
   FindDataForSubmissionDto,
   FindGeneralDataTemplateDto,
 } from '../dto/find-general-data-template.dto';
+import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -156,6 +157,10 @@ export class GreenCheckRepository {
     	AND r.is_active = TRUE;      
     `;
 
+    const principal = await this.dataSource
+      .query(queryPrincipalInvestigator(), [userId, resultId])
+      .then((result) => result?.[0]?.is_principal ?? 0);
+
     const roles = await this.dataSource
       .query(query, [userId])
       .then((result) => result?.[0]?.validation);
@@ -164,7 +169,7 @@ export class GreenCheckRepository {
       .query(queryResult, [resultId, userId])
       .then((result) => result?.[0]?.validation);
 
-    return roles == 1 && result == 1;
+    return principal == 1 || (roles == 1 && result == 1);
   }
 
   async getDataForSubmissionResult(

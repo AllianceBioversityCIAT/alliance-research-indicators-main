@@ -1,11 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager, In, Not } from 'typeorm';
 import {
   ResultFiltersInterface,
   ResultRepository,
@@ -32,13 +31,8 @@ import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
-import {
-  AiRoarMiningApp,
-  ResponseAiRoarDto,
-} from '../../tools/broker/ai-roar-mining.app';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
-import { ReportYearService } from '../report-year/report-year.service';
 import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
 import { ResultCountriesService } from '../result-countries/result-countries.service';
 import { ResultRegionsService } from '../result-regions/result-regions.service';
@@ -55,10 +49,13 @@ import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
-import { ResultAiDto, RootAi } from './dto/result-ai.dto';
+import { CountryAreas, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-sharing-ip.service';
+import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
+import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
+import { ResultUser } from '../result-users/entities/result-user.entity';
 
 @Injectable()
 export class ResultsService {
@@ -72,9 +69,7 @@ export class ResultsService {
     private readonly _resultCapacitySharingService: ResultCapacitySharingService,
     private readonly _resultPolicyChangeService: ResultPolicyChangeService,
     private readonly currentUser: CurrentUserUtil,
-    private readonly _aiRoarMiningApp: AiRoarMiningApp,
     private readonly _alianceManagementApp: AlianceManagementApp,
-    private readonly _reportYearService: ReportYearService,
     private readonly _resultCountriesService: ResultCountriesService,
     private readonly _resultRegionsService: ResultRegionsService,
     private readonly _resultCountriesSubNationalsService: ResultCountriesSubNationalsService,
@@ -84,6 +79,7 @@ export class ResultsService {
     private readonly _indicatorsService: IndicatorsService,
     private readonly _clarisaSubNationalsService: ClarisaSubNationalsService,
     private readonly _resultCapSharingIpService: ResultCapSharingIpService,
+    private readonly _agressoUserStaffService: AllianceUserStaffService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -113,24 +109,27 @@ export class ResultsService {
       'contract_id',
       'indicator_id',
       'title',
+      'year',
     ]);
 
     if (!isValid) {
       throw new BadRequestException(`Invalid fields: ${invalidFields}`);
     }
 
-    const { description, indicator_id, title, contract_id } = createResult;
+    const { description, indicator_id, title, contract_id, year } =
+      createResult;
 
-    await this.mainRepo.findOne({ where: { title } }).then((result) => {
-      if (result) {
-        throw new ConflictException(
-          'The name of the result is already registered',
-        );
-      }
-    });
+    await this.mainRepo
+      .findOne({ where: { title, is_active: true } })
+      .then((result) => {
+        if (result) {
+          throw new ConflictException(
+            'The name of the result is already registered',
+          );
+        }
+      });
 
     const newOfficialCode = await this.newOfficialCode();
-    const reportYear = await this._reportYearService.activeReportYear();
 
     const result = await this.dataSource.transaction(async (manager) => {
       const result = await manager
@@ -139,8 +138,10 @@ export class ResultsService {
           description,
           indicator_id,
           title,
+          is_ai: createResult.is_ai ?? false,
           result_official_code: newOfficialCode,
-          report_year_id: reportYear.report_year,
+          report_year_id: year,
+          is_snapshot: false,
           ...this.currentUser.audit(SetAutitEnum.NEW),
         })
         .then((result) => {
@@ -251,9 +252,25 @@ export class ResultsService {
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
     return this.dataSource.transaction(async (manager) => {
+      const existsResult = await manager
+        .getRepository(this.mainRepo.target)
+        .findOne({
+          where: {
+            result_id: Not(result_id),
+            title: generalInformation.title,
+            is_active: true,
+          },
+        });
+
+      if (existsResult) {
+        throw new ConflictException(
+          'The name of the result is already registered',
+        );
+      }
       await manager.getRepository(this.mainRepo.target).update(result_id, {
         title: generalInformation.title,
         description: generalInformation.description,
+        report_year_id: generalInformation.year,
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 
@@ -297,24 +314,64 @@ export class ResultsService {
 
   async findGeneralInfo(resultId: number) {
     const result = await this.mainRepo.findOne({
-      select: ['title', 'description', 'result_id', 'created_at', 'updated_at'],
+      select: {
+        title: true,
+        description: true,
+        report_year_id: true,
+        result_id: true,
+        created_at: true,
+        updated_at: true,
+      },
       where: { result_id: resultId, is_active: true },
     });
-
     const keywords =
       await this._resultKeywordsService.findKeywordsByResultId(resultId);
 
     const mainContactPerson = await this._resultUsersService
       .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
       .then((data) => (data?.length > 0 ? data[0] : null));
-
+    const year = result.report_year_id;
+    delete result.report_year_id;
     const generalInformation: UpdateGeneralInformation = {
       ...result,
+      year,
       keywords: keywords.map((keyword) => keyword.keyword),
       main_contact_person: mainContactPerson,
     };
 
     return generalInformation;
+  }
+
+  async findResultVersions(resultCode: number) {
+    const select = {
+      result_id: true,
+      result_official_code: true,
+      report_year_id: true,
+    };
+    const where = {
+      result_official_code: resultCode,
+      is_active: true,
+    };
+    const versions = await this.mainRepo.find({
+      select,
+      where: {
+        ...where,
+        is_snapshot: true,
+      },
+    });
+
+    const live = await this.mainRepo.find({
+      select,
+      where: {
+        ...where,
+        is_snapshot: false,
+      },
+    });
+
+    return {
+      live,
+      versions: versions ?? [],
+    };
   }
 
   async updateResultAlignment(
@@ -389,6 +446,7 @@ export class ResultsService {
           name: true,
           indicator_id: true,
         },
+        report_year_id: true,
         result_id: true,
         result_official_code: true,
         result_status_id: true,
@@ -416,11 +474,12 @@ export class ResultsService {
       indicator_id: result?.indicator?.indicator_id,
       indicator_name: result?.indicator?.name,
       result_id: result?.result_id,
-      result_official_code: result?.result_id,
+      result_official_code: result?.result_official_code,
       status_id: result?.result_status_id,
       status_name: result?.result_status?.name,
       result_title: result?.title,
       created_by: result?.created_by,
+      report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
     };
   }
@@ -434,122 +493,121 @@ export class ResultsService {
       .then((result) => result != null);
   }
 
-  async formalizeResult(resultAi: number) {
-    const result = await this.dataSource.getRepository(TempResultAi).findOne({
-      where: { id: resultAi, is_active: true },
-    });
-
-    if (!result) {
-      throw new NotFoundException('Result not found');
-    }
-
-    const processedResult = result?.processed_object as ResultAiDto;
+  async formalizeResult(result: ResultRawAi) {
+    const processedResult = await this.createResultFromAiRoar(result);
     const newResult = await this.createResult(processedResult.result);
     await this.updateGeneralInfo(
       newResult.result_id,
       processedResult.generalInformation,
     );
     await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
-    await this._resultCapacitySharingService.update(
-      newResult.result_id,
-      processedResult.capSharing,
-    );
-
-    await this.dataSource.getRepository(TempResultAi).update(resultAi, {
-      result_id: newResult.result_id,
-      is_active: false,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
-    });
+    switch (newResult.indicator_id) {
+      case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
+        await this._resultCapacitySharingService.update(
+          newResult.result_id,
+          processedResult.capSharing,
+        );
+        break;
+      case IndicatorsEnum.POLICY_CHANGE:
+        await this._resultPolicyChangeService.update(
+          newResult.result_id,
+          processedResult.policyChange,
+        );
+        break;
+    }
 
     return newResult;
   }
 
-  async createResultFromAiRoar(file: Express.Multer.File) {
-    const dataTemp: RootAi = await this._aiRoarMiningApp
-      .create(file)
-      .then((response: ResponseAiRoarDto<RootAi>) => {
-        if (response.status !== HttpStatus.CREATED) {
-          throw new BadRequestException(response.errors);
-        }
-        return response.data;
-      });
-
-    if (!dataTemp?.results?.length) {
-      throw new BadRequestException(
-        'No se encontraron resultados para procesar',
+  async createResultFromAiRoar(result: ResultRawAi) {
+    const tmpNewData: ResultAiDto = new ResultAiDto();
+    {
+      const newResult: CreateResultDto = new CreateResultDto();
+      newResult.title = result.title;
+      newResult.description = result.description;
+      const indicator: Indicator = await this._indicatorsService.findByName(
+        result.indicator,
       );
+      newResult.indicator_id = indicator?.indicator_id;
+      newResult.contract_id = result.contract_code;
+      newResult.is_ai = true;
+      newResult.year = result?.year ?? new Date().getFullYear();
+
+      tmpNewData.result = newResult;
     }
 
-    for (const [index, result] of dataTemp.results.entries()) {
-      const tmpNewData: ResultAiDto = new ResultAiDto();
-      {
-        const newResult: CreateResultDto = new CreateResultDto();
-        newResult.title = result.title;
-        newResult.description = result.description;
-        const indicator: Indicator = await this._indicatorsService.findByName(
-          result.indicator,
+    {
+      const tempGeneralInformation: UpdateGeneralInformation =
+        new UpdateGeneralInformation();
+      tempGeneralInformation.title = result.title;
+      tempGeneralInformation.description = result.description;
+      tempGeneralInformation.keywords = result.keywords;
+      const userStaff: AllianceUserStaff =
+        await this._agressoUserStaffService.findUserByFirstAndLastName(
+          result?.alliance_main_contact_person_first_name,
+          result?.alliance_main_contact_person_last_name,
         );
-        newResult.indicator_id = indicator?.indicator_id;
-        newResult.contract_id = 'A100';
+      if (userStaff)
+        tempGeneralInformation.main_contact_person = {
+          user_id: userStaff.carnet,
+        } as ResultUser;
 
-        tmpNewData.result = newResult;
-      }
-
-      {
-        const tempGeneralInformation: UpdateGeneralInformation =
-          new UpdateGeneralInformation();
-        tempGeneralInformation.title = result.title;
-        tempGeneralInformation.description = result.description;
-        tempGeneralInformation.keywords = result.keywords;
-        tempGeneralInformation.main_contact_person = undefined;
-
-        tmpNewData.generalInformation = tempGeneralInformation;
-      }
-
-      {
-        const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
-        const geoscope: ClarisaGeoScope =
-          await this._clarisaGeoScopeService.findByName(result.geoscope.level);
-        tempGeoscope.geo_scope_id = geoscope?.code;
-
-        const tempCountries: ResultCountry[] = [];
-        if (result.geoscope?.sub_list?.length > 0) {
-          for (const country of result.geoscope.sub_list) {
-            const tempCountry: ResultCountry = new ResultCountry();
-            tempCountry.isoAlpha2 = country.country_code;
-            const tempSubNational: ResultCountriesSubNational[] =
-              await this._clarisaSubNationalsService
-                .findByNames(country.areas)
-                .then((response) =>
-                  response.map(
-                    (el) =>
-                      ({
-                        sub_national_id: el.id,
-                      }) as ResultCountriesSubNational,
-                  ),
-                );
-            tempCountry.result_countries_sub_nationals = tempSubNational;
-            tempCountries.push(tempCountry);
-          }
-        }
-        tempGeoscope.countries = tempCountries;
-
-        tmpNewData.geoScope = tempGeoscope;
-      }
-
-      tmpNewData.capSharing =
-        await this._resultCapacitySharingService.processedAiInfo(result);
-
-      const tempResultAi = await this.dataSource
-        .getRepository(TempResultAi)
-        .save({
-          processed_object: tmpNewData,
-          raw_object: result,
-          ...this.currentUser.audit(SetAutitEnum.BOTH),
-        });
-      dataTemp.results[index]['temp_result_ai'] = tempResultAi.id;
+      tmpNewData.generalInformation = tempGeneralInformation;
     }
-    return dataTemp;
+
+    {
+      const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
+      const geoscope: ClarisaGeoScope =
+        await this._clarisaGeoScopeService.findByName(result.geoscope.level);
+      tempGeoscope.geo_scope_id = geoscope?.code;
+
+      const tempCountries: ResultCountry[] = [];
+      if (result.geoscope?.sub_list?.length > 0) {
+        const tempParseCountries: Partial<CountryAreas>[] =
+          result.geoscope.sub_list.map((el) =>
+            typeof el === 'string' ? { country_code: el } : el,
+          );
+        for (const country of tempParseCountries) {
+          const tempCountry: ResultCountry = new ResultCountry();
+          tempCountry.isoAlpha2 = country.country_code;
+          const tempCountryAreas: string[] = country?.areas ?? [];
+          const tempSubNational: ResultCountriesSubNational[] =
+            await this._clarisaSubNationalsService
+              .findByNames(tempCountryAreas)
+              .then((response) =>
+                response.map(
+                  (el) =>
+                    ({
+                      sub_national_id: el.id,
+                    }) as ResultCountriesSubNational,
+                ),
+              );
+          tempCountry.result_countries_sub_nationals = tempSubNational;
+          tempCountries.push(tempCountry);
+        }
+      }
+      tempGeoscope.countries = tempCountries;
+
+      tmpNewData.geoScope = tempGeoscope;
+    }
+
+    switch (tmpNewData.result.indicator_id) {
+      case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
+        tmpNewData.capSharing =
+          await this._resultCapacitySharingService.processedAiInfo(result);
+        break;
+      case IndicatorsEnum.POLICY_CHANGE:
+        tmpNewData.policyChange =
+          await this._resultPolicyChangeService.processedAiInfo(result);
+        break;
+    }
+
+    this.dataSource.getRepository(TempResultAi).save({
+      processed_object: tmpNewData,
+      raw_object: result,
+      ...this.currentUser.audit(SetAutitEnum.BOTH),
+    });
+    return tmpNewData;
   }
 
   async saveGeoLocation(

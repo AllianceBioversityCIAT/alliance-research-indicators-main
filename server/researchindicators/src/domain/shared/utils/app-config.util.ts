@@ -255,6 +255,10 @@ export class AppConfig {
     return process.env.ARI_CLIENT_HOST;
   }
 
+  COMPLETE_CLIENT_HOST(path: string): string {
+    return `${process.env.ARI_CLIENT_HOST}${path}`;
+  }
+
   /**
    * Get the support email
    * @readonly
@@ -262,5 +266,23 @@ export class AppConfig {
    */
   get ARI_SUPPORT_EMAIL(): string {
     return process.env.ARI_SUPPORT_EMAIL;
+  }
+
+  /**
+   * Get the technical support email
+   * @readonly
+   * @type {string}
+   */
+  get TECHNICAL_SUPPORT(): string {
+    return process.env.ARI_TECHNICAL_SUPPORT;
+  }
+
+  /**
+   * Get the content support email
+   * @readonly
+   * @type {string}
+   */
+  get CONTENT_SUPPORT(): string {
+    return process.env.ARI_CONTENT_SUPPORT;
   }
 }

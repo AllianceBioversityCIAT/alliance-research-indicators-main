@@ -24,6 +24,7 @@ import { SessionTypesModule } from '../session-types/session-types.module';
 import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modalities.module';
 import { ClarisaSubNationalsModule } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.module';
 import { ResultCapSharingIpModule } from '../result-cap-sharing-ip/result-cap-sharing-ip.module';
+import { AllianceUserStaffModule } from '../alliance-user-staff/alliance-user-staff.module';
 
 @Module({
   controllers: [ResultsController],
@@ -49,6 +50,7 @@ import { ResultCapSharingIpModule } from '../result-cap-sharing-ip/result-cap-sh
     DeliveryModalitiesModule,
     ClarisaSubNationalsModule,
     ResultCapSharingIpModule,
+    AllianceUserStaffModule,
   ],
   providers: [
     ResultsService,

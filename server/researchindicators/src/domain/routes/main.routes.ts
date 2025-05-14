@@ -30,6 +30,7 @@ import { ReportYearModule } from '../entities/report-year/report-year.module';
 import { GreenChecksModule } from '../entities/green-checks/green-checks.module';
 import { IntellectualPropertyOwnersModule } from '../entities/intellectual-property-owners/intellectual-property-owners.module';
 import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/result-cap-sharing-ip.module';
+import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
 
 const capSharingChildren: Routes = [
   {
@@ -192,6 +193,10 @@ const children: Routes = [
   {
     path: 'announcement-setting',
     module: AnnouncementSettingsModule,
+  },
+  {
+    path: 'reporting-feedback',
+    module: ReportingFeedbackModule,
   },
 ];
 
