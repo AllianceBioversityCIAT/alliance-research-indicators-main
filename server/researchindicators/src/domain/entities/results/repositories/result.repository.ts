@@ -8,6 +8,7 @@ import { formatArrayToQuery } from '../../../shared/utils/queries.util';
 import { isEmpty } from '../../../shared/utils/object.utils';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
+import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 
 @Injectable()
 export class ResultRepository
@@ -341,21 +342,11 @@ export class ResultRepository
   }
 
   async metadataPrincipalInvestigator(result_id: number) {
-    const query = `
-		select r.result_id, 
-			ifnull(su.sec_user_id = ?, false) as is_principal
-		from results r
-			inner join result_contracts rc on r.result_id = rc.result_id 
-											and rc.is_primary = true
-			inner join agresso_contracts ac on ac.agreement_id = rc.contract_id 
-			left join sec_users su on su.first_name like concat('%',trim(SUBSTRING_INDEX(ac.project_lead_description , ',', -1)),'%')
-									and su.last_name  like concat('%',trim(SUBSTRING_INDEX(ac.project_lead_description , ',', 1)),'%')
-		where r.result_id = ?
-		limit 1;
-	`;
-    return this.query(query, [this.currentUserUtil.user_id, result_id]).then(
-      (res: { result_id: number; is_principal: number }[]) =>
-        res?.length ? res[0] : { result_id: result_id, is_principal: 0 },
+    return this.query(queryPrincipalInvestigator(), [
+      this.currentUserUtil.user_id,
+      result_id,
+    ]).then((res: { result_id: number; is_principal: number }[]) =>
+      res?.length ? res[0] : { result_id: result_id, is_principal: 0 },
     );
   }
 }

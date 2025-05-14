@@ -62,6 +62,17 @@ export class ResultEvidence extends AuditableEntity {
   })
   evidence_role_id!: number;
 
+  @ApiProperty({
+    type: Boolean,
+    name: 'is_private',
+  })
+  @Column('boolean', {
+    name: 'is_private',
+    nullable: true,
+    default: false,
+  })
+  is_private!: boolean;
+
   @ManyToOne(() => EvidenceRole, (role) => role.result_evidences)
   @JoinColumn({ name: 'evidence_role_id' })
   evidence_role!: EvidenceRole;
