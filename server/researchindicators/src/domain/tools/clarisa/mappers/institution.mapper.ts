@@ -5,6 +5,7 @@ import {
 } from '../entities/clarisa-institutions/dto/create-clarisa-institution.dto';
 import { ClarisaInstitution } from '../entities/clarisa-institutions/entities/clarisa-institution.entity';
 import { ClarisaInstitutionLocation } from '../entities/clarisa-institution-locations/entities/clarisa-institution-location.entity';
+import { isEmpty } from '../../../shared/utils/object.utils';
 
 export const institutionMapper = (
   data: CreateClarisaInstitutionDto,
@@ -21,12 +22,14 @@ export const institutionMapper = (
 const hqInstitutionsMapper = (
   hq: CountryOfficeDTO[],
 ): Partial<ClarisaInstitutionLocation>[] => {
-  return hq.map(
-    (hq): Partial<ClarisaInstitutionLocation> => ({
-      code: hq.code,
-      name: hq.name,
-      isoAlpha2: hq.isoAlpha2,
-      isHeadquarter: hq.isHeadquarter == 1,
-    }),
-  );
+  return hq
+    .map(
+      (hq): Partial<ClarisaInstitutionLocation> => ({
+        code: hq.code,
+        name: hq.name,
+        isoAlpha2: hq.isoAlpha2,
+        isHeadquarter: hq.isHeadquarter == 1,
+      }),
+    )
+    .filter((hq): boolean => !isEmpty(hq.code));
 };

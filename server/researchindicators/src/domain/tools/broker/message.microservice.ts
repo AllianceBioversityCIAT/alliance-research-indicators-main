@@ -25,6 +25,7 @@ export class MessageMicroservice extends BrokerConnectionBase {
     const parsedMessage: ConfigMessageSocketDto = {
       auth: this.auth,
       data: {
+        environment: this._appConfig.ARI_MIS_ENV,
         from: {
           email: this._appConfig.ARI_FROM_EMAIL,
           name: this._appConfig.ARI_FROM_EMAIL_NAME,

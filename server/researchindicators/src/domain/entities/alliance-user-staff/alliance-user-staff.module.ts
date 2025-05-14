@@ -5,5 +5,6 @@ import { AllianceUserStaffController } from './alliance-user-staff.controller';
 @Module({
   controllers: [AllianceUserStaffController],
   providers: [AllianceUserStaffService],
+  exports: [AllianceUserStaffService],
 })
 export class AllianceUserStaffModule {}

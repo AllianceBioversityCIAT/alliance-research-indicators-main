@@ -5,5 +5,6 @@ import { PolicyTypesController } from './policy-types.controller';
 @Module({
   controllers: [PolicyTypesController],
   providers: [PolicyTypesService],
+  exports: [PolicyTypesService],
 })
 export class PolicyTypesModule {}

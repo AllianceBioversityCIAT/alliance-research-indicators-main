@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, FindManyOptions } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { AgressoContractWhere } from './dto/agresso-contract.dto';
 import { cleanObject, parseBoolean } from '../../shared/utils/object.utils';
@@ -22,21 +22,13 @@ export class AgressoContractService {
     relations: Partial<StringKeys<AgressoContract>>,
   ) {
     const whereClean = cleanObject<AgressoContractWhere>(where);
-    const paginationClean = cleanObject<PaginationDto>(pagination);
-    const findQuery: FindManyOptions<AgressoContract> = {};
+    const relationsClean = parseBoolean<StringKeys<AgressoContract>>(relations);
 
-    if (Object.keys(whereClean).length !== 0) findQuery.where = whereClean;
-
-    if (Object.keys(paginationClean).length === 2) {
-      const offset = (paginationClean.page - 1) * paginationClean.limit;
-      findQuery.take = paginationClean.limit;
-      findQuery.skip = offset;
-    }
-    if (Object.keys(relations).length !== 0) {
-      findQuery.relations =
-        parseBoolean<StringKeys<AgressoContract>>(relations);
-    }
-    return this.dataSource.getRepository(AgressoContract).find(findQuery);
+    return this._agressoContractRepository.findAllContracts(
+      pagination,
+      whereClean,
+      relationsClean,
+    );
   }
 
   async findByName(
