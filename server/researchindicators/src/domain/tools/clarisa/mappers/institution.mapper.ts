@@ -9,27 +9,38 @@ import { isEmpty } from '../../../shared/utils/object.utils';
 
 export const institutionMapper = (
   data: CreateClarisaInstitutionDto,
-): DeepPartial<ClarisaInstitution> => ({
-  acronym: data?.acronym,
-  added: data?.added,
-  code: data.code,
-  name: data?.name,
-  websiteLink: data?.websiteLink,
-  institution_type_id: data?.institutionType?.code,
-  institution_locations: hqInstitutionsMapper(data.countryOfficeDTO),
-});
+  locationArray: Partial<ClarisaInstitutionLocation>[],
+): DeepPartial<ClarisaInstitution> => {
+  hqInstitutionsMapper(data?.countryOfficeDTO, data?.code, locationArray);
+  return {
+    acronym: data?.acronym,
+    added: data?.added,
+    code: data.code,
+    name: data?.name,
+    websiteLink: data?.websiteLink,
+    institution_type_id: data?.institutionType?.code,
+  };
+};
 
 const hqInstitutionsMapper = (
   hq: CountryOfficeDTO[],
-): Partial<ClarisaInstitutionLocation>[] => {
-  return hq
-    .map(
-      (hq): Partial<ClarisaInstitutionLocation> => ({
+  code: number,
+  locationArray: Partial<ClarisaInstitutionLocation>[],
+): void => {
+  hq.forEach((hq) => {
+    if (
+      !isEmpty(hq?.code) &&
+      !isEmpty(code) &&
+      !isEmpty(hq?.name) &&
+      !isEmpty(hq?.isoAlpha2)
+    ) {
+      locationArray.push({
         code: hq.code,
         name: hq.name,
         isoAlpha2: hq.isoAlpha2,
         isHeadquarter: hq.isHeadquarter == 1,
-      }),
-    )
-    .filter((hq): boolean => !isEmpty(hq.code));
+        institution_id: code,
+      });
+    }
+  });
 };

@@ -27,6 +27,7 @@ import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
 import { CreateSecretDto, MisSimpleInfoDto } from './dto/clarisa.types';
+import { ClarisaInstitutionLocation } from './entities/clarisa-institution-locations/entities/clarisa-institution-location.entity';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -105,11 +106,16 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
     );
 
     const institutionsPath = await this.ciService.clonePath();
+    const institutionLocation: Partial<ClarisaInstitutionLocation>[] = [];
     await this.base<CreateClarisaInstitutionDto, ClarisaInstitution>(
       institutionsPath,
       ClarisaInstitution,
-      (data) => institutionMapper(data),
+      (data) => institutionMapper(data, institutionLocation),
     );
+
+    await this.dataSource
+      .getRepository(ClarisaInstitutionLocation)
+      .save(institutionLocation);
 
     await this.base<ClarisaLeversRawDto, ClarisaLever>(
       ClarisaPathEnum.LEVERS,
