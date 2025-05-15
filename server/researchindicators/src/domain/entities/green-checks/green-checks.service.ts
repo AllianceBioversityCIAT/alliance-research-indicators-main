@@ -239,7 +239,7 @@ export class GreenChecksService {
       .getDataForReviseResult(resultId, toStatusId, fromStatusId)
       .then(async (data) => {
         data['url'] =
-          `${this.appConfig.ARI_CLIENT_HOST}/result/${resultId}/general-information`;
+          `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`;
         const template = await this.templateService._getTemplate(
           templateName,
           data,
