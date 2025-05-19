@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -56,6 +57,7 @@ import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-s
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
 import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../result-users/entities/result-user.entity';
+import { customErrorResponse } from '../../shared/utils/response.utils';
 
 @Injectable()
 export class ResultsService {
@@ -120,12 +122,17 @@ export class ResultsService {
       createResult;
 
     await this.mainRepo
-      .findOne({ where: { title, is_active: true } })
+      .findOne({
+        where: { title, is_active: true },
+        relations: { indicator: true },
+      })
       .then((result) => {
         if (result) {
-          throw new ConflictException(
-            'The name of the result is already registered',
-          );
+          throw customErrorResponse<Result>({
+            message: result,
+            name: `Please enter a unique title. Review the existing result by selecting this link: ${result.indicator.name} - ${result.title}`,
+            status: HttpStatus.CONFLICT,
+          });
         }
       });
 
