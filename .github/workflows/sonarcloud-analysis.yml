@@ -2,9 +2,9 @@ name: SonarCloud Analysis - NestJS Backend
 
 on:
   push:
-    branches: [dev, staging, main, staging-action]
+    branches: [dev, staging, main]
   pull_request:
-    branches: [dev, staging, main, staging-action]
+    branches: [dev, staging, main]
 
 jobs:
   sonarcloud:
