@@ -12,7 +12,7 @@ COPY package*.json ./
 FROM base AS development
 
 # Install all dependencies (scripts allowed in dev)
-RUN npm install
+RUN npm install  --ignore-scripts
 
 # Copy source code and config files
 COPY src ./src
