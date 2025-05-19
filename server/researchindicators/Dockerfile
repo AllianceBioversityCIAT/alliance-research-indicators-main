@@ -7,6 +7,7 @@ WORKDIR /app
 # Copy dependency files
 COPY package*.json ./
 
+
 #################### DEVELOPMENT STAGE ####################
 FROM base AS development
 
@@ -17,6 +18,7 @@ RUN npm install
 COPY src ./src
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
+COPY eslint.config.mjs ./
 
 # Build the app
 RUN npm run build
@@ -27,20 +29,23 @@ EXPOSE 3000
 # Start the development server (acceptable to use npm here)
 CMD ["npm", "run", "start"]
 
+
 #################### BUILD STAGE ####################
 FROM base AS build
 
 # Install production dependencies securely (no script execution)
-RUN npm ci --only=production
+RUN npm ci --only=production --ignore-scripts
 
 # Copy source code and config files
 COPY src ./src
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY package*.json ./
+COPY eslint.config.mjs ./
 
 # Build the app
 RUN npm run build
+
 
 #################### PRODUCTION STAGE ####################
 FROM --platform=linux/amd64 node:20.13.1-alpine AS production
