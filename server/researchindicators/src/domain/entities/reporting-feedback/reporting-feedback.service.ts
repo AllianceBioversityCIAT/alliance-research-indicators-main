@@ -17,14 +17,14 @@ export class ReportingFeedbackService {
     let templateName: TemplateEnum;
     let subject: string;
     let emailTo: string;
-    let isProd = this._appConfig.ARI_IS_PRODUCTION ? '' : ' Simulation';
+    const isProd = this._appConfig.ARI_IS_PRODUCTION ? '' : ' Simulation';
     if (feedbackData.type == AskForHelpTypeEnum.TECHNICAL_SUPPORT) {
       templateName = TemplateEnum.ASK_HELP_TECHNICAL;
-      subject = `[STAR] Technical Support Request${isProd}`;
+      subject = `[${this._appConfig.ARI_MIS}] Technical Support Request${isProd}`;
       emailTo = this._appConfig.TECHNICAL_SUPPORT;
     } else if (feedbackData.type == AskForHelpTypeEnum.CONTENT_SUPPORT) {
       templateName = TemplateEnum.ASK_HELP_CONTENT;
-      subject = `[STAR] Content Support Request${isProd}`;
+      subject = `[${this._appConfig.ARI_MIS}] Content Support Request${isProd}`;
       emailTo = this._appConfig.CONTENT_SUPPORT;
     }
 

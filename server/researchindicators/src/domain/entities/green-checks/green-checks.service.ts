@@ -23,6 +23,7 @@ import {
   SubmissionEmailTemplateDataDto,
 } from './dto/find-general-data-template.dto';
 import { AppConfig } from '../../shared/utils/app-config.util';
+import { ResultsUtil } from '../../shared/utils/results.util';
 
 @Injectable()
 export class GreenChecksService {
@@ -33,6 +34,7 @@ export class GreenChecksService {
     private readonly messageMicroservice: MessageMicroservice,
     private readonly templateService: TemplateService,
     private readonly appConfig: AppConfig,
+    private readonly _resultsUtil: ResultsUtil,
   ) {}
 
   async findByResultId(resultId: number) {
@@ -117,7 +119,7 @@ export class GreenChecksService {
               ResultStatusEnum.REVISED,
               TemplateEnum.REVISE_RESULT,
               (data) =>
-                `[ROAR] Action Required: Revision Requested for Result ${data.title}`,
+                `[${this.appConfig.ARI_MIS}] Action Required: Revision Requested for Result ${data.title}`,
             );
             break;
           case ResultStatusEnum.REJECTED:
@@ -126,7 +128,9 @@ export class GreenChecksService {
               ResultStatusEnum.SUBMITTED,
               ResultStatusEnum.REJECTED,
               TemplateEnum.REJECTED_RESULT,
-              (data) => `[ROAR] Result ${data.result_id} Rejected`,
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              (data) =>
+                `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode} Rejected`,
             );
             break;
           case ResultStatusEnum.APPROVED:
@@ -135,7 +139,9 @@ export class GreenChecksService {
               ResultStatusEnum.SUBMITTED,
               ResultStatusEnum.APPROVED,
               TemplateEnum.APPROVAL_RESULT,
-              (data) => `[ROAR] Result ${data.result_id} has been approved`,
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              (data) =>
+                `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode} has been approved`,
             );
         }
         return data;
@@ -215,7 +221,7 @@ export class GreenChecksService {
           resultId,
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           (data) =>
-            `[ROAR] Result ${resultId}, Action Required: Review New Result Submission`,
+            `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode}, Action Required: Review New Result Submission`,
         );
       }
       return res;
@@ -233,7 +239,7 @@ export class GreenChecksService {
       .getDataForReviseResult(resultId, toStatusId, fromStatusId)
       .then(async (data) => {
         data['url'] =
-          `${this.appConfig.ARI_CLIENT_HOST}/result/${resultId}/general-information`;
+          `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`;
         const template = await this.templateService._getTemplate(
           templateName,
           data,

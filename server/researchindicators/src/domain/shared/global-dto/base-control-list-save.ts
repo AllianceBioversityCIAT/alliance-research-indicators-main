@@ -6,7 +6,7 @@ export abstract class BaseControlListSave<
 > {
   protected readonly _logger: Logger;
   constructor(
-    protected readonly dataSource: DataSource,
+    public readonly dataSource: DataSource,
     protected readonly connection: Connection,
     logger: Logger,
   ) {

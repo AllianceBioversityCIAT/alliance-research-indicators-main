@@ -17,3 +17,14 @@ export class ServiceResponseDto<T> {
   @ApiProperty()
   errors?: any;
 }
+
+export class ServiceResponseErrorDto<T> {
+  @ApiProperty()
+  status: HttpStatus;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  message: T;
+}
