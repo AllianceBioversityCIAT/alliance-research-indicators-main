@@ -9,7 +9,7 @@ COPY package*.json ./
 
 
 #################### DEVELOPMENT STAGE ####################
-FROM base AS development
+FROM base AS development --ignore-scripts
 
 # Install all dependencies (scripts allowed in dev)
 RUN npm install
