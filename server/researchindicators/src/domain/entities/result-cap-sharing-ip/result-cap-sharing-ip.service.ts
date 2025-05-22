@@ -40,6 +40,11 @@ export class ResultCapSharingIpService {
       requires_futher_development: updateData.requires_futher_development,
       asset_ip_owner_id: updateData.asset_ip_owner,
       potential_asset: updateData.potential_asset,
+      publicity_restriction_description:
+        updateData.publicity_restriction_description,
+      requires_futher_development_description:
+        updateData.requires_futher_development_description,
+      potential_asset_description: updateData.potential_asset_description,
       ...this.currentUser.audit(SetAutitEnum.UPDATE),
     });
 

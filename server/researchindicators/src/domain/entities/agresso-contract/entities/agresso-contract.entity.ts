@@ -54,7 +54,6 @@ export class AgressoContract extends AuditableEntity {
   @Column('text', {
     name: 'departmentId',
     nullable: true,
-    select: false,
   })
   departmentId?: string;
 

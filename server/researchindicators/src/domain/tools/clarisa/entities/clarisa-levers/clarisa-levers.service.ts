@@ -17,8 +17,8 @@ export class ClarisaLeversService extends ControlListBaseService<
     );
   }
 
-  homologateData(data: string) {
-    const omologate = {
+  homologatedData(data: string) {
+    const homologated = {
       L8: 'Lever 8',
       L7: 'Lever 7',
       L6: 'Lever 6',
@@ -28,6 +28,6 @@ export class ClarisaLeversService extends ControlListBaseService<
       L2: 'Lever 2',
       L1: 'Lever 1',
     };
-    return omologate[data?.toUpperCase()?.trim()] ?? null;
+    return homologated[data?.toUpperCase()?.trim()] ?? null;
   }
 }
