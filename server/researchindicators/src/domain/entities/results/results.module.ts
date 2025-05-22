@@ -25,6 +25,8 @@ import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modali
 import { ClarisaSubNationalsModule } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.module';
 import { ResultCapSharingIpModule } from '../result-cap-sharing-ip/result-cap-sharing-ip.module';
 import { AllianceUserStaffModule } from '../alliance-user-staff/alliance-user-staff.module';
+import { ClarisaLeversModule } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.module';
+import { AgressoContractModule } from '../agresso-contract/agresso-contract.module';
 
 @Module({
   controllers: [ResultsController],
@@ -51,6 +53,8 @@ import { AllianceUserStaffModule } from '../alliance-user-staff/alliance-user-st
     ClarisaSubNationalsModule,
     ResultCapSharingIpModule,
     AllianceUserStaffModule,
+    ClarisaLeversModule,
+    AgressoContractModule,
   ],
   providers: [
     ResultsService,
