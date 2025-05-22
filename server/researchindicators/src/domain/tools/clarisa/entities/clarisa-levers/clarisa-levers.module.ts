@@ -5,5 +5,6 @@ import { ClarisaLeversController } from './clarisa-levers.controller';
 @Module({
   controllers: [ClarisaLeversController],
   providers: [ClarisaLeversService],
+  exports: [ClarisaLeversService],
 })
 export class ClarisaLeversModule {}
