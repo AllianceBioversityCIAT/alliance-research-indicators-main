@@ -19,11 +19,25 @@ export class ResultCapSharingIp extends AuditableEntity {
   publicity_restriction?: boolean;
 
   @Column({
+    name: 'publicity_restriction_description',
+    type: 'text',
+    nullable: true,
+  })
+  publicity_restriction_description?: string;
+
+  @Column({
     name: 'requires_futher_development',
     type: 'boolean',
     nullable: true,
   })
   requires_futher_development?: boolean;
+
+  @Column({
+    name: 'requires_futher_development_description',
+    type: 'text',
+    nullable: true,
+  })
+  requires_futher_development_description?: string;
 
   @Column({
     name: 'asset_ip_owner_id',
@@ -45,6 +59,13 @@ export class ResultCapSharingIp extends AuditableEntity {
     nullable: true,
   })
   potential_asset?: boolean;
+
+  @Column({
+    name: 'potential_asset_description',
+    type: 'text',
+    nullable: true,
+  })
+  potential_asset_description?: string;
 
   @ManyToOne(
     () => IntellectualPropertyOwner,

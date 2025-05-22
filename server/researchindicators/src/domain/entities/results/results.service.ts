@@ -173,7 +173,7 @@ export class ResultsService {
 
       const agressoContract =
         await this._agressoContractService.findOne(contract_id);
-      const lever = this._clarisaLeversService.homologateData(
+      const lever = this._clarisaLeversService.homologatedData(
         agressoContract.departmentId,
       );
       const clarisaLever = await this._clarisaLeversService.findByName(lever);
