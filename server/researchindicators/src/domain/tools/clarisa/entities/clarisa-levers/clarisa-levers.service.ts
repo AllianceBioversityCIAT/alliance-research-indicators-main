@@ -9,7 +9,12 @@ export class ClarisaLeversService extends ControlListBaseService<
   Repository<ClarisaLever>
 > {
   constructor(dataSource: DataSource, currentUser: CurrentUserUtil) {
-    super(ClarisaLever, dataSource.getRepository(ClarisaLever), currentUser);
+    super(
+      ClarisaLever,
+      dataSource.getRepository(ClarisaLever),
+      currentUser,
+      'short_name',
+    );
   }
 
   homologateData(data: string) {
