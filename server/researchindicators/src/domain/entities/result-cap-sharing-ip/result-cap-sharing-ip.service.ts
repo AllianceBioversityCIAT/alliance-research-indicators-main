@@ -63,6 +63,11 @@ export class ResultCapSharingIpService {
         requires_futher_development: result?.requires_futher_development,
         asset_ip_owner: result?.asset_ip_owner_id,
         potential_asset: result?.potential_asset,
+        potential_asset_description: result?.potential_asset_description,
+        publicity_restriction_description:
+          result?.publicity_restriction_description,
+        requires_futher_development_description:
+          result?.requires_futher_development_description,
       }));
   }
 }
