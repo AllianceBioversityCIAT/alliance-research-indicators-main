@@ -58,6 +58,9 @@ import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-s
 import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../result-users/entities/result-user.entity';
 import { customErrorResponse } from '../../shared/utils/response.utils';
+import { ResultLever } from '../result-levers/entities/result-lever.entity';
+import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
+import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
 
 @Injectable()
 export class ResultsService {
@@ -82,6 +85,8 @@ export class ResultsService {
     private readonly _clarisaSubNationalsService: ClarisaSubNationalsService,
     private readonly _resultCapSharingIpService: ResultCapSharingIpService,
     private readonly _agressoUserStaffService: AllianceUserStaffService,
+    private readonly _clarisaLeversService: ClarisaLeversService,
+    private readonly _agressoContractService: AgressoContractService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -165,6 +170,29 @@ export class ResultsService {
         result.indicator_id,
         manager,
       );
+
+      const agressoContract =
+        await this._agressoContractService.findOne(contract_id);
+      const lever = this._clarisaLeversService.homologateData(
+        agressoContract.departmentId,
+      );
+      const clarisaLever = await this._clarisaLeversService.findByName(lever);
+
+      if (clarisaLever) {
+        const primaryLever: Partial<ResultLever> = {
+          lever_id: String(clarisaLever.id),
+          is_primary: true,
+        };
+
+        this._resultLeversService.create<LeverRolesEnum>(
+          result.result_id,
+          primaryLever,
+          'lever_id',
+          LeverRolesEnum.ALIGNMENT,
+          manager,
+          ['is_primary'],
+        );
+      }
 
       const primaryContract: Partial<ResultContract> = {
         contract_id: contract_id,

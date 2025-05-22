@@ -2,6 +2,7 @@ import {
   FindOptionsRelations,
   FindOptionsWhere,
   In,
+  Like,
   Repository,
 } from 'typeorm';
 import { AuditableEntity } from './auditable.entity';
@@ -29,7 +30,7 @@ export abstract class ControlListBaseService<
   async findByName(name: string): Promise<Entity> {
     const where: FindOptionsWhere<Entity> = {
       is_active: true,
-      [this.findByNameKey]: name,
+      [this.findByNameKey]: Like(`%${name}%`),
     } as FindOptionsWhere<Entity>;
     return this.mainRepo.findOne({
       where: where,

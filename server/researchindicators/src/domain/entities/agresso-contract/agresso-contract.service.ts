@@ -31,6 +31,14 @@ export class AgressoContractService {
     );
   }
 
+  async findOne(contractId: string) {
+    return this._agressoContractRepository.findOne({
+      where: {
+        agreement_id: contractId,
+      },
+    });
+  }
+
   async findByName(
     first_name: string,
     last_name: string,
