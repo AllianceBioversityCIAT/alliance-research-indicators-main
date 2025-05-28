@@ -110,7 +110,7 @@ export class GreenChecksService {
         tempComment,
         currentStatus,
         status,
-      ).then((data) => {
+      ).then(async (data) => {
         switch (status) {
           case ResultStatusEnum.REVISED:
             this.prepareEmail(
@@ -134,6 +134,9 @@ export class GreenChecksService {
             );
             break;
           case ResultStatusEnum.APPROVED:
+            const result = await this.greenCheckRepository.createSnapshot(
+              this._resultsUtil.resultCode,
+            );
             this.prepareEmail(
               resultId,
               ResultStatusEnum.SUBMITTED,
@@ -143,6 +146,7 @@ export class GreenChecksService {
               (data) =>
                 `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode} has been approved`,
             );
+            return result;
         }
         return data;
       });
@@ -311,5 +315,42 @@ export class GreenChecksService {
 
   async getSubmissionHistory(resultId: number): Promise<SubmissionHistory[]> {
     return this.greenCheckRepository.getSubmissionHistory(resultId);
+  }
+
+  async newReportingCycle(
+    resultCode: number,
+    newReportYear: number,
+  ): Promise<Result> {
+    const repoResult = this.dataSource.getRepository(Result);
+    const tempResult = repoResult.findOne({
+      where: {
+        result_official_code: resultCode,
+        is_active: true,
+        is_snapshot: false,
+        result_status_id: ResultStatusEnum.APPROVED,
+      },
+    });
+
+    if (!tempResult) {
+      throw new BadRequestException(
+        'Result not found or not approved for new reporting cycle',
+      );
+    }
+
+    return repoResult
+      .update(resultCode, {
+        report_year_id: newReportYear,
+        result_status_id: ResultStatusEnum.DRAFT,
+        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+      })
+      .then(() => {
+        return this.dataSource.getRepository(Result).findOne({
+          where: {
+            result_official_code: resultCode,
+            is_active: true,
+            is_snapshot: false,
+          },
+        });
+      });
   }
 }
