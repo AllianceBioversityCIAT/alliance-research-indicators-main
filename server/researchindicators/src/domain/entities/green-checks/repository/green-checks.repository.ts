@@ -202,6 +202,11 @@ export class GreenCheckRepository {
     return result;
   }
 
+  async createSnapshot(resultCode: number) {
+    const query = `CALL SP_versioning(?);`;
+    return this.dataSource.query<Result>(query, [resultCode]);
+  }
+
   async getDataForReviseResult(
     resultId: number,
     toStatusId: ResultStatusEnum,
