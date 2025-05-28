@@ -7,7 +7,7 @@ export function GetResultVersion(
 ) {
   const dataResultConfig = {
     name: RESULT_CODE_PARAM,
-    required: true,
+    required: config === ParamOrQueryEnum.PARAM,
     type: Number,
     description: 'Is a reference to the result Code',
   };
