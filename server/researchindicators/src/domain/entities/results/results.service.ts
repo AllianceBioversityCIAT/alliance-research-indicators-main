@@ -382,6 +382,7 @@ export class ResultsService {
       result_id: true,
       result_official_code: true,
       report_year_id: true,
+      result_status_id: true,
     };
     const where = {
       result_official_code: resultCode,
