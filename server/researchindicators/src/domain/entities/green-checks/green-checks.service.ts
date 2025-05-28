@@ -338,11 +338,18 @@ export class GreenChecksService {
     }
 
     return repoResult
-      .update(resultCode, {
-        report_year_id: newReportYear,
-        result_status_id: ResultStatusEnum.DRAFT,
-        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
-      })
+      .update(
+        {
+          result_official_code: resultCode,
+          is_snapshot: false,
+          is_active: true,
+        },
+        {
+          report_year_id: newReportYear,
+          result_status_id: ResultStatusEnum.DRAFT,
+          ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+        },
+      )
       .then(() => {
         return this.dataSource.getRepository(Result).findOne({
           where: {
