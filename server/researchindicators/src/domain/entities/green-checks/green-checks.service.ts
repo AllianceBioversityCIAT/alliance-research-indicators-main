@@ -136,6 +136,7 @@ export class GreenChecksService {
           case ResultStatusEnum.APPROVED:
             const result = await this.greenCheckRepository.createSnapshot(
               this._resultsUtil.resultCode,
+              this._resultsUtil.nullRportYearId,
             );
             this.prepareEmail(
               resultId,
