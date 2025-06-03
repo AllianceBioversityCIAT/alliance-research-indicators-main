@@ -359,6 +359,16 @@ export class GreenChecksService {
             is_snapshot: false,
           },
         });
+      })
+      .then(async (result) => {
+        await this.saveHistory(
+          result.result_id,
+          null,
+          result.result_status_id,
+          ResultStatusEnum.DRAFT,
+        );
+
+        return result;
       });
   }
 }
