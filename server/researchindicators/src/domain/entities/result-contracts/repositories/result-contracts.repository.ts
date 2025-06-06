@@ -72,6 +72,7 @@ export class ResultContractsRepository extends Repository<ResultContract> {
     	su.sec_user_id = r.created_by
     where
     	r.is_active = TRUE
+      and r.is_snapshot = FALSE
     	and rc.is_active = TRUE
     	and ac.agreement_id = ?`;
 
