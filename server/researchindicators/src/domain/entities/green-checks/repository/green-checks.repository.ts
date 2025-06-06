@@ -203,7 +203,7 @@ export class GreenCheckRepository {
   }
 
   async createSnapshot(resultCode: number, reportYear: number) {
-    const deleteQuery = `CALL SP_delete_version(?, ?)`;
+    const deleteQuery = `CALL SP_delete_result_version(?, ?)`;
     const snapshotResult = await this.dataSource.getRepository(Result).findOne({
       where: {
         is_snapshot: true,
