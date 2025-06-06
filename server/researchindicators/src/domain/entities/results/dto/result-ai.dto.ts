@@ -132,7 +132,7 @@ export class ResultRawAi {
     description: 'Training modality (online, in-person, hybrid)',
     required: false,
   })
-  training_modality: string;
+  delivery_modality: string;
 
   @ApiProperty({
     type: String,
@@ -191,4 +191,11 @@ export class ResultRawAi {
     required: false,
   })
   stage_in_policy_process: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Degree of policy change achieved',
+    required: false,
+  })
+  degree: string;
 }
