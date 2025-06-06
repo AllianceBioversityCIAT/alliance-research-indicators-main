@@ -294,6 +294,7 @@ export class ResultsService {
             result_id: Not(result_id),
             title: generalInformation.title,
             is_active: true,
+            is_snapshot: false,
           },
         });
 
