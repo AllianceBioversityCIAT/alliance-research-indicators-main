@@ -292,7 +292,7 @@ export abstract class BaseOpenSearchApi<
     ids?: number[],
   ): Promise<string[]> {
     return this._mainRepo
-      .findDataForOpenSearch(FindAllOptions.SHOW_ALL, ids)
+      .findDataForOpenSearch(FindAllOptions.SHOW_ONLY_ACTIVE, ids)
       .then((queryResult) => {
         if (!queryResult.length) {
           throw new Error('No data found');
