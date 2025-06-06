@@ -10,6 +10,7 @@ import { SessionLengthsModule } from '../session-lengths/session-lengths.module'
 import { SessionTypesModule } from '../session-types/session-types.module';
 import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modalities.module';
 import { SessionFormatsModule } from '../session-formats/session-formats.module';
+import { DegreesModule } from '../degrees/degrees.module';
 
 @Module({
   controllers: [ResultCapacitySharingController],
@@ -22,6 +23,7 @@ import { SessionFormatsModule } from '../session-formats/session-formats.module'
     SessionTypesModule,
     SessionFormatsModule,
     DeliveryModalitiesModule,
+    DegreesModule,
   ],
   providers: [ResultCapacitySharingService, AiRoarMiningApp],
   exports: [ResultCapacitySharingService],
