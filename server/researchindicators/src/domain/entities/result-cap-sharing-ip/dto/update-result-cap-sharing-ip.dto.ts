@@ -12,11 +12,27 @@ export class UpdateResultCapSharingIpDto {
 
   @ApiProperty({
     required: false,
+    description: 'Description of the publicity restriction',
+    example: 'Description of the publicity restriction',
+    type: String,
+  })
+  public publicity_restriction_description?: string;
+
+  @ApiProperty({
+    required: false,
     description: 'Requires further development',
     example: true,
     type: Boolean,
   })
   public requires_futher_development?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'Description of the further development required',
+    example: 'Description of the further development required',
+    type: String,
+  })
+  public requires_futher_development_description?: string;
 
   @ApiProperty({
     required: false,
@@ -42,4 +58,12 @@ export class UpdateResultCapSharingIpDto {
     type: Boolean,
   })
   public potential_asset?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'Description of the potential asset',
+    example: 'Description of the potential asset',
+    type: String,
+  })
+  public potential_asset_description?: string;
 }

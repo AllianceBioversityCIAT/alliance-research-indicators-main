@@ -202,6 +202,24 @@ export class GreenCheckRepository {
     return result;
   }
 
+  async createSnapshot(resultCode: number, reportYear: number) {
+    const deleteQuery = `CALL SP_delete_result_version(?, ?)`;
+    const snapshotResult = await this.dataSource.getRepository(Result).findOne({
+      where: {
+        is_snapshot: true,
+        result_official_code: resultCode,
+        report_year_id: reportYear,
+      },
+    });
+
+    if (snapshotResult) {
+      await this.dataSource.query(deleteQuery, [resultCode, reportYear]);
+    }
+
+    const query = `CALL SP_versioning(?);`;
+    return this.dataSource.query<Result>(query, [resultCode]);
+  }
+
   async getDataForReviseResult(
     resultId: number,
     toStatusId: ResultStatusEnum,

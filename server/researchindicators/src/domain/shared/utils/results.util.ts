@@ -61,6 +61,14 @@ export class ResultsUtil {
     if (!this.currentResult) throw new BadRequestException('Result not found');
     return this.currentResult.result_official_code;
   }
+
+  get nullResultCode(): number {
+    return this.currentResult?.result_official_code ?? null;
+  }
+
+  get nullReportYearId(): number {
+    return this.currentResult?.report_year_id ?? null;
+  }
 }
 
 export const RESULT_CODE = ':resultCode(\\d+)';

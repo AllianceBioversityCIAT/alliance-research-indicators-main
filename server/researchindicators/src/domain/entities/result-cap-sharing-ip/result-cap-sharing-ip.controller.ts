@@ -39,6 +39,7 @@ export class ResultCapSharingIpController {
   }
 
   @Patch(RESULT_CODE)
+  @GetResultVersion()
   update(@Body() updateData: UpdateResultCapSharingIpDto) {
     return this.resultCapSharingIpService
       .update(this._resultsUtil.resultId, updateData)

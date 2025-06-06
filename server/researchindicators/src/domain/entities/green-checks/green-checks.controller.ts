@@ -2,13 +2,14 @@ import {
   Controller,
   Get,
   HttpStatus,
+  Param,
   Patch,
   Query,
   UseInterceptors,
 } from '@nestjs/common';
 import { GreenChecksService } from './green-checks.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
-import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import {
@@ -78,6 +79,25 @@ export class GreenChecksController {
         ResponseUtils.format({
           data: result,
           description: 'Submission history found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @Patch(`new-reporting-cycle/${RESULT_CODE}/year/:newReportYear([0-9]{4})`)
+  @ApiParam({
+    name: 'newReportYear',
+    type: Number,
+    required: true,
+    description: 'The year for the new reporting cycle',
+  })
+  @GetResultVersion(ParamOrQueryEnum.PARAM)
+  async newReportingCycle(@Param('newReportYear') reportYear: string) {
+    return this.greenChecksService
+      .newReportingCycle(this._resultsUtil.resultCode, +reportYear)
+      .then(() =>
+        ResponseUtils.format({
+          description: 'New reporting cycle created',
           status: HttpStatus.OK,
         }),
       );

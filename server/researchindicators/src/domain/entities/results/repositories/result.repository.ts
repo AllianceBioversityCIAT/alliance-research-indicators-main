@@ -54,6 +54,7 @@ export class ResultRepository
 			inner join result_status rs on rs.result_status_id = r.result_status_id 
 			left join result_keywords rk on rk.result_id = r.result_id 
 		where 1 = 1
+		and r.is_snapshot = FALSE
 		${ids && ids.length > 0 ? `and r.result_id in (${ids.join(',')})` : ''}
 		${option !== FindAllOptions.SHOW_ALL ? 'and r.is_active = 1' : ''}
 		GROUP by r.result_id,
@@ -296,6 +297,11 @@ export class ResultRepository
 		r.geo_scope_id,
 		r.result_status_id,
 		r.report_year_id,
+		IF(
+		COUNT(r2.report_year_id) = 0,
+		JSON_ARRAY(),
+		JSON_ARRAYAGG(r2.report_year_id)
+		) AS snapshot_years,
 		r.is_active
 		${queryParts.result_audit_data?.select}
 		${queryParts.result_status?.select}
@@ -303,6 +309,9 @@ export class ResultRepository
 		${queryParts.levers?.select}
 		${queryParts.contracts?.select}
 	FROM results r
+		LEFT JOIN results r2 ON r.result_official_code = r2.result_official_code
+							AND r2.is_active = TRUE
+							AND r2.is_snapshot = TRUE
 		${queryParts.result_audit_data?.join}
 		${queryParts.result_status?.join}
 		${queryParts.indicators?.join}
@@ -310,6 +319,7 @@ export class ResultRepository
 		${queryParts.levers?.join}
 		WHERE 1 = 1
 		AND r.is_active = TRUE
+		AND r.is_snapshot = FALSE
 		${haveContractsCodes ? `AND ac.agreement_id IN (${formatArrayToQuery<string>(filters.contract_codes)})` : ''}
 		${haveLeversCodes ? `AND cl.id IN (${formatArrayToQuery<string>(filters.lever_codes)})` : ``}
 		${haveIndicatorsCodes ? `AND r.indicator_id IN (${formatArrayToQuery<string>(filters.indicator_code)})` : ''}

@@ -25,11 +25,11 @@ import { Result } from '../results/entities/result.entity';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { ResultRawAi } from '../results/dto/result-ai.dto';
 import { AiRoarMiningApp } from '../../tools/broker/ai-roar-mining.app';
-import { SessionTypesService } from '../session-types/session-types.service';
 import { SessionLengthsService } from '../session-lengths/session-lengths.service';
 import { DeliveryModalitiesService } from '../delivery-modalities/delivery-modalities.service';
 import { DeliveryModality } from '../delivery-modalities/entities/delivery-modality.entity';
 import { SessionFormatsService } from '../session-formats/session-formats.service';
+import { DegreesService } from '../degrees/degrees.service';
 @Injectable()
 export class ResultCapacitySharingService {
   private mainRepo: Repository<ResultCapacitySharing>;
@@ -42,10 +42,10 @@ export class ResultCapacitySharingService {
     private readonly _currentUser: CurrentUserUtil,
     private readonly _updateDataUtil: UpdateDataUtil,
     private readonly _aiRoarMiningApp: AiRoarMiningApp,
-    private readonly _sessionTypesService: SessionTypesService,
     private readonly _sessionLengthsService: SessionLengthsService,
     private readonly _deliveryModalitiesService: DeliveryModalitiesService,
     private readonly _sessionFormatsService: SessionFormatsService,
+    private readonly _degreesService: DegreesService,
   ) {
     this.mainRepo = dataSource.getRepository(ResultCapacitySharing);
   }
@@ -85,7 +85,7 @@ export class ResultCapacitySharingService {
 
     const clean_sessionFormat = <string>(
       this._aiRoarMiningApp.cleanDataNotProvided(
-        rawData.training_modality,
+        rawData.delivery_modality,
         'string',
       )
     );
@@ -93,7 +93,8 @@ export class ResultCapacitySharingService {
       await this._deliveryModalitiesService.findByName(clean_sessionFormat);
     tempCapSharing.delivery_modality_id =
       deliveryModality?.delivery_modality_id;
-
+    const degree = await this._degreesService.findByName(rawData.degree);
+    tempCapSharing.degree_id = degree?.degree_id;
     tempCapSharing.group = this.processedAiInfoGroup(rawData);
 
     return tempCapSharing;

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -56,6 +57,10 @@ import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-s
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
 import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../result-users/entities/result-user.entity';
+import { customErrorResponse } from '../../shared/utils/response.utils';
+import { ResultLever } from '../result-levers/entities/result-lever.entity';
+import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
+import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
 
 @Injectable()
 export class ResultsService {
@@ -80,6 +85,8 @@ export class ResultsService {
     private readonly _clarisaSubNationalsService: ClarisaSubNationalsService,
     private readonly _resultCapSharingIpService: ResultCapSharingIpService,
     private readonly _agressoUserStaffService: AllianceUserStaffService,
+    private readonly _clarisaLeversService: ClarisaLeversService,
+    private readonly _agressoContractService: AgressoContractService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -120,12 +127,17 @@ export class ResultsService {
       createResult;
 
     await this.mainRepo
-      .findOne({ where: { title, is_active: true } })
+      .findOne({
+        where: { title, is_active: true },
+        relations: { indicator: true },
+      })
       .then((result) => {
         if (result) {
-          throw new ConflictException(
-            'The name of the result is already registered',
-          );
+          throw customErrorResponse<Result>({
+            message: result,
+            name: `Please enter a unique title. Review the existing result by selecting this link: ${result.indicator.name} - ${result.title}`,
+            status: HttpStatus.CONFLICT,
+          });
         }
       });
 
@@ -158,6 +170,29 @@ export class ResultsService {
         result.indicator_id,
         manager,
       );
+
+      const agressoContract =
+        await this._agressoContractService.findOne(contract_id);
+      const lever = this._clarisaLeversService.homologatedData(
+        agressoContract.departmentId,
+      );
+      const clarisaLever = await this._clarisaLeversService.findByName(lever);
+
+      if (clarisaLever) {
+        const primaryLever: Partial<ResultLever> = {
+          lever_id: String(clarisaLever.id),
+          is_primary: true,
+        };
+
+        this._resultLeversService.create<LeverRolesEnum>(
+          result.result_id,
+          primaryLever,
+          'lever_id',
+          LeverRolesEnum.ALIGNMENT,
+          manager,
+          ['is_primary'],
+        );
+      }
 
       const primaryContract: Partial<ResultContract> = {
         contract_id: contract_id,
@@ -243,6 +278,10 @@ export class ResultsService {
       });
 
     await this.mainRepo.deleteResult(result.result_id);
+    await this._openSearchResultApi.uploadSingleToOpenSearch(
+      { result_id: result.result_id },
+      ElasticOperationEnum.DELETE,
+    );
     return result;
   }
 
@@ -259,6 +298,7 @@ export class ResultsService {
             result_id: Not(result_id),
             title: generalInformation.title,
             is_active: true,
+            is_snapshot: false,
           },
         });
 
@@ -347,6 +387,7 @@ export class ResultsService {
       result_id: true,
       result_official_code: true,
       report_year_id: true,
+      result_status_id: true,
     };
     const where = {
       result_official_code: resultCode,
@@ -801,6 +842,7 @@ export class ResultsService {
         where: {
           created_by: this.currentUser.user_id,
           is_active: true,
+          is_snapshot: false,
         },
         relations: {
           indicator: true,
