@@ -838,6 +838,7 @@ export class ResultsService {
         where: {
           created_by: this.currentUser.user_id,
           is_active: true,
+          is_snapshot: false,
         },
         relations: {
           indicator: true,
