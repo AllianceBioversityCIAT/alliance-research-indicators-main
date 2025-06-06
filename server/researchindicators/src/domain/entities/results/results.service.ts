@@ -278,6 +278,10 @@ export class ResultsService {
       });
 
     await this.mainRepo.deleteResult(result.result_id);
+    await this._openSearchResultApi.uploadSingleToOpenSearch(
+      { result_id: result.result_id },
+      ElasticOperationEnum.DELETE,
+    );
     return result;
   }
 

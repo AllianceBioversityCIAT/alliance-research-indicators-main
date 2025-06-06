@@ -54,6 +54,7 @@ export class ResultRepository
 			inner join result_status rs on rs.result_status_id = r.result_status_id 
 			left join result_keywords rk on rk.result_id = r.result_id 
 		where 1 = 1
+		and r.is_snapshot = FALSE
 		${ids && ids.length > 0 ? `and r.result_id in (${ids.join(',')})` : ''}
 		${option !== FindAllOptions.SHOW_ALL ? 'and r.is_active = 1' : ''}
 		GROUP by r.result_id,
