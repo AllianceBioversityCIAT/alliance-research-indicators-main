@@ -66,7 +66,7 @@ export class ResultsUtil {
     return this.currentResult?.result_official_code ?? null;
   }
 
-  get nullRportYearId(): number {
+  get nullReportYearId(): number {
     return this.currentResult?.report_year_id ?? null;
   }
 }

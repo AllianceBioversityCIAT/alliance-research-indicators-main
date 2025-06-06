@@ -133,10 +133,10 @@ export class GreenChecksService {
                 `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode} Rejected`,
             );
             break;
-          case ResultStatusEnum.APPROVED:
+          case ResultStatusEnum.APPROVED: {
             const result = await this.greenCheckRepository.createSnapshot(
               this._resultsUtil.resultCode,
-              this._resultsUtil.nullRportYearId,
+              this._resultsUtil.nullReportYearId,
             );
             this.prepareEmail(
               resultId,
@@ -148,6 +148,7 @@ export class GreenChecksService {
                 `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode} has been approved`,
             );
             return result;
+          }
         }
         return data;
       });
@@ -323,7 +324,7 @@ export class GreenChecksService {
     newReportYear: number,
   ): Promise<Result> {
     const repoResult = this.dataSource.getRepository(Result);
-    const tempResult = repoResult.findOne({
+    const tempResult = await repoResult.findOne({
       where: {
         result_official_code: resultCode,
         is_active: true,
