@@ -314,7 +314,7 @@ export class ResultRepository
 					FROM results temp
 					WHERE temp.is_active = TRUE
 					AND temp.is_snapshot = TRUE
-					ORDER BY temp.created_at DESC) r2 ON r.result_official_code = r2.result_official_code
+					ORDER BY temp.report_year_id DESC) r2 ON r.result_official_code = r2.result_official_code
 		${queryParts.result_audit_data?.join}
 		${queryParts.result_status?.join}
 		${queryParts.indicators?.join}
