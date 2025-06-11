@@ -27,6 +27,7 @@ import { SubmissionHistory } from '../../green-checks/entities/submission-histor
 import { ResultEvidence } from '../../result-evidences/entities/result-evidence.entity';
 import { TempResultAi } from './temp-result-ai.entity';
 import { ResultCapSharingIp } from '../../result-cap-sharing-ip/entities/result-cap-sharing-ip.entity';
+import { ResultInnovationDev } from '../../result-innovation-dev/entities/result-innovation-dev.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -216,4 +217,10 @@ export class Result extends AuditableEntity {
     (resultCapSharingIp) => resultCapSharingIp.result,
   )
   result_cap_sharing_ip!: ResultCapSharingIp[];
+
+  @OneToMany(
+    () => ResultInnovationDev,
+    (resultInnovationDev) => resultInnovationDev.result,
+  )
+  result_innovation_dev!: ResultInnovationDev[];
 }
