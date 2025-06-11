@@ -8,6 +8,7 @@ import { ClarisaRegionsModule } from '../entities/clarisa-regions/clarisa-region
 import { ClarisaSubNationalsModule } from '../entities/clarisa-sub-nationals/clarisa-sub-nationals.module';
 import { ClarisaModule } from '../clarisa.module';
 import { ClarisaLeversModule } from '../entities/clarisa-levers/clarisa-levers.module';
+import { ClarisaInnovationReadinessLevelsModule } from '../entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.module';
 
 export const clarisaRoutes: Routes = [
   {
@@ -48,6 +49,6 @@ export const clarisaRoutes: Routes = [
   },
   {
     path: 'innovation-readiness-levels',
-    module: ClarisaLeversModule,
+    module: ClarisaInnovationReadinessLevelsModule,
   },
 ];
