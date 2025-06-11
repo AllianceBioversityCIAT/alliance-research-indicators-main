@@ -11,6 +11,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ClarisaInstitutionTypesModule } from './entities/clarisa-institution-types/clarisa-institution-types.module';
 import { ClarisaController } from './clarisa.controller';
 import { ClarisaInstitutionLocationsModule } from './entities/clarisa-institution-locations/clarisa-institution-locations.module';
+import { ClarisaInnovationReadinessLevelsModule } from './entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.module';
 
 @Module({
   providers: [ClarisaService],
@@ -26,6 +27,7 @@ import { ClarisaInstitutionLocationsModule } from './entities/clarisa-institutio
     HttpModule,
     ClarisaInstitutionTypesModule,
     ClarisaInstitutionLocationsModule,
+    ClarisaInnovationReadinessLevelsModule,
   ],
   exports: [ClarisaService],
 })

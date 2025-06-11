@@ -46,4 +46,8 @@ export const clarisaRoutes: Routes = [
     path: 'levers',
     module: ClarisaLeversModule,
   },
+  {
+    path: 'innovation-readiness-levels',
+    module: ClarisaLeversModule,
+  },
 ];
