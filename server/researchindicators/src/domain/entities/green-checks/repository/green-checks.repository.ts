@@ -77,7 +77,7 @@ export class GreenCheckRepository {
     const query = `
             SELECT
                 ${this.generalInformationValidation(result_key)},
-                1 as alignment,
+                ${this.alignmentValidation(result_key)},
                 ${this.geoLocationValidation(result_key)},
                 ${this.partnersValidation(result_key)},
                 ${this.evidencesValidation(result_key)},
