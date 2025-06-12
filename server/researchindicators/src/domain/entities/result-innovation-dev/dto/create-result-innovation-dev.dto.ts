@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateResultInnovationDevDto {
   @IsString()
@@ -21,4 +21,9 @@ export class CreateResultInnovationDevDto {
   @IsOptional()
   @ApiProperty({ required: false })
   innovation_readiness_id?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  no_sex_age_disaggregation?: boolean;
 }

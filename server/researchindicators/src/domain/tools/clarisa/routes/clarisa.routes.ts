@@ -9,6 +9,8 @@ import { ClarisaSubNationalsModule } from '../entities/clarisa-sub-nationals/cla
 import { ClarisaModule } from '../clarisa.module';
 import { ClarisaLeversModule } from '../entities/clarisa-levers/clarisa-levers.module';
 import { ClarisaInnovationReadinessLevelsModule } from '../entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.module';
+import { ClarisaInnovationTypesModule } from '../entities/clarisa-innovation-types/clarisa-innovation-types.module';
+import { ClarisaInnovationCharacteristicsModule } from '../entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.module';
 
 export const clarisaRoutes: Routes = [
   {
@@ -50,5 +52,13 @@ export const clarisaRoutes: Routes = [
   {
     path: 'innovation-readiness-levels',
     module: ClarisaInnovationReadinessLevelsModule,
+  },
+  {
+    path: 'innovation-types',
+    module: ClarisaInnovationTypesModule,
+  },
+  {
+    path: 'innovation-characteristics',
+    module: ClarisaInnovationCharacteristicsModule,
   },
 ];
