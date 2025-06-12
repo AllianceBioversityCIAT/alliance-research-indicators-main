@@ -1,6 +1,9 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
+import { ClarisaInnovationCharacteristic } from '../../../tools/clarisa/entities/clarisa-innovation-characteristics/entities/clarisa-innovation-characteristic.entity';
+import { ClarisaInnovationType } from '../../../tools/clarisa/entities/clarisa-innovation-types/entities/clarisa-innovation-type.entity';
+import { ClarisaInnovationReadinessLevel } from '../../../tools/clarisa/entities/clarisa-innovation-readiness-levels/entities/clarisa-innovation-readiness-level.entity';
 
 @Entity('result_innovation_dev')
 export class ResultInnovationDev extends AuditableEntity {
@@ -38,9 +41,40 @@ export class ResultInnovationDev extends AuditableEntity {
   })
   innovation_readiness_id?: number;
 
+  @Column({
+    name: 'no_sex_age_disaggregation',
+    type: 'boolean',
+    nullable: true,
+  })
+  no_sex_age_disaggregation?: boolean;
+
   @ManyToOne(() => Result, (result) => result.result_innovation_dev)
   @JoinColumn({
     name: 'result_id',
   })
   result?: Result;
+
+  @ManyToOne(
+    () => ClarisaInnovationCharacteristic,
+    (characteristic) => characteristic.result_innovation_dev,
+  )
+  @JoinColumn({
+    name: 'innovation_nature_id',
+  })
+  innovationNature?: ClarisaInnovationCharacteristic;
+
+  @ManyToOne(() => ClarisaInnovationType, (type) => type.result_innovation_dev)
+  @JoinColumn({
+    name: 'innovation_type_id',
+  })
+  innovationType?: ClarisaInnovationType;
+
+  @ManyToOne(
+    () => ClarisaInnovationReadinessLevel,
+    (readiness) => readiness.result_innovation_dev,
+  )
+  @JoinColumn({
+    name: 'innovation_readiness_id',
+  })
+  innovationReadiness?: ClarisaInnovationReadinessLevel;
 }

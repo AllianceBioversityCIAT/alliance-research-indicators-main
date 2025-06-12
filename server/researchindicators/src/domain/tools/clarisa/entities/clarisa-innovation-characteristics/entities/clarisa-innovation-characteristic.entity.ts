@@ -1,5 +1,6 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
+import { ResultInnovationDev } from '../../../../../entities/result-innovation-dev/entities/result-innovation-dev.entity';
 
 @Entity('clarisa_innovation_characteristics')
 export class ClarisaInnovationCharacteristic extends AuditableEntity {
@@ -29,4 +30,10 @@ export class ClarisaInnovationCharacteristic extends AuditableEntity {
     nullable: true,
   })
   source_id?: number;
+
+  @OneToMany(
+    () => ResultInnovationDev,
+    (resultInnovationDev) => resultInnovationDev.innovationNature,
+  )
+  result_innovation_dev?: ResultInnovationDev[];
 }
