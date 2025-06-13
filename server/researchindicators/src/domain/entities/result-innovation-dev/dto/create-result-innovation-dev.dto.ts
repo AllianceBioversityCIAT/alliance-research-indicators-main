@@ -26,4 +26,9 @@ export class CreateResultInnovationDevDto {
   @IsOptional()
   @ApiProperty({ required: false })
   no_sex_age_disaggregation?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  anticipated_users_id?: number;
 }
