@@ -45,6 +45,7 @@ import { ResultCapSharingIpModule } from './result-cap-sharing-ip/result-cap-sha
 import { IntellectualPropertyOwnersModule } from './intellectual-property-owners/intellectual-property-owners.module';
 import { ReportingFeedbackModule } from './reporting-feedback/reporting-feedback.module';
 import { ResultInnovationDevModule } from './result-innovation-dev/result-innovation-dev.module';
+import { InnovationDevAnticipatedUsersModule } from './innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
 
 @Module({
   imports: [
@@ -94,6 +95,7 @@ import { ResultInnovationDevModule } from './result-innovation-dev/result-innova
     IntellectualPropertyOwnersModule,
     ReportingFeedbackModule,
     ResultInnovationDevModule,
+    InnovationDevAnticipatedUsersModule,
   ],
   exports: [AgressoContractModule],
 })

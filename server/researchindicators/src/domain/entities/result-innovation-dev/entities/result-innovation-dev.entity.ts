@@ -4,6 +4,7 @@ import { Result } from '../../results/entities/result.entity';
 import { ClarisaInnovationCharacteristic } from '../../../tools/clarisa/entities/clarisa-innovation-characteristics/entities/clarisa-innovation-characteristic.entity';
 import { ClarisaInnovationType } from '../../../tools/clarisa/entities/clarisa-innovation-types/entities/clarisa-innovation-type.entity';
 import { ClarisaInnovationReadinessLevel } from '../../../tools/clarisa/entities/clarisa-innovation-readiness-levels/entities/clarisa-innovation-readiness-level.entity';
+import { InnovationDevAnticipatedUser } from '../../innovation-dev-anticipated-users/entities/innovation-dev-anticipated-user.entity';
 
 @Entity('result_innovation_dev')
 export class ResultInnovationDev extends AuditableEntity {
@@ -48,6 +49,13 @@ export class ResultInnovationDev extends AuditableEntity {
   })
   no_sex_age_disaggregation?: boolean;
 
+  @Column({
+    name: 'anticipated_users_id',
+    type: 'bigint',
+    nullable: true,
+  })
+  anticipated_users_id?: number;
+
   @ManyToOne(() => Result, (result) => result.result_innovation_dev)
   @JoinColumn({
     name: 'result_id',
@@ -77,4 +85,13 @@ export class ResultInnovationDev extends AuditableEntity {
     name: 'innovation_readiness_id',
   })
   innovationReadiness?: ClarisaInnovationReadinessLevel;
+
+  @ManyToOne(
+    () => InnovationDevAnticipatedUser,
+    (user) => user.result_innovation_dev,
+  )
+  @JoinColumn({
+    name: 'anticipated_users_id',
+  })
+  anticipatedUsers?: InnovationDevAnticipatedUser;
 }

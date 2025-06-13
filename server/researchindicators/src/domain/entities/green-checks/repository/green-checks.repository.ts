@@ -71,6 +71,8 @@ export class GreenCheckRepository {
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
         spesificQuery = `${this.capSharingIpValidation(result_key)},
             ${this.capSharingValidation(result_key)}`;
+      case IndicatorsEnum.INNOVATION_DEV:
+        spesificQuery = '0 as innovation_dev';
         break;
     }
 
@@ -87,6 +89,7 @@ export class GreenCheckRepository {
                 AND r.is_active = TRUE
             LIMIT 1;
         `;
+    console.log(query);
 
     return this.dataSource
       .query(query, [result_id])

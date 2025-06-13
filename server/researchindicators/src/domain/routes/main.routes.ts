@@ -32,6 +32,7 @@ import { IntellectualPropertyOwnersModule } from '../entities/intellectual-prope
 import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/result-cap-sharing-ip.module';
 import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
 import { ResultInnovationDevModule } from '../entities/result-innovation-dev/result-innovation-dev.module';
+import { InnovationDevAnticipatedUsersModule } from '../entities/innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
 
 const capSharingChildren: Routes = [
   {
@@ -52,6 +53,12 @@ const ResultsChildren: Routes = [
   {
     path: 'innovation-dev',
     module: ResultInnovationDevModule,
+    children: [
+      {
+        path: 'anticipated-users',
+        module: InnovationDevAnticipatedUsersModule,
+      },
+    ],
   },
   {
     path: 'evidences',

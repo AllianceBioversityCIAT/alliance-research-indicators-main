@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateResultInnovationDevDto } from './dto/create-result-innovation-dev.dto';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultInnovationDev } from './entities/result-innovation-dev.entity';
@@ -35,6 +35,14 @@ export class ResultInnovationDevService {
     resultId: number,
     createResultInnovationDevDto: CreateResultInnovationDevDto,
   ) {
+    const existingResult = await this.mainRepo.findOne({
+      where: { result_id: resultId, is_active: true },
+    });
+
+    if (!existingResult) {
+      throw new NotFoundException(`Result with ID ${resultId} not found`);
+    }
+
     return this.mainRepo.update(resultId, {
       innovation_nature_id: createResultInnovationDevDto?.innovation_nature_id,
       innovation_readiness_id:
@@ -43,6 +51,7 @@ export class ResultInnovationDevService {
       no_sex_age_disaggregation:
         createResultInnovationDevDto?.no_sex_age_disaggregation,
       short_title: createResultInnovationDevDto?.short_title,
+      anticipated_users_id: createResultInnovationDevDto?.anticipated_users_id,
       ...this._currentUser.audit(SetAutitEnum.UPDATE),
     });
   }
