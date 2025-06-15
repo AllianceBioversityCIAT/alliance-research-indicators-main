@@ -3,6 +3,7 @@ import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-ba
 import { ClarisaInstitutionType } from './entities/clarisa-institution-type.entity';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
 import { ClarisaInstitutionTypesRepository } from './repositories/clarisa-institution-types.repository';
+import { getItemsAtLevel } from '../../../../shared/utils/array.util';
 @Injectable()
 export class ClarisaInstitutionTypesService extends ControlListBaseService<
   ClarisaInstitutionType,
@@ -35,5 +36,18 @@ export class ClarisaInstitutionTypesService extends ControlListBaseService<
         delete el.children;
         return el;
       });
+  }
+
+  async getInstitutionTypesByDepthLevel(level: number) {
+    const institutionTypes = await this.mainRepo.find({
+      where: { is_active: true },
+      relations: {
+        children: {
+          children: true,
+        },
+      },
+    });
+
+    return getItemsAtLevel<ClarisaInstitutionType>(institutionTypes, level);
   }
 }

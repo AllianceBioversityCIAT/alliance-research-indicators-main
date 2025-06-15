@@ -33,6 +33,10 @@ import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/resu
 import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
 import { ResultInnovationDevModule } from '../entities/result-innovation-dev/result-innovation-dev.module';
 import { InnovationDevAnticipatedUsersModule } from '../entities/innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
+import { ResultActorsModule } from '../entities/result-actors/result-actors.module';
+import { ActorRolesModule } from '../entities/actor-roles/actor-roles.module';
+import { ResultInstitutionTypesModule } from '../entities/result-institution-types/result-institution-types.module';
+import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/institution-type-roles.module';
 
 const capSharingChildren: Routes = [
   {
@@ -92,6 +96,26 @@ const ResultsChildren: Routes = [
   {
     path: 'green-checks',
     module: GreenChecksModule,
+  },
+  {
+    path: 'actors',
+    module: ResultActorsModule,
+    children: [
+      {
+        path: 'roles',
+        module: ActorRolesModule,
+      },
+    ],
+  },
+  {
+    path: 'institution-types',
+    module: ResultInstitutionTypesModule,
+    children: [
+      {
+        path: 'roles',
+        module: InstitutionTypeRolesModule,
+      },
+    ],
   },
 ];
 

@@ -56,6 +56,20 @@ export class ResultInnovationDev extends AuditableEntity {
   })
   anticipated_users_id?: number;
 
+  @Column({
+    name: 'expected_outcome',
+    type: 'text',
+    nullable: true,
+  })
+  expected_outcome?: string;
+
+  @Column({
+    name: 'intended_beneficiaries_description',
+    type: 'text',
+    nullable: true,
+  })
+  intended_beneficiaries_description?: string;
+
   @ManyToOne(() => Result, (result) => result.result_innovation_dev)
   @JoinColumn({
     name: 'result_id',

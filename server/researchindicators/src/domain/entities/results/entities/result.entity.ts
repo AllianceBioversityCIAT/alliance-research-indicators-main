@@ -28,6 +28,8 @@ import { ResultEvidence } from '../../result-evidences/entities/result-evidence.
 import { TempResultAi } from './temp-result-ai.entity';
 import { ResultCapSharingIp } from '../../result-cap-sharing-ip/entities/result-cap-sharing-ip.entity';
 import { ResultInnovationDev } from '../../result-innovation-dev/entities/result-innovation-dev.entity';
+import { ResultActor } from '../../result-actors/entities/result-actor.entity';
+import { ResultInstitutionType } from '../../result-institution-types/entities/result-institution-type.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -223,4 +225,13 @@ export class Result extends AuditableEntity {
     (resultInnovationDev) => resultInnovationDev.result,
   )
   result_innovation_dev!: ResultInnovationDev[];
+
+  @OneToMany(() => ResultActor, (resultActor) => resultActor.result)
+  result_actors!: ResultActor[];
+
+  @OneToMany(
+    () => ResultInstitutionType,
+    (resultInstitutionType) => resultInstitutionType.result,
+  )
+  result_institution_types!: ResultInstitutionType[];
 }

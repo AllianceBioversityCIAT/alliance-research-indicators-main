@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ClarisaInstitution } from '../../clarisa-institutions/entities/clarisa-institution.entity';
+import { ResultInstitutionType } from '../../../../../entities/result-institution-types/entities/result-institution-type.entity';
 
 @Entity('clarisa_institution_types')
 export class ClarisaInstitutionType extends AuditableEntity {
@@ -53,4 +54,10 @@ export class ClarisaInstitutionType extends AuditableEntity {
     (clarisaInstitution) => clarisaInstitution.institution_type,
   )
   institutions!: ClarisaInstitution[];
+
+  @OneToMany(
+    () => ResultInstitutionType,
+    (resultInstitutionType) => resultInstitutionType.institution_type,
+  )
+  result_institution_types?: ResultInstitutionType[];
 }
