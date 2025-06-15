@@ -14,6 +14,7 @@ import { ClarisaInstitutionLocationsModule } from './entities/clarisa-institutio
 import { ClarisaInnovationReadinessLevelsModule } from './entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.module';
 import { ClarisaInnovationCharacteristicsModule } from './entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.module';
 import { ClarisaInnovationTypesModule } from './entities/clarisa-innovation-types/clarisa-innovation-types.module';
+import { ClarisaActorTypesModule } from './entities/clarisa-actor-types/clarisa-actor-types.module';
 
 @Module({
   providers: [ClarisaService],
@@ -32,6 +33,7 @@ import { ClarisaInnovationTypesModule } from './entities/clarisa-innovation-type
     ClarisaInnovationReadinessLevelsModule,
     ClarisaInnovationCharacteristicsModule,
     ClarisaInnovationTypesModule,
+    ClarisaActorTypesModule,
   ],
   exports: [ClarisaService],
 })

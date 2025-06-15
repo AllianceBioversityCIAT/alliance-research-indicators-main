@@ -62,4 +62,17 @@ export class ClarisaInstitutionTypesController {
         }),
       );
   }
+
+  @Get('depth-level/:depth(\\d+)')
+  async getInstitutionTypesByDepthLevel(depth: string) {
+    return this.clarisaInstitutionTypesService
+      .getInstitutionTypesByDepthLevel(+depth)
+      .then((institutionTypes) =>
+        ResponseUtils.format({
+          data: institutionTypes,
+          description: `Institution types found by depth level ${depth}`,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }

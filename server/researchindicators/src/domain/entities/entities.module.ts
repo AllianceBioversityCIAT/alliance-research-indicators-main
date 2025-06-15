@@ -46,6 +46,10 @@ import { IntellectualPropertyOwnersModule } from './intellectual-property-owners
 import { ReportingFeedbackModule } from './reporting-feedback/reporting-feedback.module';
 import { ResultInnovationDevModule } from './result-innovation-dev/result-innovation-dev.module';
 import { InnovationDevAnticipatedUsersModule } from './innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
+import { ResultActorsModule } from './result-actors/result-actors.module';
+import { ActorRolesModule } from './actor-roles/actor-roles.module';
+import { ResultInstitutionTypesModule } from './result-institution-types/result-institution-types.module';
+import { InstitutionTypeRolesModule } from './institution-type-roles/institution-type-roles.module';
 
 @Module({
   imports: [
@@ -96,6 +100,10 @@ import { InnovationDevAnticipatedUsersModule } from './innovation-dev-anticipate
     ReportingFeedbackModule,
     ResultInnovationDevModule,
     InnovationDevAnticipatedUsersModule,
+    ResultActorsModule,
+    ActorRolesModule,
+    ResultInstitutionTypesModule,
+    InstitutionTypeRolesModule,
   ],
   exports: [AgressoContractModule],
 })

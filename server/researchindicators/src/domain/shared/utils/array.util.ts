@@ -103,4 +103,48 @@ export const isArrayOfType = <T>(
   return arr.every(typeChecker);
 };
 
+export const getItemsAtLevel = <T extends { children?: T[] }>(
+  items: T[],
+  level: number,
+): T[] => {
+  if (level < 1) return [];
+  if (level === 1) {
+    return items.map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { children, ...rest } = item;
+      return rest as T;
+    });
+  }
+
+  let result: T[] = [];
+  for (const item of items) {
+    if (item.children && item.children.length > 0) {
+      result = result.concat(getItemsAtLevel(item.children, level - 1));
+    }
+  }
+  return result;
+};
+
+export const filterByUniqueKeyWithPriority = <T>(
+  array: T[],
+  keyField: keyof T,
+  priorityField: keyof T,
+): T[] => {
+  const map = new Map<any, T>();
+
+  for (const item of array ?? []) {
+    const key = item[keyField];
+    const existing = map.get(key);
+
+    if (
+      !existing ||
+      (item[priorityField] != null && !existing[priorityField])
+    ) {
+      map.set(key, item);
+    }
+  }
+
+  return Array.from(map.values());
+};
+
 export type ArrayType<T> = T extends (infer U)[] ? U : T;
