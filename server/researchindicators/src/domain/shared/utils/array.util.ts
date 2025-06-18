@@ -21,6 +21,7 @@ export const updateArray = <T>(
     value: any;
   },
   primaryKey?: keyof T & string,
+  notDeleteIds?: number[],
 ): Partial<T>[] => {
   clientArray = clientArray ?? [];
   clientArray = clientArray.map((item) => ({
@@ -43,7 +44,9 @@ export const updateArray = <T>(
       if (primaryKey) {
         clientArray[clientArrayItemIndex][primaryKey] = bItem[primaryKey];
       }
-    } else {
+    } else if (
+      !notDeleteIds?.includes(bItem[primaryKey as keyof T] as number)
+    ) {
       clientArray.push({
         ...bItem,
         is_active: false,

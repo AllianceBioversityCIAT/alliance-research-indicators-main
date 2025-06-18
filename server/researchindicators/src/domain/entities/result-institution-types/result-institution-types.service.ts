@@ -59,8 +59,9 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
   ) {
     const { other, sub_type, type } = this.formatData(data);
 
-    if (other.length > 0)
-      await this.create(
+    let notDeleteIds = [];
+    if (other.length > 0) {
+      const tempData = await this.create(
         resultId,
         other,
         'institution_type_custom_name',
@@ -69,14 +70,26 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         ['institution_type_id'],
       );
 
-    if (type.length > 0)
-      await this.create(
+      notDeleteIds = tempData.map((x) => x.result_institution_type_id);
+    }
+
+    if (type.length > 0) {
+      const tempData = await this.create(
         resultId,
         type,
         'institution_type_id',
         InstitutionTypeRoleEnum.INNOVATION_DEV,
         manager,
+        undefined,
+        undefined,
+        notDeleteIds,
       );
+
+      notDeleteIds = [
+        ...notDeleteIds,
+        ...tempData.map((x) => x.result_institution_type_id),
+      ];
+    }
 
     if (sub_type.length > 0)
       await this.create(
@@ -86,6 +99,8 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         InstitutionTypeRoleEnum.INNOVATION_DEV,
         manager,
         ['institution_type_id'],
+        undefined,
+        notDeleteIds,
       );
   }
 }

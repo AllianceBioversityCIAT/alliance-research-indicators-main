@@ -120,6 +120,7 @@ export abstract class BaseServiceSimple<
     manager?: EntityManager,
     otherAttributes?: (keyof Entity & string)[],
     deleteOthersAttributes: { [K in keyof Entity]?: Entity[K] } = {},
+    notDeleteIds?: number[],
   ) {
     const entityManager: RepositoryData | Repository<Entity> = selectManager<
       Entity,
@@ -166,6 +167,7 @@ export abstract class BaseServiceSimple<
         value: resultId,
       },
       this.primaryKey,
+      notDeleteIds,
     );
 
     const persistId = filterPersistKey<Entity>(this.primaryKey, newDataToSave);
