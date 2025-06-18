@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateResultActorDto {
   @IsNumber()
@@ -46,4 +46,9 @@ export class CreateResultActorDto {
   @IsOptional()
   @ApiProperty({ required: false })
   actor_role_id?: number;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ required: false })
+  actor_type_custom_name?: string;
 }
