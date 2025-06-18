@@ -13,7 +13,7 @@ import { filterByUniqueKeyWithPriority } from '../../shared/utils/array.util';
 import { CreateResultActorDto } from '../result-actors/dto/create-result-actor.dto';
 import { ResultInstitutionTypesService } from '../result-institution-types/result-institution-types.service';
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
-
+import { ClarisaActorTypesService } from '../../tools/clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
 @Injectable()
 export class ResultInnovationDevService {
   private readonly mainRepo: Repository<ResultInnovationDev>;
@@ -22,6 +22,7 @@ export class ResultInnovationDevService {
     private readonly _currentUser: CurrentUserUtil,
     private readonly _resultActorsService: ResultActorsService,
     private readonly _resultInstitutionTypesService: ResultInstitutionTypesService,
+    private readonly _clarisaActorTypesService: ClarisaActorTypesService,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultInnovationDev);
   }
@@ -75,26 +76,23 @@ export class ResultInnovationDevService {
         'result_actors_id',
       );
 
-      await this._resultActorsService.create<ActorRolesEnum>(
-        resultId,
-        filterActors,
-        'actor_type_id',
-        ActorRolesEnum.INNOVATION_DEV,
-        manager,
-        [
-          'sex_age_disaggregation_not_apply',
-          'men_youth',
-          'men_not_youth',
-          'women_youth',
-          'women_not_youth',
-        ],
+      const filterIds = await this._clarisaActorTypesService.validateActorTypes(
+        filterActors.map((actor) => actor.actor_type_id),
       );
 
-      await this._resultInstitutionTypesService.create(
+      const saveActors = filterActors.filter((actor) =>
+        filterIds.includes(actor.actor_type_id),
+      );
+
+      await this._resultActorsService.saveInnovationDev(
+        resultId,
+        saveActors,
+        manager,
+      );
+
+      await this._resultInstitutionTypesService.saveInnovationDev(
         resultId,
         createResultInnovationDevDto?.institution_types,
-        'institution_type_id',
-        InstitutionTypeRoleEnum.INNOVATION_DEV,
         manager,
       );
 
@@ -105,8 +103,24 @@ export class ResultInnovationDevService {
   }
 
   async findOne(id: number): Promise<CreateResultInnovationDevDto> {
-    return this.mainRepo.findOne({
+    const resultInnovationDev = await this.mainRepo.findOne({
       where: { result_id: id, is_active: true },
     });
+
+    const institution_types = await this._resultInstitutionTypesService.find(
+      id,
+      InstitutionTypeRoleEnum.INNOVATION_DEV,
+    );
+
+    const actors = await this._resultActorsService.find(
+      id,
+      ActorRolesEnum.INNOVATION_DEV,
+    );
+
+    return {
+      ...resultInnovationDev,
+      actors,
+      institution_types,
+    };
   }
 }

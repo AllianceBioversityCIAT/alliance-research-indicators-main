@@ -14,6 +14,16 @@ export class CreateResultInstitutionTypeDto {
 
   @IsNumber()
   @IsOptional()
-  @ApiProperty({ required: true })
-  institution_type_id!: number;
+  @ApiProperty({ required: false })
+  institution_type_id?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  sub_institution_type_id?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  institution_type_custom_name?: string;
 }

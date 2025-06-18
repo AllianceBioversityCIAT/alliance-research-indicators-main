@@ -33,6 +33,20 @@ export class ResultInstitutionType extends AuditableEntity {
   institution_type_id!: number;
 
   @Column({
+    name: 'sub_institution_type_id',
+    type: 'bigint',
+    nullable: true,
+  })
+  sub_institution_type_id!: number;
+
+  @Column({
+    name: 'institution_type_custom_name',
+    type: 'text',
+    nullable: true,
+  })
+  institution_type_custom_name?: string;
+
+  @Column({
     name: 'institution_type_role_id',
     type: 'bigint',
     nullable: false,
@@ -53,6 +67,15 @@ export class ResultInstitutionType extends AuditableEntity {
     name: 'institution_type_id',
   })
   institution_type?: ClarisaInstitutionType;
+
+  @ManyToOne(
+    () => ClarisaInstitutionType,
+    (institutionType) => institutionType.result_sub_institution_types,
+  )
+  @JoinColumn({
+    name: 'sub_institution_type_id',
+  })
+  sub_institution_type?: ClarisaInstitutionType;
 
   @ManyToOne(
     () => InstitutionTypeRole,

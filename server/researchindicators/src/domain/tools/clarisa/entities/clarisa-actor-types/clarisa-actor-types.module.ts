@@ -5,5 +5,6 @@ import { ClarisaActorTypesController } from './clarisa-actor-types.controller';
 @Module({
   controllers: [ClarisaActorTypesController],
   providers: [ClarisaActorTypesService],
+  exports: [ClarisaActorTypesService],
 })
 export class ClarisaActorTypesModule {}

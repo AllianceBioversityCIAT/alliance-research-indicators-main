@@ -30,6 +30,12 @@ export class ResultActor extends AuditableEntity {
   })
   actor_type_id!: number;
 
+  @Column('text', {
+    name: 'actor_type_custom_name',
+    nullable: true,
+  })
+  actor_type_custom_name?: string;
+
   @Column('boolean', {
     name: 'sex_age_disaggregation_not_apply',
     nullable: true,
