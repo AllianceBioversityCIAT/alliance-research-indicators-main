@@ -60,7 +60,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     const { other, sub_type, type } = this.formatData(data);
 
     if (other.length > 0)
-      this.create(
+      await this.create(
         resultId,
         other,
         'institution_type_custom_name',
@@ -70,7 +70,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       );
 
     if (type.length > 0)
-      this.create(
+      await this.create(
         resultId,
         type,
         'institution_type_id',
@@ -79,7 +79,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       );
 
     if (sub_type.length > 0)
-      this.create(
+      await this.create(
         resultId,
         sub_type,
         'sub_institution_type_id',
