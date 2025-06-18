@@ -80,8 +80,8 @@ export class ResultInnovationDevService {
         filterActors.map((actor) => actor.actor_type_id),
       );
 
-      const saveActors = filterActors.filter((actor) =>
-        filterIds.includes(actor.actor_type_id),
+      const saveActors = filterActors.filter(
+        (actor) => !filterIds.includes(actor.actor_type_id),
       );
 
       await this._resultActorsService.saveInnovationDev(

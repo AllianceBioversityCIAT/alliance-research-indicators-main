@@ -51,13 +51,13 @@ export class ResultActorsService extends BaseServiceSimple<
     ];
 
     if (other.length > 0)
-      this.create(
+      await this.create(
         resultId,
         other,
         'actor_type_custom_name',
         ActorRolesEnum.INNOVATION_DEV,
         manager,
-        othersProperties,
+        ['actor_type_id', ...othersProperties],
       );
 
     if (actors.length > 0)
