@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { ResultInstitutionType } from './entities/result-institution-type.entity';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { CreateResultInstitutionTypeDto } from './dto/create-result-institution-type.dto';
+import { ClarisaInstitutionTypeEnum } from '../../tools/clarisa/entities/clarisa-institution-types/enum/clarisa-institution-type.enum';
+import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
 
 @Injectable()
 export class ResultInstitutionTypesService extends BaseServiceSimple<
@@ -21,4 +24,74 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       'institution_type_role_id',
     );
   }
+
+  private formatData(
+    institutionTypes: CreateResultInstitutionTypeDto[],
+  ): SaveInnovationDevInstitutionType {
+    return {
+      other:
+        institutionTypes.filter(
+          (institution) =>
+            institution.institution_type_id ===
+            ClarisaInstitutionTypeEnum.OTHER,
+        ) ?? [],
+      type:
+        institutionTypes.filter(
+          (institution) =>
+            institution.institution_type_id !==
+              ClarisaInstitutionTypeEnum.OTHER &&
+            !institution?.sub_institution_type_id,
+        ) ?? [],
+      sub_type:
+        institutionTypes.filter(
+          (institution) =>
+            institution.institution_type_id !==
+              ClarisaInstitutionTypeEnum.OTHER &&
+            institution?.sub_institution_type_id,
+        ) ?? [],
+    };
+  }
+
+  async saveInnovationDev(
+    resultId: number,
+    data: CreateResultInstitutionTypeDto[],
+    manager: EntityManager,
+  ) {
+    const { other, sub_type, type } = this.formatData(data);
+
+    if (other.length > 0)
+      this.create(
+        resultId,
+        other,
+        'institution_type_custom_name',
+        InstitutionTypeRoleEnum.INNOVATION_DEV,
+        manager,
+        ['institution_type_id'],
+      );
+
+    if (type.length > 0)
+      this.create(
+        resultId,
+        type,
+        'institution_type_id',
+        InstitutionTypeRoleEnum.INNOVATION_DEV,
+        manager,
+      );
+
+    if (sub_type.length > 0)
+      this.create(
+        resultId,
+        sub_type,
+        'sub_institution_type_id',
+        InstitutionTypeRoleEnum.INNOVATION_DEV,
+        manager,
+        ['institution_type_id'],
+      );
+  }
 }
+
+type SaveInnovationDevInstitutionType = {
+  other: CreateResultInstitutionTypeDto[];
+  type: CreateResultInstitutionTypeDto[];
+  sub_type: CreateResultInstitutionTypeDto[];
+};

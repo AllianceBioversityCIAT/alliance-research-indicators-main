@@ -1,7 +1,7 @@
-import { Controller, Get, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Param, Query } from '@nestjs/common';
 import { ClarisaInstitutionTypesService } from './clarisa-institution-types.service';
 import { ResponseUtils } from '../../../../shared/utils/response.utils';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Clarisa')
 @Controller()
@@ -64,9 +64,23 @@ export class ClarisaInstitutionTypesController {
   }
 
   @Get('depth-level/:depth(\\d+)')
-  async getInstitutionTypesByDepthLevel(depth: string) {
+  @ApiParam({
+    name: 'depth',
+    description: 'Depth level of the institution type',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'code',
+    description: 'Code of the institution type',
+    type: Number,
+    required: false,
+  })
+  async getInstitutionTypesByDepthLevel(
+    @Param('depth') depth: string,
+    @Query('code') code: string,
+  ) {
     return this.clarisaInstitutionTypesService
-      .getInstitutionTypesByDepthLevel(+depth)
+      .getInstitutionTypesByDepthLevel(Number(code), Number(depth))
       .then((institutionTypes) =>
         ResponseUtils.format({
           data: institutionTypes,

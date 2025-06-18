@@ -60,4 +60,10 @@ export class ClarisaInstitutionType extends AuditableEntity {
     (resultInstitutionType) => resultInstitutionType.institution_type,
   )
   result_institution_types?: ResultInstitutionType[];
+
+  @OneToMany(
+    () => ResultInstitutionType,
+    (resultInstitutionType) => resultInstitutionType.sub_institution_type,
+  )
+  result_sub_institution_types?: ResultInstitutionType[];
 }
