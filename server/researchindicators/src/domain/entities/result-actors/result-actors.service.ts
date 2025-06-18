@@ -49,9 +49,9 @@ export class ResultActorsService extends BaseServiceSimple<
       'women_youth',
       'women_not_youth',
     ];
-
-    if (other.length > 0)
-      await this.create(
+    let notDeleteIds = [];
+    if (other.length > 0) {
+      const tempData = await this.create(
         resultId,
         other,
         'actor_type_custom_name',
@@ -59,6 +59,8 @@ export class ResultActorsService extends BaseServiceSimple<
         manager,
         ['actor_type_id', ...othersProperties],
       );
+      notDeleteIds = tempData.map((x) => x.result_actors_id);
+    }
 
     if (actors.length > 0)
       await this.create<ActorRolesEnum>(
@@ -68,6 +70,8 @@ export class ResultActorsService extends BaseServiceSimple<
         ActorRolesEnum.INNOVATION_DEV,
         manager,
         othersProperties,
+        undefined,
+        notDeleteIds,
       );
   }
 }
