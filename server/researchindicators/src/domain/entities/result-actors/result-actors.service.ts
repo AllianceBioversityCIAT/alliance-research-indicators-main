@@ -5,6 +5,7 @@ import {
   DataSource,
   EntityManager,
   FindOptionsWhere,
+  IsNull,
   Repository,
 } from 'typeorm';
 import {
@@ -155,6 +156,7 @@ export class ResultActorsService extends BaseServiceSimple<
       where['actor_type_id'] = ClarisaActorTypesEnum.OTHER;
     } else {
       where['actor_type_id'] = data?.actor_type_id;
+      where['actor_type_custom_name'] = IsNull();
     }
 
     return where;
