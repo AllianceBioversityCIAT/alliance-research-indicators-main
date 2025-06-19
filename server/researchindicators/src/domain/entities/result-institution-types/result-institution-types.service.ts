@@ -9,6 +9,7 @@ import {
 import { CreateResultInstitutionTypeDto } from './dto/create-result-institution-type.dto';
 import { ClarisaInstitutionTypeEnum } from '../../tools/clarisa/entities/clarisa-institution-types/enum/clarisa-institution-type.enum';
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
+import { setNull } from '../../shared/utils/object.utils';
 
 @Injectable()
 export class ResultInstitutionTypesService extends BaseServiceSimple<
@@ -134,11 +135,14 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
 
         const dataTemp: Partial<ResultInstitutionType> = {
           result_id: resultId,
-          institution_type_custom_name:
+          institution_type_custom_name: setNull(
             institution?.institution_type_custom_name,
-          institution_type_id: institution?.institution_type_id,
+          ),
+          institution_type_id: setNull(institution?.institution_type_id),
           institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
-          sub_institution_type_id: institution?.sub_institution_type_id,
+          sub_institution_type_id: setNull(
+            institution?.sub_institution_type_id,
+          ),
           is_active: true,
           ...this.currentUser.audit(SetAutitEnum.NEW),
         };
