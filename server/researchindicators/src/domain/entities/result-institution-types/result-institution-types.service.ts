@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { ResultInstitutionType } from './entities/result-institution-type.entity';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import {
+  CurrentUserUtil,
+  SetAutitEnum,
+} from '../../shared/utils/current-user.util';
 import { CreateResultInstitutionTypeDto } from './dto/create-result-institution-type.dto';
 import { ClarisaInstitutionTypeEnum } from '../../tools/clarisa/entities/clarisa-institution-types/enum/clarisa-institution-type.enum';
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
@@ -102,6 +105,86 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         undefined,
         notDeleteIds,
       );
+  }
+
+  async customSaveInnovationDev(
+    resultId: number,
+    data: CreateResultInstitutionTypeDto[],
+    manager: EntityManager,
+  ) {
+    const tempRepo = manager.getRepository(ResultInstitutionType);
+    const dataToSave: Partial<ResultInstitutionType>[] = [];
+    for (const institution of data) {
+      if (institution?.result_institution_type_id) {
+        dataToSave.push({
+          result_institution_type_id: institution?.result_institution_type_id,
+          institution_type_custom_name:
+            institution?.institution_type_custom_name,
+          institution_type_id: institution?.institution_type_id,
+          institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+          sub_institution_type_id: institution?.sub_institution_type_id,
+          is_active: true,
+          ...this.currentUser.audit(SetAutitEnum.UPDATE),
+        });
+      } else {
+        const where = this.constructWhereClause(institution, resultId);
+        const existData = await tempRepo.findOne({
+          where,
+        });
+
+        const dataTemp: Partial<ResultInstitutionType> = {
+          result_id: resultId,
+          institution_type_custom_name:
+            institution?.institution_type_custom_name,
+          institution_type_id: institution?.institution_type_id,
+          institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+          sub_institution_type_id: institution?.sub_institution_type_id,
+          is_active: true,
+          ...this.currentUser.audit(SetAutitEnum.NEW),
+        };
+
+        if (existData) {
+          dataTemp['result_institution_type_id'] =
+            existData.result_institution_type_id;
+        }
+
+        dataToSave.push(dataTemp);
+      }
+    }
+    await tempRepo.update(
+      {
+        result_id: resultId,
+        is_active: true,
+        institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+      },
+      { is_active: false },
+    );
+    return tempRepo.save(dataToSave);
+  }
+
+  private constructWhereClause(
+    data: CreateResultInstitutionTypeDto,
+    resultId: number,
+  ) {
+    const where = {
+      result_id: resultId,
+      institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+    };
+    if (data.institution_type_id == ClarisaInstitutionTypeEnum.OTHER) {
+      where['institution_type_custom_name'] = data.institution_type_custom_name;
+      where['institution_type_id'] = ClarisaInstitutionTypeEnum.OTHER;
+    }
+
+    if (data?.sub_institution_type_id) {
+      where['sub_institution_type_id'] = data?.sub_institution_type_id;
+      where['institution_type_id'] = data?.institution_type_id;
+    }
+
+    if (!data?.sub_institution_type_id && data?.institution_type_id) {
+      where['institution_type_id'] = data?.institution_type_id;
+    }
+
+    return where;
   }
 }
 
