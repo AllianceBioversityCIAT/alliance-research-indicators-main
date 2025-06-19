@@ -9,8 +9,6 @@ import {
 import { selectManager } from '../../shared/utils/orm.util';
 import { ResultActorsService } from '../result-actors/result-actors.service';
 import { ActorRolesEnum } from '../actor-roles/enum/actor-roles.enum';
-import { filterByUniqueKeyWithPriority } from '../../shared/utils/array.util';
-import { CreateResultActorDto } from '../result-actors/dto/create-result-actor.dto';
 import { ResultInstitutionTypesService } from '../result-institution-types/result-institution-types.service';
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
 import { ClarisaActorTypesService } from '../../tools/clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
@@ -70,27 +68,23 @@ export class ResultInnovationDevService {
         ...this._currentUser.audit(SetAutitEnum.UPDATE),
       });
 
-      const filterActors = filterByUniqueKeyWithPriority<CreateResultActorDto>(
-        createResultInnovationDevDto?.actors,
-        'actor_type_id',
-        'result_actors_id',
-      );
-
       const filterIds = await this._clarisaActorTypesService.validateActorTypes(
-        filterActors.map((actor) => actor.actor_type_id),
+        createResultInnovationDevDto?.actors.map(
+          (actor) => actor.actor_type_id,
+        ),
       );
 
-      const saveActors = filterActors.filter(
+      const saveActors = createResultInnovationDevDto?.actors.filter(
         (actor) => !filterIds.includes(actor.actor_type_id),
       );
 
-      await this._resultActorsService.saveInnovationDev(
+      await this._resultActorsService.customSaveInnovationDev(
         resultId,
         saveActors,
         manager,
       );
 
-      await this._resultInstitutionTypesService.saveInnovationDev(
+      await this._resultInstitutionTypesService.customSaveInnovationDev(
         resultId,
         createResultInnovationDevDto?.institution_types,
         manager,

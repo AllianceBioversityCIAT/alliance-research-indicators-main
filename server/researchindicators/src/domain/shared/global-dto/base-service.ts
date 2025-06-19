@@ -27,7 +27,7 @@ export abstract class BaseServiceProperties<
     protected readonly mainRepo: RepositoryData,
     protected readonly resultKey: keyof Entity & string = null,
     protected readonly roleKey: keyof Entity & string = null,
-    protected readonly currentUser: CurrentUserUtil,
+    public readonly currentUser: CurrentUserUtil,
   ) {
     this.primaryKey = this.mainRepo.metadata.primaryColumns?.[0]
       .propertyName as keyof Entity & string;
