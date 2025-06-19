@@ -15,6 +15,7 @@ import {
 import { CreateResultActorDto } from './dto/create-result-actor.dto';
 import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
 import { ActorRolesEnum } from '../actor-roles/enum/actor-roles.enum';
+import { setNull } from '../../shared/utils/object.utils';
 
 @Injectable()
 export class ResultActorsService extends BaseServiceSimple<
@@ -116,14 +117,15 @@ export class ResultActorsService extends BaseServiceSimple<
         const dataTemp: Partial<ResultActor> = {
           result_id: resultId,
           is_active: true,
-          actor_type_id: institution?.actor_type_id,
-          men_youth: institution?.men_youth,
-          men_not_youth: institution?.men_not_youth,
-          women_youth: institution?.women_youth,
-          women_not_youth: institution?.women_not_youth,
-          actor_type_custom_name: institution?.actor_type_custom_name,
-          sex_age_disaggregation_not_apply:
+          actor_type_id: setNull(institution?.actor_type_id),
+          men_youth: setNull(institution?.men_youth),
+          men_not_youth: setNull(institution?.men_not_youth),
+          women_youth: setNull(institution?.women_youth),
+          women_not_youth: setNull(institution?.women_not_youth),
+          actor_type_custom_name: setNull(institution?.actor_type_custom_name),
+          sex_age_disaggregation_not_apply: setNull(
             institution?.sex_age_disaggregation_not_apply,
+          ),
           actor_role_id: ActorRolesEnum.INNOVATION_DEV,
           ...this.currentUser.audit(SetAutitEnum.NEW),
         };
