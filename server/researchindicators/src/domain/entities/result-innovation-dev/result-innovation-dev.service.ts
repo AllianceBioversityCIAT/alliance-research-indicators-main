@@ -86,7 +86,9 @@ export class ResultInnovationDevService {
 
       await this._resultInstitutionTypesService.customSaveInnovationDev(
         resultId,
-        createResultInnovationDevDto?.institution_types,
+        createResultInnovationDevDto?.institution_types?.filter((el) =>
+          Boolean(el?.institution_type_id),
+        ),
         manager,
       );
 

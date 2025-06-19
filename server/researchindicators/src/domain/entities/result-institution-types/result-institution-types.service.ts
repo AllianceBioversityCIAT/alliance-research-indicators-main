@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { ResultInstitutionType } from './entities/result-institution-type.entity';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import {
   CurrentUserUtil,
   SetAutitEnum,
@@ -173,15 +173,19 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     if (data.institution_type_id == ClarisaInstitutionTypeEnum.OTHER) {
       where['institution_type_custom_name'] = data.institution_type_custom_name;
       where['institution_type_id'] = ClarisaInstitutionTypeEnum.OTHER;
+      where['sub_institution_type_id'] = IsNull();
     }
 
     if (data?.sub_institution_type_id) {
       where['sub_institution_type_id'] = data?.sub_institution_type_id;
       where['institution_type_id'] = data?.institution_type_id;
+      where['institution_type_custom_name'] = IsNull();
     }
 
     if (!data?.sub_institution_type_id && data?.institution_type_id) {
       where['institution_type_id'] = data?.institution_type_id;
+      where['sub_institution_type_id'] = IsNull();
+      where['institution_type_custom_name'] = IsNull();
     }
 
     return where;
