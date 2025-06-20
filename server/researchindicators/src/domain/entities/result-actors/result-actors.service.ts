@@ -102,7 +102,10 @@ export class ResultActorsService extends BaseServiceSimple<
           men_not_youth: institution?.men_not_youth,
           women_youth: institution?.women_youth,
           women_not_youth: institution?.women_not_youth,
-          actor_type_custom_name: institution?.actor_type_custom_name,
+          actor_type_custom_name:
+            institution?.actor_type_id == ClarisaActorTypesEnum.OTHER
+              ? setNull(institution?.actor_type_custom_name)
+              : null,
           sex_age_disaggregation_not_apply:
             institution?.sex_age_disaggregation_not_apply,
           actor_role_id: ActorRolesEnum.INNOVATION_DEV,
@@ -122,7 +125,10 @@ export class ResultActorsService extends BaseServiceSimple<
           men_not_youth: setNull(institution?.men_not_youth),
           women_youth: setNull(institution?.women_youth),
           women_not_youth: setNull(institution?.women_not_youth),
-          actor_type_custom_name: setNull(institution?.actor_type_custom_name),
+          actor_type_custom_name:
+            institution?.actor_type_id == ClarisaActorTypesEnum.OTHER
+              ? setNull(institution?.actor_type_custom_name)
+              : null,
           sex_age_disaggregation_not_apply: setNull(
             institution?.sex_age_disaggregation_not_apply,
           ),
