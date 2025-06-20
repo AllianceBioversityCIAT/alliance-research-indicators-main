@@ -120,7 +120,9 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         dataToSave.push({
           result_institution_type_id: institution?.result_institution_type_id,
           institution_type_custom_name:
-            institution?.institution_type_custom_name,
+            institution?.institution_type_id == ClarisaInstitutionTypeEnum.OTHER
+              ? setNull(institution?.institution_type_custom_name)
+              : null,
           institution_type_id: institution?.institution_type_id,
           institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
           sub_institution_type_id: institution?.sub_institution_type_id,
@@ -135,9 +137,10 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
 
         const dataTemp: Partial<ResultInstitutionType> = {
           result_id: resultId,
-          institution_type_custom_name: setNull(
-            institution?.institution_type_custom_name,
-          ),
+          institution_type_custom_name:
+            institution?.institution_type_id == ClarisaInstitutionTypeEnum.OTHER
+              ? setNull(institution?.institution_type_custom_name)
+              : null,
           institution_type_id: setNull(institution?.institution_type_id),
           institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
           sub_institution_type_id: setNull(
