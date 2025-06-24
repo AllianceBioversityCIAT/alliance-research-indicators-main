@@ -75,7 +75,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
 
     return result.map((item) => ({
       ...item,
-      lever: leverUrlMap[item.departmentId] || 'Not available',
+      leverUrl: leverUrlMap[item.departmentId] || 'Not available',
     }));
   }
 
