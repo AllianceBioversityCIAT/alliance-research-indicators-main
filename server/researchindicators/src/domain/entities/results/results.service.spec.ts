@@ -5,7 +5,7 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, In, Not } from 'typeorm';
+import { DataSource, EntityManager, Not } from 'typeorm';
 import { ResultsService } from './results.service';
 import { ResultRepository } from './repositories/result.repository';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
@@ -36,8 +36,6 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ContractRolesEnum } from '../result-contracts/enum/contract-roles.enum';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
-import { Result } from './entities/result.entity';
-import { customErrorResponse } from '../../shared/utils/response.utils';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
@@ -67,6 +65,7 @@ describe('ResultsService', () => {
   let mockClarisaLeversService: jest.Mocked<ClarisaLeversService>;
   let mockAgressoContractService: jest.Mocked<AgressoContractService>;
   let mockResultInnovationDevService: jest.Mocked<ResultInnovationDevService>;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
   beforeEach(async () => {
@@ -660,6 +659,7 @@ describe('ResultsService', () => {
       mockCurrentUser.audit.mockReturnValue({});
 
       // Act
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const result = await service.createResult(createResult);
 
       // Assert
