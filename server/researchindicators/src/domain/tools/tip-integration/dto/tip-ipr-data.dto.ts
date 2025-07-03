@@ -1,31 +1,26 @@
-export enum IprOwner {
-  CIAT = 'CIAT',
-  Bioversity = 'Bioversity',
-  Both = 'Both',
-  Other = 'Other',
-}
-
-export interface ResultCreatorDto {
-  fullName: string;
-  email: string;
-}
-
 export interface TipIprDataDto {
-  resultId: string;
-  resultCode: string;
+  resultId: number;
+  resultCode: number;
   indicator: string;
   resultTitle: string;
   resultDescription: string;
   reportingProject: string;
-  resultCreator: ResultCreatorDto;
+  resultCreator: {
+    fullName: string;
+    email: string;
+  };
   linkToResult: string;
 
-  iprOwner: IprOwner;
-  iprOwnerOther?: string;
+  intellectualPropertyOwnerId: number | null;
+  intellectualPropertyOwnerName: string | null;
+  iprOwnerOther: string | null;
+
   hasLegalRestrictions: boolean;
-  legalRestrictionsDetails?: string;
+  legalRestrictionsDetails: string | null;
+
   hasCommercializationPotential: boolean;
-  commercializationDetails?: string;
+  commercializationDetails: string | null;
+
   requiresFurtherDevelopment: boolean;
-  furtherDevelopmentDetails?: string;
+  furtherDevelopmentDetails: string | null;
 }

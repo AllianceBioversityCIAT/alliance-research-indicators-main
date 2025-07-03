@@ -31,6 +31,7 @@ import { GreenChecksModule } from '../entities/green-checks/green-checks.module'
 import { IntellectualPropertyOwnersModule } from '../entities/intellectual-property-owners/intellectual-property-owners.module';
 import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/result-cap-sharing-ip.module';
 import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
+import { TipIntegrationModule } from '../tools/tip-integration/tip-integration.module';
 
 const capSharingChildren: Routes = [
   {
@@ -133,6 +134,10 @@ const toolsChildren: Routes = [
   {
     path: 'agresso',
     children: agressotoolsChildren,
+  },
+  {
+    path: 'tip-integration',
+    module: TipIntegrationModule,
   },
 ];
 
