@@ -114,8 +114,12 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     manager: EntityManager,
   ) {
     const tempRepo = manager.getRepository(ResultInstitutionType);
+
+    const uniqueData = this.removeDuplicates(data);
+
     const dataToSave: Partial<ResultInstitutionType>[] = [];
-    for (const institution of data) {
+
+    for (const institution of uniqueData) {
       if (institution?.result_institution_type_id) {
         dataToSave.push({
           result_institution_type_id: institution?.result_institution_type_id,
@@ -131,9 +135,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         });
       } else {
         const where = this.constructWhereClause(institution, resultId);
-        const existData = await tempRepo.findOne({
-          where,
-        });
+        const existData = await tempRepo.findOne({ where });
 
         const dataTemp: Partial<ResultInstitutionType> = {
           result_id: resultId,
@@ -147,7 +149,9 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
             institution?.sub_institution_type_id,
           ),
           is_active: true,
-          ...this.currentUser.audit(SetAutitEnum.NEW),
+          ...this.currentUser.audit(
+            existData ? SetAutitEnum.UPDATE : SetAutitEnum.NEW,
+          ),
         };
 
         if (existData) {
@@ -158,6 +162,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         dataToSave.push(dataTemp);
       }
     }
+
     await tempRepo.update(
       {
         result_id: resultId,
@@ -166,7 +171,32 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       },
       { is_active: false },
     );
+
     return tempRepo.save(dataToSave);
+  }
+
+  private removeDuplicates(
+    data: CreateResultInstitutionTypeDto[],
+  ): CreateResultInstitutionTypeDto[] {
+    const seen = new Map<string, CreateResultInstitutionTypeDto>();
+
+    for (const institution of data) {
+      let key: string;
+
+      if (
+        institution.institution_type_id === ClarisaInstitutionTypeEnum.OTHER
+      ) {
+        key = `other_${institution.institution_type_id}_${institution.institution_type_custom_name}`;
+      } else if (institution.sub_institution_type_id) {
+        key = `sub_${institution.sub_institution_type_id}`;
+      } else {
+        key = `type_${institution.institution_type_id}`;
+      }
+
+      seen.set(key, institution);
+    }
+
+    return Array.from(seen.values());
   }
 
   private constructWhereClause(
