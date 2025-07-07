@@ -50,6 +50,7 @@ import { ResultActorsModule } from './result-actors/result-actors.module';
 import { ActorRolesModule } from './actor-roles/actor-roles.module';
 import { ResultInstitutionTypesModule } from './result-institution-types/result-institution-types.module';
 import { InstitutionTypeRolesModule } from './institution-type-roles/institution-type-roles.module';
+import { IssueCategoriesModule } from './issue-categories/issue-categories.module';
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { InstitutionTypeRolesModule } from './institution-type-roles/institution
     ActorRolesModule,
     ResultInstitutionTypesModule,
     InstitutionTypeRolesModule,
+    IssueCategoriesModule,
   ],
   exports: [AgressoContractModule],
 })
