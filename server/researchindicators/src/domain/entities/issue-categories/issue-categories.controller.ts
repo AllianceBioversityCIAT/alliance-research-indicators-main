@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { IssueCategoriesService } from './issue-categories.service';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
