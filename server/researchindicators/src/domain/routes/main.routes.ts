@@ -37,6 +37,8 @@ import { ResultActorsModule } from '../entities/result-actors/result-actors.modu
 import { ActorRolesModule } from '../entities/actor-roles/actor-roles.module';
 import { ResultInstitutionTypesModule } from '../entities/result-institution-types/result-institution-types.module';
 import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/institution-type-roles.module';
+import { IssueCategoriesModule } from '../entities/issue-categories/issue-categories.module';
+import { DynamoFeedbackModule } from '../tools/dynamo-feedback/dynamo-feedback.module';
 
 const capSharingChildren: Routes = [
   {
@@ -234,6 +236,14 @@ const children: Routes = [
     path: 'reporting-feedback',
     module: ReportingFeedbackModule,
   },
+   {
+    path: 'issue-categories',
+    module: IssueCategoriesModule,
+  },
+  {
+    path: 'dynamo-feedback',
+    module: DynamoFeedbackModule,
+  }
 ];
 
 export const route: Routes = [
