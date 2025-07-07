@@ -296,6 +296,7 @@ export class GreenChecksService {
                   ', ',
                 ),
           url: `${this.appConfig.ARI_CLIENT_HOST}/result/${resultId}/general-information`,
+          indicator: data.indicator,
         };
         const template = await this.templateService._getTemplate(
           TemplateEnum.SUBMITTED_RESULT,
