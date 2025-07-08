@@ -25,9 +25,10 @@ export class DynamoFeedbackService {
         select: ['issue_category_id', 'name', 'description'],
       });
 
-      console.log('IssueCategory:', issueCategory);
-      if (!issueCategory) {
-        throw new InternalServerErrorException('IssueType category not found');
+      if (data.feedbackType === 'bad') {
+        if (!issueCategory) {
+          throw new InternalServerErrorException('IssueType category not found');
+        }
       }
 
       const dataToSave = {
@@ -37,8 +38,8 @@ export class DynamoFeedbackService {
         feedbackType: { S: data.feedbackType || '' },
         text: { S: data.text || '' },
         issueType: { S: String(data.issueType) || '' },
-        issueTypeName: { S: issueCategory.name },
-        issueCategoryDescription: { S: issueCategory.description || '' },
+        issueTypeName: { S: issueCategory?.name || '' },
+        issueCategoryDescription: { S: issueCategory?.description || '' },
       };
 
       const command = new PutItemCommand({
