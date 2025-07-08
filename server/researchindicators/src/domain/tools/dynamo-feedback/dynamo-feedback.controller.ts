@@ -63,8 +63,14 @@ export class DynamoFeedbackController {
   }
 
   @Get('test-data')
-  getAllFeedback() {
-    return this.dynamoFeedbackService.getAllFeedback();
+  async getAllFeedback() {
+    return await this.dynamoFeedbackService.getAllFeedback().then((response) => 
+      ResponseUtils.format({
+        description: 'Feedback retrieved successfully',
+        status: HttpStatus.OK,
+        data: response,
+      }), 
+    );
   }
 
 }
