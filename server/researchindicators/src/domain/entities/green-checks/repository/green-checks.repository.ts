@@ -207,7 +207,7 @@ export class GreenCheckRepository {
     const result: FindDataForSubmissionDto = await this.dataSource
       .query(query, [resultId])
       .then((result) => (result?.length ? result[0] : null));
-    
+
     return result;
   }
 
@@ -257,7 +257,9 @@ export class GreenCheckRepository {
     limit 1;
     `;
     const result = await this.dataSource
-      .query<{ result_id: number; title: string; indicator: string}[]>(queryResult, [resultId])
+      .query<
+        { result_id: number; title: string; indicator: string }[]
+      >(queryResult, [resultId])
       .then((result) => (result?.length ? result[0] : null));
 
     const history = await this.dataSource.query<FindGreenChecksUserDto[]>(

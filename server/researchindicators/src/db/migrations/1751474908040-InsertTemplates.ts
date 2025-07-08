@@ -1,11 +1,10 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
-import { TemplateEnum } from "../../domain/shared/auxiliar/template/enum/template.enum";
+import { MigrationInterface, QueryRunner } from 'typeorm';
+import { TemplateEnum } from '../../domain/shared/auxiliar/template/enum/template.enum';
 
 export class InsertTemplates1751474908040 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(` delete from \`sec_template\``);
-        await queryRunner.query(` insert into \`sec_template\` (\`name\`, \`template\` ) values
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(` delete from \`sec_template\``);
+    await queryRunner.query(` insert into \`sec_template\` (\`name\`, \`template\` ) values
             ('${TemplateEnum.WELCOME_EMAIL}', '<!DOCTYPE html>
                 <html lang="en">
                 <head>
@@ -448,15 +447,10 @@ export class InsertTemplates1751474908040 implements MigrationInterface {
                     <p>Best regards,</p>
                     <b>STAR Team</b>
                 </body>
-                </html>') `
+                </html>') `);
+  }
 
-        ) 
-
-    }
-
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(` delete from \`sec_template\``);
-
-    }
-
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(` delete from \`sec_template\``);
+  }
 }
