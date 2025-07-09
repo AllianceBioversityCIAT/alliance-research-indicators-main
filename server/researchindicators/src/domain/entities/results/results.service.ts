@@ -348,14 +348,6 @@ export class ResultsService {
         manager,
       );
 
-      await this._resultSdgsService.create(
-        result_id,
-        generalInformation.result_sdgs,
-        'clarisa_sdg_id',
-        undefined,
-        manager,
-      );
-
       await this._resultUsersService.create<UserRolesEnum>(
         result_id,
         generalInformation.main_contact_person,
@@ -397,8 +389,6 @@ export class ResultsService {
     const keywords =
       await this._resultKeywordsService.findKeywordsByResultId(resultId);
 
-    const result_sdgs = await this._resultSdgsService.find(resultId);
-
     const mainContactPerson = await this._resultUsersService
       .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
       .then((data) => (data?.length > 0 ? data[0] : null));
@@ -409,7 +399,6 @@ export class ResultsService {
       year,
       keywords: keywords.map((keyword) => keyword.keyword),
       main_contact_person: mainContactPerson,
-      result_sdgs,
     };
 
     return generalInformation;
@@ -484,6 +473,14 @@ export class ResultsService {
         },
       );
 
+      await this._resultSdgsService.create(
+        resultId,
+        alignmentData.result_sdgs,
+        'clarisa_sdg_id',
+        undefined,
+        manager,
+      );
+
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
     });
 
@@ -505,9 +502,12 @@ export class ResultsService {
       LeverRolesEnum.ALIGNMENT,
     );
 
+    const result_sdgs = await this._resultSdgsService.find(resultId);
+
     const resultAlignment: ResultAlignmentDto = {
       contracts,
       levers,
+      result_sdgs,
     };
 
     return resultAlignment;

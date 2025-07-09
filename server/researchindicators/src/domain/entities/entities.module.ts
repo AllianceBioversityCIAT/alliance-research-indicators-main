@@ -52,6 +52,7 @@ import { ResultInstitutionTypesModule } from './result-institution-types/result-
 import { InstitutionTypeRolesModule } from './institution-type-roles/institution-type-roles.module';
 import { IssueCategoriesModule } from './issue-categories/issue-categories.module';
 import { ResultSdgsModule } from './result-sdgs/result-sdgs.module';
+import { AppConfigModule } from './app-config/app-config.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { ResultSdgsModule } from './result-sdgs/result-sdgs.module';
     InstitutionTypeRolesModule,
     IssueCategoriesModule,
     ResultSdgsModule,
+    AppConfigModule,
   ],
   exports: [AgressoContractModule],
 })

@@ -39,6 +39,7 @@ import { ResultInstitutionTypesModule } from '../entities/result-institution-typ
 import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/institution-type-roles.module';
 import { IssueCategoriesModule } from '../entities/issue-categories/issue-categories.module';
 import { DynamoFeedbackModule } from '../tools/dynamo-feedback/dynamo-feedback.module';
+import { AppConfigModule } from '../entities/app-config/app-config.module';
 
 const capSharingChildren: Routes = [
   {
@@ -176,6 +177,10 @@ const toolsChildren: Routes = [
 
 const children: Routes = [
   {
+    path: 'configuration',
+    module: AppConfigModule,
+  },
+  {
     path: 'results',
     children: ResultsChildren,
     module: ResultsModule,
@@ -236,14 +241,14 @@ const children: Routes = [
     path: 'reporting-feedback',
     module: ReportingFeedbackModule,
   },
-   {
+  {
     path: 'issue-categories',
     module: IssueCategoriesModule,
   },
   {
     path: 'dynamo-feedback',
     module: DynamoFeedbackModule,
-  }
+  },
 ];
 
 export const route: Routes = [
