@@ -51,6 +51,7 @@ import { ActorRolesModule } from './actor-roles/actor-roles.module';
 import { ResultInstitutionTypesModule } from './result-institution-types/result-institution-types.module';
 import { InstitutionTypeRolesModule } from './institution-type-roles/institution-type-roles.module';
 import { ResultSdgsModule } from './result-sdgs/result-sdgs.module';
+import { AppConfigModule } from './app-config/app-config.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { ResultSdgsModule } from './result-sdgs/result-sdgs.module';
     ResultInstitutionTypesModule,
     InstitutionTypeRolesModule,
     ResultSdgsModule,
+    AppConfigModule,
   ],
   exports: [AgressoContractModule],
 })

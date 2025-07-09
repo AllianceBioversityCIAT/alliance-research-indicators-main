@@ -37,6 +37,7 @@ import { ResultActorsModule } from '../entities/result-actors/result-actors.modu
 import { ActorRolesModule } from '../entities/actor-roles/actor-roles.module';
 import { ResultInstitutionTypesModule } from '../entities/result-institution-types/result-institution-types.module';
 import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/institution-type-roles.module';
+import { AppConfigModule } from '../entities/app-config/app-config.module';
 
 const capSharingChildren: Routes = [
   {
@@ -173,6 +174,10 @@ const toolsChildren: Routes = [
 ];
 
 const children: Routes = [
+  {
+    path: 'configuration',
+    module: AppConfigModule,
+  },
   {
     path: 'results',
     children: ResultsChildren,
