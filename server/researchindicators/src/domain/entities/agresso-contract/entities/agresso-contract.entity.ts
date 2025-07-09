@@ -3,6 +3,7 @@ import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { AgressoContractCountry } from '../../agresso-contract-countries/entities/agresso-contract-country.entity';
 import { UserAgressoContract } from '../../user-agresso-contracts/entities/user-agresso-contract.entity';
 import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
+import { ClarisaSdg } from '../../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 
 @Entity('agresso_contracts')
 export class AgressoContract extends AuditableEntity {
@@ -203,6 +204,12 @@ export class AgressoContract extends AuditableEntity {
     select: false,
   })
   officeId?: string;
+
+  @Column('json', {
+    name: 'sdgs',
+    nullable: true,
+  })
+  sdgs?: ClarisaSdg[];
 
   @OneToMany(
     () => AgressoContractCountry,

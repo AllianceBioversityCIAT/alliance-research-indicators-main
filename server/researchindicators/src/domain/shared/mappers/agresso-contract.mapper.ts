@@ -1,10 +1,12 @@
 import { AgressoContractCountry } from '../../entities/agresso-contract-countries/entities/agresso-contract-country.entity';
 import { AgressoContractRawDto } from '../../entities/agresso-contract/dto/agresso-contract-raw.dto';
 import { AgressoContract } from '../../entities/agresso-contract/entities/agresso-contract.entity';
+import { ClarisaSdg } from '../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 import { isEmpty } from '../utils/object.utils';
 
 export const AgressoContractMapper = (
   data: AgressoContractRawDto,
+  sdgsData: ClarisaSdg[],
 ): AgressoContract => {
   const tempData = data;
   /**
@@ -13,8 +15,17 @@ export const AgressoContractMapper = (
    */
   delete tempData.countryId;
   delete tempData.country;
+  const sdgList = tempData?.sustainableDevelopmentGoals
+    ?.split(';')
+    ?.map((goal) => goal?.split(':')?.[0]);
+  const sdgObjectList = sdgsData.filter((obj) =>
+    sdgList?.some((frag) =>
+      obj.short_name.toLowerCase().includes(frag.toLowerCase()),
+    ),
+  );
+  delete tempData.sustainableDevelopmentGoals;
 
-  const mapperData: AgressoContract = tempData;
+  const mapperData: AgressoContract = { ...tempData, sdgs: sdgObjectList };
   return mapperData;
 };
 

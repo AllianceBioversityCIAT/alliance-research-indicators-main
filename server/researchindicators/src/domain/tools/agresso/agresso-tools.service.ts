@@ -5,6 +5,7 @@ import { AgressoContractRawDto } from '../../entities/agresso-contract/dto/agres
 import { AgressoContractMapper } from '../../shared/mappers/agresso-contract.mapper';
 import { BaseControlListSave } from '../../shared/global-dto/base-control-list-save';
 import { DataSource, DeepPartial } from 'typeorm';
+import { ClarisaSdg } from '../clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 
 @Injectable()
 export class AgressoToolsService extends BaseControlListSave<Agresso> {
@@ -13,16 +14,18 @@ export class AgressoToolsService extends BaseControlListSave<Agresso> {
   }
 
   async cloneAllAgressoEntities() {
+    const clarisaSdg = await this.dataSource.getRepository(ClarisaSdg).find();
     this.base<AgressoContractRawDto, AgressoContract>(
       'getAgreementsRM',
       AgressoContract,
       null,
-      (data) => this.cleanDuplicates(data),
+      (data) => this.cleanDuplicates(data, clarisaSdg),
     );
   }
 
   private cleanDuplicates(
     data: AgressoContractRawDto[],
+    clarisaSdg: ClarisaSdg[],
   ): DeepPartial<AgressoContract>[] {
     const idCount = new Map<string, number>();
     const cleanData: AgressoContractRawDto[] = [];
@@ -35,6 +38,6 @@ export class AgressoToolsService extends BaseControlListSave<Agresso> {
         cleanData.push(item);
       }
     });
-    return cleanData.map((data) => AgressoContractMapper(data));
+    return cleanData.map((data) => AgressoContractMapper(data, clarisaSdg));
   }
 }

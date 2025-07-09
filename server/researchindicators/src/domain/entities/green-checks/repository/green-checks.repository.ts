@@ -264,7 +264,17 @@ export class GreenCheckRepository {
 
     const subData = history.find((d) => d.to_status_id === toStatusId);
     const revData = history.find((d) => d.to_status_id === fromStatusId);
-
+    console.log({
+      sub_last_name: subData.user.last_name,
+      sub_first_name: subData.user.first_name,
+      sub_email: subData.user.email,
+      rev_last_name: revData.user.last_name,
+      rev_first_name: revData.user.first_name,
+      rev_email: revData.user.email,
+      description: revData.submission_comment,
+      result_id: result.result_id,
+      title: result.title,
+    });
     return {
       sub_last_name: subData.user.last_name,
       sub_first_name: subData.user.first_name,

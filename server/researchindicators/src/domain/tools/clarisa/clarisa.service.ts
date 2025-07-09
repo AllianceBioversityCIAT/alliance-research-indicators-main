@@ -28,6 +28,7 @@ import { AppConfig } from '../../shared/utils/app-config.util';
 import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
 import { CreateSecretDto, MisSimpleInfoDto } from './dto/clarisa.types';
 import { ClarisaInstitutionLocation } from './entities/clarisa-institution-locations/entities/clarisa-institution-location.entity';
+import { ClarisaSdg } from './entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -90,6 +91,8 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
    */
   async cloneAllClarisaEntities(): Promise<void> {
     this._logger.debug('Cloning all entities from Clarisa API');
+
+    await this.base<ClarisaSdg>(ClarisaPathEnum.SDG, ClarisaSdg);
 
     await this.base<ClarisaRegion>(ClarisaPathEnum.REGIONS, ClarisaRegion);
 
