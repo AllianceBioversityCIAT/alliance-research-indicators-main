@@ -20,13 +20,14 @@ export class DynamoFeedbackService {
 
   async saveData(data: CreateDynamoFeedbackDto): Promise<any> {
     try{
-      const issueCategory = Array.isArray(data.issueType)
+      const issueTypeIds = data.issueType.map((id: string) => Number(id));
+      const issueCategory = Array.isArray(issueTypeIds)
         ? await this.issueCategoryRepository.find({
-            where: { issue_category_id: In(data.issueType) },
+            where: { issue_category_id: In(issueTypeIds) },
             select: ['issue_category_id', 'name', 'description'],
         })
         : await this.issueCategoryRepository.find({
-            where: { issue_category_id: In([data.issueType]) },
+            where: { issue_category_id: In([issueTypeIds]) },
             select: ['issue_category_id', 'name', 'description'],
         });
 
