@@ -13,6 +13,7 @@ export enum ClarisaPathEnum {
   PARTNER_REQUEST_CREATE = 'api/partner-requests/create',
   CREATE_SECRET = 'api/app-secrets/create',
   VALIDATE_SECRET = 'api/app-secrets/validate',
+  SDG = 'api/sdgs',
 }
 
 export enum SearchToOpenSearchEnum {

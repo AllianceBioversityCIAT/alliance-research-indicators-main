@@ -28,6 +28,7 @@ import { AllianceUserStaffModule } from '../alliance-user-staff/alliance-user-st
 import { ClarisaLeversModule } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.module';
 import { AgressoContractModule } from '../agresso-contract/agresso-contract.module';
 import { ResultInnovationDevModule } from '../result-innovation-dev/result-innovation-dev.module';
+import { ResultSdgsModule } from '../result-sdgs/result-sdgs.module';
 
 @Module({
   controllers: [ResultsController],
@@ -57,6 +58,7 @@ import { ResultInnovationDevModule } from '../result-innovation-dev/result-innov
     ClarisaLeversModule,
     AgressoContractModule,
     ResultInnovationDevModule,
+    ResultSdgsModule,
   ],
   providers: [
     ResultsService,

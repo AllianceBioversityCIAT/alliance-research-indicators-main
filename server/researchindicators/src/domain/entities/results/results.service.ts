@@ -62,6 +62,8 @@ import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
 import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
+import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
+import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 
 @Injectable()
 export class ResultsService {
@@ -89,6 +91,7 @@ export class ResultsService {
     private readonly _clarisaLeversService: ClarisaLeversService,
     private readonly _agressoContractService: AgressoContractService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
+    private readonly _resultSdgsService: ResultSdgsService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -208,6 +211,20 @@ export class ResultsService {
         ContractRolesEnum.ALIGNMENT,
         manager,
         ['is_primary'],
+      );
+
+      const tempSdg: Partial<ResultSdg>[] = agressoContract?.sdgs?.map(
+        (sdg) => ({
+          clarisa_sdg_id: sdg.id,
+        }),
+      );
+
+      await this._resultSdgsService.create(
+        result.result_id,
+        tempSdg,
+        'clarisa_sdg_id',
+        undefined,
+        manager,
       );
 
       return result;
@@ -331,6 +348,14 @@ export class ResultsService {
         manager,
       );
 
+      await this._resultSdgsService.create(
+        result_id,
+        generalInformation.result_sdgs,
+        'clarisa_sdg_id',
+        undefined,
+        manager,
+      );
+
       await this._resultUsersService.create<UserRolesEnum>(
         result_id,
         generalInformation.main_contact_person,
@@ -372,6 +397,8 @@ export class ResultsService {
     const keywords =
       await this._resultKeywordsService.findKeywordsByResultId(resultId);
 
+    const result_sdgs = await this._resultSdgsService.find(resultId);
+
     const mainContactPerson = await this._resultUsersService
       .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
       .then((data) => (data?.length > 0 ? data[0] : null));
@@ -382,6 +409,7 @@ export class ResultsService {
       year,
       keywords: keywords.map((keyword) => keyword.keyword),
       main_contact_person: mainContactPerson,
+      result_sdgs,
     };
 
     return generalInformation;

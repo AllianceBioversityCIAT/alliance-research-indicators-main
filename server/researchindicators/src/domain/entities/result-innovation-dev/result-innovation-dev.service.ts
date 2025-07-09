@@ -12,6 +12,7 @@ import { ActorRolesEnum } from '../actor-roles/enum/actor-roles.enum';
 import { ResultInstitutionTypesService } from '../result-institution-types/result-institution-types.service';
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
 import { ClarisaActorTypesService } from '../../tools/clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
+import { isEmpty } from '../../shared/utils/object.utils';
 @Injectable()
 export class ResultInnovationDevService {
   private readonly mainRepo: Repository<ResultInnovationDev>;
@@ -50,6 +51,11 @@ export class ResultInnovationDevService {
       throw new NotFoundException(`Result with ID ${resultId} not found`);
     }
 
+    const adddExtraData = !(
+      createResultInnovationDevDto?.anticipated_users_id == 1 ||
+      isEmpty(createResultInnovationDevDto?.anticipated_users_id)
+    );
+
     return this.dataSource.transaction(async (manager) => {
       manager.getRepository(this.mainRepo.target).update(resultId, {
         innovation_nature_id:
@@ -62,9 +68,16 @@ export class ResultInnovationDevService {
         short_title: createResultInnovationDevDto?.short_title,
         anticipated_users_id:
           createResultInnovationDevDto?.anticipated_users_id,
-        expected_outcome: createResultInnovationDevDto?.expected_outcome,
-        intended_beneficiaries_description:
-          createResultInnovationDevDto?.intended_beneficiaries_description,
+        ...(adddExtraData
+          ? {
+              expected_outcome: createResultInnovationDevDto?.expected_outcome,
+              intended_beneficiaries_description:
+                createResultInnovationDevDto?.intended_beneficiaries_description,
+            }
+          : {
+              expected_outcome: null,
+              intended_beneficiaries_description: null,
+            }),
         ...this._currentUser.audit(SetAutitEnum.UPDATE),
       });
 
@@ -80,15 +93,17 @@ export class ResultInnovationDevService {
 
       await this._resultActorsService.customSaveInnovationDev(
         resultId,
-        saveActors,
+        adddExtraData ? saveActors : [],
         manager,
       );
 
       await this._resultInstitutionTypesService.customSaveInnovationDev(
         resultId,
-        createResultInnovationDevDto?.institution_types?.filter((el) =>
-          Boolean(el?.institution_type_id),
-        ),
+        adddExtraData
+          ? createResultInnovationDevDto?.institution_types?.filter((el) =>
+              Boolean(el?.institution_type_id),
+            )
+          : [],
         manager,
       );
 
