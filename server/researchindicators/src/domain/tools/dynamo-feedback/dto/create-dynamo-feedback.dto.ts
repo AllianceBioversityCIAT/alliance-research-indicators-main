@@ -24,7 +24,7 @@ export class CreateDynamoFeedbackDto {
     roleName: string;
   };
   description: string;
-  issueType: number;
+  issueType: number | number[];
   feedbackType: string;
   text: string;
 }
