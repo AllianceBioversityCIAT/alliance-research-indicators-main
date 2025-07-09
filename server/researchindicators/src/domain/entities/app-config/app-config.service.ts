@@ -1,11 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfig } from './entities/app-config.entity';
-import {
-  cleanObject,
-  isEmpty,
-  validObject,
-} from '../../shared/utils/object.utils';
+import { cleanObject, isEmpty } from '../../shared/utils/object.utils';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 @Injectable()
