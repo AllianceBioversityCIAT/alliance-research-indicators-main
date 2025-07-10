@@ -1,11 +1,13 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('app_config')
 export class AppConfig extends AuditableEntity {
   @PrimaryColumn({ type: 'varchar', length: 100 })
   key: string;
 
+  @ApiProperty()
   @Column({
     type: 'text',
     nullable: true,
@@ -13,6 +15,7 @@ export class AppConfig extends AuditableEntity {
   })
   description: string;
 
+  @ApiProperty()
   @Column({
     type: 'text',
     nullable: true,
@@ -20,6 +23,7 @@ export class AppConfig extends AuditableEntity {
   })
   simple_value: string;
 
+  @ApiProperty()
   @Column({
     type: 'json',
     nullable: true,
