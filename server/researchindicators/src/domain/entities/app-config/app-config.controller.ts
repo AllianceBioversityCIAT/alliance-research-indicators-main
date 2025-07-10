@@ -9,7 +9,7 @@ import {
 import { AppConfigService } from './app-config.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { AppConfig } from './entities/app-config.entity';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiParam, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Configuration')
 @ApiBearerAuth()
@@ -18,6 +18,11 @@ export class AppConfigController {
   constructor(private readonly appConfigService: AppConfigService) {}
 
   @Get(':key')
+  @ApiParam({
+    name: 'key',
+    description: 'The key of the configuration to update',
+    type: String,
+  })
   async getConfigByKey(@Param('key') key: string) {
     return this.appConfigService.findConfigByKey(key).then((config) =>
       ResponseUtils.format({
@@ -29,6 +34,15 @@ export class AppConfigController {
   }
 
   @Patch(':key')
+  @ApiBody({
+    type: AppConfig,
+    description: 'Configuration data to update',
+  })
+  @ApiParam({
+    name: 'key',
+    description: 'The key of the configuration to update',
+    type: String,
+  })
   async updateConfig(
     @Param('key') key: string,
     @Body() updateData: Partial<AppConfig>,
