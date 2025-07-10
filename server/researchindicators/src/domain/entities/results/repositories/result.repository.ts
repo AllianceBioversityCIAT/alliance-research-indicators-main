@@ -300,7 +300,7 @@ export class ResultRepository
 		IF(
         COUNT(r2.report_year_id) = 0,
         JSON_ARRAY(),
-        CAST(CONCAT('[', GROUP_CONCAT(r2.report_year_id ORDER BY r2.report_year_id ASC), ']') AS JSON)
+        CAST(CONCAT('[', GROUP_CONCAT(r2.report_year_id ORDER BY r2.report_year_id DESC), ']') AS JSON)
     	) AS snapshot_years,
 		r.is_active
 		${queryParts.result_audit_data?.select}
