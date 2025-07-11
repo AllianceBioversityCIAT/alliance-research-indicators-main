@@ -11,16 +11,16 @@ export interface TipIprDataDto {
   };
   linkToResult: string;
 
-  intellectualPropertyOwnerId: number | null;
-  intellectualPropertyOwnerName: string | null;
-  iprOwnerOther: string | null;
+  intellectualPropertyOwnerId?: string;
+  intellectualPropertyOwnerName?: string;
+  iprOwnerOther?: string;
 
-  hasLegalRestrictions: boolean;
-  legalRestrictionsDetails: string | null;
+  hasLegalRestrictions: string;
+  legalRestrictionsDetails?: string;
 
-  hasCommercializationPotential: boolean;
-  commercializationDetails: string | null;
+  hasCommercializationPotential: string;
+  commercializationDetails?: string;
 
-  requiresFurtherDevelopment: boolean;
-  furtherDevelopmentDetails: string | null;
+  requiresFurtherDevelopment: string;
+  furtherDevelopmentDetails?: string;
 }

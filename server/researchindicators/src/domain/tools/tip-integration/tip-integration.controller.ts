@@ -39,7 +39,7 @@ export class TipIntegrationController {
   @Get('ipr-data')
   async getIprDataRest(@Query('limit') limit?: number) {
     return this.tipIntegrationService
-      .getAllIprData({ limit: limit ? Number(limit) : undefined })
+      .getAllIprData({ take: limit ? Number(limit) : undefined })
       .then((data) =>
         ResponseUtils.format({
           description: 'IPR data found successfully',
