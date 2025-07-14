@@ -40,6 +40,7 @@ import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/i
 import { IssueCategoriesModule } from '../entities/issue-categories/issue-categories.module';
 import { DynamoFeedbackModule } from '../tools/dynamo-feedback/dynamo-feedback.module';
 import { AppConfigModule } from '../entities/app-config/app-config.module';
+import { TipIntegrationModule } from '../tools/tip-integration/tip-integration.module';
 
 const capSharingChildren: Routes = [
   {
@@ -172,6 +173,10 @@ const toolsChildren: Routes = [
   {
     path: 'agresso',
     children: agressotoolsChildren,
+  },
+  {
+    path: 'tip-integration',
+    module: TipIntegrationModule,
   },
 ];
 

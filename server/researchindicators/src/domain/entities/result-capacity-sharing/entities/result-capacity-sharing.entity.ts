@@ -7,6 +7,7 @@ import { SessionLength } from '../../session-lengths/entities/session-length.ent
 import { Gender } from '../../genders/entities/gender.entity';
 import { SessionPurpose } from '../../session-purposes/entities/session-purpose.entity';
 import { DeliveryModality } from '../../delivery-modalities/entities/delivery-modality.entity';
+import { Result } from '../../results/entities/result.entity';
 
 @Entity('result_capacity_sharing')
 export class ResultCapacitySharing extends AuditableEntity {
@@ -124,6 +125,10 @@ export class ResultCapacitySharing extends AuditableEntity {
     nullable: true,
   })
   delivery_modality_id?: number;
+
+  @ManyToOne(() => Result, (result) => result.result_capacity_sharings)
+  @JoinColumn({ name: 'result_id' })
+  result!: Result;
 
   @ManyToOne(
     () => SessionFormat,

@@ -116,6 +116,42 @@ export class ResultsService {
     });
   }
 
+  async findResultTIPData(options: { take: number }) {
+    const query = this.mainRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.indicator', 'indicator')
+      .leftJoinAndSelect(
+        'r.result_contracts',
+        'result_contracts',
+        'result_contracts.is_primary = :isPrimary',
+      )
+      .leftJoinAndSelect(
+        'result_contracts.agresso_contract',
+        'agresso_contract',
+      )
+      .leftJoinAndSelect('r.result_cap_sharing_ip', 'result_cap_sharing_ip')
+      .leftJoinAndSelect(
+        'result_cap_sharing_ip.intellectualPropertyOwner',
+        'intellectualPropertyOwner',
+      )
+      .leftJoinAndSelect(
+        'r.result_users',
+        'result_users',
+        'result_users.user_role_id = :roleId',
+      )
+      .leftJoinAndSelect('result_users.user', 'user')
+      .where('r.is_active = :active', { active: true })
+      .andWhere('r.is_snapshot = :snapshot', { snapshot: false })
+      .setParameters({
+        roleId: UserRolesEnum.MAIN_CONTACT,
+        isPrimary: true,
+      });
+
+    if (options?.take) query.take(options.take);
+
+    return query.getMany();
+  }
+
   async createResult(createResult: CreateResultDto): Promise<Result> {
     const { invalidFields, isValid } = validObject(createResult, [
       'contract_id',
