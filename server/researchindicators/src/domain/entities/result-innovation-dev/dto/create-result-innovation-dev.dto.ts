@@ -42,6 +42,35 @@ export class ResultInnovationDevKnouldgeSharingDto {
   link_to_result?: LinkResult[];
 }
 
+export class ResultInnovationDevScalingPotentialDto {
+  @ApiProperty({ required: false })
+  is_cheaper_than_alternatives?: number;
+
+  @ApiProperty({ required: false })
+  is_simpler_to_use?: number;
+
+  @ApiProperty({ required: false })
+  does_perform_better?: number;
+
+  @ApiProperty({ required: false })
+  is_desirable_to_users?: number;
+
+  @ApiProperty({ required: false })
+  has_commercial_viability?: number;
+
+  @ApiProperty({ required: false })
+  has_suitable_enabling_environment?: number;
+
+  @ApiProperty({ required: false })
+  has_evidence_of_uptake?: number;
+
+  @ApiProperty({ required: false })
+  expansion_potential_id?: number;
+
+  @ApiProperty({ required: false })
+  expansion_adaptation_details?: string;
+}
+
 export class CreateResultInnovationDevDto {
   @IsString()
   @IsOptional()
@@ -97,5 +126,11 @@ export class CreateResultInnovationDevDto {
     type: ResultInnovationDevKnouldgeSharingDto,
     required: false,
   })
-  knowledge_sharing_form: ResultInnovationDevKnouldgeSharingDto;
+  knowledge_sharing_form?: ResultInnovationDevKnouldgeSharingDto;
+
+  @ApiProperty({
+    type: ResultInnovationDevScalingPotentialDto,
+    required: false,
+  })
+  scaling_potential_form?: ResultInnovationDevScalingPotentialDto;
 }

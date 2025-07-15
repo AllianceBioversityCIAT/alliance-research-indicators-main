@@ -53,6 +53,14 @@ export const setNull = <T>(data: T) => {
   return isEmpty(data) ? null : data;
 };
 
+export const defaultValue = <T>(
+  data: T,
+  condition: boolean,
+  defaultValue: any = null,
+) => {
+  return condition ? data : defaultValue;
+};
+
 export interface ValidationResult {
   isValid: boolean;
   invalidFields: string[];

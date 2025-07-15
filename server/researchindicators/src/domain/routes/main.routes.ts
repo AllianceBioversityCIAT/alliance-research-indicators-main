@@ -40,6 +40,7 @@ import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/i
 import { AppConfigModule } from '../entities/app-config/app-config.module';
 import { DisseminationQualificationsModule } from '../entities/dissemination-qualifications/dissemination-qualifications.module';
 import { ToolFunctionsModule } from '../entities/tool-functions/tool-functions.module';
+import { ExpansionPotentialsModule } from '../entities/expansion-potentials/expansion-potentials.module';
 
 const capSharingChildren: Routes = [
   {
@@ -248,6 +249,10 @@ const children: Routes = [
   {
     path: 'tool-functions',
     module: ToolFunctionsModule,
+  },
+  {
+    path: 'expansion-potentials',
+    module: ExpansionPotentialsModule,
   },
 ];
 
