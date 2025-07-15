@@ -53,6 +53,8 @@ import { InstitutionTypeRolesModule } from './institution-type-roles/institution
 import { IssueCategoriesModule } from './issue-categories/issue-categories.module';
 import { ResultSdgsModule } from './result-sdgs/result-sdgs.module';
 import { AppConfigModule } from './app-config/app-config.module';
+import { DisseminationQualificationsModule } from './dissemination-qualifications/dissemination-qualifications.module';
+import { ToolFunctionsModule } from './tool-functions/tool-functions.module';
 
 @Module({
   imports: [
@@ -110,6 +112,8 @@ import { AppConfigModule } from './app-config/app-config.module';
     IssueCategoriesModule,
     ResultSdgsModule,
     AppConfigModule,
+    DisseminationQualificationsModule,
+    ToolFunctionsModule,
   ],
   exports: [AgressoContractModule],
 })
