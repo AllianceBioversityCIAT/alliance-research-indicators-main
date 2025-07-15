@@ -5,6 +5,8 @@ import { ClarisaInnovationCharacteristic } from '../../../tools/clarisa/entities
 import { ClarisaInnovationType } from '../../../tools/clarisa/entities/clarisa-innovation-types/entities/clarisa-innovation-type.entity';
 import { ClarisaInnovationReadinessLevel } from '../../../tools/clarisa/entities/clarisa-innovation-readiness-levels/entities/clarisa-innovation-readiness-level.entity';
 import { InnovationDevAnticipatedUser } from '../../innovation-dev-anticipated-users/entities/innovation-dev-anticipated-user.entity';
+import { ToolFunction } from '../../tool-functions/entities/tool-function.entity';
+import { DisseminationQualification } from '../../dissemination-qualifications/entities/dissemination-qualification.entity';
 
 @Entity('result_innovation_dev')
 export class ResultInnovationDev extends AuditableEntity {
@@ -70,6 +72,64 @@ export class ResultInnovationDev extends AuditableEntity {
   })
   intended_beneficiaries_description?: string;
 
+  // fields for knowledge sharing
+
+  @Column('boolean', {
+    name: 'is_knowledge_sharing',
+    nullable: true,
+  })
+  is_knowledge_sharing?: boolean;
+
+  @Column('bigint', {
+    name: 'dissemination_qualification_id',
+    nullable: true,
+  })
+  dissemination_qualification_id?: number;
+
+  @Column('text', {
+    name: 'tool_useful_context',
+    nullable: true,
+  })
+  tool_useful_context?: string;
+
+  @Column('text', {
+    name: 'results_achieved_expected',
+    nullable: true,
+  })
+  results_achieved_expected?: string;
+
+  @Column('bigint', {
+    name: 'tool_function_id',
+    nullable: true,
+  })
+  tool_function_id?: number;
+
+  @Column('boolean', {
+    name: 'is_used_beyond_original_context',
+    nullable: true,
+  })
+  is_used_beyond_original_context?: boolean;
+
+  @Column('text', {
+    name: 'adoption_adaptation_context',
+    nullable: true,
+  })
+  adoption_adaptation_context?: string;
+
+  @Column('text', {
+    name: 'other_tools',
+    nullable: true,
+  })
+  other_tools?: string;
+
+  @Column('text', {
+    name: 'other_tools_integration',
+    nullable: true,
+  })
+  other_tools_integration?: string;
+
+  // end of knowledge sharing fields
+
   @ManyToOne(() => Result, (result) => result.result_innovation_dev)
   @JoinColumn({
     name: 'result_id',
@@ -108,4 +168,19 @@ export class ResultInnovationDev extends AuditableEntity {
     name: 'anticipated_users_id',
   })
   anticipatedUsers?: InnovationDevAnticipatedUser;
+
+  @ManyToOne(
+    () => DisseminationQualification,
+    (disseminationQualification) =>
+      disseminationQualification.result_innovations_dev,
+  )
+  @JoinColumn({ name: 'dissemination_qualification_id' })
+  dissemination_qualification!: DisseminationQualification;
+
+  @ManyToOne(
+    () => ToolFunction,
+    (toolFunction) => toolFunction.result_innovations_dev,
+  )
+  @JoinColumn({ name: 'tool_function_id' })
+  tool_function!: ToolFunction;
 }

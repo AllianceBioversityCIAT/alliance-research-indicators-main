@@ -38,6 +38,8 @@ import { ActorRolesModule } from '../entities/actor-roles/actor-roles.module';
 import { ResultInstitutionTypesModule } from '../entities/result-institution-types/result-institution-types.module';
 import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/institution-type-roles.module';
 import { AppConfigModule } from '../entities/app-config/app-config.module';
+import { DisseminationQualificationsModule } from '../entities/dissemination-qualifications/dissemination-qualifications.module';
+import { ToolFunctionsModule } from '../entities/tool-functions/tool-functions.module';
 
 const capSharingChildren: Routes = [
   {
@@ -238,6 +240,14 @@ const children: Routes = [
   {
     path: 'reporting-feedback',
     module: ReportingFeedbackModule,
+  },
+  {
+    path: 'dissemination-qualifications',
+    module: DisseminationQualificationsModule,
+  },
+  {
+    path: 'tool-functions',
+    module: ToolFunctionsModule,
   },
 ];
 

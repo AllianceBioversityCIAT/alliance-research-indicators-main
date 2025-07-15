@@ -13,6 +13,9 @@ import { ResultInstitutionTypesService } from '../result-institution-types/resul
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
 import { ClarisaActorTypesService } from '../../tools/clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
 import { isEmpty } from '../../shared/utils/object.utils';
+import { LinkResultsService } from '../link-results/link-results.service';
+import { LinkResult } from '../link-results/entities/link-result.entity';
+import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 @Injectable()
 export class ResultInnovationDevService {
   private readonly mainRepo: Repository<ResultInnovationDev>;
@@ -22,6 +25,7 @@ export class ResultInnovationDevService {
     private readonly _resultActorsService: ResultActorsService,
     private readonly _resultInstitutionTypesService: ResultInstitutionTypesService,
     private readonly _clarisaActorTypesService: ClarisaActorTypesService,
+    private readonly _linkResultsService: LinkResultsService,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultInnovationDev);
   }
@@ -107,9 +111,52 @@ export class ResultInnovationDevService {
         manager,
       );
 
+      await this.knouldgeSharing(resultId, createResultInnovationDevDto);
+
       return this.mainRepo.findOne({
         where: { result_id: resultId, is_active: true },
       });
+    });
+  }
+
+  private async knouldgeSharing(
+    resultId: number,
+    createResultInnovationDevDto: CreateResultInnovationDevDto,
+  ) {
+    const knowledgeSharingData =
+      createResultInnovationDevDto.knowledge_sharing_form;
+    const linkToResult: Partial<LinkResult>[] =
+      knowledgeSharingData?.link_to_result?.map((link) => ({
+        other_result_id: link?.other_result_id,
+      }));
+    delete knowledgeSharingData.link_to_result;
+
+    await this._linkResultsService.create(
+      resultId,
+      linkToResult,
+      'other_result_id',
+      LinkResultRolesEnum.INNOVATION_DEV,
+    );
+
+    if (!knowledgeSharingData) {
+      return;
+    }
+
+    await this.mainRepo.update(resultId, {
+      adoption_adaptation_context:
+        knowledgeSharingData?.adoption_adaptation_context,
+      dissemination_qualification_id:
+        knowledgeSharingData?.dissemination_qualification_id,
+      is_knowledge_sharing: knowledgeSharingData?.is_knowledge_sharing,
+      is_used_beyond_original_context:
+        knowledgeSharingData?.is_used_beyond_original_context,
+      other_tools: knowledgeSharingData?.other_tools,
+      other_tools_integration: knowledgeSharingData?.other_tools_integration,
+      results_achieved_expected:
+        knowledgeSharingData?.results_achieved_expected,
+      tool_function_id: knowledgeSharingData?.tool_function_id,
+      tool_useful_context: knowledgeSharingData?.tool_useful_context,
+      ...this._currentUser.audit(SetAutitEnum.UPDATE),
     });
   }
 
@@ -117,6 +164,11 @@ export class ResultInnovationDevService {
     const resultInnovationDev = await this.mainRepo.findOne({
       where: { result_id: id, is_active: true },
     });
+
+    const link_to_result = await this._linkResultsService.find(
+      id,
+      LinkResultRolesEnum.INNOVATION_DEV,
+    );
 
     const institution_types = await this._resultInstitutionTypesService.find(
       id,
@@ -129,9 +181,33 @@ export class ResultInnovationDevService {
     );
 
     return {
-      ...resultInnovationDev,
+      short_title: resultInnovationDev.short_title,
+      innovation_nature_id: resultInnovationDev.innovation_nature_id,
+      innovation_type_id: resultInnovationDev.innovation_type_id,
+      innovation_readiness_id: resultInnovationDev.innovation_readiness_id,
+      no_sex_age_disaggregation: resultInnovationDev.no_sex_age_disaggregation,
+      anticipated_users_id: resultInnovationDev.anticipated_users_id,
+      expected_outcome: resultInnovationDev.expected_outcome,
+      intended_beneficiaries_description:
+        resultInnovationDev.intended_beneficiaries_description,
       actors,
       institution_types,
+      knowledge_sharing_form: {
+        is_knowledge_sharing: resultInnovationDev.is_knowledge_sharing,
+        dissemination_qualification_id:
+          resultInnovationDev.dissemination_qualification_id,
+        tool_useful_context: resultInnovationDev.tool_useful_context,
+        results_achieved_expected:
+          resultInnovationDev.results_achieved_expected,
+        tool_function_id: resultInnovationDev.tool_function_id,
+        is_used_beyond_original_context:
+          resultInnovationDev.is_used_beyond_original_context,
+        adoption_adaptation_context:
+          resultInnovationDev.adoption_adaptation_context,
+        other_tools: resultInnovationDev.other_tools,
+        other_tools_integration: resultInnovationDev.other_tools_integration,
+        link_to_result,
+      },
     };
   }
 }
