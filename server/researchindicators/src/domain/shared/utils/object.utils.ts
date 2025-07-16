@@ -49,8 +49,36 @@ export const isEmpty = <T>(attr: T) => {
   );
 };
 
+/**
+ *
+ * @param obj
+ * @param setAttributes
+ * @param defaultValue
+ * @returns
+ * Sets default values for specified attributes in an object.
+ * If the attribute is already set, it will not override it.
+ */
+export const setDefaultValueInObject = <T>(
+  obj: Partial<T>,
+  setAttributes: (keyof T)[],
+  defaultValue: any = null,
+) => {
+  for (const key of setAttributes) {
+    obj[key] = defaultValue;
+  }
+  return { ...obj };
+};
+
 export const setNull = <T>(data: T) => {
   return isEmpty(data) ? null : data;
+};
+
+export const defaultValue = <T>(
+  data: T,
+  condition: boolean,
+  defaultValue: any = null,
+) => {
+  return condition ? data : defaultValue;
 };
 
 export interface ValidationResult {

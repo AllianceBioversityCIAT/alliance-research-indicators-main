@@ -62,6 +62,8 @@ import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
 import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
+import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
+import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 
 @Injectable()
 export class ResultsService {
@@ -89,6 +91,7 @@ export class ResultsService {
     private readonly _clarisaLeversService: ClarisaLeversService,
     private readonly _agressoContractService: AgressoContractService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
+    private readonly _resultSdgsService: ResultSdgsService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -208,6 +211,20 @@ export class ResultsService {
         ContractRolesEnum.ALIGNMENT,
         manager,
         ['is_primary'],
+      );
+
+      const tempSdg: Partial<ResultSdg>[] = agressoContract?.sdgs?.map(
+        (sdg) => ({
+          clarisa_sdg_id: sdg.id,
+        }),
+      );
+
+      await this._resultSdgsService.create(
+        result.result_id,
+        tempSdg,
+        'clarisa_sdg_id',
+        undefined,
+        manager,
       );
 
       return result;
@@ -456,6 +473,14 @@ export class ResultsService {
         },
       );
 
+      await this._resultSdgsService.create(
+        resultId,
+        alignmentData.result_sdgs,
+        'clarisa_sdg_id',
+        undefined,
+        manager,
+      );
+
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
     });
 
@@ -477,9 +502,12 @@ export class ResultsService {
       LeverRolesEnum.ALIGNMENT,
     );
 
+    const result_sdgs = await this._resultSdgsService.find(resultId);
+
     const resultAlignment: ResultAlignmentDto = {
       contracts,
       levers,
+      result_sdgs,
     };
 
     return resultAlignment;

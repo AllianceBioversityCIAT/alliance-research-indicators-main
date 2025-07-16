@@ -143,6 +143,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             WHERE rc.contract_id = ac.agreement_id
               AND r.indicator_id = i.indicator_id
               AND r.is_active = 1
+              AND r.is_snapshot = false
               AND rc.is_active = 1)
         )
       ) AS indicators
@@ -188,6 +189,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             WHERE rc.contract_id = ac.agreement_id
               AND r.indicator_id = i.indicator_id
               AND r.is_active = 1
+              AND r.is_snapshot = false
               AND rc.is_active = 1)
         )
       ) AS indicators

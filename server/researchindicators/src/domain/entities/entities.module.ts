@@ -51,6 +51,11 @@ import { ActorRolesModule } from './actor-roles/actor-roles.module';
 import { ResultInstitutionTypesModule } from './result-institution-types/result-institution-types.module';
 import { InstitutionTypeRolesModule } from './institution-type-roles/institution-type-roles.module';
 import { IssueCategoriesModule } from './issue-categories/issue-categories.module';
+import { ResultSdgsModule } from './result-sdgs/result-sdgs.module';
+import { AppConfigModule } from './app-config/app-config.module';
+import { DisseminationQualificationsModule } from './dissemination-qualifications/dissemination-qualifications.module';
+import { ToolFunctionsModule } from './tool-functions/tool-functions.module';
+import { ExpansionPotentialsModule } from './expansion-potentials/expansion-potentials.module';
 
 @Module({
   imports: [
@@ -106,6 +111,11 @@ import { IssueCategoriesModule } from './issue-categories/issue-categories.modul
     ResultInstitutionTypesModule,
     InstitutionTypeRolesModule,
     IssueCategoriesModule,
+    ResultSdgsModule,
+    AppConfigModule,
+    DisseminationQualificationsModule,
+    ToolFunctionsModule,
+    ExpansionPotentialsModule,
   ],
   exports: [AgressoContractModule],
 })
