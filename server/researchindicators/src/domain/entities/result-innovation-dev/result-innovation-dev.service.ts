@@ -111,8 +111,16 @@ export class ResultInnovationDevService {
         manager,
       );
 
-      await this.knouldgeSharing(resultId, createResultInnovationDevDto);
-      await this.scalingPotential(resultId, createResultInnovationDevDto);
+      await this.knouldgeSharing(
+        resultId,
+        createResultInnovationDevDto,
+        manager,
+      );
+      await this.scalingPotential(
+        resultId,
+        createResultInnovationDevDto,
+        manager,
+      );
 
       return this.mainRepo.findOne({
         where: { result_id: resultId, is_active: true },
@@ -123,11 +131,17 @@ export class ResultInnovationDevService {
   private async scalingPotential(
     resultId: number,
     createResultInnovationDevDto: CreateResultInnovationDevDto,
+    manager?: EntityManager,
   ) {
+    const entityManager = selectManager(
+      manager,
+      ResultInnovationDev,
+      this.mainRepo,
+    );
     const scalingPotentialData =
       createResultInnovationDevDto.scaling_potential_form;
 
-    await this.mainRepo.update(resultId, {
+    await entityManager.update(resultId, {
       is_cheaper_than_alternatives:
         scalingPotentialData.is_cheaper_than_alternatives,
       is_simpler_to_use: scalingPotentialData.is_simpler_to_use,
@@ -146,7 +160,13 @@ export class ResultInnovationDevService {
   private async knouldgeSharing(
     resultId: number,
     createResultInnovationDevDto: CreateResultInnovationDevDto,
+    manager?: EntityManager,
   ) {
+    const entityManager = selectManager(
+      manager,
+      ResultInnovationDev,
+      this.mainRepo,
+    );
     const knowledgeSharingData =
       createResultInnovationDevDto.knowledge_sharing_form;
     const linkToResult: Partial<LinkResult>[] =
@@ -162,7 +182,7 @@ export class ResultInnovationDevService {
       LinkResultRolesEnum.INNOVATION_DEV,
     );
 
-    await this.mainRepo.update(resultId, {
+    await entityManager.update(resultId, {
       adoption_adaptation_context:
         knowledgeSharingData?.adoption_adaptation_context,
       dissemination_qualification_id:
