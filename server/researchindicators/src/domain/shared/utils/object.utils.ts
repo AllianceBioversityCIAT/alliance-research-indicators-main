@@ -49,6 +49,10 @@ export const isEmpty = <T>(attr: T) => {
   );
 };
 
+export const setNull = <T>(data: T) => {
+  return isEmpty(data) ? null : data;
+};
+
 export interface ValidationResult {
   isValid: boolean;
   invalidFields: string[];

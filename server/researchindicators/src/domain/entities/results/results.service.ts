@@ -61,6 +61,7 @@ import { customErrorResponse } from '../../shared/utils/response.utils';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
+import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
 
 @Injectable()
 export class ResultsService {
@@ -87,6 +88,7 @@ export class ResultsService {
     private readonly _agressoUserStaffService: AllianceUserStaffService,
     private readonly _clarisaLeversService: ClarisaLeversService,
     private readonly _agressoContractService: AgressoContractService,
+    private readonly _resultInnovationDevService: ResultInnovationDevService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -283,6 +285,9 @@ export class ResultsService {
         break;
       case IndicatorsEnum.POLICY_CHANGE:
         await this._resultPolicyChangeService.create(resultId, manager);
+        break;
+      case IndicatorsEnum.INNOVATION_DEV:
+        await this._resultInnovationDevService.create(resultId, manager);
         break;
       default:
         break;

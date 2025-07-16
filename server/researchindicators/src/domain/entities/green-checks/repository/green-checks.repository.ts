@@ -51,6 +51,10 @@ export class GreenCheckRepository {
     return `policy_change_validation(${result_key}) as policy_change`;
   }
 
+  innovationDevValidation(result_key: string) {
+    return `innovation_dev_validation(${result_key}) as innovation_dev`;
+  }
+
   async calculateGreenChecks(result_id: number): Promise<FindGreenChecksDto> {
     const indicator: IndicatorsEnum = await this.dataSource
       .getRepository(Result)
@@ -71,6 +75,9 @@ export class GreenCheckRepository {
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
         spesificQuery = `${this.capSharingIpValidation(result_key)},
             ${this.capSharingValidation(result_key)}`;
+        break;
+      case IndicatorsEnum.INNOVATION_DEV:
+        spesificQuery = this.innovationDevValidation(result_key);
         break;
     }
 

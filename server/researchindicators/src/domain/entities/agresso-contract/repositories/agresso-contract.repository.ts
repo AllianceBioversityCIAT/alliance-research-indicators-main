@@ -36,7 +36,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
           .join(' AND ')}`
       : '';
     const query = `
-    select ac.*
+    select ac.*,
+    ifnull(cl.full_name, 'Not available' ) as lever
     ${
       relations?.countries
         ? `,JSON_ARRAYAGG(
@@ -51,9 +52,11 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     from agresso_contracts ac 
     LEFT JOIN 
         agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
+    left join clarisa_levers cl on cl.short_name = REPLACE(ac.departmentId, 'L', 'Lever ')
     ${whereClause}
     GROUP BY 
-      	ac.agreement_id
+      	ac.agreement_id,
+        cl.full_name
     order by FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')
     ${!isEmpty(offset) ? `LIMIT ${pagination.limit} OFFSET ${offset}` : ''};
     `;

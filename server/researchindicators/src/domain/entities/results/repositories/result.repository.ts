@@ -309,9 +309,12 @@ export class ResultRepository
 		${queryParts.levers?.select}
 		${queryParts.contracts?.select}
 	FROM results r
-		LEFT JOIN results r2 ON r.result_official_code = r2.result_official_code
-							AND r2.is_active = TRUE
-							AND r2.is_snapshot = TRUE
+		LEFT JOIN (SELECT temp.result_official_code,
+					temp.report_year_id
+					FROM results temp
+					WHERE temp.is_active = TRUE
+					AND temp.is_snapshot = TRUE
+					ORDER BY temp.report_year_id DESC) r2 ON r.result_official_code = r2.result_official_code
 		${queryParts.result_audit_data?.join}
 		${queryParts.result_status?.join}
 		${queryParts.indicators?.join}
