@@ -228,6 +228,20 @@ export class ResultInnovationDevService {
         other_tools_integration: resultInnovationDev.other_tools_integration,
         link_to_result,
       },
+      scaling_potential_form: {
+        is_cheaper_than_alternatives:
+          resultInnovationDev.is_cheaper_than_alternatives,
+        is_simpler_to_use: resultInnovationDev.is_simpler_to_use,
+        does_perform_better: resultInnovationDev.does_perform_better,
+        is_desirable_to_users: resultInnovationDev.is_desirable_to_users,
+        has_commercial_viability: resultInnovationDev.has_commercial_viability,
+        has_suitable_enabling_environment:
+          resultInnovationDev.has_suitable_enabling_environment,
+        has_evidence_of_uptake: resultInnovationDev.has_evidence_of_uptake,
+        expansion_potential_id: resultInnovationDev.expansion_potential_id,
+        expansion_adaptation_details:
+          resultInnovationDev.expansion_adaptation_details,
+      },
     };
   }
 }
