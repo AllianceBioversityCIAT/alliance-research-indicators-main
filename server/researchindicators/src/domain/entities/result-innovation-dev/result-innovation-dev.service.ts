@@ -12,10 +12,14 @@ import { ActorRolesEnum } from '../actor-roles/enum/actor-roles.enum';
 import { ResultInstitutionTypesService } from '../result-institution-types/result-institution-types.service';
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
 import { ClarisaActorTypesService } from '../../tools/clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
-import { isEmpty } from '../../shared/utils/object.utils';
+import {
+  isEmpty,
+  setDefaultValueInObject,
+} from '../../shared/utils/object.utils';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { LinkResult } from '../link-results/entities/link-result.entity';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
+import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 @Injectable()
 export class ResultInnovationDevService {
   private readonly mainRepo: Repository<ResultInnovationDev>;
@@ -26,6 +30,7 @@ export class ResultInnovationDevService {
     private readonly _resultInstitutionTypesService: ResultInstitutionTypesService,
     private readonly _clarisaActorTypesService: ClarisaActorTypesService,
     private readonly _linkResultsService: LinkResultsService,
+    private readonly _updateDataUtil: UpdateDataUtil,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultInnovationDev);
   }
@@ -122,6 +127,8 @@ export class ResultInnovationDevService {
         manager,
       );
 
+      await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
+
       return this.mainRepo.findOne({
         where: { result_id: resultId, is_active: true },
       });
@@ -169,11 +176,26 @@ export class ResultInnovationDevService {
     );
     const knowledgeSharingData =
       createResultInnovationDevDto.knowledge_sharing_form;
-    const linkToResult: Partial<LinkResult>[] =
+    let linkToResult: Partial<LinkResult>[] =
       knowledgeSharingData?.link_to_result?.map((link) => ({
         other_result_id: link?.other_result_id,
       }));
     delete knowledgeSharingData.link_to_result;
+
+    if (!knowledgeSharingData?.is_knowledge_sharing) {
+      setDefaultValueInObject(knowledgeSharingData, [
+        'adoption_adaptation_context',
+        'dissemination_qualification_id',
+        'is_used_beyond_original_context',
+        'other_tools',
+        'other_tools_integration',
+        'results_achieved_expected',
+        'tool_function_id',
+        'tool_useful_context',
+      ]);
+
+      linkToResult = [];
+    }
 
     await this._linkResultsService.create(
       resultId,
