@@ -55,6 +55,7 @@ import { ResultSdgsModule } from './result-sdgs/result-sdgs.module';
 import { AppConfigModule } from './app-config/app-config.module';
 import { DisseminationQualificationsModule } from './dissemination-qualifications/dissemination-qualifications.module';
 import { ToolFunctionsModule } from './tool-functions/tool-functions.module';
+import { ExpansionPotentialsModule } from './expansion-potentials/expansion-potentials.module';
 
 @Module({
   imports: [
@@ -114,6 +115,7 @@ import { ToolFunctionsModule } from './tool-functions/tool-functions.module';
     AppConfigModule,
     DisseminationQualificationsModule,
     ToolFunctionsModule,
+    ExpansionPotentialsModule,
   ],
   exports: [AgressoContractModule],
 })

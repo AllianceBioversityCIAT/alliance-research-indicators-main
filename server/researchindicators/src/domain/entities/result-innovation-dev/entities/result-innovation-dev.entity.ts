@@ -7,6 +7,7 @@ import { ClarisaInnovationReadinessLevel } from '../../../tools/clarisa/entities
 import { InnovationDevAnticipatedUser } from '../../innovation-dev-anticipated-users/entities/innovation-dev-anticipated-user.entity';
 import { ToolFunction } from '../../tool-functions/entities/tool-function.entity';
 import { DisseminationQualification } from '../../dissemination-qualifications/entities/dissemination-qualification.entity';
+import { ExpansionPotential } from '../../expansion-potentials/entities/expansion-potential.entity';
 
 @Entity('result_innovation_dev')
 export class ResultInnovationDev extends AuditableEntity {
@@ -130,6 +131,64 @@ export class ResultInnovationDev extends AuditableEntity {
 
   // end of knowledge sharing fields
 
+  // scaling potential fields
+
+  @Column('int', {
+    name: 'is_cheaper_than_alternatives',
+    nullable: true,
+  })
+  is_cheaper_than_alternatives?: number;
+
+  @Column('int', {
+    name: 'is_simpler_to_use',
+    nullable: true,
+  })
+  is_simpler_to_use?: number;
+
+  @Column('int', {
+    name: 'does_perform_better',
+    nullable: true,
+  })
+  does_perform_better?: number;
+
+  @Column('int', {
+    name: 'is_desirable_to_users',
+    nullable: true,
+  })
+  is_desirable_to_users?: number;
+
+  @Column('int', {
+    name: 'has_commercial_viability',
+    nullable: true,
+  })
+  has_commercial_viability?: number;
+
+  @Column('int', {
+    name: 'has_suitable_enabling_environment',
+    nullable: true,
+  })
+  has_suitable_enabling_environment?: number;
+
+  @Column('int', {
+    name: 'has_evidence_of_uptake',
+    nullable: true,
+  })
+  has_evidence_of_uptake?: number;
+
+  @Column('bigint', {
+    name: 'expansion_potential_id',
+    nullable: true,
+  })
+  expansion_potential_id?: number;
+
+  @Column('text', {
+    name: 'expansion_adaptation_details',
+    nullable: true,
+  })
+  expansion_adaptation_details?: string;
+
+  // end of scaling potential fields
+
   @ManyToOne(() => Result, (result) => result.result_innovation_dev)
   @JoinColumn({
     name: 'result_id',
@@ -183,4 +242,11 @@ export class ResultInnovationDev extends AuditableEntity {
   )
   @JoinColumn({ name: 'tool_function_id' })
   tool_function!: ToolFunction;
+
+  @ManyToOne(
+    () => ExpansionPotential,
+    (expansionPotential) => expansionPotential.result_innovations_dev,
+  )
+  @JoinColumn({ name: 'expansion_potential_id' })
+  expansion_potential?: ExpansionPotential;
 }

@@ -112,10 +112,34 @@ export class ResultInnovationDevService {
       );
 
       await this.knouldgeSharing(resultId, createResultInnovationDevDto);
+      await this.scalingPotential(resultId, createResultInnovationDevDto);
 
       return this.mainRepo.findOne({
         where: { result_id: resultId, is_active: true },
       });
+    });
+  }
+
+  private async scalingPotential(
+    resultId: number,
+    createResultInnovationDevDto: CreateResultInnovationDevDto,
+  ) {
+    const scalingPotentialData =
+      createResultInnovationDevDto.scaling_potential_form;
+
+    await this.mainRepo.update(resultId, {
+      is_cheaper_than_alternatives:
+        scalingPotentialData.is_cheaper_than_alternatives,
+      is_simpler_to_use: scalingPotentialData.is_simpler_to_use,
+      does_perform_better: scalingPotentialData.does_perform_better,
+      is_desirable_to_users: scalingPotentialData.is_desirable_to_users,
+      has_commercial_viability: scalingPotentialData.has_commercial_viability,
+      has_suitable_enabling_environment:
+        scalingPotentialData.has_suitable_enabling_environment,
+      has_evidence_of_uptake: scalingPotentialData.has_evidence_of_uptake,
+      expansion_potential_id: scalingPotentialData.expansion_potential_id,
+      expansion_adaptation_details:
+        scalingPotentialData.expansion_adaptation_details,
     });
   }
 
@@ -137,10 +161,6 @@ export class ResultInnovationDevService {
       'other_result_id',
       LinkResultRolesEnum.INNOVATION_DEV,
     );
-
-    if (!knowledgeSharingData) {
-      return;
-    }
 
     await this.mainRepo.update(resultId, {
       adoption_adaptation_context:
