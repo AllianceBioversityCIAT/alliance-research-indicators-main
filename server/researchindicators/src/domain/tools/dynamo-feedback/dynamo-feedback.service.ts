@@ -67,9 +67,9 @@ export class DynamoFeedbackService {
       await ddbClient.send(command);
       return dataToSave;
     } catch (error) {
-      console.error('Error al guardar en DynamoDB:', error);
+      console.error('Error saving to DynamoDB:', error);
       throw new InternalServerErrorException({
-        message: 'Error al guardar en DynamoDB',
+        message: 'Error saving to DynamoDB',
         error: error.message || error,
       });
     }
@@ -96,7 +96,7 @@ export class DynamoFeedbackService {
 
       return feedbackList;
     } catch (error) {
-      console.error('Error al obtener datos de DynamoDB:', error);
+      console.error('Error getting data from DynamoDB:', error);
       throw new InternalServerErrorException({
         message: 'Error al consultar en DynamoDB',
         error: error.message || error,

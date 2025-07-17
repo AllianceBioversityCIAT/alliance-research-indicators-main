@@ -16,7 +16,7 @@ export class DynamoFeedbackController {
     type: CreateDynamoFeedbackDto,
     examples: {
       example1: {
-        summary: 'Ejemplo de feedback completo',
+        summary: 'Example of complete feedback',
         value: {
           user: {
             sec_user_id: 123,
@@ -44,10 +44,10 @@ export class DynamoFeedbackController {
             ],
             roleName: 'Editor',
           },
-          description: 'El sistema presenta errores al guardar el formulario.',
+          description: 'The system has errors when saving the form.',
           issueType: 1,
           feedbackType: 'Bug',
-          text: "Al presionar el botón 'Guardar', aparece un error 500 en consola.",
+          text: 'When pressing the ‘Save’ button, an error 500 appears in the console.',
         },
       },
     },
