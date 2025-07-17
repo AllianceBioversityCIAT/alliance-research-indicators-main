@@ -298,10 +298,10 @@ export class ResultRepository
 		r.result_status_id,
 		r.report_year_id,
 		IF(
-		COUNT(r2.report_year_id) = 0,
-		JSON_ARRAY(),
-		JSON_ARRAYAGG(r2.report_year_id)
-		) AS snapshot_years,
+        COUNT(r2.report_year_id) = 0,
+        JSON_ARRAY(),
+        CAST(CONCAT('[', GROUP_CONCAT(r2.report_year_id ORDER BY r2.report_year_id DESC), ']') AS JSON)
+    	) AS snapshot_years,
 		r.is_active
 		${queryParts.result_audit_data?.select}
 		${queryParts.result_status?.select}
@@ -309,9 +309,11 @@ export class ResultRepository
 		${queryParts.levers?.select}
 		${queryParts.contracts?.select}
 	FROM results r
-		LEFT JOIN results r2 ON r.result_official_code = r2.result_official_code
-							AND r2.is_active = TRUE
-							AND r2.is_snapshot = TRUE
+		LEFT JOIN (SELECT temp.result_official_code,
+					temp.report_year_id
+					FROM results temp
+					WHERE temp.is_active = TRUE
+					AND temp.is_snapshot = TRUE) r2 ON r.result_official_code = r2.result_official_code
 		${queryParts.result_audit_data?.join}
 		${queryParts.result_status?.join}
 		${queryParts.indicators?.join}

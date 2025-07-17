@@ -36,7 +36,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
           .join(' AND ')}`
       : '';
     const query = `
-    select ac.*
+    select ac.*,
+    ifnull(cl.full_name, 'Not available' ) as lever
     ${
       relations?.countries
         ? `,JSON_ARRAYAGG(
@@ -51,13 +52,31 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     from agresso_contracts ac 
     LEFT JOIN 
         agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
+    left join clarisa_levers cl on cl.short_name = REPLACE(ac.departmentId, 'L', 'Lever ')
     ${whereClause}
     GROUP BY 
-      	ac.agreement_id
+      	ac.agreement_id,
+        cl.full_name
     order by FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')
     ${!isEmpty(offset) ? `LIMIT ${pagination.limit} OFFSET ${offset}` : ''};
     `;
-    return this.query(query);
+
+    const result = await this.query(query);
+
+    const leverUrlMap: Record<string, string> = {
+      L1: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L1-Food-environment_COLOR.png',
+      L2: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L2-Multifuntional-Landscapes_COLOR.png',
+      L3: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L3-Climate-Action_COLOR.png',
+      L4: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L4-Agrobiodiversity_COLOR.png',
+      L5: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L5-Digital-Inclusion_COLOR.png',
+      L6: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L6-Crops-for-Nutrition_COLOR.png',
+      L7: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L7-Gender-Youth-and-Inclusion_COLOR.png',
+    };
+
+    return result.map((item) => ({
+      ...item,
+      leverUrl: leverUrlMap[item.departmentId] || 'Not available',
+    }));
   }
 
   async findByName(first_name: string, last_name: string) {
@@ -124,6 +143,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             WHERE rc.contract_id = ac.agreement_id
               AND r.indicator_id = i.indicator_id
               AND r.is_active = 1
+              AND r.is_snapshot = false
               AND rc.is_active = 1)
         )
       ) AS indicators
@@ -169,6 +189,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             WHERE rc.contract_id = ac.agreement_id
               AND r.indicator_id = i.indicator_id
               AND r.is_active = 1
+              AND r.is_snapshot = false
               AND rc.is_active = 1)
         )
       ) AS indicators

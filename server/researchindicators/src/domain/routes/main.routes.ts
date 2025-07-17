@@ -31,6 +31,18 @@ import { GreenChecksModule } from '../entities/green-checks/green-checks.module'
 import { IntellectualPropertyOwnersModule } from '../entities/intellectual-property-owners/intellectual-property-owners.module';
 import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/result-cap-sharing-ip.module';
 import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
+import { ResultInnovationDevModule } from '../entities/result-innovation-dev/result-innovation-dev.module';
+import { InnovationDevAnticipatedUsersModule } from '../entities/innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
+import { ResultActorsModule } from '../entities/result-actors/result-actors.module';
+import { ActorRolesModule } from '../entities/actor-roles/actor-roles.module';
+import { ResultInstitutionTypesModule } from '../entities/result-institution-types/result-institution-types.module';
+import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/institution-type-roles.module';
+import { IssueCategoriesModule } from '../entities/issue-categories/issue-categories.module';
+import { DynamoFeedbackModule } from '../tools/dynamo-feedback/dynamo-feedback.module';
+import { AppConfigModule } from '../entities/app-config/app-config.module';
+import { DisseminationQualificationsModule } from '../entities/dissemination-qualifications/dissemination-qualifications.module';
+import { ToolFunctionsModule } from '../entities/tool-functions/tool-functions.module';
+import { ExpansionPotentialsModule } from '../entities/expansion-potentials/expansion-potentials.module';
 
 const capSharingChildren: Routes = [
   {
@@ -47,6 +59,16 @@ const ResultsChildren: Routes = [
   {
     path: 'institutions',
     module: ResultInstitutionsModule,
+  },
+  {
+    path: 'innovation-dev',
+    module: ResultInnovationDevModule,
+    children: [
+      {
+        path: 'anticipated-users',
+        module: InnovationDevAnticipatedUsersModule,
+      },
+    ],
   },
   {
     path: 'evidences',
@@ -80,6 +102,26 @@ const ResultsChildren: Routes = [
   {
     path: 'green-checks',
     module: GreenChecksModule,
+  },
+  {
+    path: 'actors',
+    module: ResultActorsModule,
+    children: [
+      {
+        path: 'roles',
+        module: ActorRolesModule,
+      },
+    ],
+  },
+  {
+    path: 'institution-types',
+    module: ResultInstitutionTypesModule,
+    children: [
+      {
+        path: 'roles',
+        module: InstitutionTypeRolesModule,
+      },
+    ],
   },
 ];
 
@@ -137,6 +179,10 @@ const toolsChildren: Routes = [
 ];
 
 const children: Routes = [
+  {
+    path: 'configuration',
+    module: AppConfigModule,
+  },
   {
     path: 'results',
     children: ResultsChildren,
@@ -197,6 +243,26 @@ const children: Routes = [
   {
     path: 'reporting-feedback',
     module: ReportingFeedbackModule,
+  },
+  {
+    path: 'issue-categories',
+    module: IssueCategoriesModule,
+  },
+  {
+    path: 'dynamo-feedback',
+    module: DynamoFeedbackModule,
+  },
+  {
+    path: 'dissemination-qualifications',
+    module: DisseminationQualificationsModule,
+  },
+  {
+    path: 'tool-functions',
+    module: ToolFunctionsModule,
+  },
+  {
+    path: 'expansion-potentials',
+    module: ExpansionPotentialsModule,
   },
 ];
 
