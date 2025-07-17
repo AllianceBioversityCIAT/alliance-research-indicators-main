@@ -21,5 +21,4 @@ export class IssueCategoriesService {
       name: c.name,
     }));
   }
-
 }

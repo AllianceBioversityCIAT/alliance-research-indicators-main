@@ -1,33 +1,13 @@
-import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { ClarisaActorTypesService } from './clarisa-actor-types.service';
-import { ResponseUtils } from '../../../../shared/utils/response.utils';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { BaseController } from '../../../../shared/global-dto/base-controller';
 
 @ApiTags('Clarisa')
 @Controller()
 @ApiBearerAuth()
-export class ClarisaActorTypesController {
-  constructor(private readonly service: ClarisaActorTypesService) {}
-
-  @Get()
-  async find() {
-    return this.service.findAll().then((levers) =>
-      ResponseUtils.format({
-        description: 'Actor types found',
-        data: levers,
-        status: HttpStatus.OK,
-      }),
-    );
-  }
-
-  @Get(':id')
-  async findById(@Param('id') id: string) {
-    return this.service.findOne<number>(+id).then((levers) =>
-      ResponseUtils.format({
-        description: 'Actor type found',
-        data: levers,
-        status: HttpStatus.OK,
-      }),
-    );
+export class ClarisaActorTypesController extends BaseController<ClarisaActorTypesService> {
+  constructor(service: ClarisaActorTypesService) {
+    super(service, 'Actor types');
   }
 }

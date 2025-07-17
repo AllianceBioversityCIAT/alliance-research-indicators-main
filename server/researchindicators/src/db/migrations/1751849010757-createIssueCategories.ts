@@ -1,11 +1,10 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateIssueCategories1751849010757 implements MigrationInterface {
-    name = 'CreateIssueCategories1751849010757'
+  name = 'CreateIssueCategories1751849010757';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-                
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             CREATE TABLE \`issue_categories\` (
                 \`created_at\` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
                 \`created_by\` bigint NULL,
@@ -20,7 +19,7 @@ export class CreateIssueCategories1751849010757 implements MigrationInterface {
             ) ENGINE=InnoDB;
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             INSERT INTO \`issue_categories\` (\`name\`, \`description\`)
             VALUES 
             ('Incorrect', 'The information is wrong or misleading.'),
@@ -30,10 +29,9 @@ export class CreateIssueCategories1751849010757 implements MigrationInterface {
             ('Unclear', 'The meaning is confusing or ambiguous.'),
             ('Other', 'Something else is wrong (with optional comment).');
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP TABLE \`issue_categories\``);
-    }
-
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP TABLE \`issue_categories\``);
+  }
 }

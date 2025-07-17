@@ -7,8 +7,10 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 @ApiBearerAuth()
 @Controller()
 export class IssueCategoriesController {
-  constructor(private readonly issueCategoriesService: IssueCategoriesService) {}
-  
+  constructor(
+    private readonly issueCategoriesService: IssueCategoriesService,
+  ) {}
+
   @ApiOperation({ summary: 'Get all issue categories' })
   @Get()
   async find() {
@@ -20,5 +22,4 @@ export class IssueCategoriesController {
       }),
     );
   }
-
 }

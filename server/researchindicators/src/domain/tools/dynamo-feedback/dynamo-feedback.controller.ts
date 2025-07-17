@@ -38,22 +38,22 @@ export class DynamoFeedbackController {
                   justification_update: null,
                   sec_role_id: 2,
                   name: 'Editor',
-                  focus_id: 5
-                }
-              }
+                  focus_id: 5,
+                },
+              },
             ],
-            roleName: 'Editor'
+            roleName: 'Editor',
           },
           description: 'El sistema presenta errores al guardar el formulario.',
           issueType: 1,
           feedbackType: 'Bug',
-          text: "Al presionar el botón 'Guardar', aparece un error 500 en consola."
-        }
-      }
-    }
+          text: "Al presionar el botón 'Guardar', aparece un error 500 en consola.",
+        },
+      },
+    },
   })
   async saveData(@Body() body: CreateDynamoFeedbackDto) {
-    return await this.dynamoFeedbackService.saveData(body).then((response) => 
+    return await this.dynamoFeedbackService.saveData(body).then((response) =>
       ResponseUtils.format({
         description: 'Feedback saved successfully',
         status: HttpStatus.OK,
@@ -64,13 +64,12 @@ export class DynamoFeedbackController {
 
   @Get('test-data')
   async getAllFeedback() {
-    return await this.dynamoFeedbackService.getAllFeedback().then((response) => 
+    return await this.dynamoFeedbackService.getAllFeedback().then((response) =>
       ResponseUtils.format({
         description: 'Feedback retrieved successfully',
         status: HttpStatus.OK,
         data: response,
-      }), 
+      }),
     );
   }
-
 }
