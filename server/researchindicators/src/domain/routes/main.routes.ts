@@ -48,10 +48,6 @@ import { IpRightsApplicationOptionsModule } from '../entities/ip-rights-applicat
 
 const capSharingChildren: Routes = [
   {
-    path: 'ip-owners',
-    module: IntellectualPropertyOwnersModule,
-  },
-  {
     path: 'ip',
     module: ResultCapSharingIpModule,
   },
@@ -65,6 +61,10 @@ const ResultsChildren: Routes = [
       {
         path: 'application-options',
         module: IpRightsApplicationOptionsModule,
+      },
+      {
+        path: 'owners',
+        module: IntellectualPropertyOwnersModule,
       },
     ],
   },

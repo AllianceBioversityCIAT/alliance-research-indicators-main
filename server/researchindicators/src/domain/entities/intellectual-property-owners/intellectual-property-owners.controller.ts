@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { mapperIntellectualPropertyOwner } from './mappers/intellectual-property-owner.mapper';
 
-@ApiTags('Result Capacity Sharing')
+@ApiTags('Intellectual Property Rights')
 @Controller()
 @ApiBearerAuth()
 export class IntellectualPropertyOwnersController {
