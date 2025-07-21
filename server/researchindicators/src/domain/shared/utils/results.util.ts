@@ -38,6 +38,7 @@ export class ResultsUtil {
           report_year_id: true,
           result_official_code: true,
           result_id: true,
+          indicator_id: true,
         },
         where,
       })

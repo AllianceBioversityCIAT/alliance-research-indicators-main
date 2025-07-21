@@ -72,7 +72,7 @@ export class ResultIpRightsService {
   }
 
   async findByResultId(resultId: number) {
-    return await this.mainRepo
+    return this.mainRepo
       .findOneBy({
         result_ip_rights_id: resultId,
         is_active: true,
