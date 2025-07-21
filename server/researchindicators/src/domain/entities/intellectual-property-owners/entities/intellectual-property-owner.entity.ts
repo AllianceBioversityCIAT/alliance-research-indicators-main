@@ -1,6 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ResultCapSharingIp } from '../../result-cap-sharing-ip/entities/result-cap-sharing-ip.entity';
+import { ResultIpRight } from '../../result-ip-rights/entities/result-ip-right.entity';
 
 @Entity('intellectual_property_owner')
 export class IntellectualPropertyOwner extends AuditableEntity {
@@ -22,4 +23,10 @@ export class IntellectualPropertyOwner extends AuditableEntity {
     (resultCapSharingIp) => resultCapSharingIp.intellectualPropertyOwner,
   )
   result_cap_sharing_ip: ResultCapSharingIp[];
+
+  @OneToMany(
+    () => ResultIpRight,
+    (resultIpRight) => resultIpRight.intellectualPropertyOwner,
+  )
+  result_ip_rights: ResultIpRight[];
 }

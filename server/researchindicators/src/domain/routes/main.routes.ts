@@ -44,6 +44,8 @@ import { TipIntegrationModule } from '../tools/tip-integration/tip-integration.m
 import { DisseminationQualificationsModule } from '../entities/dissemination-qualifications/dissemination-qualifications.module';
 import { ToolFunctionsModule } from '../entities/tool-functions/tool-functions.module';
 import { ExpansionPotentialsModule } from '../entities/expansion-potentials/expansion-potentials.module';
+import { ResultIpRightsModule } from '../entities/result-ip-rights/result-ip-rights.module';
+import { IpRightsApplicationOptionsModule } from '../entities/ip-rights-application-options/ip-rights-application-options.module';
 
 const capSharingChildren: Routes = [
   {
@@ -57,6 +59,16 @@ const capSharingChildren: Routes = [
 ];
 
 const ResultsChildren: Routes = [
+  {
+    path: 'intellectual-property',
+    module: ResultIpRightsModule,
+    children: [
+      {
+        path: 'application-options',
+        module: IpRightsApplicationOptionsModule,
+      },
+    ],
+  },
   {
     path: 'institutions',
     module: ResultInstitutionsModule,

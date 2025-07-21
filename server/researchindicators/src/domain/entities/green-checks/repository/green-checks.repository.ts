@@ -44,7 +44,7 @@ export class GreenCheckRepository {
   }
 
   capSharingIpValidation(result_key: string) {
-    return `cap_sharing_ip_validation(${result_key}) as cap_sharing_ip`;
+    return `cap_sharing_ip_validation(${result_key}) as ip_rights`; //TODO: Modificar esto a las de ya
   }
 
   policyChangeValidation(result_key: string) {
