@@ -73,12 +73,20 @@ export class GreenCheckRepository {
         spesificQuery = this.policyChangeValidation(result_key);
         break;
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
-        spesificQuery = `${this.capSharingIpValidation(result_key)},
-            ${this.capSharingValidation(result_key)}`;
+        spesificQuery = this.capSharingValidation(result_key);
         break;
       case IndicatorsEnum.INNOVATION_DEV:
         spesificQuery = this.innovationDevValidation(result_key);
         break;
+    }
+
+    if (
+      [
+        IndicatorsEnum.INNOVATION_DEV,
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      ].includes(indicator)
+    ) {
+      spesificQuery += `,${this.capSharingIpValidation(result_key)}`;
     }
 
     const query = `
