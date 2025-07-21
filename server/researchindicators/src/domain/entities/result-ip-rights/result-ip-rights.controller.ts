@@ -1,11 +1,8 @@
 import {
   Controller,
   Get,
-  Post,
   Body,
   Patch,
-  Param,
-  Delete,
   HttpStatus,
   UseInterceptors,
 } from '@nestjs/common';
