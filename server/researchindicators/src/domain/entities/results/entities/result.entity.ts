@@ -31,6 +31,7 @@ import { ResultInnovationDev } from '../../result-innovation-dev/entities/result
 import { ResultActor } from '../../result-actors/entities/result-actor.entity';
 import { ResultInstitutionType } from '../../result-institution-types/entities/result-institution-type.entity';
 import { ResultSdg } from '../../result-sdgs/entities/result-sdg.entity';
+import { ResultIpRight } from '../../result-ip-rights/entities/result-ip-right.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -220,6 +221,9 @@ export class Result extends AuditableEntity {
     (resultCapSharingIp) => resultCapSharingIp.result,
   )
   result_cap_sharing_ip!: ResultCapSharingIp[];
+
+  @OneToMany(() => ResultIpRight, (resultIpRight) => resultIpRight.result)
+  result_ip_rights!: ResultIpRight[];
 
   @OneToMany(
     () => ResultInnovationDev,

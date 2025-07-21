@@ -1,24 +1,28 @@
 import {
-  Body,
   Controller,
   Get,
-  HttpStatus,
+  Post,
+  Body,
   Patch,
+  Param,
+  Delete,
+  HttpStatus,
   UseInterceptors,
 } from '@nestjs/common';
-import { ResponseUtils } from '../../shared/utils/response.utils';
-import { UpdateResultCapSharingIpDto } from './dto/update-result-cap-sharing-ip.dto';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { ResultIpRightsService } from './result-ip-rights.service';
+import { UpdateIpRightDto } from './dto/update-ip-right.dto';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
-import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
+import { ResponseUtils } from '../../shared/utils/response.utils';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 
-@ApiTags('Result Capacity Sharing')
+@ApiTags('Intellectual Property Rights')
 @UseInterceptors(SetUpInterceptor)
 @Controller()
 @ApiBearerAuth()
-export class ResultCapSharingIpController {
+@Controller('ip-rights')
+export class ResultIpRightsController {
   constructor(
     private readonly _resultIpRightsService: ResultIpRightsService,
     private readonly _resultsUtil: ResultsUtil,
@@ -26,15 +30,12 @@ export class ResultCapSharingIpController {
 
   @Get(RESULT_CODE)
   @GetResultVersion()
-  @ApiOperation({
-    deprecated: true,
-  })
   findByResultId() {
     return this._resultIpRightsService
       .findByResultId(this._resultsUtil.resultId)
       .then((result) =>
         ResponseUtils.format({
-          description: 'Result capacity sharing ip found',
+          description: 'Result intellectual property rights found',
           status: HttpStatus.OK,
           data: result,
         }),
@@ -43,15 +44,12 @@ export class ResultCapSharingIpController {
 
   @Patch(RESULT_CODE)
   @GetResultVersion()
-  @ApiOperation({
-    deprecated: true,
-  })
-  update(@Body() updateData: UpdateResultCapSharingIpDto) {
+  update(@Body() updateData: UpdateIpRightDto) {
     return this._resultIpRightsService
       .update(this._resultsUtil.resultId, updateData)
       .then(() =>
         ResponseUtils.format({
-          description: 'Result capacity sharing ip updated',
+          description: 'Result intellectual property rights updated',
           status: HttpStatus.OK,
         }),
       );

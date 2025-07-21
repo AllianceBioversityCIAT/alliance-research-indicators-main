@@ -21,7 +21,7 @@ export abstract class BaseController<
     );
   }
 
-  @Get(':id')
+  @Get(':id(\\d+)')
   async findById(@Param('id') id: string) {
     return this.service.findOne(+id).then((data) =>
       ResponseUtils.format({

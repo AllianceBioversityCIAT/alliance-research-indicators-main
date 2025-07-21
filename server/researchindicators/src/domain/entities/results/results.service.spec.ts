@@ -24,7 +24,6 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
-import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-sharing-ip.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
@@ -39,6 +38,7 @@ import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operat
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
+import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -60,7 +60,7 @@ describe('ResultsService', () => {
   let mockOpenSearchResultApi: jest.Mocked<OpenSearchResultApi>;
   let mockIndicatorsService: jest.Mocked<IndicatorsService>;
   let mockClarisaSubNationalsService: jest.Mocked<ClarisaSubNationalsService>;
-  let mockResultCapSharingIpService: jest.Mocked<ResultCapSharingIpService>;
+  let mockResultIpRightsService: jest.Mocked<ResultIpRightsService>;
   let mockAgressoUserStaffService: jest.Mocked<AllianceUserStaffService>;
   let mockClarisaLeversService: jest.Mocked<ClarisaLeversService>;
   let mockAgressoContractService: jest.Mocked<AgressoContractService>;
@@ -164,7 +164,7 @@ describe('ResultsService', () => {
       findByNames: jest.fn(),
     } as any;
 
-    mockResultCapSharingIpService = {
+    mockResultIpRightsService = {
       create: jest.fn(),
     } as any;
 
@@ -232,8 +232,8 @@ describe('ResultsService', () => {
           useValue: mockClarisaSubNationalsService,
         },
         {
-          provide: ResultCapSharingIpService,
-          useValue: mockResultCapSharingIpService,
+          provide: ResultIpRightsService,
+          useValue: mockResultIpRightsService,
         },
         {
           provide: AllianceUserStaffService,
@@ -782,7 +782,7 @@ describe('ResultsService', () => {
           savedResult.result_id,
           mockEntityManager,
         );
-        expect(mockResultCapSharingIpService.create).toHaveBeenCalledWith(
+        expect(mockResultIpRightsService.create).toHaveBeenCalledWith(
           savedResult.result_id,
           mockEntityManager,
         );
@@ -831,7 +831,7 @@ describe('ResultsService', () => {
           mockEntityManager,
         );
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
-        expect(mockResultCapSharingIpService.create).not.toHaveBeenCalled();
+        expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
         expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
       });
 
@@ -876,7 +876,7 @@ describe('ResultsService', () => {
           mockEntityManager,
         );
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
-        expect(mockResultCapSharingIpService.create).not.toHaveBeenCalled();
+        expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
       });
 
@@ -917,7 +917,7 @@ describe('ResultsService', () => {
 
         // Assert
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
-        expect(mockResultCapSharingIpService.create).not.toHaveBeenCalled();
+        expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
         expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
       });
