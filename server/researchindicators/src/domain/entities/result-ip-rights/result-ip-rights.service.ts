@@ -31,7 +31,7 @@ export class ResultIpRightsService {
     );
 
     const response = await entityManager.save({
-      result_cap_sharing_ip_id: resultId,
+      result_ip_rights_id: resultId,
       ...this.currentUser.audit(SetAutitEnum.NEW),
     });
 
