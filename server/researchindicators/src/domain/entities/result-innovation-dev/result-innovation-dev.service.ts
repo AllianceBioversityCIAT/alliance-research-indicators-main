@@ -1,5 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateResultInnovationDevDto } from './dto/create-result-innovation-dev.dto';
+import {
+  CreateResultInnovationDevDto,
+  ResultInnovationDevKnouldgeSharingDto,
+} from './dto/create-result-innovation-dev.dto';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultInnovationDev } from './entities/result-innovation-dev.entity';
 import {
@@ -20,6 +23,7 @@ import { LinkResultsService } from '../link-results/link-results.service';
 import { LinkResult } from '../link-results/entities/link-result.entity';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
+import { ClarisaInnovationReadinessLevel } from '../../tools/clarisa/entities/clarisa-innovation-readiness-levels/entities/clarisa-innovation-readiness-level.entity';
 @Injectable()
 export class ResultInnovationDevService {
   private readonly mainRepo: Repository<ResultInnovationDev>;
@@ -150,17 +154,19 @@ export class ResultInnovationDevService {
 
     await entityManager.update(resultId, {
       is_cheaper_than_alternatives:
-        scalingPotentialData.is_cheaper_than_alternatives,
-      is_simpler_to_use: scalingPotentialData.is_simpler_to_use,
-      does_perform_better: scalingPotentialData.does_perform_better,
-      is_desirable_to_users: scalingPotentialData.is_desirable_to_users,
-      has_commercial_viability: scalingPotentialData.has_commercial_viability,
+        scalingPotentialData?.is_cheaper_than_alternatives,
+      is_simpler_to_use: scalingPotentialData?.is_simpler_to_use,
+      does_perform_better: scalingPotentialData?.does_perform_better,
+      is_desirable_to_users: scalingPotentialData?.is_desirable_to_users,
+      has_commercial_viability: scalingPotentialData?.has_commercial_viability,
       has_suitable_enabling_environment:
-        scalingPotentialData.has_suitable_enabling_environment,
-      has_evidence_of_uptake: scalingPotentialData.has_evidence_of_uptake,
-      expansion_potential_id: scalingPotentialData.expansion_potential_id,
+        scalingPotentialData?.has_suitable_enabling_environment,
+      has_evidence_of_uptake: scalingPotentialData?.has_evidence_of_uptake,
+      expansion_potential_id: scalingPotentialData?.expansion_potential_id,
       expansion_adaptation_details:
-        scalingPotentialData.expansion_adaptation_details,
+        scalingPotentialData?.expansion_potential_id == 2
+          ? scalingPotentialData.expansion_adaptation_details
+          : null,
     });
   }
 
@@ -174,6 +180,16 @@ export class ResultInnovationDevService {
       ResultInnovationDev,
       this.mainRepo,
     );
+
+    const readinessLevel = await this.dataSource
+      .getRepository(ClarisaInnovationReadinessLevel)
+      .findOne({
+        where: {
+          id: createResultInnovationDevDto?.innovation_readiness_id,
+        },
+      })
+      .then((res) => res.level);
+
     const knowledgeSharingData =
       createResultInnovationDevDto.knowledge_sharing_form;
     let linkToResult: Partial<LinkResult>[] =
@@ -182,18 +198,20 @@ export class ResultInnovationDevService {
       }));
     delete knowledgeSharingData.link_to_result;
 
-    if (!knowledgeSharingData?.is_knowledge_sharing) {
-      setDefaultValueInObject(knowledgeSharingData, [
-        'adoption_adaptation_context',
-        'dissemination_qualification_id',
-        'is_used_beyond_original_context',
-        'other_tools',
-        'other_tools_integration',
-        'results_achieved_expected',
-        'tool_function_id',
-        'tool_useful_context',
-      ]);
-
+    if (!knowledgeSharingData?.is_knowledge_sharing || readinessLevel < 7) {
+      const defaultAttributes: (keyof ResultInnovationDevKnouldgeSharingDto)[] =
+        [
+          'adoption_adaptation_context',
+          'dissemination_qualification_id',
+          'is_used_beyond_original_context',
+          'other_tools',
+          'other_tools_integration',
+          'results_achieved_expected',
+          'tool_function_id',
+          'tool_useful_context',
+        ];
+      if (readinessLevel < 7) defaultAttributes.push('is_knowledge_sharing');
+      setDefaultValueInObject(knowledgeSharingData, defaultAttributes);
       linkToResult = [];
     }
 
