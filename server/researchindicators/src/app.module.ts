@@ -62,9 +62,15 @@ import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integra
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(JwtMiddleware).forRoutes({
-      path: '*',
-      method: RequestMethod.ALL,
-    });
+    consumer
+      .apply(JwtMiddleware)
+      .exclude({
+        path: '/api/configuration/:key',
+        method: RequestMethod.GET,
+      })
+      .forRoutes({
+        path: '*',
+        method: RequestMethod.ALL,
+      });
   }
 }
