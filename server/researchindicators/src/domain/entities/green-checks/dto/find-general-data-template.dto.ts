@@ -8,6 +8,7 @@ export class FindGeneralDataTemplateDto {
   description: string;
   result_id: number;
   title: string;
+  indicator: string;
 }
 
 export class FindDataForSubmissionDto {
@@ -18,6 +19,7 @@ export class FindDataForSubmissionDto {
   result_id: number;
   title: string;
   project_name: string;
+  indicator: string;
 }
 
 export class SubmissionEmailTemplateDataDto {

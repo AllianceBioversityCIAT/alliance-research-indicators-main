@@ -31,4 +31,5 @@ export class AgressoContractRawDto {
   public ubwClientDescription: string;
   public unit: string;
   public unitId: string;
+  public sustainableDevelopmentGoals?: string;
 }

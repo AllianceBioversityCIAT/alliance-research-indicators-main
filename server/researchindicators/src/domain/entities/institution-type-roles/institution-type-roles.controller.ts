@@ -1,33 +1,13 @@
-import { Controller, Get, Param, HttpStatus } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { InstitutionTypeRolesService } from './institution-type-roles.service';
-import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { BaseController } from '../../shared/global-dto/base-controller';
 
 @ApiTags('Results')
 @ApiBearerAuth()
 @Controller()
-export class InstitutionTypeRolesController {
-  constructor(private readonly service: InstitutionTypeRolesService) {}
-
-  @Get()
-  async find() {
-    return this.service.findAll().then((levers) =>
-      ResponseUtils.format({
-        description: 'Innovation anticipated users found',
-        data: levers,
-        status: HttpStatus.OK,
-      }),
-    );
-  }
-
-  @Get(':id')
-  async findById(@Param('id') id: string) {
-    return this.service.findOne<number>(+id).then((levers) =>
-      ResponseUtils.format({
-        description: 'Innovation anticipated user found',
-        data: levers,
-        status: HttpStatus.OK,
-      }),
-    );
+export class InstitutionTypeRolesController extends BaseController<InstitutionTypeRolesService> {
+  constructor(service: InstitutionTypeRolesService) {
+    super(service, 'Institution type roles');
   }
 }

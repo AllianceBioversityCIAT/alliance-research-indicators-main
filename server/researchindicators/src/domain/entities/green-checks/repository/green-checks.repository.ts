@@ -183,23 +183,25 @@ export class GreenCheckRepository {
     resultId: number,
   ): Promise<FindDataForSubmissionDto> {
     const query = `
-        select 
-          su.sec_user_id as contributor_id,
-        	su.email as contributor_email,
-        	ac.project_lead_description as pi_name,
-        	null as pi_email,
-        	r.result_id,
-        	r.title,
-        	ac.description as project_name  
-        from results r 
-        	left join result_contracts rc on rc.result_id = r.result_id 
-        									and rc.is_primary = true
-        									and rc.is_active = true
-        	left join agresso_contracts ac on ac.agreement_id = rc.contract_id 
-        	left join sec_users su on su.sec_user_id = r.created_by 
-        where r.is_active = true
-        	and r.result_id = ?
-        limit 1;
+      select 
+        su.sec_user_id as contributor_id,
+        su.email as contributor_email,
+        ac.project_lead_description as pi_name,
+        null as pi_email,
+        r.result_official_code as result_id,
+        r.title,
+        ac.description as project_name ,
+        i.name as indicator
+      from results r 
+        left join result_contracts rc on rc.result_id = r.result_id 
+                        and rc.is_primary = true
+                        and rc.is_active = true
+        left join agresso_contracts ac on ac.agreement_id = rc.contract_id 
+        left join sec_users su on su.sec_user_id = r.created_by
+        inner join indicators i on i.indicator_id = r.indicator_id
+      where r.is_active = true
+        and r.result_id = ?
+      limit 1;
     `;
 
     const result: FindDataForSubmissionDto = await this.dataSource
@@ -247,14 +249,17 @@ export class GreenCheckRepository {
     `;
 
     const queryResult = `
-    select r.result_id, r.title 
-    from results r 
+    select r.result_official_code as result_id, r.title, i.name as indicator
+    from results r
+    inner join indicators i on i.indicator_id = r.indicator_id
     where r.result_id = ?
-    	and r.is_active = true
+      and r.is_active = true
     limit 1;
     `;
     const result = await this.dataSource
-      .query<{ result_id: number; title: string }[]>(queryResult, [resultId])
+      .query<
+        { result_id: number; title: string; indicator: string }[]
+      >(queryResult, [resultId])
       .then((result) => (result?.length ? result[0] : null));
 
     const history = await this.dataSource.query<FindGreenChecksUserDto[]>(
@@ -275,6 +280,7 @@ export class GreenCheckRepository {
       description: revData.submission_comment,
       result_id: result.result_id,
       title: result.title,
+      indicator: result.indicator,
     };
   }
 }

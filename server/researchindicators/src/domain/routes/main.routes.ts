@@ -38,6 +38,12 @@ import { ResultActorsModule } from '../entities/result-actors/result-actors.modu
 import { ActorRolesModule } from '../entities/actor-roles/actor-roles.module';
 import { ResultInstitutionTypesModule } from '../entities/result-institution-types/result-institution-types.module';
 import { InstitutionTypeRolesModule } from '../entities/institution-type-roles/institution-type-roles.module';
+import { IssueCategoriesModule } from '../entities/issue-categories/issue-categories.module';
+import { DynamoFeedbackModule } from '../tools/dynamo-feedback/dynamo-feedback.module';
+import { AppConfigModule } from '../entities/app-config/app-config.module';
+import { DisseminationQualificationsModule } from '../entities/dissemination-qualifications/dissemination-qualifications.module';
+import { ToolFunctionsModule } from '../entities/tool-functions/tool-functions.module';
+import { ExpansionPotentialsModule } from '../entities/expansion-potentials/expansion-potentials.module';
 
 const capSharingChildren: Routes = [
   {
@@ -179,6 +185,10 @@ const toolsChildren: Routes = [
 
 const children: Routes = [
   {
+    path: 'configuration',
+    module: AppConfigModule,
+  },
+  {
     path: 'results',
     children: ResultsChildren,
     module: ResultsModule,
@@ -238,6 +248,26 @@ const children: Routes = [
   {
     path: 'reporting-feedback',
     module: ReportingFeedbackModule,
+  },
+  {
+    path: 'issue-categories',
+    module: IssueCategoriesModule,
+  },
+  {
+    path: 'dynamo-feedback',
+    module: DynamoFeedbackModule,
+  },
+  {
+    path: 'dissemination-qualifications',
+    module: DisseminationQualificationsModule,
+  },
+  {
+    path: 'tool-functions',
+    module: ToolFunctionsModule,
+  },
+  {
+    path: 'expansion-potentials',
+    module: ExpansionPotentialsModule,
   },
 ];
 

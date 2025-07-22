@@ -9,7 +9,11 @@ import {
 import { CreateResultInstitutionTypeDto } from './dto/create-result-institution-type.dto';
 import { ClarisaInstitutionTypeEnum } from '../../tools/clarisa/entities/clarisa-institution-types/enum/clarisa-institution-type.enum';
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
-import { setNull } from '../../shared/utils/object.utils';
+import {
+  defaultValue,
+  isEmpty,
+  setNull,
+} from '../../shared/utils/object.utils';
 
 @Injectable()
 export class ResultInstitutionTypesService extends BaseServiceSimple<
@@ -123,10 +127,11 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       if (institution?.result_institution_type_id) {
         dataToSave.push({
           result_institution_type_id: institution?.result_institution_type_id,
-          institution_type_custom_name:
-            institution?.institution_type_id == ClarisaInstitutionTypeEnum.OTHER
-              ? setNull(institution?.institution_type_custom_name)
-              : null,
+          institution_type_custom_name: defaultValue(
+            setNull(institution?.institution_type_custom_name),
+            institution?.institution_type_id ==
+              ClarisaInstitutionTypeEnum.OTHER,
+          ),
           institution_type_id: institution?.institution_type_id,
           institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
           sub_institution_type_id: institution?.sub_institution_type_id,
@@ -139,10 +144,11 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
 
         const dataTemp: Partial<ResultInstitutionType> = {
           result_id: resultId,
-          institution_type_custom_name:
-            institution?.institution_type_id == ClarisaInstitutionTypeEnum.OTHER
-              ? setNull(institution?.institution_type_custom_name)
-              : null,
+          institution_type_custom_name: defaultValue(
+            setNull(institution?.institution_type_custom_name),
+            institution?.institution_type_id ==
+              ClarisaInstitutionTypeEnum.OTHER,
+          ),
           institution_type_id: setNull(institution?.institution_type_id),
           institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
           sub_institution_type_id: setNull(
@@ -150,7 +156,11 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
           ),
           is_active: true,
           ...this.currentUser.audit(
-            existData ? SetAutitEnum.UPDATE : SetAutitEnum.NEW,
+            defaultValue(
+              SetAutitEnum.UPDATE,
+              !isEmpty(existData),
+              SetAutitEnum.NEW,
+            ),
           ),
         };
 
