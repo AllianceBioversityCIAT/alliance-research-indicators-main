@@ -171,7 +171,6 @@ export class UpdateIndicators1753303310598 implements MigrationInterface {
     and/or capacity development activities. They involve a change in knowledge or tools within the research process itself, produced under the control
     of the research team.
     <br />
-    <br />
     Examples include new research methods, policy analyses, gene maps, new crop varieties and breeds, institutional innovations or other products of
     research work, partnerships because of a signed memorandum of understanding.
   </div>
@@ -193,7 +192,6 @@ export class UpdateIndicators1753303310598 implements MigrationInterface {
     A change in knowledge, attitudes, skills, and/or relationships (KASR) of external actors. An outcome is a change in behavior that happens outside
     the research team, in people or organizations who interact with the research outputs. While the research influences these changes, the researchers
     cannot directly control them.
-    <br />
     <br />
     Examples include the use of a new technology (including outputs like a seed variety) by farmers; policy actors using research-based knowledge to
     inform policy decisions; participants in an Alliance-supported process agree to a new germplasm conservation and exchange protocols; researchers
