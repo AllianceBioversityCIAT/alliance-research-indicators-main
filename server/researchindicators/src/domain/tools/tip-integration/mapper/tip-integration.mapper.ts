@@ -34,15 +34,13 @@ export const tipIntegrationMapper = (
     },
     linkToResult: `${appConfig.ARI_CLIENT_HOST}/result/${result.result_official_code}/general-information`,
 
-    intellectualPropertyOwnerId: validationField(
-      result.result_cap_sharing_ip?.[0]?.asset_ip_owner_id,
-    ),
+    intellectualPropertyOwnerId: validationField(ip?.asset_ip_owner_id),
     intellectualPropertyOwnerName: validationField(
-      result.result_cap_sharing_ip?.[0]?.intellectualPropertyOwner?.name,
+      ip?.intellectualPropertyOwner?.name,
     ),
     iprOwnerOther: validationField(
-      ip.asset_ip_owner_description,
-      ip.asset_ip_owner_id == IntellectualPropertyOwnerEnum.OTHERS,
+      ip?.asset_ip_owner_description,
+      ip?.asset_ip_owner_id == IntellectualPropertyOwnerEnum.OTHERS,
     ),
 
     hasLegalRestrictions: validationField(ip?.publicity_restriction),
