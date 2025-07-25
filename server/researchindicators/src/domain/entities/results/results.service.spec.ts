@@ -752,7 +752,7 @@ describe('ResultsService', () => {
         // Don't mock createResultType for these tests
         (service as any).createResultType =
           service.constructor.prototype.createResultType.bind(service);
-        
+
         // Clear all mock calls
         jest.clearAllMocks();
       });
@@ -1614,8 +1614,12 @@ describe('ResultsService', () => {
       const mockMainContact = { user_id: 1 };
 
       mockMainRepo.findOne.mockResolvedValue(mockResult as any);
-      mockResultKeywordsService.findKeywordsByResultId.mockResolvedValue(mockKeywords as any);
-      mockResultUsersService.findUsersByRoleResult.mockResolvedValue([mockMainContact] as any);
+      mockResultKeywordsService.findKeywordsByResultId.mockResolvedValue(
+        mockKeywords as any,
+      );
+      mockResultUsersService.findUsersByRoleResult.mockResolvedValue([
+        mockMainContact,
+      ] as any);
 
       // Act
       const result = await service.findGeneralInfo(resultId);
@@ -1623,7 +1627,9 @@ describe('ResultsService', () => {
       // Assert
       expect(result).toBeDefined();
       expect(mockMainRepo.findOne).toHaveBeenCalled();
-      expect(mockResultKeywordsService.findKeywordsByResultId).toHaveBeenCalledWith(resultId);
+      expect(
+        mockResultKeywordsService.findKeywordsByResultId,
+      ).toHaveBeenCalledWith(resultId);
       expect(mockResultUsersService.findUsersByRoleResult).toHaveBeenCalledWith(
         UserRolesEnum.MAIN_CONTACT,
         resultId,
@@ -1639,9 +1645,7 @@ describe('ResultsService', () => {
         { result_id: 1, title: 'Version 1', version: 1 },
         { result_id: 2, title: 'Version 2', version: 2 },
       ];
-      const mockLive = [
-        { result_id: 3, title: 'Live Version', version: 3 },
-      ];
+      const mockLive = [{ result_id: 3, title: 'Live Version', version: 3 }];
 
       mockMainRepo.find
         .mockResolvedValueOnce(mockVersions as any) // First call for versions
@@ -1699,7 +1703,9 @@ describe('ResultsService', () => {
       };
 
       const errorMessage = 'Contract service error';
-      mockResultContractsService.create.mockRejectedValue(new Error(errorMessage));
+      mockResultContractsService.create.mockRejectedValue(
+        new Error(errorMessage),
+      );
 
       // Act & Assert
       await expect(
@@ -1721,7 +1727,9 @@ describe('ResultsService', () => {
       };
 
       // Mock the method that's actually called
-      jest.spyOn(service, 'findResultAlignment').mockResolvedValue(mockAlignment as any);
+      jest
+        .spyOn(service, 'findResultAlignment')
+        .mockResolvedValue(mockAlignment as any);
 
       // Act
       const result = await service.findResultAlignment(resultId);
@@ -1742,18 +1750,20 @@ describe('ResultsService', () => {
         result_status_id: 1,
         report_year_id: 2024,
         created_by: 123,
-        indicator: { 
-          indicator_id: 1, 
-          name: 'Test Indicator' 
+        indicator: {
+          indicator_id: 1,
+          name: 'Test Indicator',
         },
-        result_status: { 
-          name: 'Active' 
+        result_status: {
+          name: 'Active',
         },
       };
       const mockPrincipalData = { is_principal: 1 };
 
       mockMainRepo.findOne.mockResolvedValue(mockResult as any);
-      mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(mockPrincipalData as any);
+      mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
+        mockPrincipalData as any,
+      );
 
       // Act
       const result = await service.findMetadataResult(resultId);
@@ -1793,20 +1803,28 @@ describe('ResultsService', () => {
           result_status: true,
         },
       });
-      expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(resultId);
+      expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
+        resultId,
+      );
     });
 
     it('should throw NotFoundException when no metadata found', async () => {
       // Arrange
       const resultId = 999;
       const mockPrincipalData = { is_principal: 0 };
-      
+
       mockMainRepo.findOne.mockResolvedValue(null);
-      mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(mockPrincipalData as any);
+      mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
+        mockPrincipalData as any,
+      );
 
       // Act & Assert
-      await expect(service.findMetadataResult(resultId)).rejects.toThrow(NotFoundException);
-      expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(resultId);
+      await expect(service.findMetadataResult(resultId)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
+        resultId,
+      );
     });
   });
 
@@ -1857,7 +1875,9 @@ describe('ResultsService', () => {
       ];
 
       // Mock the method directly
-      jest.spyOn(service, 'findLastUpdatedResultByCurrentUser').mockResolvedValue(mockResults as any);
+      jest
+        .spyOn(service, 'findLastUpdatedResultByCurrentUser')
+        .mockResolvedValue(mockResults as any);
 
       // Act
       const result = await service.findLastUpdatedResultByCurrentUser(take);
