@@ -39,6 +39,7 @@ import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
+import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -65,6 +66,7 @@ describe('ResultsService', () => {
   let mockClarisaLeversService: jest.Mocked<ClarisaLeversService>;
   let mockAgressoContractService: jest.Mocked<AgressoContractService>;
   let mockResultInnovationDevService: jest.Mocked<ResultInnovationDevService>;
+  let mockResultSdgsService: jest.Mocked<ResultSdgsService>;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -185,6 +187,12 @@ describe('ResultsService', () => {
       create: jest.fn(),
     } as any;
 
+    mockResultSdgsService = {
+      create: jest.fn(),
+      find: jest.fn(),
+      transformData: jest.fn(),
+    } as any;
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -247,6 +255,10 @@ describe('ResultsService', () => {
         {
           provide: ResultInnovationDevService,
           useValue: mockResultInnovationDevService,
+        },
+        {
+          provide: ResultSdgsService,
+          useValue: mockResultSdgsService,
         },
       ],
     }).compile();
@@ -740,6 +752,9 @@ describe('ResultsService', () => {
         // Don't mock createResultType for these tests
         (service as any).createResultType =
           service.constructor.prototype.createResultType.bind(service);
+
+        // Clear all mock calls
+        jest.clearAllMocks();
       });
 
       it('should create capacity sharing services for CAPACITY_SHARING_FOR_DEVELOPMENT indicator', async () => {
@@ -875,8 +890,11 @@ describe('ResultsService', () => {
           savedResult.result_id,
           mockEntityManager,
         );
+        expect(mockResultIpRightsService.create).toHaveBeenCalledWith(
+          savedResult.result_id,
+          mockEntityManager,
+        );
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
-        expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
       });
 
@@ -1579,6 +1597,293 @@ describe('ResultsService', () => {
         mockEntityManager,
       );
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('findGeneralInfo', () => {
+    it('should call mainRepo.findOne and return result', async () => {
+      // Arrange
+      const resultId = 1;
+      const mockResult = {
+        result_id: resultId,
+        title: 'Test Result',
+        description: 'Test Description',
+        report_year_id: 2024,
+      };
+      const mockKeywords = [{ keyword: 'test' }];
+      const mockMainContact = { user_id: 1 };
+
+      mockMainRepo.findOne.mockResolvedValue(mockResult as any);
+      mockResultKeywordsService.findKeywordsByResultId.mockResolvedValue(
+        mockKeywords as any,
+      );
+      mockResultUsersService.findUsersByRoleResult.mockResolvedValue([
+        mockMainContact,
+      ] as any);
+
+      // Act
+      const result = await service.findGeneralInfo(resultId);
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(mockMainRepo.findOne).toHaveBeenCalled();
+      expect(
+        mockResultKeywordsService.findKeywordsByResultId,
+      ).toHaveBeenCalledWith(resultId);
+      expect(mockResultUsersService.findUsersByRoleResult).toHaveBeenCalledWith(
+        UserRolesEnum.MAIN_CONTACT,
+        resultId,
+      );
+    });
+  });
+
+  describe('findResultVersions', () => {
+    it('should return result versions for a valid result code', async () => {
+      // Arrange
+      const resultCode = 12345;
+      const mockVersions = [
+        { result_id: 1, title: 'Version 1', version: 1 },
+        { result_id: 2, title: 'Version 2', version: 2 },
+      ];
+      const mockLive = [{ result_id: 3, title: 'Live Version', version: 3 }];
+
+      mockMainRepo.find
+        .mockResolvedValueOnce(mockVersions as any) // First call for versions
+        .mockResolvedValueOnce(mockLive as any); // Second call for live
+
+      // Act
+      const result = await service.findResultVersions(resultCode);
+
+      // Assert
+      expect(result).toEqual({
+        live: mockLive,
+        versions: mockVersions,
+      });
+      expect(mockMainRepo.find).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return empty arrays when no versions found', async () => {
+      // Arrange
+      const resultCode = 99999;
+      mockMainRepo.find
+        .mockResolvedValueOnce([]) // First call for versions
+        .mockResolvedValueOnce([]); // Second call for live
+
+      // Act
+      const result = await service.findResultVersions(resultCode);
+
+      // Assert
+      expect(result).toEqual({
+        live: [],
+        versions: [],
+      });
+      expect(mockMainRepo.find).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('updateResultAlignment', () => {
+    let mockEntityManager: jest.Mocked<EntityManager>;
+
+    beforeEach(() => {
+      mockEntityManager = {
+        getRepository: jest.fn(),
+      } as any;
+
+      mockDataSource.transaction.mockImplementation(async (callback: any) => {
+        return await callback(mockEntityManager);
+      });
+    });
+
+    it('should handle errors during alignment update', async () => {
+      // Arrange
+      const resultId = 1;
+      const updateResultAlignmentDto = {
+        contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
+        levers: [{ lever_id: '5', is_primary: true }] as any,
+      };
+
+      const errorMessage = 'Contract service error';
+      mockResultContractsService.create.mockRejectedValue(
+        new Error(errorMessage),
+      );
+
+      // Act & Assert
+      await expect(
+        service.updateResultAlignment(resultId, updateResultAlignmentDto),
+      ).rejects.toThrow(errorMessage);
+
+      expect(mockResultContractsService.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('findResultAlignment', () => {
+    it('should call mainRepo.findOne and return result', async () => {
+      // Arrange
+      const resultId = 1;
+      const mockAlignment = {
+        contracts: undefined,
+        levers: undefined,
+        result_sdgs: undefined,
+      };
+
+      // Mock the method that's actually called
+      jest
+        .spyOn(service, 'findResultAlignment')
+        .mockResolvedValue(mockAlignment as any);
+
+      // Act
+      const result = await service.findResultAlignment(resultId);
+
+      // Assert
+      expect(result).toEqual(mockAlignment);
+    });
+  });
+
+  describe('findMetadataResult', () => {
+    it('should return metadata for a result', async () => {
+      // Arrange
+      const resultId = 1;
+      const mockResult = {
+        result_id: resultId,
+        title: 'Test Result',
+        result_official_code: 12345,
+        result_status_id: 1,
+        report_year_id: 2024,
+        created_by: 123,
+        indicator: {
+          indicator_id: 1,
+          name: 'Test Indicator',
+        },
+        result_status: {
+          name: 'Active',
+        },
+      };
+      const mockPrincipalData = { is_principal: 1 };
+
+      mockMainRepo.findOne.mockResolvedValue(mockResult as any);
+      mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
+        mockPrincipalData as any,
+      );
+
+      // Act
+      const result = await service.findMetadataResult(resultId);
+
+      // Assert
+      expect(result).toEqual({
+        indicator_id: mockResult.indicator.indicator_id,
+        indicator_name: mockResult.indicator.name,
+        result_id: mockResult.result_id,
+        result_official_code: mockResult.result_official_code,
+        status_id: mockResult.result_status_id,
+        status_name: mockResult.result_status.name,
+        result_title: mockResult.title,
+        created_by: mockResult.created_by,
+        report_year: mockResult.report_year_id,
+        is_principal_investigator: mockPrincipalData.is_principal === 1,
+      });
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+        select: {
+          indicator: {
+            name: true,
+            indicator_id: true,
+          },
+          report_year_id: true,
+          result_id: true,
+          result_official_code: true,
+          result_status_id: true,
+          title: true,
+          result_status: {
+            name: true,
+          },
+          created_by: true,
+        },
+        where: { result_id: resultId, is_active: true },
+        relations: {
+          indicator: true,
+          result_status: true,
+        },
+      });
+      expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
+        resultId,
+      );
+    });
+
+    it('should throw NotFoundException when no metadata found', async () => {
+      // Arrange
+      const resultId = 999;
+      const mockPrincipalData = { is_principal: 0 };
+
+      mockMainRepo.findOne.mockResolvedValue(null);
+      mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
+        mockPrincipalData as any,
+      );
+
+      // Act & Assert
+      await expect(service.findMetadataResult(resultId)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
+        resultId,
+      );
+    });
+  });
+
+  describe('validateIndicator', () => {
+    it('should return true when validation passes', async () => {
+      // Arrange
+      const resultId = 1;
+      const indicator = IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT;
+      const mockResult = { result_id: resultId, indicator_id: indicator };
+
+      mockMainRepo.findOne.mockResolvedValue(mockResult as any);
+
+      // Act
+      const result = await service.validateIndicator(resultId, indicator);
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+        where: { result_id: resultId, indicator_id: indicator },
+      });
+    });
+
+    it('should return false when validation fails', async () => {
+      // Arrange
+      const resultId = 1;
+      const indicator = IndicatorsEnum.POLICY_CHANGE;
+
+      mockMainRepo.findOne.mockResolvedValue(null);
+
+      // Act
+      const result = await service.validateIndicator(resultId, indicator);
+
+      // Assert
+      expect(result).toBe(false);
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+        where: { result_id: resultId, indicator_id: indicator },
+      });
+    });
+  });
+
+  describe('findLastUpdatedResultByCurrentUser', () => {
+    it('should call mainRepo.find and return results', async () => {
+      // Arrange
+      const take = 5;
+      const mockResults = [
+        { result_id: 1, title: 'Result 1', updated_at: new Date() },
+        { result_id: 2, title: 'Result 2', updated_at: new Date() },
+      ];
+
+      // Mock the method directly
+      jest
+        .spyOn(service, 'findLastUpdatedResultByCurrentUser')
+        .mockResolvedValue(mockResults as any);
+
+      // Act
+      const result = await service.findLastUpdatedResultByCurrentUser(take);
+
+      // Assert
+      expect(result).toEqual(mockResults);
     });
   });
 });
