@@ -120,14 +120,25 @@ export class ResultInnovationDevService {
         manager,
       );
 
+      const readinessLevel = await this.dataSource
+        .getRepository(ClarisaInnovationReadinessLevel)
+        .findOne({
+          where: {
+            id: createResultInnovationDevDto?.innovation_readiness_id,
+          },
+        })
+        .then((res) => res.level);
+
       await this.knouldgeSharing(
         resultId,
         createResultInnovationDevDto,
+        readinessLevel,
         manager,
       );
       await this.scalingPotential(
         resultId,
         createResultInnovationDevDto,
+        readinessLevel,
         manager,
       );
 
@@ -142,6 +153,7 @@ export class ResultInnovationDevService {
   private async scalingPotential(
     resultId: number,
     createResultInnovationDevDto: CreateResultInnovationDevDto,
+    readinessLevel: number,
     manager?: EntityManager,
   ) {
     const entityManager = selectManager(
@@ -151,6 +163,19 @@ export class ResultInnovationDevService {
     );
     const scalingPotentialData =
       createResultInnovationDevDto.scaling_potential_form;
+    if (readinessLevel < 7) {
+      setDefaultValueInObject(scalingPotentialData, [
+        'is_cheaper_than_alternatives',
+        'is_simpler_to_use',
+        'does_perform_better',
+        'is_desirable_to_users',
+        'has_commercial_viability',
+        'has_suitable_enabling_environment',
+        'has_evidence_of_uptake',
+        'expansion_potential_id',
+        'expansion_adaptation_details',
+      ]);
+    }
 
     await entityManager.update(resultId, {
       is_cheaper_than_alternatives:
@@ -173,6 +198,7 @@ export class ResultInnovationDevService {
   private async knouldgeSharing(
     resultId: number,
     createResultInnovationDevDto: CreateResultInnovationDevDto,
+    readinessLevel: number,
     manager?: EntityManager,
   ) {
     const entityManager = selectManager(
@@ -180,15 +206,6 @@ export class ResultInnovationDevService {
       ResultInnovationDev,
       this.mainRepo,
     );
-
-    const readinessLevel = await this.dataSource
-      .getRepository(ClarisaInnovationReadinessLevel)
-      .findOne({
-        where: {
-          id: createResultInnovationDevDto?.innovation_readiness_id,
-        },
-      })
-      .then((res) => res.level);
 
     const knowledgeSharingData =
       createResultInnovationDevDto.knowledge_sharing_form;
