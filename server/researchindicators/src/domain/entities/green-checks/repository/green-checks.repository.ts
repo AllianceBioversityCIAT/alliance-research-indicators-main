@@ -44,7 +44,7 @@ export class GreenCheckRepository {
   }
 
   capSharingIpValidation(result_key: string) {
-    return `cap_sharing_ip_validation(${result_key}) as cap_sharing_ip`;
+    return `intellectual_property_validation(${result_key}) as ip_rights`;
   }
 
   policyChangeValidation(result_key: string) {
@@ -73,12 +73,20 @@ export class GreenCheckRepository {
         spesificQuery = this.policyChangeValidation(result_key);
         break;
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
-        spesificQuery = `${this.capSharingIpValidation(result_key)},
-            ${this.capSharingValidation(result_key)}`;
+        spesificQuery = this.capSharingValidation(result_key);
         break;
       case IndicatorsEnum.INNOVATION_DEV:
         spesificQuery = this.innovationDevValidation(result_key);
         break;
+    }
+
+    if (
+      [
+        IndicatorsEnum.INNOVATION_DEV,
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      ].includes(indicator)
+    ) {
+      spesificQuery += `,${this.capSharingIpValidation(result_key)}`;
     }
 
     const query = `

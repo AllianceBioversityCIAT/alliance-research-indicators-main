@@ -243,7 +243,9 @@ export class ResultCapacitySharingService {
 
     await this._resultInsitutionService.create<InstitutionRolesEnum>(
       resultId,
-      updateData?.trainee_organization_representative,
+      updateData?.is_attending_organization
+        ? updateData?.trainee_organization_representative
+        : null,
       'institution_id',
       InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE,
       manager,

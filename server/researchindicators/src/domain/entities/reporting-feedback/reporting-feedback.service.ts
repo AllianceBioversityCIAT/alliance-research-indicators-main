@@ -4,6 +4,7 @@ import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { AskForHelp, AskForHelpTypeEnum } from './dto/reporting-feedback.dto';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
+import { format, toZonedTime } from 'date-fns-tz';
 
 @Injectable()
 export class ReportingFeedbackService {
@@ -28,10 +29,15 @@ export class ReportingFeedbackService {
       emailTo = this._appConfig.CONTENT_SUPPORT;
     }
 
+    const cetDate = toZonedTime(new Date(), 'Europe/Paris');
+    const formattedDate = format(cetDate, 'yyyy-MM-dd HH:mm:ss', {
+      timeZone: 'Europe/Paris',
+    });
+
     const dataTemplate = {
       firstName: feedbackData.userData?.first_name,
       lastName: feedbackData.userData?.last_name,
-      date: new Date(),
+      date: formattedDate,
       description: feedbackData?.message,
       url: this._appConfig.COMPLETE_CLIENT_HOST(feedbackData?.url),
     };

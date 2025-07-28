@@ -53,7 +53,6 @@ import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/
 import { CountryAreas, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
-import { ResultCapSharingIpService } from '../result-cap-sharing-ip/result-cap-sharing-ip.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
 import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../result-users/entities/result-user.entity';
@@ -64,6 +63,7 @@ import { AgressoContractService } from '../agresso-contract/agresso-contract.ser
 import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
 import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
+import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 
 @Injectable()
 export class ResultsService {
@@ -86,7 +86,7 @@ export class ResultsService {
     private readonly _openSearchResultApi: OpenSearchResultApi,
     private readonly _indicatorsService: IndicatorsService,
     private readonly _clarisaSubNationalsService: ClarisaSubNationalsService,
-    private readonly _resultCapSharingIpService: ResultCapSharingIpService,
+    private readonly _resultIpRightsService: ResultIpRightsService,
     private readonly _agressoUserStaffService: AllianceUserStaffService,
     private readonly _clarisaLeversService: ClarisaLeversService,
     private readonly _agressoContractService: AgressoContractService,
@@ -262,7 +262,6 @@ export class ResultsService {
     switch (indicator) {
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
         await this._resultCapacitySharingService.create(resultId, manager);
-        await this._resultCapSharingIpService.create(resultId, manager);
         break;
       case IndicatorsEnum.POLICY_CHANGE:
         await this._resultPolicyChangeService.create(resultId, manager);
@@ -272,6 +271,15 @@ export class ResultsService {
         break;
       default:
         break;
+    }
+
+    const ipAvailables = [
+      IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      IndicatorsEnum.INNOVATION_DEV,
+    ];
+
+    if (ipAvailables.includes(indicator)) {
+      await this._resultIpRightsService.create(resultId, manager);
     }
   }
 

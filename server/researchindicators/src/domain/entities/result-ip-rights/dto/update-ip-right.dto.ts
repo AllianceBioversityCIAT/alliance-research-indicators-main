@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IntellectualPropertyOwnerEnum } from '../../intellectual-property-owners/enum/intellectual-property-owner.enum';
 
-export class UpdateResultCapSharingIpDto {
+export class UpdateIpRightDto {
   @ApiProperty({
     required: false,
     description: 'Restrictions on publicity',
@@ -66,4 +66,20 @@ export class UpdateResultCapSharingIpDto {
     type: String,
   })
   public potential_asset_description?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Private sector engagement ID',
+    example: 1,
+    type: Number,
+  })
+  public private_sector_engagement_id?: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'Formal IP rights application ID',
+    example: 1,
+    type: Number,
+  })
+  public formal_ip_rights_application_id?: number;
 }

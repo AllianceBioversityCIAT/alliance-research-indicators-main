@@ -29,6 +29,7 @@ import { ClarisaLeversModule } from '../../tools/clarisa/entities/clarisa-levers
 import { AgressoContractModule } from '../agresso-contract/agresso-contract.module';
 import { ResultInnovationDevModule } from '../result-innovation-dev/result-innovation-dev.module';
 import { ResultSdgsModule } from '../result-sdgs/result-sdgs.module';
+import { ResultIpRightsModule } from '../result-ip-rights/result-ip-rights.module';
 
 @Module({
   controllers: [ResultsController],
@@ -59,6 +60,7 @@ import { ResultSdgsModule } from '../result-sdgs/result-sdgs.module';
     AgressoContractModule,
     ResultInnovationDevModule,
     ResultSdgsModule,
+    ResultIpRightsModule,
   ],
   providers: [
     ResultsService,
