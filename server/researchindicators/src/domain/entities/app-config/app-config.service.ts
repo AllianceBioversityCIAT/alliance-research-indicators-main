@@ -3,11 +3,15 @@ import { DataSource, Repository } from 'typeorm';
 import { AppConfig } from './entities/app-config.entity';
 import { cleanObject, isEmpty } from '../../shared/utils/object.utils';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 
 @Injectable()
 export class AppConfigService {
   private readonly mainRepo: Repository<AppConfig>;
-  constructor(private readonly dataSource: DataSource) {
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly currentUserUtil: CurrentUserUtil,
+  ) {
     this.mainRepo = this.dataSource.getRepository(AppConfig);
   }
 
