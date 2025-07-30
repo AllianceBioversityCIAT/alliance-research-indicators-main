@@ -9,6 +9,7 @@ import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { ClarisaInstitutionType } from '../../../tools/clarisa/entities/clarisa-institution-types/entities/clarisa-institution-type.entity';
 import { InstitutionTypeRole } from '../../institution-type-roles/entities/institution-type-role.entity';
+import { ClarisaInstitution } from '../../../tools/clarisa/entities/clarisa-institutions/entities/clarisa-institution.entity';
 
 @Entity('result_institution_types')
 export class ResultInstitutionType extends AuditableEntity {
@@ -52,6 +53,29 @@ export class ResultInstitutionType extends AuditableEntity {
     nullable: false,
   })
   institution_type_role_id!: number;
+
+  @Column({
+    name: 'is_organization_known',
+    type: 'boolean',
+    nullable: true,
+  })
+  is_organization_known?: boolean;
+
+  @Column({
+    name: 'institution_id',
+    type: 'bigint',
+    nullable: true,
+  })
+  institution_id?: number;
+
+  @ManyToOne(
+    () => ClarisaInstitution,
+    (institution) => institution.result_institution_types,
+  )
+  @JoinColumn({
+    name: 'institution_id',
+  })
+  institution?: ClarisaInstitution;
 
   @ManyToOne(() => Result, (result) => result.result_institution_types)
   @JoinColumn({

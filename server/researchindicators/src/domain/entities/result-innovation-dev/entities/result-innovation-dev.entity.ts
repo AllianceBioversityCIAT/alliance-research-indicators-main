@@ -73,6 +73,19 @@ export class ResultInnovationDev extends AuditableEntity {
   })
   intended_beneficiaries_description?: string;
 
+  @Column({
+    name: 'is_new_or_improved_variety',
+    type: 'boolean',
+    nullable: true,
+  })
+  is_new_or_improved_variety?: boolean;
+
+  @Column('bigint', {
+    name: 'new_or_improved_varieties_count',
+    nullable: true,
+  })
+  new_or_improved_varieties_count?: number;
+
   // fields for knowledge sharing
 
   @Column('boolean', {
