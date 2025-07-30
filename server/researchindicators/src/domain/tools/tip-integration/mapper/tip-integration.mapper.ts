@@ -17,7 +17,7 @@ export const tipIntegrationMapper = (
     creatorEmail = user.email;
   }
 
-  const ip = result.result_cap_sharing_ip?.[0];
+  const ip = result.result_ip_rights?.[0];
 
   return {
     resultId: Number(result.result_id),
