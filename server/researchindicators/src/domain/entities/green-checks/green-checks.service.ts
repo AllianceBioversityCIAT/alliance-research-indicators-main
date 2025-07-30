@@ -289,6 +289,8 @@ export class GreenChecksService {
           title: data.title,
           project_name: data.project_name,
           support_email: this.appConfig.ARI_SUPPORT_EMAIL,
+          content_support_email: this.appConfig.ARI_CONTENT_SUPPORT_EMAIL,
+          system_name: this.appConfig.ARI_MIS,
           rev_email:
             data.contributor_id == this.currentUserUtil.user_id
               ? data.contributor_email

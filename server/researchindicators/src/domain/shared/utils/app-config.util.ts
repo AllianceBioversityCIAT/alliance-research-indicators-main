@@ -269,6 +269,15 @@ export class AppConfig {
   }
 
   /**
+   * Get the support email
+   * @readonly
+   * @type {string}
+   */
+  get ARI_CONTENT_SUPPORT_EMAIL(): string {
+    return process.env.ARI_CONTENT_SUPPORT_EMAIL;
+  }
+
+  /**
    * Get the technical support email
    * @readonly
    * @type {string}
