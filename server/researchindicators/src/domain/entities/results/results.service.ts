@@ -129,9 +129,9 @@ export class ResultsService {
         'result_contracts.agresso_contract',
         'agresso_contract',
       )
-      .leftJoinAndSelect('r.result_cap_sharing_ip', 'result_cap_sharing_ip')
+      .leftJoinAndSelect('r.result_ip_rights', 'result_ip_rights')
       .leftJoinAndSelect(
-        'result_cap_sharing_ip.intellectualPropertyOwner',
+        'result_ip_rights.intellectualPropertyOwner',
         'intellectualPropertyOwner',
       )
       .leftJoinAndSelect(
