@@ -7,12 +7,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ResponseUtils } from '../../shared/utils/response.utils';
-import { UpdateResultCapSharingIpDto } from './dto/update-result-cap-sharing-ip.dto';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
+import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
 
 @ApiTags('Result Capacity Sharing')
 @UseInterceptors(SetUpInterceptor)
@@ -46,7 +46,7 @@ export class ResultCapSharingIpController {
   @ApiOperation({
     deprecated: true,
   })
-  update(@Body() updateData: UpdateResultCapSharingIpDto) {
+  update(@Body() updateData: UpdateIpRightDto) {
     return this._resultIpRightsService
       .update(this._resultsUtil.resultId, updateData)
       .then(() =>

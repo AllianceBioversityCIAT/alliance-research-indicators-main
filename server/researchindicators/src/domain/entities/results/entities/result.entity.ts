@@ -26,7 +26,6 @@ import { OpenSearchProperty } from '../../../tools/open-search/decorators/opense
 import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
 import { ResultEvidence } from '../../result-evidences/entities/result-evidence.entity';
 import { TempResultAi } from './temp-result-ai.entity';
-import { ResultCapSharingIp } from '../../result-cap-sharing-ip/entities/result-cap-sharing-ip.entity';
 import { ResultInnovationDev } from '../../result-innovation-dev/entities/result-innovation-dev.entity';
 import { ResultActor } from '../../result-actors/entities/result-actor.entity';
 import { ResultInstitutionType } from '../../result-institution-types/entities/result-institution-type.entity';
@@ -215,12 +214,6 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => TempResultAi, (tempResultAi) => tempResultAi.result)
   temp_result_ai!: TempResultAi[];
-
-  @OneToMany(
-    () => ResultCapSharingIp,
-    (resultCapSharingIp) => resultCapSharingIp.result,
-  )
-  result_cap_sharing_ip!: ResultCapSharingIp[];
 
   @OneToMany(() => ResultIpRight, (resultIpRight) => resultIpRight.result)
   result_ip_rights!: ResultIpRight[];
