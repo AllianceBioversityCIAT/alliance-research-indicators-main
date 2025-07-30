@@ -13,6 +13,7 @@ import { ClarisaModule } from './domain/tools/clarisa/clarisa.module';
 import { AlianceManagementApp } from './domain/tools/broker/aliance-management.app';
 import { AgressoToolsModule } from './domain/tools/agresso/agresso-tools.module';
 import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
+import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integration.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
       <DataSourceOptions>getDataSource(dataSourceTarget.CORE, false),
     ),
     GlobalUtilsModule,
+    TipIntegrationModule,
   ],
   providers: [
     AlianceManagementApp,
