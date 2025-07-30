@@ -79,6 +79,12 @@ export class ResultInnovationDevService {
         no_sex_age_disaggregation:
           createResultInnovationDevDto?.no_sex_age_disaggregation,
         short_title: createResultInnovationDevDto?.short_title,
+        is_new_or_improved_variety:
+          createResultInnovationDevDto?.is_new_or_improved_variety,
+        new_or_improved_varieties_count:
+          createResultInnovationDevDto?.is_new_or_improved_variety
+            ? createResultInnovationDevDto?.new_or_improved_varieties_count
+            : null,
         anticipated_users_id:
           createResultInnovationDevDto?.anticipated_users_id,
         ...(adddExtraData
@@ -287,6 +293,10 @@ export class ResultInnovationDevService {
       expected_outcome: resultInnovationDev.expected_outcome,
       intended_beneficiaries_description:
         resultInnovationDev.intended_beneficiaries_description,
+      is_new_or_improved_variety:
+        resultInnovationDev.is_new_or_improved_variety,
+      new_or_improved_varieties_count:
+        resultInnovationDev.new_or_improved_varieties_count,
       actors,
       institution_types,
       knowledge_sharing_form: {

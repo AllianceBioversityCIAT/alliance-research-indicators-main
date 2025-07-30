@@ -133,4 +133,14 @@ export class CreateResultInnovationDevDto {
     required: false,
   })
   scaling_potential_form?: ResultInnovationDevScalingPotentialDto;
+
+  @IsBoolean()
+  @ApiProperty({ required: false })
+  is_new_or_improved_variety: boolean;
+
+  @ApiProperty({
+    required: false,
+    type: Number,
+  })
+  new_or_improved_varieties_count: number;
 }

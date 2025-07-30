@@ -124,45 +124,90 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     const dataToSave: Partial<ResultInstitutionType>[] = [];
 
     for (const institution of uniqueData) {
+      // Nueva lógica condicional según is_organization_known
       if (institution?.result_institution_type_id) {
-        dataToSave.push({
-          result_institution_type_id: institution?.result_institution_type_id,
-          institution_type_custom_name: defaultValue(
-            setNull(institution?.institution_type_custom_name),
-            institution?.institution_type_id ==
-              ClarisaInstitutionTypeEnum.OTHER,
-          ),
-          institution_type_id: institution?.institution_type_id,
-          institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
-          sub_institution_type_id: institution?.sub_institution_type_id,
-          is_active: true,
-          ...this.currentUser.audit(SetAutitEnum.UPDATE),
-        });
+        if (institution?.is_organization_known) {
+          dataToSave.push({
+            result_institution_type_id: institution?.result_institution_type_id,
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+            is_organization_known: true,
+            institution_id: institution?.institution_id,
+            is_active: true,
+            ...this.currentUser.audit(SetAutitEnum.UPDATE),
+          });
+        } else {
+          dataToSave.push({
+            result_institution_type_id: institution?.result_institution_type_id,
+            institution_type_custom_name: defaultValue(
+              setNull(institution?.institution_type_custom_name),
+              institution?.institution_type_id ==
+                ClarisaInstitutionTypeEnum.OTHER,
+            ),
+            institution_type_id: institution?.institution_type_id,
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+            sub_institution_type_id: institution?.sub_institution_type_id,
+            is_organization_known: false,
+            institution_id: null,
+            is_active: true,
+            ...this.currentUser.audit(SetAutitEnum.UPDATE),
+          });
+        }
       } else {
-        const where = this.constructWhereClause(institution, resultId);
+        let where;
+        // Si is_organization_known es true, buscar por institution_id y institution_type_id
+        if (institution?.is_organization_known === true) {
+          where = {
+            result_id: resultId,
+            institution_id: institution?.institution_id,
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+          };
+        } else {
+          // Mantener lógica anterior
+          where = this.constructWhereClause(institution, resultId);
+        }
         const existData = await tempRepo.findOne({ where });
 
-        const dataTemp: Partial<ResultInstitutionType> = {
-          result_id: resultId,
-          institution_type_custom_name: defaultValue(
-            setNull(institution?.institution_type_custom_name),
-            institution?.institution_type_id ==
-              ClarisaInstitutionTypeEnum.OTHER,
-          ),
-          institution_type_id: setNull(institution?.institution_type_id),
-          institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
-          sub_institution_type_id: setNull(
-            institution?.sub_institution_type_id,
-          ),
-          is_active: true,
-          ...this.currentUser.audit(
-            defaultValue(
-              SetAutitEnum.UPDATE,
-              !isEmpty(existData),
-              SetAutitEnum.NEW,
+        let dataTemp: Partial<ResultInstitutionType>;
+        if (institution?.is_organization_known) {
+          dataTemp = {
+            result_id: resultId,
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+            is_organization_known: true,
+            institution_id: institution?.institution_id,
+            is_active: true,
+            ...this.currentUser.audit(
+              defaultValue(
+                SetAutitEnum.UPDATE,
+                !isEmpty(existData),
+                SetAutitEnum.NEW,
+              ),
             ),
-          ),
-        };
+          };
+        } else {
+          dataTemp = {
+            result_id: resultId,
+            institution_type_custom_name: defaultValue(
+              setNull(institution?.institution_type_custom_name),
+              institution?.institution_type_id ==
+                ClarisaInstitutionTypeEnum.OTHER,
+            ),
+            institution_type_id: setNull(institution?.institution_type_id),
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+            sub_institution_type_id: setNull(
+              institution?.sub_institution_type_id,
+            ),
+            is_organization_known: false,
+            institution_id: null,
+            is_active: true,
+            ...this.currentUser.audit(
+              defaultValue(
+                SetAutitEnum.UPDATE,
+                !isEmpty(existData),
+                SetAutitEnum.NEW,
+              ),
+            ),
+          };
+        }
 
         if (existData) {
           dataTemp['result_institution_type_id'] =
