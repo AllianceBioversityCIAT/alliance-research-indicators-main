@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ResultCapSharingIpService } from './result-cap-sharing-ip.service';
 import { ResultCapSharingIpController } from './result-cap-sharing-ip.controller';
+import { ResultIpRightsModule } from '../result-ip-rights/result-ip-rights.module';
 
 @Module({
   controllers: [ResultCapSharingIpController],
-  providers: [ResultCapSharingIpService],
-  exports: [ResultCapSharingIpService],
+  imports: [ResultIpRightsModule],
 })
 export class ResultCapSharingIpModule {}

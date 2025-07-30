@@ -56,6 +56,8 @@ import { AppConfigModule } from './app-config/app-config.module';
 import { DisseminationQualificationsModule } from './dissemination-qualifications/dissemination-qualifications.module';
 import { ToolFunctionsModule } from './tool-functions/tool-functions.module';
 import { ExpansionPotentialsModule } from './expansion-potentials/expansion-potentials.module';
+import { ResultIpRightsModule } from './result-ip-rights/result-ip-rights.module';
+import { IpRightsApplicationOptionsModule } from './ip-rights-application-options/ip-rights-application-options.module';
 
 @Module({
   imports: [
@@ -116,6 +118,8 @@ import { ExpansionPotentialsModule } from './expansion-potentials/expansion-pote
     DisseminationQualificationsModule,
     ToolFunctionsModule,
     ExpansionPotentialsModule,
+    ResultIpRightsModule,
+    IpRightsApplicationOptionsModule,
   ],
   exports: [AgressoContractModule],
 })
