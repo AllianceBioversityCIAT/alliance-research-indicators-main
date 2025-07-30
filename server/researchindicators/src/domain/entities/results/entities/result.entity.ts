@@ -26,6 +26,7 @@ import { OpenSearchProperty } from '../../../tools/open-search/decorators/opense
 import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
 import { ResultEvidence } from '../../result-evidences/entities/result-evidence.entity';
 import { TempResultAi } from './temp-result-ai.entity';
+import { ResultCapacitySharing } from '../../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { ResultInnovationDev } from '../../result-innovation-dev/entities/result-innovation-dev.entity';
 import { ResultActor } from '../../result-actors/entities/result-actor.entity';
 import { ResultInstitutionType } from '../../result-institution-types/entities/result-institution-type.entity';
@@ -180,40 +181,46 @@ export class Result extends AuditableEntity {
     type: 'nested',
     nestedType: ResultKeyword,
   })
-  result_keywords!: ResultKeyword[];
+  result_keywords?: ResultKeyword[];
 
   @OneToMany(
     () => ResultInstitution,
     (resultInstitution) => resultInstitution.result,
   )
-  result_institutions!: ResultInstitution[];
+  result_institutions?: ResultInstitution[];
 
   @OneToMany(() => ResultUser, (resultUser) => resultUser.result)
-  result_users!: ResultUser[];
+  result_users?: ResultUser[];
 
   @OneToMany(
     () => ResultPolicyChange,
     (resultPolicyChange) => resultPolicyChange.result,
   )
-  results_policy_change!: ResultPolicyChange[];
+  results_policy_change?: ResultPolicyChange[];
 
   @OneToMany(() => LinkResult, (linkResult) => linkResult.result)
-  link_results!: LinkResult[];
+  link_results?: LinkResult[];
 
   @OneToMany(() => LinkResult, (linkResult) => linkResult.other_result)
-  link_other_results!: LinkResult[];
+  link_other_results?: LinkResult[];
 
   @OneToMany(
     () => SubmissionHistory,
     (submissionHistory) => submissionHistory.result,
   )
-  submission_histories!: SubmissionHistory[];
+  submission_histories?: SubmissionHistory[];
 
   @OneToMany(() => ResultEvidence, (resultEvidence) => resultEvidence.result)
-  result_evidences!: ResultEvidence[];
+  result_evidences?: ResultEvidence[];
 
   @OneToMany(() => TempResultAi, (tempResultAi) => tempResultAi.result)
-  temp_result_ai!: TempResultAi[];
+  temp_result_ai?: TempResultAi[];
+
+  @OneToMany(
+    () => ResultCapacitySharing,
+    (resultCapacitySharing) => resultCapacitySharing.result,
+  )
+  result_capacity_sharings?: ResultCapacitySharing[];
 
   @OneToMany(() => ResultIpRight, (resultIpRight) => resultIpRight.result)
   result_ip_rights!: ResultIpRight[];
