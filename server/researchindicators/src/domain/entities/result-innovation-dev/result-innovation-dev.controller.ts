@@ -4,8 +4,6 @@ import {
   Body,
   Patch,
   UseInterceptors,
-  UsePipes,
-  ValidationPipe,
   HttpStatus,
 } from '@nestjs/common';
 import { ResultInnovationDevService } from './result-innovation-dev.service';
@@ -28,7 +26,6 @@ export class ResultInnovationDevController {
 
   @Patch(`${RESULT_CODE}`)
   @GetResultVersion()
-  @UsePipes(new ValidationPipe({ transform: true }))
   create(@Body() createResultInnovationDevDto: CreateResultInnovationDevDto) {
     return this.resultInnovationDevService
       .update(this._currentResult.resultId, createResultInnovationDevDto)

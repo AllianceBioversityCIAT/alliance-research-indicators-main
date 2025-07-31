@@ -207,6 +207,7 @@ export class ResultInnovationDevService {
     readinessLevel: number,
     manager?: EntityManager,
   ) {
+    console.log('entro');
     const entityManager = selectManager(
       manager,
       ResultInnovationDev,
