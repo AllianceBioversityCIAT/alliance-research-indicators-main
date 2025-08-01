@@ -29,7 +29,7 @@ export class ResultInstitutionType extends AuditableEntity {
   @Column({
     name: 'institution_type_id',
     type: 'bigint',
-    nullable: false,
+    nullable: true,
   })
   institution_type_id!: number;
 
