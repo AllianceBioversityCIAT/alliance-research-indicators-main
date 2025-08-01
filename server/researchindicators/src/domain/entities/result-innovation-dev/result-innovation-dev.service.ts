@@ -120,7 +120,7 @@ export class ResultInnovationDevService {
         resultId,
         adddExtraData
           ? createResultInnovationDevDto?.institution_types?.filter((el) =>
-              Boolean(el?.institution_type_id),
+              Boolean(el?.institution_type_id || el?.institution_id),
             )
           : [],
         manager,

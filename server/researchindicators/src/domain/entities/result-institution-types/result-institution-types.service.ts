@@ -124,7 +124,6 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     const dataToSave: Partial<ResultInstitutionType>[] = [];
 
     for (const institution of uniqueData) {
-      // Nueva lógica condicional según is_organization_known
       if (institution?.result_institution_type_id) {
         if (institution?.is_organization_known) {
           dataToSave.push({
@@ -133,6 +132,9 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
             is_organization_known: true,
             institution_id: institution?.institution_id,
             is_active: true,
+            institution_type_custom_name: null,
+            institution_type_id: null,
+            sub_institution_type_id: null,
             ...this.currentUser.audit(SetAutitEnum.UPDATE),
           });
         } else {
@@ -154,7 +156,6 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         }
       } else {
         let where;
-        // Si is_organization_known es true, buscar por institution_id y institution_type_id
         if (institution?.is_organization_known === true) {
           where = {
             result_id: resultId,
@@ -162,11 +163,9 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
             institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
           };
         } else {
-          // Mantener lógica anterior
           where = this.constructWhereClause(institution, resultId);
         }
         const existData = await tempRepo.findOne({ where });
-
         let dataTemp: Partial<ResultInstitutionType>;
         if (institution?.is_organization_known) {
           dataTemp = {
@@ -234,7 +233,6 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     data: CreateResultInstitutionTypeDto[],
   ): CreateResultInstitutionTypeDto[] {
     const seen = new Map<string, CreateResultInstitutionTypeDto>();
-
     for (const institution of data) {
       let key: string;
 
@@ -244,13 +242,14 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         key = `other_${institution.institution_type_id}_${institution.institution_type_custom_name}`;
       } else if (institution.sub_institution_type_id) {
         key = `sub_${institution.sub_institution_type_id}`;
-      } else {
+      } else if (institution.institution_type_id) {
         key = `type_${institution.institution_type_id}`;
+      } else if (institution.is_organization_known) {
+        key = `institution_${institution.institution_id}`;
       }
 
       seen.set(key, institution);
     }
-
     return Array.from(seen.values());
   }
 
