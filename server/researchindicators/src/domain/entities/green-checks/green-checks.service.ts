@@ -118,6 +118,7 @@ export class GreenChecksService {
               ResultStatusEnum.SUBMITTED,
               ResultStatusEnum.REVISED,
               TemplateEnum.REVISE_RESULT,
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               (data) =>
                 `[${this.appConfig.ARI_MIS}] Action Required: Revision Requested for Result ${this._resultsUtil.resultCode}`,
             );
