@@ -23,6 +23,7 @@ import { AgressoToolsModule } from './domain/tools/agresso/agresso-tools.module'
 import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
 import { RoarManagementModule } from './domain/tools/roar-management/roar-management.module';
 import { ResultOpenSearchModule } from './domain/tools/open-search/results/result.opensearch.module';
+import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integration.module';
 import { DynamoFeedbackModule } from './domain/tools/dynamo-feedback/dynamo-feedback.module';
 
 @Module({
@@ -37,6 +38,7 @@ import { DynamoFeedbackModule } from './domain/tools/dynamo-feedback/dynamo-feed
     ),
     RoarManagementModule,
     ResultOpenSearchModule,
+    TipIntegrationModule,
     DynamoFeedbackModule,
   ],
   controllers: [AppController],

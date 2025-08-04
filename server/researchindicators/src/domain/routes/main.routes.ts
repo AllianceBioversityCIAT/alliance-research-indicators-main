@@ -31,6 +31,7 @@ import { GreenChecksModule } from '../entities/green-checks/green-checks.module'
 import { IntellectualPropertyOwnersModule } from '../entities/intellectual-property-owners/intellectual-property-owners.module';
 import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/result-cap-sharing-ip.module';
 import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
+import { TipIntegrationModule } from '../tools/tip-integration/tip-integration.module';
 import { ResultInnovationDevModule } from '../entities/result-innovation-dev/result-innovation-dev.module';
 import { InnovationDevAnticipatedUsersModule } from '../entities/innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
 import { ResultActorsModule } from '../entities/result-actors/result-actors.module';
@@ -45,6 +46,7 @@ import { ToolFunctionsModule } from '../entities/tool-functions/tool-functions.m
 import { ExpansionPotentialsModule } from '../entities/expansion-potentials/expansion-potentials.module';
 import { ResultIpRightsModule } from '../entities/result-ip-rights/result-ip-rights.module';
 import { IpRightsApplicationOptionsModule } from '../entities/ip-rights-application-options/ip-rights-application-options.module';
+import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
 
 const capSharingChildren: Routes = [
   {
@@ -188,12 +190,22 @@ const toolsChildren: Routes = [
     path: 'agresso',
     children: agressotoolsChildren,
   },
+  {
+    path: 'tip-integration',
+    module: TipIntegrationModule,
+  },
 ];
 
 const children: Routes = [
   {
     path: 'configuration',
     module: AppConfigModule,
+    children: [
+      {
+        path: 'application/secrets',
+        module: AppSecretsModule,
+      },
+    ],
   },
   {
     path: 'results',
