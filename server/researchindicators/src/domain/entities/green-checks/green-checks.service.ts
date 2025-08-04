@@ -119,7 +119,7 @@ export class GreenChecksService {
               ResultStatusEnum.REVISED,
               TemplateEnum.REVISE_RESULT,
               (data) =>
-                `[${this.appConfig.ARI_MIS}] Action Required: Revision Requested for Result ${data.title}`,
+                `[${this.appConfig.ARI_MIS}] Action Required: Revision Requested for Result ${this._resultsUtil.resultCode}`,
             );
             break;
           case ResultStatusEnum.REJECTED:
