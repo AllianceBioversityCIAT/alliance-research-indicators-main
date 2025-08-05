@@ -29,4 +29,5 @@ export interface TipIprDataDto {
   requiresFurtherDevelopment: string;
   furtherDevelopmentDetails?: string;
   year?: number;
+  resultStatusName?: string;
 }
