@@ -25,12 +25,21 @@ export const tipIntegrationMapper = (
     indicator: validationField(result.indicator?.name),
     resultTitle: validationField(result?.title),
     resultDescription: validationField(result?.description),
-    reportingProject: validationField(
-      result.result_contracts?.[0]?.agresso_contract?.project,
-    ),
+    reportingProject: {
+      project: validationField(
+        result.result_contracts?.[0]?.agresso_contract?.project,
+      ),
+      agreement_id: validationField(
+        result.result_contracts?.[0]?.agresso_contract?.agreement_id,
+      ),
+      name: validationField(
+        result.result_contracts?.[0]?.agresso_contract?.description,
+      ),
+    },
     resultCreator: {
       fullName: creatorFullName,
       email: creatorEmail,
+      carnet: validationField(user?.carnet, Boolean(user)),
     },
     linkToResult: `${appConfig.ARI_CLIENT_HOST}/result/${result.result_official_code}/general-information`,
 
@@ -59,6 +68,11 @@ export const tipIntegrationMapper = (
     furtherDevelopmentDetails: validationField(
       ip?.requires_futher_development_description,
       Boolean(ip?.requires_futher_development),
+    ),
+    year: result.report_year_id,
+    resultStatusName: validationField(
+      result.result_status?.name,
+      Boolean(result.result_status),
     ),
   };
 };
