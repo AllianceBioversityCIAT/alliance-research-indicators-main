@@ -70,6 +70,10 @@ export const tipIntegrationMapper = (
       Boolean(ip?.requires_futher_development),
     ),
     year: result.report_year_id,
+    resultStatusName: validationField(
+      result.result_status?.name,
+      Boolean(result.result_status),
+    ),
   };
 };
 

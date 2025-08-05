@@ -141,8 +141,12 @@ export class ResultsService {
         'result_users.user_role_id = :roleId',
       )
       .leftJoinAndSelect('result_users.user', 'user')
+      .leftJoinAndSelect('r.result_status', 'result_status')
       .where('r.is_active = :active', { active: true })
       .andWhere('r.is_snapshot = :snapshot', { snapshot: false })
+      .andWhere('r.result_status_id IN (:...statusIds)', {
+        statusIds: [ResultStatusEnum.APPROVED, ResultStatusEnum.SUBMITTED],
+      })
       .setParameters({
         roleId: UserRolesEnum.MAIN_CONTACT,
         isPrimary: true,
