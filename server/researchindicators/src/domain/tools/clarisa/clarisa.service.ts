@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Clarisa } from './clarisa.connection';
 import { HttpService } from '@nestjs/axios';
 import { ClarisaPathEnum, SearchToOpenSearchEnum } from './anum/path.enum';
@@ -29,6 +29,7 @@ import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
 import { CreateSecretDto, MisSimpleInfoDto } from './dto/clarisa.types';
 import { ClarisaInstitutionLocation } from './entities/clarisa-institution-locations/entities/clarisa-institution-location.entity';
 import { ClarisaSdg } from './entities/clarisa-sdgs/entities/clarisa-sdg.entity';
+import { ResClarisaValidateConectioDto } from './dto/clarisa-create-conection.dto';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -139,6 +140,43 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
     this._logger.debug('All entities cloned');
   }
 
+  async authorization(clientId: string, clientSecret: string) {
+    return this.connection
+      .post<ClarisaSecret, ResponseClarisaDtio<ResClarisaValidateConectioDto>>(
+        'app-secrets/validate',
+        {
+          client_id: clientId,
+          secret: clientSecret,
+        },
+      )
+      .then((res) => {
+        const response = this.formatValid<ResClarisaValidateConectioDto>(res);
+        if (
+          response.data.receiver_mis.acronym !== this.appConfig.ARI_MIS ||
+          response.data.receiver_mis.environment !== this.appConfig.ARI_MIS_ENV
+        ) {
+          throw new BadRequestException('Invalid credentials.');
+        }
+        return response;
+      })
+      .catch((err) => this.formatValid(err));
+  }
+
+  private formatValid<T>(
+    data: ResponseClarisaDtio<T>,
+  ): ResponseValidateClarisa<T> {
+    if (data.status >= 200 && data.status < 300) {
+      return {
+        data: data.response,
+        valid: true,
+      };
+    }
+    return {
+      data: null,
+      valid: false,
+    };
+  }
+
   async createPermission(newMisInfo: MisSimpleInfoDto) {
     const { acronym, environment } = newMisInfo;
     const configData: CreateSecretDto = {
@@ -153,4 +191,20 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
     };
     return this.connection.post(ClarisaPathEnum.CREATE_SECRET, configData);
   }
+}
+
+class ClarisaSecret {
+  client_id: string;
+  secret: string;
+}
+
+export class ResponseValidateClarisa<T> {
+  data: T;
+  valid: boolean;
+}
+
+export class ResponseClarisaDtio<T> {
+  message: string;
+  status: number;
+  response: T;
 }

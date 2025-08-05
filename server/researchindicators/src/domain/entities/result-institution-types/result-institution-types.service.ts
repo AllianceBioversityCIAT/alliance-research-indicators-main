@@ -125,44 +125,88 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
 
     for (const institution of uniqueData) {
       if (institution?.result_institution_type_id) {
-        dataToSave.push({
-          result_institution_type_id: institution?.result_institution_type_id,
-          institution_type_custom_name: defaultValue(
-            setNull(institution?.institution_type_custom_name),
-            institution?.institution_type_id ==
-              ClarisaInstitutionTypeEnum.OTHER,
-          ),
-          institution_type_id: institution?.institution_type_id,
-          institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
-          sub_institution_type_id: institution?.sub_institution_type_id,
-          is_active: true,
-          ...this.currentUser.audit(SetAutitEnum.UPDATE),
-        });
-      } else {
-        const where = this.constructWhereClause(institution, resultId);
-        const existData = await tempRepo.findOne({ where });
-
-        const dataTemp: Partial<ResultInstitutionType> = {
-          result_id: resultId,
-          institution_type_custom_name: defaultValue(
-            setNull(institution?.institution_type_custom_name),
-            institution?.institution_type_id ==
-              ClarisaInstitutionTypeEnum.OTHER,
-          ),
-          institution_type_id: setNull(institution?.institution_type_id),
-          institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
-          sub_institution_type_id: setNull(
-            institution?.sub_institution_type_id,
-          ),
-          is_active: true,
-          ...this.currentUser.audit(
-            defaultValue(
-              SetAutitEnum.UPDATE,
-              !isEmpty(existData),
-              SetAutitEnum.NEW,
+        if (institution?.is_organization_known) {
+          dataToSave.push({
+            result_institution_type_id: institution?.result_institution_type_id,
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+            is_organization_known: true,
+            institution_id: institution?.institution_id,
+            is_active: true,
+            institution_type_custom_name: null,
+            institution_type_id: null,
+            sub_institution_type_id: null,
+            ...this.currentUser.audit(SetAutitEnum.UPDATE),
+          });
+        } else {
+          dataToSave.push({
+            result_institution_type_id: institution?.result_institution_type_id,
+            institution_type_custom_name: defaultValue(
+              setNull(institution?.institution_type_custom_name),
+              institution?.institution_type_id ==
+                ClarisaInstitutionTypeEnum.OTHER,
             ),
-          ),
-        };
+            institution_type_id: institution?.institution_type_id,
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+            sub_institution_type_id: institution?.sub_institution_type_id,
+            is_organization_known: false,
+            institution_id: null,
+            is_active: true,
+            ...this.currentUser.audit(SetAutitEnum.UPDATE),
+          });
+        }
+      } else {
+        let where;
+        if (institution?.is_organization_known === true) {
+          where = {
+            result_id: resultId,
+            institution_id: institution?.institution_id,
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+          };
+        } else {
+          where = this.constructWhereClause(institution, resultId);
+        }
+        const existData = await tempRepo.findOne({ where });
+        let dataTemp: Partial<ResultInstitutionType>;
+        if (institution?.is_organization_known) {
+          dataTemp = {
+            result_id: resultId,
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+            is_organization_known: true,
+            institution_id: institution?.institution_id,
+            is_active: true,
+            ...this.currentUser.audit(
+              defaultValue(
+                SetAutitEnum.UPDATE,
+                !isEmpty(existData),
+                SetAutitEnum.NEW,
+              ),
+            ),
+          };
+        } else {
+          dataTemp = {
+            result_id: resultId,
+            institution_type_custom_name: defaultValue(
+              setNull(institution?.institution_type_custom_name),
+              institution?.institution_type_id ==
+                ClarisaInstitutionTypeEnum.OTHER,
+            ),
+            institution_type_id: setNull(institution?.institution_type_id),
+            institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_DEV,
+            sub_institution_type_id: setNull(
+              institution?.sub_institution_type_id,
+            ),
+            is_organization_known: false,
+            institution_id: null,
+            is_active: true,
+            ...this.currentUser.audit(
+              defaultValue(
+                SetAutitEnum.UPDATE,
+                !isEmpty(existData),
+                SetAutitEnum.NEW,
+              ),
+            ),
+          };
+        }
 
         if (existData) {
           dataTemp['result_institution_type_id'] =
@@ -189,7 +233,6 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     data: CreateResultInstitutionTypeDto[],
   ): CreateResultInstitutionTypeDto[] {
     const seen = new Map<string, CreateResultInstitutionTypeDto>();
-
     for (const institution of data) {
       let key: string;
 
@@ -199,13 +242,14 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         key = `other_${institution.institution_type_id}_${institution.institution_type_custom_name}`;
       } else if (institution.sub_institution_type_id) {
         key = `sub_${institution.sub_institution_type_id}`;
-      } else {
+      } else if (institution.institution_type_id) {
         key = `type_${institution.institution_type_id}`;
+      } else if (institution.is_organization_known) {
+        key = `institution_${institution.institution_id}`;
       }
 
       seen.set(key, institution);
     }
-
     return Array.from(seen.values());
   }
 

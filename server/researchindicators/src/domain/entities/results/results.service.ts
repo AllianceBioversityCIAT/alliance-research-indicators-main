@@ -116,7 +116,7 @@ export class ResultsService {
     });
   }
 
-  async findResultTIPData(options: { take: number }) {
+  async findResultTIPData(options: { year?: number; productType?: number }) {
     const query = this.mainRepo
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.indicator', 'indicator')
@@ -129,7 +129,7 @@ export class ResultsService {
         'result_contracts.agresso_contract',
         'agresso_contract',
       )
-      .leftJoinAndSelect('r.result_ip_rights', 'result_ip_rights')
+      .innerJoinAndSelect('r.result_ip_rights', 'result_ip_rights')
       .leftJoinAndSelect(
         'result_ip_rights.intellectualPropertyOwner',
         'intellectualPropertyOwner',
@@ -140,14 +140,26 @@ export class ResultsService {
         'result_users.user_role_id = :roleId',
       )
       .leftJoinAndSelect('result_users.user', 'user')
+      .leftJoinAndSelect('r.result_status', 'result_status')
       .where('r.is_active = :active', { active: true })
       .andWhere('r.is_snapshot = :snapshot', { snapshot: false })
+      .andWhere('r.result_status_id IN (:...statusIds)', {
+        statusIds: [ResultStatusEnum.APPROVED, ResultStatusEnum.SUBMITTED],
+      })
       .setParameters({
         roleId: UserRolesEnum.MAIN_CONTACT,
         isPrimary: true,
       });
 
-    if (options?.take) query.take(options.take);
+    if (options?.year) {
+      query.andWhere('report_year_id = :year', { year: options.year });
+    }
+
+    if (options?.productType) {
+      query.andWhere('r.indicator_id = :productType', {
+        productType: options.productType,
+      });
+    }
 
     return query.getMany();
   }

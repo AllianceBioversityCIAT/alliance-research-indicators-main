@@ -7,12 +7,14 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { json, urlencoded } from 'express';
 import { AppMicroserviceModule } from './app-microservice.module';
 import { LoggerUtil } from './domain/shared/utils/logger.util';
+import helmet from 'helmet';
 const logger: LoggerUtil = new LoggerUtil({
   name: 'bootstrap',
 });
 async function httpservice() {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
+  app.use(helmet());
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
   const config = new DocumentBuilder()
