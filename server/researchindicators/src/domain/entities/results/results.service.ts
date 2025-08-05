@@ -116,7 +116,7 @@ export class ResultsService {
     });
   }
 
-  async findResultTIPData(options: { take: number }) {
+  async findResultTIPData(options: { year?: number; productType?: number }) {
     const query = this.mainRepo
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.indicator', 'indicator')
@@ -129,7 +129,7 @@ export class ResultsService {
         'result_contracts.agresso_contract',
         'agresso_contract',
       )
-      .leftJoinAndSelect('r.result_ip_rights', 'result_ip_rights')
+      .innerJoinAndSelect('r.result_ip_rights', 'result_ip_rights')
       .leftJoinAndSelect(
         'result_ip_rights.intellectualPropertyOwner',
         'intellectualPropertyOwner',
@@ -147,7 +147,15 @@ export class ResultsService {
         isPrimary: true,
       });
 
-    if (options?.take) query.take(options.take);
+    if (options?.year) {
+      query.andWhere('report_year_id = :year', { year: options.year });
+    }
+
+    if (options?.productType) {
+      query.andWhere('r.indicator_id = :productType', {
+        productType: options.productType,
+      });
+    }
 
     return query.getMany();
   }
