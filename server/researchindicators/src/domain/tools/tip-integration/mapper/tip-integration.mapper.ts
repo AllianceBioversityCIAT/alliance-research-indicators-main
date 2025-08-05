@@ -39,7 +39,7 @@ export const tipIntegrationMapper = (
     resultCreator: {
       fullName: creatorFullName,
       email: creatorEmail,
-      carnet: user?.carnet || NotProvided,
+      carnet: validationField(user?.carnet, Boolean(user)),
     },
     linkToResult: `${appConfig.ARI_CLIENT_HOST}/result/${result.result_official_code}/general-information`,
 
