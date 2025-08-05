@@ -113,6 +113,7 @@ export class ResultsService {
       status_codes: filters?.status_codes,
       user_codes: filters?.user_codes,
       years: filters?.years,
+      resultCodes: filters?.resultCodes,
     });
   }
 

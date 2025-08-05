@@ -268,6 +268,7 @@ export class ResultRepository
     const haveStatusCodes = !isEmpty(filters?.status_codes);
     const haveUsersCodes = !isEmpty(filters?.user_codes);
     const haveYears = !isEmpty(filters?.years);
+    const haveResultCodes = !isEmpty(filters?.resultCodes);
 
     let limit: string = '';
 
@@ -322,6 +323,7 @@ export class ResultRepository
 		WHERE 1 = 1
 		AND r.is_active = TRUE
 		AND r.is_snapshot = FALSE
+    ${haveResultCodes ? `AND r.result_official_code IN (${formatArrayToQuery<string>(filters.resultCodes)})` : ''}
 		${haveContractsCodes ? `AND ac.agreement_id IN (${formatArrayToQuery<string>(filters.contract_codes)})` : ''}
 		${haveLeversCodes ? `AND cl.id IN (${formatArrayToQuery<string>(filters.lever_codes)})` : ``}
 		${haveIndicatorsCodes ? `AND r.indicator_id IN (${formatArrayToQuery<string>(filters.indicator_code)})` : ''}
@@ -381,6 +383,7 @@ export interface ResultFiltersInterface {
   status_codes: string[];
   user_codes: string[];
   years: string[];
+  resultCodes: string[];
 }
 
 export interface CreateResultQueryInterface {
