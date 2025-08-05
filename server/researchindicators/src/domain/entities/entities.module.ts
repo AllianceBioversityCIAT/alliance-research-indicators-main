@@ -58,6 +58,8 @@ import { ToolFunctionsModule } from './tool-functions/tool-functions.module';
 import { ExpansionPotentialsModule } from './expansion-potentials/expansion-potentials.module';
 import { ResultIpRightsModule } from './result-ip-rights/result-ip-rights.module';
 import { IpRightsApplicationOptionsModule } from './ip-rights-application-options/ip-rights-application-options.module';
+import { AppSecretsModule } from './app-secrets/app-secrets.module';
+import { AppSecretHostListModule } from './app-secret-host-list/app-secret-host-list.module';
 
 @Module({
   imports: [
@@ -120,7 +122,9 @@ import { IpRightsApplicationOptionsModule } from './ip-rights-application-option
     ExpansionPotentialsModule,
     ResultIpRightsModule,
     IpRightsApplicationOptionsModule,
+    AppSecretsModule,
+    AppSecretHostListModule,
   ],
-  exports: [AgressoContractModule],
+  exports: [AgressoContractModule, AppSecretsModule],
 })
 export class EntitiesModule {}

@@ -285,4 +285,13 @@ export class AppConfig {
   get CONTENT_SUPPORT(): string {
     return process.env.ARI_CONTENT_SUPPORT;
   }
+
+  /**
+   * Get the salt for password hashing
+   * @readonly
+   * @type {string}
+   */
+  get SALT(): number {
+    return Number(process.env.ARI_SALT);
+  }
 }

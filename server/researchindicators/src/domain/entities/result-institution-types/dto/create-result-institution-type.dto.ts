@@ -26,4 +26,13 @@ export class CreateResultInstitutionTypeDto {
   @IsOptional()
   @ApiProperty({ required: false })
   institution_type_custom_name?: string;
+
+  @IsOptional()
+  @ApiProperty({ required: false })
+  is_organization_known?: boolean;
+
+  @IsNumber()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  institution_id?: number;
 }

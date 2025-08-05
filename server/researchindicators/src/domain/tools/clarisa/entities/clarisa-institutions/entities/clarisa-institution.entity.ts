@@ -10,6 +10,7 @@ import { AuditableEntity } from '../../../../../shared/global-dto/auditable.enti
 import { ClarisaInstitutionType } from '../../clarisa-institution-types/entities/clarisa-institution-type.entity';
 import { ResultInstitution } from '../../../../../entities/result-institutions/entities/result-institution.entity';
 import { ClarisaInstitutionLocation } from '../../clarisa-institution-locations/entities/clarisa-institution-location.entity';
+import { ResultInstitutionType } from '../../../../../entities/result-institution-types/entities/result-institution-type.entity';
 
 @Entity('clarisa_institutions')
 export class ClarisaInstitution extends AuditableEntity {
@@ -68,4 +69,10 @@ export class ClarisaInstitution extends AuditableEntity {
     { cascade: true },
   )
   institution_locations!: ClarisaInstitutionLocation[];
+
+  @OneToMany(
+    () => ResultInstitutionType,
+    (resultInstitutionType) => resultInstitutionType.institution,
+  )
+  result_institution_types!: ResultInstitutionType[];
 }
