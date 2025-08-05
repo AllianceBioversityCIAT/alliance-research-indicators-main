@@ -16,9 +16,13 @@ import {
 } from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
+import {
+  QueryIndicators,
+  QueryIndicatorsEnum,
+} from '../../entities/indicators/enum/indicators.enum';
 
 @ApiTags('TIP Integration')
-@Controller('tip-integration')
+@Controller()
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
 export class TipIntegrationController {
@@ -31,15 +35,28 @@ export class TipIntegrationController {
 
   @ApiOperation({ summary: 'Get all IPR data for TIP integration' })
   @ApiQuery({
-    name: 'limit',
+    name: 'year',
     required: false,
     type: Number,
-    description: 'Limit the number of results returned',
+    description: 'Filter by report year',
+  })
+  @ApiQuery({
+    name: 'product_type',
+    type: 'number',
+    required: false,
+    enum: QueryIndicatorsEnum,
   })
   @Get('ipr-data')
-  async getIprDataRest(@Query('limit') limit?: number) {
+  async getIprDataRest(
+    @Query('year') year?: number,
+    @Query('product_type') productType?: QueryIndicatorsEnum,
+  ) {
+    const productTypeEnum = QueryIndicators.getFromName(productType)?.value;
     return this.tipIntegrationService
-      .getAllIprData({ take: limit ? Number(limit) : undefined })
+      .getAllIprData({
+        year: year ? Number(year) : undefined,
+        productType: productTypeEnum,
+      })
       .then((data) =>
         ResponseUtils.format({
           description: 'IPR data found successfully',

@@ -11,9 +11,13 @@ export class TipIntegrationService {
     private readonly resultsService: ResultsService,
   ) {}
 
-  async getAllIprData(options?: { take?: number }): Promise<TipIprDataDto[]> {
+  async getAllIprData(options?: {
+    year?: number;
+    productType?: number;
+  }): Promise<TipIprDataDto[]> {
     const results = await this.resultsService.findResultTIPData({
-      take: options?.take,
+      year: options?.year,
+      productType: options?.productType,
     });
 
     return results.map((result) =>

@@ -4,10 +4,15 @@ export interface TipIprDataDto {
   indicator: string;
   resultTitle: string;
   resultDescription: string;
-  reportingProject: string;
+  reportingProject: {
+    project: string;
+    agreement_id?: string;
+    name?: string;
+  };
   resultCreator: {
     fullName: string;
     email: string;
+    carnet?: string;
   };
   linkToResult: string;
 
@@ -23,4 +28,5 @@ export interface TipIprDataDto {
 
   requiresFurtherDevelopment: string;
   furtherDevelopmentDetails?: string;
+  year?: number;
 }
