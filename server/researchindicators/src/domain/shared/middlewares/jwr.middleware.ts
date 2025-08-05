@@ -42,7 +42,7 @@ export class JwtMiddleware implements NestMiddleware {
     const tokenData = this.validateTokenType(token);
 
     if (tokenData) {
-      const origin = <string>req.headers['origin'];
+      const origin = req.headers['origin'];
       const ip =
         (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
         req.socket?.remoteAddress ||

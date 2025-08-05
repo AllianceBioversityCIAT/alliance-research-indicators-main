@@ -42,14 +42,12 @@ export class AppSecretsService {
     }
 
     await this.dataSource.transaction(async (manager) => {
-      const newSecret = await manager
-        .getRepository(this.mainRepo.target)
-        .create({
-          app_secret_key: bcrypt.hashSync(password, this.appConfigUtil.SALT),
-          app_secret_uuid: clientId,
-          app_secret_description: data?.application_description,
-          responsible_user_id: user.sec_user_id,
-        });
+      const newSecret = manager.getRepository(this.mainRepo.target).create({
+        app_secret_key: bcrypt.hashSync(password, this.appConfigUtil.SALT),
+        app_secret_uuid: clientId,
+        app_secret_description: data?.application_description,
+        responsible_user_id: user.sec_user_id,
+      });
       const result = await manager
         .getRepository(this.mainRepo.target)
         .save(newSecret);
