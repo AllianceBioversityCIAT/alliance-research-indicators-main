@@ -118,8 +118,9 @@ export class GreenChecksService {
               ResultStatusEnum.SUBMITTED,
               ResultStatusEnum.REVISED,
               TemplateEnum.REVISE_RESULT,
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               (data) =>
-                `[${this.appConfig.ARI_MIS}] Action Required: Revision Requested for Result ${data.title}`,
+                `[${this.appConfig.ARI_MIS}] Action Required: Revision Requested for Result ${this._resultsUtil.resultCode}`,
             );
             break;
           case ResultStatusEnum.REJECTED:
@@ -289,6 +290,8 @@ export class GreenChecksService {
           title: data.title,
           project_name: data.project_name,
           support_email: this.appConfig.ARI_SUPPORT_EMAIL,
+          content_support_email: this.appConfig.ARI_CONTENT_SUPPORT_EMAIL,
+          system_name: this.appConfig.ARI_MIS,
           rev_email:
             data.contributor_id == this.currentUserUtil.user_id
               ? data.contributor_email
