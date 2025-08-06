@@ -248,7 +248,9 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${
       userId
         ? `inner join results r on r.result_id = rc.result_id 
-    					and r.created_by = ${userId}`
+    					and r.created_by = ${userId}
+              and r.is_active = true
+              and r.is_snapshot = false`
         : ''
     }
     left join clarisa_levers cl on cl.short_name = CONCAT('Lever ', IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
