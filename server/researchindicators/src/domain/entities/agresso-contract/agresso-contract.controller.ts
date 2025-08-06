@@ -12,6 +12,7 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 import { AgressoFindNamePayload } from './dto/agresso-find-options.payload';
 import { ServiceResponseDto } from '../../shared/global-dto/service-response.dto';
 import { AgressoContract } from './entities/agresso-contract.entity';
+import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -116,6 +117,85 @@ export class AgressoContractController {
   async findContractsByContractId(@Param('contractId') contractId: string) {
     return this.agressoContractService
       .findContratResultByContractId(contractId)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contracts found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get('find-contracts')
+  @ApiOperation({ summary: 'Find all agresso contracts' })
+  @ApiQuery({
+    name: 'current-user',
+    required: false,
+    description: 'Filter contracts by current user',
+    enum: TrueFalseEnum,
+  })
+  @ApiQuery({
+    name: 'contract-code',
+    required: false,
+    type: String,
+    description: 'Filter by contract code',
+  })
+  @ApiQuery({
+    name: 'project-name',
+    required: false,
+    type: String,
+    description: 'Filter by project name',
+  })
+  @ApiQuery({
+    name: 'principal-investigator',
+    required: false,
+    type: String,
+    description: 'Filter by principal investigator',
+  })
+  @ApiQuery({
+    name: 'lever',
+    required: false,
+    type: Number,
+    description: 'Filter by lever',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: AgressoContractStatus,
+    description: 'Filter by contract status',
+  })
+  @ApiQuery({
+    name: 'start-date',
+    required: false,
+    type: String,
+    description: 'Filter by start date',
+  })
+  @ApiQuery({
+    name: 'end-date',
+    required: false,
+    type: String,
+    description: 'Filter by end date',
+  })
+  async findContracts(
+    @Query('current-user') currentUser: TrueFalseEnum,
+    @Query('contract-code') contractCode: string,
+    @Query('project-name') projectName: string,
+    @Query('principal-investigator') principalInvestigator: string,
+    @Query('lever') lever: string,
+    @Query('status') status: AgressoContractStatus,
+    @Query('start-date') startDate: string,
+    @Query('end-date') endDate: string,
+  ) {
+    return this.agressoContractService
+      .findAgressoContracts(currentUser, {
+        contract_code: contractCode,
+        project_name: projectName,
+        principal_investigator: principalInvestigator,
+        lever: lever,
+        start_date: startDate,
+        end_date: endDate,
+        status: status,
+      })
       .then((response) =>
         ResponseUtils.format({
           description: 'Contracts found',
