@@ -259,10 +259,10 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${filter?.contract_code ? `AND ac.contract_code = '${filter.contract_code}'` : ''}
     ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
     ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
-    ${filter?.lever ? `AND cl.id = '${filter.lever}'` : ''}
+    ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
     ${filter?.start_date ? `AND ac.start_date >= '${filter.start_date}'` : ''}
     ${filter?.end_date ? `AND ac.end_date <= '${filter.end_date}'` : ''}
-    ${filter?.status ? `AND ac.contract_status = '${filter.status}'` : ''}
+    ${filter?.status?.length ? `AND LOWER(ac.contract_status) in (${filter.status.join(',')})` : ''}
     GROUP BY ac.agreement_id, cl.id;`;
 
     return this.query(query) as Promise<ContractResultCountDto[]>;
