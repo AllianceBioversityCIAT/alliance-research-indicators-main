@@ -47,6 +47,7 @@ import { ExpansionPotentialsModule } from '../entities/expansion-potentials/expa
 import { ResultIpRightsModule } from '../entities/result-ip-rights/result-ip-rights.module';
 import { IpRightsApplicationOptionsModule } from '../entities/ip-rights-application-options/ip-rights-application-options.module';
 import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
+import { UserSettingsModule } from '../entities/user-settings/user-settings.module';
 
 const capSharingChildren: Routes = [
   {
@@ -204,6 +205,15 @@ const children: Routes = [
       {
         path: 'application/secrets',
         module: AppSecretsModule,
+      },
+    ],
+  },
+  {
+    path: 'user',
+    children: [
+      {
+        path: 'configuration',
+        module: UserSettingsModule,
       },
     ],
   },
