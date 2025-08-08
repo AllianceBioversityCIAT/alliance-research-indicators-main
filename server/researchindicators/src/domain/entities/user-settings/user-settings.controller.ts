@@ -4,12 +4,21 @@ import {
   Get,
   HttpStatus,
   Param,
+  Patch,
   Query,
 } from '@nestjs/common';
 import { UserSettingsService } from './user-settings.service';
-import { ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 
+@ApiTags('User Settings')
+@ApiBearerAuth()
 @Controller()
 export class UserSettingsController {
   constructor(private readonly userSettingsService: UserSettingsService) {}
@@ -54,6 +63,7 @@ export class UserSettingsController {
     description: 'Data to update user settings',
     type: Object,
   })
+  @Patch(':key')
   async updateUserSettings(
     @Param('key') key: string,
     @Query('component') component: string,

@@ -13,6 +13,7 @@ import { AgressoFindNamePayload } from './dto/agresso-find-options.payload';
 import { ServiceResponseDto } from '../../shared/global-dto/service-response.dto';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
+import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -181,8 +182,8 @@ export class AgressoContractController {
     @Query('contract-code') contractCode: string,
     @Query('project-name') projectName: string,
     @Query('principal-investigator') principalInvestigator: string,
-    @Query('lever') lever: string,
-    @Query('status') status: AgressoContractStatus,
+    @Query('lever', ListParseToArrayPipe) lever: string[],
+    @Query('status', ListParseToArrayPipe) status: AgressoContractStatus[],
     @Query('start-date') startDate: string,
     @Query('end-date') endDate: string,
   ) {
