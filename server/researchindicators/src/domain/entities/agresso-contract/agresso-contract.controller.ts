@@ -195,7 +195,7 @@ export class AgressoContractController {
         lever: lever,
         start_date: startDate,
         end_date: endDate,
-        status: status,
+        status: status.map((s) => AgressoContractStatus[s?.toUpperCase()]),
       })
       .then((response) =>
         ResponseUtils.format({
