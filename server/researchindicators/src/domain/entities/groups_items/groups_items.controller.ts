@@ -1,34 +1,26 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, HttpStatus, UseInterceptors } from '@nestjs/common';
 import { GroupsItemsService } from './groups_items.service';
-import { CreateGroupsItemDto } from './dto/create-groups_item.dto';
-import { UpdateGroupsItemDto } from './dto/update-groups_item.dto';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { ResponseUtils } from '../../shared/utils/response.utils';
 
-@Controller('groups-items')
+@ApiTags('groups-items')
+@ApiBearerAuth()
+@UseInterceptors(SetUpInterceptor)
+@Controller()
 export class GroupsItemsController {
   constructor(private readonly groupsItemsService: GroupsItemsService) {}
-
-  @Post()
-  create(@Body() createGroupsItemDto: CreateGroupsItemDto) {
-    return this.groupsItemsService.create(createGroupsItemDto);
-  }
-
-  @Get()
+  
+  @Get('items-list')
   findAll() {
-    return this.groupsItemsService.findAll();
+    return this.groupsItemsService.findAll()
+    .then((structure) =>
+      ResponseUtils.format({
+        description: 'Structure found',
+        status: HttpStatus.OK,
+        data: structure,
+      }),
+    );
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.groupsItemsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateGroupsItemDto: UpdateGroupsItemDto) {
-    return this.groupsItemsService.update(+id, updateGroupsItemDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.groupsItemsService.remove(+id);
-  }
 }

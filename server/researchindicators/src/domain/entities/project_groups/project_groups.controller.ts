@@ -1,34 +1,32 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseInterceptors, HttpStatus} from '@nestjs/common';
 import { ProjectGroupsService } from './project_groups.service';
-import { CreateProjectGroupDto } from './dto/create-project_group.dto';
-import { UpdateProjectGroupDto } from './dto/update-project_group.dto';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { StructureDto } from './dto/structure.dto';
+import { ResponseUtils } from '../../shared/utils/response.utils';
 
-@Controller('project-groups')
+@ApiTags('project_structure')
+@ApiBearerAuth()
+@UseInterceptors(SetUpInterceptor)
+@Controller()
 export class ProjectGroupsController {
   constructor(private readonly projectGroupsService: ProjectGroupsService) {}
 
-  @Post()
-  create(@Body() createProjectGroupDto: CreateProjectGroupDto) {
-    return this.projectGroupsService.create(createProjectGroupDto);
+  @Post('manage-structure')
+  async manageStructure(@Body() dto: StructureDto) {
+    return this.projectGroupsService.handleStructure(dto);
   }
 
-  @Get()
-  findAll() {
-    return this.projectGroupsService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.projectGroupsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProjectGroupDto: UpdateProjectGroupDto) {
-    return this.projectGroupsService.update(+id, updateProjectGroupDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.projectGroupsService.remove(+id);
+  @Get('structure-list')
+  async findAll() {
+    return this.projectGroupsService
+    .findAll()
+    .then((structure) =>
+      ResponseUtils.format({
+        description: 'Structure found',
+        status: HttpStatus.OK,
+        data: structure,
+      }),
+    );
   }
 }

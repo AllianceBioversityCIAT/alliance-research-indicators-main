@@ -2,45 +2,28 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  CreateDateColumn,
-  UpdateDateColumn,
   ManyToOne,
   OneToMany,
   JoinColumn,
 } from 'typeorm';
+import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
+import { GroupItem } from '../../groups_items/entities/groups_item.entity';
 
 @Entity('project_groups')
-export class ProjectGroup {
+export class ProjectGroup extends AuditableEntity{
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 255, nullable: false })
+  @Column({name: 'name', type: 'varchar', length: 255, nullable: false })
   name: string;
 
   @ManyToOne(() => ProjectGroup, (group) => group.childGroups, { nullable: true })
   @JoinColumn({ name: 'parent_group_id' })
   parentGroup?: ProjectGroup;
 
-  @OneToMany(() => ProjectGroup, (group) => group.parentGroup)
+  @OneToMany(() => ProjectGroup, (group) => group.parentGroup, { cascade: true, onDelete: 'CASCADE' })
   childGroups: ProjectGroup[];
 
-  @Column({ type: 'tinyint', width: 1, default: 1 })
-  isActive: number;
-
-  @CreateDateColumn({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  createdAt: Date;
-
-  @UpdateDateColumn({
-    name: 'updated_at',
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP',
-    onUpdate: 'CURRENT_TIMESTAMP',
-  })
-  updatedAt: Date;
-
-  @Column({ name: 'created_by', type: 'varchar', length: 100, nullable: true })
-  createdBy: string;
-
-  @Column({ name: 'updated_by', type: 'varchar', length: 100, nullable: true })
-  updatedBy: string;
+  @OneToMany(() => GroupItem, (item) => item.group, { cascade: true })
+  groupItems: GroupItem[];
 }

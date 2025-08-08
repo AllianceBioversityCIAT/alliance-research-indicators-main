@@ -1,26 +1,27 @@
 import { Injectable } from '@nestjs/common';
-import { CreateGroupsItemDto } from './dto/create-groups_item.dto';
-import { UpdateGroupsItemDto } from './dto/update-groups_item.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { GroupItem } from './entities/groups_item.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class GroupsItemsService {
-  create(createGroupsItemDto: CreateGroupsItemDto) {
-    return 'This action adds a new groupsItem';
-  }
+  constructor(
+    @InjectRepository(GroupItem)
+    private readonly groupItemRepository: Repository<GroupItem>,
+  ) {}
 
-  findAll() {
-    return `This action returns all groupsItems`;
-  }
+  async findAll(projectId?: number): Promise<GroupItem[]> {
+    const query = this.groupItemRepository.createQueryBuilder('groupItem')
+      .select([
+        'groupItem.id as item_id',
+        'groupItem.name as item_name',
+        'groupItem.description as item_description',
+        'group.id AS group_id',
+        'group.name AS group_name',
+      ])
+      .leftJoin('groupItem.group', 'group')
+      .where('groupItem.is_active = :isActive', { isActive: true });
 
-  findOne(id: number) {
-    return `This action returns a #${id} groupsItem`;
-  }
-
-  update(id: number, updateGroupsItemDto: UpdateGroupsItemDto) {
-    return `This action updates a #${id} groupsItem`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} groupsItem`;
+    return await query.getRawMany();
   }
 }
