@@ -262,7 +262,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
     ${filter?.start_date ? `AND ac.start_date >= '${filter.start_date}'` : ''}
     ${filter?.end_date ? `AND ac.end_date <= '${filter.end_date}'` : ''}
-    ${filter?.status?.length ? `AND LOWER(ac.contract_status) in (${filter.status.join(',')})` : ''}
+    ${filter?.status?.length ? `AND LOWER(ac.contract_status) in (${filter.status.map((status) => `'${status}'`).join(',')})` : ''}
     GROUP BY ac.agreement_id, cl.id;`;
 
     return this.query(query) as Promise<ContractResultCountDto[]>;
