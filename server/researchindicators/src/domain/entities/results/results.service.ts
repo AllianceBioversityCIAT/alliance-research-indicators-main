@@ -645,6 +645,12 @@ export class ResultsService {
           processedResult.policyChange,
         );
         break;
+      case IndicatorsEnum.INNOVATION_DEV:
+        await this._resultInnovationDevService.update(
+          newResult.result_id,
+          processedResult.innovationDev,
+        );
+        break;
     }
 
     return newResult;
@@ -731,6 +737,9 @@ export class ResultsService {
       case IndicatorsEnum.POLICY_CHANGE:
         tmpNewData.policyChange =
           await this._resultPolicyChangeService.processedAiInfo(result);
+      case IndicatorsEnum.INNOVATION_DEV:
+        tmpNewData.innovationDev =
+          await this._resultInnovationDevService.processedAiInfo(result);
         break;
     }
 
