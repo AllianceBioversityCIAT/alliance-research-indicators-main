@@ -4,6 +4,7 @@ import { CreateResultPolicyChangeDto } from '../../result-policy-change/dto/crea
 import { CreateResultDto } from './create-result.dto';
 import { SaveGeoLocationDto } from './save-geo-location.dto';
 import { UpdateGeneralInformation } from './update-general-information.dto';
+import { CreateResultInnovationDevDto } from '../../result-innovation-dev/dto/create-result-innovation-dev.dto';
 
 export class ResultAiDto {
   result: CreateResultDto;
@@ -11,6 +12,7 @@ export class ResultAiDto {
   geoScope: SaveGeoLocationDto;
   capSharing?: UpdateResultCapacitySharingDto;
   policyChange?: CreateResultPolicyChangeDto;
+  innovationDev?: CreateResultInnovationDevDto;
 }
 
 export class RootAi {
@@ -47,6 +49,39 @@ export class GeoscopeRawAi {
     required: false,
   })
   sub_list?: CountryAreas[] | string[];
+}
+
+export class ResultInnovationActorDetailedDto {
+  @ApiProperty({
+    type: String,
+    description: 'Name of the actor',
+  })
+  name: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Type of the actor (e.g., individual, organization)',
+  })
+  type: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Other actor type if applicable',
+    required: false,
+  })
+  other_actor_type?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Gender of the actor',
+  })
+  gender: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Age group of the actor',
+  })
+  age_group: string;
 }
 
 export class ResultRawAi {
@@ -198,4 +233,76 @@ export class ResultRawAi {
     required: false,
   })
   degree: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Short title of the innovation dev',
+    required: false,
+  })
+  short_title: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Nature of the innovation',
+    required: false,
+  })
+  innovation_nature: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Type of the innovation',
+    required: false,
+  })
+  innovation_type: string;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Readiness assessment score',
+    required: false,
+  })
+  assess_readiness: number;
+
+  @ApiProperty({
+    type: String,
+    description: 'Anticipated users of the innovation',
+    required: false,
+  })
+  anticipated_users: string;
+
+  @ApiProperty({
+    type: ResultInnovationActorDetailedDto,
+    isArray: true,
+    description: 'Detailed information about the innovation actors',
+    required: false,
+  })
+  innovation_actors_detailed: ResultInnovationActorDetailedDto[];
+
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    description: 'Organizations involved in the result',
+    required: false,
+  })
+  organizations: string[];
+
+  @ApiProperty({
+    type: String,
+    description: 'Organization type of the result',
+    required: false,
+  })
+  organization_type: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Sub-type of the organization if applicable',
+    required: false,
+  })
+  organization_sub_type: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Other organization type if applicable',
+    required: false,
+  })
+  other_organization_type: string;
 }
