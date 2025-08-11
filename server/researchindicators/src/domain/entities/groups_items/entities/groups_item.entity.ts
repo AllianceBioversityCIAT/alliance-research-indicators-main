@@ -4,8 +4,9 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  OneToMany,
+  RelationId,
 } from 'typeorm';
-import { ProjectGroup } from '../../project_groups/entities/project_group.entity';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 
 @Entity('groups_items')
@@ -22,10 +23,16 @@ export class GroupItem extends AuditableEntity{
   @Column({ name: 'official_code', type: 'varchar', length: 100, nullable: false })
   officialCode: string;
 
-  @ManyToOne(() => ProjectGroup, (projectGroup) => projectGroup.groupItems, { nullable: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'group_id' })
-  group: ProjectGroup;
-
   @Column({ name: 'project_id', type: 'int', nullable: true })
   projectId?: number;
+
+  @ManyToOne(() => GroupItem, (group) => group.childGroups, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'parent_id' })
+  parentGroup?: GroupItem | null;
+
+  @OneToMany(() => GroupItem, (group) => group.parentGroup)
+  childGroups?: GroupItem[];
+
+  @RelationId((groupItem: GroupItem) => groupItem.parentGroup)
+  parent_id?: number | null;
 }

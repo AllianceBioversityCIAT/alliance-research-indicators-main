@@ -12,10 +12,10 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 export class ProjectGroupsController {
   constructor(private readonly projectGroupsService: ProjectGroupsService) {}
 
-  @Post('manage-structure')
+/*   @Post('manage-structure')
   async manageStructure(@Body() dto: StructureDto) {
     return this.projectGroupsService.handleStructure(dto);
-  }
+  } */
 
   @Get('structure-list')
   async findAll() {

@@ -116,7 +116,7 @@ export class ProjectGroupsService {
    * Handle structure changes (create, update, delete)
    * @param dto
    */
-  async handleStructure(dto: StructureDto) {
+  /* async handleStructure(dto: StructureDto) {
     const queryRunner = this.groupRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -143,9 +143,9 @@ export class ProjectGroupsService {
     } finally {
       await queryRunner.release();
     }
-  }
+  } */
 
-  private async createStructure(dto: StructureDto, qr: QueryRunner) {
+/*   private async createStructure(dto: StructureDto, qr: QueryRunner) {
     // 1. Crear grupo nivel 1
     const groupLevel1 = qr.manager.create(ProjectGroup, {
       name: dto.groupName,
@@ -297,5 +297,5 @@ export class ProjectGroupsService {
       const ids = dto.items.map(i => i.id);
       await qr.manager.delete(GroupItem, ids);
     }
-  }
+  } */
 }
