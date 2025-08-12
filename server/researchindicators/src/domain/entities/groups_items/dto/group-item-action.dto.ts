@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsString, ValidateNested, IsArray, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, ValidateNested, IsArray, IsNotEmpty, IsOptional, IsInt, IsNumber, IsBoolean } from 'class-validator';
 
 export class StructureDto {
   @IsArray()
@@ -17,6 +17,8 @@ export class ChildItemDto {
   @IsString()
   @IsNotEmpty()
   code: string;
+
+  indicators?: IndicatorDto[];
 }
 
 export class ParentItemDto {
@@ -33,4 +35,51 @@ export class ParentItemDto {
   @IsArray()
   @IsOptional()
   items?: ChildItemDto[];
+
+  indicators?: IndicatorDto[];
+}
+
+export class IndicatorDto {
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsInt()
+  level?: number;
+
+  @IsString()
+  @IsNotEmpty()
+  number_type: string;
+
+  @IsString()
+  @IsNotEmpty()
+  number_format: string;
+
+  @IsArray()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  years: number[];
+
+  @IsString()
+  @IsNotEmpty()
+  target_unit: string;
+
+  @IsNumber()
+  target_value: number;
+
+  @IsNumber()
+  base_line: number;
 }

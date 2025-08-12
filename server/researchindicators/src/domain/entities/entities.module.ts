@@ -62,6 +62,8 @@ import { AppSecretsModule } from './app-secrets/app-secrets.module';
 import { AppSecretHostListModule } from './app-secret-host-list/app-secret-host-list.module';
 import { ProjectGroupsModule } from './project_groups/project_groups.module';
 import { GroupsItemsModule } from './groups_items/groups_items.module';
+import { ProjectIndicatorsModule } from './project_indicators/project_indicators.module';
+import { IndicatorPerItemModule } from './indicator_per_item/indicator_per_item.module';
 
 @Module({
   imports: [
@@ -128,6 +130,8 @@ import { GroupsItemsModule } from './groups_items/groups_items.module';
     AppSecretHostListModule,
     ProjectGroupsModule,
     GroupsItemsModule,
+    ProjectIndicatorsModule,
+    IndicatorPerItemModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
