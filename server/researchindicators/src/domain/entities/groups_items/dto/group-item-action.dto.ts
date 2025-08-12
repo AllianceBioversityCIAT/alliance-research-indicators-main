@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsString, ValidateNested, IsArray, IsNotEmpty, IsOptional, IsInt, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsArray, IsNotEmpty, IsOptional, IsInt, IsNumber} from 'class-validator';
 
 export class StructureDto {
   @IsArray()

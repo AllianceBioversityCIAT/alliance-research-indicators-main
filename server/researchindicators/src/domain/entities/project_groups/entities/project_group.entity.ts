@@ -7,7 +7,6 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
-import { GroupItem } from '../../groups_items/entities/groups_item.entity';
 
 @Entity('project_groups')
 export class ProjectGroup extends AuditableEntity {

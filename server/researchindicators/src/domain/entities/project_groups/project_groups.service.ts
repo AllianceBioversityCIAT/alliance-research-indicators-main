@@ -1,9 +1,8 @@
-import { BadRequestException, Injectable, InternalServerErrorException} from '@nestjs/common';
+import { Injectable, InternalServerErrorException} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GroupItem } from '../groups_items/entities/groups_item.entity';
-import { QueryRunner, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ProjectGroup } from './entities/project_group.entity';
-import { StructureDto } from './dto/structure.dto';
 
 @Injectable()
 export class ProjectGroupsService {
