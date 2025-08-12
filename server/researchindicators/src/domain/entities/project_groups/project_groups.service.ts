@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException} from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GroupItem } from '../groups_items/entities/groups_item.entity';
 import { Repository } from 'typeorm';
@@ -18,40 +18,39 @@ export class ProjectGroupsService {
   */
   async findAll(): Promise<ProjectGroup[]> {
     try {
-        const rawData = await this.groupRepository
-          .createQueryBuilder('pg')
-          .leftJoin('pg.childGroups', 'subpg')
-          .leftJoin('pg.groupItems', 'gi')       // Items del padre
-          .leftJoin('subpg.groupItems', 'sgi')   // Items del subgrupo
-          .select([
-            'pg.id AS group_id',
-            'pg.name AS group_name',
-            'pg.parent_group_id AS group_parent_id',
+      const rawData = await this.groupRepository
+        .createQueryBuilder('pg')
+        .leftJoin('pg.childGroups', 'subpg')
+        .leftJoin('pg.groupItems', 'gi') // Items del padre
+        .leftJoin('subpg.groupItems', 'sgi') // Items del subgrupo
+        .select([
+          'pg.id AS group_id',
+          'pg.name AS group_name',
+          'pg.parent_group_id AS group_parent_id',
 
-            'gi.id AS parent_item_id',
-            'gi.name AS parent_item_name',
-            'gi.description AS parent_item_description',
+          'gi.id AS parent_item_id',
+          'gi.name AS parent_item_name',
+          'gi.description AS parent_item_description',
 
-            'subpg.id AS subgroup_id',
-            'subpg.name AS subgroup_name',
+          'subpg.id AS subgroup_id',
+          'subpg.name AS subgroup_name',
 
-            'sgi.id AS child_item_id',
-            'sgi.name AS child_item_name',
-            'sgi.description AS child_item_description',
-          ])
-          .orderBy('pg.id', 'ASC')
-          .addOrderBy('subpg.id', 'ASC')
-          .addOrderBy('gi.id', 'ASC')
-          .addOrderBy('sgi.id', 'ASC')
-          .getRawMany();
+          'sgi.id AS child_item_id',
+          'sgi.name AS child_item_name',
+          'sgi.description AS child_item_description',
+        ])
+        .orderBy('pg.id', 'ASC')
+        .addOrderBy('subpg.id', 'ASC')
+        .addOrderBy('gi.id', 'ASC')
+        .addOrderBy('sgi.id', 'ASC')
+        .getRawMany();
 
-        return this.mapGroups(rawData);
-
+      return this.mapGroups(rawData);
     } catch (error) {
       console.error('❌ Error al obtener la jerarquía de grupos:', error);
 
       throw new InternalServerErrorException(
-        'Ocurrió un error al obtener la jerarquía de grupos. Intenta nuevamente más tarde.'
+        'Ocurrió un error al obtener la jerarquía de grupos. Intenta nuevamente más tarde.',
       );
     }
   }
@@ -64,44 +63,50 @@ export class ProjectGroupsService {
       }
 
       // Buscar o crear el grupo padre
-      let parent = acc.find(g => g.id === row.group_id);
+      let parent = acc.find((g) => g.id === row.group_id);
       if (!parent) {
         parent = {
           id: row.group_id,
           name: row.group_name,
           items: [],
-          subgroups: []
+          subgroups: [],
         };
         acc.push(parent);
       }
 
       // Items del padre
-      if (row.parent_item_id && !parent.items.some(i => i.id === row.parent_item_id)) {
+      if (
+        row.parent_item_id &&
+        !parent.items.some((i) => i.id === row.parent_item_id)
+      ) {
         parent.items.push({
           id: row.parent_item_id,
           name: row.parent_item_name,
-          description: row.parent_item_description
+          description: row.parent_item_description,
         });
       }
 
       // Subgrupo
       if (row.subgroup_id) {
-        let child = parent.subgroups.find(sg => sg.id === row.subgroup_id);
+        let child = parent.subgroups.find((sg) => sg.id === row.subgroup_id);
         if (!child) {
           child = {
             id: row.subgroup_id,
             name: row.subgroup_name,
-            items: []
+            items: [],
           };
           parent.subgroups.push(child);
         }
 
         // Items del subgrupo
-        if (row.child_item_id && !child.items.some(i => i.id === row.child_item_id)) {
+        if (
+          row.child_item_id &&
+          !child.items.some((i) => i.id === row.child_item_id)
+        ) {
           child.items.push({
             id: row.child_item_id,
             name: row.child_item_name,
-            description: row.child_item_description
+            description: row.child_item_description,
           });
         }
       }
@@ -109,7 +114,6 @@ export class ProjectGroupsService {
       return acc;
     }, []);
   }
-
 
   /**
    * Handle structure changes (create, update, delete)
@@ -144,7 +148,7 @@ export class ProjectGroupsService {
     }
   } */
 
-/*   private async createStructure(dto: StructureDto, qr: QueryRunner) {
+  /*   private async createStructure(dto: StructureDto, qr: QueryRunner) {
     // 1. Crear grupo nivel 1
     const groupLevel1 = qr.manager.create(ProjectGroup, {
       name: dto.groupName,

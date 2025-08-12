@@ -48,8 +48,8 @@ import { ResultIpRightsModule } from '../entities/result-ip-rights/result-ip-rig
 import { IpRightsApplicationOptionsModule } from '../entities/ip-rights-application-options/ip-rights-application-options.module';
 import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
 import { UserSettingsModule } from '../entities/user-settings/user-settings.module';
-import { ProjectGroupsModule } from '../entities/project_groups/project_groups.module';
 import { GroupsItemsModule } from '../entities/groups_items/groups_items.module';
+import { ProjectIndicatorsModule } from '../entities/project_indicators/project_indicators.module';
 
 const capSharingChildren: Routes = [
   {
@@ -302,7 +302,7 @@ const children: Routes = [
   },
   {
     path: 'project-indicators',
-    module: ProjectGroupsModule,
+    module: ProjectIndicatorsModule,
   },
   {
     path: 'groups-items',

@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  UseInterceptors,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, UseInterceptors, HttpStatus } from '@nestjs/common';
 import { ProjectGroupsService } from './project_groups.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';

@@ -1,6 +1,4 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { GroupItem } from './entities/groups_item.entity';
 import { DataSource, EntityManager, Repository } from 'typeorm';
@@ -17,56 +15,75 @@ export class GroupsItemsService {
   ) {}
 
   async findAll() {
-    const parents = await this.groupItemRepository.find({
-      where: { parentGroup: null, is_active: true },
+    // Traemos todos los grupos activos con su parent y sus indicadores
+    const groups = await this.groupItemRepository.find({
+      where: { is_active: true },
       relations: [
-        'childGroups',
-        'childGroups.childGroups',
+        'parentGroup',
         'indicatorPerItem',
         'indicatorPerItem.projectIndicator',
-        'childGroups.indicatorPerItem',
-        'childGroups.indicatorPerItem.projectIndicator',
-        'childGroups.childGroups.indicatorPerItem',
-        'childGroups.childGroups.indicatorPerItem.projectIndicator',
       ],
       order: { id: 'ASC' },
     });
 
-    const cleanGroup = (group: GroupItem) => {
-      return {
-        id: group.id.toString(),
-        name: group.name,
-        code: group.officialCode || group.id.toString(),
-        items:
-          group.childGroups
-            ?.filter((child) => child.is_active)
-            .map(cleanGroup) || [],
-        indicators:
-          group.indicatorPerItem
-            ?.filter(
-              (ipi) => ipi.projectIndicator && ipi.projectIndicator.is_active,
-            )
-            .map((ipi) => ({
-              id: ipi.projectIndicator.id.toString(),
-              name: ipi.projectIndicator.name,
-              description: ipi.projectIndicator.description || '',
-              numberType: ipi.projectIndicator.number_type,
-              numberFormat: ipi.projectIndicator.number_format || 'decimal',
-              years: ipi.projectIndicator.year || [],
-              targetUnit: ipi.projectIndicator.target_unit || '',
-              targetValue: ipi.projectIndicator.target_value || 0,
-              baseline: ipi.projectIndicator.base_line || 0,
-              isActive: ipi.projectIndicator.is_active,
-            })) || [],
-      };
-    };
+    // Mapa id -> nodo ya transformado (sin children todavía)
+    const nodes = new Map<number, any>();
 
-    // Mapear la respuesta final con la estructura requerida
-    const structures = parents.map((parent) => cleanGroup(parent));
+    for (const g of groups) {
+      const indicators =
+        g.indicatorPerItem
+          ?.filter(
+            (ipi) => ipi.projectIndicator && ipi.projectIndicator.is_active,
+          )
+          .map((ipi) => ({
+            id: ipi.projectIndicator.id.toString(),
+            name: ipi.projectIndicator.name,
+            description: ipi.projectIndicator.description || '',
+            numberType: ipi.projectIndicator.number_type,
+            numberFormat: ipi.projectIndicator.number_format || 'decimal',
+            years: ipi.projectIndicator.year || [],
+            targetUnit: ipi.projectIndicator.target_unit || '',
+            targetValue: Number(ipi.projectIndicator.target_value) || 0,
+            baseline: Number(ipi.projectIndicator.base_line) || 0,
+          })) || [];
 
-    return {
-      structures,
+      nodes.set(g.id, {
+        id: g.id.toString(),
+        name: g.name,
+        code: g.officialCode || g.id.toString(),
+        items: [] as any[],
+        indicators,
+      });
+    }
+
+    const roots: any[] = [];
+
+    for (const g of groups) {
+      const node = nodes.get(g.id);
+      const parentId = g.parentGroup?.id;
+
+      if (parentId) {
+        const parentNode = nodes.get(parentId);
+        if (parentNode) {
+          parentNode.items.push(node);
+        } else {
+          // Si el padre no está presente (por algún motivo), puedes:
+          // - ignorar el nodo, o
+          // - tratarlo como raíz. Aquí lo ignoramos para no duplicar.
+        }
+      } else {
+        roots.push(node);
+      }
+    }
+
+    // (Opcional) ordenar hijos por id para consistencia
+    const sortRecursively = (list: any[]) => {
+      list.sort((a, b) => Number(a.id) - Number(b.id));
+      for (const it of list) if (it.items?.length) sortRecursively(it.items);
     };
+    sortRecursively(roots);
+
+    return { structures: roots };
   }
 
   async syncStructures(dto: StructureDto) {

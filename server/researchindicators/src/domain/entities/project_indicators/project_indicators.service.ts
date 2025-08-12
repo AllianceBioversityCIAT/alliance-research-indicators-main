@@ -6,12 +6,11 @@ import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
 
 @Injectable()
 export class ProjectIndicatorsService {
-
   constructor(
     @InjectRepository(ProjectIndicator)
     private readonly indicatorRepository: Repository<ProjectIndicator>,
   ) {}
-  
+
   async findAll(): Promise<CreateProjectIndicatorDto[]> {
     const indicators = await this.indicatorRepository
       .createQueryBuilder('pi')
@@ -39,8 +38,6 @@ export class ProjectIndicatorsService {
       targetValue: pi.target_value,
       baseline: pi.base_line,
       years: pi.year ?? [],
-      // `level` no está en la entidad, así que no lo devolvemos o lo dejamos en null
-      level: null,
     })) as CreateProjectIndicatorDto[];
   }
 
@@ -60,5 +57,4 @@ export class ProjectIndicatorsService {
 
     return await this.indicatorRepository.save(newIndicator);
   }
-
 }
