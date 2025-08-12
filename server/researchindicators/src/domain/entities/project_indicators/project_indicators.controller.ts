@@ -14,7 +14,7 @@ export class ProjectIndicatorsController {
   constructor(
     private readonly projectIndicatorsService: ProjectIndicatorsService,
   ) {}
-  @Get()
+  @Get('get-list')
   async getAll() {
     return await this.projectIndicatorsService.findAll().then((data) =>
       ResponseUtils.format({
@@ -25,7 +25,7 @@ export class ProjectIndicatorsController {
     );
   }
 
-  @Post()
+  @Post('create')
   async create(@Body() createProjectIndicatorDto: CreateProjectIndicatorDto) {
     return await this.projectIndicatorsService
       .create(createProjectIndicatorDto)
