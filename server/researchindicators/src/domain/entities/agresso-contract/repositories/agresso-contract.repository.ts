@@ -256,12 +256,12 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     left join clarisa_levers cl on cl.short_name = CONCAT('Lever ', IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
     CROSS JOIN indicators i
     WHERE 1 = 1
-    ${filter?.contract_code ? `AND ac.contract_code = '${filter.contract_code}'` : ''}
+    ${filter?.contract_code ? `AND ac.agreement_id = '${filter.contract_code}'` : ''}
     ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
     ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
     ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
-    ${filter?.start_date ? `AND ac.start_date >= '${filter.start_date}'` : ''}
-    ${filter?.end_date ? `AND ac.end_date <= '${filter.end_date}'` : ''}
+    ${filter?.start_date ? `AND ac.start_date <= '${filter.end_date}'` : ''}
+    ${filter?.end_date ? `AND (ac.end_date >= '${filter.start_date}' OR ac.end_date IS NULL)` : ''}
     ${filter?.status?.length ? `AND LOWER(ac.contract_status) in (${filter.status.map((status) => `'${status}'`).join(',')})` : ''}
     GROUP BY ac.agreement_id, cl.id;`;
 
