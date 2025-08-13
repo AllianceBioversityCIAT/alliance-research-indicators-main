@@ -60,6 +60,8 @@ import { ResultIpRightsModule } from './result-ip-rights/result-ip-rights.module
 import { IpRightsApplicationOptionsModule } from './ip-rights-application-options/ip-rights-application-options.module';
 import { AppSecretsModule } from './app-secrets/app-secrets.module';
 import { AppSecretHostListModule } from './app-secret-host-list/app-secret-host-list.module';
+import { UserSettingsModule } from './user-settings/user-settings.module';
+import { SettingKeysModule } from './setting-keys/setting-keys.module';
 
 @Module({
   imports: [
@@ -124,6 +126,8 @@ import { AppSecretHostListModule } from './app-secret-host-list/app-secret-host-
     IpRightsApplicationOptionsModule,
     AppSecretsModule,
     AppSecretHostListModule,
+    UserSettingsModule,
+    SettingKeysModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
