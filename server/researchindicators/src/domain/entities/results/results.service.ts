@@ -736,6 +736,7 @@ export class ResultsService {
       case IndicatorsEnum.POLICY_CHANGE:
         tmpNewData.policyChange =
           await this._resultPolicyChangeService.processedAiInfo(result);
+        break;
       case IndicatorsEnum.INNOVATION_DEV:
         tmpNewData.innovationDev =
           await this._resultInnovationDevService.processedAiInfo(result);

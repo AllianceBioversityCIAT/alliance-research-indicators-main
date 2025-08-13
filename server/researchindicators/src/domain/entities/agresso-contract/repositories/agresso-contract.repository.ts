@@ -204,6 +204,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
   }
 
   async getContracts(filter?: Record<string, any>, userId?: number) {
+    const dateFilterClause = this.buildDateFilterClause(filter);
+
     const query = `
     SELECT 
       ac.agreement_id, 
@@ -260,18 +262,33 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
     ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
     ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
-    ${
-      filter?.start_date && filter?.end_date
-        ? `AND ac.start_date <= '${filter.end_date}' AND (ac.end_date >= '${filter.start_date}' OR ac.end_date IS NULL)`
-        : filter?.start_date
-          ? `AND ac.start_date >= '${filter.start_date}'`
-          : filter?.end_date
-            ? `AND (ac.end_date <= '${filter.end_date}' OR ac.end_date IS NULL)`
-            : ''
-    }
-    ${filter?.status?.length ? `AND LOWER(ac.contract_status) in (${filter.status.map((status) => `'${status}'`).join(',')})` : ''}
+    ${dateFilterClause}
+    ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
     GROUP BY ac.agreement_id, cl.id;`;
 
     return this.query(query) as Promise<ContractResultCountDto[]>;
+  }
+
+  private buildStatusFilterClause(statuses: string[]): string {
+    const statusList = statuses
+      .map((status) => `'${status.toLowerCase()}'`)
+      .join(',');
+    return `AND LOWER(ac.contract_status) in (${statusList})`;
+  }
+
+  private buildDateFilterClause(filter?: Record<string, any>): string {
+    if (filter?.start_date && filter?.end_date) {
+      return `AND ac.start_date <= '${filter.end_date}' AND (ac.end_date >= '${filter.start_date}' OR ac.end_date IS NULL)`;
+    }
+
+    if (filter?.start_date) {
+      return `AND ac.start_date >= '${filter.start_date}'`;
+    }
+
+    if (filter?.end_date) {
+      return `AND (ac.end_date <= '${filter.end_date}' OR ac.end_date IS NULL)`;
+    }
+
+    return '';
   }
 }
