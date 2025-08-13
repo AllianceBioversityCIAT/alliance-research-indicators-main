@@ -42,8 +42,9 @@ export class ProjectIndicatorsService {
   }
 
   async create(dto: CreateProjectIndicatorDto): Promise<ProjectIndicator> {
-    const newIndicator = this.indicatorRepository.create({
-      id: Number(dto.id),
+    let newIndicator: ProjectIndicator;
+    try {
+      newIndicator = this.indicatorRepository.create({
       code: dto.id,
       name: dto.name,
       description: dto.description,
@@ -53,7 +54,10 @@ export class ProjectIndicatorsService {
       target_value: dto.targetValue,
       base_line: dto.baseline,
       year: dto.years,
-    });
+      });
+    } catch (error) {
+      throw new Error(`Error creating ProjectIndicator: ${error.message}`);
+    }
 
     return await this.indicatorRepository.save(newIndicator);
   }
