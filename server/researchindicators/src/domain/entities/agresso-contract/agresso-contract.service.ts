@@ -7,6 +7,7 @@ import { PaginationDto } from '../../shared/global-dto/pagination.dto';
 import { StringKeys } from '../../shared/global-dto/types-global';
 import { AgressoContractRepository } from './repositories/agresso-contract.repository';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 
 @Injectable()
 export class AgressoContractService {
@@ -54,5 +55,15 @@ export class AgressoContractService {
 
   async findContratResultByContractId(contract_id: string) {
     return this._agressoContractRepository.findOneContract(contract_id);
+  }
+
+  async findAgressoContracts(
+    onlyCurrentUser: TrueFalseEnum,
+    filter?: Record<string, any>,
+  ) {
+    return this._agressoContractRepository.getContracts(
+      filter,
+      onlyCurrentUser == TrueFalseEnum.TRUE ? this.currentUser.user_id : null,
+    );
   }
 }

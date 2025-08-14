@@ -5,6 +5,7 @@ import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-ba
 import { ClarisaInstitution } from './entities/clarisa-institution.entity';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
 import { TrueFalseEnum } from '../../../../shared/enum/queries.enum';
+import { FindOptionsWhere, Like } from 'typeorm';
 @Injectable()
 export class ClarisaInstitutionsService extends ControlListBaseService<
   ClarisaInstitution,
@@ -14,7 +15,7 @@ export class ClarisaInstitutionsService extends ControlListBaseService<
     customRepo: ClarisaInstitutionsRepository,
     currentUser: CurrentUserUtil,
   ) {
-    super(ClarisaInstitution, customRepo, currentUser);
+    super(ClarisaInstitution, customRepo, currentUser, 'name');
   }
 
   async clonePath() {
@@ -52,5 +53,15 @@ export class ClarisaInstitutionsService extends ControlListBaseService<
     }
 
     return query.getMany();
+  }
+
+  async findByLikeNames(names: string[]) {
+    const where: FindOptionsWhere<ClarisaInstitution>[] = names.map((name) => ({
+      is_active: true,
+      [this.findByNameKey]: Like(`'%${name?.trim()}%'`),
+    }));
+    return this.mainRepo.find({
+      where,
+    });
   }
 }

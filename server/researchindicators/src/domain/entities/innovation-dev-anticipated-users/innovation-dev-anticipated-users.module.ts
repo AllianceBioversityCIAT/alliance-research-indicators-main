@@ -5,5 +5,6 @@ import { InnovationDevAnticipatedUsersController } from './innovation-dev-antici
 @Module({
   controllers: [InnovationDevAnticipatedUsersController],
   providers: [InnovationDevAnticipatedUsersService],
+  exports: [InnovationDevAnticipatedUsersService],
 })
 export class InnovationDevAnticipatedUsersModule {}

@@ -40,7 +40,7 @@ export abstract class ControlListBaseService<
   async findByNames(name: string[]): Promise<Entity[]> {
     const where: FindOptionsWhere<Entity> = {
       is_active: true,
-      [this.findByNameKey]: In(name),
+      [this.findByNameKey]: In(name.map((el) => `'${el}'`)),
     } as FindOptionsWhere<Entity>;
     return this.mainRepo.find({
       where: where,

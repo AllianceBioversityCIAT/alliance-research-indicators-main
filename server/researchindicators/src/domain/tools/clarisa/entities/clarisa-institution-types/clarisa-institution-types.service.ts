@@ -4,7 +4,7 @@ import { ClarisaInstitutionType } from './entities/clarisa-institution-type.enti
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
 import { ClarisaInstitutionTypesRepository } from './repositories/clarisa-institution-types.repository';
 import { getItemsAtLevel } from '../../../../shared/utils/array.util';
-import { IsNull } from 'typeorm';
+import { FindOptionsWhere, IsNull, Like } from 'typeorm';
 @Injectable()
 export class ClarisaInstitutionTypesService extends ControlListBaseService<
   ClarisaInstitutionType,
@@ -62,5 +62,20 @@ export class ClarisaInstitutionTypesService extends ControlListBaseService<
     });
 
     return getItemsAtLevel<ClarisaInstitutionType>(institutionTypes, level);
+  }
+
+  async findByLikeNames(names: string[]) {
+    const where: FindOptionsWhere<ClarisaInstitutionType>[] = names.map(
+      (name) => ({
+        is_active: true,
+        [this.findByNameKey]: Like(`'%${name?.trim()}%'`),
+      }),
+    );
+    return this.mainRepo.find({
+      relations: {
+        parent: true,
+      },
+      where,
+    });
   }
 }

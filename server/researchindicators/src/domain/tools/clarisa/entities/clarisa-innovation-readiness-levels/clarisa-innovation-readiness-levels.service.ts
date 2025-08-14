@@ -17,4 +17,13 @@ export class ClarisaInnovationReadinessLevelsService extends ControlListBaseServ
       'name',
     );
   }
+
+  async findByValue(value: number) {
+    return this.mainRepo.findOne({
+      where: {
+        is_active: true,
+        level: value,
+      },
+    });
+  }
 }

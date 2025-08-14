@@ -24,6 +24,17 @@ import { LinkResult } from '../link-results/entities/link-result.entity';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { ClarisaInnovationReadinessLevel } from '../../tools/clarisa/entities/clarisa-innovation-readiness-levels/entities/clarisa-innovation-readiness-level.entity';
+import { ResultRawAi } from '../results/dto/result-ai.dto';
+import { ClarisaInnovationCharacteristicsService } from '../../tools/clarisa/entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.service';
+import { ClarisaInnovationTypesService } from '../../tools/clarisa/entities/clarisa-innovation-types/clarisa-innovation-types.service';
+import { ClarisaInnovationReadinessLevelsService } from '../../tools/clarisa/entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.service';
+import { InnovationDevAnticipatedUsersService } from '../innovation-dev-anticipated-users/innovation-dev-anticipated-users.service';
+import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
+import { CreateResultActorDto } from '../result-actors/dto/create-result-actor.dto';
+import { ClarisaInstitutionsService } from '../../tools/clarisa/entities/clarisa-institutions/clarisa-institutions.service';
+import { ClarisaInstitution } from '../../tools/clarisa/entities/clarisa-institutions/entities/clarisa-institution.entity';
+import { CreateResultInstitutionTypeDto } from '../result-institution-types/dto/create-result-institution-type.dto';
+import { ClarisaInstitutionTypesService } from '../../tools/clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
 @Injectable()
 export class ResultInnovationDevService {
   private readonly mainRepo: Repository<ResultInnovationDev>;
@@ -35,8 +46,110 @@ export class ResultInnovationDevService {
     private readonly _clarisaActorTypesService: ClarisaActorTypesService,
     private readonly _linkResultsService: LinkResultsService,
     private readonly _updateDataUtil: UpdateDataUtil,
+    private readonly _clarisaInnovationCharacteristicService: ClarisaInnovationCharacteristicsService,
+    private readonly _clarisaInnovationTypesService: ClarisaInnovationTypesService,
+    private readonly _clarisaInnovationReadinessLevelsService: ClarisaInnovationReadinessLevelsService,
+    private readonly _innovationDevAnticipatedUsersService: InnovationDevAnticipatedUsersService,
+    private readonly _clarisaInstitutionsService: ClarisaInstitutionsService,
+    private readonly _clarisaInstitutionTypesService: ClarisaInstitutionTypesService,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultInnovationDev);
+  }
+
+  async processedAiInfo(
+    result: ResultRawAi,
+  ): Promise<CreateResultInnovationDevDto> {
+    const innovationDev = new CreateResultInnovationDevDto();
+    innovationDev.short_title = result.short_title;
+
+    innovationDev.innovation_nature_id =
+      await this._clarisaInnovationCharacteristicService
+        .findByName(result?.innovation_nature)
+        .then((res) => res?.id);
+
+    innovationDev.innovation_type_id = await this._clarisaInnovationTypesService
+      .findByName(result?.innovation_type)
+      .then((res) => res?.code);
+
+    innovationDev.innovation_readiness_id =
+      await this._clarisaInnovationReadinessLevelsService
+        .findByValue(result?.assess_readiness)
+        .then((res) => res?.id);
+
+    innovationDev.anticipated_users_id =
+      await this._innovationDevAnticipatedUsersService
+        .findByName(result?.anticipated_users)
+        .then((res) => res?.id);
+
+    const actors = result.innovation_actors_detailed;
+    const newActors: Partial<CreateResultActorDto>[] = [];
+    for (const actor of actors) {
+      const actorTypeCode = await this._clarisaActorTypesService
+        .findByName(actor.type)
+        .then((res) => res?.code);
+
+      const isOther = ClarisaActorTypesEnum.OTHER === actorTypeCode;
+      newActors.push({
+        actor_type_id: actorTypeCode,
+        actor_role_id: ActorRolesEnum.INNOVATION_DEV,
+        actor_type_custom_name: isOther ? actor.other_actor_type : null,
+      });
+    }
+    innovationDev.actors = newActors as CreateResultActorDto[];
+
+    const organizationsNames = result.organizations;
+    let clarisaInstitutions: ClarisaInstitution[] = [];
+    if (Array.isArray(organizationsNames) && organizationsNames.length > 0) {
+      clarisaInstitutions =
+        await this._clarisaInstitutionsService.findByLikeNames(
+          organizationsNames,
+        );
+    }
+    const newInstitutionTypes: Partial<CreateResultInstitutionTypeDto>[] = [];
+
+    for (const institution of clarisaInstitutions) {
+      newInstitutionTypes.push({
+        institution_type_id: null,
+        sub_institution_type_id: null,
+        institution_type_custom_name: null,
+        is_organization_known: true,
+        institution_id: institution.code,
+      });
+    }
+
+    const clarisaInstitutionsType =
+      await this._clarisaInstitutionTypesService.findByLikeNames(
+        result.organization_type?.split(',').map((el) => el.trim()),
+      );
+    const clarisaInstitutionsSubType =
+      await this._clarisaInstitutionTypesService.findByLikeNames(
+        result.organization_sub_type?.split(',').map((el) => el.trim()),
+      );
+
+    for (const institutionsType of clarisaInstitutionsType) {
+      newInstitutionTypes.push({
+        institution_type_id: institutionsType.code,
+        sub_institution_type_id: null,
+        institution_type_custom_name: null,
+        is_organization_known: false,
+        institution_id: null,
+      });
+    }
+
+    for (const institutionsSubType of clarisaInstitutionsSubType) {
+      newInstitutionTypes.push({
+        institution_type_id: institutionsSubType?.parent?.code,
+        sub_institution_type_id: institutionsSubType.code,
+        institution_type_custom_name: null,
+        is_organization_known: false,
+        institution_id: null,
+      });
+    }
+
+    innovationDev.institution_types =
+      newInstitutionTypes as CreateResultInstitutionTypeDto[];
+
+    return innovationDev;
   }
 
   async create(resultId: number, manager?: EntityManager) {

@@ -5,5 +5,6 @@ import { ClarisaInnovationTypesController } from './clarisa-innovation-types.con
 @Module({
   controllers: [ClarisaInnovationTypesController],
   providers: [ClarisaInnovationTypesService],
+  exports: [ClarisaInnovationTypesService],
 })
 export class ClarisaInnovationTypesModule {}
