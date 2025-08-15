@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, UseInterceptors } from '@nestjs/common';
+import { Controller, Delete, Get, HttpStatus, Param, UseInterceptors } from '@nestjs/common';
 import { ProjectIndicatorsService } from './project_indicators.service';
 import { Post, Body } from '@nestjs/common';
 import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
@@ -14,9 +14,9 @@ export class ProjectIndicatorsController {
   constructor(
     private readonly projectIndicatorsService: ProjectIndicatorsService,
   ) {}
-  @Get('get-list')
-  async getAll() {
-    return await this.projectIndicatorsService.findAll().then((data) =>
+  @Get('get-list/:id')
+  async getAll(@Param('id') agreement_id: string) {
+    return await this.projectIndicatorsService.findAll(agreement_id).then((data) =>
       ResponseUtils.format({
         description: 'Structure found',
         status: HttpStatus.OK,
@@ -28,7 +28,7 @@ export class ProjectIndicatorsController {
   @Post('create')
   async create(@Body() createProjectIndicatorDto: CreateProjectIndicatorDto) {
     return await this.projectIndicatorsService
-      .create(createProjectIndicatorDto)
+      .syncIndicator(createProjectIndicatorDto)
       .then((data) =>
         ResponseUtils.format({
           description: 'Structure created',
@@ -36,5 +36,16 @@ export class ProjectIndicatorsController {
           data: data,
         }),
       );
+  }
+
+@Delete(':id/delete')
+  async softDelete(@Param('id') id: number) {
+    const result = await this.projectIndicatorsService.softDelete(id);
+    
+    return ResponseUtils.format({
+      description: 'Indicator deleted successfully',
+      status: HttpStatus.OK,
+      data: result,
+    });
   }
 }

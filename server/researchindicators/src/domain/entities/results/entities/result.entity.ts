@@ -32,6 +32,7 @@ import { ResultInstitutionType } from '../../result-institution-types/entities/r
 import { ResultSdg } from '../../result-sdgs/entities/result-sdg.entity';
 import { ResultCapacitySharing } from '../../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { ResultIpRight } from '../../result-ip-rights/entities/result-ip-right.entity';
+import { ProjectIndicatorsResult } from '../../project_indicators_results/entities/project_indicators_result.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -242,4 +243,7 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultSdg, (resultSdg) => resultSdg.result)
   result_sdgs!: ResultSdg[];
+
+  @OneToMany(() => ProjectIndicatorsResult, (pir) => pir.result_id)
+  projectIndicatorsResult: ProjectIndicatorsResult[];
 }

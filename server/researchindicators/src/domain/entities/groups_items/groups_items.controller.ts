@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpStatus,
+  Param,
   Post,
   UseInterceptors,
 } from '@nestjs/common';
@@ -19,9 +20,9 @@ import { StructureDto } from './dto/group-item-action.dto';
 export class GroupsItemsController {
   constructor(private readonly groupsItemsService: GroupsItemsService) {}
 
-  @Get('items-list')
-  findAll() {
-    return this.groupsItemsService.findAll().then((structure) =>
+  @Get('items-list/:id')
+  findAll(@Param('id') agreement_id: string) {
+    return this.groupsItemsService.findAll(agreement_id).then((structure) =>
       ResponseUtils.format({
         description: 'Structure found',
         status: HttpStatus.OK,
@@ -32,7 +33,7 @@ export class GroupsItemsController {
 
   @Post('sync')
   async handleAction(@Body() dto: StructureDto) {
-    return this.groupsItemsService.syncStructures(dto).then((structure) =>
+    return this.groupsItemsService.syncStructures2(dto).then((structure) =>
       ResponseUtils.format({
         description: 'Structure found',
         status: HttpStatus.OK,

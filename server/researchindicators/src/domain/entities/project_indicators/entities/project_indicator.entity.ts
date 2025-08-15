@@ -1,6 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { IndicatorPerItem } from '../../indicator_per_item/entities/indicator_per_item.entity';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
+import { ProjectIndicatorsResult } from '../../project_indicators_results/entities/project_indicators_result.entity';
 
 export enum NumberType {
   SUM = 'sum',
@@ -54,6 +55,17 @@ export class ProjectIndicator extends AuditableEntity {
   @Column({ type: 'json', nullable: true })
   year?: number[];
 
+  @Column({
+    name: 'agreement_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  agreement_id: string;
+
   @OneToMany(() => IndicatorPerItem, (gip) => gip.projectIndicator)
   indicatorPerItem: IndicatorPerItem[];
+
+  @OneToMany(() => ProjectIndicatorsResult, (gip) => gip.indicator_id)
+  projectIndicatorsResult: ProjectIndicatorsResult[];
 }

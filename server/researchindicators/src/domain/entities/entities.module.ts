@@ -66,6 +66,7 @@ import { ProjectGroupsModule } from './project_groups/project_groups.module';
 import { GroupsItemsModule } from './groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from './project_indicators/project_indicators.module';
 import { IndicatorPerItemModule } from './indicator_per_item/indicator_per_item.module';
+import { ProjectIndicatorsResultsModule } from './project_indicators_results/project_indicators_results.module';
 
 @Module({
   imports: [
@@ -136,6 +137,7 @@ import { IndicatorPerItemModule } from './indicator_per_item/indicator_per_item.
     GroupsItemsModule,
     ProjectIndicatorsModule,
     IndicatorPerItemModule,
+    ProjectIndicatorsResultsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
