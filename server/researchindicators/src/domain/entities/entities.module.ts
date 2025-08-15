@@ -60,6 +60,8 @@ import { ResultIpRightsModule } from './result-ip-rights/result-ip-rights.module
 import { IpRightsApplicationOptionsModule } from './ip-rights-application-options/ip-rights-application-options.module';
 import { AppSecretsModule } from './app-secrets/app-secrets.module';
 import { AppSecretHostListModule } from './app-secret-host-list/app-secret-host-list.module';
+import { UserSettingsModule } from './user-settings/user-settings.module';
+import { SettingKeysModule } from './setting-keys/setting-keys.module';
 import { ProjectGroupsModule } from './project_groups/project_groups.module';
 import { GroupsItemsModule } from './groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from './project_indicators/project_indicators.module';
@@ -129,6 +131,8 @@ import { ProjectIndicatorsResultsModule } from './project_indicators_results/pro
     IpRightsApplicationOptionsModule,
     AppSecretsModule,
     AppSecretHostListModule,
+    UserSettingsModule,
+    SettingKeysModule,
     ProjectGroupsModule,
     GroupsItemsModule,
     ProjectIndicatorsModule,

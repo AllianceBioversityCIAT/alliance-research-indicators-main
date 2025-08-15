@@ -9,5 +9,6 @@ import { ClarisaInstitutionTypesRepository } from './repositories/clarisa-instit
     ClarisaInstitutionTypesService,
     ClarisaInstitutionTypesRepository,
   ],
+  exports: [ClarisaInstitutionTypesService, ClarisaInstitutionTypesRepository],
 })
 export class ClarisaInstitutionTypesModule {}

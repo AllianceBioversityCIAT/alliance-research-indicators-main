@@ -202,4 +202,93 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       this.query(query, [contract_id]) as Promise<ContractResultCountDto[]>
     ).then((response) => (response.length > 0 ? response[0] : null));
   }
+
+  async getContracts(filter?: Record<string, any>, userId?: number) {
+    const dateFilterClause = this.buildDateFilterClause(filter);
+
+    const query = `
+    SELECT 
+      ac.agreement_id, 
+      ac.projectDescription, 
+      ac.project_lead_description, 
+      ac.description,
+      ac.start_date, 
+      ac.end_date, 
+      ac.contract_status,
+      JSON_ARRAYAGG(
+        JSON_OBJECT(
+          'indicator', JSON_OBJECT(
+            'indicator_id', i.indicator_id,
+            'name', i.name,
+            'description', i.description,
+            'indicator_type_id', i.indicator_type_id,
+            'long_description', i.long_description,
+            'icon_src', i.icon_src,
+            'other_names', i.other_names,
+            'is_active', i.is_active
+          ),
+          'count_results', 
+            (SELECT count(r.result_id)
+            FROM results r
+            INNER JOIN result_contracts rc ON rc.result_id = r.result_id
+            WHERE rc.contract_id = ac.agreement_id
+              AND r.indicator_id = i.indicator_id
+              AND r.is_active = 1
+              AND r.is_snapshot = false
+              AND rc.is_active = 1
+              ${userId ? `AND r.created_by = ${userId}` : ''})
+        )
+      ) AS indicators,
+      IF(cl.id IS NOT NULL, JSON_OBJECT('id', cl.id,
+    			'short_name', cl.short_name,
+    			'full_name', cl.full_name,
+    			'other_names', cl.other_names), NULL) as lever
+    FROM agresso_contracts ac
+    INNER JOIN result_contracts rc on rc.contract_id = ac.agreement_id 
+    								and rc.is_active = true
+    								and rc.is_primary = true
+    ${
+      userId
+        ? `inner join results r on r.result_id = rc.result_id 
+    					and r.created_by = ${userId}
+              and r.is_active = true
+              and r.is_snapshot = false`
+        : ''
+    }
+    left join clarisa_levers cl on cl.short_name = CONCAT('Lever ', IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
+    CROSS JOIN indicators i
+    WHERE 1 = 1
+    ${filter?.contract_code ? `AND ac.agreement_id = '${filter.contract_code}'` : ''}
+    ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
+    ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
+    ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
+    ${dateFilterClause}
+    ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
+    GROUP BY ac.agreement_id, cl.id;`;
+
+    return this.query(query) as Promise<ContractResultCountDto[]>;
+  }
+
+  private buildStatusFilterClause(statuses: string[]): string {
+    const statusList = statuses
+      .map((status) => `'${status.toLowerCase()}'`)
+      .join(',');
+    return `AND LOWER(ac.contract_status) in (${statusList})`;
+  }
+
+  private buildDateFilterClause(filter?: Record<string, any>): string {
+    if (filter?.start_date && filter?.end_date) {
+      return `AND ac.start_date <= '${filter.end_date}' AND (ac.end_date >= '${filter.start_date}' OR ac.end_date IS NULL)`;
+    }
+
+    if (filter?.start_date) {
+      return `AND ac.start_date >= '${filter.start_date}'`;
+    }
+
+    if (filter?.end_date) {
+      return `AND (ac.end_date <= '${filter.end_date}' OR ac.end_date IS NULL)`;
+    }
+
+    return '';
+  }
 }
