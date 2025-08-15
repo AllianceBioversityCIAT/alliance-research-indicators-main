@@ -27,10 +27,18 @@ export class GroupItem extends AuditableEntity {
     length: 100,
     nullable: false,
   })
-  officialCode: string;
+  code: string;
 
-  @Column({ name: 'agreement_id', type: 'int', nullable: true })
-  agreementId?: number;
+  @Column({
+    name: 'agreement_id',
+    type: 'varchar',
+    length: 100,
+    nullable: false,
+  })
+  agreement_id: string;
+
+  @Column({ name: 'parent_id', type: 'int', nullable: true })
+  parent_id?: number | null;
 
   @ManyToOne(() => GroupItem, (group) => group.childGroups, {
     nullable: true,
@@ -41,9 +49,6 @@ export class GroupItem extends AuditableEntity {
 
   @OneToMany(() => GroupItem, (group) => group.parentGroup)
   childGroups?: GroupItem[];
-
-  @RelationId((groupItem: GroupItem) => groupItem.parentGroup)
-  parent_id?: number | null;
 
   @OneToMany(() => IndicatorPerItem, (gip) => gip.groupItem)
   indicatorPerItem: IndicatorPerItem[];

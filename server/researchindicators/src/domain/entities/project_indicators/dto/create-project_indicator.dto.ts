@@ -2,9 +2,9 @@ import { Type } from "class-transformer";
 import { IsArray, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
 
 export class CreateProjectIndicatorDto {
-    @IsString()
-    @IsNotEmpty()
-    id: string;
+    @IsNumber()
+    @IsOptional()
+    id?: number;
 
     @IsString()
     @IsNotEmpty()
@@ -12,11 +12,15 @@ export class CreateProjectIndicatorDto {
 
     @IsString()
     @IsOptional()
-    description: string;
+    code?: string;
+
+    @IsString()
+    @IsOptional()
+    description?: string;
 
     @IsNumber()
     @IsOptional()
-    level: number;
+    level?: number;
 
     @IsString()
     @IsNotEmpty()
@@ -24,7 +28,7 @@ export class CreateProjectIndicatorDto {
 
     @IsString()
     @IsOptional()
-    numberFormat: string;
+    numberFormat?: string;
 
     @IsArray()
     @Type(() => Number)
@@ -33,13 +37,17 @@ export class CreateProjectIndicatorDto {
 
     @IsString()
     @IsOptional()
-    targetUnit: string;
+    targetUnit?: string;
 
     @IsNumber()
     @IsOptional()
-    targetValue: number;
+    targetValue?: number;
 
     @IsNumber()
     @IsOptional()
-    baseline: number;
+    baseline?: number;
+
+    @IsString()
+    @IsNotEmpty()
+    agreement_id: string;
 }

@@ -1,14 +1,21 @@
 import { Type } from 'class-transformer';
-import { IsString, IsArray, IsNotEmpty, IsOptional, IsInt, IsNumber} from 'class-validator';
+import { IsString, IsArray, IsNotEmpty, IsOptional, IsInt, IsNumber, IsBoolean, ValidateNested } from 'class-validator';
 
 export class StructureDto {
+  @IsString()
+  @IsNotEmpty()
+  agreement_id: string;
+
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ParentItemDto)
   structures: ParentItemDto[];
 }
 
 export class ChildItemDto {
-  @IsString()
-  id: string;
+  @IsOptional()
+  @IsNumber()
+  id?: number;
 
   @IsString()
   @IsNotEmpty()
@@ -18,12 +25,17 @@ export class ChildItemDto {
   @IsNotEmpty()
   code: string;
 
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IndicatorDto)
   indicators?: IndicatorDto[];
 }
 
 export class ParentItemDto {
-  @IsString()
-  id: string;
+  @IsOptional()
+  @IsNumber()
+  id?: number;
 
   @IsString()
   @IsNotEmpty()
@@ -32,17 +44,23 @@ export class ParentItemDto {
   @IsString()
   code: string;
 
-  @IsArray()
   @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ChildItemDto)
   items?: ChildItemDto[];
 
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IndicatorDto)
   indicators?: IndicatorDto[];
 }
 
 export class IndicatorDto {
   @IsOptional()
-  @IsString()
-  id?: string;
+  @IsNumber()
+  id?: number;
 
   @IsString()
   @IsNotEmpty()
