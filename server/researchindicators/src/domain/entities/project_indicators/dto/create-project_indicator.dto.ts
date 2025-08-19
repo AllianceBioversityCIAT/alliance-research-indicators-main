@@ -47,6 +47,10 @@ export class CreateProjectIndicatorDto {
     @IsOptional()
     baseline?: number;
 
+    @IsNumber()
+    @IsOptional()
+    type?: number;
+
     @IsString()
     @IsNotEmpty()
     agreement_id: string;

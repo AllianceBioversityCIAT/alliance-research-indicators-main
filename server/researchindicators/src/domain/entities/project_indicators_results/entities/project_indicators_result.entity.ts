@@ -1,4 +1,5 @@
 import {
+  Column,
   Entity,
   JoinColumn,
   ManyToOne,
@@ -28,4 +29,7 @@ export class ProjectIndicatorsResult extends AuditableEntity {
   )
   @JoinColumn({ name: 'indicator_id' })
   indicator_id: ProjectIndicator;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  contribution_value: number;
 }

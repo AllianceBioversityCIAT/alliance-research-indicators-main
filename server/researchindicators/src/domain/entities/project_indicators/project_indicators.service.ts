@@ -23,6 +23,7 @@ export class ProjectIndicatorsService {
         'pi.number_format as number_format',
         'pi.target_unit as target_unit',
         'pi.year as year',
+        'pi.type as type',
       ])
       .addSelect(
         'CASE WHEN pi.target_value = FLOOR(pi.target_value) THEN CAST(pi.target_value AS SIGNED) ELSE ROUND(pi.target_value, 2) END',
@@ -47,6 +48,7 @@ export class ProjectIndicatorsService {
       targetValue: pi.target_value,
       baseline: pi.base_line,
       years: pi.year ?? [],
+      type: pi.type,
     })) as CreateProjectIndicatorDto[];
   }
 
@@ -69,6 +71,7 @@ export class ProjectIndicatorsService {
         base_line: dto.baseline,
         year: dto.years,
         agreement_id: dto.agreement_id,
+        type: dto.type,
       });
     } else {
       indicator = this.indicatorRepository.create({
@@ -82,6 +85,7 @@ export class ProjectIndicatorsService {
         base_line: dto.baseline,
         year: dto.years,
         agreement_id: dto.agreement_id,
+        type: dto.type as any,
       });
     }
 
