@@ -11,8 +11,15 @@ export enum NumberType {
 }
 
 export enum NumberFormat {
-  NUMBER = 'number',
+  NUMBER = 'number (Integer)',
   DECIMAL = 'decimal',
+}
+
+export enum IndicatorType {
+  OUTPUT = 'output',
+  OUTCOME = 'outcome',
+  IMPACT = 'impact',
+  OTHER = 'other',
 }
 
 @Entity('project_indicators')
@@ -54,6 +61,13 @@ export class ProjectIndicator extends AuditableEntity {
 
   @Column({ type: 'json', nullable: true })
   year?: number[];
+
+  @Column({
+    type: 'enum',
+    enum: IndicatorType,
+    nullable: true,
+  })
+  type?: IndicatorType;
 
   @Column({
     name: 'agreement_id',
