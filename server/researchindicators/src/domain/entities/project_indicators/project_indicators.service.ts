@@ -104,29 +104,12 @@ export class ProjectIndicatorsService {
     const rows = await this.indicatorRepository
       .createQueryBuilder('pi')
       .select([
-        'pi.id AS indicator_id',
-        'pi.name AS indicator_name',
-        'pi.code AS indicator_code',
-        'pi.description AS indicator_description',
-        'pi.number_type AS number_type',
-        'pi.number_format AS number_format',
-        'pi.target_unit AS target_unit',
-        'pi.year AS year',
-        'pi.type AS type',
         'ac.agreement_id AS agreement_id',
         'ac.description AS contract_description',
         'r.result_id AS result_id',
         'r.result_official_code AS result_official_code',
         'r.title AS result_title',
       ])
-      .addSelect(
-        'CASE WHEN pi.target_value = FLOOR(pi.target_value) THEN CAST(pi.target_value AS SIGNED) ELSE ROUND(pi.target_value, 2) END',
-        'target_value'
-      )
-      .addSelect(
-        'CASE WHEN pi.base_line = FLOOR(pi.base_line) THEN CAST(pi.base_line AS SIGNED) ELSE ROUND(pi.base_line, 2) END',
-        'base_line'
-      )
       .innerJoin('agresso_contracts', 'ac', 'pi.agreement_id = ac.agreement_id')
       .innerJoin('result_contracts', 'rc', 'ac.agreement_id = rc.contract_id')
       .innerJoin('results', 'r', 'rc.result_id = r.result_id')
@@ -151,28 +134,10 @@ export class ProjectIndicatorsService {
         contractMap.set(row.agreement_id, {
           agreement_id: row.agreement_id,
           description: row.contract_description,
-          indicators: [],
         });
       }
 
       const contract = contractMap.get(row.agreement_id);
-
-      // Evitar duplicados de indicadores
-      if (!contract.indicators.some((i: any) => i.id === row.indicator_id)) {
-        contract.indicators.push({
-          id: row.indicator_id,
-          name: row.indicator_name,
-          code: row.indicator_code,
-          description: row.indicator_description,
-          number_type: row.number_type,
-          number_format: row.number_format,
-          target_unit: row.target_unit,
-          target_value: row.target_value,
-          base_line: row.base_line,
-          year: row.year,
-          type: row.type,
-        });
-      }
     }
 
     return {
@@ -237,116 +202,58 @@ export class ProjectIndicatorsService {
       [agreementId],
     );
 
-    type Indicator = {
-      id: number;
-      code: string | null;
-      name: string | null;
-      description: string | null;
-      numberType: string | null;
-      numberFormat: string | null;
-      targetUnit: string | null;
-      targetValue: number | null;
-      baseLine: number | null;
-      year: any; // según tu esquema (a veces es JSON/array)
-      type: string | null;
-    };
-
-    type Node = {
-      id: number;
-      name: string;
-      code: string;
-      level: number;
-      parentId: number | null;
-      indicators: Indicator[];
-      children: Node[];
-      _indSet?: Set<number>;
-    };
-
-    const itemsMap = new Map<number, Node>();
+    const indicatorsMap = new Map();
 
     for (const row of rawData) {
-      // Crea el nodo si no existe
-      if (!itemsMap.has(row.item_id)) {
-        itemsMap.set(row.item_id, {
-          id: row.item_id,
-          name: row.item_name,
-          code: row.item_code,
-          level: row.level,
-          parentId: row.parent_id ?? null,
-          indicators: [],
-          children: [],
-          _indSet: new Set<number>(),
-        });
-      }
+      if (!row.project_indicator_id) continue;
 
-      const node = itemsMap.get(row.item_id)!;
-
-      // Agrega indicador si existe y evita duplicados
-      if (row.project_indicator_id != null && !node._indSet!.has(row.project_indicator_id)) {
-        node._indSet!.add(row.project_indicator_id);
-        node.indicators.push({
+      if (!indicatorsMap.has(row.project_indicator_id)) {
+        indicatorsMap.set(row.project_indicator_id, {
           id: row.project_indicator_id,
-          code: row.indicator_code ?? null,
-          name: row.indicator_name ?? null,
-          description: row.indicator_description ?? null,
-          numberType: row.number_type ?? null,
-          numberFormat: row.number_format ?? null,
-          targetUnit: row.target_unit ?? null,
-          targetValue: row.target_value ?? null,
-          baseLine: row.base_line ?? null,
-          year: row.year ?? null,
-          type: row.type ?? null,
+          code: row.indicator_code,
+          name: row.indicator_name,
+          description: row.indicator_description,
+          numberType: row.number_type,
+          numberFormat: row.number_format,
+          targetUnit: row.target_unit,
+          targetValue: row.target_value,
+          baseLine: row.base_line,
+          year: row.year,
+          type: row.type,
+          group_item: null,
         });
       }
-    }
 
-    // ---------- PASO 2: Enlazar jerarquía (padres ← hijos) ----------
-    for (const node of itemsMap.values()) {
-      if (node.parentId != null && itemsMap.has(node.parentId)) {
-        itemsMap.get(node.parentId)!.children.push(node);
+      // Group item
+      const groupItem = {
+        id: row.item_id,
+        name: row.item_name,
+        code: row.item_code,
+        parent_id: row.parent_id,
+      };
+
+      // Buscamos el padre (si existe en el rawData)
+      let parent_item = null;
+      if (row.parent_id) {
+        const parentRow = rawData.find(r => r.item_id === row.parent_id);
+        if (parentRow) {
+          parent_item = {
+            id: parentRow.item_id,
+            name: parentRow.item_name,
+            code: parentRow.item_code,
+          };
+        }
       }
+
+      indicatorsMap.get(row.project_indicator_id).group_item = {
+        ...groupItem,
+        parent_item,
+      };
     }
 
-    // ---------- PASO 3: Pruning: conservar solo
-    // nodos con indicadores o con descendientes que tienen indicadores ----------
-    const hasIndicatorsOrDescendants = (n: Node): boolean => {
-      const selfHas = n.indicators.length > 0;
-      let childHas = false;
-      // filtra in-place los hijos que no aportan
-      n.children = n.children.filter((c) => {
-        const keep = hasIndicatorsOrDescendants(c);
-        if (keep) childHas = true;
-        return keep;
-      });
-      return selfHas || childHas;
-    };
+    const result = Array.from(indicatorsMap.values());
 
-    // raíces = nodos sin padre
-    let roots = Array.from(itemsMap.values()).filter((n) => n.parentId == null);
-
-    // aplica pruning a las raíces
-    roots = roots.filter((r) => hasIndicatorsOrDescendants(r));
-
-    // ---------- PASO 4: Orden opcional: Padre, indicadores padre, hijos ----------
-    // (la estructura ya cumple: cada nodo tiene sus indicators y luego children)
-    // Si quieres ordenar hijos por nombre/código:
-    const orderTree = (n: Node) => {
-      n.children.sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
-      n.children.forEach(orderTree);
-    };
-    roots.forEach(orderTree);
-
-    // Limpieza: quitar campos internos
-    const strip = (n: Node): any => ({
-      id: n.id,
-      name: n.name,
-      code: n.code,
-      level: n.level,
-      indicators: n.indicators,
-      children: n.children.map(strip),
-    });
-    const tree = roots.map(strip);
-
-    return tree;
+    // --- EL RETURN ---
+    return result;
   }
 }
