@@ -3,6 +3,7 @@ import { ProjectIndicator } from './entities/project_indicator.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
+import { ResultContractsDto } from './dto/response-by-result.dto';
 
 @Injectable()
 export class ProjectIndicatorsService {
@@ -100,7 +101,7 @@ export class ProjectIndicatorsService {
     });
   }
 
-  async findByResult(resultId: string) {
+  async findByResult(resultId: string): Promise<ResultContractsDto> {
     const rows = await this.indicatorRepository
       .createQueryBuilder('pi')
       .select([
@@ -117,7 +118,6 @@ export class ProjectIndicatorsService {
       .andWhere('pi.is_active = true')
       .getRawMany();
 
-      console.log(rows);
     if (rows.length === 0) {
       return {
         result_id: resultId,
@@ -136,8 +136,6 @@ export class ProjectIndicatorsService {
           description: row.contract_description,
         });
       }
-
-      const contract = contractMap.get(row.agreement_id);
     }
 
     return {
