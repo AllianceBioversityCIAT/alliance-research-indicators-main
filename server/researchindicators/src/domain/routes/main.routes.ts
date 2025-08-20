@@ -50,6 +50,7 @@ import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
 import { UserSettingsModule } from '../entities/user-settings/user-settings.module';
 import { GroupsItemsModule } from '../entities/groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from '../entities/project_indicators/project_indicators.module';
+import { ProjectIndicatorsResultsModule } from '../entities/project_indicators_results/project_indicators_results.module';
 
 const capSharingChildren: Routes = [
   {
@@ -307,6 +308,10 @@ const children: Routes = [
   {
     path: 'groups-items',
     module: GroupsItemsModule,
+  },
+  {
+    path: 'contributions',
+    module: ProjectIndicatorsResultsModule,
   },
 ];
 
