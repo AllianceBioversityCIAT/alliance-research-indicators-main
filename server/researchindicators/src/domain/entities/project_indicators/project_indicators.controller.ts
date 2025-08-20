@@ -5,7 +5,6 @@ import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ResultContractsDto } from './dto/response-by-result.dto';
 
 @ApiTags('project-indicators')
 @ApiBearerAuth()
