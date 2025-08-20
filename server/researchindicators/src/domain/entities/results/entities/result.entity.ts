@@ -32,6 +32,8 @@ import { ResultActor } from '../../result-actors/entities/result-actor.entity';
 import { ResultInstitutionType } from '../../result-institution-types/entities/result-institution-type.entity';
 import { ResultSdg } from '../../result-sdgs/entities/result-sdg.entity';
 import { ResultIpRight } from '../../result-ip-rights/entities/result-ip-right.entity';
+import { ResultTag } from '../../result-tags/entities/result-tag.entity';
+import { ResultInitiative } from '../../result-initiatives/entities/result-initiative.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -136,6 +138,12 @@ export class Result extends AuditableEntity {
     default: false,
   })
   is_ai?: boolean;
+
+  @Column('text', {
+    name: 'comment_geo_scope',
+    nullable: true,
+  })
+  comment_geo_scope?: string;
 
   @ManyToOne(() => ReportYear, (reportYear) => reportYear.results)
   @JoinColumn({ name: 'report_year_id' })
@@ -242,4 +250,13 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultSdg, (resultSdg) => resultSdg.result)
   result_sdgs!: ResultSdg[];
+
+  @OneToMany(() => ResultTag, (resultTag) => resultTag.result)
+  result_tags!: ResultTag[];
+
+  @OneToMany(
+    () => ResultInitiative,
+    (resultInitiative) => resultInitiative.result,
+  )
+  result_initiatives!: ResultInitiative[];
 }
