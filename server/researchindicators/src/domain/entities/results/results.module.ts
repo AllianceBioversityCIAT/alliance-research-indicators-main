@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import { ResultsController } from './results.controller';
 import { ResultRepository } from './repositories/result.repository';
@@ -30,6 +30,7 @@ import { AgressoContractModule } from '../agresso-contract/agresso-contract.modu
 import { ResultInnovationDevModule } from '../result-innovation-dev/result-innovation-dev.module';
 import { ResultSdgsModule } from '../result-sdgs/result-sdgs.module';
 import { ResultIpRightsModule } from '../result-ip-rights/result-ip-rights.module';
+import { ResultOicrModule } from '../result-oicr/result-oicr.module';
 
 @Module({
   controllers: [ResultsController],
@@ -61,6 +62,7 @@ import { ResultIpRightsModule } from '../result-ip-rights/result-ip-rights.modul
     ResultInnovationDevModule,
     ResultSdgsModule,
     ResultIpRightsModule,
+    forwardRef(() => ResultOicrModule),
   ],
   providers: [
     ResultsService,
