@@ -27,6 +27,8 @@ import { ResultLeversService } from '../result-levers/result-levers.service';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ResultsService } from '../results/results.service';
 import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
+import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
+import { Result } from '../results/entities/result.entity';
 
 @Injectable()
 export class ResultOicrService {
@@ -51,6 +53,20 @@ export class ResultOicrService {
       result_id: resultId,
     });
     return this.mainRepo.save(newResultOicr);
+  }
+
+  async createOicr(data: CreateResultOicrDto) {
+    const result = await this.resultService.createResult(data.base_information);
+    await this.stepOneOicr(data.step_one, result.result_id);
+    await this.stepTwoOicr(data.step_two, result.result_id);
+    await this.resultService.saveGeoLocation(result.result_id, data.step_three);
+    await this.mainRepo.update(result.result_id, {
+      general_comment: data.step_four.general_comment,
+    });
+    this.dataSource.getRepository(Result).update(result.result_id, {
+      description: data?.step_one?.outcome_impact_statement,
+    });
+    return result;
   }
 
   async createOicrSteps(
