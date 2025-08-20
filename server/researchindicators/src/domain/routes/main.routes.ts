@@ -50,6 +50,7 @@ import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
 import { UserSettingsModule } from '../entities/user-settings/user-settings.module';
 import { GroupsItemsModule } from '../entities/groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from '../entities/project_indicators/project_indicators.module';
+import { TagsModule } from '../entities/tags/tags.module';
 
 const capSharingChildren: Routes = [
   {
@@ -267,6 +268,10 @@ const children: Routes = [
   {
     path: 'gender',
     module: GendersModule,
+  },
+  {
+    path: 'tags',
+    module: TagsModule,
   },
   {
     path: 'opensearch',

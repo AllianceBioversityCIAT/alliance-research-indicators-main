@@ -67,6 +67,10 @@ import { GroupsItemsModule } from './groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from './project_indicators/project_indicators.module';
 import { IndicatorPerItemModule } from './indicator_per_item/indicator_per_item.module';
 import { ProjectIndicatorsResultsModule } from './project_indicators_results/project_indicators_results.module';
+import { ResultOicrModule } from './result-oicr/result-oicr.module';
+import { ResultTagsModule } from './result-tags/result-tags.module';
+import { TagsModule } from './tags/tags.module';
+import { ResultInitiativesModule } from './result-initiatives/result-initiatives.module';
 
 @Module({
   imports: [
@@ -138,6 +142,10 @@ import { ProjectIndicatorsResultsModule } from './project_indicators_results/pro
     ProjectIndicatorsModule,
     IndicatorPerItemModule,
     ProjectIndicatorsResultsModule,
+    ResultOicrModule,
+    ResultTagsModule,
+    TagsModule,
+    ResultInitiativesModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

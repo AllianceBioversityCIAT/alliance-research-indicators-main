@@ -33,6 +33,8 @@ import { ResultSdg } from '../../result-sdgs/entities/result-sdg.entity';
 import { ResultCapacitySharing } from '../../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { ResultIpRight } from '../../result-ip-rights/entities/result-ip-right.entity';
 import { ProjectIndicatorsResult } from '../../project_indicators_results/entities/project_indicators_result.entity';
+import { ResultTag } from '../../result-tags/entities/result-tag.entity';
+import { ResultInitiative } from '../../result-initiatives/entities/result-initiative.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -137,6 +139,12 @@ export class Result extends AuditableEntity {
     default: false,
   })
   is_ai?: boolean;
+
+  @Column('text', {
+    name: 'comment_geo_scope',
+    nullable: true,
+  })
+  comment_geo_scope?: string;
 
   @ManyToOne(() => ReportYear, (reportYear) => reportYear.results)
   @JoinColumn({ name: 'report_year_id' })
@@ -246,4 +254,13 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ProjectIndicatorsResult, (pir) => pir.result_id)
   projectIndicatorsResult: ProjectIndicatorsResult[];
+
+  @OneToMany(() => ResultTag, (resultTag) => resultTag.result)
+  result_tags!: ResultTag[];
+
+  @OneToMany(
+    () => ResultInitiative,
+    (resultInitiative) => resultInitiative.result,
+  )
+  result_initiatives!: ResultInitiative[];
 }
