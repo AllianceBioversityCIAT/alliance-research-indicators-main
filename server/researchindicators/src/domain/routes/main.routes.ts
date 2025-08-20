@@ -48,6 +48,7 @@ import { ResultIpRightsModule } from '../entities/result-ip-rights/result-ip-rig
 import { IpRightsApplicationOptionsModule } from '../entities/ip-rights-application-options/ip-rights-application-options.module';
 import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
 import { UserSettingsModule } from '../entities/user-settings/user-settings.module';
+import { TagsModule } from '../entities/tags/tags.module';
 
 const capSharingChildren: Routes = [
   {
@@ -265,6 +266,10 @@ const children: Routes = [
   {
     path: 'gender',
     module: GendersModule,
+  },
+  {
+    path: 'tags',
+    module: TagsModule,
   },
   {
     path: 'opensearch',
