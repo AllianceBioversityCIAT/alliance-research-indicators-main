@@ -22,4 +22,11 @@ export class SaveGeoLocationDto {
     isArray: true,
   })
   regions: ResultRegion[];
+
+  @ApiProperty({
+    type: String,
+    required: false,
+    description: 'Comment about geo scope',
+  })
+  comment_geo_scope?: string;
 }

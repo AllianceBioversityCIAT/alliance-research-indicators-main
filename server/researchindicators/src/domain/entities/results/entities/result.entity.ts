@@ -35,6 +35,7 @@ import { ResultIpRight } from '../../result-ip-rights/entities/result-ip-right.e
 import { ProjectIndicatorsResult } from '../../project_indicators_results/entities/project_indicators_result.entity';
 import { ResultTag } from '../../result-tags/entities/result-tag.entity';
 import { ResultInitiative } from '../../result-initiatives/entities/result-initiative.entity';
+import { ResultOicr } from '../../result-oicr/entities/result-oicr.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -263,4 +264,7 @@ export class Result extends AuditableEntity {
     (resultInitiative) => resultInitiative.result,
   )
   result_initiatives!: ResultInitiative[];
+
+  @OneToMany(() => ResultOicr, (resultOicr) => resultOicr.result)
+  result_oicrs!: ResultOicr[];
 }

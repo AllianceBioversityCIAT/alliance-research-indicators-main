@@ -40,6 +40,7 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
+import { ResultOicrService } from '../result-oicr/result-oicr.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -67,6 +68,7 @@ describe('ResultsService', () => {
   let mockAgressoContractService: jest.Mocked<AgressoContractService>;
   let mockResultInnovationDevService: jest.Mocked<ResultInnovationDevService>;
   let mockResultSdgsService: jest.Mocked<ResultSdgsService>;
+  let mockResultOicrService: jest.Mocked<ResultOicrService>;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -193,6 +195,10 @@ describe('ResultsService', () => {
       transformData: jest.fn(),
     } as any;
 
+    mockResultOicrService = {
+      create: jest.fn(),
+    } as any;
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -259,6 +265,10 @@ describe('ResultsService', () => {
         {
           provide: ResultSdgsService,
           useValue: mockResultSdgsService,
+        },
+        {
+          provide: ResultOicrService,
+          useValue: mockResultOicrService,
         },
       ],
     }).compile();
@@ -671,8 +681,8 @@ describe('ResultsService', () => {
       mockCurrentUser.audit.mockReturnValue({});
 
       // Act
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const result = await service.createResult(createResult);
+
+      await service.createResult(createResult);
 
       // Assert
       expect(mockRepository.save).toHaveBeenCalledWith(
@@ -803,6 +813,7 @@ describe('ResultsService', () => {
         );
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
         expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
+        expect(mockResultOicrService.create).not.toHaveBeenCalled();
       });
 
       it('should create policy change service for POLICY_CHANGE indicator', async () => {
@@ -848,6 +859,7 @@ describe('ResultsService', () => {
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
         expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
         expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
+        expect(mockResultOicrService.create).not.toHaveBeenCalled();
       });
 
       it('should create innovation dev service for INNOVATION_DEV indicator', async () => {
@@ -896,6 +908,7 @@ describe('ResultsService', () => {
         );
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
+        expect(mockResultOicrService.create).not.toHaveBeenCalled();
       });
 
       it('should not call any specialized service for other indicators', async () => {
@@ -934,6 +947,52 @@ describe('ResultsService', () => {
         await service.createResult(createResult);
 
         // Assert
+        expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
+        expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
+        expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
+        expect(mockResultOicrService.create).not.toHaveBeenCalled();
+      });
+
+      it('should create OICR service for OICR indicator', async () => {
+        // Arrange
+        const createResult: CreateResultDto = {
+          contract_id: 'CONTRACT123',
+          indicator_id: IndicatorsEnum.OICR,
+          title: 'OICR Result',
+          year: 2024,
+          description: 'Test description',
+          is_ai: false,
+        };
+
+        const savedResult = {
+          result_id: 17,
+          indicator_id: IndicatorsEnum.OICR,
+        };
+
+        // Setup mocks
+        mockMainRepo.findOne.mockResolvedValue(null);
+        (service as any).newOfficialCode.mockResolvedValue(12353);
+        mockRepository.save.mockResolvedValue(savedResult);
+        mockAgressoContractService.findOne.mockResolvedValue({
+          agreement_id: 'AGR123',
+          departmentId: 'DEPT001',
+          center_amount: 1000,
+          center_amount_usd: 1000,
+          grant_amount: 2000,
+          grant_amount_usd: 2000,
+        } as any);
+        mockClarisaLeversService.homologatedData.mockReturnValue('Test Lever');
+        mockClarisaLeversService.findByName.mockResolvedValue(null);
+        mockCurrentUser.audit.mockReturnValue({});
+
+        // Act
+        await service.createResult(createResult);
+
+        // Assert
+        expect(mockResultOicrService.create).toHaveBeenCalledWith(
+          savedResult.result_id,
+        );
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
         expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
@@ -1862,6 +1921,268 @@ describe('ResultsService', () => {
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         where: { result_id: resultId, indicator_id: indicator },
       });
+    });
+  });
+
+  describe('saveGeoLocation', () => {
+    let mockRepository: any;
+    let mockEntityManager: jest.Mocked<EntityManager>;
+
+    beforeEach(() => {
+      // Setup repository mock
+      mockRepository = {
+        update: jest.fn(),
+      };
+
+      // Setup entity manager mock
+      mockEntityManager = {
+        getRepository: jest.fn().mockReturnValue(mockRepository),
+      } as any;
+
+      // Setup the transaction mock
+      mockDataSource.transaction.mockImplementation(async (callback: any) => {
+        return await callback(mockEntityManager);
+      });
+
+      // Setup audit mock return value
+      mockCurrentUser.audit.mockReturnValue({
+        created_by: 123,
+        created_at: new Date(),
+        updated_by: 123,
+        updated_at: new Date(),
+      });
+    });
+
+    it('should save geo location with comment_geo_scope', async () => {
+      // Arrange
+      const resultId = 1;
+      const saveGeoLocationDto = {
+        geo_scope_id: 1,
+        countries: [
+          {
+            isoAlpha2: 'CO',
+            result_countries_sub_nationals: [{ sub_national_id: 123 }],
+          },
+        ],
+        regions: [{ region_id: 1 }],
+        comment_geo_scope: 'Test comment for geo scope',
+      };
+
+      const transformedGeoScopeId = 1;
+      const mockCountriesData = [
+        {
+          isoAlpha2: 'CO',
+          is_active: true,
+          result_country_id: 1,
+        },
+      ];
+      const mockSaveCountries = [
+        {
+          isoAlpha2: 'CO',
+          result_country_id: 1,
+        },
+      ];
+
+      mockClarisaGeoScopeService.transformGeoScope.mockReturnValue(
+        transformedGeoScopeId,
+      );
+      mockResultCountriesService.comparerClientToServerCountry.mockResolvedValue(
+        mockCountriesData as any,
+      );
+      mockResultCountriesService.create.mockResolvedValue(
+        mockSaveCountries as any,
+      );
+      mockResultRegionsService.create.mockResolvedValue([]);
+      mockResultCountriesSubNationalsService.create.mockResolvedValue([]);
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      // Mock findGeoLocation for the return
+      jest
+        .spyOn(service, 'findGeoLocation')
+        .mockResolvedValue(saveGeoLocationDto as any);
+
+      // Act
+      const result = await service.saveGeoLocation(
+        resultId,
+        saveGeoLocationDto as any,
+      );
+
+      // Assert
+      expect(mockClarisaGeoScopeService.transformGeoScope).toHaveBeenCalledWith(
+        saveGeoLocationDto.geo_scope_id,
+        saveGeoLocationDto.countries,
+      );
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({
+          geo_scope_id: transformedGeoScopeId,
+          comment_geo_scope: 'Test comment for geo scope',
+        }),
+      );
+      expect(
+        mockResultCountriesService.comparerClientToServerCountry,
+      ).toHaveBeenCalledWith(resultId, saveGeoLocationDto.countries);
+      expect(mockUpdateDataUtil.updateLastUpdatedDate).toHaveBeenCalledWith(
+        resultId,
+        mockEntityManager,
+      );
+      expect(result).toEqual(saveGeoLocationDto);
+    });
+
+    it('should save geo location without comment_geo_scope', async () => {
+      // Arrange
+      const resultId = 1;
+      const saveGeoLocationDto = {
+        geo_scope_id: 1,
+        countries: [],
+        regions: [],
+      };
+
+      const transformedGeoScopeId = 1;
+
+      mockClarisaGeoScopeService.transformGeoScope.mockReturnValue(
+        transformedGeoScopeId,
+      );
+      mockResultCountriesService.comparerClientToServerCountry.mockResolvedValue(
+        [],
+      );
+      mockResultCountriesService.create.mockResolvedValue([]);
+      mockResultRegionsService.create.mockResolvedValue([]);
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      jest
+        .spyOn(service, 'findGeoLocation')
+        .mockResolvedValue(saveGeoLocationDto as any);
+
+      // Act
+      const result = await service.saveGeoLocation(
+        resultId,
+        saveGeoLocationDto as any,
+      );
+
+      // Assert
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({
+          geo_scope_id: transformedGeoScopeId,
+          comment_geo_scope: undefined,
+        }),
+      );
+      expect(result).toEqual(saveGeoLocationDto);
+    });
+
+    it('should handle different geo scope types correctly', async () => {
+      // Arrange
+      const resultId = 1;
+      const saveGeoLocationDto = {
+        geo_scope_id: 2, // REGIONAL
+        countries: [],
+        regions: [{ region_id: 1 }],
+        comment_geo_scope: 'Regional scope comment',
+      };
+
+      mockClarisaGeoScopeService.transformGeoScope.mockReturnValue(2);
+      mockResultCountriesService.comparerClientToServerCountry.mockResolvedValue(
+        [],
+      );
+      mockResultCountriesService.create.mockResolvedValue([]);
+      mockResultRegionsService.create.mockResolvedValue([]);
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      jest
+        .spyOn(service, 'findGeoLocation')
+        .mockResolvedValue(saveGeoLocationDto as any);
+
+      // Act
+      await service.saveGeoLocation(resultId, saveGeoLocationDto as any);
+
+      // Assert
+      expect(mockRepository.update).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({
+          comment_geo_scope: 'Regional scope comment',
+        }),
+      );
+      expect(mockResultRegionsService.create).toHaveBeenCalled();
+      expect(mockClarisaGeoScopeService.transformGeoScope).toHaveBeenCalledWith(
+        saveGeoLocationDto.geo_scope_id,
+        saveGeoLocationDto.countries,
+      );
+    });
+  });
+
+  describe('findGeoLocation', () => {
+    it('should find geo location data', async () => {
+      // Arrange
+      const resultId = 1;
+      const mockGeoScopeId = 1;
+      const mockCountries = [
+        {
+          result_country_id: 1,
+          isoAlpha2: 'CO',
+          result_countries_sub_nationals: [],
+        },
+      ];
+      const mockRegions = [{ region_id: 1 }];
+      const mockSubNational = [];
+
+      mockMainRepo.findOne.mockResolvedValue({
+        geo_scope_id: mockGeoScopeId,
+      } as any);
+      mockClarisaGeoScopeService.transformGeoScope.mockReturnValue(
+        mockGeoScopeId,
+      );
+      mockResultCountriesService.find.mockResolvedValue(mockCountries as any);
+      mockResultCountriesSubNationalsService.find.mockResolvedValue(
+        mockSubNational as any,
+      );
+      mockResultRegionsService.find.mockResolvedValue(mockRegions as any);
+
+      // Act
+      const result = await service.findGeoLocation(resultId);
+
+      // Assert
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+        where: { result_id: resultId, is_active: true },
+        select: ['geo_scope_id'],
+      });
+      expect(mockClarisaGeoScopeService.transformGeoScope).toHaveBeenCalledWith(
+        mockGeoScopeId,
+        undefined,
+        false,
+      );
+      expect(mockResultCountriesService.find).toHaveBeenCalled();
+      expect(mockResultRegionsService.find).toHaveBeenCalled();
+      expect(result).toEqual({
+        geo_scope_id: mockGeoScopeId,
+        regions: mockRegions,
+        countries: mockCountries,
+      });
+    });
+
+    it('should handle case when no geo scope found', async () => {
+      // Arrange
+      const resultId = 1;
+
+      mockMainRepo.findOne.mockResolvedValue(null);
+      mockClarisaGeoScopeService.transformGeoScope.mockReturnValue(undefined);
+      mockResultCountriesService.find.mockResolvedValue([]);
+      mockResultCountriesSubNationalsService.find.mockResolvedValue([]);
+      mockResultRegionsService.find.mockResolvedValue([]);
+
+      // Act
+      await service.findGeoLocation(resultId);
+
+      // Assert
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+        where: { result_id: resultId, is_active: true },
+        select: ['geo_scope_id'],
+      });
+      expect(mockClarisaGeoScopeService.transformGeoScope).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+        false,
+      );
     });
   });
 

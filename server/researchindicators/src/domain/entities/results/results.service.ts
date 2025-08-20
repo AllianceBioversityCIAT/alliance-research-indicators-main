@@ -64,6 +64,7 @@ import { ResultInnovationDevService } from '../result-innovation-dev/result-inno
 import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
+import { ResultOicrService } from '../result-oicr/result-oicr.service';
 
 @Injectable()
 export class ResultsService {
@@ -92,6 +93,7 @@ export class ResultsService {
     private readonly _agressoContractService: AgressoContractService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
     private readonly _resultSdgsService: ResultSdgsService,
+    private readonly _resultOicrService: ResultOicrService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -317,6 +319,9 @@ export class ResultsService {
         break;
       case IndicatorsEnum.INNOVATION_DEV:
         await this._resultInnovationDevService.create(resultId, manager);
+        break;
+      case IndicatorsEnum.OICR:
+        await this._resultOicrService.create(resultId);
         break;
       default:
         break;
@@ -764,6 +769,7 @@ export class ResultsService {
         );
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
+        comment_geo_scope: saveGeoLocationDto?.comment_geo_scope,
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 

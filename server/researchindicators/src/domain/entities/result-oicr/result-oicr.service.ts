@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { ResultOicr } from './entities/result-oicr.entity';
 import { StepOneOicrDto } from './dto/step-one-oicr.dto';
@@ -20,6 +25,8 @@ import { StepTwoOicrDto } from './dto/step-two-oicr.dto';
 import { ResultInitiative } from '../result-initiatives/entities/result-initiative.entity';
 import { ResultLeversService } from '../result-levers/result-levers.service';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
+import { ResultsService } from '../results/results.service';
+import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
 
 @Injectable()
 export class ResultOicrService {
@@ -33,6 +40,8 @@ export class ResultOicrService {
     private readonly updateDataUtil: UpdateDataUtil,
     private readonly resultInitiativesService: ResultInitiativesService,
     private readonly resultLeversService: ResultLeversService,
+    @Inject(forwardRef(() => ResultsService))
+    private readonly resultService: ResultsService,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultOicr);
   }
@@ -44,8 +53,27 @@ export class ResultOicrService {
     return this.mainRepo.save(newResultOicr);
   }
 
-  async createOicrSteps(resultId: number) {
+  async createOicrSteps(
+    resultId: number,
+    data: CreateStepsOicrDto,
+    step: number,
+  ) {
     await this.updateDataUtil.updateLastUpdatedDate(resultId);
+
+    switch (step) {
+      case 1:
+        return this.stepOneOicr(data, resultId);
+      case 2:
+        return this.stepTwoOicr(data, resultId);
+      case 3:
+        return this.resultService.saveGeoLocation(resultId, data);
+      case 4:
+        return this.mainRepo.update(resultId, {
+          general_comment: data.general_comment,
+        });
+      default:
+        throw new BadRequestException('Invalid step number');
+    }
   }
 
   async stepTwoOicr(data: StepTwoOicrDto, resultId: number) {
@@ -131,5 +159,69 @@ export class ResultOicrService {
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
     });
+  }
+
+  async findByResultIdAndSteps(resultId: number, step: number) {
+    switch (step) {
+      case 1:
+        return this.findStepOneIoicr(resultId);
+      case 2:
+        return this.findStepTwoOicr(resultId);
+      case 3:
+        return this.resultService.findGeoLocation(resultId);
+      case 4:
+        return this.mainRepo
+          .findOne({
+            where: {
+              result_id: resultId,
+            },
+            select: {
+              general_comment: true,
+            },
+          })
+          .then((result) => result?.general_comment || '');
+      default:
+        throw new BadRequestException('Invalid step number');
+    }
+  }
+
+  private async findStepOneIoicr(resultId: number): Promise<StepOneOicrDto> {
+    const main_contact_person = await this.resultUsersService
+      .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
+      .then((users) => users?.[0]);
+    const linked_result = await this.linkResultService.find(
+      resultId,
+      LinkResultRolesEnum.OICR_STEP_ONE,
+    );
+    const tagging = await this.resultTagsService.find(resultId);
+    const outcome_impact_statement = await this.mainRepo
+      .findOne({
+        where: {
+          result_id: resultId,
+          is_active: true,
+        },
+        select: {
+          outcome_impact_statement: true,
+        },
+      })
+      .then((result) => result?.outcome_impact_statement);
+
+    return {
+      main_contact_person,
+      linked_result,
+      tagging,
+      outcome_impact_statement,
+    };
+  }
+
+  private async findStepTwoOicr(resultId: number): Promise<StepTwoOicrDto> {
+    const initiatives = await this.resultInitiativesService.find(resultId);
+    const allLevers = await this.resultLeversService.find(resultId);
+
+    return {
+      initiatives,
+      primary_lever: allLevers.filter((lever) => lever.is_primary),
+      contributor_lever: allLevers.filter((lever) => !lever.is_primary),
+    };
   }
 }
