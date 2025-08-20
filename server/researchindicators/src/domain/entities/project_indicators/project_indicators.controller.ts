@@ -38,7 +38,29 @@ export class ProjectIndicatorsController {
       );
   }
 
-@Delete(':id/delete')
+  @Get('hierarchy/:id')
+  async getHierarchy(@Param('id') agreement_id: string) {
+    return await this.projectIndicatorsService.getIndicatorsHierarchy(agreement_id).then((data) =>
+      ResponseUtils.format({
+        description: 'Hierarchy found',
+        status: HttpStatus.OK,
+        data: data,
+      }),
+    );
+  }
+
+  @Get('indicators/by-result/:id')
+  async getByResult(@Param('id') result_id: string) {
+    return await this.projectIndicatorsService.findByResult(result_id).then((data) =>
+      ResponseUtils.format({
+        description: 'Indicators found',
+        status: HttpStatus.OK,
+        data: data,
+      }),
+    );
+  }
+
+  @Delete(':id/delete')
   async softDelete(@Param('id') id: number) {
     const result = await this.projectIndicatorsService.softDelete(id);
     
