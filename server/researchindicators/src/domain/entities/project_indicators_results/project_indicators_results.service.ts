@@ -15,8 +15,8 @@ export class ProjectIndicatorsResultsService {
   async syncResultToIndicator(dto: SyncProjectIndicatorsResultDto): Promise<ProjectIndicatorsResult> {
     let contribution: ProjectIndicatorsResult;
 
-    if (dto.id) {
-      contribution = await this.indicatorsResultsRepo.findOne({ where: { id: dto.id } });
+    if (dto.contribution_id) {
+      contribution = await this.indicatorsResultsRepo.findOne({ where: { id: dto.contribution_id } });
       console.log('Contribution found:', contribution);
       if (!contribution) {
         throw new Error('Contribution not found');
@@ -43,7 +43,7 @@ export class ProjectIndicatorsResultsService {
       .leftJoinAndSelect('pir.indicator_id', 'pi', 'pi.is_active = true')
       .leftJoinAndSelect('pir.result_id', 'r', 'r.is_active = true')
       .select([
-        'pir.id AS id_contribution',
+        'pir.id AS contribution_id',
         'CASE WHEN pir.contribution_value = FLOOR(pir.contribution_value) THEN CAST(pir.contribution_value AS SIGNED) ELSE ROUND(pir.contribution_value, 2) END AS contribution_value',
         'pir.result_id AS result_id',
         'pir.indicator_id AS indicator_id',
@@ -52,4 +52,6 @@ export class ProjectIndicatorsResultsService {
       .getRawMany();
     return rows;
   }
+
+  async deleteContribution(){}
 }

@@ -3,7 +3,7 @@ import { IsNotEmpty, IsNumber, IsOptional } from "class-validator";
 export class SyncProjectIndicatorsResultDto {
     @IsOptional()
     @IsNumber()
-    id: number;
+    contribution_id: number;
 
     @IsNotEmpty()
     @IsNumber()
