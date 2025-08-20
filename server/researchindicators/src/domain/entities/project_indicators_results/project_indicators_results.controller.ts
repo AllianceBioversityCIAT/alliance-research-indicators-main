@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Get,
   HttpStatus,
+  Param,
   Post,
   UseInterceptors,
 } from '@nestjs/common';
@@ -26,6 +28,19 @@ export class ProjectIndicatorsResultsController {
     return await this.indicatorsResultsService
       .syncResultToIndicator(syncProjectIndicatorsResultDto)
       .then((data) =>
+        ResponseUtils.format({
+          description: 'Structure created',
+          status: HttpStatus.CREATED,
+          data: data,
+        }),
+      );
+  }
+
+  @Get('by-result/:resultId')
+  async findByResultId(@Param('resultId') resultId: number) {
+    return await this.indicatorsResultsService
+    .findByResultId(resultId)
+    .then((data) =>
         ResponseUtils.format({
           description: 'Structure created',
           status: HttpStatus.CREATED,
