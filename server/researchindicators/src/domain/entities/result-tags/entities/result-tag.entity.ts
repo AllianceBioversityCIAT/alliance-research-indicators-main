@@ -8,6 +8,7 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Tag } from '../../tags/entities/tag.entity';
 import { Result } from '../../results/entities/result.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('result_tags')
 export class ResultTag extends AuditableEntity {
@@ -28,6 +29,10 @@ export class ResultTag extends AuditableEntity {
     type: 'bigint',
     name: 'tag_id',
     nullable: false,
+  })
+  @ApiProperty({
+    description: 'The unique identifier for the tag',
+    example: 1,
   })
   tag_id: number;
 

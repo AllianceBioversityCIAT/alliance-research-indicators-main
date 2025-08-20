@@ -14,8 +14,10 @@ import { ResultsService } from '../results/results.service';
 import { StepOneOicrDto } from './dto/step-one-oicr.dto';
 import { StepTwoOicrDto } from './dto/step-two-oicr.dto';
 import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
+import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
+import { Result } from '../results/entities/result.entity';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -79,6 +81,7 @@ describe('ResultOicrService', () => {
     } as any;
 
     mockResultsService = {
+      createResult: jest.fn(),
       saveGeoLocation: jest.fn(),
       findGeoLocation: jest.fn(),
     } as any;
@@ -125,6 +128,87 @@ describe('ResultOicrService', () => {
       expect(mockMainRepo.create).toHaveBeenCalledWith({ result_id: resultId });
       expect(mockMainRepo.save).toHaveBeenCalledWith(newResultOicr);
       expect(result).toEqual(savedResultOicr);
+    });
+  });
+
+  describe('createOicr', () => {
+    it('should create a complete OICR result with all steps', async () => {
+      // Arrange
+      const mockCreateData: CreateResultOicrDto = {
+        base_information: {
+          result_type_id: 1,
+          title: 'Test Result',
+          description: 'Test Description',
+        } as any,
+        step_one: {
+          outcome_impact_statement: 'Test outcome',
+          main_contact_person: { user_id: 123 },
+          tagging: [{ tag_id: 1 }],
+          linked_result: [{ other_result_id: 456 }],
+        } as any,
+        step_two: {
+          initiatives: [{ clarisa_initiative_id: 1 }],
+          primary_lever: [{ lever_id: 1 }],
+          contributor_lever: [{ lever_id: 2 }],
+        } as any,
+        step_three: {
+          geo_scope_id: 1,
+          regions: [],
+          countries: [],
+        } as any,
+        step_four: {
+          general_comment: 'Test comment',
+        },
+      };
+
+      const mockCreatedResult = { result_id: 123, id: 1 };
+      const mockResultRepo = {
+        update: jest.fn().mockResolvedValue(undefined),
+      } as any;
+
+      mockResultsService.createResult.mockResolvedValue(mockCreatedResult as any);
+      mockResultsService.saveGeoLocation.mockResolvedValue(undefined);
+      mockMainRepo.update.mockResolvedValue(undefined);
+      mockDataSource.getRepository.mockReturnValue(mockResultRepo);
+
+      jest.spyOn(service, 'stepOneOicr').mockResolvedValue(undefined as any);
+      jest.spyOn(service, 'stepTwoOicr').mockResolvedValue(undefined as any);
+
+      // Act
+      const result = await service.createOicr(mockCreateData);
+
+      // Assert
+      expect(mockResultsService.createResult).toHaveBeenCalledWith(mockCreateData.base_information);
+      expect(service.stepOneOicr).toHaveBeenCalledWith(mockCreateData.step_one, mockCreatedResult.result_id);
+      expect(service.stepTwoOicr).toHaveBeenCalledWith(mockCreateData.step_two, mockCreatedResult.result_id);
+      expect(mockResultsService.saveGeoLocation).toHaveBeenCalledWith(mockCreatedResult.result_id, mockCreateData.step_three);
+      expect(mockMainRepo.update).toHaveBeenCalledWith(mockCreatedResult.result_id, {
+        general_comment: mockCreateData.step_four.general_comment,
+      });
+      expect(mockResultRepo.update).toHaveBeenCalledWith(mockCreatedResult.result_id, {
+        description: mockCreateData.step_one.outcome_impact_statement,
+      });
+      expect(result).toEqual(mockCreatedResult);
+    });
+
+    it('should handle error when createResult fails', async () => {
+      // Arrange
+      const mockCreateData: CreateResultOicrDto = {
+        base_information: {
+          result_type_id: 1,
+          title: 'Test Result',
+        } as any,
+        step_one: {} as any,
+        step_two: {} as any,
+        step_three: {} as any,
+        step_four: { general_comment: 'Test' },
+      };
+
+      mockResultsService.createResult.mockRejectedValue(new Error('Create failed'));
+
+      // Act & Assert
+      await expect(service.createOicr(mockCreateData)).rejects.toThrow('Create failed');
+      expect(mockResultsService.createResult).toHaveBeenCalledWith(mockCreateData.base_information);
     });
   });
 
