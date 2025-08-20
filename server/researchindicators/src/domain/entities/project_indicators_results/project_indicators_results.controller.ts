@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpStatus,
   Param,
@@ -44,6 +45,19 @@ export class ProjectIndicatorsResultsController {
         ResponseUtils.format({
           description: 'Structure created',
           status: HttpStatus.CREATED,
+          data: data,
+        }),
+      );
+  }
+
+  @Delete('delete/:contributionId')
+  async deleteContribution(@Param('contributionId') id: number) {
+    return await this.indicatorsResultsService
+      .deleteContribution(id)
+      .then((data) =>
+        ResponseUtils.format({
+          description: 'Structure deleted',
+          status: HttpStatus.OK,
           data: data,
         }),
       );
