@@ -49,9 +49,15 @@ export class ProjectIndicatorsResultsService {
         'pir.indicator_id AS indicator_id',
       ])
       .where('pir.result_id = :resultId', { resultId })
+      .andWhere('pir.is_active = true')
       .getRawMany();
     return rows;
   }
 
-  async deleteContribution(){}
+  async deleteContribution(contributionId: number) {
+    return await this.indicatorsResultsRepo.update(contributionId, {
+      deleted_at: new Date(),
+      is_active: false
+    });
+  }
 }
