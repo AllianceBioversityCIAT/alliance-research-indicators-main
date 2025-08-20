@@ -445,13 +445,17 @@ describe('ResultOicrController', () => {
         status: HttpStatus.CREATED,
       };
 
-      mockResultOicrService.createOicr.mockResolvedValue(expectedServiceResult as any);
+      mockResultOicrService.createOicr.mockResolvedValue(
+        expectedServiceResult as any,
+      );
 
       // Act
       const result = await controller.createResultOicr(mockCreateData);
 
       // Assert
-      expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(mockCreateData);
+      expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(
+        mockCreateData,
+      );
       expect(result).toEqual(expectedResponse);
     });
 
@@ -472,8 +476,12 @@ describe('ResultOicrController', () => {
       mockResultOicrService.createOicr.mockRejectedValue(serviceError);
 
       // Act & Assert
-      await expect(controller.createResultOicr(mockCreateData)).rejects.toThrow('Service error occurred');
-      expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(mockCreateData);
+      await expect(controller.createResultOicr(mockCreateData)).rejects.toThrow(
+        'Service error occurred',
+      );
+      expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(
+        mockCreateData,
+      );
     });
 
     it('should handle empty step data when creating OICR result', async () => {
@@ -510,13 +518,17 @@ describe('ResultOicrController', () => {
         title: 'Minimal OICR Result',
       };
 
-      mockResultOicrService.createOicr.mockResolvedValue(expectedServiceResult as any);
+      mockResultOicrService.createOicr.mockResolvedValue(
+        expectedServiceResult as any,
+      );
 
       // Act
       const result = await controller.createResultOicr(mockCreateData);
 
       // Assert
-      expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(mockCreateData);
+      expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(
+        mockCreateData,
+      );
       expect(result.data).toEqual(expectedServiceResult);
       expect(result.status).toBe(HttpStatus.CREATED);
     });

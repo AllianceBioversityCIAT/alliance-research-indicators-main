@@ -17,7 +17,6 @@ import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
-import { Result } from '../results/entities/result.entity';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -166,7 +165,9 @@ describe('ResultOicrService', () => {
         update: jest.fn().mockResolvedValue(undefined),
       } as any;
 
-      mockResultsService.createResult.mockResolvedValue(mockCreatedResult as any);
+      mockResultsService.createResult.mockResolvedValue(
+        mockCreatedResult as any,
+      );
       mockResultsService.saveGeoLocation.mockResolvedValue(undefined);
       mockMainRepo.update.mockResolvedValue(undefined);
       mockDataSource.getRepository.mockReturnValue(mockResultRepo);
@@ -178,16 +179,33 @@ describe('ResultOicrService', () => {
       const result = await service.createOicr(mockCreateData);
 
       // Assert
-      expect(mockResultsService.createResult).toHaveBeenCalledWith(mockCreateData.base_information);
-      expect(service.stepOneOicr).toHaveBeenCalledWith(mockCreateData.step_one, mockCreatedResult.result_id);
-      expect(service.stepTwoOicr).toHaveBeenCalledWith(mockCreateData.step_two, mockCreatedResult.result_id);
-      expect(mockResultsService.saveGeoLocation).toHaveBeenCalledWith(mockCreatedResult.result_id, mockCreateData.step_three);
-      expect(mockMainRepo.update).toHaveBeenCalledWith(mockCreatedResult.result_id, {
-        general_comment: mockCreateData.step_four.general_comment,
-      });
-      expect(mockResultRepo.update).toHaveBeenCalledWith(mockCreatedResult.result_id, {
-        description: mockCreateData.step_one.outcome_impact_statement,
-      });
+      expect(mockResultsService.createResult).toHaveBeenCalledWith(
+        mockCreateData.base_information,
+      );
+      expect(service.stepOneOicr).toHaveBeenCalledWith(
+        mockCreateData.step_one,
+        mockCreatedResult.result_id,
+      );
+      expect(service.stepTwoOicr).toHaveBeenCalledWith(
+        mockCreateData.step_two,
+        mockCreatedResult.result_id,
+      );
+      expect(mockResultsService.saveGeoLocation).toHaveBeenCalledWith(
+        mockCreatedResult.result_id,
+        mockCreateData.step_three,
+      );
+      expect(mockMainRepo.update).toHaveBeenCalledWith(
+        mockCreatedResult.result_id,
+        {
+          general_comment: mockCreateData.step_four.general_comment,
+        },
+      );
+      expect(mockResultRepo.update).toHaveBeenCalledWith(
+        mockCreatedResult.result_id,
+        {
+          description: mockCreateData.step_one.outcome_impact_statement,
+        },
+      );
       expect(result).toEqual(mockCreatedResult);
     });
 
@@ -204,11 +222,17 @@ describe('ResultOicrService', () => {
         step_four: { general_comment: 'Test' },
       };
 
-      mockResultsService.createResult.mockRejectedValue(new Error('Create failed'));
+      mockResultsService.createResult.mockRejectedValue(
+        new Error('Create failed'),
+      );
 
       // Act & Assert
-      await expect(service.createOicr(mockCreateData)).rejects.toThrow('Create failed');
-      expect(mockResultsService.createResult).toHaveBeenCalledWith(mockCreateData.base_information);
+      await expect(service.createOicr(mockCreateData)).rejects.toThrow(
+        'Create failed',
+      );
+      expect(mockResultsService.createResult).toHaveBeenCalledWith(
+        mockCreateData.base_information,
+      );
     });
   });
 
