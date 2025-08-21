@@ -119,11 +119,11 @@ export class ResultInnovationDevService {
 
     const clarisaInstitutionsType =
       await this._clarisaInstitutionTypesService.findByLikeNames(
-        result.organization_type?.split(',').map((el) => el.trim()),
+        result.organization_type?.map((el) => el.trim()),
       );
     const clarisaInstitutionsSubType =
       await this._clarisaInstitutionTypesService.findByLikeNames(
-        result.organization_sub_type?.split(',').map((el) => el.trim()),
+        result.organization_sub_type?.map((el) => el.trim()),
       );
 
     for (const institutionsType of clarisaInstitutionsType) {
