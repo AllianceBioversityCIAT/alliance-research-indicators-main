@@ -183,7 +183,7 @@ export class ResultInnovationDevService {
     );
 
     return this.dataSource.transaction(async (manager) => {
-      manager.getRepository(this.mainRepo.target).update(resultId, {
+      await manager.getRepository(this.mainRepo.target).update(resultId, {
         innovation_nature_id:
           createResultInnovationDevDto?.innovation_nature_id,
         innovation_readiness_id:
@@ -262,7 +262,6 @@ export class ResultInnovationDevService {
       );
 
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
-
       return this.mainRepo.findOne({
         where: { result_id: resultId, is_active: true },
       });
@@ -332,7 +331,7 @@ export class ResultInnovationDevService {
       knowledgeSharingData?.link_to_result?.map((link) => ({
         other_result_id: link?.other_result_id,
       }));
-    delete knowledgeSharingData.link_to_result;
+    delete knowledgeSharingData?.link_to_result;
 
     if (!knowledgeSharingData?.is_knowledge_sharing || readinessLevel < 7) {
       const defaultAttributes: (keyof ResultInnovationDevKnouldgeSharingDto)[] =

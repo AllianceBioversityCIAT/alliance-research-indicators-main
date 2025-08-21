@@ -18,7 +18,6 @@ import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 
-@Controller('result-oicr')
 @ApiTags('Results')
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)

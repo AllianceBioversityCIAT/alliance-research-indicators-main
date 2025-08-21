@@ -52,6 +52,7 @@ import { GroupsItemsModule } from '../entities/groups_items/groups_items.module'
 import { ProjectIndicatorsModule } from '../entities/project_indicators/project_indicators.module';
 import { TagsModule } from '../entities/tags/tags.module';
 import { ProjectIndicatorsResultsModule } from '../entities/project_indicators_results/project_indicators_results.module';
+import { ResultOicrModule } from '../entities/result-oicr/result-oicr.module';
 
 const capSharingChildren: Routes = [
   {
@@ -74,6 +75,10 @@ const ResultsChildren: Routes = [
         module: IntellectualPropertyOwnersModule,
       },
     ],
+  },
+  {
+    path: 'oicr',
+    module: ResultOicrModule,
   },
   {
     path: 'institutions',
