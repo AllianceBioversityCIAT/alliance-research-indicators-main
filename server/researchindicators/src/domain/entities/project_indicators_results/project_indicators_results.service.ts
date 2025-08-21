@@ -12,29 +12,34 @@ export class ProjectIndicatorsResultsService {
     private readonly indicatorsResultsRepo: Repository<ProjectIndicatorsResult>,
   ) {}
 
-  async syncResultToIndicator(dto: SyncProjectIndicatorsResultDto): Promise<ProjectIndicatorsResult> {
-    let contribution: ProjectIndicatorsResult;
+  async syncResultToIndicator(dtos: SyncProjectIndicatorsResultDto[]): Promise<ProjectIndicatorsResult[]> {
+    const contributions: ProjectIndicatorsResult[] = [];
 
-    if (dto.contribution_id) {
-      contribution = await this.indicatorsResultsRepo.findOne({ where: { id: dto.contribution_id } });
-      console.log('Contribution found:', contribution);
-      if (!contribution) {
-        throw new Error('Contribution not found');
-      }
-      Object.assign(contribution, {
-        result_id: {result_id: dto.result_id},
-        indicator_id: {id: dto.indicator_id},
-        contribution_value: dto.contribution_value
-      });
-    } else {
-      contribution = this.indicatorsResultsRepo.create({
-        result_id: {result_id: dto.result_id},
-        indicator_id: {id: dto.indicator_id},
-        contribution_value: dto.contribution_value
-      });
+    for (const dto of dtos) {
+      let contribution: ProjectIndicatorsResult;
+
+        if (dto.contribution_id) {
+          contribution = await this.indicatorsResultsRepo.findOne({ where: { id: dto.contribution_id } });
+
+          if (!contribution) {
+            throw new Error('Contribution not found');
+          }
+          Object.assign(contribution, {
+            result_id: {result_id: dto.result_id},
+            indicator_id: {id: dto.indicator_id},
+            contribution_value: dto.contribution_value
+          });
+        } else {
+          contribution = this.indicatorsResultsRepo.create({
+            result_id: {result_id: dto.result_id},
+            indicator_id: {id: dto.indicator_id},
+            contribution_value: dto.contribution_value
+          });
+        }
+        contributions.push(contribution);
     }
 
-    return await this.indicatorsResultsRepo.save(contribution);
+    return await this.indicatorsResultsRepo.save(contributions);
   }
 
   async findByResultId(resultId: number): Promise<ProjectIndicatorsResult[]> {
