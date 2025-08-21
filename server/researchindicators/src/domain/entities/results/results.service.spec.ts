@@ -992,6 +992,7 @@ describe('ResultsService', () => {
         // Assert
         expect(mockResultOicrService.create).toHaveBeenCalledWith(
           savedResult.result_id,
+          expect.any(Object),
         );
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
         expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
@@ -2065,7 +2066,7 @@ describe('ResultsService', () => {
         resultId,
         expect.objectContaining({
           geo_scope_id: transformedGeoScopeId,
-          comment_geo_scope: undefined,
+          comment_geo_scope: 'undefined',
         }),
       );
       expect(result).toEqual(saveGeoLocationDto);

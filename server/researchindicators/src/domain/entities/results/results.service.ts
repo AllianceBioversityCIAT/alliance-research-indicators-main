@@ -4,6 +4,8 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { DataSource, EntityManager, In, Not } from 'typeorm';
 import {
@@ -93,6 +95,7 @@ export class ResultsService {
     private readonly _agressoContractService: AgressoContractService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
     private readonly _resultSdgsService: ResultSdgsService,
+    @Inject(forwardRef(() => ResultOicrService))
     private readonly _resultOicrService: ResultOicrService,
   ) {}
 
@@ -240,7 +243,7 @@ export class ResultsService {
           is_primary: true,
         };
 
-        this._resultLeversService.create<LeverRolesEnum>(
+        await this._resultLeversService.create<LeverRolesEnum>(
           result.result_id,
           primaryLever,
           'lever_id',
@@ -321,7 +324,7 @@ export class ResultsService {
         await this._resultInnovationDevService.create(resultId, manager);
         break;
       case IndicatorsEnum.OICR:
-        await this._resultOicrService.create(resultId);
+        await this._resultOicrService.create(resultId, manager);
         break;
       default:
         break;
@@ -769,7 +772,7 @@ export class ResultsService {
         );
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
-        comment_geo_scope: saveGeoLocationDto?.comment_geo_scope,
+        comment_geo_scope: String(saveGeoLocationDto?.comment_geo_scope),
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 

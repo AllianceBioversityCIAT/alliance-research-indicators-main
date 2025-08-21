@@ -4,7 +4,7 @@ import { SaveGeoLocationDto } from '../../results/dto/save-geo-location.dto';
 import { StepOneOicrDto } from './step-one-oicr.dto';
 import { StepTwoOicrDto } from './step-two-oicr.dto';
 
-export class StepThreeOicrDto {
+export class StepFourOicrDto {
   @ApiProperty({ type: SaveGeoLocationDto })
   general_comment?: string;
 }
@@ -16,8 +16,8 @@ export class CreateResultOicrDto {
   step_two: StepTwoOicrDto;
   @ApiProperty({ type: SaveGeoLocationDto })
   step_three: SaveGeoLocationDto;
-  @ApiProperty({ type: StepThreeOicrDto })
-  step_four: StepThreeOicrDto;
+  @ApiProperty({ type: StepFourOicrDto })
+  step_four: StepFourOicrDto;
   @ApiProperty({ type: CreateResultDto })
   base_information: CreateResultDto;
 }
