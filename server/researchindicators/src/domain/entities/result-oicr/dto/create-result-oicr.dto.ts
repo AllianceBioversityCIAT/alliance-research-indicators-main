@@ -5,7 +5,7 @@ import { StepOneOicrDto } from './step-one-oicr.dto';
 import { StepTwoOicrDto } from './step-two-oicr.dto';
 
 export class StepFourOicrDto {
-  @ApiProperty({ type: SaveGeoLocationDto })
+  @ApiProperty({ type: String })
   general_comment?: string;
 }
 
