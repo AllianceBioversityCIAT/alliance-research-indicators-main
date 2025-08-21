@@ -303,4 +303,8 @@ export class AppConfig {
   get SALT(): number {
     return Number(process.env.ARI_SALT);
   }
+
+  get BUCKET_URL(): string {
+    return process.env.ARI_BUCKET_URL;
+  }
 }

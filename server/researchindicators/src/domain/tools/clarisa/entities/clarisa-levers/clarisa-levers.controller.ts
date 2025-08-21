@@ -14,7 +14,7 @@ export class ClarisaLeversController {
     return this.clarisaLeversService.findAll().then((levers) =>
       ResponseUtils.format({
         description: 'Levers found',
-        data: levers,
+        data: this.clarisaLeversService.iconMapper(levers),
         status: HttpStatus.OK,
       }),
     );
