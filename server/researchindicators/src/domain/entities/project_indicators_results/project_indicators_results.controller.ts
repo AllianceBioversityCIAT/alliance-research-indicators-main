@@ -25,12 +25,12 @@ export class ProjectIndicatorsResultsController {
   ) {}
 
   @Post('sync-contribution')
-  async createResult(@Body() syncProjectIndicatorsResultDto: SyncProjectIndicatorsResultDto) {
+  async createResult(@Body() dtos: SyncProjectIndicatorsResultDto[]) {
     return await this.indicatorsResultsService
-      .syncResultToIndicator(syncProjectIndicatorsResultDto)
+      .syncResultToIndicator(dtos)
       .then((data) =>
         ResponseUtils.format({
-          description: 'Structure created',
+          description: 'Contributions synced successfully',
           status: HttpStatus.CREATED,
           data: data,
         }),
@@ -43,8 +43,8 @@ export class ProjectIndicatorsResultsController {
     .findByResultId(resultId)
     .then((data) =>
         ResponseUtils.format({
-          description: 'Structure created',
-          status: HttpStatus.CREATED,
+          description: 'Contributions retrieved successfully',
+          status: HttpStatus.OK,
           data: data,
         }),
       );
@@ -56,7 +56,7 @@ export class ProjectIndicatorsResultsController {
       .deleteContribution(id)
       .then((data) =>
         ResponseUtils.format({
-          description: 'Structure deleted',
+          description: 'Contribution deleted',
           status: HttpStatus.OK,
           data: data,
         }),
