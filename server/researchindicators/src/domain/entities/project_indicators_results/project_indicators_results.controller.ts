@@ -37,10 +37,13 @@ export class ProjectIndicatorsResultsController {
       );
   }
 
-  @Get('by-result/:resultId')
-  async findByResultId(@Param('resultId') resultId: number) {
+  @Get('by-result/:resultId/:agreementId')
+  async findByResultId(
+    @Param('resultId') resultId: number,
+    @Param('agreementId') agreementId: string,
+  ) {
     return await this.indicatorsResultsService
-    .findByResultId(resultId)
+    .findByResultId(resultId, agreementId)
     .then((data) =>
         ResponseUtils.format({
           description: 'Contributions retrieved successfully',
