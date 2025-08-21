@@ -42,20 +42,34 @@ export class ProjectIndicatorsResultsService {
     return await this.indicatorsResultsRepo.save(contributions);
   }
 
-  async findByResultId(resultId: number): Promise<ProjectIndicatorsResult[]> {
-    const rows = await this.indicatorsResultsRepo
-      .createQueryBuilder('pir')
-      .leftJoinAndSelect('pir.indicator_id', 'pi', 'pi.is_active = true')
-      .leftJoinAndSelect('pir.result_id', 'r', 'r.is_active = true')
-      .select([
-        'pir.id AS contribution_id',
-        'CASE WHEN pir.contribution_value = FLOOR(pir.contribution_value) THEN CAST(pir.contribution_value AS SIGNED) ELSE ROUND(pir.contribution_value, 2) END AS contribution_value',
-        'pir.result_id AS result_id',
-        'pir.indicator_id AS indicator_id',
-      ])
-      .where('pir.result_id = :resultId', { resultId })
-      .andWhere('pir.is_active = true')
-      .getRawMany();
+  async findByResultId(resultId: number, agreementId: string): Promise<ProjectIndicatorsResult[]> {
+    console.log('Params:', resultId, agreementId);
+    const rows = await this.indicatorsResultsRepo.query(
+      `
+        SELECT 
+            pir.id AS contribution_id,
+            CASE 
+                WHEN pir.contribution_value = FLOOR(pir.contribution_value) 
+                THEN CAST(pir.contribution_value AS SIGNED) 
+                ELSE ROUND(pir.contribution_value, 2) 
+            END AS contribution_value,
+            pir.result_id AS result_id,
+            pir.indicator_id AS indicator_id
+        FROM project_indicators_results pir
+        LEFT JOIN project_indicators pi 
+            ON pir.indicator_id = pi.id 
+          AND pi.is_active = TRUE
+        LEFT JOIN results r 
+            ON pir.result_id = r.result_id 
+          AND r.is_active = TRUE
+        WHERE pir.result_id = ?
+          AND pi.agreement_id = ?
+          AND pir.is_active = TRUE
+      `,
+      [resultId, agreementId], // parámetros en orden
+    );
+
+      console.log('Rows retrieved:', rows);
     return rows;
   }
 
@@ -64,5 +78,61 @@ export class ProjectIndicatorsResultsService {
       deleted_at: new Date(),
       is_active: false
     });
+  }
+
+  async syncResultToIndicator2(dtos: SyncProjectIndicatorsResultDto[]): Promise<ProjectIndicatorsResult[]> {
+    if (!dtos || dtos.length === 0) {
+      throw new Error('Debe enviar al menos un dto');
+    }
+
+    // Tomamos el result_id de los dtos (asumo que todos son del mismo result)
+    const resultId = dtos[0].result_id;
+
+    // Traemos de BD todos los contributions asociados a ese result
+    const existingContributions = await this.indicatorsResultsRepo.find({
+      where: { result_id: { result_id: resultId } },
+    });
+
+    const contributionsToSave: ProjectIndicatorsResult[] = [];
+    const payloadIds = dtos.map(dto => dto.contribution_id).filter(id => !!id);
+
+    for (const dto of dtos) {
+      let contribution: ProjectIndicatorsResult;
+
+      if (dto.contribution_id) {
+        // Buscar si existe en BD
+        contribution = existingContributions.find(c => c.id === dto.contribution_id);
+
+        if (!contribution) {
+          throw new Error(`Contribution with id ${dto.contribution_id} not found`);
+        }
+
+        Object.assign(contribution, {
+          result_id: { id: dto.result_id },
+          indicator_id: { id: dto.indicator_id },
+          contribution_value: dto.contribution_value,
+        });
+      } else {
+        // Nuevo registro
+        contribution = this.indicatorsResultsRepo.create({
+          result_id: { result_id: dto.result_id },
+          indicator_id: { id: dto.indicator_id },
+          contribution_value: dto.contribution_value,
+        });
+      }
+
+      contributionsToSave.push(contribution);
+    }
+
+    // Guardamos los nuevos y actualizados
+    const savedContributions = await this.indicatorsResultsRepo.save(contributionsToSave);
+
+    // Eliminamos los que ya no están en el payload
+    const toDelete = existingContributions.filter(c => !payloadIds.includes(c.id));
+    if (toDelete.length > 0) {
+      await this.indicatorsResultsRepo.remove(toDelete);
+    }
+
+    return savedContributions;
   }
 }
