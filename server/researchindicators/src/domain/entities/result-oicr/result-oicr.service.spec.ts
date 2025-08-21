@@ -114,18 +114,30 @@ describe('ResultOicrService', () => {
     it('should create a new ResultOicr', async () => {
       // Arrange
       const resultId = 123;
-      const newResultOicr = { result_id: resultId };
       const savedResultOicr = { result_id: resultId, id: 1 };
 
-      mockMainRepo.create.mockReturnValue(newResultOicr as any);
+      mockCurrentUser.audit.mockReturnValue({
+        created_at: new Date(),
+        created_by: 1,
+        updated_at: new Date(),
+        updated_by: 1,
+      });
       mockMainRepo.save.mockResolvedValue(savedResultOicr as any);
 
       // Act
-      const result = await service.create(resultId);
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(mockMainRepo),
+      } as any;
+      const result = await service.create(resultId, mockManager);
 
       // Assert
-      expect(mockMainRepo.create).toHaveBeenCalledWith({ result_id: resultId });
-      expect(mockMainRepo.save).toHaveBeenCalledWith(newResultOicr);
+      expect(mockMainRepo.save).toHaveBeenCalledWith({
+        result_id: resultId,
+        created_at: expect.any(Date),
+        created_by: 1,
+        updated_at: expect.any(Date),
+        updated_by: 1,
+      });
       expect(result).toEqual(savedResultOicr);
     });
   });

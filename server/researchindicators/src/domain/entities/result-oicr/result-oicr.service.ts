@@ -4,7 +4,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultOicr } from './entities/result-oicr.entity';
 import { StepOneOicrDto } from './dto/step-one-oicr.dto';
 import { ResultTagsService } from '../result-tags/result-tags.service';
@@ -29,6 +29,7 @@ import { ResultsService } from '../results/results.service';
 import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { Result } from '../results/entities/result.entity';
+import { selectManager } from '../../shared/utils/orm.util';
 
 @Injectable()
 export class ResultOicrService {
@@ -48,11 +49,16 @@ export class ResultOicrService {
     this.mainRepo = this.dataSource.getRepository(ResultOicr);
   }
 
-  async create(resultId: number) {
-    const newResultOicr = this.mainRepo.create({
+  async create(resultId: number, manager: EntityManager) {
+    const entityManager: Repository<ResultOicr> = selectManager(
+      manager,
+      ResultOicr,
+      this.mainRepo,
+    );
+    return entityManager.save({
       result_id: resultId,
+      ...this.currentUser.audit(SetAutitEnum.NEW),
     });
-    return this.mainRepo.save(newResultOicr);
   }
 
   async createOicr(data: CreateResultOicrDto) {
@@ -61,9 +67,9 @@ export class ResultOicrService {
     await this.stepTwoOicr(data.step_two, result.result_id);
     await this.resultService.saveGeoLocation(result.result_id, data.step_three);
     await this.mainRepo.update(result.result_id, {
-      general_comment: data.step_four.general_comment,
+      general_comment: String(data?.step_four?.general_comment),
     });
-    this.dataSource.getRepository(Result).update(result.result_id, {
+    await this.dataSource.getRepository(Result).update(result.result_id, {
       description: data?.step_one?.outcome_impact_statement,
     });
     return result;
@@ -93,7 +99,7 @@ export class ResultOicrService {
   }
 
   async stepTwoOicr(data: StepTwoOicrDto, resultId: number) {
-    this.dataSource.transaction(async (manager) => {
+    return this.dataSource.transaction(async (manager) => {
       const saveInitiatives: Partial<ResultInitiative>[] = data.initiatives.map(
         (initiative) => ({
           clarisa_initiative_id: initiative.clarisa_initiative_id,
@@ -146,9 +152,11 @@ export class ResultOicrService {
         manager,
       );
 
-      const saveTags: Partial<ResultTag>[] = data?.tagging?.map((tag) => ({
-        tag_id: tag.tag_id,
-      }));
+      const saveTags: Partial<ResultTag>[] = Array.isArray(data?.tagging)
+        ? data?.tagging?.map((tag) => ({
+            tag_id: tag.tag_id,
+          }))
+        : [];
       const createdTags = await this.resultTagsService.create(
         resultId,
         saveTags,
