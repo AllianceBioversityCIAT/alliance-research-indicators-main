@@ -27,6 +27,10 @@ export class GroupsItemsService {
     const nodes = new Map<number, any>();
 
     for (const g of groups) {
+      if (!g.name || !g.code) {
+        continue;
+      }
+
       const indicators =
         g.indicatorPerItem
           ?.filter(
@@ -56,6 +60,8 @@ export class GroupsItemsService {
     const roots: any[] = [];
 
     for (const g of groups) {
+      if (!nodes.has(g.id)) continue;
+      
       const node = nodes.get(g.id);
       const parentId = g.parent_id;
 
