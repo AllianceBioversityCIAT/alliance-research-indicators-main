@@ -91,8 +91,6 @@ export class GroupsItemsService {
       where: { agreement_id: agreementId, parent_id: IsNull(), is_active: true },
     });
 
-    console.log('Existing parents from DB:', existingParentsDB);
-
     return new Map<number, GroupItem>(
       existingParentsDB.map((p) => [p.id, p])
     );
@@ -105,7 +103,7 @@ export class GroupsItemsService {
     existingParentsMap: Map<number, GroupItem>,
     manager: EntityManager
   ): Promise<GroupItem | null> {
-    const payloadParentId = parentPayload.id != null ? parentPayload.id : null;
+    const payloadParentId = parentPayload.id != null ? Number(parentPayload.id) : null;
 
     if (payloadParentId && existingParentsMap.has(payloadParentId)) {
       return this.updateExistingParent(parentPayload, existingParentsMap.get(payloadParentId)!, agreementId, nameLevel1, manager);
@@ -126,9 +124,9 @@ export class GroupsItemsService {
       parent.name = parentPayload.name;
       parent.code = parentPayload.code;
       parent.group_name = nameLevel1;
-      await manager.save(parent);
+      const review = await manager.save(parent);
     }
-    
+
     await this.syncGroupItemIndicators(
       parent.id,
       parentPayload.indicators || [],
@@ -174,7 +172,6 @@ export class GroupsItemsService {
 
     for (const dbParent of existingParents) {
       if (!processedParentIds.has(dbParent.id)) {
-        console.log('Deactivating parent:', dbParent.id);
         await manager.update(
           GroupItem,
           { id: dbParent.id },
@@ -202,7 +199,7 @@ export class GroupsItemsService {
     existingChildsMap: Map<number, GroupItem>,
     manager: EntityManager
   ): Promise<GroupItem | null> {
-    const payloadChildId = childrenPayload.id != null ? childrenPayload.id : null;
+    const payloadChildId = childrenPayload.id != null ? Number(childrenPayload.id) : null;
 
     if (payloadChildId && existingChildsMap.has(payloadChildId)) {
       return this.updateExistingChild(childrenPayload, existingChildsMap.get(payloadChildId)!, agreementId, nameLevel2, manager);
@@ -271,7 +268,6 @@ export class GroupsItemsService {
 
     for (const dbChild of existingChildren) {
       if (!processedChildrensIds.has(dbChild.id)) {
-        console.log('Deactivating child:', dbChild.id);
         await manager.update(
           GroupItem,
           { id: dbChild.id },
