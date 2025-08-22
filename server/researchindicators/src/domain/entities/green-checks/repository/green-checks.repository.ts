@@ -78,6 +78,9 @@ export class GreenCheckRepository {
       case IndicatorsEnum.INNOVATION_DEV:
         spesificQuery = this.innovationDevValidation(result_key);
         break;
+      case IndicatorsEnum.OICR:
+        spesificQuery = `1 as oicr`;
+        break;
     }
 
     if (
