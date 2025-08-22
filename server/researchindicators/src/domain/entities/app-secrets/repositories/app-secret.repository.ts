@@ -26,6 +26,6 @@ export class AppSecretRepository extends Repository<AppSecret> {
     where su.sec_user_id = ?
         and su.is_active = true`;
 
-    return this.query(query, [userId]);
+    return this.query(query, [userId]).then((res) => res?.[0] ?? null);
   }
 }
