@@ -602,8 +602,10 @@ export class ResultsService {
       },
     });
 
-    const { is_principal } =
-      await this.mainRepo.metadataPrincipalInvestigator(result_id);
+    const { is_principal } = await this.mainRepo.metadataPrincipalInvestigator(
+      result_id,
+      this.currentUser.user_id,
+    );
 
     if (!result) {
       throw new NotFoundException('Result not found');
