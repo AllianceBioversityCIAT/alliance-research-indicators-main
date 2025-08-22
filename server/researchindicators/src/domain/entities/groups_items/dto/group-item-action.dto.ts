@@ -14,6 +14,14 @@ export class StructureDto {
   @IsNotEmpty()
   agreement_id: string;
 
+  @IsString()
+  @IsOptional()
+  name_level_1?: string;
+
+  @IsString()
+  @IsOptional()
+  name_level_2?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ParentItemDto)

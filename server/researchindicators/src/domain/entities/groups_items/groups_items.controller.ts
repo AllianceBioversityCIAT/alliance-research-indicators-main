@@ -20,9 +20,9 @@ import { StructureDto } from './dto/group-item-action.dto';
 export class GroupsItemsController {
   constructor(private readonly groupsItemsService: GroupsItemsService) {}
 
-  @Get('items-list/:id')
-  findAll(@Param('id') agreement_id: string) {
-    return this.groupsItemsService.findAll(agreement_id).then((structure) =>
+  @Get('items-list/:agreementId')
+  findAll(@Param('agreementId') agreementId: string) {
+    return this.groupsItemsService.findAll(agreementId).then((structure) =>
       ResponseUtils.format({
         description: 'Structure found',
         status: HttpStatus.OK,
