@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GroupItem } from './entities/groups_item.entity';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { ChildItemDto, ParentItemDto, StructureDto } from './dto/group-item-action.dto';
 import { ProjectIndicator } from '../project_indicators/entities/project_indicator.entity';
 
@@ -63,10 +63,6 @@ export class GroupsItemsService {
         const parentNode = nodes.get(parentId);
         if (parentNode) {
           parentNode.items.push(node);
-        } else {
-          // Si el padre no está presente (por algún motivo), puedes:
-          // - ignorar el nodo, o
-          // - tratarlo como raíz. Aquí lo ignoramos para no duplicar.
         }
       } else {
         roots.push(node);
@@ -80,14 +76,22 @@ export class GroupsItemsService {
     };
     sortRecursively(roots);
 
-    return { structures: roots };
+    const name_level_1 = groups.find((g) => !g.parent_id)?.group_name || '';
+    const name_level_2 = groups.find((g) => g.parent_id)?.group_name || '';
+    
+    return { 
+      name_level_1,
+      name_level_2,
+      structures: roots,
+    };
   }
   
   private async getExistingParentsMap(agreementId: string, manager: EntityManager): Promise<Map<number, GroupItem>> {
-    console.log('🍕 PARENT: Creando Map de padres de la BD')
     const existingParentsDB = await manager.find(GroupItem, {
-      where: { agreement_id: agreementId, parent_id: null, is_active: true },
+      where: { agreement_id: agreementId, parent_id: IsNull(), is_active: true },
     });
+
+    console.log('Existing parents from DB:', existingParentsDB);
 
     return new Map<number, GroupItem>(
       existingParentsDB.map((p) => [p.id, p])
@@ -97,16 +101,16 @@ export class GroupsItemsService {
   private async processParent(
     parentPayload: ParentItemDto,
     agreementId: string,
+    nameLevel1: string | undefined,
     existingParentsMap: Map<number, GroupItem>,
     manager: EntityManager
   ): Promise<GroupItem | null> {
-    console.log('🍕 PARENT: Procesando los padres del payload')
     const payloadParentId = parentPayload.id != null ? parentPayload.id : null;
 
     if (payloadParentId && existingParentsMap.has(payloadParentId)) {
-      return this.updateExistingParent(parentPayload, existingParentsMap.get(payloadParentId)!, agreementId, manager);
+      return this.updateExistingParent(parentPayload, existingParentsMap.get(payloadParentId)!, agreementId, nameLevel1, manager);
     } else {
-      return this.createNewParent(parentPayload, agreementId, manager);
+      return this.createNewParent(parentPayload, agreementId, nameLevel1, manager);
     }     
 
   }
@@ -115,12 +119,13 @@ export class GroupsItemsService {
     parentPayload: ParentItemDto,
     parent: GroupItem,
     agreementId: string,
+    nameLevel1: string | undefined,
     manager: EntityManager
   ): Promise<GroupItem> {
-    console.log('🍕 PARENT: Actualizando padres con cambios')
-    if (parent.name !== parentPayload.name || parent.code !== parentPayload.code) {
+    if (parent.name !== parentPayload.name || parent.code !== parentPayload.code || parent.group_name !== nameLevel1) {
       parent.name = parentPayload.name;
       parent.code = parentPayload.code;
+      parent.group_name = nameLevel1;
       await manager.save(parent);
     }
     
@@ -137,13 +142,14 @@ export class GroupsItemsService {
   private async createNewParent(
     parentPayload: ParentItemDto,
     agreementId: string,
+    nameLevel1: string | undefined,
     manager: EntityManager
   ): Promise<GroupItem> {
-    console.log('🍕 PARENT: Creando nuevo padre')
     const newParent = manager.create(GroupItem, {
       name: parentPayload.name,
       code: parentPayload.code,
       agreement_id: agreementId,
+      group_name: nameLevel1,
       parentGroup: null,
     });
     
@@ -164,22 +170,21 @@ export class GroupsItemsService {
     processedParentIds: Set<number>,
     manager: any
   ): Promise<void> {
-    console.log('🍕 PARENT: Eliminando padres que no vienen en el payload')
     const existingParents = Array.from(existingParentsMap.values());
-    
+
     for (const dbParent of existingParents) {
       if (!processedParentIds.has(dbParent.id)) {
+        console.log('Deactivating parent:', dbParent.id);
         await manager.update(
           GroupItem,
           { id: dbParent.id },
-          { is_active: false }
+          { is_active: false, deleted_at: new Date() }
         );
       }
     }
   }
 
   private async getExistingChildrenMap(parent: GroupItem, agreementId: string, manager: EntityManager): Promise<Map<number, GroupItem>> {
-    console.log('🍔 CHILD: Generando Map de hijos de la BD')
     const existingChildrenDB = await manager.find(GroupItem, {
       where: { agreement_id: agreementId, parent_id: parent.id, is_active: true },
     });
@@ -193,16 +198,16 @@ export class GroupsItemsService {
     parentId: number,
     childrenPayload: ChildItemDto,
     agreementId: string,
+    nameLevel2: string | undefined,
     existingChildsMap: Map<number, GroupItem>,
     manager: EntityManager
   ): Promise<GroupItem | null> {
-    console.log('🍔 CHILD: Procesando hijos del payload')
     const payloadChildId = childrenPayload.id != null ? childrenPayload.id : null;
 
     if (payloadChildId && existingChildsMap.has(payloadChildId)) {
-      return this.updateExistingChild(childrenPayload, existingChildsMap.get(payloadChildId)!, agreementId,manager);
+      return this.updateExistingChild(childrenPayload, existingChildsMap.get(payloadChildId)!, agreementId, nameLevel2, manager);
     } else {
-      return this.createNewChild(childrenPayload, parentId, agreementId, manager);
+      return this.createNewChild(childrenPayload, parentId, agreementId, nameLevel2, manager);
     }
   }
 
@@ -210,12 +215,13 @@ export class GroupsItemsService {
     childPayload: ChildItemDto,
     child: GroupItem,
     agreementId: string,
+    nameLevel2: string | undefined,
     manager: EntityManager
   ): Promise<GroupItem> {
-    console.log('🍔 CHILD: Actualizando hijos con cambios')
-    if (child.name !== childPayload.name || child.code !== childPayload.code) {
+    if (child.name !== childPayload.name || child.code !== childPayload.code || child.group_name !== nameLevel2) {
       child.name = childPayload.name;
       child.code = childPayload.code;
+      child.group_name = nameLevel2;
       await manager.save(child);
     }
     
@@ -233,14 +239,15 @@ export class GroupsItemsService {
     childPayload: ChildItemDto,
     parent: number,
     agreementId: string,
+    nameLevel2: string | undefined,
     manager: EntityManager
   ): Promise<GroupItem> {
-    console.log('🍔 CHILD: Creando nuevo hijo')
     const newChild = manager.create(GroupItem, {
       name: childPayload.name,
       code: childPayload.code,
       agreement_id: agreementId,
       parent_id: parent,
+      group_name: nameLevel2,
     });
 
     const savedChild = await manager.save(newChild);
@@ -260,23 +267,60 @@ export class GroupsItemsService {
     processedChildrensIds: Set<number>,
     manager: any
   ): Promise<void> {
-    console.log('🍔 CHILD: Eliminando hijos que no vienen en el payload')
     const existingChildren = Array.from(existingChildsMap.values());
 
     for (const dbChild of existingChildren) {
       if (!processedChildrensIds.has(dbChild.id)) {
+        console.log('Deactivating child:', dbChild.id);
         await manager.update(
           GroupItem,
           { id: dbChild.id },
-          { is_active: false }
+          { is_active: false },
+          { deleted_at: new Date() }
         );
       }
     }
   }
 
   async syncStructures2(dto: StructureDto) {
-    console.log('🚀 Syncing structures 2...');
     return this.dataSource.transaction(async (manager) => {
+      if (!dto.structures || dto.structures.length === 0) {
+        const { agreement_id, name_level_1, name_level_2 } = dto;
+
+        if (!name_level_1 && !name_level_2) {
+          throw new Error('Debe enviarse al menos name_level_1 o name_level_2');
+        }
+
+        let parentRecord = null;
+        let childRecord = null;
+
+        // Caso 1: guardar nivel 1
+        if (name_level_1) {
+          parentRecord = manager.create(GroupItem, {
+            agreement_id,
+            group_name: name_level_1,
+            is_active: true,
+          });
+          parentRecord = await manager.save(parentRecord);
+        }
+
+        // Caso 2: guardar nivel 2 (con herencia si existe nivel 1)
+        if (name_level_2) {
+          childRecord = manager.create(GroupItem, {
+            agreement_id,
+            group_name: name_level_2,
+            is_active: true,
+            parent_id: parentRecord ? parentRecord.id : null,
+          });
+          childRecord = await manager.save(childRecord);
+        }
+
+        return {
+          message: 'Registro(s) creado(s) con acuerdo y nombre(s) de nivel',
+          data: { parent: parentRecord, child: childRecord },
+        };
+      }
+
       // Traer padres existentes de la BD del proyecto actual
       const existingParentsMap = await this.getExistingParentsMap(dto.agreement_id, manager);
       const processedParentIds  = new Set<number>();
@@ -286,6 +330,7 @@ export class GroupsItemsService {
         const parent = await this.processParent(
           parentPayload,
           dto.agreement_id,
+          dto.name_level_1,
           existingParentsMap,
           manager
         );
@@ -302,6 +347,7 @@ export class GroupsItemsService {
               parent.id,
               childPayload,
               dto.agreement_id,
+              dto.name_level_2,
               existingChildsMap,
               manager
             );
@@ -319,269 +365,6 @@ export class GroupsItemsService {
       return { message: 'Sincronización de padres completada' };
       });
   }
-  
-
-  async syncStructures(dto: StructureDto) {
-    return this.dataSource.transaction(async (manager) => {
-      // 1) Traer padres activos (solo fila padre)
-      const existingParents = await manager
-        .createQueryBuilder(GroupItem, 'g')
-        .where('g.parent_id IS NULL')
-        .andWhere('g.is_active = true')
-        .andWhere('g.agreement_id = :agreementId', { agreementId: dto.agreement_id })
-        .getMany();
-
-      const existingParentsMap = new Map<number, GroupItem>(
-        existingParents.map((p) => [p.id, p]),
-      );
-
-      const processedParentIds = new Set<number>();
-
-      // 2) Procesar cada padre del payload
-      for (const parentPayload of dto.structures || []) {
-        const payloadParentId =
-          parentPayload.id != null ? Number(parentPayload.id) : null;
-        let parent: GroupItem | null = null;
-
-        // buscar padre por id en la DB (priorizar el mapa para rendimiento)
-        if (payloadParentId && existingParentsMap.has(payloadParentId)) {
-          parent = existingParentsMap.get(payloadParentId)!;
-          // actualizar si cambió
-          if (
-            parent.name !== parentPayload.name ||
-            parent.code !== parentPayload.code
-          ) {
-            parent.name = parentPayload.name;
-            parent.code = parentPayload.code;
-            await manager.save(parent);
-          }
-          await this.syncGroupItemIndicators(
-            parent.id,
-            parentPayload.indicators || [],
-            dto.agreement_id,
-            manager,
-          );
-        } else if (payloadParentId) {
-          // puede existir pero inactivo o en otra condición: buscar directamente
-          parent = await manager.findOne(GroupItem, {
-            where: { id: payloadParentId },
-          });
-          if (parent) {
-            const needsUpdate =
-              parent.name !== parentPayload.name ||
-              parent.code !== parentPayload.code ||
-              parent.parentGroup !== null ||
-              !(parent as any).isActive;
-
-            if (needsUpdate) {
-              parent.name = parentPayload.name;
-              parent.code = parentPayload.code;
-              parent.parentGroup = null;
-              (parent as any).isActive = true;
-              await manager.save(parent);
-            }
-
-            await this.syncGroupItemIndicators(
-              parent.id,
-              parentPayload.indicators || [],
-              dto.agreement_id,
-              manager,
-            );
-          } else {
-            // crear nuevo padre si no existe
-            const newParent = manager.create(GroupItem, {
-              name: parentPayload.name,
-              code: parentPayload.code,
-              agreement_id: dto.agreement_id,
-              parentGroup: null,
-              is_active: true,
-            });
-            const savedParent = await manager.save(newParent);
-            parent = savedParent;
-            processedParentIds.add(savedParent.id);
-            await this.syncGroupItemIndicators(
-              savedParent.id,
-              parentPayload.indicators || [],
-              dto.agreement_id,
-              manager,
-            );
-          }
-        } else {
-          // payload sin id: verificar si ya existe un padre con el mismo nombre y código
-          const existsParent = await manager.findOne(GroupItem, {
-            where: {
-              name: parentPayload.name,
-              code: parentPayload.code,
-              parentGroup: null,
-              is_active: true,
-            },
-          });
-
-          if (existsParent) {
-            parent = existsParent;
-            await this.syncGroupItemIndicators(
-              parent.id,
-              parentPayload.indicators || [],
-              dto.agreement_id,
-              manager,
-            );
-          } else {
-            // crear padre nuevo solo si no existe
-            const newParent = manager.create(GroupItem, {
-              name: parentPayload.name,
-              code: parentPayload.code,
-              agreement_id: dto.agreement_id,
-              parentGroup: null,
-            });
-            const savedParent = await manager.save(newParent);
-            parent = savedParent;
-            processedParentIds.add(savedParent.id);
-            await this.syncGroupItemIndicators(
-              savedParent.id,
-              parentPayload.indicators || [],
-              dto.agreement_id,
-              manager,
-            );
-          }
-        }
-
-        // Registrar este padre como procesado
-        if (parent) {
-          processedParentIds.add(parent.id);
-        }
-
-        // 3) Procesar hijos para ESTE padre
-        const createdChildIds: number[] = [];
-        const payloadChildIdsFromPayload: number[] = [];
-
-        for (const childPayload of parentPayload.items || []) {
-          if (childPayload.id != null) {
-            const childId = Number(childPayload.id);
-            payloadChildIdsFromPayload.push(childId);
-
-            // Buscar hijo en DB (si no estaba cargado en memoria)
-            const child = await manager.findOne(GroupItem, {
-              where: { id: childId },
-            });
-
-            if (child) {
-              // actualizar solo si cambió algo
-              const needsUpdate =
-                child.name !== childPayload.name ||
-                child.code !== childPayload.code ||
-                child.parentGroup?.id !== parent!.id ||
-                !(child as any).isActive;
-
-              if (needsUpdate) {
-                child.name = childPayload.name;
-                child.code = childPayload.code;
-                child.parentGroup = parent;
-                (child as any).isActive = true;
-                await manager.save(child);
-              }
-              await this.syncGroupItemIndicators(
-                child.id,
-                childPayload.indicators || [],
-                dto.agreement_id,
-                manager,
-              );
-            } else {
-              // si no existe, crearlo (caso raro)
-              const newChild = manager.create(GroupItem, {
-                name: childPayload.name,
-                code: childPayload.code,
-                agreement_id: dto.agreement_id,
-                parentGroup: parent,
-                isActive: true,
-              });
-              const saved = await manager.save(newChild);
-              await this.syncGroupItemIndicators(
-                saved.id,
-                childPayload.indicators || [],
-                dto.agreement_id,
-                manager,
-              );
-              createdChildIds.push(saved.id);
-            }
-          } else {
-            // payload sin id -> verificar si ya existe un hijo con el mismo nombre y código para este padre
-            const existingChild = await manager.findOne(GroupItem, {
-              where: {
-                name: childPayload.name,
-                code: childPayload.code,
-                parentGroup: { id: parent.id },
-                is_active: true,
-              },
-            });
-
-            if (existingChild) {
-              // Si ya existe, no crear duplicado
-              await this.syncGroupItemIndicators(
-                existingChild.id,
-                childPayload.indicators || [],
-                dto.agreement_id,
-                manager,
-              );
-            } else {
-              // crear hijo nuevo solo si no existe
-              const newChild = manager.create(GroupItem, {
-                name: childPayload.name,
-                code: childPayload.code,
-                agreement_id: dto.agreement_id,
-                parentGroup: parent,
-                isActive: true,
-              });
-              const saved = await manager.save(newChild);
-              await this.syncGroupItemIndicators(
-                saved.id,
-                childPayload.indicators || [],
-                dto.agreement_id,
-                manager,
-              );
-              createdChildIds.push(saved.id);
-            }
-          }
-        }
-
-        // 4) Evitar borrar hijos recién creados: construir el conjunto de ids válidos
-        const validChildIdsSet = new Set<number>([
-          ...payloadChildIdsFromPayload,
-          ...createdChildIds,
-        ]);
-
-        // 5) Tomar el estado actual en DB de los hijos activos de este padre y desactivar los que NO vienen en payload
-        const childrenInDb = await manager
-          .createQueryBuilder(GroupItem, 'c')
-          .where('c.parent_id = :parentId', { parentId: parent.id })
-          .andWhere('c.is_active = true')
-          .getMany();
-
-        for (const dbChild of childrenInDb) {
-          if (!validChildIdsSet.has(dbChild.id)) {
-            await manager.update(
-              GroupItem,
-              { id: dbChild.id },
-              { is_active: false },
-            );
-          }
-        }
-      }
-
-      // 6) Desactivar padres que ya no vienen en el payload
-      // CORRECCIÓN: Usar todos los padres procesados, no solo los que tienen ID
-      for (const dbParent of existingParents) {
-        if (!processedParentIds.has(dbParent.id)) {
-          await manager.update(
-            GroupItem,
-            { id: dbParent.id },
-            { is_active: false },
-          );
-        }
-      }
-
-      return { message: 'Sincronización completada' };
-    });
-  }
 
   private async syncGroupItemIndicators(
     groupItemId: number,
@@ -589,7 +372,6 @@ export class GroupsItemsService {
     agreementId: string,
     manager: EntityManager,
   ) {
-    console.log('🔗 Syncing indicators for groupItemId:', groupItemId);
     // Obtener ids actuales de la relación
     const currentRelations = await manager
       .createQueryBuilder(ProjectIndicator, 'pi')
@@ -682,7 +464,6 @@ export class GroupsItemsService {
           indicatorId = saved.id;
         }
       }
-      console.log('groupItemId:', groupItemId, 'indicatorId:', indicatorId);
       payloadIds.push(indicatorId);
 
       // Asociar si no existe la relación

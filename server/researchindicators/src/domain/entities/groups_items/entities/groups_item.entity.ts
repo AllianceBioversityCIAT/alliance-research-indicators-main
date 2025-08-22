@@ -14,17 +14,20 @@ export class GroupItem extends AuditableEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 255, nullable: false })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   name: string;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  group_name?: string;
+
   @Column({
     name: 'official_code',
     type: 'varchar',
     length: 100,
-    nullable: false,
+    nullable: true,
   })
   code: string;
 
