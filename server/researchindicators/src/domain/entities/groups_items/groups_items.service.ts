@@ -124,7 +124,7 @@ export class GroupsItemsService {
       parent.name = parentPayload.name;
       parent.code = parentPayload.code;
       parent.group_name = nameLevel1;
-      const review = await manager.save(parent);
+      await manager.save(parent);
     }
 
     await this.syncGroupItemIndicators(
