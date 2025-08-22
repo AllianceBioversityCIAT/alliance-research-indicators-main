@@ -12,36 +12,6 @@ export class ProjectIndicatorsResultsService {
     private readonly indicatorsResultsRepo: Repository<ProjectIndicatorsResult>,
   ) {}
 
-  async syncResultToIndicator(dtos: SyncProjectIndicatorsResultDto[]): Promise<ProjectIndicatorsResult[]> {
-    const contributions: ProjectIndicatorsResult[] = [];
-
-    for (const dto of dtos) {
-      let contribution: ProjectIndicatorsResult;
-
-        if (dto.contribution_id) {
-          contribution = await this.indicatorsResultsRepo.findOne({ where: { id: dto.contribution_id } });
-
-          if (!contribution) {
-            throw new Error('Contribution not found');
-          }
-          Object.assign(contribution, {
-            result_id: {result_id: dto.result_id},
-            indicator_id: {id: dto.indicator_id},
-            contribution_value: dto.contribution_value
-          });
-        } else {
-          contribution = this.indicatorsResultsRepo.create({
-            result_id: {result_id: dto.result_id},
-            indicator_id: {id: dto.indicator_id},
-            contribution_value: dto.contribution_value
-          });
-        }
-        contributions.push(contribution);
-    }
-
-    return await this.indicatorsResultsRepo.save(contributions);
-  }
-
   async findByResultId(resultId: number, agreementId: string): Promise<ProjectIndicatorsResult[]> {
     console.log('Params:', resultId, agreementId);
     const rows = await this.indicatorsResultsRepo.query(
@@ -73,25 +43,14 @@ export class ProjectIndicatorsResultsService {
     return rows;
   }
 
-  async deleteContribution(contributionId: number) {
-    return await this.indicatorsResultsRepo.update(contributionId, {
-      deleted_at: new Date(),
-      is_active: false
-    });
-  }
-
-  async syncResultToIndicator2(dtos: SyncProjectIndicatorsResultDto[]): Promise<ProjectIndicatorsResult[]> {
-    if (!dtos || dtos.length === 0) {
-      throw new Error('Debe enviar al menos un dto');
-    }
-
-    // Tomamos el result_id de los dtos (asumo que todos son del mismo result)
-    const resultId = dtos[0].result_id;
-
+  async syncResultToIndicator(dtos: SyncProjectIndicatorsResultDto[], resultId: number): Promise<ProjectIndicatorsResult[]> {
     // Traemos de BD todos los contributions asociados a ese result
-    const existingContributions = await this.indicatorsResultsRepo.find({
-      where: { result_id: { result_id: resultId } },
-    });
+    const existingContributions = await this.indicatorsResultsRepo
+      .createQueryBuilder('pir')
+      .innerJoin('pir.result_id', 'r')
+      .where('r.result_id = :resultId', { resultId: resultId })
+      .andWhere('pir.is_active = true')
+      .getMany();
 
     const contributionsToSave: ProjectIndicatorsResult[] = [];
     const payloadIds = dtos.map(dto => dto.contribution_id).filter(id => !!id);
@@ -102,7 +61,6 @@ export class ProjectIndicatorsResultsService {
       if (dto.contribution_id) {
         // Buscar si existe en BD
         contribution = existingContributions.find(c => c.id === dto.contribution_id);
-
         if (!contribution) {
           throw new Error(`Contribution with id ${dto.contribution_id} not found`);
         }
@@ -130,7 +88,10 @@ export class ProjectIndicatorsResultsService {
     // Eliminamos los que ya no están en el payload
     const toDelete = existingContributions.filter(c => !payloadIds.includes(c.id));
     if (toDelete.length > 0) {
-      await this.indicatorsResultsRepo.remove(toDelete);
+      await this.indicatorsResultsRepo.update(toDelete.map(c => c.id), {
+        deleted_at: new Date(),
+        is_active: false
+      });
     }
 
     return savedContributions;

@@ -24,10 +24,10 @@ export class ProjectIndicatorsResultsController {
     private readonly indicatorsResultsService: ProjectIndicatorsResultsService
   ) {}
 
-  @Post('sync-contribution')
-  async createResult(@Body() dtos: SyncProjectIndicatorsResultDto[]) {
+  @Post('sync-contribution/:resultId')
+  async createResult(@Param('resultId') resultId: number, @Body() dtos: SyncProjectIndicatorsResultDto[]) {
     return await this.indicatorsResultsService
-      .syncResultToIndicator(dtos)
+      .syncResultToIndicator(dtos, resultId)
       .then((data) =>
         ResponseUtils.format({
           description: 'Contributions synced successfully',
@@ -47,19 +47,6 @@ export class ProjectIndicatorsResultsController {
     .then((data) =>
         ResponseUtils.format({
           description: 'Contributions retrieved successfully',
-          status: HttpStatus.OK,
-          data: data,
-        }),
-      );
-  }
-
-  @Delete('delete/:contributionId')
-  async deleteContribution(@Param('contributionId') id: number) {
-    return await this.indicatorsResultsService
-      .deleteContribution(id)
-      .then((data) =>
-        ResponseUtils.format({
-          description: 'Contribution deleted',
           status: HttpStatus.OK,
           data: data,
         }),
