@@ -70,4 +70,15 @@ export class ProjectIndicatorsController {
       data: result,
     });
   }
+
+  @Get('contributions/:agreementId')
+  async getContributionsByResult(@Param('agreementId') agreementId: string) {
+    return await this.projectIndicatorsService.findContributionsByResult(agreementId).then((data) =>
+      ResponseUtils.format({
+        description: 'Contributions found',
+        status: HttpStatus.OK,
+        data: data,
+      }),
+    );
+  }
 }

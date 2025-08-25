@@ -47,9 +47,9 @@ export class CreateProjectIndicatorDto {
     @IsOptional()
     baseline?: number;
 
-    @IsNumber()
+    @IsString()
     @IsOptional()
-    type?: number;
+    type?: string;
 
     @IsString()
     @IsNotEmpty()

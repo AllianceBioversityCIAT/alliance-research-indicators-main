@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
 import { ResultContractsDto } from './dto/response-by-result.dto';
+import { IndicatorWithContributionsDto } from './dto/contribution.dto';
 
 @Injectable()
 export class ProjectIndicatorsService {
@@ -253,5 +254,84 @@ export class ProjectIndicatorsService {
 
     // --- EL RETURN ---
     return result;
+  }
+
+  async findContributionsByResult(agreementID: string): Promise <IndicatorWithContributionsDto[]>{
+    const rawData = await this.indicatorRepository
+      .createQueryBuilder('pi')
+      .select([
+        'pi.id AS indicator_id',
+        'pi.code AS code',
+        'pi.name AS name',
+        'pi.description AS description',
+        'pi.target_unit AS target_unit',
+        'pi.number_type AS number_type',
+        'pi.number_format AS number_format',
+        'CASE WHEN pi.target_value = FLOOR(pi.target_value) THEN CAST(pi.target_value AS SIGNED) ELSE ROUND(pi.target_value, 2) END AS target_value',
+        'CASE WHEN pi.base_line = FLOOR(pi.base_line) THEN CAST(pi.base_line AS SIGNED) ELSE ROUND(pi.base_line, 2) END AS base_line',
+        'pi.year AS year',
+        'pi.type AS type',
+        'CASE WHEN pir.contribution_value = FLOOR(pir.contribution_value) THEN CAST(pir.contribution_value AS SIGNED) ELSE ROUND(pir.contribution_value, 2) END AS contribution_value',
+        'r.result_id AS result_id',
+        'r.result_official_code AS result_official_code',
+        'r.title AS title',
+        'r.description AS result_description',
+      ])
+      .innerJoin('project_indicators_results', 'pir', 'pi.id = pir.indicator_id')
+      .innerJoin('results', 'r', 'pir.result_id = r.result_id')
+      .where('pi.agreement_id = :agreementID', { agreementID })
+      .getRawMany();
+
+      const grouped = Object.values(
+          rawData.reduce((acc, row) => {
+            const {
+              indicator_id,
+              code,
+              name,
+              description,
+              target_unit,
+              number_type,
+              number_format,
+              target_value,
+              base_line,
+              year,
+              type,
+              contribution_value,
+              result_id,
+              result_official_code,
+              title,
+              result_description,
+            } = row;
+
+            if (!acc[indicator_id]) {
+              acc[indicator_id] = {
+                indicator_id,
+                code,
+                name,
+                description,
+                target_unit,
+                number_type,
+                number_format,
+                target_value,
+                base_line,
+                year,
+                type,
+                contributions: [],
+              } as IndicatorWithContributionsDto;
+            }
+
+            acc[indicator_id].contributions.push({
+              result_id,
+              result_official_code,
+              title,
+              description: result_description,
+              contribution_value,
+            });
+
+            return acc;
+          }, {} as Record<number, IndicatorWithContributionsDto>)
+        );
+
+        return grouped as IndicatorWithContributionsDto[];
   }
 }
