@@ -1,10 +1,7 @@
 import {
   Entity,
   PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  OneToMany,
-  JoinColumn,
+  Column
 } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 
@@ -16,15 +13,9 @@ export class ProjectGroup extends AuditableEntity {
   @Column({ name: 'name', type: 'varchar', length: 255, nullable: false })
   name: string;
 
-  @ManyToOne(() => ProjectGroup, (group) => group.childGroups, {
-    nullable: true,
-  })
-  @JoinColumn({ name: 'parent_group_id' })
-  parentGroup?: ProjectGroup;
+  @Column({ name: 'level', type: 'int', nullable: false })
+  level: number;
 
-  @OneToMany(() => ProjectGroup, (group) => group.parentGroup, {
-    cascade: true,
-    onDelete: 'CASCADE',
-  })
-  childGroups: ProjectGroup[];
+  @Column({ name: 'agreement_id', type: 'varchar', nullable: false })
+  agreement_id: string;
 }

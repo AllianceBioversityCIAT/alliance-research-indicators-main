@@ -4,6 +4,7 @@ import { GroupItem } from './entities/groups_item.entity';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { ChildItemDto, ParentItemDto, StructureDto } from './dto/group-item-action.dto';
 import { ProjectIndicator } from '../project_indicators/entities/project_indicator.entity';
+import { ProjectGroup } from '../project_groups/entities/project_group.entity';
 
 @Injectable()
 export class GroupsItemsService {
@@ -82,10 +83,15 @@ export class GroupsItemsService {
     };
     sortRecursively(roots);
 
-    const name_level_1 = groups.find((g) => !g.parent_id)?.group_name || '';
-    const name_level_2 = groups.find((g) => g.parent_id)?.group_name || '';
-    
-    return { 
+    const projectGroups = await this.dataSource.getRepository(ProjectGroup).find({
+      where: { agreement_id, is_active: true },
+      select: ['name', 'level'],
+    });
+
+    const name_level_1 = projectGroups.find((g) => g.level === 1)?.name || '';
+    const name_level_2 = projectGroups.find((g) => g.level === 2)?.name || '';
+
+    return {
       name_level_1,
       name_level_2,
       structures: roots,
@@ -105,16 +111,15 @@ export class GroupsItemsService {
   private async processParent(
     parentPayload: ParentItemDto,
     agreementId: string,
-    nameLevel1: string | undefined,
     existingParentsMap: Map<number, GroupItem>,
     manager: EntityManager
   ): Promise<GroupItem | null> {
     const payloadParentId = parentPayload.id != null ? Number(parentPayload.id) : null;
 
     if (payloadParentId && existingParentsMap.has(payloadParentId)) {
-      return this.updateExistingParent(parentPayload, existingParentsMap.get(payloadParentId)!, agreementId, nameLevel1, manager);
+      return this.updateExistingParent(parentPayload, existingParentsMap.get(payloadParentId)!, agreementId, manager);
     } else {
-      return this.createNewParent(parentPayload, agreementId, nameLevel1, manager);
+      return this.createNewParent(parentPayload, agreementId, manager);
     }     
 
   }
@@ -123,13 +128,11 @@ export class GroupsItemsService {
     parentPayload: ParentItemDto,
     parent: GroupItem,
     agreementId: string,
-    nameLevel1: string | undefined,
     manager: EntityManager
   ): Promise<GroupItem> {
-    if (parent.name !== parentPayload.name || parent.code !== parentPayload.code || parent.group_name !== nameLevel1) {
+    if (parent.name !== parentPayload.name || parent.code !== parentPayload.code) {
       parent.name = parentPayload.name;
       parent.code = parentPayload.code;
-      parent.group_name = nameLevel1;
       await manager.save(parent);
     }
 
@@ -146,14 +149,12 @@ export class GroupsItemsService {
   private async createNewParent(
     parentPayload: ParentItemDto,
     agreementId: string,
-    nameLevel1: string | undefined,
     manager: EntityManager
   ): Promise<GroupItem> {
     const newParent = manager.create(GroupItem, {
       name: parentPayload.name,
       code: parentPayload.code,
       agreement_id: agreementId,
-      group_name: nameLevel1,
       parentGroup: null,
     });
     
@@ -178,6 +179,7 @@ export class GroupsItemsService {
 
     for (const dbParent of existingParents) {
       if (!processedParentIds.has(dbParent.id)) {
+        console.log('Deactivating parent:', dbParent.id, dbParent.name);
         await manager.update(
           GroupItem,
           { id: dbParent.id },
@@ -201,16 +203,15 @@ export class GroupsItemsService {
     parentId: number,
     childrenPayload: ChildItemDto,
     agreementId: string,
-    nameLevel2: string | undefined,
     existingChildsMap: Map<number, GroupItem>,
     manager: EntityManager
   ): Promise<GroupItem | null> {
     const payloadChildId = childrenPayload.id != null ? Number(childrenPayload.id) : null;
 
     if (payloadChildId && existingChildsMap.has(payloadChildId)) {
-      return this.updateExistingChild(childrenPayload, existingChildsMap.get(payloadChildId)!, agreementId, nameLevel2, manager);
+      return this.updateExistingChild(childrenPayload, existingChildsMap.get(payloadChildId)!, agreementId, manager);
     } else {
-      return this.createNewChild(childrenPayload, parentId, agreementId, nameLevel2, manager);
+      return this.createNewChild(childrenPayload, parentId, agreementId, manager);
     }
   }
 
@@ -218,13 +219,11 @@ export class GroupsItemsService {
     childPayload: ChildItemDto,
     child: GroupItem,
     agreementId: string,
-    nameLevel2: string | undefined,
     manager: EntityManager
   ): Promise<GroupItem> {
-    if (child.name !== childPayload.name || child.code !== childPayload.code || child.group_name !== nameLevel2) {
+    if (child.name !== childPayload.name || child.code !== childPayload.code ) {
       child.name = childPayload.name;
       child.code = childPayload.code;
-      child.group_name = nameLevel2;
       await manager.save(child);
     }
     
@@ -242,7 +241,6 @@ export class GroupsItemsService {
     childPayload: ChildItemDto,
     parent: number,
     agreementId: string,
-    nameLevel2: string | undefined,
     manager: EntityManager
   ): Promise<GroupItem> {
     const newChild = manager.create(GroupItem, {
@@ -250,7 +248,6 @@ export class GroupsItemsService {
       code: childPayload.code,
       agreement_id: agreementId,
       parent_id: parent,
-      group_name: nameLevel2,
     });
 
     const savedChild = await manager.save(newChild);
@@ -274,89 +271,57 @@ export class GroupsItemsService {
 
     for (const dbChild of existingChildren) {
       if (!processedChildrensIds.has(dbChild.id)) {
+        console.log('Deactivating child:', dbChild.id, dbChild.name);
         await manager.update(
           GroupItem,
           { id: dbChild.id },
-          { is_active: false },
-          { deleted_at: new Date() }
+          { is_active: false, deleted_at: new Date() }
         );
       }
     }
   }
 
+  async processLevels(dto: any, manager: EntityManager) {
+    const { agreement_id, name_level_1, name_level_2 } = dto;
+
+    if (name_level_1) {
+      await this.upsertLevel(manager, agreement_id, 1, name_level_1);
+    }
+
+    if (name_level_2) {
+      await this.upsertLevel(manager, agreement_id, 2, name_level_2);
+    }
+  }
+
+  private async upsertLevel(
+    manager: EntityManager,
+    agreement_id: string,
+    level: number,
+    name: string,
+  ) {
+    let record = await manager.findOne(ProjectGroup, {
+      where: { agreement_id, level, is_active: true },
+    });
+
+    if (record) {
+      if (record.name !== name) {
+        record.name = name;
+        await manager.save(record);
+      }
+    } else {
+      record = manager.create(ProjectGroup, {
+        agreement_id,
+        name,
+        level,
+        is_active: true,
+      });
+      await manager.save(record);
+    }
+  }
+
   async syncStructures2(dto: StructureDto) {
     return this.dataSource.transaction(async (manager) => {
-    if (!dto.structures || dto.structures.length === 0) {
-      const { agreement_id, name_level_1, name_level_2 } = dto;
-
-      if (!name_level_1 && !name_level_2) {
-        throw new Error('Debe enviarse al menos name_level_1 o name_level_2');
-      }
-
-      let parentRecord = null;
-      let childRecord = null;
-
-      // Caso 1: guardar/actualizar nivel 1
-      if (name_level_1) {
-        parentRecord = await manager.findOne(GroupItem, {
-          where: { agreement_id, parent_id: null, is_active: true },
-        });
-
-        if (parentRecord) {
-          parentRecord.group_name = name_level_1;
-          parentRecord = await manager.save(parentRecord);
-        } else {
-          // Crear si no existe
-          parentRecord = manager.create(GroupItem, {
-            agreement_id,
-            group_name: name_level_1,
-          });
-          parentRecord = await manager.save(parentRecord);
-        }
-      }
-
-      // Caso 2: guardar/actualizar nivel 2 (heredando nivel 1 si aplica)
-      if (name_level_2) {
-        childRecord = await manager.findOne(GroupItem, {
-          where: { agreement_id, parent_id: parentRecord.id, is_active: true },
-        });
-
-        if (childRecord) {
-          // Actualizar si ya existe
-          childRecord.group_name = name_level_2;
-          if (parentRecord) childRecord.parent_id = parentRecord.id;
-          childRecord = await manager.save(childRecord);
-        } else {
-          // Crear si no existe
-          childRecord = manager.create(GroupItem, {
-            agreement_id,
-            group_name: name_level_2,
-            is_active: true,
-            parent_id: parentRecord ? parentRecord.id : null,
-          });
-          childRecord = await manager.save(childRecord);
-        }
-      }
-
-      return {
-        message: 'Registro(s) creado(s) o actualizado(s)',
-        data: { parent: parentRecord, child: childRecord },
-      };
-    } else {
-      const { agreement_id } = dto;
-      const find = await manager.find(GroupItem, {
-        where: { agreement_id, is_active: true, name: IsNull() },
-      });
-
-      for (const item of find) {
-        await manager.update(
-          GroupItem,
-          { id: item.id },
-          { is_active: false, deleted_at: new Date() }
-        );
-      }
-
-    }
+      await this.processLevels(dto, manager);
 
       // Traer padres existentes de la BD del proyecto actual
       const existingParentsMap = await this.getExistingParentsMap(dto.agreement_id, manager);
@@ -367,7 +332,6 @@ export class GroupsItemsService {
         const parent = await this.processParent(
           parentPayload,
           dto.agreement_id,
-          dto.name_level_1,
           existingParentsMap,
           manager
         );
@@ -384,7 +348,6 @@ export class GroupsItemsService {
               parent.id,
               childPayload,
               dto.agreement_id,
-              dto.name_level_2,
               existingChildsMap,
               manager
             );
