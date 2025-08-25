@@ -170,6 +170,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       ac.project_lead_description, 
       ac.start_date, 
       ac.end_date, 
+      ac.endDatefinance,
+      ac.contract_status,
       JSON_ARRAYAGG(
         JSON_OBJECT(
           'indicator', JSON_OBJECT(
@@ -214,6 +216,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       ac.description,
       ac.start_date, 
       ac.end_date, 
+      ac.endDateGlobal,
+      ac.endDatefinance,
       ac.contract_status,
       JSON_ARRAYAGG(
         JSON_OBJECT(

@@ -373,6 +373,18 @@ export class ResultsController {
     );
   }
 
+  @ApiOperation({ summary: 'Create results from AI bulk' })
+  @Post('ai/formalize/bulk')
+  async createResultFromAiBulk(@Body() results: ResultRawAi[]) {
+    return this.resultsService.createResultFromAiBulk(results).then((data) =>
+      ResponseUtils.format({
+        data: data,
+        description: 'AI Results created',
+        status: HttpStatus.CREATED,
+      }),
+    );
+  }
+
   @ApiOperation({ summary: 'Save data for Geo Location' })
   @UseGuards(ResultStatusGuard)
   @GetResultVersion()

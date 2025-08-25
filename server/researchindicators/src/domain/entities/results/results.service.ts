@@ -666,6 +666,15 @@ export class ResultsService {
     return newResult;
   }
 
+  async createResultFromAiBulk(results: ResultRawAi[]) {
+    const resultsCreated: Result[] = [];
+    for (const result of results) {
+      const newResult = await this.formalizeResult(result);
+      resultsCreated.push(newResult);
+    }
+    return resultsCreated;
+  }
+
   async createResultFromAiRoar(result: ResultRawAi) {
     const tmpNewData: ResultAiDto = new ResultAiDto();
     {

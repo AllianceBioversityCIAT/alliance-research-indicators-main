@@ -1865,6 +1865,7 @@ describe('ResultsService', () => {
       });
       expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
         resultId,
+        123,
       );
     });
 
@@ -1884,6 +1885,7 @@ describe('ResultsService', () => {
       );
       expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
         resultId,
+        123,
       );
     });
   });
