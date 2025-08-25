@@ -116,4 +116,7 @@ export class IndicatorDto {
 
   @IsNumber()
   base_line: number;
+
+  @IsString()
+  type: string;
 }

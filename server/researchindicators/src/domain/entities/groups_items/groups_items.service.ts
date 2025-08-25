@@ -441,6 +441,7 @@ export class GroupsItemsService {
             year: ind.years,
             target_unit: ind.targetUnit,
             target_value: ind.targetValue,
+            type: ind.type,
             base_line: ind.baseline,
             agreement_id: agreementId,
           },
@@ -458,6 +459,7 @@ export class GroupsItemsService {
             year: ind.years,
             target_unit: ind.targetUnit,
             target_value: ind.targetValue,
+            type: ind.type,
             base_line: ind.baseline,
             agreement_id: agreementId,
             is_active: true,
@@ -478,6 +480,7 @@ export class GroupsItemsService {
               year: ind.years,
               target_unit: ind.targetUnit,
               target_value: ind.targetValue,
+              type: ind.type,
               base_line: ind.baseline,
               agreement_id: agreementId
             },
@@ -494,6 +497,7 @@ export class GroupsItemsService {
             target_unit: ind.targetUnit,
             target_value: ind.targetValue,
             agreement_id: agreementId,
+            type: ind.type,
             base_line: ind.baseline,
             is_active: ind.isActive,
           });
