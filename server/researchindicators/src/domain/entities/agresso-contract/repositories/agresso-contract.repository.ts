@@ -248,7 +248,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     			'full_name', cl.full_name,
     			'other_names', cl.other_names), NULL) as lever
     FROM agresso_contracts ac
-    INNER JOIN result_contracts rc on rc.contract_id = ac.agreement_id 
+    LEFT JOIN result_contracts rc on rc.contract_id = ac.agreement_id 
     								and rc.is_active = true
     								and rc.is_primary = true
     ${
