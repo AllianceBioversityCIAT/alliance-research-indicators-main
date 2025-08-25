@@ -286,28 +286,48 @@ export class GroupsItemsService {
 
   async syncStructures2(dto: StructureDto) {
     return this.dataSource.transaction(async (manager) => {
-      if (!dto.structures || dto.structures.length === 0) {
-        const { agreement_id, name_level_1, name_level_2 } = dto;
+    if (!dto.structures || dto.structures.length === 0) {
+      const { agreement_id, name_level_1, name_level_2 } = dto;
 
-        if (!name_level_1 && !name_level_2) {
-          throw new Error('Debe enviarse al menos name_level_1 o name_level_2');
-        }
+      if (!name_level_1 && !name_level_2) {
+        throw new Error('Debe enviarse al menos name_level_1 o name_level_2');
+      }
 
-        let parentRecord = null;
-        let childRecord = null;
+      let parentRecord = null;
+      let childRecord = null;
 
-        // Caso 1: guardar nivel 1
-        if (name_level_1) {
+      // Caso 1: guardar/actualizar nivel 1
+      if (name_level_1) {
+        parentRecord = await manager.findOne(GroupItem, {
+          where: { agreement_id, parent_id: null, is_active: true },
+        });
+
+        if (parentRecord) {
+          parentRecord.group_name = name_level_1;
+          parentRecord = await manager.save(parentRecord);
+        } else {
+          // Crear si no existe
           parentRecord = manager.create(GroupItem, {
             agreement_id,
             group_name: name_level_1,
-            is_active: true,
           });
           parentRecord = await manager.save(parentRecord);
         }
+      }
 
-        // Caso 2: guardar nivel 2 (con herencia si existe nivel 1)
-        if (name_level_2) {
+      // Caso 2: guardar/actualizar nivel 2 (heredando nivel 1 si aplica)
+      if (name_level_2) {
+        childRecord = await manager.findOne(GroupItem, {
+          where: { agreement_id, parent_id: parentRecord.id, is_active: true },
+        });
+
+        if (childRecord) {
+          // Actualizar si ya existe
+          childRecord.group_name = name_level_2;
+          if (parentRecord) childRecord.parent_id = parentRecord.id;
+          childRecord = await manager.save(childRecord);
+        } else {
+          // Crear si no existe
           childRecord = manager.create(GroupItem, {
             agreement_id,
             group_name: name_level_2,
@@ -316,12 +336,27 @@ export class GroupsItemsService {
           });
           childRecord = await manager.save(childRecord);
         }
-
-        return {
-          message: 'Registro(s) creado(s) con acuerdo y nombre(s) de nivel',
-          data: { parent: parentRecord, child: childRecord },
-        };
       }
+
+      return {
+        message: 'Registro(s) creado(s) o actualizado(s)',
+        data: { parent: parentRecord, child: childRecord },
+      };
+    } else {
+      const { agreement_id } = dto;
+      const find = await manager.find(GroupItem, {
+        where: { agreement_id, is_active: true, name: IsNull() },
+      });
+
+      for (const item of find) {
+        await manager.update(
+          GroupItem,
+          { id: item.id },
+          { is_active: false, deleted_at: new Date() }
+        );
+      }
+
+    }
 
       // Traer padres existentes de la BD del proyecto actual
       const existingParentsMap = await this.getExistingParentsMap(dto.agreement_id, manager);
