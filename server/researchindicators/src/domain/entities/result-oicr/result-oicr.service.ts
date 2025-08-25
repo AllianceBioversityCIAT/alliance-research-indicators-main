@@ -30,10 +30,14 @@ import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { Result } from '../results/entities/result.entity';
 import { selectManager } from '../../shared/utils/orm.util';
+import { MessageMicroservice } from '../../tools/broker/message.microservice';
+import { AppConfig } from '../../shared/utils/app-config.util';
+import { TemplateService } from '../../shared/auxiliar/template/template.service';
+import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
+import { ResultOicrRepository } from './repositories/result-oicr.repository';
 
 @Injectable()
 export class ResultOicrService {
-  private readonly mainRepo: Repository<ResultOicr>;
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUser: CurrentUserUtil,
@@ -45,9 +49,11 @@ export class ResultOicrService {
     private readonly resultLeversService: ResultLeversService,
     @Inject(forwardRef(() => ResultsService))
     private readonly resultService: ResultsService,
-  ) {
-    this.mainRepo = this.dataSource.getRepository(ResultOicr);
-  }
+    private readonly messageMicroservice: MessageMicroservice,
+    private readonly appConfig: AppConfig,
+    private readonly templateService: TemplateService,
+    private readonly mainRepo: ResultOicrRepository,
+  ) {}
 
   async create(resultId: number, manager: EntityManager) {
     const entityManager: Repository<ResultOicr> = selectManager(
@@ -72,7 +78,27 @@ export class ResultOicrService {
     await this.dataSource.getRepository(Result).update(result.result_id, {
       description: data?.step_one?.outcome_impact_statement,
     });
+
+    await this.sendMessageOicr(result.result_id);
+
     return result;
+  }
+
+  async sendMessageOicr(resultId: number) {
+    const messageData = await this.mainRepo.getDataToNewOicrMessage(resultId);
+    const template = await this.templateService._getTemplate(
+      TemplateEnum.OICR_NOTIFICATION_CREATED,
+      messageData,
+    );
+    if (template) {
+      await this.messageMicroservice.sendEmail({
+        subject: `[STAR] - New OICR Submission #${messageData.result_code}`,
+        to: this.appConfig.SPRM_EMAIL_SAFE(this.currentUser.email),
+        message: {
+          socketFile: Buffer.from(template),
+        },
+      });
+    }
   }
 
   async createOicrSteps(

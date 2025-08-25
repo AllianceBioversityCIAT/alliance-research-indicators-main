@@ -307,4 +307,12 @@ export class AppConfig {
   get BUCKET_URL(): string {
     return process.env.ARI_BUCKET_URL;
   }
+
+  get SPRM_EMAIL(): string {
+    return process.env.ARI_SPRM_EMAIL;
+  }
+
+  SPRM_EMAIL_SAFE(currentUserEmail: string): string {
+    return this.ARI_IS_PRODUCTION ? this.SPRM_EMAIL : currentUserEmail;
+  }
 }
