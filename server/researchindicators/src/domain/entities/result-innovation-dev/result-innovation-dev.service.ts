@@ -117,14 +117,24 @@ export class ResultInnovationDevService {
       });
     }
 
-    const clarisaInstitutionsType =
-      await this._clarisaInstitutionTypesService.findByLikeNames(
-        result.organization_type?.map((el) => el.trim()),
-      );
-    const clarisaInstitutionsSubType =
-      await this._clarisaInstitutionTypesService.findByLikeNames(
-        result.organization_sub_type?.map((el) => el.trim()),
-      );
+    const preProcessedTypes = this.processDataArrayString(
+      result?.organization_type,
+    );
+    const clarisaInstitutionsType = preProcessedTypes.length
+      ? await this._clarisaInstitutionTypesService.findByLikeNames(
+          preProcessedTypes,
+        )
+      : [];
+
+    const preProcessedSubTypes = this.processDataArrayString(
+      result?.organization_sub_type,
+    );
+
+    const clarisaInstitutionsSubType = preProcessedSubTypes.length
+      ? await this._clarisaInstitutionTypesService.findByLikeNames(
+          preProcessedSubTypes,
+        )
+      : [];
 
     for (const institutionsType of clarisaInstitutionsType) {
       newInstitutionTypes.push({
@@ -150,6 +160,16 @@ export class ResultInnovationDevService {
       newInstitutionTypes as CreateResultInstitutionTypeDto[];
 
     return innovationDev;
+  }
+
+  processDataArrayString(input: string | string[]): string[] {
+    if (Array.isArray(input)) {
+      return input?.map((el) => el.trim());
+    }
+    if (typeof input === 'string') {
+      return input?.split(',').map((el) => el.trim());
+    }
+    return [];
   }
 
   async create(resultId: number, manager?: EntityManager) {
