@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GroupsItemsService } from './groups_items.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { GroupItem } from './entities/groups_item.entity';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 describe('GroupsItemsService', () => {
   let service: GroupsItemsService;
@@ -91,7 +91,6 @@ describe('GroupsItemsService', () => {
   });
 
   describe('syncStructures2', () => {
-    
     function createMockQueryBuilder() {
       return {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -127,14 +126,19 @@ describe('GroupsItemsService', () => {
       const managerMock: any = {
         find: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation((_, obj) => obj),
-        save: jest.fn().mockImplementation(async (obj) => ({ ...obj, id: Math.floor(Math.random() * 1000) })),
+        save: jest.fn().mockImplementation(async (obj) => ({
+          ...obj,
+          id: Math.floor(Math.random() * 1000),
+        })),
         update: jest.fn().mockResolvedValue({ affected: 1 }),
         createQueryBuilder: jest.fn().mockReturnValue(createMockQueryBuilder()),
         findOne: jest.fn().mockResolvedValue(null),
         remove: jest.fn().mockResolvedValue({}),
         softDelete: jest.fn().mockResolvedValue({ affected: 0 }),
       };
-      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+      dataSource.transaction = jest
+        .fn()
+        .mockImplementation(async (cb) => cb(managerMock));
 
       const dto = {
         agreement_id: 'agreement1',
@@ -143,23 +147,32 @@ describe('GroupsItemsService', () => {
         structures: [],
       };
       const result = await service.syncStructures2(dto);
-      expect(result.message).toBe('Registro(s) creado(s) con acuerdo y nombre(s) de nivel');
+      expect(result.message).toBe(
+        'Registro(s) creado(s) con acuerdo y nombre(s) de nivel',
+      );
       expect(result.data.parent).toBeDefined();
       expect(result.data.child).toBeDefined();
     });
 
     it('should throw error if no names and no structures', async () => {
       const managerMock: any = {};
-      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+      dataSource.transaction = jest
+        .fn()
+        .mockImplementation(async (cb) => cb(managerMock));
       const dto = { agreement_id: 'agreement1', structures: [] };
-      await expect(service.syncStructures2(dto)).rejects.toThrow('Debe enviarse al menos name_level_1 o name_level_2');
+      await expect(service.syncStructures2(dto)).rejects.toThrow(
+        'Debe enviarse al menos name_level_1 o name_level_2',
+      );
     });
 
     it('should process structures and deactivate missing parents/children', async () => {
       const managerMock: any = {
         find: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation((_, obj) => obj),
-        save: jest.fn().mockImplementation(async (obj) => ({ ...obj, id: Math.floor(Math.random() * 1000) })),
+        save: jest.fn().mockImplementation(async (obj) => ({
+          ...obj,
+          id: Math.floor(Math.random() * 1000),
+        })),
         update: jest.fn().mockResolvedValue({ affected: 1 }),
         createQueryBuilder: jest.fn().mockReturnValue(createMockQueryBuilder()),
         findOne: jest.fn().mockResolvedValue(null),
@@ -167,7 +180,9 @@ describe('GroupsItemsService', () => {
         softDelete: jest.fn().mockResolvedValue({ affected: 0 }),
       };
 
-      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+      dataSource.transaction = jest
+        .fn()
+        .mockImplementation(async (cb) => cb(managerMock));
 
       const dto = {
         agreement_id: 'agreement1',

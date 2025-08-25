@@ -2,12 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProjectIndicatorsResultsService } from './project_indicators_results.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ProjectIndicatorsResult } from './entities/project_indicators_result.entity';
-import { Repository } from 'typeorm';
 import { SyncProjectIndicatorsResultDto } from './dto/sync-project_indicators_result.dto';
 
 describe('ProjectIndicatorsResultsService', () => {
   let service: ProjectIndicatorsResultsService;
-  let repo: Repository<ProjectIndicatorsResult>;
 
   const mockRepo = {
     query: jest.fn(),
@@ -28,8 +26,9 @@ describe('ProjectIndicatorsResultsService', () => {
       ],
     }).compile();
 
-    service = module.get<ProjectIndicatorsResultsService>(ProjectIndicatorsResultsService);
-    repo = module.get<Repository<ProjectIndicatorsResult>>(getRepositoryToken(ProjectIndicatorsResult));
+    service = module.get<ProjectIndicatorsResultsService>(
+      ProjectIndicatorsResultsService,
+    );
 
     jest.clearAllMocks();
   });
@@ -47,7 +46,10 @@ describe('ProjectIndicatorsResultsService', () => {
 
       const rows = await service.findByResultId(resultId, agreementId);
 
-      expect(mockRepo.query).toHaveBeenCalledWith(expect.any(String), [resultId, agreementId]);
+      expect(mockRepo.query).toHaveBeenCalledWith(expect.any(String), [
+        resultId,
+        agreementId,
+      ]);
       expect(rows).toBe(mockRows);
     });
   });
@@ -55,11 +57,21 @@ describe('ProjectIndicatorsResultsService', () => {
   describe('syncResultToIndicator', () => {
     it('should create new contributions and save them', async () => {
       const dtos: SyncProjectIndicatorsResultDto[] = [
-        { contribution_id: undefined, result_id: 1, indicator_id: 2, contribution_value: 100 },
+        {
+          contribution_id: undefined,
+          result_id: 1,
+          indicator_id: 2,
+          contribution_value: 100,
+        },
       ];
       const resultId = 1;
       const mockExisting = [];
-      const mockCreated = { id: 10, result_id: { result_id: 1 }, indicator_id: { id: 2 }, contribution_value: 100 };
+      const mockCreated = {
+        id: 10,
+        result_id: { result_id: 1 },
+        indicator_id: { id: 2 },
+        contribution_value: 100,
+      };
       const mockSaved = [mockCreated];
 
       mockRepo.createQueryBuilder.mockReturnValue({
@@ -85,10 +97,17 @@ describe('ProjectIndicatorsResultsService', () => {
 
     it('should update existing contributions', async () => {
       const dtos: SyncProjectIndicatorsResultDto[] = [
-        { contribution_id: 5, result_id: 1, indicator_id: 2, contribution_value: 200 },
+        {
+          contribution_id: 5,
+          result_id: 1,
+          indicator_id: 2,
+          contribution_value: 200,
+        },
       ];
       const resultId = 1;
-      const mockExisting = [{ id: 5, result_id: {}, indicator_id: {}, contribution_value: 100 }];
+      const mockExisting = [
+        { id: 5, result_id: {}, indicator_id: {}, contribution_value: 100 },
+      ];
       const mockSaved = [mockExisting[0]];
 
       mockRepo.createQueryBuilder.mockReturnValue({
@@ -108,7 +127,12 @@ describe('ProjectIndicatorsResultsService', () => {
 
     it('should throw error if contribution_id not found', async () => {
       const dtos: SyncProjectIndicatorsResultDto[] = [
-        { contribution_id: 99, result_id: 1, indicator_id: 2, contribution_value: 200 },
+        {
+          contribution_id: 99,
+          result_id: 1,
+          indicator_id: 2,
+          contribution_value: 200,
+        },
       ];
       const resultId = 1;
       const mockExisting = [{ id: 5 }];
@@ -120,12 +144,19 @@ describe('ProjectIndicatorsResultsService', () => {
         getMany: jest.fn().mockResolvedValue(mockExisting),
       });
 
-      await expect(service.syncResultToIndicator(dtos, resultId)).rejects.toThrow('Contribution with id 99 not found');
+      await expect(
+        service.syncResultToIndicator(dtos, resultId),
+      ).rejects.toThrow('Contribution with id 99 not found');
     });
 
     it('should update deleted_at and is_active for removed contributions', async () => {
       const dtos: SyncProjectIndicatorsResultDto[] = [
-        { contribution_id: 1, result_id: 1, indicator_id: 2, contribution_value: 100 },
+        {
+          contribution_id: 1,
+          result_id: 1,
+          indicator_id: 2,
+          contribution_value: 100,
+        },
       ];
       const resultId = 1;
       const mockExisting = [
@@ -145,10 +176,13 @@ describe('ProjectIndicatorsResultsService', () => {
 
       await service.syncResultToIndicator(dtos, resultId);
 
-      expect(mockRepo.update).toHaveBeenCalledWith([2], expect.objectContaining({
-        is_active: false,
-        deleted_at: expect.any(Date),
-      }));
+      expect(mockRepo.update).toHaveBeenCalledWith(
+        [2],
+        expect.objectContaining({
+          is_active: false,
+          deleted_at: expect.any(Date),
+        }),
+      );
     });
   });
 });
