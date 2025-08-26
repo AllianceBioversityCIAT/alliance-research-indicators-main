@@ -67,6 +67,7 @@ import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
+import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 
 @Injectable()
 export class ResultsService {
@@ -170,7 +171,10 @@ export class ResultsService {
     return query.getMany();
   }
 
-  async createResult(createResult: CreateResultDto): Promise<Result> {
+  async createResult(
+    createResult: CreateResultDto,
+    platform_code: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
+  ): Promise<Result> {
     const { invalidFields, isValid } = validObject(createResult, [
       'contract_id',
       'indicator_id',
@@ -213,6 +217,7 @@ export class ResultsService {
           result_official_code: newOfficialCode,
           report_year_id: year,
           is_snapshot: false,
+          platform_code,
           ...this.currentUser.audit(SetAutitEnum.NEW),
         })
         .then((result) => {

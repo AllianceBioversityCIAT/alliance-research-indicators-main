@@ -15,7 +15,7 @@ export class CreatedOicrTemplate1756143877136 implements MigrationInterface {
                                 <p>A new OICR has been submitted and is ready for review.</p>
                                 <p>
                                 <b>Submission Number:</b>
-                                {result_code} <br />
+                                {{result_code}} <br />
                                 <b>Title:</b> {{result_title}} <br />
                                 <b>Project Code:</b> {{contract_code}} – {{contract_description}} <br />
                                 <b>Principal Investigator:</b> {{principal_investigator}} <br />
