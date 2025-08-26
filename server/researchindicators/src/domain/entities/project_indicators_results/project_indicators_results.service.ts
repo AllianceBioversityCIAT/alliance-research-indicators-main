@@ -13,7 +13,6 @@ export class ProjectIndicatorsResultsService {
   ) {}
 
   async findByResultId(resultId: number, agreementId: string): Promise<ProjectIndicatorsResult[]> {
-    console.log('Params:', resultId, agreementId);
     const rows = await this.indicatorsResultsRepo.query(
       `
         SELECT 
@@ -39,7 +38,6 @@ export class ProjectIndicatorsResultsService {
       [resultId, agreementId], // parámetros en orden
     );
 
-      console.log('Rows retrieved:', rows);
     return rows;
   }
 

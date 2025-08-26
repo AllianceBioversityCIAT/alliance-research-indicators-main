@@ -179,7 +179,6 @@ export class GroupsItemsService {
 
     for (const dbParent of existingParents) {
       if (!processedParentIds.has(dbParent.id)) {
-        console.log('Deactivating parent:', dbParent.id, dbParent.name);
         await manager.update(
           GroupItem,
           { id: dbParent.id },
@@ -271,7 +270,6 @@ export class GroupsItemsService {
 
     for (const dbChild of existingChildren) {
       if (!processedChildrensIds.has(dbChild.id)) {
-        console.log('Deactivating child:', dbChild.id, dbChild.name);
         await manager.update(
           GroupItem,
           { id: dbChild.id },
