@@ -16,6 +16,7 @@ import { ClarisaInnovationCharacteristicsModule } from './entities/clarisa-innov
 import { ClarisaInnovationTypesModule } from './entities/clarisa-innovation-types/clarisa-innovation-types.module';
 import { ClarisaActorTypesModule } from './entities/clarisa-actor-types/clarisa-actor-types.module';
 import { ClarisaSdgsModule } from './entities/clarisa-sdgs/clarisa-sdgs.module';
+import { ClarisaInitiativesModule } from './entities/clarisa-initiatives/clarisa-initiatives.module';
 
 @Module({
   providers: [ClarisaService],
@@ -36,6 +37,7 @@ import { ClarisaSdgsModule } from './entities/clarisa-sdgs/clarisa-sdgs.module';
     ClarisaInnovationTypesModule,
     ClarisaActorTypesModule,
     ClarisaSdgsModule,
+    ClarisaInitiativesModule,
   ],
   exports: [ClarisaService],
 })
