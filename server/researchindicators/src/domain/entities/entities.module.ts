@@ -62,6 +62,10 @@ import { AppSecretsModule } from './app-secrets/app-secrets.module';
 import { AppSecretHostListModule } from './app-secret-host-list/app-secret-host-list.module';
 import { UserSettingsModule } from './user-settings/user-settings.module';
 import { SettingKeysModule } from './setting-keys/setting-keys.module';
+import { ResultOicrModule } from './result-oicr/result-oicr.module';
+import { ResultTagsModule } from './result-tags/result-tags.module';
+import { TagsModule } from './tags/tags.module';
+import { ResultInitiativesModule } from './result-initiatives/result-initiatives.module';
 
 @Module({
   imports: [
@@ -128,6 +132,10 @@ import { SettingKeysModule } from './setting-keys/setting-keys.module';
     AppSecretHostListModule,
     UserSettingsModule,
     SettingKeysModule,
+    ResultOicrModule,
+    ResultTagsModule,
+    TagsModule,
+    ResultInitiativesModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

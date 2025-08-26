@@ -13,8 +13,13 @@ import { ClarisaInnovationTypesModule } from '../entities/clarisa-innovation-typ
 import { ClarisaInnovationCharacteristicsModule } from '../entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.module';
 import { ClarisaActorTypesModule } from '../entities/clarisa-actor-types/clarisa-actor-types.module';
 import { ClarisaSdgsModule } from '../entities/clarisa-sdgs/clarisa-sdgs.module';
+import { ClarisaInitiativesModule } from '../entities/clarisa-initiatives/clarisa-initiatives.module';
 
 export const clarisaRoutes: Routes = [
+  {
+    path: 'initiatives',
+    module: ClarisaInitiativesModule,
+  },
   {
     path: 'countries',
     module: ClarisaCountriesModule,
