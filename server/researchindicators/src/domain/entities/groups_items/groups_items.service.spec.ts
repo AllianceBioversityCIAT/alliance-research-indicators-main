@@ -22,7 +22,7 @@ describe('GroupsItemsService', () => {
       getRepository: jest.fn().mockReturnValue({
         find: jest.fn().mockResolvedValue([
           { name: 'Level1', level: 1 },
-          { name: 'Level2', level: 2 }
+          { name: 'Level2', level: 2 },
         ]),
         createQueryBuilder: jest.fn(),
         save: jest.fn(),
@@ -152,7 +152,9 @@ describe('GroupsItemsService', () => {
 
     it('should create new parent and child when none exist', async () => {
       const managerMock = createMockEntityManager();
-      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+      dataSource.transaction = jest
+        .fn()
+        .mockImplementation(async (cb) => cb(managerMock));
 
       const dtoCreate = {
         agreement_id: 'agreement1',
@@ -175,7 +177,7 @@ describe('GroupsItemsService', () => {
                     number_format: 'format2',
                     years: [2023],
                     target_unit: 'unit2',
-                    target_value: 50, 
+                    target_value: 50,
                     base_line: 25,
                     type: 'type2',
                     level: 2,
@@ -203,7 +205,9 @@ describe('GroupsItemsService', () => {
       };
 
       const result = await service.syncStructures2(dtoCreate);
-      expect(result).toEqual({ message: 'Sincronización de padres completada' });
+      expect(result).toEqual({
+        message: 'Sincronización de padres completada',
+      });
       expect(managerMock.save).toHaveBeenCalled();
       expect(managerMock.create).toHaveBeenCalled();
       expect(managerMock.update).toHaveBeenCalled();
@@ -214,33 +218,35 @@ describe('GroupsItemsService', () => {
       const childId = 456;
       const managerMock = createMockEntityManager();
       managerMock.find.mockImplementationOnce(async () => [
-        { 
-          id: parentId, 
-          name: 'OldParent', 
-          code: 'OP', 
-          agreement_id: 'agreement1', 
-          parent_id: null
-        }
+        {
+          id: parentId,
+          name: 'OldParent',
+          code: 'OP',
+          agreement_id: 'agreement1',
+          parent_id: null,
+        },
       ]);
-      
+
       // Mock the second call for existing children
       managerMock.find.mockImplementationOnce(async () => [
-        { 
-          id: childId, 
-          name: 'OldChild', 
-          code: 'OC', 
-          agreement_id: 'agreement1', 
-          parent_id: parentId 
-        }
+        {
+          id: childId,
+          name: 'OldChild',
+          code: 'OC',
+          agreement_id: 'agreement1',
+          parent_id: parentId,
+        },
       ]);
 
       // Mock save to return the saved entity with id
       managerMock.save.mockImplementation(async (entity) => ({
         ...entity,
-        id: entity.id || Math.floor(Math.random() * 1000)
+        id: entity.id || Math.floor(Math.random() * 1000),
       }));
 
-      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+      dataSource.transaction = jest
+        .fn()
+        .mockImplementation(async (cb) => cb(managerMock));
 
       const dtoUpdate = {
         agreement_id: 'agreement1',
@@ -265,15 +271,18 @@ describe('GroupsItemsService', () => {
       };
 
       const result = await service.syncStructures2(dtoUpdate);
-      expect(result).toEqual({ message: 'Sincronización de padres completada' });
+      expect(result).toEqual({
+        message: 'Sincronización de padres completada',
+      });
       expect(managerMock.save).toHaveBeenCalled();
     });
 
     it('should deactivate parents and children not in payload', async () => {
       const parentId = 111;
-      const childId = 222;
       const managerMock = createMockEntityManager();
-      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+      dataSource.transaction = jest
+        .fn()
+        .mockImplementation(async (cb) => cb(managerMock));
 
       const dto = {
         agreement_id: 'agreement1',
@@ -283,17 +292,21 @@ describe('GroupsItemsService', () => {
       };
 
       const result = await service.syncStructures2(dto);
-      expect(result).toEqual({ message: 'Sincronización de padres completada' });
+      expect(result).toEqual({
+        message: 'Sincronización de padres completada',
+      });
       expect(managerMock.update).toHaveBeenCalledWith(
         expect.anything(),
         { id: parentId },
-        expect.objectContaining({ is_active: false })
+        expect.objectContaining({ is_active: false }),
       );
     });
 
     it('should handle indicators creation and association', async () => {
       const managerMock = createMockEntityManager();
-      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+      dataSource.transaction = jest
+        .fn()
+        .mockImplementation(async (cb) => cb(managerMock));
 
       const dtoIndicators = {
         agreement_id: 'agreement1',
@@ -325,7 +338,9 @@ describe('GroupsItemsService', () => {
       };
 
       const result = await service.syncStructures2(dtoIndicators);
-      expect(result).toEqual({ message: 'Sincronización de padres completada' });
+      expect(result).toEqual({
+        message: 'Sincronización de padres completada',
+      });
       expect(managerMock.save).toHaveBeenCalled();
       expect(managerMock.create).toHaveBeenCalled();
       expect(managerMock.query).toHaveBeenCalled();
