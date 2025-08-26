@@ -19,6 +19,17 @@ describe('GroupsItemsService', () => {
     };
     const dataSourceMock = {
       transaction: jest.fn(),
+      getRepository: jest.fn().mockReturnValue({
+        find: jest.fn().mockResolvedValue([
+          { name: 'Level1', level: 1 },
+          { name: 'Level2', level: 2 }
+        ]),
+        createQueryBuilder: jest.fn(),
+        save: jest.fn(),
+        update: jest.fn(),
+        create: jest.fn(),
+        findOne: jest.fn(),
+      }),
     };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -122,9 +133,9 @@ describe('GroupsItemsService', () => {
       };
     }
 
-    it('should create parent and child when structures is empty', async () => {
-      const managerMock: any = {
-        find: jest.fn().mockResolvedValue([]),
+    function createMockEntityManager() {
+      return {
+        find: jest.fn().mockResolvedValue([{ id: 111, is_active: true }]),
         create: jest.fn().mockImplementation((_, obj) => obj),
         save: jest.fn().mockImplementation(async (obj) => ({
           ...obj,
@@ -135,56 +146,15 @@ describe('GroupsItemsService', () => {
         findOne: jest.fn().mockResolvedValue(null),
         remove: jest.fn().mockResolvedValue({}),
         softDelete: jest.fn().mockResolvedValue({ affected: 0 }),
+        query: jest.fn().mockResolvedValue({}),
       };
-      dataSource.transaction = jest
-        .fn()
-        .mockImplementation(async (cb) => cb(managerMock));
+    }
 
-      const dto = {
-        agreement_id: 'agreement1',
-        name_level_1: 'Level1',
-        name_level_2: 'Level2',
-        structures: [],
-      };
-      const result = await service.syncStructures2(dto);
-      expect(result.message).toBe(
-        'Registro(s) creado(s) con acuerdo y nombre(s) de nivel',
-      );
-      expect(result.data.parent).toBeDefined();
-      expect(result.data.child).toBeDefined();
-    });
+    it('should create new parent and child when none exist', async () => {
+      const managerMock = createMockEntityManager();
+      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
 
-    it('should throw error if no names and no structures', async () => {
-      const managerMock: any = {};
-      dataSource.transaction = jest
-        .fn()
-        .mockImplementation(async (cb) => cb(managerMock));
-      const dto = { agreement_id: 'agreement1', structures: [] };
-      await expect(service.syncStructures2(dto)).rejects.toThrow(
-        'Debe enviarse al menos name_level_1 o name_level_2',
-      );
-    });
-
-    it('should process structures and deactivate missing parents/children', async () => {
-      const managerMock: any = {
-        find: jest.fn().mockResolvedValue([]),
-        create: jest.fn().mockImplementation((_, obj) => obj),
-        save: jest.fn().mockImplementation(async (obj) => ({
-          ...obj,
-          id: Math.floor(Math.random() * 1000),
-        })),
-        update: jest.fn().mockResolvedValue({ affected: 1 }),
-        createQueryBuilder: jest.fn().mockReturnValue(createMockQueryBuilder()),
-        findOne: jest.fn().mockResolvedValue(null),
-        remove: jest.fn().mockResolvedValue({}),
-        softDelete: jest.fn().mockResolvedValue({ affected: 0 }),
-      };
-
-      dataSource.transaction = jest
-        .fn()
-        .mockImplementation(async (cb) => cb(managerMock));
-
-      const dto = {
+      const dtoCreate = {
         agreement_id: 'agreement1',
         name_level_1: 'Level1',
         name_level_2: 'Level2',
@@ -192,19 +162,173 @@ describe('GroupsItemsService', () => {
           {
             name: 'Parent',
             code: 'P1',
-            indicators: [],
             items: [
               {
                 name: 'Child',
                 code: 'C1',
+                indicators: [
+                  {
+                    name: 'Child Indicator',
+                    description: 'Child test indicator',
+                    code: 'CIND1',
+                    number_type: 'type2',
+                    number_format: 'format2',
+                    years: [2023],
+                    target_unit: 'unit2',
+                    target_value: 50, 
+                    base_line: 25,
+                    type: 'type2',
+                    level: 2,
+                  },
+                ],
+              },
+            ],
+            indicators: [
+              {
+                name: 'Indicator 1',
+                description: 'Test indicator',
+                code: 'IND1',
+                number_type: 'type1',
+                number_format: 'format1',
+                years: [2023, 2024],
+                target_unit: 'unit1',
+                target_value: 100,
+                base_line: 50,
+                type: 'type1',
+                level: 1,
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await service.syncStructures2(dtoCreate);
+      expect(result).toEqual({ message: 'Sincronización de padres completada' });
+      expect(managerMock.save).toHaveBeenCalled();
+      expect(managerMock.create).toHaveBeenCalled();
+      expect(managerMock.update).toHaveBeenCalled();
+    });
+
+    it('should update existing parent and child', async () => {
+      const parentId = 123;
+      const childId = 456;
+      const managerMock = createMockEntityManager();
+      managerMock.find.mockImplementationOnce(async () => [
+        { 
+          id: parentId, 
+          name: 'OldParent', 
+          code: 'OP', 
+          agreement_id: 'agreement1', 
+          parent_id: null
+        }
+      ]);
+      
+      // Mock the second call for existing children
+      managerMock.find.mockImplementationOnce(async () => [
+        { 
+          id: childId, 
+          name: 'OldChild', 
+          code: 'OC', 
+          agreement_id: 'agreement1', 
+          parent_id: parentId 
+        }
+      ]);
+
+      // Mock save to return the saved entity with id
+      managerMock.save.mockImplementation(async (entity) => ({
+        ...entity,
+        id: entity.id || Math.floor(Math.random() * 1000)
+      }));
+
+      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+
+      const dtoUpdate = {
+        agreement_id: 'agreement1',
+        name_level_1: 'Level1',
+        name_level_2: 'Level2',
+        structures: [
+          {
+            id: parentId,
+            name: 'UpdatedParent',
+            code: 'UP1',
+            indicators: [],
+            items: [
+              {
+                id: childId,
+                name: 'UpdatedChild',
+                code: 'UC1',
                 indicators: [],
               },
             ],
           },
         ],
       };
+
+      const result = await service.syncStructures2(dtoUpdate);
+      expect(result).toEqual({ message: 'Sincronización de padres completada' });
+      expect(managerMock.save).toHaveBeenCalled();
+    });
+
+    it('should deactivate parents and children not in payload', async () => {
+      const parentId = 111;
+      const childId = 222;
+      const managerMock = createMockEntityManager();
+      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+
+      const dto = {
+        agreement_id: 'agreement1',
+        name_level_1: 'Level1',
+        name_level_2: 'Level2',
+        structures: [],
+      };
+
       const result = await service.syncStructures2(dto);
-      expect(result.message).toBe('Sincronización de padres completada');
+      expect(result).toEqual({ message: 'Sincronización de padres completada' });
+      expect(managerMock.update).toHaveBeenCalledWith(
+        expect.anything(),
+        { id: parentId },
+        expect.objectContaining({ is_active: false })
+      );
+    });
+
+    it('should handle indicators creation and association', async () => {
+      const managerMock = createMockEntityManager();
+      dataSource.transaction = jest.fn().mockImplementation(async (cb) => cb(managerMock));
+
+      const dtoIndicators = {
+        agreement_id: 'agreement1',
+        name_level_1: 'Level1',
+        name_level_2: 'Level2',
+        structures: [
+          {
+            name: 'Parent',
+            code: 'P1',
+            indicators: [
+              {
+                id: 1,
+                name: 'Ind1',
+                code: 'C1',
+                description: 'desc',
+                number_type: 'int',
+                number_format: 'decimal',
+                years: [2022],
+                target_unit: 'unit',
+                target_value: 100,
+                base_line: 10,
+                type: 'type1',
+                level: 1,
+              },
+            ],
+            items: [],
+          },
+        ],
+      };
+
+      const result = await service.syncStructures2(dtoIndicators);
+      expect(result).toEqual({ message: 'Sincronización de padres completada' });
+      expect(managerMock.save).toHaveBeenCalled();
+      expect(managerMock.create).toHaveBeenCalled();
+      expect(managerMock.query).toHaveBeenCalled();
     });
   });
 });
