@@ -267,7 +267,4 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultOicr, (resultOicr) => resultOicr.result)
   result_oicrs!: ResultOicr[];
-
-  @OneToMany(() => ProjectIndicatorsResult, (pir) => pir.result_id)
-  projectIndicatorsResult: ProjectIndicatorsResult[];
 }
