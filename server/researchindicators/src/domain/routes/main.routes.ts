@@ -48,6 +48,7 @@ import { ResultIpRightsModule } from '../entities/result-ip-rights/result-ip-rig
 import { IpRightsApplicationOptionsModule } from '../entities/ip-rights-application-options/ip-rights-application-options.module';
 import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
 import { UserSettingsModule } from '../entities/user-settings/user-settings.module';
+import { TagsModule } from '../entities/tags/tags.module';
 import { GroupsItemsModule } from '../entities/groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from '../entities/project_indicators/project_indicators.module';
 import { ProjectIndicatorsResultsModule } from '../entities/project_indicators_results/project_indicators_results.module';
@@ -268,6 +269,10 @@ const children: Routes = [
   {
     path: 'gender',
     module: GendersModule,
+  },
+  {
+    path: 'tags',
+    module: TagsModule,
   },
   {
     path: 'opensearch',

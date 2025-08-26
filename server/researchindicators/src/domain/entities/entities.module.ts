@@ -62,6 +62,10 @@ import { AppSecretsModule } from './app-secrets/app-secrets.module';
 import { AppSecretHostListModule } from './app-secret-host-list/app-secret-host-list.module';
 import { UserSettingsModule } from './user-settings/user-settings.module';
 import { SettingKeysModule } from './setting-keys/setting-keys.module';
+import { ResultOicrModule } from './result-oicr/result-oicr.module';
+import { ResultTagsModule } from './result-tags/result-tags.module';
+import { TagsModule } from './tags/tags.module';
+import { ResultInitiativesModule } from './result-initiatives/result-initiatives.module';
 import { ProjectGroupsModule } from './project_groups/project_groups.module';
 import { GroupsItemsModule } from './groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from './project_indicators/project_indicators.module';
@@ -133,6 +137,10 @@ import { ProjectIndicatorsResultsModule } from './project_indicators_results/pro
     AppSecretHostListModule,
     UserSettingsModule,
     SettingKeysModule,
+    ResultOicrModule,
+    ResultTagsModule,
+    TagsModule,
+    ResultInitiativesModule,
     ProjectGroupsModule,
     GroupsItemsModule,
     ProjectIndicatorsModule,
