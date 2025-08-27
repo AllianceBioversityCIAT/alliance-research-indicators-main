@@ -3,10 +3,10 @@ import { SecRolesEnum } from '../enum/sec_role.enum';
 import { ROLES_KEY } from '../guards/roles.guard';
 
 /**
- * Decorador para definir los roles requeridos para acceder a un endpoint.
- * Los usuarios con rol GENERAL_ADMIN o GLOBAL siempre tendrán acceso automáticamente.
+ * Decorator to define the roles required to access an endpoint.
+ * Users with the GENERAL_ADMIN or GLOBAL role will always have access automatically.
  *
- * @param roles - Array de roles que pueden acceder al endpoint
+ * @param roles - List of roles allowed to access the endpoint
  *
  * @example
  * ```typescript
@@ -14,9 +14,10 @@ import { ROLES_KEY } from '../guards/roles.guard';
  * @UseGuards(RolesGuard)
  * @Get()
  * async getData() {
- *   // Solo usuarios con rol CONTRIBUTOR, CONTRACT_CONTRIBUTOR, GENERAL_ADMIN o GLOBAL pueden acceder
+ *   // Only users with the roles CONTRIBUTOR, CONTRACT_CONTRIBUTOR, GENERAL_ADMIN, or GLOBAL can access
  * }
  * ```
  */
+
 export const Roles = (...roles: SecRolesEnum[]) =>
   SetMetadata(ROLES_KEY, roles);
