@@ -30,11 +30,11 @@ export class ProjectIndicatorsService {
       ])
       .addSelect(
         'CASE WHEN pi.target_value = FLOOR(pi.target_value) THEN CAST(pi.target_value AS SIGNED) ELSE ROUND(pi.target_value, 2) END',
-        'target_value'
+        'target_value',
       )
       .addSelect(
         'CASE WHEN pi.base_line = FLOOR(pi.base_line) THEN CAST(pi.base_line AS SIGNED) ELSE ROUND(pi.base_line, 2) END',
-        'base_line'
+        'base_line',
       )
       .where('pi.is_active = true')
       .andWhere('pi.agreement_id = :agreement_id', { agreement_id })
@@ -55,11 +55,15 @@ export class ProjectIndicatorsService {
     })) as CreateProjectIndicatorDto[];
   }
 
-  async syncIndicator(dto: CreateProjectIndicatorDto): Promise<ProjectIndicator> {
+  async syncIndicator(
+    dto: CreateProjectIndicatorDto,
+  ): Promise<ProjectIndicator> {
     let indicator: ProjectIndicator;
 
     if (dto.id) {
-      indicator = await this.indicatorRepository.findOne({ where: { id: dto.id } });
+      indicator = await this.indicatorRepository.findOne({
+        where: { id: dto.id },
+      });
       if (!indicator) {
         throw new Error(`Indicator with id ${dto.id} not found`);
       }
@@ -96,9 +100,9 @@ export class ProjectIndicatorsService {
   }
 
   async softDelete(id: number) {
-    return await this.indicatorRepository.update(id, { 
+    return await this.indicatorRepository.update(id, {
       deleted_at: new Date(),
-      is_active: false
+      is_active: false,
     });
   }
 
@@ -234,7 +238,7 @@ export class ProjectIndicatorsService {
       // Buscamos el padre (si existe en el rawData)
       let parent_item = null;
       if (row.parent_id) {
-        const parentRow = rawData.find(r => r.item_id === row.parent_id);
+        const parentRow = rawData.find((r) => r.item_id === row.parent_id);
         if (parentRow) {
           parent_item = {
             id: parentRow.item_id,
@@ -256,7 +260,9 @@ export class ProjectIndicatorsService {
     return result;
   }
 
-  async findContributionsByResult(agreementID: string): Promise <IndicatorWithContributionsDto[]>{
+  async findContributionsByResult(
+    agreementID: string,
+  ): Promise<IndicatorWithContributionsDto[]> {
     const rawData = await this.indicatorRepository
       .createQueryBuilder('pi')
       .select([
@@ -277,14 +283,42 @@ export class ProjectIndicatorsService {
         'r.title AS title',
         'r.description AS result_description',
       ])
-      .innerJoin('project_indicators_results', 'pir', 'pi.id = pir.indicator_id')
+      .innerJoin(
+        'project_indicators_results',
+        'pir',
+        'pi.id = pir.indicator_id',
+      )
       .innerJoin('results', 'r', 'pir.result_id = r.result_id')
       .where('pi.agreement_id = :agreementID', { agreementID })
+      .andWhere('r.is_active = true')
+      .andWhere('pir.is_active = true')
+      .andWhere('pi.is_active = true')
       .getRawMany();
 
-      const grouped = Object.values(
-          rawData.reduce((acc, row) => {
-            const {
+    const grouped = Object.values(
+      rawData.reduce(
+        (acc, row) => {
+          const {
+            indicator_id,
+            code,
+            name,
+            description,
+            target_unit,
+            number_type,
+            number_format,
+            target_value,
+            base_line,
+            year,
+            type,
+            contribution_value,
+            result_id,
+            result_official_code,
+            title,
+            result_description,
+          } = row;
+
+          if (!acc[indicator_id]) {
+            acc[indicator_id] = {
               indicator_id,
               code,
               name,
@@ -296,42 +330,24 @@ export class ProjectIndicatorsService {
               base_line,
               year,
               type,
-              contribution_value,
-              result_id,
-              result_official_code,
-              title,
-              result_description,
-            } = row;
+              contributions: [],
+            } as IndicatorWithContributionsDto;
+          }
 
-            if (!acc[indicator_id]) {
-              acc[indicator_id] = {
-                indicator_id,
-                code,
-                name,
-                description,
-                target_unit,
-                number_type,
-                number_format,
-                target_value,
-                base_line,
-                year,
-                type,
-                contributions: [],
-              } as IndicatorWithContributionsDto;
-            }
+          acc[indicator_id].contributions.push({
+            result_id,
+            result_official_code,
+            title,
+            description: result_description,
+            contribution_value,
+          });
 
-            acc[indicator_id].contributions.push({
-              result_id,
-              result_official_code,
-              title,
-              description: result_description,
-              contribution_value,
-            });
+          return acc;
+        },
+        {} as Record<number, IndicatorWithContributionsDto>,
+      ),
+    );
 
-            return acc;
-          }, {} as Record<number, IndicatorWithContributionsDto>)
-        );
-
-        return grouped as IndicatorWithContributionsDto[];
+    return grouped as IndicatorWithContributionsDto[];
   }
 }

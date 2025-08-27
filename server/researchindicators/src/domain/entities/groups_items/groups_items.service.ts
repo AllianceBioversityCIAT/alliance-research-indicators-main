@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GroupItem } from './entities/groups_item.entity';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
-import { ChildItemDto, ParentItemDto, StructureDto } from './dto/group-item-action.dto';
+import {
+  ChildItemDto,
+  ParentItemDto,
+  StructureDto,
+} from './dto/group-item-action.dto';
 import { ProjectIndicator } from '../project_indicators/entities/project_indicator.entity';
 import { ProjectGroup } from '../project_groups/entities/project_group.entity';
 
@@ -19,7 +23,10 @@ export class GroupsItemsService {
       .createQueryBuilder('gi')
       .leftJoinAndSelect('gi.parentGroup', 'parentGroup')
       .leftJoinAndSelect('gi.indicatorPerItem', 'indicatorPerItem')
-      .leftJoinAndSelect('indicatorPerItem.projectIndicator', 'projectIndicator')
+      .leftJoinAndSelect(
+        'indicatorPerItem.projectIndicator',
+        'projectIndicator',
+      )
       .where('gi.is_active = :active', { active: true })
       .andWhere('gi.agreement_id = :agreementId', { agreementId: agreement_id })
       .orderBy('gi.id', 'ASC')
@@ -40,6 +47,7 @@ export class GroupsItemsService {
           .map((ipi) => ({
             id: ipi.projectIndicator.id.toString(),
             name: ipi.projectIndicator.name,
+            code: ipi.projectIndicator.code || '',
             description: ipi.projectIndicator.description || '',
             numberType: ipi.projectIndicator.number_type,
             numberFormat: ipi.projectIndicator.number_format || 'decimal',
@@ -47,6 +55,7 @@ export class GroupsItemsService {
             targetUnit: ipi.projectIndicator.target_unit || '',
             targetValue: Number(ipi.projectIndicator.target_value) || 0,
             baseline: Number(ipi.projectIndicator.base_line) || 0,
+            type: ipi.projectIndicator.type || '',
           })) || [];
 
       nodes.set(g.id, {
@@ -62,7 +71,7 @@ export class GroupsItemsService {
 
     for (const g of groups) {
       if (!nodes.has(g.id)) continue;
-      
+
       const node = nodes.get(g.id);
       const parentId = g.parent_id;
 
@@ -83,10 +92,12 @@ export class GroupsItemsService {
     };
     sortRecursively(roots);
 
-    const projectGroups = await this.dataSource.getRepository(ProjectGroup).find({
-      where: { agreement_id, is_active: true },
-      select: ['name', 'level'],
-    });
+    const projectGroups = await this.dataSource
+      .getRepository(ProjectGroup)
+      .find({
+        where: { agreement_id, is_active: true },
+        select: ['name', 'level'],
+      });
 
     const name_level_1 = projectGroups.find((g) => g.level === 1)?.name || '';
     const name_level_2 = projectGroups.find((g) => g.level === 2)?.name || '';
@@ -97,40 +108,53 @@ export class GroupsItemsService {
       structures: roots,
     };
   }
-  
-  private async getExistingParentsMap(agreementId: string, manager: EntityManager): Promise<Map<number, GroupItem>> {
+
+  private async getExistingParentsMap(
+    agreementId: string,
+    manager: EntityManager,
+  ): Promise<Map<number, GroupItem>> {
     const existingParentsDB = await manager.find(GroupItem, {
-      where: { agreement_id: agreementId, parent_id: IsNull(), is_active: true },
+      where: {
+        agreement_id: agreementId,
+        parent_id: IsNull(),
+        is_active: true,
+      },
     });
 
-    return new Map<number, GroupItem>(
-      existingParentsDB.map((p) => [p.id, p])
-    );
+    return new Map<number, GroupItem>(existingParentsDB.map((p) => [p.id, p]));
   }
 
   private async processParent(
     parentPayload: ParentItemDto,
     agreementId: string,
     existingParentsMap: Map<number, GroupItem>,
-    manager: EntityManager
+    manager: EntityManager,
   ): Promise<GroupItem | null> {
-    const payloadParentId = parentPayload.id != null ? Number(parentPayload.id) : null;
+    const payloadParentId =
+      parentPayload.id != null ? Number(parentPayload.id) : null;
 
     if (payloadParentId && existingParentsMap.has(payloadParentId)) {
-      return this.updateExistingParent(parentPayload, existingParentsMap.get(payloadParentId)!, agreementId, manager);
+      return this.updateExistingParent(
+        parentPayload,
+        existingParentsMap.get(payloadParentId)!,
+        agreementId,
+        manager,
+      );
     } else {
       return this.createNewParent(parentPayload, agreementId, manager);
-    }     
-
+    }
   }
 
   private async updateExistingParent(
     parentPayload: ParentItemDto,
     parent: GroupItem,
     agreementId: string,
-    manager: EntityManager
+    manager: EntityManager,
   ): Promise<GroupItem> {
-    if (parent.name !== parentPayload.name || parent.code !== parentPayload.code) {
+    if (
+      parent.name !== parentPayload.name ||
+      parent.code !== parentPayload.code
+    ) {
       parent.name = parentPayload.name;
       parent.code = parentPayload.code;
       await manager.save(parent);
@@ -140,16 +164,16 @@ export class GroupsItemsService {
       parent.id,
       parentPayload.indicators || [],
       agreementId,
-      manager
+      manager,
     );
-    
+
     return parent;
   }
 
   private async createNewParent(
     parentPayload: ParentItemDto,
     agreementId: string,
-    manager: EntityManager
+    manager: EntityManager,
   ): Promise<GroupItem> {
     const newParent = manager.create(GroupItem, {
       name: parentPayload.name,
@@ -157,46 +181,51 @@ export class GroupsItemsService {
       agreement_id: agreementId,
       parentGroup: null,
     });
-    
+
     const savedParent = await manager.save(newParent);
-    
+
     await this.syncGroupItemIndicators(
       savedParent.id,
       parentPayload.indicators || [],
       agreementId,
-      manager
+      manager,
     );
-    
+
     return savedParent;
   }
 
   private async deactivateUnprocessedParents(
     existingParentsMap: Map<number, GroupItem>,
     processedParentIds: Set<number>,
-    manager: any
+    manager: any,
   ): Promise<void> {
     const existingParents = Array.from(existingParentsMap.values());
 
     for (const dbParent of existingParents) {
       if (!processedParentIds.has(dbParent.id)) {
-        console.log('Deactivating parent:', dbParent.id, dbParent.name);
         await manager.update(
           GroupItem,
           { id: dbParent.id },
-          { is_active: false, deleted_at: new Date() }
+          { is_active: false, deleted_at: new Date() },
         );
       }
     }
   }
 
-  private async getExistingChildrenMap(parent: GroupItem, agreementId: string, manager: EntityManager): Promise<Map<number, GroupItem>> {
+  private async getExistingChildrenMap(
+    parent: GroupItem,
+    agreementId: string,
+    manager: EntityManager,
+  ): Promise<Map<number, GroupItem>> {
     const existingChildrenDB = await manager.find(GroupItem, {
-      where: { agreement_id: agreementId, parent_id: parent.id, is_active: true },
+      where: {
+        agreement_id: agreementId,
+        parent_id: parent.id,
+        is_active: true,
+      },
     });
 
-    return new Map<number, GroupItem>(
-      existingChildrenDB.map((p) => [p.id, p])
-    );
+    return new Map<number, GroupItem>(existingChildrenDB.map((p) => [p.id, p]));
   }
 
   private async processChild(
@@ -204,14 +233,25 @@ export class GroupsItemsService {
     childrenPayload: ChildItemDto,
     agreementId: string,
     existingChildsMap: Map<number, GroupItem>,
-    manager: EntityManager
+    manager: EntityManager,
   ): Promise<GroupItem | null> {
-    const payloadChildId = childrenPayload.id != null ? Number(childrenPayload.id) : null;
+    const payloadChildId =
+      childrenPayload.id != null ? Number(childrenPayload.id) : null;
 
     if (payloadChildId && existingChildsMap.has(payloadChildId)) {
-      return this.updateExistingChild(childrenPayload, existingChildsMap.get(payloadChildId)!, agreementId, manager);
+      return this.updateExistingChild(
+        childrenPayload,
+        existingChildsMap.get(payloadChildId)!,
+        agreementId,
+        manager,
+      );
     } else {
-      return this.createNewChild(childrenPayload, parentId, agreementId, manager);
+      return this.createNewChild(
+        childrenPayload,
+        parentId,
+        agreementId,
+        manager,
+      );
     }
   }
 
@@ -219,19 +259,19 @@ export class GroupsItemsService {
     childPayload: ChildItemDto,
     child: GroupItem,
     agreementId: string,
-    manager: EntityManager
+    manager: EntityManager,
   ): Promise<GroupItem> {
-    if (child.name !== childPayload.name || child.code !== childPayload.code ) {
+    if (child.name !== childPayload.name || child.code !== childPayload.code) {
       child.name = childPayload.name;
       child.code = childPayload.code;
       await manager.save(child);
     }
-    
+
     await this.syncGroupItemIndicators(
       child.id,
       childPayload.indicators || [],
       agreementId,
-      manager
+      manager,
     );
 
     return child;
@@ -241,7 +281,7 @@ export class GroupsItemsService {
     childPayload: ChildItemDto,
     parent: number,
     agreementId: string,
-    manager: EntityManager
+    manager: EntityManager,
   ): Promise<GroupItem> {
     const newChild = manager.create(GroupItem, {
       name: childPayload.name,
@@ -256,7 +296,7 @@ export class GroupsItemsService {
       savedChild.id,
       childPayload.indicators || [],
       agreementId,
-      manager
+      manager,
     );
 
     return savedChild;
@@ -265,17 +305,16 @@ export class GroupsItemsService {
   private async deactivateUnprocessedChildren(
     existingChildsMap: Map<number, GroupItem>,
     processedChildrensIds: Set<number>,
-    manager: any
+    manager: any,
   ): Promise<void> {
     const existingChildren = Array.from(existingChildsMap.values());
 
     for (const dbChild of existingChildren) {
       if (!processedChildrensIds.has(dbChild.id)) {
-        console.log('Deactivating child:', dbChild.id, dbChild.name);
         await manager.update(
           GroupItem,
           { id: dbChild.id },
-          { is_active: false, deleted_at: new Date() }
+          { is_active: false, deleted_at: new Date() },
         );
       }
     }
@@ -324,8 +363,11 @@ export class GroupsItemsService {
       await this.processLevels(dto, manager);
 
       // Traer padres existentes de la BD del proyecto actual
-      const existingParentsMap = await this.getExistingParentsMap(dto.agreement_id, manager);
-      const processedParentIds  = new Set<number>();
+      const existingParentsMap = await this.getExistingParentsMap(
+        dto.agreement_id,
+        manager,
+      );
+      const processedParentIds = new Set<number>();
 
       //Procesa cada padre en el payload
       for (const parentPayload of dto.structures || []) {
@@ -333,15 +375,19 @@ export class GroupsItemsService {
           parentPayload,
           dto.agreement_id,
           existingParentsMap,
-          manager
+          manager,
         );
 
         //Procesa cada hijo de cada padre
         if (parent) {
           processedParentIds.add(parent.id);
 
-          const existingChildsMap = await this.getExistingChildrenMap(parent, dto.agreement_id, manager);
-          const processedChildrensIds  = new Set<number>();
+          const existingChildsMap = await this.getExistingChildrenMap(
+            parent,
+            dto.agreement_id,
+            manager,
+          );
+          const processedChildrensIds = new Set<number>();
 
           for (const childPayload of parentPayload.items || []) {
             const child = await this.processChild(
@@ -349,7 +395,7 @@ export class GroupsItemsService {
               childPayload,
               dto.agreement_id,
               existingChildsMap,
-              manager
+              manager,
             );
 
             if (child) {
@@ -357,13 +403,21 @@ export class GroupsItemsService {
             }
           }
           // Elimina hijos que no vinieron en el payload
-          await this.deactivateUnprocessedChildren(existingChildsMap, processedChildrensIds, manager);
+          await this.deactivateUnprocessedChildren(
+            existingChildsMap,
+            processedChildrensIds,
+            manager,
+          );
         }
       }
       //Elimina padres que no vinieron en el payload
-      await this.deactivateUnprocessedParents(existingParentsMap, processedParentIds, manager);
+      await this.deactivateUnprocessedParents(
+        existingParentsMap,
+        processedParentIds,
+        manager,
+      );
       return { message: 'Sincronización de padres completada' };
-      });
+    });
   }
 
   private async syncGroupItemIndicators(
@@ -445,7 +499,7 @@ export class GroupsItemsService {
               target_value: ind.targetValue,
               type: ind.type,
               base_line: ind.baseline,
-              agreement_id: agreementId
+              agreement_id: agreementId,
             },
           );
         } else {
