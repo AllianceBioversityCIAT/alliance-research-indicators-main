@@ -4,7 +4,6 @@ import { ProjectIndicatorsResult } from './entities/project_indicators_result.en
 import { Repository } from 'typeorm';
 import { SyncProjectIndicatorsResultDto } from './dto/sync-project_indicators_result.dto';
 
-
 @Injectable()
 export class ProjectIndicatorsResultsService {
   constructor(
@@ -12,7 +11,10 @@ export class ProjectIndicatorsResultsService {
     private readonly indicatorsResultsRepo: Repository<ProjectIndicatorsResult>,
   ) {}
 
-  async findByResultId(resultId: number, agreementId: string): Promise<ProjectIndicatorsResult[]> {
+  async findByResultId(
+    resultId: number,
+    agreementId: string,
+  ): Promise<ProjectIndicatorsResult[]> {
     const rows = await this.indicatorsResultsRepo.query(
       `
         SELECT 
@@ -41,7 +43,10 @@ export class ProjectIndicatorsResultsService {
     return rows;
   }
 
-  async syncResultToIndicator(dtos: SyncProjectIndicatorsResultDto[], resultId: number): Promise<ProjectIndicatorsResult[]> {
+  async syncResultToIndicator(
+    dtos: SyncProjectIndicatorsResultDto[],
+    resultId: number,
+  ): Promise<ProjectIndicatorsResult[]> {
     // Traemos de BD todos los contributions asociados a ese result
     const existingContributions = await this.indicatorsResultsRepo
       .createQueryBuilder('pir')
@@ -51,16 +56,22 @@ export class ProjectIndicatorsResultsService {
       .getMany();
 
     const contributionsToSave: ProjectIndicatorsResult[] = [];
-    const payloadIds = dtos.map(dto => dto.contribution_id).filter(id => !!id);
+    const payloadIds = dtos
+      .map((dto) => dto.contribution_id)
+      .filter((id) => !!id);
 
     for (const dto of dtos) {
       let contribution: ProjectIndicatorsResult;
 
       if (dto.contribution_id) {
         // Buscar si existe en BD
-        contribution = existingContributions.find(c => c.id === dto.contribution_id);
+        contribution = existingContributions.find(
+          (c) => c.id === dto.contribution_id,
+        );
         if (!contribution) {
-          throw new Error(`Contribution with id ${dto.contribution_id} not found`);
+          throw new Error(
+            `Contribution with id ${dto.contribution_id} not found`,
+          );
         }
 
         Object.assign(contribution, {
@@ -81,15 +92,21 @@ export class ProjectIndicatorsResultsService {
     }
 
     // Guardamos los nuevos y actualizados
-    const savedContributions = await this.indicatorsResultsRepo.save(contributionsToSave);
+    const savedContributions =
+      await this.indicatorsResultsRepo.save(contributionsToSave);
 
     // Eliminamos los que ya no están en el payload
-    const toDelete = existingContributions.filter(c => !payloadIds.includes(c.id));
+    const toDelete = existingContributions.filter(
+      (c) => !payloadIds.includes(c.id),
+    );
     if (toDelete.length > 0) {
-      await this.indicatorsResultsRepo.update(toDelete.map(c => c.id), {
-        deleted_at: new Date(),
-        is_active: false
-      });
+      await this.indicatorsResultsRepo.update(
+        toDelete.map((c) => c.id),
+        {
+          deleted_at: new Date(),
+          is_active: false,
+        },
+      );
     }
 
     return savedContributions;

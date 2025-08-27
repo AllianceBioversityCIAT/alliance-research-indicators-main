@@ -25,13 +25,18 @@ describe('ProjectIndicatorsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProjectIndicatorsService,
-        { provide: getRepositoryToken(ProjectIndicator), useValue: indicatorRepositoryMock },
+        {
+          provide: getRepositoryToken(ProjectIndicator),
+          useValue: indicatorRepositoryMock,
+        },
         { provide: DataSource, useValue: dataSourceMock },
       ],
     }).compile();
 
     service = module.get<ProjectIndicatorsService>(ProjectIndicatorsService);
-    indicatorRepository = module.get<Repository<ProjectIndicator>>(getRepositoryToken(ProjectIndicator));
+    indicatorRepository = module.get<Repository<ProjectIndicator>>(
+      getRepositoryToken(ProjectIndicator),
+    );
     dataSource = module.get<DataSource>(DataSource);
   });
 
@@ -104,18 +109,25 @@ describe('ProjectIndicatorsService', () => {
       };
       const indicator = { id: 1 };
       (indicatorRepository.findOne as any).mockResolvedValue(indicator);
-      (indicatorRepository.save as any).mockResolvedValue({ ...indicator, ...dto });
+      (indicatorRepository.save as any).mockResolvedValue({
+        ...indicator,
+        ...dto,
+      });
 
       const result = await service.syncIndicator(dto);
       expect(result).toMatchObject(dto);
-      expect(indicatorRepository.findOne).toHaveBeenCalledWith({ where: { id: dto.id } });
+      expect(indicatorRepository.findOne).toHaveBeenCalledWith({
+        where: { id: dto.id },
+      });
       expect(indicatorRepository.save).toHaveBeenCalled();
     });
 
     it('should throw if indicator not found', async () => {
       (indicatorRepository.findOne as any).mockResolvedValue(null);
       const dto: CreateProjectIndicatorDto = { id: 99 } as any;
-      await expect(service.syncIndicator(dto)).rejects.toThrow('Indicator with id 99 not found');
+      await expect(service.syncIndicator(dto)).rejects.toThrow(
+        'Indicator with id 99 not found',
+      );
     });
 
     it('should create new indicator', async () => {
@@ -147,9 +159,12 @@ describe('ProjectIndicatorsService', () => {
       (indicatorRepository.update as any).mockResolvedValue({ affected: 1 });
       const result = await service.softDelete(1);
       expect(result).toEqual({ affected: 1 });
-      expect(indicatorRepository.update).toHaveBeenCalledWith(1, expect.objectContaining({
-        is_active: false,
-      }));
+      expect(indicatorRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          is_active: false,
+        }),
+      );
     });
   });
 
@@ -177,9 +192,7 @@ describe('ProjectIndicatorsService', () => {
         result_id: 'r1',
         result_official_code: 'code',
         result_title: 'title',
-        contracts: [
-          { agreement_id: 'ag1', description: 'desc' },
-        ],
+        contracts: [{ agreement_id: 'ag1', description: 'desc' }],
       });
     });
 
@@ -264,6 +277,7 @@ describe('ProjectIndicatorsService', () => {
         select: jest.fn().mockReturnThis(),
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([
           {
             indicator_id: 1,
@@ -381,6 +395,7 @@ describe('ProjectIndicatorsService', () => {
       expect(qb.innerJoin).toHaveBeenCalled();
       expect(qb.where).toHaveBeenCalled();
       expect(qb.getRawMany).toHaveBeenCalled();
+      expect(qb.getRawMany).toHaveBeenCalled();
     });
 
     it('should return empty array if no contributions', async () => {
@@ -388,6 +403,7 @@ describe('ProjectIndicatorsService', () => {
         select: jest.fn().mockReturnThis(),
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([]),
       };
       (indicatorRepository.createQueryBuilder as any).mockReturnValue(qb);

@@ -1,4 +1,11 @@
-import { Controller, Delete, Get, HttpStatus, Param, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpStatus,
+  Param,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ProjectIndicatorsService } from './project_indicators.service';
 import { Post, Body } from '@nestjs/common';
 import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
@@ -16,13 +23,15 @@ export class ProjectIndicatorsController {
   ) {}
   @Get('get-list/:id')
   async getAll(@Param('id') agreement_id: string) {
-    return await this.projectIndicatorsService.findAll(agreement_id).then((data) =>
-      ResponseUtils.format({
-        description: 'Structure found',
-        status: HttpStatus.OK,
-        data: data,
-      }),
-    );
+    return await this.projectIndicatorsService
+      .findAll(agreement_id)
+      .then((data) =>
+        ResponseUtils.format({
+          description: 'Structure found',
+          status: HttpStatus.OK,
+          data: data,
+        }),
+      );
   }
 
   @Post('create')
@@ -40,30 +49,34 @@ export class ProjectIndicatorsController {
 
   @Get('hierarchy/:id')
   async getHierarchy(@Param('id') agreement_id: string) {
-    return await this.projectIndicatorsService.getIndicatorsHierarchy(agreement_id).then((data) =>
-      ResponseUtils.format({
-        description: 'Hierarchy found',
-        status: HttpStatus.OK,
-        data: data,
-      }),
-    );
+    return await this.projectIndicatorsService
+      .getIndicatorsHierarchy(agreement_id)
+      .then((data) =>
+        ResponseUtils.format({
+          description: 'Hierarchy found',
+          status: HttpStatus.OK,
+          data: data,
+        }),
+      );
   }
 
   @Get('indicators/by-result/:id')
   async getByResult(@Param('id') result_id: string) {
-    return await this.projectIndicatorsService.findByResult(result_id).then((data) =>
-      ResponseUtils.format({
-        description: 'Indicators found',
-        status: HttpStatus.OK,
-        data: data,
-      }),
-    );
+    return await this.projectIndicatorsService
+      .findByResult(result_id)
+      .then((data) =>
+        ResponseUtils.format({
+          description: 'Indicators found',
+          status: HttpStatus.OK,
+          data: data,
+        }),
+      );
   }
 
   @Delete(':id/delete')
   async softDelete(@Param('id') id: number) {
     const result = await this.projectIndicatorsService.softDelete(id);
-    
+
     return ResponseUtils.format({
       description: 'Indicator deleted successfully',
       status: HttpStatus.OK,
@@ -73,12 +86,14 @@ export class ProjectIndicatorsController {
 
   @Get('contributions/:agreementId')
   async getContributionsByResult(@Param('agreementId') agreementId: string) {
-    return await this.projectIndicatorsService.findContributionsByResult(agreementId).then((data) =>
-      ResponseUtils.format({
-        description: 'Contributions found',
-        status: HttpStatus.OK,
-        data: data,
-      }),
-    );
+    return await this.projectIndicatorsService
+      .findContributionsByResult(agreementId)
+      .then((data) =>
+        ResponseUtils.format({
+          description: 'Contributions found',
+          status: HttpStatus.OK,
+          data: data,
+        }),
+      );
   }
 }
