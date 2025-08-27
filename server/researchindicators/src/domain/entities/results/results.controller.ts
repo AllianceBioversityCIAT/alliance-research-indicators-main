@@ -30,9 +30,13 @@ import { ResultRawAi } from './dto/result-ai.dto';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import { RolesGuard } from '../../shared/guards/roles.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 @ApiTags('Results')
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
+@UseGuards(RolesGuard)
 @Controller()
 export class ResultsController {
   constructor(
@@ -375,6 +379,7 @@ export class ResultsController {
 
   @ApiOperation({ summary: 'Create results from AI bulk' })
   @Post('ai/formalize/bulk')
+  @Roles(SecRolesEnum.DEVELOPER)
   async createResultFromAiBulk(@Body() results: ResultRawAi[]) {
     return this.resultsService.createResultFromAiBulk(results).then((data) =>
       ResponseUtils.format({
