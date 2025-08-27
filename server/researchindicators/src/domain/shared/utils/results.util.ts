@@ -3,6 +3,7 @@ import { Request } from 'express';
 import { REQUEST } from '@nestjs/core';
 import { DataSource, FindOptionsWhere } from 'typeorm';
 import { Result } from '../../entities/results/entities/result.entity';
+import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 
 @Injectable()
 export class ResultsUtil {
@@ -17,8 +18,14 @@ export class ResultsUtil {
       this.request.params?.[RESULT_CODE_PARAM] ??
       this.request.query?.[RESULT_CODE_PARAM];
     const reportYear = this.request.query?.[REPORT_YEAR_PARAM];
+    const reportingPlatforms =
+      ReportingPlatformEnum[
+        (this.request.query?.[REPORTING_PLATFORMS] as string) ?? ''
+      ] ?? ReportingPlatformEnum.STAR;
     const where: FindOptionsWhere<Result> = {};
     if (!resultCode) return null;
+
+    where.platform_code = reportingPlatforms;
 
     if (!reportYear) {
       where.result_official_code = Number(resultCode);
@@ -75,3 +82,4 @@ export class ResultsUtil {
 export const RESULT_CODE = ':resultCode(\\d+)';
 export const RESULT_CODE_PARAM = 'resultCode';
 export const REPORT_YEAR_PARAM = 'reportYear';
+export const REPORTING_PLATFORMS = 'reportingPlatforms';

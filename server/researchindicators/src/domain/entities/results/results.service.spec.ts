@@ -41,6 +41,7 @@ import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
+import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -578,7 +579,10 @@ describe('ResultsService', () => {
       );
 
       // Act
-      const result = await service.createResult(createResult);
+      const result = await service.createResult(
+        createResult,
+        ReportingPlatformEnum.STAR,
+      );
 
       // Assert
       expect(result).toEqual(savedResult);
@@ -596,6 +600,7 @@ describe('ResultsService', () => {
         result_official_code: newOfficialCode,
         report_year_id: createResult.year,
         is_snapshot: false,
+        platform_code: ReportingPlatformEnum.STAR, // Default value
         created_at: expect.any(Date),
         updated_at: expect.any(Date),
         created_by: 123,
@@ -682,12 +687,13 @@ describe('ResultsService', () => {
 
       // Act
 
-      await service.createResult(createResult);
+      await service.createResult(createResult, ReportingPlatformEnum.PRMS);
 
       // Assert
       expect(mockRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           is_ai: false, // Should default to false
+          platform_code: ReportingPlatformEnum.PRMS,
         }),
       );
     });
@@ -728,12 +734,116 @@ describe('ResultsService', () => {
       mockCurrentUser.audit.mockReturnValue({});
 
       // Act
-      const result = await service.createResult(createResult);
+      const result = await service.createResult(
+        createResult,
+        ReportingPlatformEnum.TIP,
+      );
 
       // Assert
       expect(result).toEqual(savedResult);
       expect(mockResultLeversService.create).not.toHaveBeenCalled(); // Should not create lever
       expect(mockResultContractsService.create).toHaveBeenCalled(); // Should still create contract
+    });
+
+    it('should use default platform_code when not provided', async () => {
+      // Arrange
+      const createResult: CreateResultDto = {
+        contract_id: 'CONTRACT123',
+        indicator_id: 1,
+        title: 'Result Without Platform Code',
+        year: 2024,
+        description: 'Test description',
+        is_ai: false,
+        // platform_code not provided - should default to STAR
+      };
+
+      const savedResult = {
+        result_id: 13,
+        title: createResult.title,
+        platform_code: ReportingPlatformEnum.STAR,
+      };
+
+      // Setup mocks
+      mockMainRepo.findOne.mockResolvedValue(null);
+      (service as any).newOfficialCode.mockResolvedValue(12348);
+      mockRepository.save.mockResolvedValue(savedResult);
+      (service as any).createResultType.mockResolvedValue(undefined);
+      mockAgressoContractService.findOne.mockResolvedValue({
+        agreement_id: 'AGR123',
+        departmentId: 'DEPT001',
+        center_amount: 1000,
+        center_amount_usd: 1000,
+        grant_amount: 2000,
+        grant_amount_usd: 2000,
+      } as any);
+      mockClarisaLeversService.homologatedData.mockReturnValue('Test Lever');
+      mockClarisaLeversService.findByName.mockResolvedValue({
+        id: 5,
+        name: 'Test Lever',
+        short_name: 'TL',
+        result_levers: [],
+      } as any);
+      mockCurrentUser.audit.mockReturnValue({});
+
+      // Act
+      await service.createResult(createResult);
+
+      // Assert
+      expect(mockRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform_code: ReportingPlatformEnum.STAR, // Should default to STAR
+        }),
+      );
+    });
+
+    it('should use specified platform_code when provided', async () => {
+      // Arrange
+      const createResult: CreateResultDto = {
+        contract_id: 'CONTRACT123',
+        indicator_id: 1,
+        title: 'Result With Custom Platform Code',
+        year: 2024,
+        description: 'Test description',
+        is_ai: false,
+      };
+
+      const savedResult = {
+        result_id: 14,
+        title: createResult.title,
+        platform_code: ReportingPlatformEnum.PRMS,
+      };
+
+      // Setup mocks
+      mockMainRepo.findOne.mockResolvedValue(null);
+      (service as any).newOfficialCode.mockResolvedValue(12349);
+      mockRepository.save.mockResolvedValue(savedResult);
+      (service as any).createResultType.mockResolvedValue(undefined);
+      mockAgressoContractService.findOne.mockResolvedValue({
+        agreement_id: 'AGR123',
+        departmentId: 'DEPT001',
+        center_amount: 1000,
+        center_amount_usd: 1000,
+        grant_amount: 2000,
+        grant_amount_usd: 2000,
+      } as any);
+      mockClarisaLeversService.homologatedData.mockReturnValue('Test Lever');
+      mockClarisaLeversService.findByName.mockResolvedValue({
+        id: 5,
+        name: 'Test Lever',
+        short_name: 'TL',
+        result_levers: [],
+      } as any);
+      mockCurrentUser.audit.mockReturnValue({});
+
+      // Act
+      await service.createResult(createResult, ReportingPlatformEnum.PRMS);
+
+      // Assert
+      expect(mockRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform_code: ReportingPlatformEnum.PRMS, // Should use provided value
+        }),
+      );
     });
 
     it('should propagate errors from transaction', async () => {
@@ -992,6 +1102,7 @@ describe('ResultsService', () => {
         // Assert
         expect(mockResultOicrService.create).toHaveBeenCalledWith(
           savedResult.result_id,
+          expect.any(Object),
         );
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
         expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
@@ -1864,6 +1975,7 @@ describe('ResultsService', () => {
       });
       expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
         resultId,
+        123,
       );
     });
 
@@ -1883,6 +1995,7 @@ describe('ResultsService', () => {
       );
       expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
         resultId,
+        123,
       );
     });
   });
@@ -2065,7 +2178,7 @@ describe('ResultsService', () => {
         resultId,
         expect.objectContaining({
           geo_scope_id: transformedGeoScopeId,
-          comment_geo_scope: undefined,
+          comment_geo_scope: 'undefined',
         }),
       );
       expect(result).toEqual(saveGeoLocationDto);

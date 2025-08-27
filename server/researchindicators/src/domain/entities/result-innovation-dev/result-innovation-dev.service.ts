@@ -117,14 +117,24 @@ export class ResultInnovationDevService {
       });
     }
 
-    const clarisaInstitutionsType =
-      await this._clarisaInstitutionTypesService.findByLikeNames(
-        result.organization_type?.split(',').map((el) => el.trim()),
-      );
-    const clarisaInstitutionsSubType =
-      await this._clarisaInstitutionTypesService.findByLikeNames(
-        result.organization_sub_type?.split(',').map((el) => el.trim()),
-      );
+    const preProcessedTypes = this.processDataArrayString(
+      result?.organization_type,
+    );
+    const clarisaInstitutionsType = preProcessedTypes.length
+      ? await this._clarisaInstitutionTypesService.findByLikeNames(
+          preProcessedTypes,
+        )
+      : [];
+
+    const preProcessedSubTypes = this.processDataArrayString(
+      result?.organization_sub_type,
+    );
+
+    const clarisaInstitutionsSubType = preProcessedSubTypes.length
+      ? await this._clarisaInstitutionTypesService.findByLikeNames(
+          preProcessedSubTypes,
+        )
+      : [];
 
     for (const institutionsType of clarisaInstitutionsType) {
       newInstitutionTypes.push({
@@ -150,6 +160,16 @@ export class ResultInnovationDevService {
       newInstitutionTypes as CreateResultInstitutionTypeDto[];
 
     return innovationDev;
+  }
+
+  processDataArrayString(input: string | string[]): string[] {
+    if (Array.isArray(input)) {
+      return input?.map((el) => el.trim());
+    }
+    if (typeof input === 'string') {
+      return input?.split(',').map((el) => el.trim());
+    }
+    return [];
   }
 
   async create(resultId: number, manager?: EntityManager) {
@@ -183,7 +203,7 @@ export class ResultInnovationDevService {
     );
 
     return this.dataSource.transaction(async (manager) => {
-      manager.getRepository(this.mainRepo.target).update(resultId, {
+      await manager.getRepository(this.mainRepo.target).update(resultId, {
         innovation_nature_id:
           createResultInnovationDevDto?.innovation_nature_id,
         innovation_readiness_id:
@@ -262,7 +282,6 @@ export class ResultInnovationDevService {
       );
 
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
-
       return this.mainRepo.findOne({
         where: { result_id: resultId, is_active: true },
       });
@@ -332,7 +351,7 @@ export class ResultInnovationDevService {
       knowledgeSharingData?.link_to_result?.map((link) => ({
         other_result_id: link?.other_result_id,
       }));
-    delete knowledgeSharingData.link_to_result;
+    delete knowledgeSharingData?.link_to_result;
 
     if (!knowledgeSharingData?.is_knowledge_sharing || readinessLevel < 7) {
       const defaultAttributes: (keyof ResultInnovationDevKnouldgeSharingDto)[] =

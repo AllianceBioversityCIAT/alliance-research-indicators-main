@@ -4,6 +4,8 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { DataSource, EntityManager, In, Not } from 'typeorm';
 import {
@@ -65,6 +67,7 @@ import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
+import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 
 @Injectable()
 export class ResultsService {
@@ -93,6 +96,7 @@ export class ResultsService {
     private readonly _agressoContractService: AgressoContractService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
     private readonly _resultSdgsService: ResultSdgsService,
+    @Inject(forwardRef(() => ResultOicrService))
     private readonly _resultOicrService: ResultOicrService,
   ) {}
 
@@ -167,7 +171,10 @@ export class ResultsService {
     return query.getMany();
   }
 
-  async createResult(createResult: CreateResultDto): Promise<Result> {
+  async createResult(
+    createResult: CreateResultDto,
+    platform_code: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
+  ): Promise<Result> {
     const { invalidFields, isValid } = validObject(createResult, [
       'contract_id',
       'indicator_id',
@@ -210,6 +217,7 @@ export class ResultsService {
           result_official_code: newOfficialCode,
           report_year_id: year,
           is_snapshot: false,
+          platform_code,
           ...this.currentUser.audit(SetAutitEnum.NEW),
         })
         .then((result) => {
@@ -240,7 +248,7 @@ export class ResultsService {
           is_primary: true,
         };
 
-        this._resultLeversService.create<LeverRolesEnum>(
+        await this._resultLeversService.create<LeverRolesEnum>(
           result.result_id,
           primaryLever,
           'lever_id',
@@ -321,7 +329,7 @@ export class ResultsService {
         await this._resultInnovationDevService.create(resultId, manager);
         break;
       case IndicatorsEnum.OICR:
-        await this._resultOicrService.create(resultId);
+        await this._resultOicrService.create(resultId, manager);
         break;
       default:
         break;
@@ -599,8 +607,10 @@ export class ResultsService {
       },
     });
 
-    const { is_principal } =
-      await this.mainRepo.metadataPrincipalInvestigator(result_id);
+    const { is_principal } = await this.mainRepo.metadataPrincipalInvestigator(
+      result_id,
+      this.currentUser.user_id,
+    );
 
     if (!result) {
       throw new NotFoundException('Result not found');
@@ -659,6 +669,15 @@ export class ResultsService {
     }
 
     return newResult;
+  }
+
+  async createResultFromAiBulk(results: ResultRawAi[]) {
+    const resultsCreated: Result[] = [];
+    for (const result of results) {
+      const newResult = await this.formalizeResult(result);
+      resultsCreated.push(newResult);
+    }
+    return resultsCreated;
   }
 
   async createResultFromAiRoar(result: ResultRawAi) {
@@ -768,7 +787,7 @@ export class ResultsService {
         );
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
-        comment_geo_scope: saveGeoLocationDto?.comment_geo_scope,
+        comment_geo_scope: String(saveGeoLocationDto?.comment_geo_scope),
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 

@@ -16,6 +16,10 @@ export class CurrentUserUtil {
     return (this.request['user'] as User).sec_user_id;
   }
 
+  get email(): string {
+    return (this.request['user'] as User).email;
+  }
+
   public audit(set: SetAutitEnum = SetAutitEnum.NEW): Partial<AuditableEntity> {
     switch (set) {
       case SetAutitEnum.NEW:

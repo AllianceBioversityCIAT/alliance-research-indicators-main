@@ -63,6 +63,8 @@ export const setDefaultValueInObject = <T>(
   setAttributes: (keyof T)[],
   defaultValue: any = null,
 ) => {
+  if (!obj || typeof obj !== 'object') return {};
+
   for (const key of setAttributes) {
     obj[key] = defaultValue;
   }

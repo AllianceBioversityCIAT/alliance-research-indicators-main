@@ -1,6 +1,11 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiParam, ApiQuery } from '@nestjs/swagger';
-import { REPORT_YEAR_PARAM, RESULT_CODE_PARAM } from '../utils/results.util';
+import {
+  REPORT_YEAR_PARAM,
+  RESULT_CODE_PARAM,
+  REPORTING_PLATFORMS,
+} from '../utils/results.util';
+import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 
 export function GetResultVersion(
   config: ParamOrQueryEnum = ParamOrQueryEnum.PARAM,
@@ -20,6 +25,12 @@ export function GetResultVersion(
 
   return applyDecorators(
     resultDecorator,
+    ApiQuery({
+      name: REPORTING_PLATFORMS,
+      required: false,
+      type: String,
+      enum: ReportingPlatformEnum,
+    }),
     ApiQuery({
       name: REPORT_YEAR_PARAM,
       required: false,
