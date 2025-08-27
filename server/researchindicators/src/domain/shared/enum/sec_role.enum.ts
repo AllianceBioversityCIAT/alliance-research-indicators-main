@@ -5,4 +5,5 @@ export enum SecRolesEnum {
   GLOBAL = 4,
   CONTRACT_CONTRIBUTOR = 5,
   RESULT_CONTRIBUTOR = 6,
+  DEVELOPER = 7,
 }

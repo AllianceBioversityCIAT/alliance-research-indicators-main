@@ -286,23 +286,23 @@ export class ResultRawAi {
   organizations: string[];
 
   @ApiProperty({
-    type: String,
+    type: [String],
     description: 'Organization type of the result',
     required: false,
   })
-  organization_type: string;
+  organization_type: string[];
 
   @ApiProperty({
-    type: String,
+    type: [String],
     description: 'Sub-type of the organization if applicable',
     required: false,
   })
-  organization_sub_type: string;
+  organization_sub_type: string[];
 
   @ApiProperty({
-    type: String,
+    type: [String],
     description: 'Other organization type if applicable',
     required: false,
   })
-  other_organization_type: string;
+  other_organization_type: string[];
 }

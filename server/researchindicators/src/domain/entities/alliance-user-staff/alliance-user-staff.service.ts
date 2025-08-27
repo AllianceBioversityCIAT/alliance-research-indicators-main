@@ -27,7 +27,7 @@ export class AllianceUserStaffService extends ControlListBaseService<
     return this.mainRepo
       .createQueryBuilder('user')
       .where('user.first_name = :first_name', { first_name })
-      .orWhere('user.last_name = :last_name', { last_name })
+      .andWhere('user.last_name = :last_name', { last_name })
       .getOne();
   }
 

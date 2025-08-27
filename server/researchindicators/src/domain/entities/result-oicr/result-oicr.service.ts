@@ -4,7 +4,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultOicr } from './entities/result-oicr.entity';
 import { StepOneOicrDto } from './dto/step-one-oicr.dto';
 import { ResultTagsService } from '../result-tags/result-tags.service';
@@ -27,10 +27,17 @@ import { ResultLeversService } from '../result-levers/result-levers.service';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ResultsService } from '../results/results.service';
 import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
+import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
+import { Result } from '../results/entities/result.entity';
+import { selectManager } from '../../shared/utils/orm.util';
+import { MessageMicroservice } from '../../tools/broker/message.microservice';
+import { AppConfig } from '../../shared/utils/app-config.util';
+import { TemplateService } from '../../shared/auxiliar/template/template.service';
+import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
+import { ResultOicrRepository } from './repositories/result-oicr.repository';
 
 @Injectable()
 export class ResultOicrService {
-  private readonly mainRepo: Repository<ResultOicr>;
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUser: CurrentUserUtil,
@@ -42,15 +49,56 @@ export class ResultOicrService {
     private readonly resultLeversService: ResultLeversService,
     @Inject(forwardRef(() => ResultsService))
     private readonly resultService: ResultsService,
-  ) {
-    this.mainRepo = this.dataSource.getRepository(ResultOicr);
+    private readonly messageMicroservice: MessageMicroservice,
+    private readonly appConfig: AppConfig,
+    private readonly templateService: TemplateService,
+    private readonly mainRepo: ResultOicrRepository,
+  ) {}
+
+  async create(resultId: number, manager: EntityManager) {
+    const entityManager: Repository<ResultOicr> = selectManager(
+      manager,
+      ResultOicr,
+      this.mainRepo,
+    );
+    return entityManager.save({
+      result_id: resultId,
+      ...this.currentUser.audit(SetAutitEnum.NEW),
+    });
   }
 
-  async create(resultId: number) {
-    const newResultOicr = this.mainRepo.create({
-      result_id: resultId,
+  async createOicr(data: CreateResultOicrDto) {
+    const result = await this.resultService.createResult(data.base_information);
+    await this.stepOneOicr(data.step_one, result.result_id);
+    await this.stepTwoOicr(data.step_two, result.result_id);
+    await this.resultService.saveGeoLocation(result.result_id, data.step_three);
+    await this.mainRepo.update(result.result_id, {
+      general_comment: String(data?.step_four?.general_comment),
     });
-    return this.mainRepo.save(newResultOicr);
+    await this.dataSource.getRepository(Result).update(result.result_id, {
+      description: data?.step_one?.outcome_impact_statement,
+    });
+
+    await this.sendMessageOicr(result.result_id);
+
+    return result;
+  }
+
+  async sendMessageOicr(resultId: number) {
+    const messageData = await this.mainRepo.getDataToNewOicrMessage(resultId);
+    const template = await this.templateService._getTemplate(
+      TemplateEnum.OICR_NOTIFICATION_CREATED,
+      messageData,
+    );
+    if (template) {
+      await this.messageMicroservice.sendEmail({
+        subject: `[STAR] - New OICR Submission #${messageData.result_code}`,
+        to: this.appConfig.SPRM_EMAIL_SAFE(this.currentUser.email),
+        message: {
+          socketFile: Buffer.from(template),
+        },
+      });
+    }
   }
 
   async createOicrSteps(
@@ -77,7 +125,7 @@ export class ResultOicrService {
   }
 
   async stepTwoOicr(data: StepTwoOicrDto, resultId: number) {
-    this.dataSource.transaction(async (manager) => {
+    return this.dataSource.transaction(async (manager) => {
       const saveInitiatives: Partial<ResultInitiative>[] = data.initiatives.map(
         (initiative) => ({
           clarisa_initiative_id: initiative.clarisa_initiative_id,
@@ -130,9 +178,11 @@ export class ResultOicrService {
         manager,
       );
 
-      const saveTags: Partial<ResultTag>[] = data?.tagging?.map((tag) => ({
-        tag_id: tag.tag_id,
-      }));
+      const saveTags: Partial<ResultTag>[] = Array.isArray(data?.tagging)
+        ? data?.tagging?.map((tag) => ({
+            tag_id: tag.tag_id,
+          }))
+        : [];
       const createdTags = await this.resultTagsService.create(
         resultId,
         saveTags,

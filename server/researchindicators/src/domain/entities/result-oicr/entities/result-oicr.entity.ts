@@ -23,6 +23,7 @@ export class ResultOicr extends AuditableEntity {
     type: 'text',
     name: 'general_comment',
     comment: 'General comment on the result',
+    nullable: true,
   })
   general_comment: string;
 

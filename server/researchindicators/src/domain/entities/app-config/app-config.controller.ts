@@ -5,15 +5,20 @@ import {
   HttpStatus,
   Param,
   Patch,
+  UseGuards,
 } from '@nestjs/common';
 import { AppConfigService } from './app-config.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { AppConfig } from './entities/app-config.entity';
 import { ApiBearerAuth, ApiBody, ApiParam, ApiTags } from '@nestjs/swagger';
+import { RolesGuard } from '../../shared/guards/roles.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 @ApiTags('Configuration')
 @ApiBearerAuth()
 @Controller()
+@UseGuards(RolesGuard)
 export class AppConfigController {
   constructor(private readonly appConfigService: AppConfigService) {}
 
@@ -43,6 +48,7 @@ export class AppConfigController {
     description: 'The key of the configuration to update',
     type: String,
   })
+  @Roles(SecRolesEnum.DEVELOPER)
   async updateConfig(
     @Param('key') key: string,
     @Body() updateData: Partial<AppConfig>,

@@ -7,10 +7,13 @@ import { ResultInitiativesModule } from '../result-initiatives/result-initiative
 import { ResultLeversModule } from '../result-levers/result-levers.module';
 import { LinkResultsModule } from '../link-results/link-results.module';
 import { ResultsModule } from '../results/results.module';
+import { MessageMicroservice } from '../../tools/broker/message.microservice';
+import { TemplateModule } from '../../shared/auxiliar/template/template.module';
+import { ResultOicrRepository } from './repositories/result-oicr.repository';
 
 @Module({
   controllers: [ResultOicrController],
-  providers: [ResultOicrService],
+  providers: [ResultOicrService, MessageMicroservice, ResultOicrRepository],
   imports: [
     ResultTagsModule,
     ResultUsersModule,
@@ -18,7 +21,8 @@ import { ResultsModule } from '../results/results.module';
     ResultInitiativesModule,
     ResultLeversModule,
     forwardRef(() => ResultsModule),
+    TemplateModule,
   ],
-  exports: [ResultOicrService],
+  exports: [ResultOicrService, ResultOicrRepository],
 })
 export class ResultOicrModule {}
