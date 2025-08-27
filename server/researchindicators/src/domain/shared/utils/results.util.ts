@@ -20,12 +20,12 @@ export class ResultsUtil {
     const reportYear = this.request.query?.[REPORT_YEAR_PARAM];
     const reportingPlatforms =
       ReportingPlatformEnum[
-        String(this.request.query?.[REPORTING_PLATFORMS])
+        (this.request.query?.[REPORTING_PLATFORMS] as string) ?? ''
       ] ?? ReportingPlatformEnum.STAR;
     const where: FindOptionsWhere<Result> = {};
     if (!resultCode) return null;
 
-    if (reportingPlatforms) where.platform_code = reportingPlatforms;
+    where.platform_code = reportingPlatforms;
 
     if (!reportYear) {
       where.result_official_code = Number(resultCode);
