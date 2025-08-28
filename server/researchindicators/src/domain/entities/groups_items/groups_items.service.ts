@@ -428,103 +428,20 @@ export class GroupsItemsService {
   ) {
     // Obtener ids actuales de la relación
     const currentRelations = await manager
-      .createQueryBuilder(ProjectIndicator, 'pi')
+      .createQueryBuilder()
       .select('ipi.project_indicator_id', 'indicatorId')
       .from('indicator_per_item', 'ipi')
+      .innerJoin(ProjectIndicator, 'pi', 'pi.id = ipi.project_indicator_id')
       .where('ipi.group_item_id = :groupItemId', { groupItemId })
       .andWhere('pi.agreement_id = :agreementId', { agreementId })
       .andWhere('pi.is_active = true')
       .getRawMany();
 
     const currentIds = currentRelations.map((r) => Number(r.indicatorId));
-    const payloadIds: number[] = [];
+    const payloadIds: number[] = indicatorsPayload.map((ind) => Number(ind.id));
 
-    for (const ind of indicatorsPayload) {
-      let indicatorId: number;
-
-      // Caso 1: Indicador ya existente
-      if (ind.id && !String(ind.id).startsWith('indicator_')) {
-        indicatorId = Number(ind.id);
-
-        // Actualizar el indicador existente
-        await manager.update(
-          ProjectIndicator,
-          { id: indicatorId },
-          {
-            name: ind.name,
-            description: ind.description,
-            number_type: ind.numberType,
-            number_format: ind.numberFormat,
-            year: ind.years,
-            target_unit: ind.targetUnit,
-            target_value: ind.targetValue,
-            type: ind.type,
-            base_line: ind.baseline,
-            agreement_id: agreementId,
-          },
-        );
-
-        // Caso 2: Indicador nuevo o con ID temporal
-      } else {
-        // Buscar si ya existe un indicador con las mismas características para evitar duplicados
-        const existingIndicator = await manager.findOne(ProjectIndicator, {
-          where: {
-            name: ind.name,
-            description: ind.description,
-            number_type: ind.numberType,
-            number_format: ind.numberFormat,
-            year: ind.years,
-            target_unit: ind.targetUnit,
-            target_value: ind.targetValue,
-            type: ind.type,
-            base_line: ind.baseline,
-            agreement_id: agreementId,
-            is_active: true,
-          },
-        });
-
-        if (existingIndicator) {
-          // Si existe, usar el existente y actualizarlo
-          indicatorId = existingIndicator.id;
-          await manager.update(
-            ProjectIndicator,
-            { id: indicatorId },
-            {
-              name: ind.name,
-              description: ind.description,
-              number_type: ind.numberType,
-              number_format: ind.numberFormat,
-              year: ind.years,
-              target_unit: ind.targetUnit,
-              target_value: ind.targetValue,
-              type: ind.type,
-              base_line: ind.baseline,
-              agreement_id: agreementId,
-            },
-          );
-        } else {
-          // Crear nuevo indicador solo si no existe
-          const newIndicator = manager.create(ProjectIndicator, {
-            name: ind.name,
-            description: ind.description,
-            level: ind.level,
-            number_type: ind.numberType,
-            number_format: ind.numberFormat,
-            year: ind.years,
-            target_unit: ind.targetUnit,
-            target_value: ind.targetValue,
-            agreement_id: agreementId,
-            type: ind.type,
-            base_line: ind.baseline,
-            is_active: ind.isActive,
-          });
-          const saved = await manager.save(newIndicator);
-          indicatorId = saved.id;
-        }
-      }
-      payloadIds.push(indicatorId);
-
-      // Asociar si no existe la relación
+    // Asociar los que no existan aún
+    for (const indicatorId of payloadIds) {
       if (!currentIds.includes(indicatorId)) {
         await manager.query(
           'INSERT INTO indicator_per_item (group_item_id, project_indicator_id) VALUES (?, ?)',

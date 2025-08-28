@@ -58,6 +58,7 @@ export class ParentItemDto {
   name: string;
 
   @IsString()
+  @IsNotEmpty()
   code: string;
 
   @IsOptional()
@@ -74,16 +75,16 @@ export class ParentItemDto {
 }
 
 export class IndicatorDto {
-  @IsOptional()
+  @IsNotEmpty()
   @IsNumber()
   id?: number;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   name: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   code: string;
 
   @IsOptional()
@@ -95,11 +96,11 @@ export class IndicatorDto {
   level?: number;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   number_type: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   number_format: string;
 
   @IsArray()
@@ -108,15 +109,18 @@ export class IndicatorDto {
   years: number[];
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   target_unit: string;
 
   @IsNumber()
+  @IsOptional()
   target_value: number;
 
   @IsNumber()
+  @IsOptional()
   base_line: number;
 
   @IsString()
+  @IsOptional()
   type: string;
 }
