@@ -20,12 +20,12 @@ export class ResultsUtil {
     const reportYear = this.request.query?.[REPORT_YEAR_PARAM];
     const reportingPlatforms =
       ReportingPlatformEnum[
-        String(this.request.query?.[REPORTING_PLATFORMS])
+        (this.request.query?.[REPORTING_PLATFORMS] as string) ?? ''
       ] ?? ReportingPlatformEnum.STAR;
     const where: FindOptionsWhere<Result> = {};
     if (!resultCode) return null;
 
-    if (reportingPlatforms) where.platform_code = reportingPlatforms;
+    where.platform_code = reportingPlatforms;
 
     if (!reportYear) {
       where.result_official_code = Number(resultCode);
@@ -78,6 +78,27 @@ export class ResultsUtil {
     return this.currentResult?.report_year_id ?? null;
   }
 }
+
+/**
+ *
+ * @param alias - table alias
+ * @returns default SQL parameters for result entity
+ * @description This function returns a string containing the default SQL parameters for the Result entity, using the specified table alias.
+ *  - result_id
+ *  - result_official_code
+ *  - version_id
+ *  - is_snapshot
+ *  - is_ai
+ *  - platform_code
+ */
+export const resultDefaultParametersSQL = (alias: string = 'r') => {
+  return `${alias}.result_id,
+          ${alias}.result_official_code,
+          ${alias}.version_id,
+          ${alias}.is_snapshot,
+          ${alias}.is_ai,
+          ${alias}.platform_code`;
+};
 
 export const RESULT_CODE = ':resultCode(\\d+)';
 export const RESULT_CODE_PARAM = 'resultCode';
