@@ -50,6 +50,8 @@ import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
 import { UserSettingsModule } from '../entities/user-settings/user-settings.module';
 import { TagsModule } from '../entities/tags/tags.module';
 import { ResultOicrModule } from '../entities/result-oicr/result-oicr.module';
+import { MaturityLevelModule } from '../entities/maturity-level/maturity-level.module';
+import { TempExternalOicrsModule } from '../entities/temp_external_oicrs/temp_external_oicrs.module';
 
 const capSharingChildren: Routes = [
   {
@@ -277,8 +279,16 @@ const children: Routes = [
     module: TagsModule,
   },
   {
+    path: 'maturity-levels',
+    module: MaturityLevelModule,
+  },
+  {
     path: 'opensearch',
     children: openSearchRoutes,
+  },
+  {
+    path: 'temp/oicrs',
+    module: TempExternalOicrsModule,
   },
   {
     path: 'announcement-setting',
