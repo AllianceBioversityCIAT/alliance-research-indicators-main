@@ -281,6 +281,87 @@ describe('ResultsService', () => {
     jest.clearAllMocks();
   });
 
+  describe('findResultTIPData', () => {
+    const makeMockQB = () => {
+      const qb: any = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
+        getMany: jest.fn(),
+        createQueryBuilder: jest.fn().mockReturnThis(),
+      };
+      return qb;
+    };
+
+    it('should join primary lever and set isPrimaryLever parameter', async () => {
+      const mockQB = makeMockQB();
+      const mockResults = [{ result_id: 1 }];
+      mockQB.getMany.mockResolvedValue(mockResults);
+
+      (mockMainRepo.createQueryBuilder as any) = jest
+        .fn()
+        .mockReturnValue(mockQB);
+
+      const results = await service.findResultTIPData({});
+
+      expect(mockMainRepo.createQueryBuilder).toHaveBeenCalledWith('r');
+      // Check lever joins
+      expect(mockQB.leftJoinAndSelect).toHaveBeenCalledWith(
+        'r.result_levers',
+        'result_levers',
+        'result_levers.is_primary = :isPrimaryLever',
+      );
+      expect(mockQB.leftJoinAndSelect).toHaveBeenCalledWith(
+        'result_levers.lever',
+        'lever',
+      );
+
+      // Check parameters include isPrimaryLever and existing ones
+      expect(mockQB.setParameters).toHaveBeenCalledWith(
+        expect.objectContaining({
+          roleId: UserRolesEnum.MAIN_CONTACT,
+          isPrimary: true,
+          isPrimaryLever: true,
+        }),
+      );
+
+      expect(results).toBe(mockResults);
+    });
+
+    it('should filter by year when provided', async () => {
+      const mockQB = makeMockQB();
+      mockQB.getMany.mockResolvedValue([]);
+      (mockMainRepo.createQueryBuilder as any) = jest
+        .fn()
+        .mockReturnValue(mockQB);
+
+      const year = 2024;
+      await service.findResultTIPData({ year });
+
+      expect(mockQB.andWhere).toHaveBeenCalledWith('report_year_id = :year', {
+        year,
+      });
+    });
+
+    it('should filter by productType when provided', async () => {
+      const mockQB = makeMockQB();
+      mockQB.getMany.mockResolvedValue([]);
+      (mockMainRepo.createQueryBuilder as any) = jest
+        .fn()
+        .mockReturnValue(mockQB);
+
+      const productType = 3;
+      await service.findResultTIPData({ productType });
+
+      expect(mockQB.andWhere).toHaveBeenCalledWith(
+        'r.indicator_id = :productType',
+        { productType },
+      );
+    });
+  });
+
   describe('findResults', () => {
     it('should call mainRepo.findResultsFilters with correct parameters', async () => {
       // Arrange

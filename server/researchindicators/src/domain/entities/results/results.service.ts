@@ -136,6 +136,12 @@ export class ResultsService {
         'result_contracts.agresso_contract',
         'agresso_contract',
       )
+      .leftJoinAndSelect(
+        'r.result_levers',
+        'result_levers',
+        'result_levers.is_primary = :isPrimaryLever',
+      )
+      .leftJoinAndSelect('result_levers.lever', 'lever')
       .innerJoinAndSelect('r.result_ip_rights', 'result_ip_rights')
       .leftJoinAndSelect(
         'result_ip_rights.intellectualPropertyOwner',
@@ -156,6 +162,7 @@ export class ResultsService {
       .setParameters({
         roleId: UserRolesEnum.MAIN_CONTACT,
         isPrimary: true,
+        isPrimaryLever: true,
       });
 
     if (options?.year) {
