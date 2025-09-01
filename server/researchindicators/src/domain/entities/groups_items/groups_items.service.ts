@@ -9,6 +9,7 @@ import {
 } from './dto/group-item-action.dto';
 import { ProjectIndicator } from '../project_indicators/entities/project_indicator.entity';
 import { ProjectGroup } from '../project_groups/entities/project_group.entity';
+import { cleanCustomFields } from '../../shared/utils/clean-custom-fields';
 
 @Injectable()
 export class GroupsItemsService {
@@ -64,6 +65,7 @@ export class GroupsItemsService {
         code: g.code || g.id.toString(),
         items: [] as any[],
         indicators,
+        custom_values: cleanCustomFields(g),
       });
     }
 
@@ -96,18 +98,34 @@ export class GroupsItemsService {
       .getRepository(ProjectGroup)
       .find({
         where: { agreement_id, is_active: true },
-        select: ['name', 'level'],
+        select: [
+          'name',
+          'level',
+          'custom_field_1',
+          'custom_field_2',
+          'custom_field_3',
+          'custom_field_4',
+          'custom_field_5',
+          'custom_field_6',
+          'custom_field_7',
+          'custom_field_8',
+          'custom_field_9',
+          'custom_field_10',
+        ],
       });
 
-    const name_level_1 = projectGroups.find((g) => g.level === 1)?.name || '';
-    const name_level_2 = projectGroups.find((g) => g.level === 2)?.name || '';
+    const levels = projectGroups.map((pg) => ({
+      level: pg.level,
+      name: pg.name,
+      custom_fields: cleanCustomFields(pg),
+    }));
 
     return {
-      name_level_1,
-      name_level_2,
+      levels,
       structures: roots,
     };
   }
+  
 
   private async getExistingParentsMap(
     agreementId: string,
@@ -151,12 +169,31 @@ export class GroupsItemsService {
     agreementId: string,
     manager: EntityManager,
   ): Promise<GroupItem> {
-    if (
-      parent.name !== parentPayload.name ||
-      parent.code !== parentPayload.code
-    ) {
+    let hasChanges = false;
+
+    if (parent.name !== parentPayload.name) {
       parent.name = parentPayload.name;
+      hasChanges = true;
+    }
+
+    if (parent.code !== parentPayload.code) {
       parent.code = parentPayload.code;
+      hasChanges = true;
+    }
+
+    for (let i = 1; i <= 10; i++) {
+      const fieldName = `custom_field_${i}` as keyof ParentItemDto;
+
+      if (fieldName in parentPayload) {
+        const newValue = parentPayload[fieldName];
+        if (parent[fieldName] !== newValue) {
+          parent[fieldName] = newValue;
+          hasChanges = true;
+        }
+      }
+    }
+
+    if (hasChanges) {
       await manager.save(parent);
     }
 
@@ -180,6 +217,13 @@ export class GroupsItemsService {
       code: parentPayload.code,
       agreement_id: agreementId,
       parentGroup: null,
+      ...Array.from({ length: 10 }, (_, i) => i + 1).reduce((acc, i) => {
+        const fieldName = `custom_field_${i}` as keyof ParentItemDto;
+        if (fieldName in parentPayload) {
+          acc[fieldName] = parentPayload[fieldName];
+        }
+        return acc;
+      }, {} as Partial<GroupItem>),
     });
 
     const savedParent = await manager.save(newParent);
@@ -261,10 +305,32 @@ export class GroupsItemsService {
     agreementId: string,
     manager: EntityManager,
   ): Promise<GroupItem> {
-    if (child.name !== childPayload.name || child.code !== childPayload.code) {
+    let hasChanges = false;
+
+    if (child.name !== childPayload.name) {
       child.name = childPayload.name;
+      hasChanges = true;
+    }
+
+    if (child.code !== childPayload.code) {
       child.code = childPayload.code;
-      await manager.save(child);
+      hasChanges = true;
+    }
+
+    for (let i = 1; i <= 10; i++) {
+      const fieldName = `custom_field_${i}` as keyof ChildItemDto;
+
+      if (fieldName in childPayload) {
+        const newValue = childPayload[fieldName];
+        if (child[fieldName] !== newValue) {
+          child[fieldName] = newValue;
+          hasChanges = true;
+        }
+      }
+    }
+
+    if (hasChanges) {
+      await manager.save(parent);
     }
 
     await this.syncGroupItemIndicators(
@@ -288,6 +354,13 @@ export class GroupsItemsService {
       code: childPayload.code,
       agreement_id: agreementId,
       parent_id: parent,
+      ...Array.from({ length: 10 }, (_, i) => i + 1).reduce((acc, i) => {
+        const fieldName = `custom_field_${i}` as keyof ChildItemDto;
+        if (fieldName in childPayload) {
+          acc[fieldName] = childPayload[fieldName];
+        }
+        return acc;
+      }, {} as Partial<GroupItem>),
     });
 
     const savedChild = await manager.save(newChild);
@@ -325,11 +398,42 @@ export class GroupsItemsService {
 
     if (name_level_1) {
       await this.upsertLevel(manager, agreement_id, 1, name_level_1);
+    } else {
+      await this.removeLevel(manager, agreement_id, 1);
     }
 
     if (name_level_2) {
       await this.upsertLevel(manager, agreement_id, 2, name_level_2);
+    } else {
+      await this.removeLevel(manager, agreement_id, 2);
     }
+  }
+
+  private async removeLevel(manager: EntityManager, agreement_id: string, level: number) {
+    const record = await manager.findOne(ProjectGroup, {
+      where: { agreement_id, level, is_active: true },
+    });
+
+    if (record) {
+      record.is_active = false;
+      await manager.save(record);
+
+      const customFieldKey = `custom_field_${level}`;
+      await this.removeCustomField(manager, agreement_id, customFieldKey);
+    }
+  }
+
+  private async removeCustomField(
+     manager: EntityManager,
+    agreementId: string,
+    customField: string,
+  ): Promise<void> {
+    await manager
+      .createQueryBuilder()
+      .update(GroupItem)
+      .set({ [customField]: () => 'NULL' })
+      .where('agreement_id = :agreementId', { agreementId })
+      .execute();
   }
 
   private async upsertLevel(

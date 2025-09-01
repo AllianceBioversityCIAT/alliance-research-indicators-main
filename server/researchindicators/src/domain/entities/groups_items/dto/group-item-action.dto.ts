@@ -22,6 +22,46 @@ export class StructureDto {
   @IsOptional()
   name_level_2?: string;
 
+  @IsString()
+  @IsOptional()
+  custom_field_1?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_2?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_3?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_4?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_5?: string;
+
+   @IsString()
+  @IsOptional()
+  custom_field_6?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_7?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_8?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_9?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_10?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ParentItemDto)
@@ -40,6 +80,46 @@ export class ChildItemDto {
   @IsString()
   @IsNotEmpty()
   code: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_1?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_2?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_3?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_4?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_5?: string;
+
+   @IsString()
+  @IsOptional()
+  custom_field_6?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_7?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_8?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_9?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_10?: string;
 
   @IsOptional()
   @IsArray()
@@ -72,6 +152,48 @@ export class ParentItemDto {
   @ValidateNested({ each: true })
   @Type(() => IndicatorDto)
   indicators?: IndicatorDto[];
+}
+
+export class CustomFieldsDto {
+  @IsString()
+  @IsOptional()
+  custom_field_1?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_2?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_3?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_4?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_5?: string;
+
+   @IsString()
+  @IsOptional()
+  custom_field_6?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_7?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_8?: string;
+
+  @IsString()
+  @IsOptional()
+  custom_field_9?: string;
+  
+  @IsString()
+  @IsOptional()
+  custom_field_10?: string;
 }
 
 export class IndicatorDto {
