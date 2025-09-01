@@ -10,6 +10,11 @@ export interface TipIprDataDto {
     agreement_id?: string;
     name?: string;
   };
+  reportingLever?: {
+    id?: string;
+    short_name?: string;
+    full_name?: string;
+  };
   resultCreator: {
     fullName: string;
     email: string;

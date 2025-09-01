@@ -42,6 +42,20 @@ export const tipIntegrationMapper = (
         result.result_contracts?.[0]?.agresso_contract?.description,
       ),
     },
+    reportingLever: {
+      id: validationField(
+        result.result_levers?.[0]?.lever?.id,
+        Boolean(result.result_levers?.[0]?.lever),
+      ),
+      short_name: validationField(
+        result.result_levers?.[0]?.lever?.short_name,
+        Boolean(result.result_levers?.[0]?.lever),
+      ),
+      full_name: validationField(
+        result.result_levers?.[0]?.lever?.full_name,
+        Boolean(result.result_levers?.[0]?.lever),
+      ),
+    },
     resultCreator: {
       fullName: creatorFullName,
       email: creatorEmail,
