@@ -10,6 +10,7 @@ import { ResultsModule } from '../results/results.module';
 import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { TemplateModule } from '../../shared/auxiliar/template/template.module';
 import { ResultOicrRepository } from './repositories/result-oicr.repository';
+import { TempExternalOicrsModule } from '../temp_external_oicrs/temp_external_oicrs.module';
 
 @Module({
   controllers: [ResultOicrController],
@@ -22,6 +23,7 @@ import { ResultOicrRepository } from './repositories/result-oicr.repository';
     ResultLeversModule,
     forwardRef(() => ResultsModule),
     TemplateModule,
+    TempExternalOicrsModule,
   ],
   exports: [ResultOicrService, ResultOicrRepository],
 })

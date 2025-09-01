@@ -53,6 +53,8 @@ import { ProjectIndicatorsModule } from '../entities/project_indicators/project_
 import { TagsModule } from '../entities/tags/tags.module';
 import { ProjectIndicatorsResultsModule } from '../entities/project_indicators_results/project_indicators_results.module';
 import { ResultOicrModule } from '../entities/result-oicr/result-oicr.module';
+import { MaturityLevelModule } from '../entities/maturity-level/maturity-level.module';
+import { TempExternalOicrsModule } from '../entities/temp_external_oicrs/temp_external_oicrs.module';
 
 const capSharingChildren: Routes = [
   {
@@ -280,8 +282,16 @@ const children: Routes = [
     module: TagsModule,
   },
   {
+    path: 'maturity-levels',
+    module: MaturityLevelModule,
+  },
+  {
     path: 'opensearch',
     children: openSearchRoutes,
+  },
+  {
+    path: 'temp/oicrs',
+    module: TempExternalOicrsModule,
   },
   {
     path: 'announcement-setting',

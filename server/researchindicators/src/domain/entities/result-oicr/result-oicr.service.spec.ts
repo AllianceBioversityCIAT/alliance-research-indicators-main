@@ -22,6 +22,7 @@ import { AppConfig } from '../../shared/utils/app-config.util';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
 import { ResultOicrRepository } from './repositories/result-oicr.repository';
+import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -39,6 +40,7 @@ describe('ResultOicrService', () => {
   let mockAppConfig: jest.Mocked<AppConfig>;
   let mockTemplateService: jest.Mocked<TemplateService>;
   let mockResultOicrRepository: jest.Mocked<ResultOicrRepository>;
+  let mockTempExternalOicrsService: jest.Mocked<TempExternalOicrsService>;
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -135,6 +137,14 @@ describe('ResultOicrService', () => {
       sendMessageOicr: jest.fn(),
     } as any;
 
+    mockTempExternalOicrsService = {
+      findAll: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultOicrService,
@@ -154,6 +164,7 @@ describe('ResultOicrService', () => {
         { provide: AppConfig, useValue: mockAppConfig },
         { provide: TemplateService, useValue: mockTemplateService },
         { provide: ResultOicrRepository, useValue: mockResultOicrRepository },
+        { provide: TempExternalOicrsService, useValue: mockTempExternalOicrsService },
       ],
     }).compile();
 

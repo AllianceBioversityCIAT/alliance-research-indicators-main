@@ -4,7 +4,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, Not, Repository } from 'typeorm';
 import { ResultOicr } from './entities/result-oicr.entity';
 import { StepOneOicrDto } from './dto/step-one-oicr.dto';
 import { ResultTagsService } from '../result-tags/result-tags.service';
@@ -35,6 +35,9 @@ import { AppConfig } from '../../shared/utils/app-config.util';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
 import { ResultOicrRepository } from './repositories/result-oicr.repository';
+import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
+import { UpdateOicrDto } from './dto/update-oicr.dto';
+import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
 
 @Injectable()
 export class ResultOicrService {
@@ -53,6 +56,7 @@ export class ResultOicrService {
     private readonly appConfig: AppConfig,
     private readonly templateService: TemplateService,
     private readonly mainRepo: ResultOicrRepository,
+    private readonly tempExternalOicrsService: TempExternalOicrsService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -99,6 +103,71 @@ export class ResultOicrService {
         },
       });
     }
+  }
+
+  async updateOicr(resultId: number, data: UpdateOicrDto) {
+    const existingOicrInternalCode = await this.mainRepo.findOne({
+      where: {
+        is_active: true,
+        oicr_internal_code: data?.oicr_internal_code,
+        result_id: Not(resultId),
+      },
+    });
+
+    await this.mainRepo.update(resultId, {
+      oicr_internal_code: existingOicrInternalCode
+        ? null
+        : data.oicr_internal_code,
+      outcome_impact_statement: data?.outcome_impact_statement,
+      short_outcome_impact_statement: data?.short_outcome_impact_statement,
+      general_comment: data?.general_comment,
+      maturity_level_id: data?.maturity_level_id,
+      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+    });
+
+    const saveTags: Partial<ResultTag>[] = Array.isArray(data?.tagging)
+      ? data?.tagging?.map((tag) => ({
+          tag_id: tag.tag_id,
+        }))
+      : [];
+    await this.resultTagsService.create(resultId, saveTags, 'tag_id');
+
+    const saveLinkedResults: Partial<TempResultExternalOicr>[] = Array.isArray(
+      data?.link_result,
+    )
+      ? data.link_result.map((link) => ({
+          external_oicr_id: link.external_oicr_id,
+        }))
+      : [];
+
+    await this.tempExternalOicrsService.create(
+      resultId,
+      saveLinkedResults,
+      'external_oicr_id',
+    );
+  }
+
+  async findOicrs(resultId: number): Promise<UpdateOicrDto> {
+    const oicr = await this.mainRepo.findOne({
+      where: {
+        is_active: true,
+        result_id: resultId,
+      },
+    });
+
+    const tagging = await this.resultTagsService.find(resultId);
+
+    const link_result = await this.tempExternalOicrsService.find(resultId);
+
+    return {
+      general_comment: oicr?.general_comment,
+      maturity_level_id: oicr?.maturity_level_id,
+      oicr_internal_code: oicr?.oicr_internal_code,
+      outcome_impact_statement: oicr?.outcome_impact_statement,
+      short_outcome_impact_statement: oicr?.short_outcome_impact_statement,
+      tagging,
+      link_result,
+    };
   }
 
   async createOicrSteps(
