@@ -260,15 +260,16 @@ export class ResultOicrService {
         manager,
       );
 
-      const saveLinkedResults: Partial<LinkResult>[] = createdTags?.length
-        ? data?.linked_result?.map((link) => ({
-            other_result_id: link.other_result_id,
-          }))
-        : [];
-      await this.linkResultService.create(
+      const saveLinkedResults: Partial<TempResultExternalOicr>[] =
+        createdTags?.length
+          ? data?.linked_result?.map((link) => ({
+              external_oicr_id: link.other_result_id,
+            }))
+          : [];
+      await this.tempExternalOicrsService.create(
         resultId,
         saveLinkedResults,
-        'other_result_id',
+        'external_oicr_id',
         LinkResultRolesEnum.OICR_STEP_ONE,
         manager,
       );
