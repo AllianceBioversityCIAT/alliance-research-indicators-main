@@ -43,12 +43,12 @@ describe('ResultOicrController', () => {
       // Arrange
       const data: UpdateOicrDto = {
         oicr_internal_code: 'TEST-001',
-        tagging: [{ tag_id: 1 } as any],
+        tagging: { tag_id: 1 } as any,
         outcome_impact_statement: 'Test outcome statement',
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Test comment',
         maturity_level_id: 1,
-        link_result: [{ temp_result_id: 123 } as any],
+        link_result: { temp_result_id: 123 } as any,
       };
       const serviceResult = { success: true };
       const expectedResult = {
@@ -74,12 +74,12 @@ describe('ResultOicrController', () => {
       // Arrange
       const data: UpdateOicrDto = {
         oicr_internal_code: 'TEST-001',
-        tagging: [],
+        tagging: null as any,
         outcome_impact_statement: 'Test statement',
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Test comment',
         maturity_level_id: 1,
-        link_result: [],
+        link_result: null as any,
       };
       const serviceError = new Error('Service error');
 
@@ -105,12 +105,12 @@ describe('ResultOicrController', () => {
 
       const data: UpdateOicrDto = {
         oicr_internal_code: 'TEST-002',
-        tagging: [],
+        tagging: null as any,
         outcome_impact_statement: 'Test statement',
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Test comment',
         maturity_level_id: 2,
-        link_result: [],
+        link_result: null as any,
       };
       const expectedResult = { success: true };
 
@@ -132,12 +132,12 @@ describe('ResultOicrController', () => {
       // Arrange
       const serviceResult: UpdateOicrDto = {
         oicr_internal_code: 'TEST-001',
-        tagging: [{ tag_id: 1 } as any],
+        tagging: { tag_id: 1 } as any,
         outcome_impact_statement: 'Test outcome statement',
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Test comment',
         maturity_level_id: 1,
-        link_result: [{ temp_result_id: 123 } as any],
+        link_result: { temp_result_id: 123 } as any,
       };
       const expectedResult = {
         data: serviceResult,
@@ -182,12 +182,12 @@ describe('ResultOicrController', () => {
 
       const expectedResult: UpdateOicrDto = {
         oicr_internal_code: 'TEST-002',
-        tagging: [],
+        tagging: null as any,
         outcome_impact_statement: 'Test statement',
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Test comment',
         maturity_level_id: 2,
-        link_result: [],
+        link_result: null as any,
       };
 
       mockResultOicrService.findOicrs.mockResolvedValue(expectedResult);

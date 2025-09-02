@@ -16,7 +16,6 @@ import { StepTwoOicrDto } from './dto/step-two-oicr.dto';
 import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
-import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
@@ -645,10 +644,7 @@ describe('ResultOicrService', () => {
         UserRolesEnum.MAIN_CONTACT,
         resultId,
       );
-      expect(mockTempExternalOicrsService.find).toHaveBeenCalledWith(
-        resultId,
-        LinkResultRolesEnum.OICR_STEP_ONE,
-      );
+      expect(mockTempExternalOicrsService.find).toHaveBeenCalledWith(resultId);
       expect(mockResultTagsService.find).toHaveBeenCalledWith(resultId);
       expect(mockResultOicrRepository.findOne).toHaveBeenCalledWith({
         where: { result_id: resultId, is_active: true },
@@ -656,8 +652,8 @@ describe('ResultOicrService', () => {
       });
       expect(result).toEqual({
         main_contact_person: mockMainContactPerson,
-        link_result: mockLinkResult,
-        tagging: mockTagging,
+        link_result: mockLinkResult[0],
+        tagging: mockTagging[0],
         outcome_impact_statement: mockOutcomeStatement,
       });
     });
@@ -677,8 +673,8 @@ describe('ResultOicrService', () => {
       // Assert
       expect(result).toEqual({
         main_contact_person: undefined,
-        link_result: [],
-        tagging: [],
+        link_result: undefined,
+        tagging: undefined,
         outcome_impact_statement: undefined,
       });
     });
@@ -1071,12 +1067,12 @@ describe('ResultOicrService', () => {
       const resultId = 123;
       const updateData: UpdateOicrDto = {
         oicr_internal_code: 'OICR-2024-001',
-        tagging: [{ tag_id: 1 }, { tag_id: 2 }] as any,
+        tagging: { tag_id: 1 } as any,
         outcome_impact_statement: 'Updated outcome statement',
         short_outcome_impact_statement: 'Updated short statement',
         general_comment: 'Updated general comment',
         maturity_level_id: 2,
-        link_result: [{ external_oicr_id: 456 }] as any,
+        link_result: { external_oicr_id: 456 } as any,
       };
 
       const auditData = { updated_at: new Date() };
@@ -1111,13 +1107,13 @@ describe('ResultOicrService', () => {
 
       expect(mockResultTagsService.create).toHaveBeenCalledWith(
         resultId,
-        [{ tag_id: 1 }, { tag_id: 2 }],
+        [],
         'tag_id',
       );
 
       expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
         resultId,
-        [{ external_oicr_id: 456 }],
+        [],
         'external_oicr_id',
       );
     });
@@ -1127,12 +1123,12 @@ describe('ResultOicrService', () => {
       const resultId = 123;
       const updateData: UpdateOicrDto = {
         oicr_internal_code: 'EXISTING-CODE',
-        tagging: [],
+        tagging: null as any,
         outcome_impact_statement: 'Test statement',
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Comment',
         maturity_level_id: 1,
-        link_result: [],
+        link_result: null as any,
       };
 
       const existingOicr = { id: 456, oicr_internal_code: 'EXISTING-CODE' };
@@ -1227,8 +1223,8 @@ describe('ResultOicrService', () => {
         outcome_impact_statement: mockOicrEntity.outcome_impact_statement,
         short_outcome_impact_statement:
           mockOicrEntity.short_outcome_impact_statement,
-        tagging: mockTagging,
-        link_result: mockLinkResult,
+        tagging: mockTagging[0] as any,
+        link_result: mockLinkResult[0] as any,
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1268,8 +1264,8 @@ describe('ResultOicrService', () => {
         oicr_internal_code: undefined,
         outcome_impact_statement: undefined,
         short_outcome_impact_statement: undefined,
-        tagging: mockTagging,
-        link_result: mockLinkResult,
+        tagging: mockTagging[0] as any,
+        link_result: mockLinkResult[0] as any,
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(null);
@@ -1303,8 +1299,8 @@ describe('ResultOicrService', () => {
         outcome_impact_statement: mockOicrEntity.outcome_impact_statement,
         short_outcome_impact_statement:
           mockOicrEntity.short_outcome_impact_statement,
-        tagging: [],
-        link_result: [],
+        tagging: undefined as any,
+        link_result: undefined as any,
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1329,12 +1325,12 @@ describe('ResultOicrService', () => {
 
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
-        tagging: [{ tag_id: 1 }, { tag_id: 2 }] as any,
-        link_result: [{ external_oicr_id: 789 }] as any,
+        tagging: { tag_id: 1 } as any,
+        link_result: { external_oicr_id: 789 } as any,
         outcome_impact_statement: 'Test outcome statement',
       };
 
-      const createdTags = [{ tag_id: 1 }, { tag_id: 2 }];
+      const createdTags = [{ tag_id: 1 }];
       const auditData = { updated_at: new Date() };
 
       // Mock the transaction to pass the mockEntityManager to the callback
@@ -1364,7 +1360,7 @@ describe('ResultOicrService', () => {
 
       expect(mockResultTagsService.create).toHaveBeenCalledWith(
         resultId,
-        [{ tag_id: 1 }, { tag_id: 2 }],
+        [{ tag_id: 1 }],
         'tag_id',
         undefined,
         mockEntityManager,
@@ -1391,8 +1387,8 @@ describe('ResultOicrService', () => {
 
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
-        tagging: [],
-        link_result: [{ external_oicr_id: 789 }] as any,
+        tagging: null as any,
+        link_result: { external_oicr_id: 789 } as any,
         outcome_impact_statement: 'Test statement',
       };
 
@@ -1429,7 +1425,7 @@ describe('ResultOicrService', () => {
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
         tagging: null as any,
-        link_result: [{ external_oicr_id: 789 }] as any,
+        link_result: { external_oicr_id: 789 } as any,
         outcome_impact_statement: 'Test statement',
       };
 
