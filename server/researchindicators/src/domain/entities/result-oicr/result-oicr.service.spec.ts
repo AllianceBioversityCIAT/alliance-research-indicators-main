@@ -1374,7 +1374,7 @@ describe('ResultOicrService', () => {
         resultId,
         [{ external_oicr_id: 789 }],
         'external_oicr_id',
-        LinkResultRolesEnum.OICR_STEP_ONE,
+        undefined,
         mockEntityManager,
       );
 
@@ -1416,7 +1416,7 @@ describe('ResultOicrService', () => {
         resultId,
         [], // Should pass empty array when no tags created
         'external_oicr_id',
-        LinkResultRolesEnum.OICR_STEP_ONE,
+        undefined,
         mockEntityManager,
       );
     });

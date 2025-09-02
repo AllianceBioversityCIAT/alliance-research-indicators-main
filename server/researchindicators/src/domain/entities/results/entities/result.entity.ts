@@ -155,6 +155,12 @@ export class Result extends AuditableEntity {
   })
   platform_code?: string;
 
+  @Column('boolean', {
+    name: 'is_partner_not_applicable',
+    nullable: true,
+  })
+  is_partner_not_applicable?: boolean;
+
   @ManyToOne(
     () => ReportingPlatform,
     (reportingPlatform) => reportingPlatform.results,
