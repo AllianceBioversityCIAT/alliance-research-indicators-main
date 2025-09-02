@@ -8,8 +8,8 @@ export class UpdateOicrDto {
   })
   oicr_internal_code: string;
 
-  @ApiProperty({ type: [ResultTag] })
-  tagging: ResultTag[];
+  @ApiProperty({ type: ResultTag })
+  tagging: ResultTag;
 
   @ApiProperty({
     type: String,
@@ -31,6 +31,6 @@ export class UpdateOicrDto {
   })
   maturity_level_id: number;
 
-  @ApiProperty({ type: [TempResultExternalOicr] })
-  link_result: Partial<TempResultExternalOicr>[];
+  @ApiProperty({ type: TempResultExternalOicr })
+  link_result: Partial<TempResultExternalOicr>;
 }

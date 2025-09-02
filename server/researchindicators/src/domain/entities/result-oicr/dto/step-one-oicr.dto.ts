@@ -6,10 +6,10 @@ import { TempResultExternalOicr } from '../../temp_external_oicrs/entities/temp_
 export class StepOneOicrDto {
   @ApiProperty({ type: ResultUser })
   main_contact_person: ResultUser;
-  @ApiProperty({ type: [ResultTag] })
-  tagging: ResultTag[];
-  @ApiProperty({ type: [TempResultExternalOicr] })
-  link_result: Partial<TempResultExternalOicr>[];
+  @ApiProperty({ type: ResultTag })
+  tagging: ResultTag;
+  @ApiProperty({ type: TempResultExternalOicr })
+  link_result: Partial<TempResultExternalOicr>;
   @ApiProperty({
     type: String,
   })

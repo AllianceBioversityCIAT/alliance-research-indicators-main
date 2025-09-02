@@ -16,7 +16,6 @@ import { ResultUsersService } from '../result-users/result-users.service';
 import { ResultUser } from '../result-users/entities/result-user.entity';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultTag } from '../result-tags/entities/result-tag.entity';
-import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { ResultInitiativesService } from '../result-initiatives/result-initiatives.service';
@@ -37,6 +36,7 @@ import { ResultOicrRepository } from './repositories/result-oicr.repository';
 import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
+import { isEmpty } from '../../shared/utils/object.utils';
 
 @Injectable()
 export class ResultOicrService {
@@ -158,9 +158,13 @@ export class ResultOicrService {
       },
     });
 
-    const tagging = await this.resultTagsService.find(resultId);
+    const tagging = await this.resultTagsService
+      .find(resultId)
+      .then((tags) => tags?.[0]);
 
-    const link_result = await this.tempExternalOicrsService.find(resultId);
+    const link_result = await this.tempExternalOicrsService
+      .find(resultId)
+      .then((links) => links?.[0]);
 
     return {
       general_comment: oicr?.general_comment,
@@ -238,6 +242,7 @@ export class ResultOicrService {
   }
 
   async stepOneOicr(data: StepOneOicrDto, resultId: number) {
+    console.log(JSON.stringify(data, null, 2));
     await this.dataSource.transaction(async (manager) => {
       const saveUsers: Partial<ResultUser> = {
         user_id: data?.main_contact_person?.user_id,
@@ -250,11 +255,15 @@ export class ResultOicrService {
         manager,
       );
 
-      const saveTags: Partial<ResultTag>[] = Array.isArray(data?.tagging)
-        ? data?.tagging?.map((tag) => ({
-            tag_id: tag.tag_id,
-          }))
+      const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
+        ? [
+            {
+              tag_id: data?.tagging?.tag_id,
+            },
+          ]
         : [];
+
+      console.log('saveTags', saveTags);
       const createdTags = await this.resultTagsService.create(
         resultId,
         saveTags,
@@ -263,12 +272,11 @@ export class ResultOicrService {
         manager,
       );
 
-      const saveLinkedResults: Partial<TempResultExternalOicr>[] =
-        createdTags?.length
-          ? data?.link_result?.map((link) => ({
-              external_oicr_id: link.external_oicr_id,
-            }))
-          : [];
+      const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
+        createdTags,
+      )
+        ? [data?.link_result]
+        : [];
       await this.tempExternalOicrsService.create(
         resultId,
         saveLinkedResults,
@@ -312,11 +320,12 @@ export class ResultOicrService {
     const main_contact_person = await this.resultUsersService
       .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
       .then((users) => users?.[0]);
-    const link_result = await this.tempExternalOicrsService.find(
-      resultId,
-      LinkResultRolesEnum.OICR_STEP_ONE,
-    );
-    const tagging = await this.resultTagsService.find(resultId);
+    const link_result = await this.tempExternalOicrsService
+      .find(resultId)
+      .then((links) => links?.[0]);
+    const tagging = await this.resultTagsService
+      .find(resultId)
+      .then((tags) => tags?.[0]);
     const outcome_impact_statement = await this.mainRepo
       .findOne({
         where: {
