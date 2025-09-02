@@ -16,7 +16,6 @@ import { ResultUsersService } from '../result-users/result-users.service';
 import { ResultUser } from '../result-users/entities/result-user.entity';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultTag } from '../result-tags/entities/result-tag.entity';
-import { LinkResult } from '../link-results/entities/link-result.entity';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
@@ -262,8 +261,8 @@ export class ResultOicrService {
 
       const saveLinkedResults: Partial<TempResultExternalOicr>[] =
         createdTags?.length
-          ? data?.linked_result?.map((link) => ({
-              external_oicr_id: link.other_result_id,
+          ? data?.link_result?.map((link) => ({
+              external_oicr_id: link.external_oicr_id,
             }))
           : [];
       await this.tempExternalOicrsService.create(
@@ -309,7 +308,7 @@ export class ResultOicrService {
     const main_contact_person = await this.resultUsersService
       .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
       .then((users) => users?.[0]);
-    const linked_result = await this.linkResultService.find(
+    const link_result = await this.tempExternalOicrsService.find(
       resultId,
       LinkResultRolesEnum.OICR_STEP_ONE,
     );
@@ -328,7 +327,7 @@ export class ResultOicrService {
 
     return {
       main_contact_person,
-      linked_result,
+      link_result,
       tagging,
       outcome_impact_statement,
     };

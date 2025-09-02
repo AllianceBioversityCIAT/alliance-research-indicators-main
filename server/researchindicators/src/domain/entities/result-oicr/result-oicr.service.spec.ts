@@ -623,7 +623,7 @@ describe('ResultOicrService', () => {
       // Arrange
       const resultId = 123;
       const mockMainContactPerson = { user_id: 456 };
-      const mockLinkedResults = [{ other_result_id: 789 }];
+      const mockLinkResult = [{ external_oicr_id: 789 }];
       const mockTagging = [{ tag_id: 1 }, { tag_id: 2 }];
       const mockOutcomeStatement = 'Test outcome statement';
       const mockOicrEntity = { outcome_impact_statement: mockOutcomeStatement };
@@ -631,7 +631,9 @@ describe('ResultOicrService', () => {
       mockResultUsersService.findUsersByRoleResult.mockResolvedValue([
         mockMainContactPerson,
       ] as any);
-      mockLinkResultsService.find.mockResolvedValue(mockLinkedResults as any);
+      mockTempExternalOicrsService.find.mockResolvedValue(
+        mockLinkResult as any,
+      );
       mockResultTagsService.find.mockResolvedValue(mockTagging as any);
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
 
@@ -643,7 +645,7 @@ describe('ResultOicrService', () => {
         UserRolesEnum.MAIN_CONTACT,
         resultId,
       );
-      expect(mockLinkResultsService.find).toHaveBeenCalledWith(
+      expect(mockTempExternalOicrsService.find).toHaveBeenCalledWith(
         resultId,
         LinkResultRolesEnum.OICR_STEP_ONE,
       );
@@ -654,7 +656,7 @@ describe('ResultOicrService', () => {
       });
       expect(result).toEqual({
         main_contact_person: mockMainContactPerson,
-        linked_result: mockLinkedResults,
+        link_result: mockLinkResult,
         tagging: mockTagging,
         outcome_impact_statement: mockOutcomeStatement,
       });
@@ -665,7 +667,7 @@ describe('ResultOicrService', () => {
       const resultId = 123;
 
       mockResultUsersService.findUsersByRoleResult.mockResolvedValue([]);
-      mockLinkResultsService.find.mockResolvedValue([]);
+      mockTempExternalOicrsService.find.mockResolvedValue([]);
       mockResultTagsService.find.mockResolvedValue([]);
       mockResultOicrRepository.findOne.mockResolvedValue(null);
 
@@ -675,7 +677,7 @@ describe('ResultOicrService', () => {
       // Assert
       expect(result).toEqual({
         main_contact_person: undefined,
-        linked_result: [],
+        link_result: [],
         tagging: [],
         outcome_impact_statement: undefined,
       });
@@ -1328,7 +1330,7 @@ describe('ResultOicrService', () => {
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
         tagging: [{ tag_id: 1 }, { tag_id: 2 }] as any,
-        linked_result: [{ other_result_id: 789 }] as any,
+        link_result: [{ external_oicr_id: 789 }] as any,
         outcome_impact_statement: 'Test outcome statement',
       };
 
@@ -1390,7 +1392,7 @@ describe('ResultOicrService', () => {
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
         tagging: [],
-        linked_result: [{ other_result_id: 789 }] as any,
+        link_result: [{ external_oicr_id: 789 }] as any,
         outcome_impact_statement: 'Test statement',
       };
 
@@ -1427,7 +1429,7 @@ describe('ResultOicrService', () => {
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
         tagging: null as any,
-        linked_result: [{ other_result_id: 789 }] as any,
+        link_result: [{ external_oicr_id: 789 }] as any,
         outcome_impact_statement: 'Test statement',
       };
 
