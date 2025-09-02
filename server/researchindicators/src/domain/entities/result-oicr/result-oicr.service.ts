@@ -75,8 +75,12 @@ export class ResultOicrService {
     await this.stepOneOicr(data.step_one, result.result_id);
     await this.stepTwoOicr(data.step_two, result.result_id);
     await this.resultService.saveGeoLocation(result.result_id, data.step_three);
+    const tempGeneralComment =
+      typeof data?.step_four?.general_comment == 'string'
+        ? data.step_four.general_comment
+        : null;
     await this.mainRepo.update(result.result_id, {
-      general_comment: String(data?.step_four?.general_comment),
+      general_comment: tempGeneralComment,
     });
     await this.dataSource.getRepository(Result).update(result.result_id, {
       description: data?.step_one?.outcome_impact_statement,
@@ -269,7 +273,7 @@ export class ResultOicrService {
         resultId,
         saveLinkedResults,
         'external_oicr_id',
-        LinkResultRolesEnum.OICR_STEP_ONE,
+        undefined,
         manager,
       );
 

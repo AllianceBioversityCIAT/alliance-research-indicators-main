@@ -9,4 +9,11 @@ export class CreateResultInstitutionDto {
     isArray: true,
   })
   institutions: ResultInstitution[];
+
+  @ApiProperty({
+    type: Boolean,
+    required: false,
+    description: 'Indicates if partner is not applicable',
+  })
+  is_partner_not_applicable?: boolean;
 }
