@@ -238,7 +238,6 @@ export class ResultOicrService {
   }
 
   async stepOneOicr(data: StepOneOicrDto, resultId: number) {
-    console.log(JSON.stringify(data, null, 2));
     await this.dataSource.transaction(async (manager) => {
       const saveUsers: Partial<ResultUser> = {
         user_id: data?.main_contact_person?.user_id,
@@ -259,7 +258,6 @@ export class ResultOicrService {
           ]
         : [];
 
-      console.log('saveTags', saveTags);
       const createdTags = await this.resultTagsService.create(
         resultId,
         saveTags,
