@@ -9,6 +9,7 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { isEmpty } from '../../shared/utils/object.utils';
 import { SessionFormatEnum } from '../session-formats/enums/session-format.enum';
 import { ResultCapacitySharing } from '../result-capacity-sharing/entities/result-capacity-sharing.entity';
+import { Result } from '../results/entities/result.entity';
 @Injectable()
 export class ResultInstitutionsService extends BaseServiceSimple<
   ResultInstitution,
@@ -33,12 +34,26 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     resultInstitution: CreateResultInstitutionDto,
   ) {
     return this.dataSource.transaction(async (manager) => {
+      const tempIsPartnerNotApplicable = isEmpty(
+        resultInstitution?.is_partner_not_applicable,
+      )
+        ? null
+        : resultInstitution?.is_partner_not_applicable;
+
+      await manager.getRepository(Result).update(resultId, {
+        is_partner_not_applicable: tempIsPartnerNotApplicable,
+      });
+
       const { institutions } = resultInstitution;
-      const filteredInstitutions = institutions.filter(
-        (institution) =>
-          isEmpty(institution?.institution_role_id) ||
-          institution?.institution_role_id == InstitutionRolesEnum.PARTNERS,
-      );
+      let filteredInstitutions = [];
+
+      if (!tempIsPartnerNotApplicable) {
+        filteredInstitutions = institutions.filter(
+          (institution) =>
+            isEmpty(institution?.institution_role_id) ||
+            institution?.institution_role_id == InstitutionRolesEnum.PARTNERS,
+        );
+      }
 
       const resResultInstitution = await this.create<InstitutionRolesEnum>(
         resultId,
@@ -131,8 +146,23 @@ export class ResultInstitutionsService extends BaseServiceSimple<
       institutio = this.filterInstitutions(institutio, capSharingType);
     }
 
+    let is_partner_not_applicable = undefined;
+    if (institution_role_id === InstitutionRolesEnum.PARTNERS) {
+      const result = await this.dataSource.getRepository(Result).findOne({
+        where: {
+          result_id: resultId,
+          is_active: true,
+        },
+        select: {
+          is_partner_not_applicable: true,
+        },
+      });
+      is_partner_not_applicable = result?.is_partner_not_applicable;
+    }
+
     return {
       institutions: institutio,
+      is_partner_not_applicable,
     };
   }
 

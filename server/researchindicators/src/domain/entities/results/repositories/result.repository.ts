@@ -9,6 +9,7 @@ import { isEmpty } from '../../../shared/utils/object.utils';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
+import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 
 @Injectable()
 export class ResultRepository
@@ -287,11 +288,9 @@ export class ResultRepository
       sort_order = filters.sort_order.toUpperCase();
     }
 
-    const mainQeury = `
+    const mainQuery = `
 	SELECT 
-		r.result_id,
-		r.result_official_code,
-		r.version_id,
+  ${resultDefaultParametersSQL('r')},
 		r.title,
 		r.description,
 		r.indicator_id,
@@ -347,7 +346,7 @@ export class ResultRepository
 		${limit}
 	`;
 
-    return this.query(mainQeury);
+    return this.query(mainQuery);
   }
 
   async deleteResult(result_id: number) {
