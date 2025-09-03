@@ -14,53 +14,10 @@ export class StructureDto {
   @IsNotEmpty()
   agreement_id: string;
 
-  @IsString()
-  @IsOptional()
-  name_level_1?: string;
-
-  @IsString()
-  @IsOptional()
-  name_level_2?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_1?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_2?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_3?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_4?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_5?: string;
-
-   @IsString()
-  @IsOptional()
-  custom_field_6?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_7?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_8?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_9?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_10?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LevelDto)
+  levels: LevelDto[];
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -68,64 +25,38 @@ export class StructureDto {
   structures: ParentItemDto[];
 }
 
-export class ChildItemDto {
+export class LevelDto {
   @IsOptional()
-  @IsNumber()
-  id?: number;
-
   @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  code: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_1?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_2?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_3?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_4?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_5?: string;
-
-   @IsString()
-  @IsOptional()
-  custom_field_6?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_7?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_8?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_9?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_10?: string;
+  name_level_1?: string;
 
   @IsOptional()
+  @IsString()
+  name_level_2?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => IndicatorDto)
-  indicators?: IndicatorDto[];
+  @Type(() => CustomFieldDto)
+  custom_fields: CustomFieldDto[];
+}
+export class CustomFieldDto {
+  @IsNotEmpty()
+  @IsInt()
+  fieldID: number;
+
+  @IsNotEmpty()
+  @IsString()
+  field_name: string;
+}
+
+export class CustomValueDto {
+  @IsNotEmpty()
+  @IsInt()
+  field: number;
+
+  @IsNotEmpty()
+  @IsString()
+  field_value: string;
 }
 
 export class ParentItemDto {
@@ -144,6 +75,12 @@ export class ParentItemDto {
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
+  @Type(() => CustomValueDto)
+  custom_values?: CustomValueDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
   @Type(() => ChildItemDto)
   items?: ChildItemDto[];
 
@@ -154,95 +91,34 @@ export class ParentItemDto {
   indicators?: IndicatorDto[];
 }
 
-export class CustomFieldsDto {
-  @IsString()
+export class ChildItemDto {
   @IsOptional()
-  custom_field_1?: string;
+  @IsNumber()
+  id?: number;
 
   @IsString()
-  @IsOptional()
-  custom_field_2?: string;
+  @IsNotEmpty()
+  name: string;
 
   @IsString()
-  @IsOptional()
-  custom_field_3?: string;
+  @IsNotEmpty()
+  code: string;
 
-  @IsString()
   @IsOptional()
-  custom_field_4?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CustomValueDto)
+  custom_values?: CustomValueDto[];
 
-  @IsString()
   @IsOptional()
-  custom_field_5?: string;
-
-   @IsString()
-  @IsOptional()
-  custom_field_6?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_7?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_8?: string;
-
-  @IsString()
-  @IsOptional()
-  custom_field_9?: string;
-  
-  @IsString()
-  @IsOptional()
-  custom_field_10?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IndicatorDto)
+  indicators?: IndicatorDto[];
 }
 
 export class IndicatorDto {
   @IsNotEmpty()
   @IsNumber()
-  id?: number;
-
-  @IsString()
-  @IsOptional()
-  name: string;
-
-  @IsString()
-  @IsOptional()
-  code: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsInt()
-  level?: number;
-
-  @IsString()
-  @IsOptional()
-  number_type: string;
-
-  @IsString()
-  @IsOptional()
-  number_format: string;
-
-  @IsArray()
-  @Type(() => Number)
-  @IsInt({ each: true })
-  years: number[];
-
-  @IsString()
-  @IsOptional()
-  target_unit: string;
-
-  @IsNumber()
-  @IsOptional()
-  target_value: number;
-
-  @IsNumber()
-  @IsOptional()
-  base_line: number;
-
-  @IsString()
-  @IsOptional()
-  type: string;
+  id: number;
 }
