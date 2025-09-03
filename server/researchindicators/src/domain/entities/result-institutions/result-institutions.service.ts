@@ -146,8 +146,23 @@ export class ResultInstitutionsService extends BaseServiceSimple<
       institutio = this.filterInstitutions(institutio, capSharingType);
     }
 
+    let is_partner_not_applicable = undefined;
+    if (institution_role_id === InstitutionRolesEnum.PARTNERS) {
+      const result = await this.dataSource.getRepository(Result).findOne({
+        where: {
+          result_id: resultId,
+          is_active: true,
+        },
+        select: {
+          is_partner_not_applicable: true,
+        },
+      });
+      is_partner_not_applicable = result?.is_partner_not_applicable;
+    }
+
     return {
       institutions: institutio,
+      is_partner_not_applicable,
     };
   }
 
