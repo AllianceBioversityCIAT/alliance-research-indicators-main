@@ -347,10 +347,10 @@ export class GroupsItemsService {
     return child;
   }
 
-  private updateBasicFields(
+  private async updateBasicFields(
     item: GroupItem,
     payload: ParentItemDto | ChildItemDto,
-  ): boolean {
+  ): Promise<boolean> {
     let hasChanges = false;
 
     if (item.name !== payload.name) {
@@ -366,11 +366,11 @@ export class GroupsItemsService {
     return hasChanges;
   }
 
-  private updateCustomFields(
+  private async updateCustomFields(
     item: GroupItem,
     payload: ParentItemDto | ChildItemDto,
-  ): boolean {
-    const customFieldColumns = this.getCustomFieldColumns();
+  ): Promise<boolean> {
+    const customFieldColumns = await this.getCustomFieldColumns();
     let updated = false;
 
     for (const columnName of customFieldColumns) {
@@ -391,7 +391,7 @@ export class GroupsItemsService {
     return updated;
   }
 
-  private getCustomFieldColumns(): string[] {
+  private async getCustomFieldColumns(): Promise<string[]> {
     return getMetadataArgsStorage()
       .columns.filter(
         (col) =>
