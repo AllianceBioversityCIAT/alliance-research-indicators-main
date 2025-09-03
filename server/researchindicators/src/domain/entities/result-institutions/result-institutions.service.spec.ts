@@ -226,6 +226,189 @@ describe('ResultInstitutionsService', () => {
         SessionFormatEnum.GROUP,
       );
     });
+
+    it('should query and return is_partner_not_applicable when role is PARTNERS', async () => {
+      const resultId = 1;
+      const mockInstitutions = [
+        {
+          result_institution_id: 1,
+          result_id: resultId,
+          institution_id: 1,
+          institution_role_id: InstitutionRolesEnum.PARTNERS,
+          is_active: true,
+        } as ResultInstitution,
+      ];
+      const mockCapacitySharing = {
+        session_format_id: SessionFormatEnum.GROUP,
+      };
+      const mockResult = {
+        is_partner_not_applicable: true,
+      };
+
+      mockRepository.find.mockResolvedValue(mockInstitutions);
+
+      // Mock the Result repository to return the is_partner_not_applicable field
+      const mockResultRepo = {
+        ...mockRepository,
+        findOne: jest.fn().mockResolvedValue(mockResult),
+      };
+
+      // Mock the capacity sharing repository call
+      const mockCapacitySharingRepo = {
+        ...mockRepository,
+        findOne: jest.fn().mockResolvedValue(mockCapacitySharing),
+      };
+
+      mockDataSource.getRepository.mockImplementation((entity) => {
+        if (entity === ResultCapacitySharing) {
+          return mockCapacitySharingRepo;
+        }
+        if (entity === Result) {
+          return mockResultRepo;
+        }
+        return mockRepository;
+      });
+
+      // Mock the filterInstitutions method
+      const filterInstitutionsSpy = jest.spyOn(
+        service as any,
+        'filterInstitutions',
+      );
+      filterInstitutionsSpy.mockReturnValue(mockInstitutions);
+
+      const result = await service.findAll(
+        resultId,
+        InstitutionRolesEnum.PARTNERS,
+      );
+
+      // Verify that the Result repository was called to get is_partner_not_applicable
+      expect(mockResultRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          result_id: resultId,
+          is_active: true,
+        },
+        select: {
+          is_partner_not_applicable: true,
+        },
+      });
+
+      // Verify that is_partner_not_applicable is included in the response
+      expect(result).toEqual({
+        institutions: mockInstitutions,
+        is_partner_not_applicable: true,
+      });
+    });
+
+    it('should handle case when is_partner_not_applicable is null for PARTNERS role', async () => {
+      const resultId = 1;
+      const mockInstitutions = [
+        {
+          result_institution_id: 1,
+          result_id: resultId,
+          institution_id: 1,
+          institution_role_id: InstitutionRolesEnum.PARTNERS,
+          is_active: true,
+        } as ResultInstitution,
+      ];
+      const mockCapacitySharing = {
+        session_format_id: SessionFormatEnum.GROUP,
+      };
+
+      mockRepository.find.mockResolvedValue(mockInstitutions);
+
+      // Mock the Result repository to return null (no result found)
+      const mockResultRepo = {
+        ...mockRepository,
+        findOne: jest.fn().mockResolvedValue(null),
+      };
+
+      // Mock the capacity sharing repository call
+      const mockCapacitySharingRepo = {
+        ...mockRepository,
+        findOne: jest.fn().mockResolvedValue(mockCapacitySharing),
+      };
+
+      mockDataSource.getRepository.mockImplementation((entity) => {
+        if (entity === ResultCapacitySharing) {
+          return mockCapacitySharingRepo;
+        }
+        if (entity === Result) {
+          return mockResultRepo;
+        }
+        return mockRepository;
+      });
+
+      // Mock the filterInstitutions method
+      const filterInstitutionsSpy = jest.spyOn(
+        service as any,
+        'filterInstitutions',
+      );
+      filterInstitutionsSpy.mockReturnValue(mockInstitutions);
+
+      const result = await service.findAll(
+        resultId,
+        InstitutionRolesEnum.PARTNERS,
+      );
+
+      // Verify that the Result repository was called
+      expect(mockResultRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          result_id: resultId,
+          is_active: true,
+        },
+        select: {
+          is_partner_not_applicable: true,
+        },
+      });
+
+      // Verify that is_partner_not_applicable is undefined when no result is found
+      expect(result).toEqual({
+        institutions: mockInstitutions,
+        is_partner_not_applicable: undefined,
+      });
+    });
+
+    it('should not query is_partner_not_applicable when role is not PARTNERS', async () => {
+      const resultId = 1;
+      const mockInstitutions = [
+        {
+          result_institution_id: 1,
+          result_id: resultId,
+          institution_id: 1,
+          institution_role_id: InstitutionRolesEnum.TRAINEE_AFFILIATION,
+          is_active: true,
+        } as ResultInstitution,
+      ];
+
+      mockRepository.find.mockResolvedValue(mockInstitutions);
+
+      // Mock the Result repository
+      const mockResultRepo = {
+        ...mockRepository,
+        findOne: jest.fn(),
+      };
+
+      mockDataSource.getRepository.mockImplementation((entity) => {
+        if (entity === Result) {
+          return mockResultRepo;
+        }
+        return mockRepository;
+      });
+
+      const result = await service.findAll(
+        resultId,
+        InstitutionRolesEnum.TRAINEE_AFFILIATION,
+      );
+
+      // Verify that the Result repository was NOT called when role is not PARTNERS
+      expect(mockResultRepo.findOne).not.toHaveBeenCalled();
+
+      // Verify that is_partner_not_applicable is undefined for non-PARTNERS roles
+      expect(result).toEqual({
+        institutions: mockInstitutions,
+        is_partner_not_applicable: undefined,
+      });
+    });
   });
 
   describe('updatePartners', () => {
