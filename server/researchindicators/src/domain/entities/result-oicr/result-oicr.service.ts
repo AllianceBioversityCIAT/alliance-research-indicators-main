@@ -4,7 +4,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, Not, Repository } from 'typeorm';
 import { ResultOicr } from './entities/result-oicr.entity';
 import { StepOneOicrDto } from './dto/step-one-oicr.dto';
 import { ResultTagsService } from '../result-tags/result-tags.service';
@@ -16,8 +16,6 @@ import { ResultUsersService } from '../result-users/result-users.service';
 import { ResultUser } from '../result-users/entities/result-user.entity';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultTag } from '../result-tags/entities/result-tag.entity';
-import { LinkResult } from '../link-results/entities/link-result.entity';
-import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { ResultInitiativesService } from '../result-initiatives/result-initiatives.service';
@@ -35,6 +33,10 @@ import { AppConfig } from '../../shared/utils/app-config.util';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
 import { ResultOicrRepository } from './repositories/result-oicr.repository';
+import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
+import { UpdateOicrDto } from './dto/update-oicr.dto';
+import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
+import { isEmpty } from '../../shared/utils/object.utils';
 
 @Injectable()
 export class ResultOicrService {
@@ -53,6 +55,7 @@ export class ResultOicrService {
     private readonly appConfig: AppConfig,
     private readonly templateService: TemplateService,
     private readonly mainRepo: ResultOicrRepository,
+    private readonly tempExternalOicrsService: TempExternalOicrsService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -72,8 +75,12 @@ export class ResultOicrService {
     await this.stepOneOicr(data.step_one, result.result_id);
     await this.stepTwoOicr(data.step_two, result.result_id);
     await this.resultService.saveGeoLocation(result.result_id, data.step_three);
+    const tempGeneralComment =
+      typeof data?.step_four?.general_comment == 'string'
+        ? data.step_four.general_comment
+        : null;
     await this.mainRepo.update(result.result_id, {
-      general_comment: String(data?.step_four?.general_comment),
+      general_comment: tempGeneralComment,
     });
     await this.dataSource.getRepository(Result).update(result.result_id, {
       description: data?.step_one?.outcome_impact_statement,
@@ -99,6 +106,71 @@ export class ResultOicrService {
         },
       });
     }
+  }
+
+  async updateOicr(resultId: number, data: UpdateOicrDto) {
+    const existingOicrInternalCode = await this.mainRepo.findOne({
+      where: {
+        is_active: true,
+        oicr_internal_code: data?.oicr_internal_code,
+        result_id: Not(resultId),
+      },
+    });
+
+    await this.mainRepo.update(resultId, {
+      oicr_internal_code: existingOicrInternalCode
+        ? null
+        : data.oicr_internal_code,
+      outcome_impact_statement: data?.outcome_impact_statement,
+      short_outcome_impact_statement: data?.short_outcome_impact_statement,
+      general_comment: data?.general_comment,
+      maturity_level_id: data?.maturity_level_id,
+      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+    });
+
+    const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
+      ? [{ tag_id: data.tagging?.tag_id }]
+      : [];
+    await this.resultTagsService.create(resultId, saveTags, 'tag_id');
+
+    const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
+      data?.link_result,
+    )
+      ? [{ external_oicr_id: data.link_result?.external_oicr_id }]
+      : [];
+
+    await this.tempExternalOicrsService.create(
+      resultId,
+      saveLinkedResults,
+      'external_oicr_id',
+    );
+  }
+
+  async findOicrs(resultId: number): Promise<UpdateOicrDto> {
+    const oicr = await this.mainRepo.findOne({
+      where: {
+        is_active: true,
+        result_id: resultId,
+      },
+    });
+
+    const tagging = await this.resultTagsService
+      .find(resultId)
+      .then((tags) => tags?.[0]);
+
+    const link_result = await this.tempExternalOicrsService
+      .find(resultId)
+      .then((links) => links?.[0]);
+
+    return {
+      general_comment: oicr?.general_comment,
+      maturity_level_id: oicr?.maturity_level_id,
+      oicr_internal_code: oicr?.oicr_internal_code,
+      outcome_impact_statement: oicr?.outcome_impact_statement,
+      short_outcome_impact_statement: oicr?.short_outcome_impact_statement,
+      tagging,
+      link_result,
+    };
   }
 
   async createOicrSteps(
@@ -166,6 +238,7 @@ export class ResultOicrService {
   }
 
   async stepOneOicr(data: StepOneOicrDto, resultId: number) {
+    console.log(JSON.stringify(data, null, 2));
     await this.dataSource.transaction(async (manager) => {
       const saveUsers: Partial<ResultUser> = {
         user_id: data?.main_contact_person?.user_id,
@@ -178,11 +251,15 @@ export class ResultOicrService {
         manager,
       );
 
-      const saveTags: Partial<ResultTag>[] = Array.isArray(data?.tagging)
-        ? data?.tagging?.map((tag) => ({
-            tag_id: tag.tag_id,
-          }))
+      const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
+        ? [
+            {
+              tag_id: data?.tagging?.tag_id,
+            },
+          ]
         : [];
+
+      console.log('saveTags', saveTags);
       const createdTags = await this.resultTagsService.create(
         resultId,
         saveTags,
@@ -191,16 +268,16 @@ export class ResultOicrService {
         manager,
       );
 
-      const saveLinkedResults: Partial<LinkResult>[] = createdTags?.length
-        ? data?.linked_result?.map((link) => ({
-            other_result_id: link.other_result_id,
-          }))
+      const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
+        createdTags,
+      )
+        ? [data?.link_result]
         : [];
-      await this.linkResultService.create(
+      await this.tempExternalOicrsService.create(
         resultId,
         saveLinkedResults,
-        'other_result_id',
-        LinkResultRolesEnum.OICR_STEP_ONE,
+        'external_oicr_id',
+        undefined,
         manager,
       );
 
@@ -239,11 +316,12 @@ export class ResultOicrService {
     const main_contact_person = await this.resultUsersService
       .findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, resultId)
       .then((users) => users?.[0]);
-    const linked_result = await this.linkResultService.find(
-      resultId,
-      LinkResultRolesEnum.OICR_STEP_ONE,
-    );
-    const tagging = await this.resultTagsService.find(resultId);
+    const link_result = await this.tempExternalOicrsService
+      .find(resultId)
+      .then((links) => links?.[0]);
+    const tagging = await this.resultTagsService
+      .find(resultId)
+      .then((tags) => tags?.[0]);
     const outcome_impact_statement = await this.mainRepo
       .findOne({
         where: {
@@ -258,7 +336,7 @@ export class ResultOicrService {
 
     return {
       main_contact_person,
-      linked_result,
+      link_result,
       tagging,
       outcome_impact_statement,
     };

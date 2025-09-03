@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ResultOicrController } from './result-oicr.controller';
 import { ResultOicrService } from './result-oicr.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
-import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
+import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { HttpStatus } from '@nestjs/common';
 
@@ -14,12 +14,9 @@ describe('ResultOicrController', () => {
   beforeEach(async () => {
     // Create mocks for all dependencies
     mockResultOicrService = {
-      createOicrSteps: jest.fn(),
-      findByResultIdAndSteps: jest.fn(),
+      updateOicr: jest.fn(),
+      findOicrs: jest.fn(),
       createOicr: jest.fn(),
-      create: jest.fn(),
-      stepOneOicr: jest.fn(),
-      stepTwoOicr: jest.fn(),
     } as any;
 
     mockResultUtil = {
@@ -42,176 +39,60 @@ describe('ResultOicrController', () => {
   });
 
   describe('updateResultOicrSteps', () => {
-    it('should call createOicrSteps with correct parameters for step 1', async () => {
+    it('should call updateOicr with correct parameters', async () => {
       // Arrange
-      const data: CreateStepsOicrDto = {
-        main_contact_person: { user_id: 456 },
-        tagging: [{ tag_id: 1 }],
-        linked_result: [{ other_result_id: 789 }],
-        outcome_impact_statement: 'Test statement',
-      } as any;
-      const step = 1;
+      const data: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-001',
+        tagging: { tag_id: 1 } as any,
+        outcome_impact_statement: 'Test outcome statement',
+        short_outcome_impact_statement: 'Short statement',
+        general_comment: 'Test comment',
+        maturity_level_id: 1,
+        link_result: { temp_result_id: 123 } as any,
+      };
       const serviceResult = { success: true };
       const expectedResult = {
         data: serviceResult,
-        description: 'Result OICR steps updated successfully',
+        description: 'Result OICR updated successfully',
         status: HttpStatus.OK,
       };
 
-      mockResultOicrService.createOicrSteps.mockResolvedValue(
-        serviceResult as any,
-      );
+      mockResultOicrService.updateOicr.mockResolvedValue(serviceResult as any);
 
       // Act
-      const result = await controller.updateResultOicrSteps(data, step);
+      const result = await controller.updateResultOicrSteps(data);
 
       // Assert
-      expect(mockResultOicrService.createOicrSteps).toHaveBeenCalledWith(
+      expect(mockResultOicrService.updateOicr).toHaveBeenCalledWith(
         mockResultUtil.resultId,
         data,
-        step,
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('should call createOicrSteps with correct parameters for step 2', async () => {
-      // Arrange
-      const data: CreateStepsOicrDto = {
-        initiatives: [{ clarisa_initiative_id: 1 }],
-        primary_lever: [{ lever_id: '1' }],
-        contributor_lever: [{ lever_id: '2' }],
-      } as any;
-      const step = 2;
-      const serviceResult = { success: true };
-      const expectedResult = {
-        data: serviceResult,
-        description: 'Result OICR steps updated successfully',
-        status: HttpStatus.OK,
-      };
-
-      mockResultOicrService.createOicrSteps.mockResolvedValue(
-        serviceResult as any,
-      );
-
-      // Act
-      const result = await controller.updateResultOicrSteps(data, step);
-
-      // Assert
-      expect(mockResultOicrService.createOicrSteps).toHaveBeenCalledWith(
-        mockResultUtil.resultId,
-        data,
-        step,
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('should call createOicrSteps with correct parameters for step 3 (geo location)', async () => {
-      // Arrange
-      const data: CreateStepsOicrDto = {
-        geo_scope_id: 1,
-        countries: [],
-        regions: [],
-        comment_geo_scope: 'Test geo comment',
-      } as any;
-      const step = 3;
-      const serviceResult = { success: true };
-      const expectedResult = {
-        data: serviceResult,
-        description: 'Result OICR steps updated successfully',
-        status: HttpStatus.OK,
-      };
-
-      mockResultOicrService.createOicrSteps.mockResolvedValue(
-        serviceResult as any,
-      );
-
-      // Act
-      const result = await controller.updateResultOicrSteps(data, step);
-
-      // Assert
-      expect(mockResultOicrService.createOicrSteps).toHaveBeenCalledWith(
-        mockResultUtil.resultId,
-        data,
-        step,
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('should call createOicrSteps with correct parameters for step 4 (general comment)', async () => {
-      // Arrange
-      const data: CreateStepsOicrDto = {
-        general_comment: 'Test general comment',
-      } as any;
-      const step = 4;
-      const serviceResult = { affected: 1 };
-      const expectedResult = {
-        data: serviceResult,
-        description: 'Result OICR steps updated successfully',
-        status: HttpStatus.OK,
-      };
-
-      mockResultOicrService.createOicrSteps.mockResolvedValue(
-        serviceResult as any,
-      );
-
-      // Act
-      const result = await controller.updateResultOicrSteps(data, step);
-
-      // Assert
-      expect(mockResultOicrService.createOicrSteps).toHaveBeenCalledWith(
-        mockResultUtil.resultId,
-        data,
-        step,
       );
       expect(result).toEqual(expectedResult);
     });
 
     it('should handle service errors properly', async () => {
       // Arrange
-      const data: CreateStepsOicrDto = {
+      const data: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-001',
+        tagging: null as any,
+        outcome_impact_statement: 'Test statement',
+        short_outcome_impact_statement: 'Short statement',
         general_comment: 'Test comment',
-      } as any;
-      const step = 1;
+        maturity_level_id: 1,
+        link_result: null as any,
+      };
       const serviceError = new Error('Service error');
 
-      mockResultOicrService.createOicrSteps.mockRejectedValue(serviceError);
+      mockResultOicrService.updateOicr.mockRejectedValue(serviceError);
 
       // Act & Assert
-      await expect(
-        controller.updateResultOicrSteps(data, step),
-      ).rejects.toThrow('Service error');
-      expect(mockResultOicrService.createOicrSteps).toHaveBeenCalledWith(
+      await expect(controller.updateResultOicrSteps(data)).rejects.toThrow(
+        'Service error',
+      );
+      expect(mockResultOicrService.updateOicr).toHaveBeenCalledWith(
         mockResultUtil.resultId,
         data,
-        step,
       );
-    });
-
-    it('should work with empty data object', async () => {
-      // Arrange
-      const data: CreateStepsOicrDto = {} as any;
-      const step = 4;
-      const serviceResult = { affected: 1 };
-      const expectedResult = {
-        data: serviceResult,
-        description: 'Result OICR steps updated successfully',
-        status: HttpStatus.OK,
-      };
-
-      mockResultOicrService.createOicrSteps.mockResolvedValue(
-        serviceResult as any,
-      );
-
-      // Act
-      const result = await controller.updateResultOicrSteps(data, step);
-
-      // Assert
-      expect(mockResultOicrService.createOicrSteps).toHaveBeenCalledWith(
-        mockResultUtil.resultId,
-        data,
-        step,
-      );
-      expect(result).toEqual(expectedResult);
     });
 
     it('should use resultId from ResultsUtil', async () => {
@@ -222,37 +103,41 @@ describe('ResultOicrController', () => {
         writable: true,
       });
 
-      const data: CreateStepsOicrDto = {
+      const data: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-002',
+        tagging: null as any,
+        outcome_impact_statement: 'Test statement',
+        short_outcome_impact_statement: 'Short statement',
         general_comment: 'Test comment',
-      } as any;
-      const step = 1;
+        maturity_level_id: 2,
+        link_result: null as any,
+      };
       const expectedResult = { success: true };
 
-      mockResultOicrService.createOicrSteps.mockResolvedValue(
-        expectedResult as any,
-      );
+      mockResultOicrService.updateOicr.mockResolvedValue(expectedResult as any);
 
       // Act
-      await controller.updateResultOicrSteps(data, step);
+      await controller.updateResultOicrSteps(data);
 
       // Assert
-      expect(mockResultOicrService.createOicrSteps).toHaveBeenCalledWith(
+      expect(mockResultOicrService.updateOicr).toHaveBeenCalledWith(
         customResultId,
         data,
-        step,
       );
     });
   });
 
   describe('getResultOicrSteps', () => {
-    it('should call findByResultIdAndSteps with correct parameters for step 1', async () => {
+    it('should call findOicrs with correct parameters', async () => {
       // Arrange
-      const step = 1;
-      const serviceResult = {
-        main_contact_person: { user_id: 456 },
-        tagging: [{ tag_id: 1 }],
-        linked_result: [{ other_result_id: 789 }],
-        outcome_impact_statement: 'Test statement',
+      const serviceResult: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-001',
+        tagging: { tag_id: 1 } as any,
+        outcome_impact_statement: 'Test outcome statement',
+        short_outcome_impact_statement: 'Short statement',
+        general_comment: 'Test comment',
+        maturity_level_id: 1,
+        link_result: { temp_result_id: 123 } as any,
       };
       const expectedResult = {
         data: serviceResult,
@@ -260,120 +145,30 @@ describe('ResultOicrController', () => {
         status: HttpStatus.OK,
       };
 
-      mockResultOicrService.findByResultIdAndSteps = jest
-        .fn()
-        .mockResolvedValue(serviceResult);
+      mockResultOicrService.findOicrs.mockResolvedValue(serviceResult);
 
       // Act
-      const result = await controller.getResultOicrSteps(step);
+      const result = await controller.getResultOicrSteps();
 
       // Assert
-      expect(mockResultOicrService.findByResultIdAndSteps).toHaveBeenCalledWith(
+      expect(mockResultOicrService.findOicrs).toHaveBeenCalledWith(
         mockResultUtil.resultId,
-        step,
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('should call findByResultIdAndSteps with correct parameters for step 2', async () => {
-      // Arrange
-      const step = 2;
-      const serviceResult = {
-        initiatives: [{ clarisa_initiative_id: 1 }],
-        primary_lever: [{ lever_id: '1', is_primary: true }],
-        contributor_lever: [{ lever_id: '2', is_primary: false }],
-      };
-      const expectedResult = {
-        data: serviceResult,
-        description: 'Result OICR steps retrieved successfully',
-        status: HttpStatus.OK,
-      };
-
-      mockResultOicrService.findByResultIdAndSteps = jest
-        .fn()
-        .mockResolvedValue(serviceResult);
-
-      // Act
-      const result = await controller.getResultOicrSteps(step);
-
-      // Assert
-      expect(mockResultOicrService.findByResultIdAndSteps).toHaveBeenCalledWith(
-        mockResultUtil.resultId,
-        step,
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('should call findByResultIdAndSteps with correct parameters for step 3', async () => {
-      // Arrange
-      const step = 3;
-      const serviceResult = {
-        geo_scope_id: 1,
-        countries: [],
-        regions: [],
-      };
-      const expectedResult = {
-        data: serviceResult,
-        description: 'Result OICR steps retrieved successfully',
-        status: HttpStatus.OK,
-      };
-
-      mockResultOicrService.findByResultIdAndSteps = jest
-        .fn()
-        .mockResolvedValue(serviceResult);
-
-      // Act
-      const result = await controller.getResultOicrSteps(step);
-
-      // Assert
-      expect(mockResultOicrService.findByResultIdAndSteps).toHaveBeenCalledWith(
-        mockResultUtil.resultId,
-        step,
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('should call findByResultIdAndSteps with correct parameters for step 4', async () => {
-      // Arrange
-      const step = 4;
-      const serviceResult = 'Test general comment';
-      const expectedResult = {
-        data: serviceResult,
-        description: 'Result OICR steps retrieved successfully',
-        status: HttpStatus.OK,
-      };
-
-      mockResultOicrService.findByResultIdAndSteps = jest
-        .fn()
-        .mockResolvedValue(serviceResult);
-
-      // Act
-      const result = await controller.getResultOicrSteps(step);
-
-      // Assert
-      expect(mockResultOicrService.findByResultIdAndSteps).toHaveBeenCalledWith(
-        mockResultUtil.resultId,
-        step,
       );
       expect(result).toEqual(expectedResult);
     });
 
     it('should handle service errors properly', async () => {
       // Arrange
-      const step = 1;
       const serviceError = new Error('Service error');
 
-      mockResultOicrService.findByResultIdAndSteps = jest
-        .fn()
-        .mockRejectedValue(serviceError);
+      mockResultOicrService.findOicrs.mockRejectedValue(serviceError);
 
       // Act & Assert
-      await expect(controller.getResultOicrSteps(step)).rejects.toThrow(
+      await expect(controller.getResultOicrSteps()).rejects.toThrow(
         'Service error',
       );
-      expect(mockResultOicrService.findByResultIdAndSteps).toHaveBeenCalledWith(
+      expect(mockResultOicrService.findOicrs).toHaveBeenCalledWith(
         mockResultUtil.resultId,
-        step,
       );
     });
 
@@ -385,20 +180,24 @@ describe('ResultOicrController', () => {
         writable: true,
       });
 
-      const step = 1;
-      const expectedResult = { success: true };
+      const expectedResult: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-002',
+        tagging: null as any,
+        outcome_impact_statement: 'Test statement',
+        short_outcome_impact_statement: 'Short statement',
+        general_comment: 'Test comment',
+        maturity_level_id: 2,
+        link_result: null as any,
+      };
 
-      mockResultOicrService.findByResultIdAndSteps = jest
-        .fn()
-        .mockResolvedValue(expectedResult);
+      mockResultOicrService.findOicrs.mockResolvedValue(expectedResult);
 
       // Act
-      await controller.getResultOicrSteps(step);
+      await controller.getResultOicrSteps();
 
       // Assert
-      expect(mockResultOicrService.findByResultIdAndSteps).toHaveBeenCalledWith(
+      expect(mockResultOicrService.findOicrs).toHaveBeenCalledWith(
         customResultId,
-        step,
       );
     });
   });
