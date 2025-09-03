@@ -1107,13 +1107,13 @@ describe('ResultOicrService', () => {
 
       expect(mockResultTagsService.create).toHaveBeenCalledWith(
         resultId,
-        [],
+        [{ tag_id: 1 }],
         'tag_id',
       );
 
       expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
         resultId,
-        [],
+        [{ external_oicr_id: 456 }],
         'external_oicr_id',
       );
     });
