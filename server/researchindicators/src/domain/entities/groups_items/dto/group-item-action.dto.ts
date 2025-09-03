@@ -14,13 +14,10 @@ export class StructureDto {
   @IsNotEmpty()
   agreement_id: string;
 
-  @IsString()
-  @IsOptional()
-  name_level_1?: string;
-
-  @IsString()
-  @IsOptional()
-  name_level_2?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LevelDto)
+  levels: LevelDto[];
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -28,24 +25,38 @@ export class StructureDto {
   structures: ParentItemDto[];
 }
 
-export class ChildItemDto {
+export class LevelDto {
   @IsOptional()
-  @IsNumber()
-  id?: number;
-
   @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  code: string;
+  name_level_1?: string;
 
   @IsOptional()
+  @IsString()
+  name_level_2?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => IndicatorDto)
-  indicators?: IndicatorDto[];
+  @Type(() => CustomFieldDto)
+  custom_fields: CustomFieldDto[];
+}
+export class CustomFieldDto {
+  @IsNotEmpty()
+  @IsInt()
+  fieldID: number;
+
+  @IsNotEmpty()
+  @IsString()
+  field_name: string;
+}
+
+export class CustomValueDto {
+  @IsNotEmpty()
+  @IsInt()
+  field: number;
+
+  @IsNotEmpty()
+  @IsString()
+  field_value: string;
 }
 
 export class ParentItemDto {
@@ -64,8 +75,40 @@ export class ParentItemDto {
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
+  @Type(() => CustomValueDto)
+  custom_values?: CustomValueDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
   @Type(() => ChildItemDto)
   items?: ChildItemDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IndicatorDto)
+  indicators?: IndicatorDto[];
+}
+
+export class ChildItemDto {
+  @IsOptional()
+  @IsNumber()
+  id?: number;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CustomValueDto)
+  custom_values?: CustomValueDto[];
 
   @IsOptional()
   @IsArray()
@@ -77,50 +120,5 @@ export class ParentItemDto {
 export class IndicatorDto {
   @IsNotEmpty()
   @IsNumber()
-  id?: number;
-
-  @IsString()
-  @IsOptional()
-  name: string;
-
-  @IsString()
-  @IsOptional()
-  code: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsInt()
-  level?: number;
-
-  @IsString()
-  @IsOptional()
-  number_type: string;
-
-  @IsString()
-  @IsOptional()
-  number_format: string;
-
-  @IsArray()
-  @Type(() => Number)
-  @IsInt({ each: true })
-  years: number[];
-
-  @IsString()
-  @IsOptional()
-  target_unit: string;
-
-  @IsNumber()
-  @IsOptional()
-  target_value: number;
-
-  @IsNumber()
-  @IsOptional()
-  base_line: number;
-
-  @IsString()
-  @IsOptional()
-  type: string;
+  id: number;
 }

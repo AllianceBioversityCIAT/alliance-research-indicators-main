@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GroupItem } from './entities/groups_item.entity';
-import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  getMetadataArgsStorage,
+  IsNull,
+  Repository,
+} from 'typeorm';
 import {
   ChildItemDto,
   ParentItemDto,
@@ -64,6 +70,7 @@ export class GroupsItemsService {
         code: g.code || g.id.toString(),
         items: [] as any[],
         indicators,
+        custom_values: this.mapCustomValues(g),
       });
     }
 
@@ -96,17 +103,58 @@ export class GroupsItemsService {
       .getRepository(ProjectGroup)
       .find({
         where: { agreement_id, is_active: true },
-        select: ['name', 'level'],
+        select: [
+          'name',
+          'level',
+          'custom_field_1',
+          'custom_field_2',
+          'custom_field_3',
+          'custom_field_4',
+          'custom_field_5',
+          'custom_field_6',
+          'custom_field_7',
+          'custom_field_8',
+          'custom_field_9',
+          'custom_field_10',
+        ],
       });
 
-    const name_level_1 = projectGroups.find((g) => g.level === 1)?.name || '';
-    const name_level_2 = projectGroups.find((g) => g.level === 2)?.name || '';
+    const levels = projectGroups.map((pg) => {
+      const custom_fields = this.mapCustomFields(pg);
+      return {
+        ...(pg.level === 1
+          ? { name_level_1: pg.name }
+          : { name_level_2: pg.name }),
+        custom_fields,
+      };
+    });
 
     return {
-      name_level_1,
-      name_level_2,
+      levels,
       structures: roots,
     };
+  }
+
+  private mapCustomFields(pg: ProjectGroup) {
+    const result: { fieldID: number; field_name: string }[] = [];
+    for (let i = 1; i <= 10; i++) {
+      const value = pg[`custom_field_${i}`];
+      if (value) {
+        result.push({ fieldID: i, field_name: value });
+      }
+    }
+    return result;
+  }
+
+  private mapCustomValues(g: any) {
+    const result: { field: number; field_value: string }[] = [];
+    for (let i = 1; i <= 10; i++) {
+      const value = g[`custom_field_${i}`];
+      if (value) {
+        result.push({ field: i, field_value: value });
+      }
+    }
+    return result;
   }
 
   private async getExistingParentsMap(
@@ -151,12 +199,15 @@ export class GroupsItemsService {
     agreementId: string,
     manager: EntityManager,
   ): Promise<GroupItem> {
-    if (
-      parent.name !== parentPayload.name ||
-      parent.code !== parentPayload.code
-    ) {
-      parent.name = parentPayload.name;
-      parent.code = parentPayload.code;
+    const hasBasicChanges = this.updateBasicFields(parent, parentPayload);
+    const hasCustomFieldChanges = this.updateCustomFields(
+      parent,
+      parentPayload,
+    );
+
+    const hasChanges = hasBasicChanges || hasCustomFieldChanges;
+
+    if (hasChanges) {
       await manager.save(parent);
     }
 
@@ -175,11 +226,24 @@ export class GroupsItemsService {
     agreementId: string,
     manager: EntityManager,
   ): Promise<GroupItem> {
+    const customFields: Partial<GroupItem> = {};
+
+    // Si el DTO trae custom_values, los mapeamos
+    if (parentPayload.custom_values?.length) {
+      parentPayload.custom_values.forEach((cv) => {
+        const fieldKey = `custom_field_${cv.field}` as keyof GroupItem;
+        if (fieldKey in customFields || fieldKey.startsWith('custom_field_')) {
+          (customFields as any)[fieldKey] = cv.field_value;
+        }
+      });
+    }
+
     const newParent = manager.create(GroupItem, {
       name: parentPayload.name,
       code: parentPayload.code,
       agreement_id: agreementId,
       parentGroup: null,
+      ...customFields,
     });
 
     const savedParent = await manager.save(newParent);
@@ -261,9 +325,15 @@ export class GroupsItemsService {
     agreementId: string,
     manager: EntityManager,
   ): Promise<GroupItem> {
-    if (child.name !== childPayload.name || child.code !== childPayload.code) {
-      child.name = childPayload.name;
-      child.code = childPayload.code;
+    const hasBasicChanges = this.updateBasicFields(child, childPayload);
+    const hasCustomFieldChanges = await this.updateCustomFields(
+      child,
+      childPayload,
+    );
+
+    const hasChanges = hasBasicChanges || hasCustomFieldChanges;
+
+    if (hasChanges) {
       await manager.save(child);
     }
 
@@ -277,17 +347,88 @@ export class GroupsItemsService {
     return child;
   }
 
+  private updateBasicFields(
+    item: GroupItem,
+    payload: ParentItemDto | ChildItemDto,
+  ): boolean {
+    let hasChanges = false;
+
+    if (item.name !== payload.name) {
+      item.name = payload.name;
+      hasChanges = true;
+    }
+
+    if (item.code !== payload.code) {
+      item.code = payload.code;
+      hasChanges = true;
+    }
+
+    return hasChanges;
+  }
+
+  private updateCustomFields(
+    item: GroupItem,
+    payload: ParentItemDto | ChildItemDto,
+  ): boolean {
+    const customFieldColumns = this.getCustomFieldColumns();
+    let updated = false;
+
+    for (const columnName of customFieldColumns) {
+      const field = Number(columnName.replace('custom_field_', ''));
+      const customValue = payload.custom_values?.find(
+        (cv) => cv.field === field,
+      );
+      const normalizedValue = this.normalizeCustomFieldValue(
+        customValue?.field_value,
+      );
+
+      if ((item as any)[columnName] !== normalizedValue) {
+        (item as any)[columnName] = normalizedValue;
+        updated = true;
+      }
+    }
+
+    return updated;
+  }
+
+  private getCustomFieldColumns(): string[] {
+    return getMetadataArgsStorage()
+      .columns.filter(
+        (col) =>
+          col.target === GroupItem &&
+          col.propertyName.startsWith('custom_field_'),
+      )
+      .map((col) => col.propertyName);
+  }
+
+  private normalizeCustomFieldValue(fieldValue?: string): string | null {
+    return fieldValue?.trim() === '' ? null : (fieldValue ?? null);
+  }
+
   private async createNewChild(
     childPayload: ChildItemDto,
     parent: number,
     agreementId: string,
     manager: EntityManager,
   ): Promise<GroupItem> {
+    const customFields: Partial<GroupItem> = {};
+
+    // Si el DTO trae custom_values, los mapeamos
+    if (childPayload.custom_values?.length) {
+      childPayload.custom_values.forEach((cv) => {
+        const fieldKey = `custom_field_${cv.field}` as keyof GroupItem;
+        if (fieldKey in customFields || fieldKey.startsWith('custom_field_')) {
+          (customFields as any)[fieldKey] = cv.field_value;
+        }
+      });
+    }
+
     const newChild = manager.create(GroupItem, {
       name: childPayload.name,
       code: childPayload.code,
       agreement_id: agreementId,
       parent_id: parent,
+      ...customFields,
     });
 
     const savedChild = await manager.save(newChild);
@@ -320,41 +461,63 @@ export class GroupsItemsService {
     }
   }
 
-  async processLevels(dto: any, manager: EntityManager) {
-    const { agreement_id, name_level_1, name_level_2 } = dto;
+  private async processLevels(dto: StructureDto, manager: EntityManager) {
+    const { agreement_id, levels } = dto;
 
-    if (name_level_1) {
-      await this.upsertLevel(manager, agreement_id, 1, name_level_1);
-    }
+    // Procesar dinámicamente los niveles
+    for (const [index, levelData] of levels.entries()) {
+      const levelIndex = index + 1;
+      const levelKey = `name_level_${levelIndex}`;
 
-    if (name_level_2) {
-      await this.upsertLevel(manager, agreement_id, 2, name_level_2);
-    }
-  }
+      const name = levelData[levelKey];
+      const customFields = levelData.custom_fields || [];
 
-  private async upsertLevel(
-    manager: EntityManager,
-    agreement_id: string,
-    level: number,
-    name: string,
-  ) {
-    let record = await manager.findOne(ProjectGroup, {
-      where: { agreement_id, level, is_active: true },
-    });
-
-    if (record) {
-      if (record.name !== name) {
-        record.name = name;
-        await manager.save(record);
-      }
-    } else {
-      record = manager.create(ProjectGroup, {
-        agreement_id,
-        name,
-        level,
-        is_active: true,
+      let record = await manager.findOne(ProjectGroup, {
+        where: { agreement_id, level: levelIndex },
       });
-      await manager.save(record);
+
+      if (!record) {
+        // Crear si no existe
+        record = manager.create(ProjectGroup, {
+          agreement_id,
+          level: levelIndex,
+          name,
+        });
+      } else {
+        // Actualizar el nombre si cambió
+        if (record.name !== name) {
+          record.name = name;
+        }
+      }
+
+      const currentFieldIDs = customFields.map((f) => f.fieldID);
+
+      console.log('Current Field IDs:', currentFieldIDs);
+      // Mapear todos los posibles custom_field (1..10)
+      const fieldMap: Record<string, string | null> = {};
+      for (let j = 1; j <= 10; j++) {
+        const fieldObj = customFields.find((f) => f.fieldID === j);
+        fieldMap[`custom_field_${j}`] = fieldObj ? fieldObj.field_name : null;
+
+        if (!currentFieldIDs.includes(j)) {
+          const columnName = `custom_field_${j}`;
+          await manager
+            .createQueryBuilder()
+            .update(GroupItem)
+            .set({ [columnName]: null })
+            .where('agreement_id = :agreement_id', { agreement_id })
+            .andWhere(
+              levelIndex === 1 ? 'parent_id IS NULL' : 'parent_id IS NOT NULL',
+            )
+            .execute();
+        }
+      }
+
+      // Asignar dinámicamente los valores a la entidad
+      Object.assign(record, fieldMap);
+
+      // Guardar (insert/update)
+      await manager.save(ProjectGroup, record);
     }
   }
 

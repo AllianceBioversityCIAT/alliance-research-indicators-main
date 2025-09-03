@@ -42,6 +42,36 @@ export class GroupItem extends AuditableEntity {
   @Column({ name: 'parent_id', type: 'int', nullable: true })
   parent_id?: number | null;
 
+  @Column({ name: 'custom_field_1', type: 'text', nullable: true })
+  custom_field_1?: string | null;
+
+  @Column({ name: 'custom_field_2', type: 'text', nullable: true })
+  custom_field_2?: string | null;
+
+  @Column({ name: 'custom_field_3', type: 'text', nullable: true })
+  custom_field_3?: string | null;
+
+  @Column({ name: 'custom_field_4', type: 'text', nullable: true })
+  custom_field_4?: string | null;
+
+  @Column({ name: 'custom_field_5', type: 'text', nullable: true })
+  custom_field_5?: string | null;
+
+  @Column({ name: 'custom_field_6', type: 'text', nullable: true })
+  custom_field_6?: string | null;
+
+  @Column({ name: 'custom_field_7', type: 'text', nullable: true })
+  custom_field_7?: string | null;
+
+  @Column({ name: 'custom_field_8', type: 'text', nullable: true })
+  custom_field_8?: string | null;
+
+  @Column({ name: 'custom_field_9', type: 'text', nullable: true })
+  custom_field_9?: string | null;
+
+  @Column({ name: 'custom_field_10', type: 'text', nullable: true })
+  custom_field_10?: string | null;
+
   @ManyToOne(() => GroupItem, (group) => group.childGroups, {
     nullable: true,
     onDelete: 'SET NULL',
