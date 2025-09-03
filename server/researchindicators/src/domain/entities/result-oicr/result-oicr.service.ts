@@ -128,19 +128,15 @@ export class ResultOicrService {
       ...this.currentUser.audit(SetAutitEnum.UPDATE),
     });
 
-    const saveTags: Partial<ResultTag>[] = Array.isArray(data?.tagging)
-      ? data?.tagging?.map((tag) => ({
-          tag_id: tag.tag_id,
-        }))
+    const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
+      ? [{ tag_id: data.tagging?.tag_id }]
       : [];
     await this.resultTagsService.create(resultId, saveTags, 'tag_id');
 
-    const saveLinkedResults: Partial<TempResultExternalOicr>[] = Array.isArray(
+    const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
       data?.link_result,
     )
-      ? data.link_result.map((link) => ({
-          external_oicr_id: link.external_oicr_id,
-        }))
+      ? [{ external_oicr_id: data.link_result?.external_oicr_id }]
       : [];
 
     await this.tempExternalOicrsService.create(
