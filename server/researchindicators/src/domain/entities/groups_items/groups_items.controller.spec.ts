@@ -42,9 +42,22 @@ describe('GroupsItemsController', () => {
     it('should return formatted response with structure', async () => {
       const agreementId = 'test-id';
       const mockResponse = {
-        name_level_1: 'Level 1 Name',
-        name_level_2: 'Level 2 Name',
-        structures: [{ id: 1, name: 'Test Structure' }]
+        levels: [
+          {
+            custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
+            name_level_1: 'Test Level 1'
+          },
+          {
+            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
+            name_level_2: 'Test Level 2'
+          }
+        ],
+        structures: [
+          {
+            id: 1,
+            name: 'Test Structure'
+          }
+        ]
       };
       jest.spyOn(service, 'findAll').mockResolvedValue(mockResponse);
       const result = await controller.findAll(agreementId);
@@ -61,8 +74,16 @@ describe('GroupsItemsController', () => {
     it('should handle empty structures', async () => {
       const agreementId = 'test-id';
       const mockResponse = {
-        name_level_1: '',
-        name_level_2: '',
+        levels: [
+          {
+            custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
+            name_level_1: 'Test Level 1'
+          },
+          {
+            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
+            name_level_2: 'Test Level 2'
+          }
+        ],
         structures: []
       };
       
@@ -79,8 +100,16 @@ describe('GroupsItemsController', () => {
     it('should return formatted response after syncing structures', async () => {
       const dto: StructureDto = {
         agreement_id: 'test-agreement-id',
-        name_level_1: 'Test Level 1',
-        name_level_2: 'Test Level 2',
+        levels: [
+          {
+            custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
+            name_level_1: 'Test Level 1'
+          },
+          {
+            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
+            name_level_2: 'Test Level 2'
+          }
+        ],
         structures: [
           {
             id: 1,
@@ -123,8 +152,16 @@ describe('GroupsItemsController', () => {
     it('should handle sync without data', async () => {
       const dto: StructureDto = {
         agreement_id: 'test-agreement-id',
-        name_level_1: 'Test Level 1',
-        name_level_2: 'Test Level 2',
+        levels: [
+          {
+            custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
+            name_level_1: 'Test Level 1'
+          },
+          {
+            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
+            name_level_2: 'Test Level 2'
+          }
+        ],
         structures: []
       };
       

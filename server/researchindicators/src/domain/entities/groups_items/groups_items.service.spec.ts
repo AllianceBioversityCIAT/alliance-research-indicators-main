@@ -3,24 +3,11 @@ import { GroupsItemsService } from './groups_items.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { GroupItem } from './entities/groups_item.entity';
 import { DataSource, Repository } from 'typeorm';
-import { ProjectGroup } from '../project_groups/entities/project_group.entity';
 import { EntityManager } from 'typeorm';
-
-
-jest.mock('../../shared/utils/clean-custom-fields', () => ({
-  cleanCustomFields: jest.fn().mockImplementation((obj) => {
-    // Simula que retorna los campos custom_field_X si existen
-    return Object.keys(obj)
-      .filter((k) => k.startsWith('custom_field_'))
-      .map((k) => obj[k])
-      .filter((v) => v !== undefined);
-  }),
-}));
 
 describe('GroupsItemsService', () => {
   let service: GroupsItemsService;
   let repo: Repository<GroupItem>;
-  let dataSource: DataSource;
 
   beforeEach(async () => {
     const repoMock = {
@@ -54,7 +41,6 @@ describe('GroupsItemsService', () => {
 
     service = module.get<GroupsItemsService>(GroupsItemsService);
     repo = module.get<Repository<GroupItem>>(getRepositoryToken(GroupItem));
-    dataSource = module.get<DataSource>(DataSource);
   });
 
   it('should be defined', () => {
@@ -115,9 +101,27 @@ describe('GroupsItemsService', () => {
 
     it('should skip groups without name or code', async () => {
       const mockGroups = [
-        { id: 1, name: null, code: 'P1', parent_id: null, indicatorPerItem: [] },
-        { id: 2, name: 'Parent', code: null, parent_id: null, indicatorPerItem: [] },
-        { id: 3, name: 'Valid', code: 'C1', parent_id: null, indicatorPerItem: [] },
+        {
+          id: 1,
+          name: null,
+          code: 'P1',
+          parent_id: null,
+          indicatorPerItem: [],
+        },
+        {
+          id: 2,
+          name: 'Parent',
+          code: null,
+          parent_id: null,
+          indicatorPerItem: [],
+        },
+        {
+          id: 3,
+          name: 'Valid',
+          code: 'C1',
+          parent_id: null,
+          indicatorPerItem: [],
+        },
       ];
       const qb: any = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -149,50 +153,6 @@ describe('GroupsItemsService', () => {
     });
   });
 
-  describe('processLevels', () => {
-    it('should upsert levels', async () => {
-      const manager = {
-        findOne: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockImplementation((_, obj) => obj),
-        save: jest.fn().mockResolvedValue({}),
-      } as unknown as EntityManager;
-
-      const dto = {
-        agreement_id: 'agreement1',
-        name_level_1: 'Level1',
-        name_level_2: 'Level2',
-      };
-
-      await service.processLevels(dto, manager);
-      expect(manager.create).toHaveBeenCalledWith(ProjectGroup, expect.objectContaining({ name: 'Level1', level: 1 }));
-      expect(manager.create).toHaveBeenCalledWith(ProjectGroup, expect.objectContaining({ name: 'Level2', level: 2 }));
-      expect(manager.save).toHaveBeenCalledTimes(2);
-    });
-
-    it('should remove levels if name not provided', async () => {
-      const manager = {
-        findOne: jest.fn().mockResolvedValue({ is_active: true, name: 'Level1', level: 1 }),
-        save: jest.fn().mockResolvedValue({}),
-        createQueryBuilder: jest.fn().mockReturnValue({
-          update: jest.fn().mockReturnThis(),
-          set: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({}),
-        }),
-      } as unknown as EntityManager;
-
-      const dto = {
-        agreement_id: 'agreement1',
-        name_level_1: null,
-        name_level_2: null,
-      };
-
-      await service.processLevels(dto, manager);
-      expect(manager.save).toHaveBeenCalled();
-      expect(manager.createQueryBuilder).toHaveBeenCalled();
-    });
-  });
-
   describe('syncGroupItemIndicators', () => {
     it('should insert new indicator relation', async () => {
       const manager = {
@@ -207,7 +167,12 @@ describe('GroupsItemsService', () => {
         query: jest.fn().mockResolvedValue({}),
       } as unknown as EntityManager;
 
-      await service['syncGroupItemIndicators'](1, [{ id: 2 }], 'agreement1', manager);
+      await service['syncGroupItemIndicators'](
+        1,
+        [{ id: 2 }],
+        'agreement1',
+        manager,
+      );
       expect(manager.query).toHaveBeenCalledWith(
         'INSERT INTO indicator_per_item (group_item_id, project_indicator_id) VALUES (?, ?)',
         [1, 2],

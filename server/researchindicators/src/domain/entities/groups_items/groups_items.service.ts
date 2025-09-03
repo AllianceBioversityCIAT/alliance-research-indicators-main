@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GroupItem } from './entities/groups_item.entity';
-import { DataSource, EntityManager, getMetadataArgsStorage, IsNull, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  getMetadataArgsStorage,
+  IsNull,
+  Repository,
+} from 'typeorm';
 import {
   ChildItemDto,
   ParentItemDto,
@@ -128,7 +134,7 @@ export class GroupsItemsService {
       structures: roots,
     };
   }
-  
+
   private mapCustomFields(pg: ProjectGroup) {
     const result: { fieldID: number; field_name: string }[] = [];
     for (let i = 1; i <= 10; i++) {
@@ -194,10 +200,13 @@ export class GroupsItemsService {
     manager: EntityManager,
   ): Promise<GroupItem> {
     const hasBasicChanges = this.updateBasicFields(parent, parentPayload);
-    const hasCustomFieldChanges = this.updateCustomFields(parent, parentPayload);
-    
+    const hasCustomFieldChanges = this.updateCustomFields(
+      parent,
+      parentPayload,
+    );
+
     const hasChanges = hasBasicChanges || hasCustomFieldChanges;
-    
+
     if (hasChanges) {
       await manager.save(parent);
     }
@@ -223,7 +232,7 @@ export class GroupsItemsService {
     if (parentPayload.custom_values?.length) {
       parentPayload.custom_values.forEach((cv) => {
         const fieldKey = `custom_field_${cv.field}` as keyof GroupItem;
-        if (fieldKey in customFields || fieldKey.startsWith("custom_field_")) {
+        if (fieldKey in customFields || fieldKey.startsWith('custom_field_')) {
           (customFields as any)[fieldKey] = cv.field_value;
         }
       });
@@ -317,10 +326,13 @@ export class GroupsItemsService {
     manager: EntityManager,
   ): Promise<GroupItem> {
     const hasBasicChanges = this.updateBasicFields(child, childPayload);
-    const hasCustomFieldChanges = await this.updateCustomFields(child, childPayload);
-    
+    const hasCustomFieldChanges = await this.updateCustomFields(
+      child,
+      childPayload,
+    );
+
     const hasChanges = hasBasicChanges || hasCustomFieldChanges;
-    
+
     if (hasChanges) {
       await manager.save(child);
     }
@@ -337,7 +349,7 @@ export class GroupsItemsService {
 
   private updateBasicFields(
     item: GroupItem,
-    payload: ParentItemDto | ChildItemDto
+    payload: ParentItemDto | ChildItemDto,
   ): boolean {
     let hasChanges = false;
 
@@ -354,14 +366,21 @@ export class GroupsItemsService {
     return hasChanges;
   }
 
-  private updateCustomFields(item: GroupItem, payload: ParentItemDto | ChildItemDto): boolean {
+  private updateCustomFields(
+    item: GroupItem,
+    payload: ParentItemDto | ChildItemDto,
+  ): boolean {
     const customFieldColumns = this.getCustomFieldColumns();
     let updated = false;
-    
+
     for (const columnName of customFieldColumns) {
-      const field = Number(columnName.replace("custom_field_", ""));
-      const customValue = payload.custom_values?.find(cv => cv.field === field);
-      const normalizedValue = this.normalizeCustomFieldValue(customValue?.field_value);
+      const field = Number(columnName.replace('custom_field_', ''));
+      const customValue = payload.custom_values?.find(
+        (cv) => cv.field === field,
+      );
+      const normalizedValue = this.normalizeCustomFieldValue(
+        customValue?.field_value,
+      );
 
       if ((item as any)[columnName] !== normalizedValue) {
         (item as any)[columnName] = normalizedValue;
@@ -374,13 +393,16 @@ export class GroupsItemsService {
 
   private getCustomFieldColumns(): string[] {
     return getMetadataArgsStorage()
-      .columns
-      .filter(col => col.target === GroupItem && col.propertyName.startsWith("custom_field_"))
-      .map(col => col.propertyName);
+      .columns.filter(
+        (col) =>
+          col.target === GroupItem &&
+          col.propertyName.startsWith('custom_field_'),
+      )
+      .map((col) => col.propertyName);
   }
 
   private normalizeCustomFieldValue(fieldValue?: string): string | null {
-    return fieldValue?.trim() === "" ? null : fieldValue ?? null;
+    return fieldValue?.trim() === '' ? null : (fieldValue ?? null);
   }
 
   private async createNewChild(
@@ -395,12 +417,12 @@ export class GroupsItemsService {
     if (childPayload.custom_values?.length) {
       childPayload.custom_values.forEach((cv) => {
         const fieldKey = `custom_field_${cv.field}` as keyof GroupItem;
-        if (fieldKey in customFields || fieldKey.startsWith("custom_field_")) {
+        if (fieldKey in customFields || fieldKey.startsWith('custom_field_')) {
           (customFields as any)[fieldKey] = cv.field_value;
         }
       });
     }
-    
+
     const newChild = manager.create(GroupItem, {
       name: childPayload.name,
       code: childPayload.code,
@@ -455,23 +477,40 @@ export class GroupsItemsService {
       });
 
       if (!record) {
-          // Crear si no existe
-          record = manager.create(ProjectGroup, {
-            agreement_id,
-            level: levelIndex,
-            name,
-          });
-        } else {
+        // Crear si no existe
+        record = manager.create(ProjectGroup, {
+          agreement_id,
+          level: levelIndex,
+          name,
+        });
+      } else {
         // Actualizar el nombre si cambió
         if (record.name !== name) {
           record.name = name;
         }
       }
 
+      const currentFieldIDs = customFields.map((f) => f.fieldID);
+
+      console.log('Current Field IDs:', currentFieldIDs);
+      // Mapear todos los posibles custom_field (1..10)
       const fieldMap: Record<string, string | null> = {};
       for (let j = 1; j <= 10; j++) {
         const fieldObj = customFields.find((f) => f.fieldID === j);
         fieldMap[`custom_field_${j}`] = fieldObj ? fieldObj.field_name : null;
+
+        if (!currentFieldIDs.includes(j)) {
+          const columnName = `custom_field_${j}`;
+          await manager
+            .createQueryBuilder()
+            .update(GroupItem)
+            .set({ [columnName]: null })
+            .where('agreement_id = :agreement_id', { agreement_id })
+            .andWhere(
+              levelIndex === 1 ? 'parent_id IS NULL' : 'parent_id IS NOT NULL',
+            )
+            .execute();
+        }
       }
 
       // Asignar dinámicamente los valores a la entidad
@@ -480,9 +519,7 @@ export class GroupsItemsService {
       // Guardar (insert/update)
       await manager.save(ProjectGroup, record);
     }
-
   }
-
 
   async syncStructures2(dto: StructureDto) {
     return this.dataSource.transaction(async (manager) => {
