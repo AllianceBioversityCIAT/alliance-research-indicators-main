@@ -1,5 +1,3 @@
-import { IsString, IsNumber, IsOptional, IsNotEmpty } from 'class-validator';
-
 export class ProjectDto {
   project_id: string;
   project_title: string;

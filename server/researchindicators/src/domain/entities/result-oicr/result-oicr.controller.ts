@@ -3,14 +3,13 @@ import {
   Controller,
   Get,
   HttpStatus,
-  Param,
   Patch,
   Post,
   UseInterceptors,
 } from '@nestjs/common';
 import { ResultOicrService } from './result-oicr.service';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
-import { ApiBearerAuth, ApiBody, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiTags } from '@nestjs/swagger';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
