@@ -155,15 +155,29 @@ describe('GroupsItemsService', () => {
 
   describe('syncGroupItemIndicators', () => {
     it('should insert new indicator relation', async () => {
+      const qbGetMany = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]), // primera query
+      };
+
+      const qbGetOne = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue(null), // segunda query
+      };
+
       const manager = {
-        createQueryBuilder: jest.fn().mockReturnValue({
-          select: jest.fn().mockReturnThis(),
-          from: jest.fn().mockReturnThis(),
-          innerJoin: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getRawMany: jest.fn().mockResolvedValue([]),
-        }),
+        createQueryBuilder: jest
+          .fn()
+          .mockReturnValueOnce(qbGetMany) // primera llamada
+          .mockReturnValueOnce(qbGetOne), // segunda llamada
         query: jest.fn().mockResolvedValue({}),
       } as unknown as EntityManager;
 
@@ -173,6 +187,7 @@ describe('GroupsItemsService', () => {
         'agreement1',
         manager,
       );
+
       expect(manager.query).toHaveBeenCalledWith(
         'INSERT INTO indicator_per_item (group_item_id, project_indicator_id) VALUES (?, ?)',
         [1, 2],

@@ -13,7 +13,6 @@ import {
   ParentItemDto,
   StructureDto,
 } from './dto/group-item-action.dto';
-import { ProjectIndicator } from '../project_indicators/entities/project_indicator.entity';
 import { ProjectGroup } from '../project_groups/entities/project_group.entity';
 
 @Injectable()
@@ -347,10 +346,10 @@ export class GroupsItemsService {
     return child;
   }
 
-  private updateBasicFields(
+  private async updateBasicFields(
     item: GroupItem,
     payload: ParentItemDto | ChildItemDto,
-  ): boolean {
+  ): Promise<boolean> {
     let hasChanges = false;
 
     if (item.name !== payload.name) {
@@ -366,11 +365,11 @@ export class GroupsItemsService {
     return hasChanges;
   }
 
-  private updateCustomFields(
+  private async updateCustomFields(
     item: GroupItem,
     payload: ParentItemDto | ChildItemDto,
-  ): boolean {
-    const customFieldColumns = this.getCustomFieldColumns();
+  ): Promise<boolean> {
+    const customFieldColumns = await this.getCustomFieldColumns();
     let updated = false;
 
     for (const columnName of customFieldColumns) {
@@ -391,7 +390,7 @@ export class GroupsItemsService {
     return updated;
   }
 
-  private getCustomFieldColumns(): string[] {
+  private async getCustomFieldColumns(): Promise<string[]> {
     return getMetadataArgsStorage()
       .columns.filter(
         (col) =>
@@ -492,7 +491,6 @@ export class GroupsItemsService {
 
       const currentFieldIDs = customFields.map((f) => f.fieldID);
 
-      console.log('Current Field IDs:', currentFieldIDs);
       // Mapear todos los posibles custom_field (1..10)
       const fieldMap: Record<string, string | null> = {};
       for (let j = 1; j <= 10; j++) {
@@ -594,10 +592,7 @@ export class GroupsItemsService {
       .createQueryBuilder()
       .select('ipi.project_indicator_id', 'indicatorId')
       .from('indicator_per_item', 'ipi')
-      .innerJoin(ProjectIndicator, 'pi', 'pi.id = ipi.project_indicator_id')
       .where('ipi.group_item_id = :groupItemId', { groupItemId })
-      .andWhere('pi.agreement_id = :agreementId', { agreementId })
-      .andWhere('pi.is_active = true')
       .getRawMany();
 
     const currentIds = currentRelations.map((r) => Number(r.indicatorId));
@@ -605,7 +600,15 @@ export class GroupsItemsService {
 
     // Asociar los que no existan aún
     for (const indicatorId of payloadIds) {
-      if (!currentIds.includes(indicatorId)) {
+      const exists = await manager
+        .createQueryBuilder()
+        .select('1')
+        .from('indicator_per_item', 'ipi')
+        .where('ipi.group_item_id = :groupItemId', { groupItemId })
+        .andWhere('ipi.project_indicator_id = :indicatorId', { indicatorId })
+        .getRawOne();
+
+      if (!exists) {
         await manager.query(
           'INSERT INTO indicator_per_item (group_item_id, project_indicator_id) VALUES (?, ?)',
           [groupItemId, indicatorId],
