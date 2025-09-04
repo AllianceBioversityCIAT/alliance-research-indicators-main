@@ -79,6 +79,27 @@ export class ResultsUtil {
   }
 }
 
+/**
+ *
+ * @param alias - table alias
+ * @returns default SQL parameters for result entity
+ * @description This function returns a string containing the default SQL parameters for the Result entity, using the specified table alias.
+ *  - result_id
+ *  - result_official_code
+ *  - version_id
+ *  - is_snapshot
+ *  - is_ai
+ *  - platform_code
+ */
+export const resultDefaultParametersSQL = (alias: string = 'r') => {
+  return `${alias}.result_id,
+          ${alias}.result_official_code,
+          ${alias}.version_id,
+          ${alias}.is_snapshot,
+          ${alias}.is_ai,
+          ${alias}.platform_code`;
+};
+
 export const RESULT_CODE = ':resultCode(\\d+)';
 export const RESULT_CODE_PARAM = 'resultCode';
 export const REPORT_YEAR_PARAM = 'reportYear';

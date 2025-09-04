@@ -4,10 +4,8 @@ import {
   Get,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
-  Query,
   UseInterceptors,
 } from '@nestjs/common';
 import { ResultOicrService } from './result-oicr.service';
@@ -15,9 +13,9 @@ import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ApiBearerAuth, ApiBody, ApiParam, ApiTags } from '@nestjs/swagger';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
-import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
+import { UpdateOicrDto } from './dto/update-oicr.dto';
 
 @ApiTags('Results')
 @ApiBearerAuth()
@@ -31,17 +29,14 @@ export class ResultOicrController {
 
   @Patch(`${RESULT_CODE}`)
   @GetResultVersion()
-  @ApiBody({ type: Object })
-  async updateResultOicrSteps(
-    @Body() data: CreateStepsOicrDto,
-    @Query('step', ParseIntPipe) step: number,
-  ) {
+  @ApiBody({ type: UpdateOicrDto })
+  async updateResultOicrSteps(@Body() data: UpdateOicrDto) {
     return this.resultOicrService
-      .createOicrSteps(this.resultUtil.resultId, data, step)
+      .updateOicr(this.resultUtil.resultId, data)
       .then((result) =>
         ResponseUtils.format({
           data: result,
-          description: 'Result OICR steps updated successfully',
+          description: 'Result OICR updated successfully',
           status: HttpStatus.OK,
         }),
       );
@@ -49,9 +44,9 @@ export class ResultOicrController {
 
   @Get(`${RESULT_CODE}`)
   @GetResultVersion()
-  async getResultOicrSteps(@Query('step', ParseIntPipe) step: number) {
+  async getResultOicrSteps() {
     return this.resultOicrService
-      .findByResultIdAndSteps(this.resultUtil.resultId, step)
+      .findOicrs(this.resultUtil.resultId)
       .then((result) =>
         ResponseUtils.format({
           data: result,
