@@ -35,6 +35,7 @@ import { AppConfig } from '../../shared/utils/app-config.util';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
 import { ResultOicrRepository } from './repositories/result-oicr.repository';
+import { ResponseOicrWordTemplateDto } from './dto/response-oicr-word-template.dto';
 
 @Injectable()
 export class ResultOicrService {
@@ -273,5 +274,9 @@ export class ResultOicrService {
       primary_lever: allLevers.filter((lever) => lever.is_primary),
       contributor_lever: allLevers.filter((lever) => !lever.is_primary),
     };
+  }
+
+  async getResultOicrDetailsByOfficialCode(resultId: number): Promise<ResponseOicrWordTemplateDto> {
+    return this.mainRepo.getResultOicrDetailsByOfficialCode(resultId);
   }
 }

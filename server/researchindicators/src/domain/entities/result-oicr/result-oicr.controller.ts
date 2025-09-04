@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpStatus,
+  Param,
   ParseIntPipe,
   Patch,
   Post,
@@ -11,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ResultOicrService } from './result-oicr.service';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
-import { ApiBearerAuth, ApiBody, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiParam, ApiTags } from '@nestjs/swagger';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
@@ -71,4 +72,19 @@ export class ResultOicrController {
       }),
     );
   }
+
+  @Get(`ejemplo/${RESULT_CODE}`)
+  @GetResultVersion()
+  async getWordTemplate(@Query('step', ParseIntPipe) step: number) {
+    return this.resultOicrService
+    .getResultOicrDetailsByOfficialCode(this.resultUtil.resultId)
+    .then((result) =>
+      ResponseUtils.format({
+        data: result,
+        description: 'Result OICR word template retrieved successfully',
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
 }
