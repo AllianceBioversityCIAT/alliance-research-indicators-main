@@ -68,9 +68,9 @@ export class ResultOicrController {
     );
   }
 
-  @Get(`ejemplo/${RESULT_CODE}`)
+  @Get(`details/${RESULT_CODE}`)
   @GetResultVersion()
-  async getWordTemplate(@Query('step', ParseIntPipe) step: number) {
+  async getWordTemplate() {
     return this.resultOicrService
     .getResultOicrDetailsByOfficialCode(this.resultUtil.resultId)
     .then((result) =>

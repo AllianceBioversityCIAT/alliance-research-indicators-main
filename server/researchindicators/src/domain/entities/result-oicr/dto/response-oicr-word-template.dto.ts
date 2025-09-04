@@ -1,67 +1,46 @@
 import { IsString, IsNumber, IsOptional, IsNotEmpty } from 'class-validator';
 
-export class ResponseOicrWordTemplateDto {
-  @IsString()
-  @IsNotEmpty()
-  result_code: string;
-
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
-  @IsString()
-  @IsNotEmpty()
+export class ProjectDto {
   project_id: string;
-
-  @IsString()
-  @IsNotEmpty()
   project_title: string;
+}
 
-  @IsOptional()
-  @IsNumber()
-  tag_id?: number | null;
+export class TagDto {
+  tag_id: number;
+  tag_name: string;
+}
 
-  @IsOptional()
-  @IsString()
-  tagging?: string | null;
+export class LeverDto {
+  lever_id: string;
+  lever_short: string;
+  lever_full: string;
+}
 
-  @IsOptional()
-  @IsString()
-  outcome_impact_statement?: string | null;
+export class RegionDto {
+  region_code: string;
+  region_name: string;
+}
 
-  @IsOptional()
-  @IsNumber()
-  lever_id?: number | null;
+export class CountryDto {
+  country_code: string;
+  country_name: string;
+}
 
-  @IsOptional()
-  @IsString()
-  lever?: string | null;
-
-  @IsOptional()
-  @IsString()
-  lever_name?: string | null;
-
-  @IsOptional()
-  @IsString()
-  geographic_scope?: string | null;
-
-  @IsOptional()
-  @IsString()
-  region_code?: string | null;
-
-  @IsOptional()
-  @IsString()
-  region_name?: string | null;
-
-  @IsOptional()
-  @IsString()
-  country_code?: string | null;
-
-  @IsOptional()
-  @IsString()
-  country_name?: string | null;
-
-  @IsOptional()
-  @IsString()
-  comment_geo_scope?: string | null;
+export class ResultMappedDto {
+  id: number;
+  official_code: number;
+  title: string;
+  main_project_id: string;
+  main_project: string;
+  other_projects: ProjectDto[];
+  tags: TagDto[];
+  outcome_impact_statement: string;
+  main_lever_id: string | null;  // Puede ser null por LEFT JOIN
+  main_lever_short: string | null;  // Puede ser null por LEFT JOIN
+  main_lever_full: string | null;  // Puede ser null por LEFT JOIN
+  other_levers: LeverDto[];
+  geographic_scope: string;
+  regions: RegionDto[];
+  countries: CountryDto[];
+  geographic_scope_comments: string;
 }
