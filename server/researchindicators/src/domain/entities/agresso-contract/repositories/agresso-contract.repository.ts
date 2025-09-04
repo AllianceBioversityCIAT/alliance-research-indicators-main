@@ -7,6 +7,7 @@ import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { ContractResultCountDto } from '../dto/contract-result-count.dto';
 import { isEmpty } from '../../../shared/utils/object.utils';
 import { StringKeys } from '../../../shared/global-dto/types-global';
+import { OrderFieldsEnum } from '../enum/order-fields.enum';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -205,7 +206,28 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ).then((response) => (response.length > 0 ? response[0] : null));
   }
 
-  async getContracts(filter?: Record<string, any>, userId?: number) {
+  orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): string {
+    if (isEmpty(field)) return '';
+
+    const fieldMap: Record<OrderFieldsEnum, string> = {
+      [OrderFieldsEnum.START_DATE]: 'ac.start_date',
+      [OrderFieldsEnum.END_DATE]: 'ac.end_date',
+      [OrderFieldsEnum.END_DATE_GLOBAL]: 'ac.endDateGlobal',
+      [OrderFieldsEnum.END_DATE_FINANCE]: 'ac.endDatefinance',
+      [OrderFieldsEnum.CONTRACT_CODE]: 'ac.agreement_id',
+      [OrderFieldsEnum.PROJECT_NAME]: 'ac.projectDescription',
+      [OrderFieldsEnum.PRINCIPAL_INVESTIGATOR]: 'ac.project_lead_description',
+      [OrderFieldsEnum.STATUS]: 'ac.contract_status',
+    };
+    return `ORDER BY ${fieldMap[field] || 'ac.start_date'} ${direction} `;
+  }
+
+  async getContracts(
+    filter?: Record<string, any>,
+    userId?: number,
+    orderFields?: OrderFieldsEnum,
+    direction?: 'ASC' | 'DESC',
+  ) {
     const dateFilterClause = this.buildDateFilterClause(filter);
 
     const query = `
@@ -268,7 +290,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
     ${dateFilterClause}
     ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
-    GROUP BY ac.agreement_id, cl.id;`;
+    GROUP BY ac.agreement_id, cl.id
+    ${this.orderBy(orderFields, direction)};`;
 
     return this.query(query) as Promise<ContractResultCountDto[]>;
   }
