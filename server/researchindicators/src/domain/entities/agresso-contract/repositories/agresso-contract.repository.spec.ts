@@ -78,6 +78,9 @@ describe('AgressoContractRepository', () => {
     // Setup repository methods
     repository.query = jest.fn();
     repository.createQueryBuilder = jest.fn().mockReturnValue(mockQueryBuilder);
+    repository['sortResultsWithLodash'] = jest
+      .fn()
+      .mockImplementation((data) => data);
 
     mockDataSource.createEntityManager.mockReturnValue(mockEntityManager);
   });
@@ -509,7 +512,12 @@ describe('AgressoContractRepository', () => {
         expect.stringContaining('AND cl.id in (1,2)'),
       );
       expect(repository.query).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY ac.start_date DESC'),
+        expect.not.stringContaining('ORDER BY'),
+      );
+      expect(repository['sortResultsWithLodash']).toHaveBeenCalledWith(
+        expectedContracts,
+        'start_date',
+        'desc',
       );
       expect(result).toEqual(expectedContracts);
     });

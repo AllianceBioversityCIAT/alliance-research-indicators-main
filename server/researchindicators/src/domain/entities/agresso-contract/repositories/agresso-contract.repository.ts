@@ -8,6 +8,7 @@ import { ContractResultCountDto } from '../dto/contract-result-count.dto';
 import { isEmpty } from '../../../shared/utils/object.utils';
 import { StringKeys } from '../../../shared/global-dto/types-global';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
+import { orderBy } from 'lodash';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -290,10 +291,36 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
     ${dateFilterClause}
     ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
-    GROUP BY ac.agreement_id, cl.id
-    ${this.orderBy(orderFields, direction)};`;
+    GROUP BY ac.agreement_id, cl.id;`;
 
-    return this.query(query) as Promise<ContractResultCountDto[]>;
+    return this.query(query).then((results) => {
+      if (orderFields) {
+        const fieldMapping = {
+          [OrderFieldsEnum.START_DATE]: 'start_date',
+          [OrderFieldsEnum.END_DATE]: 'end_date',
+          [OrderFieldsEnum.END_DATE_GLOBAL]: 'endDateGlobal',
+          [OrderFieldsEnum.END_DATE_FINANCE]: 'endDatefinance',
+          [OrderFieldsEnum.CONTRACT_CODE]: 'agreement_id',
+          [OrderFieldsEnum.PROJECT_NAME]: 'projectDescription',
+          [OrderFieldsEnum.PRINCIPAL_INVESTIGATOR]: 'project_lead_description',
+          [OrderFieldsEnum.STATUS]: 'contract_status',
+        };
+
+        const field = fieldMapping[orderFields];
+        const dir = (direction?.toLowerCase() as 'asc' | 'desc') || 'asc';
+
+        return this.sortResultsWithLodash(results, field, dir);
+      }
+      return results;
+    }) as Promise<ContractResultCountDto[]>;
+  }
+
+  private sortResultsWithLodash<T>(
+    data: T[],
+    field: string | string[],
+    direction: 'asc' | 'desc' | ('asc' | 'desc')[] = 'asc',
+  ): T[] {
+    return orderBy(data, field, direction);
   }
 
   private buildStatusFilterClause(statuses: string[]): string {
