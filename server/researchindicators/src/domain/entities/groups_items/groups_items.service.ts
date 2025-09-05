@@ -118,15 +118,23 @@ export class GroupsItemsService {
         ],
       });
 
-    const levels = projectGroups.map((pg) => {
-      const custom_fields = this.mapCustomFields(pg);
-      return {
-        ...(pg.level === 1
-          ? { name_level_1: pg.name }
-          : { name_level_2: pg.name }),
-        custom_fields,
-      };
-    });
+    const levels = (projectGroups.length > 0
+      ? projectGroups.map((pg) => {
+          const custom_fields = this.mapCustomFields(pg) ?? [];
+          return {
+            ...(pg.level === 1
+              ? { name_level_1: pg.name ?? '' }
+              : { name_level_2: pg.name ?? '' }),
+            custom_fields,
+          };
+        })
+      : [
+          {
+            name_level_1: '',
+            name_level_2: '',
+            custom_fields: [],
+          },
+        ]);
 
     return {
       levels,
