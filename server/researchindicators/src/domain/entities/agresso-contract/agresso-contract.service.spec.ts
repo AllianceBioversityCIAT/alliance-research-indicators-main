@@ -19,7 +19,7 @@ jest.mock('../../shared/utils/object.utils', () => ({
 
 describe('AgressoContractService', () => {
   let service: AgressoContractService;
-  let dataSource: DataSource;
+  let dataSource: DataSource; // eslint-disable-line @typescript-eslint/no-unused-vars
   let repository: AgressoContractRepository;
   let currentUser: CurrentUserUtil;
 
