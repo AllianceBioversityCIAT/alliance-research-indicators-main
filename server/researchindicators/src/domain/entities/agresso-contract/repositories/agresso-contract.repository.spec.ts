@@ -1,9 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { AgressoContractRepository } from './agresso-contract.repository';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../../tools/broker/aliance-management.app';
-import { AgressoContract } from '../entities/agresso-contract.entity';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
 import { AgressoContractStatus } from '../../../shared/enum/agresso-contract.enum';
@@ -17,7 +16,7 @@ jest.mock('../../../shared/utils/object.utils', () => ({
 
 describe('AgressoContractRepository', () => {
   let repository: AgressoContractRepository;
-  let dataSource: DataSource;
+  let dataSource: DataSource; // eslint-disable-line @typescript-eslint/no-unused-vars
   let currentUser: CurrentUserUtil;
   let alianceManagementApp: AlianceManagementApp;
 
