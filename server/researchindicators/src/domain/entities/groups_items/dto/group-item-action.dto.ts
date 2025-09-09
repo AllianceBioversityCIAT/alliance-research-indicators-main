@@ -27,12 +27,16 @@ export class StructureDto {
 
 export class LevelDto {
   @IsOptional()
-  @IsString()
-  name_level_1?: string;
+  @IsNumber()
+  id?: number;
+
+  @IsOptional()
+  @IsNumber()
+  level?: number;
 
   @IsOptional()
   @IsString()
-  name_level_2?: string;
+  name?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
