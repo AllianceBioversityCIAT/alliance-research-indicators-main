@@ -36,4 +36,18 @@ export class TempExternalOicr extends AuditableEntity {
     nullable: true,
   })
   report_year: string;
+
+  @Column({
+    type: 'text',
+    name: 'pdf_url',
+    nullable: true,
+  })
+  pdf_url: string;
+
+  @Column({
+    type: 'text',
+    name: 'external_id',
+    nullable: true,
+  })
+  external_id: string;
 }
