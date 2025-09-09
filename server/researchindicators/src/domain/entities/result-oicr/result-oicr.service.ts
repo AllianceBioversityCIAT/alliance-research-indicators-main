@@ -37,7 +37,15 @@ import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_o
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
 import { isEmpty } from '../../shared/utils/object.utils';
-import { CountryDto, LeverDto, ProjectDto, RegionDto, ResultMappedDto, TagDto } from './dto/response-oicr-word-template.dto';
+import {
+  CountryDto,
+  LeverDto,
+  ProjectDto,
+  RegionDto,
+  ResultMappedDto,
+  TagDto,
+} from './dto/response-oicr-word-template.dto';
+import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 
 @Injectable()
 export class ResultOicrService {
@@ -231,7 +239,7 @@ export class ResultOicrService {
         resultId,
         allLevers,
         'lever_id',
-        undefined,
+        LeverRolesEnum.ALIGNMENT,
         manager,
         ['is_primary'],
       );
@@ -352,33 +360,36 @@ export class ResultOicrService {
     };
   }
 
-  async getResultOicrDetailsByOfficialCode(resultId: number): Promise<ResultMappedDto> {
-    const rawResults = await this.mainRepo.getResultOicrDetailsByOfficialCode(resultId);
+  async getResultOicrDetailsByOfficialCode(
+    resultId: number,
+  ): Promise<ResultMappedDto> {
+    const rawResults =
+      await this.mainRepo.getResultOicrDetailsByOfficialCode(resultId);
 
     if (!rawResults || rawResults.length === 0) {
       return null;
     }
 
     const firstRow = rawResults[0];
-    
+
     const projectsMap = new Map<string, ProjectDto>();
     const tagsMap = new Map<number, TagDto>();
     const leversMap = new Map<string, LeverDto>();
     const regionsMap = new Map<string, RegionDto>();
     const countriesMap = new Map<string, CountryDto>();
 
-    rawResults.forEach(row => {
+    rawResults.forEach((row) => {
       if (row.project_id && row.project_title) {
         projectsMap.set(row.project_id, {
           project_id: row.project_id,
-          project_title: row.project_title
+          project_title: row.project_title,
         });
       }
 
       if (row.tag_id && row.tagging) {
         tagsMap.set(row.tag_id, {
           tag_id: row.tag_id,
-          tag_name: row.tagging
+          tag_name: row.tagging,
         });
       }
 
@@ -386,21 +397,21 @@ export class ResultOicrService {
         leversMap.set(row.lever_id, {
           lever_id: row.lever_id,
           lever_short: row.lever,
-          lever_full: row.lever_name
+          lever_full: row.lever_name,
         });
       }
 
       if (row.region_code && row.region_name) {
         regionsMap.set(row.region_code, {
           region_code: row.region_code,
-          region_name: row.region_name
+          region_name: row.region_name,
         });
       }
 
       if (row.country_code && row.country_name) {
         countriesMap.set(row.country_code, {
           country_code: row.country_code,
-          country_name: row.country_name
+          country_name: row.country_name,
         });
       }
     });
@@ -421,7 +432,7 @@ export class ResultOicrService {
       geographic_scope: firstRow.geographic_scope,
       regions: Array.from(regionsMap.values()),
       countries: Array.from(countriesMap.values()),
-      geographic_scope_comments: firstRow.comment_geo_scope
+      geographic_scope_comments: firstRow.comment_geo_scope,
     };
   }
 }
