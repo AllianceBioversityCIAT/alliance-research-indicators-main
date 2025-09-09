@@ -37,6 +37,7 @@ import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_o
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
 import { isEmpty } from '../../shared/utils/object.utils';
+import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 
 @Injectable()
 export class ResultOicrService {
@@ -230,7 +231,7 @@ export class ResultOicrService {
         resultId,
         allLevers,
         'lever_id',
-        undefined,
+        LeverRolesEnum.ALIGNMENT,
         manager,
         ['is_primary'],
       );
