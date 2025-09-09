@@ -466,7 +466,7 @@ describe('ResultOicrService', () => {
           { lever_id: '3', is_primary: false },
         ],
         'lever_id',
-        LeverRolesEnum.ALIGNMENT,
+        LeverRolesEnum.OICR_ALIGNMENT,
         mockEntityManager,
         ['is_primary'],
       );
@@ -506,7 +506,7 @@ describe('ResultOicrService', () => {
         resultId,
         [],
         'lever_id',
-        LeverRolesEnum.ALIGNMENT,
+        LeverRolesEnum.OICR_ALIGNMENT,
         mockEntityManager,
         ['is_primary'],
       );

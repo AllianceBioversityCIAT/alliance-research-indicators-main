@@ -238,7 +238,7 @@ export class ResultOicrService {
         resultId,
         allLevers,
         'lever_id',
-        LeverRolesEnum.ALIGNMENT,
+        LeverRolesEnum.OICR_ALIGNMENT,
         manager,
         ['is_primary'],
       );
