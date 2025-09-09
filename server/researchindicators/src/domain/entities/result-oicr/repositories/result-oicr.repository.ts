@@ -97,12 +97,15 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
         AND rl.is_primary = 0
       LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id 
       LEFT JOIN result_tags rt on rt.result_id = r.result_id
+        AND rt.is_active = TRUE
       LEFT JOIN tags t on t.id = rt.tag_id
         AND t.is_active = TRUE
       LEFT JOIN clarisa_geo_scope cgs on cgs.code = r.geo_scope_id
       LEFT JOIN result_regions rg on rg.result_id = r.result_id
+        AND rg.is_active = TRUE
       LEFT JOIN clarisa_regions cr on cr.um49Code = rg.region_id
       LEFT JOIN result_countries rco on rco.result_id = r.result_id
+        AND rco.is_active = TRUE
       LEFT JOIN clarisa_countries cc on cc.isoAlpha2 = rco.isoAlpha2
       WHERE r.result_id = ?
         AND r.is_active = TRUE;

@@ -39,7 +39,7 @@ import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_res
 import { isEmpty } from '../../shared/utils/object.utils';
 import {
   CountryDto,
-  LeverDto,
+  LeverDto, MainLeverDto,
   ProjectDto,
   RegionDto,
   ResultMappedDto,
@@ -375,12 +375,29 @@ export class ResultOicrService {
     const leversMap = new Map<string, LeverDto>();
     const regionsMap = new Map<string, RegionDto>();
     const countriesMap = new Map<string, CountryDto>();
+    const mainLeversMap = new Map<string, MainLeverDto>();
 
     rawResults.forEach((row) => {
       if (row.project_id && row.project_title) {
         projectsMap.set(row.project_id, {
           project_id: row.project_id,
-          project_title: row.project_title,
+          project_title: row.project_title
+        });
+      }
+
+      if (row.main_lever_id && row.main_lever) {
+        mainLeversMap.set(row.main_lever_id, {
+          main_lever_id: row.main_lever_id,
+          main_lever: row.main_lever,
+          main_lever_name: row.main_lever_name
+        });
+      }
+
+      if (row.main_lever_id && row.main_lever) {
+        mainLeversMap.set(row.main_lever_id, {
+          main_lever_id: row.main_lever_id,
+          main_lever: row.main_lever,
+          main_lever_name: row.main_lever_name
         });
       }
 
@@ -417,9 +434,7 @@ export class ResultOicrService {
       tag_id: firstRow.tag_id,
       tag_name: firstRow.tag_name,
       outcome_impact_statement: firstRow.outcome_impact_statement,
-      main_lever_id: firstRow.main_lever_id,
-      main_lever_short: firstRow.main_lever,
-      main_lever_full: firstRow.main_lever_name,
+      main_levers: Array.from(mainLeversMap.values()),
       other_levers: Array.from(leversMap.values()),
       geographic_scope: firstRow.geographic_scope,
       regions: Array.from(regionsMap.values()),
