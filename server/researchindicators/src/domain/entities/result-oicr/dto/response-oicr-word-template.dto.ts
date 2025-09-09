@@ -19,6 +19,12 @@ export class CountryDto {
   country_name: string;
 }
 
+export class MainLeverDto {
+  main_lever_id: string;
+  main_lever: string;
+  main_lever_name: string;
+}
+
 export class ResultMappedDto {
   id: number;
   official_code: number;
@@ -29,9 +35,7 @@ export class ResultMappedDto {
   tag_id: number | null;
   tag_name: string | null;
   outcome_impact_statement: string;
-  main_lever_id: string | null;
-  main_lever_short: string | null;
-  main_lever_full: string | null;
+  main_levers: MainLeverDto[];
   other_levers: LeverDto[];
   geographic_scope: string;
   regions: RegionDto[];
