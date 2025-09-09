@@ -23,6 +23,7 @@ import { TemplateService } from '../../shared/auxiliar/template/template.service
 import { ResultOicrRepository } from './repositories/result-oicr.repository';
 import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
+import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -465,7 +466,7 @@ describe('ResultOicrService', () => {
           { lever_id: '3', is_primary: false },
         ],
         'lever_id',
-        undefined,
+        LeverRolesEnum.ALIGNMENT,
         mockEntityManager,
         ['is_primary'],
       );
@@ -505,7 +506,7 @@ describe('ResultOicrService', () => {
         resultId,
         [],
         'lever_id',
-        undefined,
+        LeverRolesEnum.ALIGNMENT,
         mockEntityManager,
         ['is_primary'],
       );
