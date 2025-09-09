@@ -3,11 +3,6 @@ export class ProjectDto {
   project_title: string;
 }
 
-export class TagDto {
-  tag_id: number;
-  tag_name: string;
-}
-
 export class LeverDto {
   lever_id: string;
   lever_short: string;
@@ -31,11 +26,12 @@ export class ResultMappedDto {
   main_project_id: string;
   main_project: string;
   other_projects: ProjectDto[];
-  tags: TagDto[];
+  tag_id: number | null;
+  tag_name: string | null;
   outcome_impact_statement: string;
-  main_lever_id: string | null;  // Puede ser null por LEFT JOIN
-  main_lever_short: string | null;  // Puede ser null por LEFT JOIN
-  main_lever_full: string | null;  // Puede ser null por LEFT JOIN
+  main_lever_id: string | null;
+  main_lever_short: string | null;
+  main_lever_full: string | null;
   other_levers: LeverDto[];
   geographic_scope: string;
   regions: RegionDto[];
