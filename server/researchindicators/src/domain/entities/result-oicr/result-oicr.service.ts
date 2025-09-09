@@ -43,7 +43,6 @@ import {
   ProjectDto,
   RegionDto,
   ResultMappedDto,
-  TagDto,
 } from './dto/response-oicr-word-template.dto';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 
@@ -373,7 +372,6 @@ export class ResultOicrService {
     const firstRow = rawResults[0];
 
     const projectsMap = new Map<string, ProjectDto>();
-    const tagsMap = new Map<number, TagDto>();
     const leversMap = new Map<string, LeverDto>();
     const regionsMap = new Map<string, RegionDto>();
     const countriesMap = new Map<string, CountryDto>();
@@ -383,13 +381,6 @@ export class ResultOicrService {
         projectsMap.set(row.project_id, {
           project_id: row.project_id,
           project_title: row.project_title,
-        });
-      }
-
-      if (row.tag_id && row.tagging) {
-        tagsMap.set(row.tag_id, {
-          tag_id: row.tag_id,
-          tag_name: row.tagging,
         });
       }
 
@@ -423,7 +414,8 @@ export class ResultOicrService {
       main_project_id: firstRow.main_project_id,
       main_project: firstRow.main_project_title,
       other_projects: Array.from(projectsMap.values()),
-      tags: Array.from(tagsMap.values()),
+      tag_id: firstRow.tag_id,
+      tag_name: firstRow.tag_name,
       outcome_impact_statement: firstRow.outcome_impact_statement,
       main_lever_id: firstRow.main_lever_id,
       main_lever_short: firstRow.main_lever,

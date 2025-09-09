@@ -58,7 +58,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
         ac.agreement_id as project_id,
         ac.description as project_title,
         t.id as tag_id,
-        t.name as tagging,
+        t.name as tag_name,
         ro.outcome_impact_statement,
         cl_main.id as main_lever_id,
         cl_main.short_name as main_lever,
@@ -98,6 +98,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
       LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id 
       LEFT JOIN result_tags rt on rt.result_id = r.result_id
       LEFT JOIN tags t on t.id = rt.tag_id
+        AND t.is_active = TRUE
       LEFT JOIN clarisa_geo_scope cgs on cgs.code = r.geo_scope_id
       LEFT JOIN result_regions rg on rg.result_id = r.result_id
       LEFT JOIN clarisa_regions cr on cr.um49Code = rg.region_id
