@@ -37,6 +37,7 @@ import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_o
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
 import { isEmpty } from '../../shared/utils/object.utils';
+import { CountryDto, LeverDto, MainLeverDto, ProjectDto, RegionDto, ResultMappedDto} from './dto/response-oicr-word-template.dto';
 
 @Injectable()
 export class ResultOicrService {
@@ -348,6 +349,79 @@ export class ResultOicrService {
       initiatives,
       primary_lever: allLevers.filter((lever) => lever.is_primary),
       contributor_lever: allLevers.filter((lever) => !lever.is_primary),
+    };
+  }
+
+  async getResultOicrDetailsByOfficialCode(resultId: number): Promise<ResultMappedDto> {
+    const rawResults = await this.mainRepo.getResultOicrDetailsByOfficialCode(resultId);
+
+    if (!rawResults || rawResults.length === 0) {
+      return null;
+    }
+
+    const firstRow = rawResults[0];
+    
+    const projectsMap = new Map<string, ProjectDto>();
+    const leversMap = new Map<string, LeverDto>();
+    const regionsMap = new Map<string, RegionDto>();
+    const countriesMap = new Map<string, CountryDto>();
+    const mainLeversMap = new Map<string, MainLeverDto>();
+
+    rawResults.forEach(row => {
+      if (row.project_id && row.project_title) {
+        projectsMap.set(row.project_id, {
+          project_id: row.project_id,
+          project_title: row.project_title
+        });
+      }
+
+      if (row.main_lever_id && row.main_lever) {
+        mainLeversMap.set(row.main_lever_id, {
+          main_lever_id: row.main_lever_id,
+          main_lever: row.main_lever,
+          main_lever_name: row.main_lever_name
+        });
+      }
+
+      if (row.lever_id && row.lever) {
+        leversMap.set(row.lever_id, {
+          lever_id: row.lever_id,
+          lever_short: row.lever,
+          lever_full: row.lever_name
+        });
+      }
+
+      if (row.region_code && row.region_name) {
+        regionsMap.set(row.region_code, {
+          region_code: row.region_code,
+          region_name: row.region_name
+        });
+      }
+
+      if (row.country_code && row.country_name) {
+        countriesMap.set(row.country_code, {
+          country_code: row.country_code,
+          country_name: row.country_name
+        });
+      }
+    });
+
+    return {
+      id: firstRow.result_id,
+      official_code: firstRow.result_code,
+      title: firstRow.title,
+      main_project_id: firstRow.main_project_id,
+      main_project: firstRow.main_project_title,
+      other_projects: Array.from(projectsMap.values()),
+      tag_id: firstRow.tag_id,
+      tag_name: firstRow.tag_name,
+      outcome_impact_statement: firstRow.outcome_impact_statement,
+      main_levers: Array.from(mainLeversMap.values()),
+      other_levers: Array.from(leversMap.values()),
+      geographic_scope: firstRow.geographic_scope,
+      regions: Array.from(regionsMap.values()),
+      countries: Array.from(countriesMap.values()),
+      geographic_scope_comments: firstRow.comment_geo_scope
     };
   }
 }
