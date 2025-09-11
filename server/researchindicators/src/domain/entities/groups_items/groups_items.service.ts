@@ -119,23 +119,24 @@ export class GroupsItemsService {
         ],
       });
 
-    const levels = (projectGroups.length > 0
-      ? projectGroups.map((pg) => {
-          const custom_fields = this.mapCustomFields(pg) ?? [];
-          return {
-            id: pg.id ?? '',
-            name: pg.name ?? '',
-            level: pg.level ?? '',
-            custom_fields,
-          };
-        })
-      : [
-          {
-            name: '',
-            level: '',
-            custom_fields: [],
-          },
-        ]);
+    const levels =
+      projectGroups.length > 0
+        ? projectGroups.map((pg) => {
+            const custom_fields = this.mapCustomFields(pg) ?? [];
+            return {
+              id: pg.id ?? '',
+              name: pg.name ?? '',
+              level: pg.level ?? '',
+              custom_fields,
+            };
+          })
+        : [
+            {
+              name: '',
+              level: '',
+              custom_fields: [],
+            },
+          ];
 
     return {
       levels,
@@ -473,7 +474,7 @@ export class GroupsItemsService {
     const { agreement_id, levels } = dto;
 
     for (const levelData of levels) {
-      const { id, name, level, custom_fields = [] } = levelData;
+      const {name, level, custom_fields = [] } = levelData;
 
       // Buscar registro existente por acuerdo y nivel
       let record = await manager.findOne(ProjectGroup, {
@@ -512,7 +513,9 @@ export class GroupsItemsService {
             .update(GroupItem)
             .set({ [columnName]: null })
             .where('agreement_id = :agreement_id', { agreement_id })
-            .andWhere(level === 1 ? 'parent_id IS NULL' : 'parent_id IS NOT NULL')
+            .andWhere(
+              level === 1 ? 'parent_id IS NULL' : 'parent_id IS NOT NULL',
+            )
             .execute();
         }
       }
