@@ -45,11 +45,15 @@ describe('GroupsItemsController', () => {
         levels: [
           {
             custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
-            name_level_1: 'Test Level 1'
+            id: 12,
+            level: 1,
+            name: "Test Level 1",
           },
           {
             custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
-            name_level_2: 'Test Level 2'
+            id: 13,
+            level: 1,
+            name: "Test Level 2",
           }
         ],
         structures: [
@@ -77,11 +81,15 @@ describe('GroupsItemsController', () => {
         levels: [
           {
             custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
-            name_level_1: 'Test Level 1'
+            id: 12,
+            level: 1,
+            name: "Test Level 1",
           },
           {
-            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
-            name_level_2: 'Test Level 2'
+            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }],
+            id: 13,
+            level: 1,
+            name: "Test Level 2"
           }
         ],
         structures: []
@@ -103,11 +111,15 @@ describe('GroupsItemsController', () => {
         levels: [
           {
             custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
-            name_level_1: 'Test Level 1'
+            id: 12,
+            level: 1,
+            name: "Test Level 1",
           },
           {
             custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
-            name_level_2: 'Test Level 2'
+            id: 13,
+            level: 1,
+            name: "Test Level 2",
           }
         ],
         structures: [
@@ -155,11 +167,15 @@ describe('GroupsItemsController', () => {
         levels: [
           {
             custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
-            name_level_1: 'Test Level 1'
+            id: 12,
+            level: 1,
+            name: "Test Level 1",
           },
           {
             custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
-            name_level_2: 'Test Level 2'
+            id: 13,
+            level: 1,
+            name: "Test Level 2",
           }
         ],
         structures: []
