@@ -472,23 +472,19 @@ export class GroupsItemsService {
   private async processLevels(dto: StructureDto, manager: EntityManager) {
     const { agreement_id, levels } = dto;
 
-    // Procesar dinámicamente los niveles
-    for (const [index, levelData] of levels.entries()) {
-      const levelIndex = index + 1;
-      const levelKey = `name_level_${levelIndex}`;
+    for (const levelData of levels) {
+      const { id, name, level, custom_fields = [] } = levelData;
 
-      const name = levelData[levelKey];
-      const customFields = levelData.custom_fields || [];
-
+      // Buscar registro existente por acuerdo y nivel
       let record = await manager.findOne(ProjectGroup, {
-        where: { agreement_id, level: levelIndex },
+        where: { agreement_id, level },
       });
 
       if (!record) {
         // Crear si no existe
         record = manager.create(ProjectGroup, {
           agreement_id,
-          level: levelIndex,
+          level,
           name,
         });
       } else {
@@ -498,12 +494,15 @@ export class GroupsItemsService {
         }
       }
 
-      const currentFieldIDs = customFields.map((f) => f.fieldID);
+      // IDs de los custom_fields actuales
+      const currentFieldIDs = custom_fields
+        .filter((f) => f.fieldID !== null)
+        .map((f) => f.fieldID);
 
       // Mapear todos los posibles custom_field (1..10)
       const fieldMap: Record<string, string | null> = {};
       for (let j = 1; j <= 10; j++) {
-        const fieldObj = customFields.find((f) => f.fieldID === j);
+        const fieldObj = custom_fields.find((f) => f.fieldID === j);
         fieldMap[`custom_field_${j}`] = fieldObj ? fieldObj.field_name : null;
 
         if (!currentFieldIDs.includes(j)) {
@@ -513,9 +512,7 @@ export class GroupsItemsService {
             .update(GroupItem)
             .set({ [columnName]: null })
             .where('agreement_id = :agreement_id', { agreement_id })
-            .andWhere(
-              levelIndex === 1 ? 'parent_id IS NULL' : 'parent_id IS NOT NULL',
-            )
+            .andWhere(level === 1 ? 'parent_id IS NULL' : 'parent_id IS NOT NULL')
             .execute();
         }
       }
