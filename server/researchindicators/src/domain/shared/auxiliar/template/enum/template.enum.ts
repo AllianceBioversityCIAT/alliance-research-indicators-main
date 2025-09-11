@@ -6,6 +6,7 @@ export enum TemplateEnum {
   SUBMITTED_RESULT = 'submitted-result',
   ASK_HELP_TECHNICAL = 'ask-help-technical',
   ASK_HELP_CONTENT = 'ask-help-content',
+  OICR_NOTIFICATION_CREATED = 'oicr-notification-created',
 }
 
 export type WelcomeEmailTemplate = {

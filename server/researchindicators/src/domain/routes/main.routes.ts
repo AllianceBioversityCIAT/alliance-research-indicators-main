@@ -49,6 +49,9 @@ import { IpRightsApplicationOptionsModule } from '../entities/ip-rights-applicat
 import { AppSecretsModule } from '../entities/app-secrets/app-secrets.module';
 import { UserSettingsModule } from '../entities/user-settings/user-settings.module';
 import { TagsModule } from '../entities/tags/tags.module';
+import { ResultOicrModule } from '../entities/result-oicr/result-oicr.module';
+import { MaturityLevelModule } from '../entities/maturity-level/maturity-level.module';
+import { TempExternalOicrsModule } from '../entities/temp_external_oicrs/temp_external_oicrs.module';
 import { GroupsItemsModule } from '../entities/groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from '../entities/project_indicators/project_indicators.module';
 import { ProjectIndicatorsResultsModule } from '../entities/project_indicators_results/project_indicators_results.module';
@@ -74,6 +77,10 @@ const ResultsChildren: Routes = [
         module: IntellectualPropertyOwnersModule,
       },
     ],
+  },
+  {
+    path: 'oicr',
+    module: ResultOicrModule,
   },
   {
     path: 'institutions',
@@ -275,8 +282,16 @@ const children: Routes = [
     module: TagsModule,
   },
   {
+    path: 'maturity-levels',
+    module: MaturityLevelModule,
+  },
+  {
     path: 'opensearch',
     children: openSearchRoutes,
+  },
+  {
+    path: 'temp/oicrs',
+    module: TempExternalOicrsModule,
   },
   {
     path: 'announcement-setting',

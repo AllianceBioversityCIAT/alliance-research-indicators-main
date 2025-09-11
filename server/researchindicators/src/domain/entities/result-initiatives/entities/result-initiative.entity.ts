@@ -8,6 +8,7 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { ClarisaInitiative } from '../../../tools/clarisa/entities/clarisa-initiatives/entities/clarisa-initiative.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('result_initiatives')
 export class ResultInitiative extends AuditableEntity {
@@ -28,6 +29,10 @@ export class ResultInitiative extends AuditableEntity {
     type: 'bigint',
     name: 'clarisa_initiative_id',
     nullable: false,
+  })
+  @ApiProperty({
+    description: 'The unique identifier for the Clarisa initiative',
+    example: 1,
   })
   clarisa_initiative_id: number;
 

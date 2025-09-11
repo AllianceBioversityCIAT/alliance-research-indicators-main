@@ -14,8 +14,15 @@ import { ResultsService } from '../results/results.service';
 import { StepOneOicrDto } from './dto/step-one-oicr.dto';
 import { StepTwoOicrDto } from './dto/step-two-oicr.dto';
 import { CreateStepsOicrDto } from './dto/create-steps-oicr.dto';
+import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
-import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
+import { MessageMicroservice } from '../../tools/broker/message.microservice';
+import { AppConfig } from '../../shared/utils/app-config.util';
+import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
+import { TemplateService } from '../../shared/auxiliar/template/template.service';
+import { ResultOicrRepository } from './repositories/result-oicr.repository';
+import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
+import { UpdateOicrDto } from './dto/update-oicr.dto';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -29,6 +36,11 @@ describe('ResultOicrService', () => {
   let mockResultInitiativesService: jest.Mocked<ResultInitiativesService>;
   let mockResultLeversService: jest.Mocked<ResultLeversService>;
   let mockResultsService: jest.Mocked<ResultsService>;
+  let mockMessageMicroservice: jest.Mocked<MessageMicroservice>;
+  let mockAppConfig: jest.Mocked<AppConfig>;
+  let mockTemplateService: jest.Mocked<TemplateService>;
+  let mockResultOicrRepository: jest.Mocked<ResultOicrRepository>;
+  let mockTempExternalOicrsService: jest.Mocked<TempExternalOicrsService>;
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -37,6 +49,7 @@ describe('ResultOicrService', () => {
       save: jest.fn(),
       update: jest.fn(),
       findOne: jest.fn(),
+      find: jest.fn(),
     } as any;
 
     mockDataSource = {
@@ -46,6 +59,7 @@ describe('ResultOicrService', () => {
 
     mockCurrentUser = {
       user_id: 123,
+      email: 'test@example.com',
       audit: jest.fn(),
     } as any;
 
@@ -79,8 +93,58 @@ describe('ResultOicrService', () => {
     } as any;
 
     mockResultsService = {
+      createResult: jest.fn(),
       saveGeoLocation: jest.fn(),
       findGeoLocation: jest.fn(),
+    } as any;
+
+    mockMessageMicroservice = {
+      emit: jest.fn(),
+      send: jest.fn(),
+      sendEmail: jest.fn().mockResolvedValue(true),
+    } as any;
+
+    mockAppConfig = {
+      get: jest.fn(),
+      SPRM_EMAIL_SAFE: jest.fn().mockReturnValue('test@example.com'),
+      ARI_CLIENT_HOST: 'http://localhost:3000',
+    } as any;
+
+    mockTemplateService = {
+      _getTemplate: jest.fn().mockResolvedValue('<html>Template</html>'),
+      generateTemplate: jest.fn(),
+    } as any;
+
+    mockResultOicrRepository = {
+      save: jest.fn(),
+      find: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      query: jest.fn(),
+      getDataToNewOicrMessage: jest.fn().mockResolvedValue({
+        result_code: 'TEST-001',
+        result_title: 'Test Result',
+        contract_code: 'CONTRACT-001',
+        contract_description: 'Test Contract',
+        principal_investigator: 'Test PI',
+        primary_lever: 'Test Lever',
+        main_contact_person: 'Test Contact',
+        oicr_description: 'Test Description',
+        oicr_link: 'http://localhost:3000/result/TEST-001/general-information',
+      }),
+      sendMessageOicr: jest.fn(),
+      getResultOicrDetailsByOfficialCode: jest.fn(),
+    } as any;
+
+    mockTempExternalOicrsService = {
+      findAll: jest.fn(),
+      findOne: jest.fn(),
+      find: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -98,6 +162,14 @@ describe('ResultOicrService', () => {
         },
         { provide: ResultLeversService, useValue: mockResultLeversService },
         { provide: ResultsService, useValue: mockResultsService },
+        { provide: MessageMicroservice, useValue: mockMessageMicroservice },
+        { provide: AppConfig, useValue: mockAppConfig },
+        { provide: TemplateService, useValue: mockTemplateService },
+        { provide: ResultOicrRepository, useValue: mockResultOicrRepository },
+        {
+          provide: TempExternalOicrsService,
+          useValue: mockTempExternalOicrsService,
+        },
       ],
     }).compile();
 
@@ -112,19 +184,137 @@ describe('ResultOicrService', () => {
     it('should create a new ResultOicr', async () => {
       // Arrange
       const resultId = 123;
-      const newResultOicr = { result_id: resultId };
       const savedResultOicr = { result_id: resultId, id: 1 };
 
-      mockMainRepo.create.mockReturnValue(newResultOicr as any);
+      mockCurrentUser.audit.mockReturnValue({
+        created_at: new Date(),
+        created_by: 1,
+        updated_at: new Date(),
+        updated_by: 1,
+      });
       mockMainRepo.save.mockResolvedValue(savedResultOicr as any);
 
       // Act
-      const result = await service.create(resultId);
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(mockMainRepo),
+      } as any;
+      const result = await service.create(resultId, mockManager);
 
       // Assert
-      expect(mockMainRepo.create).toHaveBeenCalledWith({ result_id: resultId });
-      expect(mockMainRepo.save).toHaveBeenCalledWith(newResultOicr);
+      expect(mockMainRepo.save).toHaveBeenCalledWith({
+        result_id: resultId,
+        created_at: expect.any(Date),
+        created_by: 1,
+        updated_at: expect.any(Date),
+        updated_by: 1,
+      });
       expect(result).toEqual(savedResultOicr);
+    });
+  });
+
+  describe('createOicr', () => {
+    it('should create a complete OICR result with all steps', async () => {
+      // Arrange
+      const mockCreateData: CreateResultOicrDto = {
+        base_information: {
+          result_type_id: 1,
+          title: 'Test Result',
+          description: 'Test Description',
+        } as any,
+        step_one: {
+          outcome_impact_statement: 'Test outcome',
+          main_contact_person: { user_id: 123 },
+          tagging: [{ tag_id: 1 }],
+          linked_result: [{ other_result_id: 456 }],
+        } as any,
+        step_two: {
+          initiatives: [{ clarisa_initiative_id: 1 }],
+          primary_lever: [{ lever_id: 1 }],
+          contributor_lever: [{ lever_id: 2 }],
+        } as any,
+        step_three: {
+          geo_scope_id: 1,
+          regions: [],
+          countries: [],
+        } as any,
+        step_four: {
+          general_comment: 'Test comment',
+        },
+      };
+
+      const mockCreatedResult = { result_id: 123, id: 1 };
+      const mockResultRepo = {
+        update: jest.fn().mockResolvedValue(undefined),
+      } as any;
+
+      mockResultsService.createResult.mockResolvedValue(
+        mockCreatedResult as any,
+      );
+      mockResultsService.saveGeoLocation.mockResolvedValue(undefined);
+      mockResultOicrRepository.update.mockResolvedValue(undefined);
+      mockDataSource.getRepository.mockReturnValue(mockResultRepo);
+
+      jest.spyOn(service, 'stepOneOicr').mockResolvedValue(undefined as any);
+      jest.spyOn(service, 'stepTwoOicr').mockResolvedValue(undefined as any);
+
+      // Act
+      const result = await service.createOicr(mockCreateData);
+
+      // Assert
+      expect(mockResultsService.createResult).toHaveBeenCalledWith(
+        mockCreateData.base_information,
+      );
+      expect(service.stepOneOicr).toHaveBeenCalledWith(
+        mockCreateData.step_one,
+        mockCreatedResult.result_id,
+      );
+      expect(service.stepTwoOicr).toHaveBeenCalledWith(
+        mockCreateData.step_two,
+        mockCreatedResult.result_id,
+      );
+      expect(mockResultsService.saveGeoLocation).toHaveBeenCalledWith(
+        mockCreatedResult.result_id,
+        mockCreateData.step_three,
+      );
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(
+        mockCreatedResult.result_id,
+        {
+          general_comment: mockCreateData.step_four.general_comment,
+        },
+      );
+      expect(mockResultRepo.update).toHaveBeenCalledWith(
+        mockCreatedResult.result_id,
+        {
+          description: mockCreateData.step_one.outcome_impact_statement,
+        },
+      );
+      expect(result).toEqual(mockCreatedResult);
+    });
+
+    it('should handle error when createResult fails', async () => {
+      // Arrange
+      const mockCreateData: CreateResultOicrDto = {
+        base_information: {
+          result_type_id: 1,
+          title: 'Test Result',
+        } as any,
+        step_one: {} as any,
+        step_two: {} as any,
+        step_three: {} as any,
+        step_four: { general_comment: 'Test' },
+      };
+
+      mockResultsService.createResult.mockRejectedValue(
+        new Error('Create failed'),
+      );
+
+      // Act & Assert
+      await expect(service.createOicr(mockCreateData)).rejects.toThrow(
+        'Create failed',
+      );
+      expect(mockResultsService.createResult).toHaveBeenCalledWith(
+        mockCreateData.base_information,
+      );
     });
   });
 
@@ -202,7 +392,7 @@ describe('ResultOicrService', () => {
       // Arrange
       const step = 4;
       const updateResult = { affected: 1 };
-      mockMainRepo.update.mockResolvedValue(updateResult as any);
+      mockResultOicrRepository.update.mockResolvedValue(updateResult as any);
 
       // Act
       const result = await service.createOicrSteps(resultId, mockData, step);
@@ -211,7 +401,7 @@ describe('ResultOicrService', () => {
       expect(mockUpdateDataUtil.updateLastUpdatedDate).toHaveBeenCalledWith(
         resultId,
       );
-      expect(mockMainRepo.update).toHaveBeenCalledWith(resultId, {
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(resultId, {
         general_comment: mockData.general_comment,
       });
       expect(result).toEqual(updateResult);
@@ -231,105 +421,7 @@ describe('ResultOicrService', () => {
     });
   });
 
-  describe('stepOneOicr', () => {
-    it('should execute step one operations in transaction', async () => {
-      // Arrange
-      const resultId = 123;
-      const mockEntityManager = {
-        update: jest.fn(),
-      } as any;
-
-      const data: StepOneOicrDto = {
-        main_contact_person: { user_id: 456 } as any,
-        tagging: [{ tag_id: 1 }, { tag_id: 2 }] as any,
-        linked_result: [{ other_result_id: 789 }] as any,
-        outcome_impact_statement: 'Test statement',
-      };
-
-      const createdTags = [{ tag_id: 1 }, { tag_id: 2 }];
-      const auditData = { updated_at: new Date() };
-
-      // Mock the transaction to pass the mockEntityManager to the callback
-      mockDataSource.transaction.mockImplementation((callback: any) => {
-        return callback(mockEntityManager);
-      });
-
-      mockResultUsersService.create.mockResolvedValue(undefined);
-      mockResultTagsService.create.mockResolvedValue(createdTags as any);
-      mockLinkResultsService.create.mockResolvedValue(undefined);
-      mockMainRepo.update.mockResolvedValue({ affected: 1 } as any);
-      mockCurrentUser.audit.mockReturnValue(auditData);
-
-      // Act
-      await service.stepOneOicr(data, resultId);
-
-      // Assert
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockResultUsersService.create).toHaveBeenCalledWith(
-        resultId,
-        { user_id: data.main_contact_person.user_id },
-        'user_id',
-        UserRolesEnum.MAIN_CONTACT,
-        mockEntityManager,
-      );
-      expect(mockResultTagsService.create).toHaveBeenCalledWith(
-        resultId,
-        [{ tag_id: 1 }, { tag_id: 2 }],
-        'tag_id',
-        undefined,
-        mockEntityManager,
-      );
-      expect(mockLinkResultsService.create).toHaveBeenCalledWith(
-        resultId,
-        [{ other_result_id: 789 }],
-        'other_result_id',
-        LinkResultRolesEnum.OICR_STEP_ONE,
-        mockEntityManager,
-      );
-      expect(mockMainRepo.update).toHaveBeenCalledWith(resultId, {
-        outcome_impact_statement: data.outcome_impact_statement,
-        ...auditData,
-      });
-    });
-
-    it('should handle empty linked results when no tags are created', async () => {
-      // Arrange
-      const resultId = 123;
-      const mockEntityManager = {} as any;
-
-      const data: StepOneOicrDto = {
-        main_contact_person: { user_id: 456 } as any,
-        tagging: [{ tag_id: 1 }] as any,
-        linked_result: [{ other_result_id: 789 }] as any,
-        outcome_impact_statement: 'Test statement',
-      };
-
-      const auditData = { updated_at: new Date() };
-
-      // Mock the transaction to pass the mockEntityManager to the callback
-      mockDataSource.transaction.mockImplementation((callback: any) => {
-        return callback(mockEntityManager);
-      });
-
-      mockResultUsersService.create.mockResolvedValue(undefined);
-      mockResultTagsService.create.mockResolvedValue([] as any); // No tags created
-      mockLinkResultsService.create.mockResolvedValue(undefined);
-      mockMainRepo.update.mockResolvedValue({ affected: 1 } as any);
-      mockCurrentUser.audit.mockReturnValue(auditData);
-
-      // Act
-      await service.stepOneOicr(data, resultId);
-
-      // Assert
-      expect(mockLinkResultsService.create).toHaveBeenCalledWith(
-        resultId,
-        [], // Empty array because no tags were created
-        'other_result_id',
-        LinkResultRolesEnum.OICR_STEP_ONE,
-        mockEntityManager,
-      );
-    });
-  });
+  describe('stepOneOicr', () => {});
 
   describe('stepTwoOicr', () => {
     it('should execute step two operations in transaction', async () => {
@@ -490,13 +582,13 @@ describe('ResultOicrService', () => {
       const step = 4;
       const generalComment = 'Test general comment';
       const oicrEntity = { general_comment: generalComment };
-      mockMainRepo.findOne.mockResolvedValue(oicrEntity as any);
+      mockResultOicrRepository.findOne.mockResolvedValue(oicrEntity as any);
 
       // Act
       const result = await service.findByResultIdAndSteps(resultId, step);
 
       // Assert
-      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+      expect(mockResultOicrRepository.findOne).toHaveBeenCalledWith({
         where: { result_id: resultId },
         select: { general_comment: true },
       });
@@ -506,7 +598,7 @@ describe('ResultOicrService', () => {
     it('should return empty string when no general_comment found for step 4', async () => {
       // Arrange
       const step = 4;
-      mockMainRepo.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
 
       // Act
       const result = await service.findByResultIdAndSteps(resultId, step);
@@ -531,7 +623,7 @@ describe('ResultOicrService', () => {
       // Arrange
       const resultId = 123;
       const mockMainContactPerson = { user_id: 456 };
-      const mockLinkedResults = [{ other_result_id: 789 }];
+      const mockLinkResult = [{ external_oicr_id: 789 }];
       const mockTagging = [{ tag_id: 1 }, { tag_id: 2 }];
       const mockOutcomeStatement = 'Test outcome statement';
       const mockOicrEntity = { outcome_impact_statement: mockOutcomeStatement };
@@ -539,9 +631,11 @@ describe('ResultOicrService', () => {
       mockResultUsersService.findUsersByRoleResult.mockResolvedValue([
         mockMainContactPerson,
       ] as any);
-      mockLinkResultsService.find.mockResolvedValue(mockLinkedResults as any);
+      mockTempExternalOicrsService.find.mockResolvedValue(
+        mockLinkResult as any,
+      );
       mockResultTagsService.find.mockResolvedValue(mockTagging as any);
-      mockMainRepo.findOne.mockResolvedValue(mockOicrEntity as any);
+      mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
 
       // Act
       const result = await (service as any).findStepOneIoicr(resultId);
@@ -551,19 +645,16 @@ describe('ResultOicrService', () => {
         UserRolesEnum.MAIN_CONTACT,
         resultId,
       );
-      expect(mockLinkResultsService.find).toHaveBeenCalledWith(
-        resultId,
-        LinkResultRolesEnum.OICR_STEP_ONE,
-      );
+      expect(mockTempExternalOicrsService.find).toHaveBeenCalledWith(resultId);
       expect(mockResultTagsService.find).toHaveBeenCalledWith(resultId);
-      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+      expect(mockResultOicrRepository.findOne).toHaveBeenCalledWith({
         where: { result_id: resultId, is_active: true },
         select: { outcome_impact_statement: true },
       });
       expect(result).toEqual({
         main_contact_person: mockMainContactPerson,
-        linked_result: mockLinkedResults,
-        tagging: mockTagging,
+        link_result: mockLinkResult[0],
+        tagging: mockTagging[0],
         outcome_impact_statement: mockOutcomeStatement,
       });
     });
@@ -573,9 +664,9 @@ describe('ResultOicrService', () => {
       const resultId = 123;
 
       mockResultUsersService.findUsersByRoleResult.mockResolvedValue([]);
-      mockLinkResultsService.find.mockResolvedValue([]);
+      mockTempExternalOicrsService.find.mockResolvedValue([]);
       mockResultTagsService.find.mockResolvedValue([]);
-      mockMainRepo.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
 
       // Act
       const result = await (service as any).findStepOneIoicr(resultId);
@@ -583,8 +674,8 @@ describe('ResultOicrService', () => {
       // Assert
       expect(result).toEqual({
         main_contact_person: undefined,
-        linked_result: [],
-        tagging: [],
+        link_result: undefined,
+        tagging: undefined,
         outcome_impact_statement: undefined,
       });
     });
@@ -647,4 +738,856 @@ describe('ResultOicrService', () => {
       });
     });
   });
+
+  describe('sendMessageOicr', () => {
+    it('should send email notification when template is generated successfully', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockMessageData = {
+        result_code: 'OICR-2024-001',
+        result_title: 'Test OICR Result',
+        contract_code: 'CONTRACT-001',
+        contract_description: 'Test Contract Description',
+        principal_investigator: 'Dr. John Doe',
+        primary_lever: 'Climate Adaptation',
+        main_contact_person: 'Jane, Smith',
+        oicr_description: 'This is a test OICR description',
+        oicr_link:
+          'http://localhost:3000/result/OICR-2024-001/general-information',
+      };
+
+      const mockTemplate =
+        '<html><body>Test email template with OICR data</body></html>';
+      const mockUserEmail = 'test-user@example.com';
+
+      mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
+        mockMessageData,
+      );
+      mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
+      mockAppConfig.SPRM_EMAIL_SAFE.mockReturnValue(mockUserEmail);
+      // Set up current user email via mock
+      const originalEmail = 'original-user@example.com';
+      Object.defineProperty(mockCurrentUser, 'email', {
+        value: originalEmail,
+        writable: true,
+      });
+
+      // Act
+      await service.sendMessageOicr(resultId);
+
+      // Assert
+      expect(
+        mockResultOicrRepository.getDataToNewOicrMessage,
+      ).toHaveBeenCalledWith(resultId);
+      expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
+        TemplateEnum.OICR_NOTIFICATION_CREATED,
+        mockMessageData,
+      );
+      expect(mockAppConfig.SPRM_EMAIL_SAFE).toHaveBeenCalledWith(
+        mockCurrentUser.email,
+      );
+      expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
+        subject: '[STAR] - New OICR Submission #OICR-2024-001',
+        to: mockUserEmail,
+        message: {
+          socketFile: Buffer.from(mockTemplate),
+        },
+      });
+    });
+
+    it('should not send email when template generation fails (returns null)', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockMessageData = {
+        result_code: 'OICR-2024-002',
+        result_title: 'Another Test OICR Result',
+        contract_code: 'CONTRACT-002',
+        contract_description: 'Another Test Contract Description',
+        principal_investigator: 'Dr. Jane Doe',
+        primary_lever: 'Climate Mitigation',
+        main_contact_person: 'John, Smith',
+        oicr_description: 'Another test OICR description',
+        oicr_link:
+          'http://localhost:3000/result/OICR-2024-002/general-information',
+      };
+
+      mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
+        mockMessageData,
+      );
+      mockTemplateService._getTemplate.mockResolvedValue(null);
+
+      // Act
+      await service.sendMessageOicr(resultId);
+
+      // Assert
+      expect(
+        mockResultOicrRepository.getDataToNewOicrMessage,
+      ).toHaveBeenCalledWith(resultId);
+      expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
+        TemplateEnum.OICR_NOTIFICATION_CREATED,
+        mockMessageData,
+      );
+      expect(mockMessageMicroservice.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('should not send email when template generation fails (returns undefined)', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockMessageData = {
+        result_code: 'OICR-2024-003',
+        result_title: 'Third Test OICR Result',
+        contract_code: 'CONTRACT-003',
+        contract_description: 'Third Test Contract Description',
+        principal_investigator: 'Dr. Bob Smith',
+        primary_lever: 'Climate Resilience',
+        main_contact_person: 'Alice, Johnson',
+        oicr_description: 'Third test OICR description',
+        oicr_link:
+          'http://localhost:3000/result/OICR-2024-003/general-information',
+      };
+
+      mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
+        mockMessageData,
+      );
+      mockTemplateService._getTemplate.mockResolvedValue(undefined);
+
+      // Act
+      await service.sendMessageOicr(resultId);
+
+      // Assert
+      expect(
+        mockResultOicrRepository.getDataToNewOicrMessage,
+      ).toHaveBeenCalledWith(resultId);
+      expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
+        TemplateEnum.OICR_NOTIFICATION_CREATED,
+        mockMessageData,
+      );
+      expect(mockMessageMicroservice.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('should handle email sending failure gracefully', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockMessageData = {
+        result_code: 'OICR-2024-004',
+        result_title: 'Fourth Test OICR Result',
+        contract_code: 'CONTRACT-004',
+        contract_description: 'Fourth Test Contract Description',
+        principal_investigator: 'Dr. Carol White',
+        primary_lever: 'Climate Finance',
+        main_contact_person: 'Bob, Wilson',
+        oicr_description: 'Fourth test OICR description',
+        oicr_link:
+          'http://localhost:3000/result/OICR-2024-004/general-information',
+      };
+
+      const mockTemplate =
+        '<html><body>Another test email template</body></html>';
+      const mockUserEmail = 'test-user@example.com';
+
+      mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
+        mockMessageData,
+      );
+      mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
+      mockAppConfig.SPRM_EMAIL_SAFE.mockReturnValue(mockUserEmail);
+      // Set up current user email via mock
+      Object.defineProperty(mockCurrentUser, 'email', {
+        value: 'original-user@example.com',
+        writable: true,
+      });
+      mockMessageMicroservice.sendEmail.mockRejectedValue(
+        new Error('Email service unavailable'),
+      );
+
+      // Act & Assert
+      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
+        'Email service unavailable',
+      );
+
+      expect(
+        mockResultOicrRepository.getDataToNewOicrMessage,
+      ).toHaveBeenCalledWith(resultId);
+      expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
+        TemplateEnum.OICR_NOTIFICATION_CREATED,
+        mockMessageData,
+      );
+      expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
+        subject: '[STAR] - New OICR Submission #OICR-2024-004',
+        to: mockUserEmail,
+        message: {
+          socketFile: Buffer.from(mockTemplate),
+        },
+      });
+    });
+
+    it('should handle repository data retrieval failure', async () => {
+      // Arrange
+      const resultId = 999;
+      const repositoryError = new Error('Result not found');
+
+      mockResultOicrRepository.getDataToNewOicrMessage.mockRejectedValue(
+        repositoryError,
+      );
+
+      // Act & Assert
+      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
+        'Result not found',
+      );
+
+      expect(
+        mockResultOicrRepository.getDataToNewOicrMessage,
+      ).toHaveBeenCalledWith(resultId);
+      expect(mockTemplateService._getTemplate).not.toHaveBeenCalled();
+      expect(mockMessageMicroservice.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('should handle template service failure', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockMessageData = {
+        result_code: 'OICR-2024-005',
+        result_title: 'Fifth Test OICR Result',
+        contract_code: 'CONTRACT-005',
+        contract_description: 'Fifth Test Contract Description',
+        principal_investigator: 'Dr. David Brown',
+        primary_lever: 'Climate Technology',
+        main_contact_person: 'Carol, Davis',
+        oicr_description: 'Fifth test OICR description',
+        oicr_link:
+          'http://localhost:3000/result/OICR-2024-005/general-information',
+      };
+
+      const templateError = new Error('Template generation failed');
+
+      mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
+        mockMessageData,
+      );
+      mockTemplateService._getTemplate.mockRejectedValue(templateError);
+
+      // Act & Assert
+      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
+        'Template generation failed',
+      );
+
+      expect(
+        mockResultOicrRepository.getDataToNewOicrMessage,
+      ).toHaveBeenCalledWith(resultId);
+      expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
+        TemplateEnum.OICR_NOTIFICATION_CREATED,
+        mockMessageData,
+      );
+      expect(mockMessageMicroservice.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('should create correct email subject with result code', async () => {
+      // Arrange
+      const resultId = 123;
+      const specialResultCode = 'SPECIAL-OICR-2024-999';
+      const mockMessageData = {
+        result_code: specialResultCode,
+        result_title: 'Special Test OICR Result',
+        contract_code: 'SPECIAL-CONTRACT-001',
+        contract_description: 'Special Test Contract Description',
+        principal_investigator: 'Dr. Special Investigator',
+        primary_lever: 'Special Climate Lever',
+        main_contact_person: 'Special, Contact',
+        oicr_description: 'Special test OICR description',
+        oicr_link:
+          'http://localhost:3000/result/SPECIAL-OICR-2024-999/general-information',
+      };
+
+      const mockTemplate =
+        '<html><body>Special test email template</body></html>';
+      const mockUserEmail = 'test-user@example.com';
+
+      mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
+        mockMessageData,
+      );
+      mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
+      mockAppConfig.SPRM_EMAIL_SAFE.mockReturnValue(mockUserEmail);
+      Object.defineProperty(mockCurrentUser, 'email', {
+        value: 'original-user@example.com',
+        writable: true,
+      });
+
+      // Act
+      await service.sendMessageOicr(resultId);
+
+      // Assert
+      expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
+        subject: `[STAR] - New OICR Submission #${specialResultCode}`,
+        to: mockUserEmail,
+        message: {
+          socketFile: Buffer.from(mockTemplate),
+        },
+      });
+    });
+
+    it('should pass correct template enum and message data to template service', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockMessageData = {
+        result_code: 'OICR-2024-006',
+        result_title: 'Sixth Test OICR Result',
+        contract_code: 'CONTRACT-006',
+        contract_description: 'Sixth Test Contract Description',
+        principal_investigator: 'Dr. Emma Green',
+        primary_lever: 'Climate Education',
+        main_contact_person: 'Emma, Green',
+        oicr_description: 'Sixth test OICR description',
+        oicr_link:
+          'http://localhost:3000/result/OICR-2024-006/general-information',
+      };
+
+      const mockTemplate =
+        '<html><body>Sixth test email template</body></html>';
+
+      mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
+        mockMessageData,
+      );
+      mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
+
+      // Act
+      await service.sendMessageOicr(resultId);
+
+      // Assert
+      expect(mockTemplateService._getTemplate).toHaveBeenCalledTimes(1);
+      const [templateEnum, messageData] =
+        mockTemplateService._getTemplate.mock.calls[0];
+
+      // Verify that the correct template enum is used (should be OICR_NOTIFICATION_CREATED)
+      expect(templateEnum).toBe(TemplateEnum.OICR_NOTIFICATION_CREATED);
+      // Verify that the message data is passed correctly
+      expect(messageData).toEqual(mockMessageData);
+    });
+  });
+
+  describe('updateOicr', () => {
+    it('should update OICR with valid data', async () => {
+      // Arrange
+      const resultId = 123;
+      const updateData: UpdateOicrDto = {
+        oicr_internal_code: 'OICR-2024-001',
+        tagging: { tag_id: 1 } as any,
+        outcome_impact_statement: 'Updated outcome statement',
+        short_outcome_impact_statement: 'Updated short statement',
+        general_comment: 'Updated general comment',
+        maturity_level_id: 2,
+        link_result: { external_oicr_id: 456 } as any,
+      };
+
+      const auditData = { updated_at: new Date() };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(null); // No existing OICR with same code
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue(auditData);
+      mockResultTagsService.create.mockResolvedValue(undefined);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+
+      // Act
+      await service.updateOicr(resultId, updateData);
+
+      // Assert
+      expect(mockResultOicrRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          is_active: true,
+          oicr_internal_code: updateData.oicr_internal_code,
+          result_id: expect.anything(), // Not(resultId)
+        },
+      });
+
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(resultId, {
+        oicr_internal_code: updateData.oicr_internal_code,
+        outcome_impact_statement: updateData.outcome_impact_statement,
+        short_outcome_impact_statement:
+          updateData.short_outcome_impact_statement,
+        general_comment: updateData.general_comment,
+        maturity_level_id: updateData.maturity_level_id,
+        ...auditData,
+      });
+
+      expect(mockResultTagsService.create).toHaveBeenCalledWith(
+        resultId,
+        [{ tag_id: 1 }],
+        'tag_id',
+      );
+
+      expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
+        resultId,
+        [{ external_oicr_id: 456 }],
+        'external_oicr_id',
+      );
+    });
+
+    it('should set oicr_internal_code to null when code already exists', async () => {
+      // Arrange
+      const resultId = 123;
+      const updateData: UpdateOicrDto = {
+        oicr_internal_code: 'EXISTING-CODE',
+        tagging: null as any,
+        outcome_impact_statement: 'Test statement',
+        short_outcome_impact_statement: 'Short statement',
+        general_comment: 'Comment',
+        maturity_level_id: 1,
+        link_result: null as any,
+      };
+
+      const existingOicr = { id: 456, oicr_internal_code: 'EXISTING-CODE' };
+      const auditData = { updated_at: new Date() };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(existingOicr as any);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue(auditData);
+      mockResultTagsService.create.mockResolvedValue(undefined);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+
+      // Act
+      await service.updateOicr(resultId, updateData);
+
+      // Assert
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(resultId, {
+        oicr_internal_code: null, // Should be null since code exists
+        outcome_impact_statement: updateData.outcome_impact_statement,
+        short_outcome_impact_statement:
+          updateData.short_outcome_impact_statement,
+        general_comment: updateData.general_comment,
+        maturity_level_id: updateData.maturity_level_id,
+        ...auditData,
+      });
+    });
+
+    it('should handle empty arrays for tagging and link_result', async () => {
+      // Arrange
+      const resultId = 123;
+      const updateData: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-CODE',
+        tagging: null as any, // Test null handling
+        outcome_impact_statement: 'Test statement',
+        short_outcome_impact_statement: 'Short statement',
+        general_comment: 'Comment',
+        maturity_level_id: 1,
+        link_result: undefined as any, // Test undefined handling
+      };
+
+      const auditData = { updated_at: new Date() };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue(auditData);
+      mockResultTagsService.create.mockResolvedValue(undefined);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+
+      // Act
+      await service.updateOicr(resultId, updateData);
+
+      // Assert
+      expect(mockResultTagsService.create).toHaveBeenCalledWith(
+        resultId,
+        [], // Should pass empty array for null
+        'tag_id',
+      );
+
+      expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
+        resultId,
+        [], // Should pass empty array for undefined
+        'external_oicr_id',
+      );
+    });
+  });
+
+  describe('findOicrs', () => {
+    it('should return complete OICR data', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockOicrEntity = {
+        general_comment: 'Test general comment',
+        maturity_level_id: 2,
+        oicr_internal_code: 'OICR-2024-001',
+        outcome_impact_statement: 'Test outcome statement',
+        short_outcome_impact_statement: 'Short statement',
+      };
+
+      const mockTagging = [
+        { tag_id: 1, tag_name: 'Tag 1' } as any,
+        { tag_id: 2, tag_name: 'Tag 2' } as any,
+      ];
+
+      const mockLinkResult = [
+        { external_oicr_id: 456, title: 'External OICR 1' },
+        { external_oicr_id: 789, title: 'External OICR 2' },
+      ];
+
+      const expectedResult: UpdateOicrDto = {
+        general_comment: mockOicrEntity.general_comment,
+        maturity_level_id: mockOicrEntity.maturity_level_id,
+        oicr_internal_code: mockOicrEntity.oicr_internal_code,
+        outcome_impact_statement: mockOicrEntity.outcome_impact_statement,
+        short_outcome_impact_statement:
+          mockOicrEntity.short_outcome_impact_statement,
+        tagging: mockTagging[0] as any,
+        link_result: mockLinkResult[0] as any,
+      };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
+      mockResultTagsService.find.mockResolvedValue(mockTagging as any);
+      mockTempExternalOicrsService.find.mockResolvedValue(
+        mockLinkResult as any,
+      );
+
+      // Act
+      const result = await service.findOicrs(resultId);
+
+      // Assert
+      expect(mockResultOicrRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          is_active: true,
+          result_id: resultId,
+        },
+      });
+
+      expect(mockResultTagsService.find).toHaveBeenCalledWith(resultId);
+      expect(mockTempExternalOicrsService.find).toHaveBeenCalledWith(resultId);
+
+      expect(result).toEqual(expectedResult);
+    });
+
+    it('should handle null OICR entity', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockTagging = [{ tag_id: 1, tag_name: 'Tag 1' } as any];
+      const mockLinkResult = [
+        { external_oicr_id: 456, title: 'External OICR 1' },
+      ];
+
+      const expectedResult: UpdateOicrDto = {
+        general_comment: undefined,
+        maturity_level_id: undefined,
+        oicr_internal_code: undefined,
+        outcome_impact_statement: undefined,
+        short_outcome_impact_statement: undefined,
+        tagging: mockTagging[0] as any,
+        link_result: mockLinkResult[0] as any,
+      };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultTagsService.find.mockResolvedValue(mockTagging as any);
+      mockTempExternalOicrsService.find.mockResolvedValue(
+        mockLinkResult as any,
+      );
+
+      // Act
+      const result = await service.findOicrs(resultId);
+
+      // Assert
+      expect(result).toEqual(expectedResult);
+    });
+
+    it('should handle empty tagging and link_result arrays', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockOicrEntity = {
+        general_comment: 'Test comment',
+        maturity_level_id: 1,
+        oicr_internal_code: 'TEST-001',
+        outcome_impact_statement: 'Test statement',
+        short_outcome_impact_statement: 'Short statement',
+      };
+
+      const expectedResult: UpdateOicrDto = {
+        general_comment: mockOicrEntity.general_comment,
+        maturity_level_id: mockOicrEntity.maturity_level_id,
+        oicr_internal_code: mockOicrEntity.oicr_internal_code,
+        outcome_impact_statement: mockOicrEntity.outcome_impact_statement,
+        short_outcome_impact_statement:
+          mockOicrEntity.short_outcome_impact_statement,
+        tagging: undefined as any,
+        link_result: undefined as any,
+      };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
+      mockResultTagsService.find.mockResolvedValue([]);
+      mockTempExternalOicrsService.find.mockResolvedValue([]);
+
+      // Act
+      const result = await service.findOicrs(resultId);
+
+      // Assert
+      expect(result).toEqual(expectedResult);
+    });
+  });
+
+  describe('stepOneOicr', () => {
+    it('should execute step one operations in transaction with temp external OICR', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockEntityManager = {
+        update: jest.fn(),
+      } as any;
+
+      const data: StepOneOicrDto = {
+        main_contact_person: { user_id: 456 } as any,
+        tagging: { tag_id: 1 } as any,
+        link_result: { external_oicr_id: 789 } as any,
+        outcome_impact_statement: 'Test outcome statement',
+      };
+
+      const createdTags = [{ tag_id: 1 }];
+      const auditData = { updated_at: new Date() };
+
+      // Mock the transaction to pass the mockEntityManager to the callback
+      mockDataSource.transaction.mockImplementation((callback: any) => {
+        return callback(mockEntityManager);
+      });
+
+      mockResultUsersService.create.mockResolvedValue(undefined);
+      mockResultTagsService.create.mockResolvedValue(createdTags as any);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue(auditData);
+
+      // Act
+      await service.stepOneOicr(data, resultId);
+
+      // Assert
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+
+      expect(mockResultUsersService.create).toHaveBeenCalledWith(
+        resultId,
+        { user_id: data.main_contact_person.user_id },
+        'user_id',
+        UserRolesEnum.MAIN_CONTACT,
+        mockEntityManager,
+      );
+
+      expect(mockResultTagsService.create).toHaveBeenCalledWith(
+        resultId,
+        [{ tag_id: 1 }],
+        'tag_id',
+        undefined,
+        mockEntityManager,
+      );
+
+      expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
+        resultId,
+        [{ external_oicr_id: 789 }],
+        'external_oicr_id',
+        undefined,
+        mockEntityManager,
+      );
+
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(resultId, {
+        outcome_impact_statement: data.outcome_impact_statement,
+        ...auditData,
+      });
+    });
+
+    it('should handle empty linked_result when no tags created', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockEntityManager = { update: jest.fn() } as any;
+
+      const data: StepOneOicrDto = {
+        main_contact_person: { user_id: 456 } as any,
+        tagging: null as any,
+        link_result: { external_oicr_id: 789 } as any,
+        outcome_impact_statement: 'Test statement',
+      };
+
+      const auditData = { updated_at: new Date() };
+
+      mockDataSource.transaction.mockImplementation((callback: any) => {
+        return callback(mockEntityManager);
+      });
+
+      mockResultUsersService.create.mockResolvedValue(undefined);
+      mockResultTagsService.create.mockResolvedValue([]); // No tags created
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue(auditData);
+
+      // Act
+      await service.stepOneOicr(data, resultId);
+
+      // Assert
+      expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
+        resultId,
+        [], // Should pass empty array when no tags created
+        'external_oicr_id',
+        undefined,
+        mockEntityManager,
+      );
+    });
+
+    it('should handle null tagging array', async () => {
+      // Arrange
+      const resultId = 123;
+      const mockEntityManager = { update: jest.fn() } as any;
+
+      const data: StepOneOicrDto = {
+        main_contact_person: { user_id: 456 } as any,
+        tagging: null as any,
+        link_result: { external_oicr_id: 789 } as any,
+        outcome_impact_statement: 'Test statement',
+      };
+
+      const auditData = { updated_at: new Date() };
+
+      mockDataSource.transaction.mockImplementation((callback: any) => {
+        return callback(mockEntityManager);
+      });
+
+      mockResultUsersService.create.mockResolvedValue(undefined);
+      mockResultTagsService.create.mockResolvedValue([]);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue(auditData);
+
+      // Act
+      await service.stepOneOicr(data, resultId);
+
+      // Assert
+      expect(mockResultTagsService.create).toHaveBeenCalledWith(
+        resultId,
+        [], // Should handle null as empty array
+        'tag_id',
+        undefined,
+        mockEntityManager,
+      );
+    });
+  });
+
+  describe('getResultOicrDetailsByOfficialCode', () => {
+    it('should return null if there are no results', async () => {
+      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue([]);
+
+      const result = await service.getResultOicrDetailsByOfficialCode(1);
+
+      expect(result).toBeNull();
+    });
+
+    it('should correctly map a result with all fields', async () => {
+      const mockRawResults = [
+      {
+        result_id: 1,
+        result_code: 'OICR-001',
+        title: 'Result Title',
+        main_project_id: 'P1',
+        main_project_title: 'Main Project',
+        project_id: 'P2',
+        project_title: 'Secondary Project',
+        tag_id: 10,
+        tag_name: 'Test Tag',
+        outcome_impact_statement: 'Expected Impact',
+        main_lever_id: 'ML1',
+        main_lever: 'Main Lever',
+        main_lever_name: 'Main Lever Name',
+        lever_id: 'L1',
+        lever: 'Short Lever',
+        lever_name: 'Long Lever',
+        geographic_scope: 'Global',
+        region_code: 'R1',
+        region_name: 'Test Region',
+        country_code: 'C1',
+        country_name: 'Test Country',
+        comment_geo_scope: 'Scope Comment'
+      }
+      ];
+
+      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(mockRawResults);
+
+      const result = await service.getResultOicrDetailsByOfficialCode(1);
+
+      expect(result).toEqual({
+      id: 1,
+      official_code: 'OICR-001',
+      title: 'Result Title',
+      main_project_id: 'P1',
+      main_project: 'Main Project',
+      other_projects: [
+        { project_id: 'P2', project_title: 'Secondary Project' }
+      ],
+      tag_id: 10,
+      tag_name: 'Test Tag',
+      outcome_impact_statement: 'Expected Impact',
+      main_levers: [
+        { main_lever_id: 'ML1', main_lever: 'Main Lever', main_lever_name: 'Main Lever Name' }
+      ],
+      other_levers: [
+        { lever_id: 'L1', lever_short: 'Short Lever', lever_full: 'Long Lever' }
+      ],
+      geographic_scope: 'Global',
+      regions: [
+        { region_code: 'R1', region_name: 'Test Region' }
+      ],
+      countries: [
+        { country_code: 'C1', country_name: 'Test Country' }
+      ],
+      geographic_scope_comments: 'Scope Comment'
+      });
+    });
+
+    it('should map multiple projects, levers, regions, and countries without duplicates', async () => {
+      const mockRawResults = [
+      {
+        result_id: 2,
+        result_code: 'OICR-002',
+        title: 'Another result',
+        main_project_id: 'P10',
+        main_project_title: 'Project X',
+        project_id: 'P11',
+        project_title: 'Project Y',
+        tag_id: null,
+        tag_name: null,
+        outcome_impact_statement: null,
+        main_lever_id: 'ML2',
+        main_lever: 'Lever P',
+        main_lever_name: 'Main Lever P',
+        lever_id: 'L2',
+        lever: 'Short',
+        lever_name: 'Long',
+        geographic_scope: 'Regional',
+        region_code: 'R2',
+        region_name: 'Region Y',
+        country_code: 'C2',
+        country_name: 'Country Y',
+        comment_geo_scope: null
+      },
+      {
+        result_id: 2,
+        result_code: 'OICR-002',
+        title: 'Another result',
+        main_project_id: 'P10',
+        main_project_title: 'Project X',
+        project_id: 'P12',
+        project_title: 'Project Z',
+        tag_id: null,
+        tag_name: null,
+        outcome_impact_statement: null,
+        main_lever_id: 'ML2',
+        main_lever: 'Lever P',
+        main_lever_name: 'Main Lever P',
+        lever_id: 'L3',
+        lever: 'Other',
+        lever_name: 'Other long',
+        geographic_scope: 'Regional',
+        region_code: 'R3',
+        region_name: 'Region Z',
+        country_code: 'C3',
+        country_name: 'Country Z',
+        comment_geo_scope: null
+      }
+      ];
+
+      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(mockRawResults);
+
+      const result = await service.getResultOicrDetailsByOfficialCode(2);
+
+      expect(result.other_projects).toHaveLength(2);
+      expect(result.main_levers).toHaveLength(1);
+      expect(result.other_levers).toHaveLength(2);
+      expect(result.regions).toHaveLength(2);
+      expect(result.countries).toHaveLength(2);
+    });
+  });
+
 });

@@ -4,6 +4,7 @@ export interface TipIprDataDto {
   indicator: string;
   resultTitle: string;
   resultDescription: string;
+  createdAt?: string;
   reportingProject: {
     project: string;
     agreement_id?: string;

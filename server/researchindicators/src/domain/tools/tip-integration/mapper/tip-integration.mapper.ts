@@ -18,6 +18,11 @@ export const tipIntegrationMapper = (
   }
 
   const ip = result.result_ip_rights?.[0];
+  const createdAtFormatted = result.created_at
+    ? `${result.created_at.getFullYear()}-${String(result.created_at.getMonth() + 1).padStart(2, '0')}-${String(
+        result.created_at.getDate(),
+      ).padStart(2, '0')}`
+    : null;
 
   return {
     resultId: Number(result.result_id),
@@ -25,6 +30,7 @@ export const tipIntegrationMapper = (
     indicator: validationField(result.indicator?.name),
     resultTitle: validationField(result?.title),
     resultDescription: validationField(result?.description),
+    createdAt: validationField(createdAtFormatted),
     reportingProject: {
       project: validationField(
         result.result_contracts?.[0]?.agresso_contract?.project,

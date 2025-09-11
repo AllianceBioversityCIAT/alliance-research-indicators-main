@@ -35,6 +35,7 @@ import { ResultIpRight } from '../../result-ip-rights/entities/result-ip-right.e
 import { ResultTag } from '../../result-tags/entities/result-tag.entity';
 import { ResultInitiative } from '../../result-initiatives/entities/result-initiative.entity';
 import { ResultOicr } from '../../result-oicr/entities/result-oicr.entity';
+import { ReportingPlatform } from './reporting-platform.entity';
 import { ProjectIndicatorsResult } from '../../project_indicators_results/entities/project_indicators_result.entity';
 
 @Entity('results')
@@ -146,6 +147,26 @@ export class Result extends AuditableEntity {
     nullable: true,
   })
   comment_geo_scope?: string;
+
+  @Column('varchar', {
+    name: 'platform_code',
+    length: 50,
+    nullable: true,
+  })
+  platform_code?: string;
+
+  @Column('boolean', {
+    name: 'is_partner_not_applicable',
+    nullable: true,
+  })
+  is_partner_not_applicable?: boolean;
+
+  @ManyToOne(
+    () => ReportingPlatform,
+    (reportingPlatform) => reportingPlatform.results,
+  )
+  @JoinColumn({ name: 'platform_code' })
+  platform!: ReportingPlatform;
 
   @ManyToOne(() => ReportYear, (reportYear) => reportYear.results)
   @JoinColumn({ name: 'report_year_id' })

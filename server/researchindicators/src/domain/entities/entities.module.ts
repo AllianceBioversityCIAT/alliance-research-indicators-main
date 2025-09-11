@@ -66,6 +66,8 @@ import { ResultOicrModule } from './result-oicr/result-oicr.module';
 import { ResultTagsModule } from './result-tags/result-tags.module';
 import { TagsModule } from './tags/tags.module';
 import { ResultInitiativesModule } from './result-initiatives/result-initiatives.module';
+import { TempExternalOicrsModule } from './temp_external_oicrs/temp_external_oicrs.module';
+import { MaturityLevelModule } from './maturity-level/maturity-level.module';
 import { ProjectGroupsModule } from './project_groups/project_groups.module';
 import { GroupsItemsModule } from './groups_items/groups_items.module';
 import { ProjectIndicatorsModule } from './project_indicators/project_indicators.module';
@@ -141,6 +143,8 @@ import { ProjectIndicatorsResultsModule } from './project_indicators_results/pro
     ResultTagsModule,
     TagsModule,
     ResultInitiativesModule,
+    TempExternalOicrsModule,
+    MaturityLevelModule,
     ProjectGroupsModule,
     GroupsItemsModule,
     ProjectIndicatorsModule,

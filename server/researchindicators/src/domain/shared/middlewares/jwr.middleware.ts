@@ -55,7 +55,7 @@ export class JwtMiddleware implements NestMiddleware {
       );
 
       req.user = isValid.user;
-      next();
+      return next();
     } else {
       try {
         const responseService =
@@ -64,7 +64,7 @@ export class JwtMiddleware implements NestMiddleware {
         if (responseService.isValid === false)
           throw new UnauthorizedException('Invalid token');
         req.user = responseService.user;
-        next();
+        return next();
       } catch (error) {
         if (error instanceof TokenExpiredError) {
           throw new UnauthorizedException('Token expired');
