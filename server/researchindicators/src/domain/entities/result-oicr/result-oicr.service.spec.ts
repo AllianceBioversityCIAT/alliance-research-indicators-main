@@ -1458,7 +1458,7 @@ describe('ResultOicrService', () => {
   });
 
   describe('getResultOicrDetailsByOfficialCode', () => {
-    it('debería retornar null si no hay resultados', async () => {
+    it('should return null if there are no results', async () => {
       mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue([]);
 
       const result = await service.getResultOicrDetailsByOfficialCode(1);
@@ -1466,32 +1466,32 @@ describe('ResultOicrService', () => {
       expect(result).toBeNull();
     });
 
-    it('debería mapear correctamente un resultado con todos los campos', async () => {
+    it('should correctly map a result with all fields', async () => {
       const mockRawResults = [
-        {
-          result_id: 1,
-          result_code: 'OICR-001',
-          title: 'Título del resultado',
-          main_project_id: 'P1',
-          main_project_title: 'Proyecto principal',
-          project_id: 'P2',
-          project_title: 'Proyecto secundario',
-          tag_id: 10,
-          tag_name: 'Tag de prueba',
-          outcome_impact_statement: 'Impacto esperado',
-          main_lever_id: 'ML1',
-          main_lever: 'Lever principal',
-          main_lever_name: 'Nombre lever principal',
-          lever_id: 'L1',
-          lever: 'Lever corto',
-          lever_name: 'Lever largo',
-          geographic_scope: 'Global',
-          region_code: 'R1',
-          region_name: 'Región de prueba',
-          country_code: 'C1',
-          country_name: 'País de prueba',
-          comment_geo_scope: 'Comentario de alcance'
-        }
+      {
+        result_id: 1,
+        result_code: 'OICR-001',
+        title: 'Result Title',
+        main_project_id: 'P1',
+        main_project_title: 'Main Project',
+        project_id: 'P2',
+        project_title: 'Secondary Project',
+        tag_id: 10,
+        tag_name: 'Test Tag',
+        outcome_impact_statement: 'Expected Impact',
+        main_lever_id: 'ML1',
+        main_lever: 'Main Lever',
+        main_lever_name: 'Main Lever Name',
+        lever_id: 'L1',
+        lever: 'Short Lever',
+        lever_name: 'Long Lever',
+        geographic_scope: 'Global',
+        region_code: 'R1',
+        region_name: 'Test Region',
+        country_code: 'C1',
+        country_name: 'Test Country',
+        comment_geo_scope: 'Scope Comment'
+      }
       ];
 
       mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(mockRawResults);
@@ -1499,84 +1499,84 @@ describe('ResultOicrService', () => {
       const result = await service.getResultOicrDetailsByOfficialCode(1);
 
       expect(result).toEqual({
-        id: 1,
-        official_code: 'OICR-001',
-        title: 'Título del resultado',
-        main_project_id: 'P1',
-        main_project: 'Proyecto principal',
-        other_projects: [
-          { project_id: 'P2', project_title: 'Proyecto secundario' }
-        ],
-        tag_id: 10,
-        tag_name: 'Tag de prueba',
-        outcome_impact_statement: 'Impacto esperado',
-        main_levers: [
-          { main_lever_id: 'ML1', main_lever: 'Lever principal', main_lever_name: 'Nombre lever principal' }
-        ],
-        other_levers: [
-          { lever_id: 'L1', lever_short: 'Lever corto', lever_full: 'Lever largo' }
-        ],
-        geographic_scope: 'Global',
-        regions: [
-          { region_code: 'R1', region_name: 'Región de prueba' }
-        ],
-        countries: [
-          { country_code: 'C1', country_name: 'País de prueba' }
-        ],
-        geographic_scope_comments: 'Comentario de alcance'
+      id: 1,
+      official_code: 'OICR-001',
+      title: 'Result Title',
+      main_project_id: 'P1',
+      main_project: 'Main Project',
+      other_projects: [
+        { project_id: 'P2', project_title: 'Secondary Project' }
+      ],
+      tag_id: 10,
+      tag_name: 'Test Tag',
+      outcome_impact_statement: 'Expected Impact',
+      main_levers: [
+        { main_lever_id: 'ML1', main_lever: 'Main Lever', main_lever_name: 'Main Lever Name' }
+      ],
+      other_levers: [
+        { lever_id: 'L1', lever_short: 'Short Lever', lever_full: 'Long Lever' }
+      ],
+      geographic_scope: 'Global',
+      regions: [
+        { region_code: 'R1', region_name: 'Test Region' }
+      ],
+      countries: [
+        { country_code: 'C1', country_name: 'Test Country' }
+      ],
+      geographic_scope_comments: 'Scope Comment'
       });
     });
 
-    it('debería mapear múltiples proyectos, levers, regiones y países sin duplicados', async () => {
+    it('should map multiple projects, levers, regions, and countries without duplicates', async () => {
       const mockRawResults = [
-        {
-          result_id: 2,
-          result_code: 'OICR-002',
-          title: 'Otro resultado',
-          main_project_id: 'P10',
-          main_project_title: 'Proyecto X',
-          project_id: 'P11',
-          project_title: 'Proyecto Y',
-          tag_id: null,
-          tag_name: null,
-          outcome_impact_statement: null,
-          main_lever_id: 'ML2',
-          main_lever: 'Lever P',
-          main_lever_name: 'Lever Principal P',
-          lever_id: 'L2',
-          lever: 'Corto',
-          lever_name: 'Largo',
-          geographic_scope: 'Regional',
-          region_code: 'R2',
-          region_name: 'Región Y',
-          country_code: 'C2',
-          country_name: 'País Y',
-          comment_geo_scope: null
-        },
-        {
-          result_id: 2,
-          result_code: 'OICR-002',
-          title: 'Otro resultado',
-          main_project_id: 'P10',
-          main_project_title: 'Proyecto X',
-          project_id: 'P12',
-          project_title: 'Proyecto Z',
-          tag_id: null,
-          tag_name: null,
-          outcome_impact_statement: null,
-          main_lever_id: 'ML2',
-          main_lever: 'Lever P',
-          main_lever_name: 'Lever Principal P',
-          lever_id: 'L3',
-          lever: 'Otro',
-          lever_name: 'Otro largo',
-          geographic_scope: 'Regional',
-          region_code: 'R3',
-          region_name: 'Región Z',
-          country_code: 'C3',
-          country_name: 'País Z',
-          comment_geo_scope: null
-        }
+      {
+        result_id: 2,
+        result_code: 'OICR-002',
+        title: 'Another result',
+        main_project_id: 'P10',
+        main_project_title: 'Project X',
+        project_id: 'P11',
+        project_title: 'Project Y',
+        tag_id: null,
+        tag_name: null,
+        outcome_impact_statement: null,
+        main_lever_id: 'ML2',
+        main_lever: 'Lever P',
+        main_lever_name: 'Main Lever P',
+        lever_id: 'L2',
+        lever: 'Short',
+        lever_name: 'Long',
+        geographic_scope: 'Regional',
+        region_code: 'R2',
+        region_name: 'Region Y',
+        country_code: 'C2',
+        country_name: 'Country Y',
+        comment_geo_scope: null
+      },
+      {
+        result_id: 2,
+        result_code: 'OICR-002',
+        title: 'Another result',
+        main_project_id: 'P10',
+        main_project_title: 'Project X',
+        project_id: 'P12',
+        project_title: 'Project Z',
+        tag_id: null,
+        tag_name: null,
+        outcome_impact_statement: null,
+        main_lever_id: 'ML2',
+        main_lever: 'Lever P',
+        main_lever_name: 'Main Lever P',
+        lever_id: 'L3',
+        lever: 'Other',
+        lever_name: 'Other long',
+        geographic_scope: 'Regional',
+        region_code: 'R3',
+        region_name: 'Region Z',
+        country_code: 'C3',
+        country_name: 'Country Z',
+        comment_geo_scope: null
+      }
       ];
 
       mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(mockRawResults);
@@ -1588,7 +1588,7 @@ describe('ResultOicrService', () => {
       expect(result.other_levers).toHaveLength(2);
       expect(result.regions).toHaveLength(2);
       expect(result.countries).toHaveLength(2);
-    });  
+    });
   });
 
 });

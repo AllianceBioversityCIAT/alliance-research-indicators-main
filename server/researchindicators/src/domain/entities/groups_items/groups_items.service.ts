@@ -103,6 +103,7 @@ export class GroupsItemsService {
       .find({
         where: { agreement_id, is_active: true },
         select: [
+          'id',
           'name',
           'level',
           'custom_field_1',
@@ -122,16 +123,16 @@ export class GroupsItemsService {
       ? projectGroups.map((pg) => {
           const custom_fields = this.mapCustomFields(pg) ?? [];
           return {
-            ...(pg.level === 1
-              ? { name_level_1: pg.name ?? '' }
-              : { name_level_2: pg.name ?? '' }),
+            id: pg.id ?? '',
+            name: pg.name ?? '',
+            level: pg.level ?? '',
             custom_fields,
           };
         })
       : [
           {
-            name_level_1: '',
-            name_level_2: '',
+            name: '',
+            level: '',
             custom_fields: [],
           },
         ]);
