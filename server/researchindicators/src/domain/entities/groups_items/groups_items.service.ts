@@ -37,6 +37,46 @@ export class GroupsItemsService {
       .orderBy('gi.id', 'ASC')
       .getMany();
 
+    const projectGroups = await this.dataSource
+      .getRepository(ProjectGroup)
+      .find({
+        where: { agreement_id, is_active: true },
+        select: [
+          'id',
+          'name',
+          'level',
+          'custom_field_1',
+          'custom_field_2',
+          'custom_field_3',
+          'custom_field_4',
+          'custom_field_5',
+          'custom_field_6',
+          'custom_field_7',
+          'custom_field_8',
+          'custom_field_9',
+          'custom_field_10',
+        ],
+      });  
+
+    const levels =
+      projectGroups.length > 0
+        ? projectGroups.map((pg) => {
+            const custom_fields = this.mapCustomFields(pg) ?? [];
+            return {
+              id: pg.id ?? '',
+              name: pg.name ?? '',
+              level: pg.level ?? '',
+              custom_fields,
+            };
+          })
+        : [
+            {
+              name: '',
+              level: '',
+              custom_fields: [],
+            },
+          ];
+    
     const nodes = new Map<number, any>();
 
     for (const g of groups) {
@@ -63,13 +103,18 @@ export class GroupsItemsService {
             type: ipi.projectIndicator.type || '',
           })) || [];
 
+      const isRoot = !g.parent_id;
+      const definedCustomFields = levels.find(
+        (lvl) => lvl.level === (isRoot ? 1 : 2),
+      )?.custom_fields ?? [];
+
       nodes.set(g.id, {
         id: g.id.toString(),
         name: g.name,
-        code: g.code || g.id.toString(),
+        code: g.code,
         items: [] as any[],
         indicators,
-        custom_values: this.mapCustomValues(g),
+        custom_values: this.mapCustomValues(g, definedCustomFields),
       });
     }
 
@@ -91,52 +136,11 @@ export class GroupsItemsService {
       }
     }
 
-    // (Opcional) ordenar hijos por id para consistencia
     const sortRecursively = (list: any[]) => {
       list.sort((a, b) => Number(a.id) - Number(b.id));
       for (const it of list) if (it.items?.length) sortRecursively(it.items);
     };
     sortRecursively(roots);
-
-    const projectGroups = await this.dataSource
-      .getRepository(ProjectGroup)
-      .find({
-        where: { agreement_id, is_active: true },
-        select: [
-          'id',
-          'name',
-          'level',
-          'custom_field_1',
-          'custom_field_2',
-          'custom_field_3',
-          'custom_field_4',
-          'custom_field_5',
-          'custom_field_6',
-          'custom_field_7',
-          'custom_field_8',
-          'custom_field_9',
-          'custom_field_10',
-        ],
-      });
-
-    const levels =
-      projectGroups.length > 0
-        ? projectGroups.map((pg) => {
-            const custom_fields = this.mapCustomFields(pg) ?? [];
-            return {
-              id: pg.id ?? '',
-              name: pg.name ?? '',
-              level: pg.level ?? '',
-              custom_fields,
-            };
-          })
-        : [
-            {
-              name: '',
-              level: '',
-              custom_fields: [],
-            },
-          ];
 
     return {
       levels,
@@ -155,14 +159,21 @@ export class GroupsItemsService {
     return result;
   }
 
-  private mapCustomValues(g: any) {
-    const result: { field: number; field_value: string }[] = [];
-    for (let i = 1; i <= 10; i++) {
-      const value = g[`custom_field_${i}`];
-      if (value) {
-        result.push({ field: i, field_value: value });
+  private mapCustomValues(
+    g: any,
+    definedFields: { fieldID: number; field_name: string }[],
+  ) {
+    const result: { field: number; field_value: string | null}[] = [];
+
+    for (const def of definedFields) {
+      let value = g[`custom_field_${def.fieldID}`];
+      if (value === null || value === undefined || value === '') {
+        value = null;
       }
+      result.push({ field: def.fieldID, field_value: value });
+
     }
+
     return result;
   }
 
