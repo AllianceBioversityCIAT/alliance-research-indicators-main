@@ -106,6 +106,10 @@ export const isArrayOfType = <T>(
   return arr.every(typeChecker);
 };
 
+export function intersection<A>(arrayA: A[], arrayB: A[]): A[] {
+  return arrayA.filter((item) => arrayB.includes(item));
+}
+
 export const getItemsAtLevel = <T extends { children?: T[] }>(
   items: T[],
   level: number,

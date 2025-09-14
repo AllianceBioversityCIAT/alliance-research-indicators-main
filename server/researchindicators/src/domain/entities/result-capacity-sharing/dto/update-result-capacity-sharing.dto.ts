@@ -3,6 +3,8 @@ import { ResultInstitution } from '../../result-institutions/entities/result-ins
 import { ResultCountry } from '../../result-countries/entities/result-country.entity';
 import { ResultUser } from '../../result-users/entities/result-user.entity';
 import { ResultLanguage } from '../../result-languages/entities/result-language.entity';
+import { ResultInstitutionAi } from '../../result-institutions/entities/result-institution-ai.entity';
+import { ResultUserAi } from '../../result-users/entities/result-user-ai.entity';
 
 export class CapDevIndividualDto {
   @ApiProperty({
@@ -22,6 +24,13 @@ export class CapDevIndividualDto {
     name: 'affiliation',
   })
   affiliation?: ResultInstitution;
+
+  @ApiProperty({
+    type: ResultInstitutionAi,
+    name: 'affiliation_ai',
+    required: false,
+  })
+  affiliation_ai?: ResultInstitutionAi;
 
   @ApiProperty({
     type: ResultCountry,
@@ -111,6 +120,12 @@ export class UpdateResultCapacitySharingDto {
     name: 'training_supervisor',
   })
   training_supervisor?: ResultUser;
+
+  @ApiProperty({
+    type: ResultUserAi,
+    name: 'training_supervisor_ai',
+  })
+  training_supervisor_ai?: ResultUserAi;
 
   @ApiProperty({
     type: ResultLanguage,

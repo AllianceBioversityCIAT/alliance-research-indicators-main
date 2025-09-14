@@ -5,6 +5,8 @@ import { CreateResultDto } from './create-result.dto';
 import { SaveGeoLocationDto } from './save-geo-location.dto';
 import { UpdateGeneralInformation } from './update-general-information.dto';
 import { CreateResultInnovationDevDto } from '../../result-innovation-dev/dto/create-result-innovation-dev.dto';
+import { CreateResultInstitutionDto } from '../../result-institutions/dto/create-result-institution.dto';
+import { CreateResultEvidenceDto } from '../../result-evidences/dto/create-result-evidence.dto';
 
 export class ResultAiDto {
   result: CreateResultDto;
@@ -13,6 +15,8 @@ export class ResultAiDto {
   capSharing?: UpdateResultCapacitySharingDto;
   policyChange?: CreateResultPolicyChangeDto;
   innovationDev?: CreateResultInnovationDevDto;
+  partners?: CreateResultInstitutionDto;
+  evidences?: CreateResultEvidenceDto;
 }
 
 export class RootAi {
@@ -32,23 +36,6 @@ export class CountryAreas {
     description: 'List of specific areas within the country',
   })
   areas: string[];
-}
-
-export class GeoscopeRawAi {
-  @ApiProperty({
-    type: String,
-    description: 'Geographic level (global, regional, national)',
-    example: 'national',
-  })
-  level: string;
-
-  @ApiProperty({
-    isArray: true,
-    type: CountryAreas || String,
-    description: 'List of countries or areas included in the geographic scope',
-    required: false,
-  })
-  sub_list?: CountryAreas[] | string[];
 }
 
 export class ResultInnovationActorDetailedDto {
@@ -82,6 +69,92 @@ export class ResultInnovationActorDetailedDto {
     description: 'Age group of the actor',
   })
   age_group: string;
+}
+
+export class AiRawInstitution {
+  @ApiProperty({
+    type: String,
+    description: 'Unique identifier for the institution',
+  })
+  institution_id: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Name of the institution',
+  })
+  institution_name: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Similarity score of the institution',
+  })
+  similarity_score: string;
+}
+
+export class AiRawUser {
+  @ApiProperty({
+    type: String,
+    description: 'name of the user',
+  })
+  name: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'code of the user',
+  })
+  code: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'similarity score of the user',
+  })
+  similarity_score: string;
+}
+
+export class AiRawCountry {
+  @ApiProperty({
+    type: String,
+    description: 'ISO code of the country',
+    example: 'COL',
+  })
+  code: string;
+
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    description: 'Specific areas within the country',
+    example: ['Cundinamarca', 'Antioquia'],
+    required: false,
+  })
+  areas?: string[];
+}
+
+export class AiRawEvidence {
+  @ApiProperty({
+    type: String,
+    description: 'Link to the evidence document or resource',
+  })
+  evidence_link: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Description of the evidence',
+  })
+  evidence_description: string;
+}
+
+export class AiRawLanguage {
+  @ApiProperty({
+    type: String,
+    description: 'Name of the language',
+  })
+  name: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Code of the language',
+  })
+  code: string;
 }
 
 export class ResultRawAi {
@@ -122,10 +195,105 @@ export class ResultRawAi {
   keywords: string[];
 
   @ApiProperty({
-    type: GeoscopeRawAi,
-    description: 'Geographic scope information of the result',
+    type: String,
+    isArray: true,
+    description: 'SDG targets related to the result',
   })
-  geoscope: GeoscopeRawAi;
+  sdg_targets?: string[];
+
+  @ApiProperty({
+    type: String,
+  })
+  geoscope_level?: string;
+
+  @ApiProperty({
+    type: AiRawCountry,
+    isArray: true,
+    description: 'Countries associated with the result',
+    required: false,
+  })
+  countries: AiRawCountry[];
+
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    description: 'Regions associated with the result',
+    required: false,
+  })
+  regions: number[];
+
+  @ApiProperty({
+    type: String,
+    description: 'Training category if applicable',
+    required: false,
+  })
+  training_category?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Purpose of the training if applicable',
+    required: false,
+  })
+  training_purpose?: string;
+
+  @ApiProperty({
+    type: AiRawInstitution,
+    isArray: true,
+    description: 'Affiliation of the trainees if applicable',
+    required: false,
+  })
+  trainee_affiliation?: AiRawInstitution;
+
+  @ApiProperty({
+    type: String,
+    description: 'Name of the trainee if applicable',
+    required: false,
+  })
+  trainee_name?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Nationality of the trainee if applicable',
+    required: false,
+  })
+  trainee_nationality?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Gender of the trainee if applicable',
+    required: false,
+  })
+  trainee_gender?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Supervisor of the training if applicable',
+    required: false,
+  })
+  training_supervisor?: AiRawUser;
+
+  @ApiProperty({
+    type: AiRawLanguage,
+    description: 'Language in which the training was conducted',
+    required: false,
+  })
+  language: AiRawLanguage;
+
+  @ApiProperty({
+    type: AiRawInstitution,
+    isArray: true,
+    description: 'parners involved in the result',
+    required: false,
+  })
+  partners?: AiRawInstitution[];
+
+  @ApiProperty({
+    type: AiRawEvidence,
+    isArray: true,
+    description: 'Evidences supporting the result',
+    required: false,
+  })
+  evidences: AiRawEvidence[];
 
   @ApiProperty({
     type: String,

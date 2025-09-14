@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ResultInstitution } from './entities/result-institution.entity';
-import { DataSource, FindOptionsWhere, In, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  FindOptionsWhere,
+  In,
+  Repository,
+} from 'typeorm';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { CreateResultInstitutionDto } from './dto/create-result-institution.dto';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
@@ -10,6 +16,9 @@ import { isEmpty } from '../../shared/utils/object.utils';
 import { SessionFormatEnum } from '../session-formats/enums/session-format.enum';
 import { ResultCapacitySharing } from '../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { Result } from '../results/entities/result.entity';
+import { AiRawInstitution } from '../results/dto/result-ai.dto';
+import { ResultInstitutionAi } from './entities/result-institution-ai.entity';
+import { selectManager } from '../../shared/utils/orm.util';
 @Injectable()
 export class ResultInstitutionsService extends BaseServiceSimple<
   ResultInstitution,
@@ -29,9 +38,60 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     );
   }
 
+  filterInstitutionsAi(
+    institutios: AiRawInstitution[],
+    institution_role: InstitutionRolesEnum,
+  ): {
+    acept: Partial<ResultInstitution>[];
+    pending: Partial<ResultInstitutionAi>[];
+  } {
+    if (isEmpty(institutios)) return null;
+    const aceptInstitutions: Partial<ResultInstitution>[] = [];
+    const pendingInstitutions: Partial<ResultInstitutionAi>[] = [];
+    for (const institution of institutios) {
+      if (parseInt(institution.similarity_score) >= 90)
+        aceptInstitutions.push({
+          institution_id: parseInt(institution.institution_id),
+        });
+      else
+        pendingInstitutions.push({
+          institution_id: parseInt(institution.institution_id),
+          institution_role_id: institution_role,
+          institution_name: institution.institution_name,
+          score: parseInt(institution.similarity_score),
+        });
+    }
+
+    return { acept: aceptInstitutions, pending: pendingInstitutions };
+  }
+
+  async insertInstitutionsAi(
+    resultId: number,
+    institutions: ResultInstitutionAi[],
+    institution_role: InstitutionRolesEnum,
+    manager?: EntityManager,
+  ) {
+    if (isEmpty(institutions)) return null;
+    const useManager = selectManager<ResultInstitutionAi>(
+      manager,
+      ResultInstitutionAi,
+      this.dataSource.getRepository(ResultInstitutionAi),
+    );
+    return useManager.save(
+      institutions.map((institution) => ({
+        result_id: resultId,
+        institution_id: institution.institution_id,
+        institution_role_id: institution_role,
+        institution_name: institution.institution_name,
+        score: institution.score,
+      })),
+    );
+  }
+
   async updatePartners(
     resultId: number,
     resultInstitution: CreateResultInstitutionDto,
+    isAi: boolean = false,
   ) {
     return this.dataSource.transaction(async (manager) => {
       const tempIsPartnerNotApplicable = isEmpty(
@@ -52,6 +112,14 @@ export class ResultInstitutionsService extends BaseServiceSimple<
           (institution) =>
             isEmpty(institution?.institution_role_id) ||
             institution?.institution_role_id == InstitutionRolesEnum.PARTNERS,
+        );
+      }
+      if (isAi && resultInstitution?.institutions_ai) {
+        await this.insertInstitutionsAi(
+          resultId,
+          resultInstitution.institutions_ai,
+          InstitutionRolesEnum.PARTNERS,
+          manager,
         );
       }
 

@@ -12,7 +12,7 @@ import {
   ResultFiltersInterface,
   ResultRepository,
 } from './repositories/result.repository';
-import { validObject } from '../../shared/utils/object.utils';
+import { isEmpty, validObject } from '../../shared/utils/object.utils';
 import { Result } from './entities/result.entity';
 import { CreateResultDto } from './dto/create-result.dto';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
@@ -52,7 +52,7 @@ import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
-import { CountryAreas, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
+import { AiRawCountry, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
@@ -68,6 +68,18 @@ import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
+import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
+import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
+import { intersection } from '../../shared/utils/array.util';
+import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
+import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
+import { CreateResultInstitutionDto } from '../result-institutions/dto/create-result-institution.dto';
+import { ResultInstitution } from '../result-institutions/entities/result-institution.entity';
+import { ResultInstitutionAi } from '../result-institutions/entities/result-institution-ai.entity';
+import { ResultEvidence } from '../result-evidences/entities/result-evidence.entity';
+import { ResultEvidencesService } from '../result-evidences/result-evidences.service';
+import { CreateResultEvidenceDto } from '../result-evidences/dto/create-result-evidence.dto';
+import { ResultRegion } from '../result-regions/entities/result-region.entity';
 
 @Injectable()
 export class ResultsService {
@@ -98,6 +110,9 @@ export class ResultsService {
     private readonly _resultSdgsService: ResultSdgsService,
     @Inject(forwardRef(() => ResultOicrService))
     private readonly _resultOicrService: ResultOicrService,
+    private readonly _clarisaCountriesService: ClarisaCountriesService,
+    private readonly _resultInstitutionsService: ResultInstitutionsService,
+    private readonly _resultEvidencesService: ResultEvidencesService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -647,11 +662,21 @@ export class ResultsService {
       processedResult.generalInformation,
     );
     await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
+    await this._resultInstitutionsService.updatePartners(
+      newResult.result_id,
+      processedResult?.partners,
+      true,
+    );
+    await this._resultEvidencesService.updateResultEvidences(
+      newResult.result_id,
+      processedResult?.evidences,
+    );
     switch (newResult.indicator_id) {
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
         await this._resultCapacitySharingService.update(
           newResult.result_id,
           processedResult.capSharing,
+          true,
         );
         break;
       case IndicatorsEnum.POLICY_CHANGE:
@@ -678,6 +703,26 @@ export class ResultsService {
       resultsCreated.push(newResult);
     }
     return resultsCreated;
+  }
+
+  async validateAiRawCountries(countries: AiRawCountry) {
+    const tempCountries = new ResultCountry();
+    tempCountries.isoAlpha2 = countries.code;
+    if (!isEmpty(countries.areas)) {
+      const tempSubNational: ResultCountriesSubNational[] =
+        await this._clarisaSubNationalsService
+          .findByNames(countries.areas)
+          .then((response) =>
+            response.map(
+              (el) =>
+                ({
+                  sub_national_id: el.id,
+                }) as ResultCountriesSubNational,
+            ),
+          );
+      tempCountries.result_countries_sub_nationals = tempSubNational;
+    }
+    return tempCountries;
   }
 
   async createResultFromAiRoar(result: ResultRawAi) {
@@ -718,38 +763,62 @@ export class ResultsService {
 
     {
       const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
-      const geoscope: ClarisaGeoScope =
-        await this._clarisaGeoScopeService.findByName(result.geoscope.level);
+      const geoscope: ClarisaGeoScope = await nextToProcessAiRaw(
+        result?.geoscope_level,
+        this._clarisaGeoScopeService.findByName,
+      );
       tempGeoscope.geo_scope_id = geoscope?.code;
 
       const tempCountries: ResultCountry[] = [];
-      if (result.geoscope?.sub_list?.length > 0) {
-        const tempParseCountries: Partial<CountryAreas>[] =
-          result.geoscope.sub_list.map((el) =>
-            typeof el === 'string' ? { country_code: el } : el,
+      if (!isEmpty(result?.countries)) {
+        const existingCountries =
+          await this._clarisaCountriesService.findByNames(
+            result.countries.map((el) => el.code),
           );
-        for (const country of tempParseCountries) {
-          const tempCountry: ResultCountry = new ResultCountry();
-          tempCountry.isoAlpha2 = country.country_code;
-          const tempCountryAreas: string[] = country?.areas ?? [];
-          const tempSubNational: ResultCountriesSubNational[] =
-            await this._clarisaSubNationalsService
-              .findByNames(tempCountryAreas)
-              .then((response) =>
-                response.map(
-                  (el) =>
-                    ({
-                      sub_national_id: el.id,
-                    }) as ResultCountriesSubNational,
-                ),
-              );
-          tempCountry.result_countries_sub_nationals = tempSubNational;
-          tempCountries.push(tempCountry);
+        const sharedCountries = intersection(
+          result.countries.map((el) => el.code),
+          existingCountries.map((el) => el.isoAlpha2),
+        );
+        const processCountries = result.countries.filter((el) =>
+          sharedCountries.includes(el.code),
+        );
+
+        for (const country of processCountries) {
+          const saveCountries = await this.validateAiRawCountries(country);
+          tempCountries.push(saveCountries);
         }
+        tempGeoscope.countries = tempCountries;
       }
-      tempGeoscope.countries = tempCountries;
+
+      tempGeoscope.regions = result.regions.map((el) => ({
+        region_id: el,
+      })) as ResultRegion[];
 
       tmpNewData.geoScope = tempGeoscope;
+    }
+
+    {
+      const tempCountries: CreateResultInstitutionDto =
+        new CreateResultInstitutionDto();
+      const { acept, pending } =
+        await this._resultInstitutionsService.filterInstitutionsAi(
+          result?.partners,
+          InstitutionRolesEnum.PARTNERS,
+        );
+      tempCountries.institutions = acept as ResultInstitution[];
+      tempCountries.institutions_ai = pending as ResultInstitutionAi[];
+      tmpNewData.partners = tempCountries;
+    }
+
+    {
+      const tempUpdateResultEvidence: CreateResultEvidenceDto =
+        new CreateResultEvidenceDto();
+      tempUpdateResultEvidence.evidence = result?.evidences.map((el) => ({
+        evidence_description: el.evidence_description,
+        evidence_url: el.evidence_link,
+      })) as ResultEvidence[];
+
+      tmpNewData.evidences = tempUpdateResultEvidence;
     }
 
     switch (tmpNewData.result.indicator_id) {
