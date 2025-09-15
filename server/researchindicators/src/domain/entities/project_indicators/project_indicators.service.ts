@@ -5,6 +5,11 @@ import { DataSource, Repository } from 'typeorm';
 import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
 import { ResultContractsDto } from './dto/response-by-result.dto';
 import { IndicatorWithContributionsDto } from './dto/contribution.dto';
+import { spawn } from 'child_process';
+import { promisify } from 'util';
+import * as path from 'path';
+import * as fs from 'fs/promises';
+
 
 @Injectable()
 export class ProjectIndicatorsService {
@@ -350,4 +355,55 @@ export class ProjectIndicatorsService {
 
     return grouped as IndicatorWithContributionsDto[];
   }
+
+  async generarExcel(agreementID: string): Promise<Buffer> {
+    // 1. Obtener datos con tu query
+    const data = await this.findContributionsByResult(agreementID);
+
+    // 2. Resuelve la ruta del binario Go
+    const filename = 'generate_excel.exe';
+    const goBinaryPath = path.resolve(
+      __dirname,
+      '../../../../go/bin/',
+      filename,
+    );
+
+    console.log('Intentando ejecutar:', goBinaryPath);
+
+    // 3. Ejecutar el binario Go pasándole el JSON
+    return new Promise<Buffer>((resolve, reject) => {
+      const child = spawn(goBinaryPath, [], { stdio: ['pipe', 'pipe', 'pipe'] });
+
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', async (code) => {
+        if (code !== 0) {
+          console.error('Error ejecutando binario Go:', stderr);
+          return reject(new Error(stderr));
+        }
+
+        const filePath = stdout.trim();
+        try {
+          const buffer = await fs.readFile(filePath);
+          resolve(buffer);
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      // Mandar el JSON al stdin del binario Go
+      child.stdin.write(JSON.stringify(data));
+      child.stdin.end();
+    });
+  }
+
 }
