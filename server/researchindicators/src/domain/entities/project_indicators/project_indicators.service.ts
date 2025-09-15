@@ -359,11 +359,11 @@ export class ProjectIndicatorsService {
     // 1. Obtener datos con tu query
     const data = await this.findContributionsByResult(agreementID);
 
-    // 2. Resuelve la ruta del binario Go
     const filename = 'generate_excel.exe';
+    // 2. Resuelve la ruta del binario Go
     const goBinaryPath = path.resolve(
       __dirname,
-      '../../../../go/bin/',
+      '../../../../src/go/bin/',
       filename,
     );
 
