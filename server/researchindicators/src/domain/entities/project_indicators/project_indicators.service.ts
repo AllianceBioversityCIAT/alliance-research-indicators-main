@@ -356,7 +356,7 @@ export class ProjectIndicatorsService {
     return grouped as IndicatorWithContributionsDto[];
   }
 
-  async generarExcel(agreementID: string): Promise<Buffer> {
+  async generarExcel(agreementID: string): Promise<{ buffer: Buffer; fileName: string }> {
     // 1. Obtener datos con tu query
     const data = await this.findContributionsByResult(agreementID);
 
@@ -371,7 +371,7 @@ export class ProjectIndicatorsService {
     console.log('Intentando ejecutar:', goBinaryPath);
 
     // 3. Ejecutar el binario Go pasándole el JSON
-    return new Promise<Buffer>((resolve, reject) => {
+    return new Promise<{ buffer: Buffer; fileName: string }>((resolve, reject) => {
       const child = spawn(goBinaryPath, [], { stdio: ['pipe', 'pipe', 'pipe'] });
 
       let stdout = '';
@@ -394,7 +394,15 @@ export class ProjectIndicatorsService {
         const filePath = stdout.trim();
         try {
           const buffer = await fs.readFile(filePath);
-          resolve(buffer);
+
+          // Construimos el nombre del archivo final
+          const dateStr = new Date()
+            .toISOString()
+            .split('T')[0]
+            .replace(/-/g, '');
+          const fileName = `${agreementID}_indicator_contributions_${dateStr}.xlsx`;
+
+          resolve({ buffer, fileName });
         } catch (err) {
           reject(err);
         }
@@ -405,5 +413,4 @@ export class ProjectIndicatorsService {
       child.stdin.end();
     });
   }
-
 }

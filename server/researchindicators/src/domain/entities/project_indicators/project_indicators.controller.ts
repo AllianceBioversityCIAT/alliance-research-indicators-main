@@ -14,6 +14,7 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
+import * as path from 'path';
 
 @ApiTags('project-indicators')
 @ApiBearerAuth()
@@ -101,7 +102,7 @@ export class ProjectIndicatorsController {
 
   @Get('excel/:agreementId')
   async getExcel(@Param('agreementId') agreementId: string, @Res() res: Response) {
-    const buffer = await this.projectIndicatorsService.generarExcel(agreementId);
+    const { buffer, fileName } = await this.projectIndicatorsService.generarExcel(agreementId);
 
     res.setHeader(
       'Content-Type',
@@ -109,9 +110,9 @@ export class ProjectIndicatorsController {
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename=indicadores.xlsx',
+      `attachment; filename="${fileName}"`,
     );
 
-    res.send(buffer);
+    res.end(buffer);
   }
 }

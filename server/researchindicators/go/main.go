@@ -6,97 +6,115 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 	"path/filepath"
 
 	"github.com/xuri/excelize/v2"
 )
 
 // Structs para mapear JSON
-type Resultado struct {
-	ID     int    `json:"id"`
-	Nombre string `json:"nombre"`
-	Valor  int    `json:"valor"`
+type Result struct {
+	ID                 int    		`json:"result_id"`
+	Code               int    		`json:"result_official_code"`
+	Title              string 		`json:"title"`
+	Description        string 		`json:"description"`
+	Contribution_Value interface{} 	`json:"contribution_value"`
 }
 
-type Indicador struct {
-	ID            int         `json:"indicator_id"`
-	Code          string      `json:"code"`
-	Name          string      `json:"name"`
-	Description   string      `json:"description"`
-	TargetUnit    string      `json:"target_unit"`
-	NumberType    string      `json:"number_type"`
-	NumberFormat  string      `json:"number_format"`
-	TargetValue   interface{} `json:"target_value"`
-	BaseLine      interface{} `json:"base_line"`
-	Year          []int         `json:"year"`
-	Type          string      `json:"type"`
-	Contributions []Resultado `json:"contributions"`
+type Indicator struct {
+	ID            	int         `json:"indicator_id"`
+	Code          	string      `json:"code"`
+	Name          	string      `json:"name"`
+	Description   	string      `json:"description"`
+	Target_Unit   	string      `json:"target_unit"`
+	Number_Type    	string      `json:"number_type"`
+	Number_Format  	string      `json:"number_format"`
+	Target_Value   	interface{} `json:"target_value"`
+	Base_Line      	interface{} `json:"base_line"`
+	Year          	[]int       `json:"year"`
+	Type          	string      `json:"type"`
+	Contributions 	[]Result  	`json:"contributions"`
 }
 
 func main() {
 	// Leer JSON desde stdin
 	input, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		log.Fatal("Error leyendo stdin:", err)
+		log.Fatal("Error reading stdin:", err)
 	}
 
-	var indicadores []Indicador
-	if err := json.Unmarshal(input, &indicadores); err != nil {
-		log.Fatal("Error parseando JSON:", err)
+	var indicators []Indicator
+	if err := json.Unmarshal(input, &indicators); err != nil {
+		log.Fatal("Error parsing JSON:", err)
 	}
 
 	f := excelize.NewFile()
 	defaultSheet := f.GetSheetName(0)
 	f.DeleteSheet(defaultSheet)
 
-	for _, indicador := range indicadores {
-		sheetName := fmt.Sprintf("Indicador_%d", indicador.ID)
+	for _, indicator := range indicators {
+		sheetName := fmt.Sprintf("Indicator_%d", indicator.ID)
 		f.NewSheet(sheetName)
 
-		// --- Sección 1: Datos del indicador ---
+		// --- INDICATOR Title ---
+		f.MergeCell(sheetName, "A1", "J1")
+		f.SetCellValue(sheetName, "A1", "INDICATOR")
+
+		// --- Indicator Headers ---
 		indicatorHeaders := []string{
-			"ID", "Code", "Name", "Description",
-			"TargetUnit", "NumberType", "NumberFormat",
-			"TargetValue", "BaseLine", "Year", "Type",
+			"Code", "Name", "Description", "Target_Unit",
+			"Number_Type", "Number_Format", "Target_Value",
+			"Base_Line", "Year", "Type",
 		}
 
 		indicatorValues := []interface{}{
-			indicador.ID, indicador.Code, indicador.Name, indicador.Description,
-			indicador.TargetUnit, indicador.NumberType, indicador.NumberFormat,
-			indicador.TargetValue, indicador.BaseLine, indicador.Year, indicador.Type,
+			indicator.Code, indicator.Name, indicator.Description, indicator.Target_Unit,
+			indicator.Number_Type, indicator.Number_Format, indicator.Target_Value,
+			indicator.Base_Line, indicator.Year, indicator.Type,
 		}
 
-		// Escribir encabezados y valores en filas 1 y 2
+		// Headers in row 2
 		for col, h := range indicatorHeaders {
-			cell, _ := excelize.CoordinatesToCellName(col+1, 1)
+			cell, _ := excelize.CoordinatesToCellName(col+1, 2)
 			f.SetCellValue(sheetName, cell, h)
 		}
+		// Values in row 3
 		for col, v := range indicatorValues {
-			cell, _ := excelize.CoordinatesToCellName(col+1, 2)
+			cell, _ := excelize.CoordinatesToCellName(col+1, 3)
 			f.SetCellValue(sheetName, cell, v)
 		}
 
-		// --- Sección 2: Tabla de resultados ---
-		resultHeaders := []string{"ID Resultado", "Nombre", "Valor"}
-		startRow := 4 // Saltamos 2 filas + 1 fila en blanco
+		// --- RESULT CONTRIBUTIONS Title ---
+		f.MergeCell(sheetName, "A6", "D6")
+		f.SetCellValue(sheetName, "A6", "RESULT CONTRIBUTIONS")
+
+		// --- Results table ---
+		resultHeaders := []string{"Code", "Title", "Description", "Contribution_Value"}
+		startRow := 7
 
 		for col, h := range resultHeaders {
 			cell, _ := excelize.CoordinatesToCellName(col+1, startRow)
 			f.SetCellValue(sheetName, cell, h)
 		}
 
-		for row, res := range indicador.Contributions {
-			f.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+row+1), res.ID)
-			f.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+row+1), res.Nombre)
-			f.SetCellValue(sheetName, fmt.Sprintf("C%d", startRow+row+1), res.Valor)
+		for row, res := range indicator.Contributions {
+			f.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+row+1), res.Code)
+			f.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+row+1), res.Title)
+			f.SetCellValue(sheetName, fmt.Sprintf("C%d", startRow+row+1), res.Description)
+			f.SetCellValue(sheetName, fmt.Sprintf("D%d", startRow+row+1), res.Contribution_Value)
 		}
 	}
 
-	// Guardar archivo en temporal
-	outputPath := filepath.Join(os.TempDir(), "indicadores.xlsx")
+	agreementID := "A100"
+	dateStr := time.Now().Format("20060102")
+
+	fileName := fmt.Sprintf("%s_indicator_contributions_%s.xlsx", agreementID, dateStr)
+
+	// Guardar archivo en directorio temporal
+	outputPath := filepath.Join(os.TempDir(), fileName)
 	if err := f.SaveAs(outputPath); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(outputPath) // Para que Nest.js capture la ruta
+	fmt.Println(outputPath)
 }
