@@ -6,7 +6,6 @@ import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
 import { ResultContractsDto } from './dto/response-by-result.dto';
 import { IndicatorWithContributionsDto } from './dto/contribution.dto';
 import { spawn } from 'child_process';
-import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 

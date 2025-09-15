@@ -14,7 +14,6 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
-import * as path from 'path';
 
 @ApiTags('project-indicators')
 @ApiBearerAuth()
