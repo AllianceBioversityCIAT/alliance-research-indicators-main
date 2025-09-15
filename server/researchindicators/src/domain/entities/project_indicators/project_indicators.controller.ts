@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Param,
   UseInterceptors,
+  Res,
 } from '@nestjs/common';
 import { ProjectIndicatorsService } from './project_indicators.service';
 import { Post, Body } from '@nestjs/common';
@@ -12,6 +13,7 @@ import { CreateProjectIndicatorDto } from './dto/create-project_indicator.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 
 @ApiTags('project-indicators')
 @ApiBearerAuth()
@@ -95,5 +97,21 @@ export class ProjectIndicatorsController {
           data: data,
         }),
       );
+  }
+
+  @Get('excel/:agreementId')
+  async getExcel(@Param('agreementId') agreementId: string, @Res() res: Response) {
+    const { buffer, fileName } = await this.projectIndicatorsService.generarExcel(agreementId);
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${fileName}"`,
+    );
+
+    res.end(buffer);
   }
 }
