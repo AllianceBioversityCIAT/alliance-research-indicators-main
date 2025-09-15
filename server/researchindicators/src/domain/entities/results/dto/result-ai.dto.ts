@@ -7,6 +7,7 @@ import { UpdateGeneralInformation } from './update-general-information.dto';
 import { CreateResultInnovationDevDto } from '../../result-innovation-dev/dto/create-result-innovation-dev.dto';
 import { CreateResultInstitutionDto } from '../../result-institutions/dto/create-result-institution.dto';
 import { CreateResultEvidenceDto } from '../../result-evidences/dto/create-result-evidence.dto';
+import { ResultSdg } from '../../result-sdgs/entities/result-sdg.entity';
 
 export class ResultAiDto {
   result: CreateResultDto;
@@ -17,6 +18,7 @@ export class ResultAiDto {
   innovationDev?: CreateResultInnovationDevDto;
   partners?: CreateResultInstitutionDto;
   evidences?: CreateResultEvidenceDto;
+  sdgs?: ResultSdg[];
 }
 
 export class RootAi {
@@ -256,7 +258,7 @@ export class ResultRawAi {
     description: 'Nationality of the trainee if applicable',
     required: false,
   })
-  trainee_nationality?: string;
+  trainee_nationality?: AiRawCountry;
 
   @ApiProperty({
     type: String,
@@ -373,6 +375,13 @@ export class ResultRawAi {
     required: false,
   })
   alliance_main_contact_person_last_name: string;
+
+  @ApiProperty({
+    type: AiRawUser,
+    description: 'Main contact person for the Alliance',
+    required: false,
+  })
+  main_contact_person: AiRawUser;
 
   @ApiProperty({
     type: String,

@@ -35,7 +35,7 @@ export class ResultUsersService extends BaseServiceSimple<
     acept: Partial<ResultUser>[];
     pending: Partial<ResultUserAi>[];
   } {
-    if (isEmpty(users)) return null;
+    if (isEmpty(users)) return { acept: [], pending: [] };
     const aceptUsers: Partial<ResultUser>[] = [];
     const pendingUsers: Partial<ResultUserAi>[] = [];
     for (const user of users) {
@@ -52,7 +52,10 @@ export class ResultUsersService extends BaseServiceSimple<
         });
     }
 
-    return { acept: aceptUsers, pending: pendingUsers };
+    return {
+      acept: !isEmpty(aceptUsers) ? aceptUsers : [],
+      pending: !isEmpty(pendingUsers) ? pendingUsers : [],
+    };
   }
 
   async insertUserAi(

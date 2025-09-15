@@ -32,7 +32,7 @@ export class ResultEvidencesService extends BaseServiceSimple<
   ) {
     return this.dataSource.transaction(async (manager) => {
       const { evidence } = resultEvidences;
-      const filterEvidence = evidence.filter(
+      const filterEvidence = evidence?.filter(
         (el) =>
           !isEmpty(el?.evidence_description) || !isEmpty(el?.evidence_url),
       );

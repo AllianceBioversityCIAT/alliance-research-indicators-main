@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultCapacitySharing } from './entities/result-capacity-sharing.entity';
-import { selectManager } from '../../shared/utils/orm.util';
+import { cleanNumberForDB, selectManager } from '../../shared/utils/orm.util';
 import {
   CapDevGroupDto,
   CapDevIndividualDto,
@@ -121,7 +121,7 @@ export class ResultCapacitySharingService {
 
     const clean_training_category = await nextToProcessAiRaw(
       rawData?.training_category,
-      this._sessionTypesService.findByName,
+      (name) => this._sessionTypesService.findByName(name),
     );
     tempCapSharing.session_type_id = clean_training_category?.session_type_id;
 
@@ -139,7 +139,7 @@ export class ResultCapacitySharingService {
     tempCapSharing.degree_id = degree?.degree_id;
     const clean_language = await nextToProcessAiRaw(
       rawData?.language?.code,
-      this._clarisaLanguagesService.findOne,
+      (name) => this._clarisaLanguagesService.findOneByiso3(name),
     );
     tempCapSharing.training_supervisor_languages = clean_language
       ? ({ language_id: clean_language.id } as ResultLanguage)
@@ -160,19 +160,19 @@ export class ResultCapacitySharingService {
     );
 
     const clean_nationality = await nextToProcessAiRaw(
-      rawData.trainee_nationality,
-      this._clarisaCountriesService.findOne,
-    );
+      rawData?.trainee_nationality?.code,
+      (name) => this._clarisaCountriesService.findByIso2([name]),
+    ).then((res) => (res && res.length > 0 ? res[0] : null));
 
     tempCapSharing.nationality = clean_nationality
       ? ({
-          result_country_id: clean_nationality.isoAlpha2,
-        } as unknown as ResultCountry)
+          isoAlpha2: clean_nationality.isoAlpha2,
+        } as ResultCountry)
       : null;
 
     const clean_gender = await nextToProcessAiRaw(
       rawData.trainee_gender,
-      this._gendersService.findByName,
+      (name) => this._gendersService.findByName(name),
     );
     if (!isEmpty(rawData.trainee_affiliation)) {
       const { acept, pending } =
@@ -225,7 +225,7 @@ export class ResultCapacitySharingService {
     if (rawData?.training_purpose) {
       const clean_training_purpose = await nextToProcessAiRaw(
         rawData.training_purpose,
-        this._sessionPurposesService.findByName,
+        (name) => this._sessionPurposesService.findByName(name),
       );
       tempCapSharing.session_purpose_id = clean_training_purpose
         ? clean_training_purpose.session_purpose_id
@@ -331,7 +331,6 @@ export class ResultCapacitySharingService {
           manager,
         );
       }
-
       await this._resultLanguageService.create<LanguageRolesEnum>(
         resultId,
         updateData?.training_supervisor_languages,
@@ -356,11 +355,18 @@ export class ResultCapacitySharingService {
     );
 
     await entityManager.update(resultId, {
-      session_participants_female: updateData?.session_participants_female,
-      session_participants_male: updateData?.session_participants_male,
-      session_participants_non_binary:
+      session_participants_female: cleanNumberForDB(
+        updateData?.session_participants_female,
+      ),
+      session_participants_male: cleanNumberForDB(
+        updateData?.session_participants_male,
+      ),
+      session_participants_non_binary: cleanNumberForDB(
         updateData?.session_participants_non_binary,
-      session_participants_total: updateData?.session_participants_total,
+      ),
+      session_participants_total: cleanNumberForDB(
+        updateData?.session_participants_total,
+      ),
       session_purpose_id: updateData?.session_purpose_id,
       session_purpose_description: updateData?.session_purpose_description,
       is_attending_organization: updateData?.is_attending_organization,

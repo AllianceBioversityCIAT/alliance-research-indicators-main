@@ -45,7 +45,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     acept: Partial<ResultInstitution>[];
     pending: Partial<ResultInstitutionAi>[];
   } {
-    if (isEmpty(institutios)) return null;
+    if (isEmpty(institutios)) return { acept: [], pending: [] };
     const aceptInstitutions: Partial<ResultInstitution>[] = [];
     const pendingInstitutions: Partial<ResultInstitutionAi>[] = [];
     for (const institution of institutios) {
@@ -62,7 +62,10 @@ export class ResultInstitutionsService extends BaseServiceSimple<
         });
     }
 
-    return { acept: aceptInstitutions, pending: pendingInstitutions };
+    return {
+      acept: !isEmpty(aceptInstitutions) ? aceptInstitutions : [],
+      pending: !isEmpty(pendingInstitutions) ? pendingInstitutions : [],
+    };
   }
 
   async insertInstitutionsAi(
@@ -78,13 +81,15 @@ export class ResultInstitutionsService extends BaseServiceSimple<
       this.dataSource.getRepository(ResultInstitutionAi),
     );
     return useManager.save(
-      institutions.map((institution) => ({
-        result_id: resultId,
-        institution_id: institution.institution_id,
-        institution_role_id: institution_role,
-        institution_name: institution.institution_name,
-        score: institution.score,
-      })),
+      institutions
+        .map((institution) => ({
+          result_id: resultId,
+          institution_id: institution.institution_id,
+          institution_role_id: institution_role,
+          institution_name: institution.institution_name,
+          score: institution.score,
+        }))
+        .filter((el) => !isEmpty(el?.institution_id)),
     );
   }
 

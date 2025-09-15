@@ -56,7 +56,6 @@ import { AiRawCountry, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
-import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../result-users/entities/result-user.entity';
 import { customErrorResponse } from '../../shared/utils/response.utils';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
@@ -80,6 +79,8 @@ import { ResultEvidence } from '../result-evidences/entities/result-evidence.ent
 import { ResultEvidencesService } from '../result-evidences/result-evidences.service';
 import { CreateResultEvidenceDto } from '../result-evidences/dto/create-result-evidence.dto';
 import { ResultRegion } from '../result-regions/entities/result-region.entity';
+import { ClarisaSdg } from '../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
+import { ResultUserAi } from '../result-users/entities/result-user-ai.entity';
 
 @Injectable()
 export class ResultsService {
@@ -396,6 +397,7 @@ export class ResultsService {
     result_id: number,
     generalInformation: UpdateGeneralInformation,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
+    isAi: boolean = false,
   ) {
     return this.dataSource.transaction(async (manager) => {
       const existsResult = await manager
@@ -440,6 +442,15 @@ export class ResultsService {
         UserRolesEnum.MAIN_CONTACT,
         manager,
       );
+
+      if (isAi && generalInformation.main_contact_person_ai) {
+        await this._resultUsersService.insertUserAi(
+          result_id,
+          [generalInformation.main_contact_person_ai],
+          UserRolesEnum.MAIN_CONTACT,
+          manager,
+        );
+      }
 
       this._openSearchResultApi.uploadSingleToOpenSearch(
         {
@@ -661,6 +672,12 @@ export class ResultsService {
       newResult.result_id,
       processedResult.generalInformation,
     );
+
+    await this._resultSdgsService.saveSdgAi(
+      newResult.result_id,
+      processedResult?.sdgs,
+    );
+
     await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
     await this._resultInstitutionsService.updatePartners(
       newResult.result_id,
@@ -711,7 +728,7 @@ export class ResultsService {
     if (!isEmpty(countries.areas)) {
       const tempSubNational: ResultCountriesSubNational[] =
         await this._clarisaSubNationalsService
-          .findByNames(countries.areas)
+          .findByCodes(countries.areas)
           .then((response) =>
             response.map(
               (el) =>
@@ -743,20 +760,40 @@ export class ResultsService {
     }
 
     {
+      if (!isEmpty(result?.sdg_targets)) {
+        const existingSdgs = await this.dataSource
+          .getRepository(ClarisaSdg)
+          .find({
+            where: { financial_code: In(result.sdg_targets) },
+          });
+        tmpNewData.sdgs = existingSdgs.map((el) => ({
+          clarisa_sdg_id: el.id,
+        })) as ResultSdg[];
+      }
+    }
+
+    {
       const tempGeneralInformation: UpdateGeneralInformation =
         new UpdateGeneralInformation();
       tempGeneralInformation.title = result.title;
       tempGeneralInformation.description = result.description;
       tempGeneralInformation.keywords = result.keywords;
-      const userStaff: AllianceUserStaff =
-        await this._agressoUserStaffService.findUserByFirstAndLastName(
-          result?.alliance_main_contact_person_first_name,
-          result?.alliance_main_contact_person_last_name,
-        );
-      if (userStaff)
-        tempGeneralInformation.main_contact_person = {
-          user_id: userStaff.carnet,
-        } as ResultUser;
+
+      if (!isEmpty(result.main_contact_person)) {
+        const { acept, pending } =
+          this._resultUsersService.filterInstitutionsAi(
+            [result.main_contact_person],
+            UserRolesEnum.MAIN_CONTACT,
+          );
+
+        tempGeneralInformation.main_contact_person = !isEmpty(acept)
+          ? (acept[0] as ResultUser)
+          : null;
+
+        tempGeneralInformation.main_contact_person_ai = !isEmpty(pending)
+          ? (pending[0] as ResultUserAi)
+          : null;
+      }
 
       tmpNewData.generalInformation = tempGeneralInformation;
     }
@@ -765,14 +802,14 @@ export class ResultsService {
       const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
       const geoscope: ClarisaGeoScope = await nextToProcessAiRaw(
         result?.geoscope_level,
-        this._clarisaGeoScopeService.findByName,
+        (name) => this._clarisaGeoScopeService.findByName(name),
       );
       tempGeoscope.geo_scope_id = geoscope?.code;
 
       const tempCountries: ResultCountry[] = [];
       if (!isEmpty(result?.countries)) {
         const existingCountries =
-          await this._clarisaCountriesService.findByNames(
+          await this._clarisaCountriesService.findByIso2(
             result.countries.map((el) => el.code),
           );
         const sharedCountries = intersection(
@@ -790,7 +827,7 @@ export class ResultsService {
         tempGeoscope.countries = tempCountries;
       }
 
-      tempGeoscope.regions = result.regions.map((el) => ({
+      tempGeoscope.regions = result.regions?.map((el) => ({
         region_id: el,
       })) as ResultRegion[];
 
@@ -801,7 +838,7 @@ export class ResultsService {
       const tempCountries: CreateResultInstitutionDto =
         new CreateResultInstitutionDto();
       const { acept, pending } =
-        await this._resultInstitutionsService.filterInstitutionsAi(
+        this._resultInstitutionsService.filterInstitutionsAi(
           result?.partners,
           InstitutionRolesEnum.PARTNERS,
         );
@@ -813,7 +850,7 @@ export class ResultsService {
     {
       const tempUpdateResultEvidence: CreateResultEvidenceDto =
         new CreateResultEvidenceDto();
-      tempUpdateResultEvidence.evidence = result?.evidences.map((el) => ({
+      tempUpdateResultEvidence.evidence = result?.evidences?.map((el) => ({
         evidence_description: el.evidence_description,
         evidence_url: el.evidence_link,
       })) as ResultEvidence[];
