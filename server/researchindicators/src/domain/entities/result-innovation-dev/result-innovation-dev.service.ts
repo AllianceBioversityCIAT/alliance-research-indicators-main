@@ -208,6 +208,8 @@ export class ResultInnovationDevService {
           createResultInnovationDevDto?.innovation_nature_id,
         innovation_readiness_id:
           createResultInnovationDevDto?.innovation_readiness_id,
+        innovation_readiness_explanation:
+          createResultInnovationDevDto?.innovation_readiness_explanation,
         innovation_type_id: createResultInnovationDevDto?.innovation_type_id,
         no_sex_age_disaggregation:
           createResultInnovationDevDto?.no_sex_age_disaggregation,
@@ -420,6 +422,8 @@ export class ResultInnovationDevService {
       innovation_nature_id: resultInnovationDev.innovation_nature_id,
       innovation_type_id: resultInnovationDev.innovation_type_id,
       innovation_readiness_id: resultInnovationDev.innovation_readiness_id,
+      innovation_readiness_explanation:
+        resultInnovationDev.innovation_readiness_explanation,
       no_sex_age_disaggregation: resultInnovationDev.no_sex_age_disaggregation,
       anticipated_users_id: resultInnovationDev.anticipated_users_id,
       expected_outcome: resultInnovationDev.expected_outcome,
