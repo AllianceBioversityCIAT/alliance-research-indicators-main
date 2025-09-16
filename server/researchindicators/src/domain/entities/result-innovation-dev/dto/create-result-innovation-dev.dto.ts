@@ -92,6 +92,11 @@ export class CreateResultInnovationDevDto {
   @ApiProperty({ required: false })
   innovation_readiness_id?: number;
 
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ required: false })
+  innovation_readiness_explanation?: string;
+
   @IsBoolean()
   @IsOptional()
   @ApiProperty({ required: false })

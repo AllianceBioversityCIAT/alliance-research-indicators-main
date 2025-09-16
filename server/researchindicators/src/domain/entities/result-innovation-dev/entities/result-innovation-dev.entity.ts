@@ -46,6 +46,13 @@ export class ResultInnovationDev extends AuditableEntity {
   innovation_readiness_id?: number;
 
   @Column({
+    name: 'innovation_readiness_explanation',
+    type: 'text',
+    nullable: true,
+  })
+  innovation_readiness_explanation?: string;
+
+  @Column({
     name: 'no_sex_age_disaggregation',
     type: 'boolean',
     nullable: true,
