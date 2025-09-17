@@ -1,26 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { CreateResultInnovationToolFunctionDto } from './dto/create-result-innovation-tool-function.dto';
-import { UpdateResultInnovationToolFunctionDto } from './dto/update-result-innovation-tool-function.dto';
+import { BaseServiceSimple } from '../../shared/global-dto/base-service';
+import { ResultInnovationToolFunction } from './entities/result-innovation-tool-function.entity';
+import { DataSource, Repository } from 'typeorm';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 
 @Injectable()
-export class ResultInnovationToolFunctionService {
-  create(createResultInnovationToolFunctionDto: CreateResultInnovationToolFunctionDto) {
-    return 'This action adds a new resultInnovationToolFunction';
-  }
-
-  findAll() {
-    return `This action returns all resultInnovationToolFunction`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} resultInnovationToolFunction`;
-  }
-
-  update(id: number, updateResultInnovationToolFunctionDto: UpdateResultInnovationToolFunctionDto) {
-    return `This action updates a #${id} resultInnovationToolFunction`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} resultInnovationToolFunction`;
+export class ResultInnovationToolFunctionService extends BaseServiceSimple<
+  ResultInnovationToolFunction,
+  Repository<ResultInnovationToolFunction>
+> {
+  constructor(dataSource: DataSource, currentUser: CurrentUserUtil) {
+    super(
+      ResultInnovationToolFunction,
+      dataSource.getRepository(ResultInnovationToolFunction),
+      'result_id',
+      currentUser,
+      null,
+    );
   }
 }

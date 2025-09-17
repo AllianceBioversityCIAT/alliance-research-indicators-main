@@ -5,5 +5,6 @@ import { ResultInnovationToolFunctionController } from './result-innovation-tool
 @Module({
   controllers: [ResultInnovationToolFunctionController],
   providers: [ResultInnovationToolFunctionService],
+  exports: [ResultInnovationToolFunctionService],
 })
 export class ResultInnovationToolFunctionModule {}
