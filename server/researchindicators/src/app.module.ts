@@ -25,6 +25,7 @@ import { RoarManagementModule } from './domain/tools/roar-management/roar-manage
 import { ResultOpenSearchModule } from './domain/tools/open-search/results/result.opensearch.module';
 import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integration.module';
 import { DynamoFeedbackModule } from './domain/tools/dynamo-feedback/dynamo-feedback.module';
+import { AllianceStaffOpenSearchModule } from './domain/tools/open-search/alliance-staff/alliance-staff.opensearch.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { DynamoFeedbackModule } from './domain/tools/dynamo-feedback/dynamo-feed
     ),
     RoarManagementModule,
     ResultOpenSearchModule,
+    AllianceStaffOpenSearchModule,
     TipIntegrationModule,
     DynamoFeedbackModule,
   ],

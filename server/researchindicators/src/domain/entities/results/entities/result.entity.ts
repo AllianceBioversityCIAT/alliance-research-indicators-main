@@ -37,6 +37,8 @@ import { ResultInitiative } from '../../result-initiatives/entities/result-initi
 import { ResultOicr } from '../../result-oicr/entities/result-oicr.entity';
 import { ProjectIndicatorsResult } from '../../project_indicators_results/entities/project_indicators_result.entity';
 import { ReportingPlatform } from './reporting-platform.entity';
+import { ResultInstitutionAi } from '../../result-institutions/entities/result-institution-ai.entity';
+import { ResultUserAi } from '../../result-users/entities/result-user-ai.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -288,4 +290,13 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultOicr, (resultOicr) => resultOicr.result)
   result_oicrs!: ResultOicr[];
+
+  @OneToMany(
+    () => ResultInstitutionAi,
+    (resultInstitutionAi) => resultInstitutionAi.result,
+  )
+  institutions_ai?: ResultInstitutionAi[];
+
+  @OneToMany(() => ResultUserAi, (resultUserAi) => resultUserAi.result)
+  users_ai?: ResultUserAi[];
 }

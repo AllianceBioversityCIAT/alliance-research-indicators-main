@@ -154,11 +154,7 @@ export class ResultRepository
 										   'full_name', cl.full_name,
 										   'other_names', cl.other_names))
 		  `;
-      queryParts.levers.select = `,${
-        filters?.primary_lever
-          ? `if(rl.result_lever_id is not null ,${tempQuery}, NULL)`
-          : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
-      } as result_levers`;
+      queryParts.levers.select = `,JSON_ARRAYAGG(COALESCE(${tempQuery})) as result_levers`;
 
       if (filters?.primary_lever) {
         queryParts.levers.groupBy = `,rl.result_lever_id`;
@@ -329,22 +325,14 @@ export class ResultRepository
 		${haveStatusCodes ? `AND r.result_status_id IN (${formatArrayToQuery<string>(filters.status_codes)})` : ''}
 		${haveYears ? `AND r.report_year_id IN (${formatArrayToQuery<string>(filters.years)})` : ''}
 		${haveUsersCodes ? `AND r.created_by IN (${formatArrayToQuery<string>(filters.user_codes)})` : ''}
-	GROUP BY r.result_id,
-		r.result_official_code,
-		r.version_id,
-		r.title,
-		r.description,
-		r.indicator_id,
-		r.geo_scope_id,
-		r.result_status_id,
-		r.report_year_id,
-		r.is_active
+	GROUP BY r.result_id
 		${queryParts.result_audit_data?.groupBy}
 		${queryParts.contracts?.groupBy}
-		${queryParts.levers?.groupBy}
 		ORDER BY r.result_official_code ${sort_order}
 		${limit}
 	`;
+
+    console.log(mainQuery);
 
     return this.query(mainQuery);
   }

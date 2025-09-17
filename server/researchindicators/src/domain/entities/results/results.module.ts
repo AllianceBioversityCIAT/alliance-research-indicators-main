@@ -31,6 +31,9 @@ import { ResultInnovationDevModule } from '../result-innovation-dev/result-innov
 import { ResultSdgsModule } from '../result-sdgs/result-sdgs.module';
 import { ResultIpRightsModule } from '../result-ip-rights/result-ip-rights.module';
 import { ResultOicrModule } from '../result-oicr/result-oicr.module';
+import { ClarisaCountriesModule } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.module';
+import { ResultInstitutionsModule } from '../result-institutions/result-institutions.module';
+import { ResultEvidencesModule } from '../result-evidences/result-evidences.module';
 
 @Module({
   controllers: [ResultsController],
@@ -63,6 +66,9 @@ import { ResultOicrModule } from '../result-oicr/result-oicr.module';
     ResultSdgsModule,
     ResultIpRightsModule,
     forwardRef(() => ResultOicrModule),
+    ClarisaCountriesModule,
+    ResultInstitutionsModule,
+    ResultEvidencesModule,
   ],
   providers: [
     ResultsService,

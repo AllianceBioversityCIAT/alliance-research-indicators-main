@@ -24,6 +24,7 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
+import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
@@ -41,6 +42,8 @@ import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
+import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
+import { ResultEvidencesService } from '../result-evidences/result-evidences.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 
 describe('ResultsService', () => {
@@ -70,6 +73,9 @@ describe('ResultsService', () => {
   let mockResultInnovationDevService: jest.Mocked<ResultInnovationDevService>;
   let mockResultSdgsService: jest.Mocked<ResultSdgsService>;
   let mockResultOicrService: jest.Mocked<ResultOicrService>;
+  let mockClarisaCountriesService: jest.Mocked<ClarisaCountriesService>;
+  let mockResultInstitutionsService: jest.Mocked<ResultInstitutionsService>;
+  let mockResultEvidencesService: jest.Mocked<ResultEvidencesService>;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -200,6 +206,22 @@ describe('ResultsService', () => {
       create: jest.fn(),
     } as any;
 
+    mockClarisaCountriesService = {
+      findByNames: jest.fn(),
+    } as any;
+
+    mockResultInstitutionsService = {
+      create: jest.fn(),
+      find: jest.fn(),
+      findByCode: jest.fn(),
+    } as any;
+
+    mockResultEvidencesService = {
+      create: jest.fn(),
+      find: jest.fn(),
+      update: jest.fn(),
+    } as any;
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -270,6 +292,18 @@ describe('ResultsService', () => {
         {
           provide: ResultOicrService,
           useValue: mockResultOicrService,
+        },
+        {
+          provide: ClarisaCountriesService,
+          useValue: mockClarisaCountriesService,
+        },
+        {
+          provide: ResultInstitutionsService,
+          useValue: mockResultInstitutionsService,
+        },
+        {
+          provide: ResultEvidencesService,
+          useValue: mockResultEvidencesService,
         },
       ],
     }).compile();

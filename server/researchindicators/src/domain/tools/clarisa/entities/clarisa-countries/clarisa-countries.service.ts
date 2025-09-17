@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ClarisaCountry } from './entities/clarisa-country.entity';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
@@ -14,5 +14,13 @@ export class ClarisaCountriesService extends ControlListBaseService<
       dataSource.getRepository(ClarisaCountry),
       currentUser,
     );
+  }
+
+  async findByIso2(iso2: string[]) {
+    return this.mainRepo.find({
+      where: {
+        isoAlpha2: In(iso2),
+      },
+    });
   }
 }

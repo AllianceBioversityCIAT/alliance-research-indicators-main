@@ -12,7 +12,7 @@ import {
   ResultFiltersInterface,
   ResultRepository,
 } from './repositories/result.repository';
-import { validObject } from '../../shared/utils/object.utils';
+import { isEmpty, validObject } from '../../shared/utils/object.utils';
 import { Result } from './entities/result.entity';
 import { CreateResultDto } from './dto/create-result.dto';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
@@ -52,11 +52,10 @@ import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
-import { CountryAreas, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
+import { AiRawCountry, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
-import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../result-users/entities/result-user.entity';
 import { customErrorResponse } from '../../shared/utils/response.utils';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
@@ -68,6 +67,20 @@ import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
+import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
+import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
+import { intersection } from '../../shared/utils/array.util';
+import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
+import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
+import { CreateResultInstitutionDto } from '../result-institutions/dto/create-result-institution.dto';
+import { ResultInstitution } from '../result-institutions/entities/result-institution.entity';
+import { ResultInstitutionAi } from '../result-institutions/entities/result-institution-ai.entity';
+import { ResultEvidence } from '../result-evidences/entities/result-evidence.entity';
+import { ResultEvidencesService } from '../result-evidences/result-evidences.service';
+import { CreateResultEvidenceDto } from '../result-evidences/dto/create-result-evidence.dto';
+import { ResultRegion } from '../result-regions/entities/result-region.entity';
+import { ClarisaSdg } from '../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
+import { ResultUserAi } from '../result-users/entities/result-user-ai.entity';
 
 @Injectable()
 export class ResultsService {
@@ -98,6 +111,9 @@ export class ResultsService {
     private readonly _resultSdgsService: ResultSdgsService,
     @Inject(forwardRef(() => ResultOicrService))
     private readonly _resultOicrService: ResultOicrService,
+    private readonly _clarisaCountriesService: ClarisaCountriesService,
+    private readonly _resultInstitutionsService: ResultInstitutionsService,
+    private readonly _resultEvidencesService: ResultEvidencesService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -178,9 +194,37 @@ export class ResultsService {
     return query.getMany();
   }
 
+  async findBaseInfo(resultId: number): Promise<CreateResultDto> {
+    const contract_id = await this._resultContractsService
+      .find(resultId, ContractRolesEnum.ALIGNMENT)
+      .then((res) => res[0]?.contract_id);
+    const result = await this.mainRepo.findOne({
+      select: {
+        title: true,
+        description: true,
+        indicator_id: true,
+        report_year_id: true,
+        is_ai: true,
+      },
+      where: {
+        result_id: resultId,
+        is_active: true,
+      },
+    });
+    return {
+      contract_id,
+      year: result.report_year_id,
+      title: result.title,
+      description: result.description,
+      indicator_id: result.indicator_id,
+      is_ai: result.is_ai,
+    };
+  }
+
   async createResult(
     createResult: CreateResultDto,
     platform_code: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
+    leverEnum: LeverRolesEnum = LeverRolesEnum.ALIGNMENT,
   ): Promise<Result> {
     const { invalidFields, isValid } = validObject(createResult, [
       'contract_id',
@@ -259,7 +303,7 @@ export class ResultsService {
           result.result_id,
           primaryLever,
           'lever_id',
-          LeverRolesEnum.ALIGNMENT,
+          leverEnum,
           manager,
           ['is_primary'],
         );
@@ -388,6 +432,7 @@ export class ResultsService {
     result_id: number,
     generalInformation: UpdateGeneralInformation,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
+    isAi: boolean = false,
   ) {
     return this.dataSource.transaction(async (manager) => {
       const existsResult = await manager
@@ -432,6 +477,15 @@ export class ResultsService {
         UserRolesEnum.MAIN_CONTACT,
         manager,
       );
+
+      if (isAi && generalInformation.main_contact_person_ai) {
+        await this._resultUsersService.insertUserAi(
+          result_id,
+          [generalInformation.main_contact_person_ai],
+          UserRolesEnum.MAIN_CONTACT,
+          manager,
+        );
+      }
 
       this._openSearchResultApi.uploadSingleToOpenSearch(
         {
@@ -653,12 +707,28 @@ export class ResultsService {
       newResult.result_id,
       processedResult.generalInformation,
     );
+
+    await this._resultSdgsService.saveSdgAi(
+      newResult.result_id,
+      processedResult?.sdgs,
+    );
+
     await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
+    await this._resultInstitutionsService.updatePartners(
+      newResult.result_id,
+      processedResult?.partners,
+      true,
+    );
+    await this._resultEvidencesService.updateResultEvidences(
+      newResult.result_id,
+      processedResult?.evidences,
+    );
     switch (newResult.indicator_id) {
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
         await this._resultCapacitySharingService.update(
           newResult.result_id,
           processedResult.capSharing,
+          true,
         );
         break;
       case IndicatorsEnum.POLICY_CHANGE:
@@ -687,6 +757,26 @@ export class ResultsService {
     return resultsCreated;
   }
 
+  async validateAiRawCountries(countries: AiRawCountry) {
+    const tempCountries = new ResultCountry();
+    tempCountries.isoAlpha2 = countries.code;
+    if (!isEmpty(countries.areas)) {
+      const tempSubNational: ResultCountriesSubNational[] =
+        await this._clarisaSubNationalsService
+          .findByCodes(countries.areas)
+          .then((response) =>
+            response.map(
+              (el) =>
+                ({
+                  sub_national_id: el.id,
+                }) as ResultCountriesSubNational,
+            ),
+          );
+      tempCountries.result_countries_sub_nationals = tempSubNational;
+    }
+    return tempCountries;
+  }
+
   async createResultFromAiRoar(result: ResultRawAi) {
     const tmpNewData: ResultAiDto = new ResultAiDto();
     {
@@ -705,59 +795,102 @@ export class ResultsService {
     }
 
     {
+      if (!isEmpty(result?.sdg_targets)) {
+        const existingSdgs = await this.dataSource
+          .getRepository(ClarisaSdg)
+          .find({
+            where: { financial_code: In(result.sdg_targets) },
+          });
+        tmpNewData.sdgs = existingSdgs.map((el) => ({
+          clarisa_sdg_id: el.id,
+        })) as ResultSdg[];
+      }
+    }
+
+    {
       const tempGeneralInformation: UpdateGeneralInformation =
         new UpdateGeneralInformation();
       tempGeneralInformation.title = result.title;
       tempGeneralInformation.description = result.description;
       tempGeneralInformation.keywords = result.keywords;
-      tempGeneralInformation.year = 2025;
-      const userStaff: AllianceUserStaff =
-        await this._agressoUserStaffService.findUserByFirstAndLastName(
-          result?.alliance_main_contact_person_first_name,
-          result?.alliance_main_contact_person_last_name,
-        );
-      if (userStaff)
-        tempGeneralInformation.main_contact_person = {
-          user_id: userStaff.carnet,
-        } as ResultUser;
+
+      if (!isEmpty(result.main_contact_person)) {
+        const { acept, pending } =
+          this._resultUsersService.filterInstitutionsAi(
+            [result.main_contact_person],
+            UserRolesEnum.MAIN_CONTACT,
+          );
+
+        tempGeneralInformation.main_contact_person = !isEmpty(acept)
+          ? (acept[0] as ResultUser)
+          : null;
+
+        tempGeneralInformation.main_contact_person_ai = !isEmpty(pending)
+          ? (pending[0] as ResultUserAi)
+          : null;
+      }
 
       tmpNewData.generalInformation = tempGeneralInformation;
     }
 
     {
       const tempGeoscope: SaveGeoLocationDto = new SaveGeoLocationDto();
-      const geoscope: ClarisaGeoScope =
-        await this._clarisaGeoScopeService.findByName(result.geoscope.level);
+      const geoscope: ClarisaGeoScope = await nextToProcessAiRaw(
+        result?.geoscope_level,
+        (name) => this._clarisaGeoScopeService.findByName(name),
+      );
       tempGeoscope.geo_scope_id = geoscope?.code;
 
       const tempCountries: ResultCountry[] = [];
-      if (result.geoscope?.sub_list?.length > 0) {
-        const tempParseCountries: Partial<CountryAreas>[] =
-          result.geoscope.sub_list.map((el) =>
-            typeof el === 'string' ? { country_code: el } : el,
+      if (!isEmpty(result?.countries)) {
+        const existingCountries =
+          await this._clarisaCountriesService.findByIso2(
+            result.countries.map((el) => el.code),
           );
-        for (const country of tempParseCountries) {
-          const tempCountry: ResultCountry = new ResultCountry();
-          tempCountry.isoAlpha2 = country.country_code;
-          const tempCountryAreas: string[] = country?.areas ?? [];
-          const tempSubNational: ResultCountriesSubNational[] =
-            await this._clarisaSubNationalsService
-              .findByNames(tempCountryAreas)
-              .then((response) =>
-                response.map(
-                  (el) =>
-                    ({
-                      sub_national_id: el.id,
-                    }) as ResultCountriesSubNational,
-                ),
-              );
-          tempCountry.result_countries_sub_nationals = tempSubNational;
-          tempCountries.push(tempCountry);
+        const sharedCountries = intersection(
+          result.countries.map((el) => el.code),
+          existingCountries.map((el) => el.isoAlpha2),
+        );
+        const processCountries = result.countries.filter((el) =>
+          sharedCountries.includes(el.code),
+        );
+
+        for (const country of processCountries) {
+          const saveCountries = await this.validateAiRawCountries(country);
+          tempCountries.push(saveCountries);
         }
+        tempGeoscope.countries = tempCountries;
       }
-      tempGeoscope.countries = tempCountries;
+
+      tempGeoscope.regions = result.regions?.map((el) => ({
+        region_id: el,
+      })) as ResultRegion[];
 
       tmpNewData.geoScope = tempGeoscope;
+    }
+
+    {
+      const tempCountries: CreateResultInstitutionDto =
+        new CreateResultInstitutionDto();
+      const { acept, pending } =
+        this._resultInstitutionsService.filterInstitutionsAi(
+          result?.partners,
+          InstitutionRolesEnum.PARTNERS,
+        );
+      tempCountries.institutions = acept as ResultInstitution[];
+      tempCountries.institutions_ai = pending as ResultInstitutionAi[];
+      tmpNewData.partners = tempCountries;
+    }
+
+    {
+      const tempUpdateResultEvidence: CreateResultEvidenceDto =
+        new CreateResultEvidenceDto();
+      tempUpdateResultEvidence.evidence = result?.evidences?.map((el) => ({
+        evidence_description: el.evidence_description,
+        evidence_url: el.evidence_link,
+      })) as ResultEvidence[];
+
+      tmpNewData.evidences = tempUpdateResultEvidence;
     }
 
     switch (tmpNewData.result.indicator_id) {
