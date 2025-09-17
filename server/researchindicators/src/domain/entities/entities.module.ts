@@ -73,6 +73,7 @@ import { TagsModule } from './tags/tags.module';
 import { ResultInitiativesModule } from './result-initiatives/result-initiatives.module';
 import { TempExternalOicrsModule } from './temp_external_oicrs/temp_external_oicrs.module';
 import { MaturityLevelModule } from './maturity-level/maturity-level.module';
+import { ResultInnovationToolFunctionModule } from './result-innovation-tool-function/result-innovation-tool-function.module';
 
 @Module({
   imports: [
@@ -150,6 +151,7 @@ import { MaturityLevelModule } from './maturity-level/maturity-level.module';
     ResultInitiativesModule,
     TempExternalOicrsModule,
     MaturityLevelModule,
+    ResultInnovationToolFunctionModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

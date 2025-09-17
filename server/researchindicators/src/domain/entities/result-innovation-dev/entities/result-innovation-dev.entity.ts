@@ -1,13 +1,13 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { ClarisaInnovationCharacteristic } from '../../../tools/clarisa/entities/clarisa-innovation-characteristics/entities/clarisa-innovation-characteristic.entity';
 import { ClarisaInnovationType } from '../../../tools/clarisa/entities/clarisa-innovation-types/entities/clarisa-innovation-type.entity';
 import { ClarisaInnovationReadinessLevel } from '../../../tools/clarisa/entities/clarisa-innovation-readiness-levels/entities/clarisa-innovation-readiness-level.entity';
 import { InnovationDevAnticipatedUser } from '../../innovation-dev-anticipated-users/entities/innovation-dev-anticipated-user.entity';
-import { ToolFunction } from '../../tool-functions/entities/tool-function.entity';
 import { DisseminationQualification } from '../../dissemination-qualifications/entities/dissemination-qualification.entity';
 import { ExpansionPotential } from '../../expansion-potentials/entities/expansion-potential.entity';
+import { ResultInnovationToolFunction } from '../../result-innovation-tool-function/entities/result-innovation-tool-function.entity';
 
 @Entity('result_innovation_dev')
 export class ResultInnovationDev extends AuditableEntity {
@@ -118,12 +118,6 @@ export class ResultInnovationDev extends AuditableEntity {
     nullable: true,
   })
   results_achieved_expected?: string;
-
-  @Column('bigint', {
-    name: 'tool_function_id',
-    nullable: true,
-  })
-  tool_function_id?: number;
 
   @Column('boolean', {
     name: 'is_used_beyond_original_context',
@@ -257,16 +251,16 @@ export class ResultInnovationDev extends AuditableEntity {
   dissemination_qualification!: DisseminationQualification;
 
   @ManyToOne(
-    () => ToolFunction,
-    (toolFunction) => toolFunction.result_innovations_dev,
-  )
-  @JoinColumn({ name: 'tool_function_id' })
-  tool_function!: ToolFunction;
-
-  @ManyToOne(
     () => ExpansionPotential,
     (expansionPotential) => expansionPotential.result_innovations_dev,
   )
   @JoinColumn({ name: 'expansion_potential_id' })
   expansion_potential?: ExpansionPotential;
+
+  @OneToMany(
+    () => ResultInnovationToolFunction,
+    (resultInnovationToolFunction) =>
+      resultInnovationToolFunction.resultInnovationDev,
+  )
+  result_innovation_tool_functions!: ResultInnovationToolFunction[];
 }
