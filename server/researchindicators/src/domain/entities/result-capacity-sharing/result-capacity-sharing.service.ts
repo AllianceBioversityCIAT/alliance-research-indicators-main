@@ -290,19 +290,12 @@ export class ResultCapacitySharingService {
     const { result_id } = existResult;
 
     return this.dataSource.transaction(async (manager) => {
-      const startDate = (
-        updateData?.start_date ? new Date(updateData?.start_date) : null
-      )?.toISOString();
-      const endDate = (
-        updateData?.end_date ? new Date(updateData?.end_date) : null
-      )?.toISOString();
-
       await manager.getRepository(this.mainRepo.target).update(result_id, {
         session_format_id: updateData?.session_format_id,
         session_type_id: updateData?.session_type_id,
         delivery_modality_id: updateData?.delivery_modality_id,
-        start_date: startDate,
-        end_date: endDate,
+        start_date: updateData?.start_date,
+        end_date: updateData?.end_date,
         degree_id: updateData?.degree_id,
         session_length_id: updateData?.session_length_id,
         ...this._currentUser.audit(SetAutitEnum.UPDATE),

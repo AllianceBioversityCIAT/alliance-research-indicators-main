@@ -187,9 +187,37 @@ export class ResultsService {
     return query.getMany();
   }
 
+  async findBaseInfo(resultId: number): Promise<CreateResultDto> {
+    const contract_id = await this._resultContractsService
+      .find(resultId, ContractRolesEnum.ALIGNMENT)
+      .then((res) => res[0]?.contract_id);
+    const result = await this.mainRepo.findOne({
+      select: {
+        title: true,
+        description: true,
+        indicator_id: true,
+        report_year_id: true,
+        is_ai: true,
+      },
+      where: {
+        result_id: resultId,
+        is_active: true,
+      },
+    });
+    return {
+      contract_id,
+      year: result.report_year_id,
+      title: result.title,
+      description: result.description,
+      indicator_id: result.indicator_id,
+      is_ai: result.is_ai,
+    };
+  }
+
   async createResult(
     createResult: CreateResultDto,
     platform_code: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
+    leverEnum: LeverRolesEnum = LeverRolesEnum.ALIGNMENT,
   ): Promise<Result> {
     const { invalidFields, isValid } = validObject(createResult, [
       'contract_id',
@@ -268,7 +296,7 @@ export class ResultsService {
           result.result_id,
           primaryLever,
           'lever_id',
-          LeverRolesEnum.ALIGNMENT,
+          leverEnum,
           manager,
           ['is_primary'],
         );
