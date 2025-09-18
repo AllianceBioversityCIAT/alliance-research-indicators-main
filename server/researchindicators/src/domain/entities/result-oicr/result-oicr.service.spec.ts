@@ -282,6 +282,7 @@ describe('ResultOicrService', () => {
           notMap: {
             lever: true,
           },
+          result_status_id: 9,
         },
       );
       expect((service as any).updateOicrSteps).toHaveBeenCalledWith(
@@ -325,6 +326,7 @@ describe('ResultOicrService', () => {
           notMap: {
             lever: true,
           },
+          result_status_id: 9,
         },
       );
     });

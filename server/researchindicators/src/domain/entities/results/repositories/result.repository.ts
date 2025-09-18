@@ -332,8 +332,6 @@ export class ResultRepository
 		${limit}
 	`;
 
-    console.log(mainQuery);
-
     return this.query(mainQuery);
   }
 

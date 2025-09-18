@@ -7,4 +7,5 @@ export enum ResultStatusEnum {
   APPROVED = 6,
   REJECTED = 7,
   DELETED = 8,
+  REQUESTED = 9,
 }

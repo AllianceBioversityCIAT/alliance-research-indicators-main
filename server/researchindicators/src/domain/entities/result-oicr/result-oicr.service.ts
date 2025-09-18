@@ -45,6 +45,7 @@ import {
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import { mergeArraysWithPriority } from '../../shared/utils/array.util';
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 
 @Injectable()
 export class ResultOicrService {
@@ -90,7 +91,11 @@ export class ResultOicrService {
       result = await this.resultService.createResult(
         data.base_information,
         platform_code,
-        { leverEnum: LeverRolesEnum.OICR_ALIGNMENT, notMap: { lever: true } },
+        {
+          leverEnum: LeverRolesEnum.OICR_ALIGNMENT,
+          result_status_id: ResultStatusEnum.REQUESTED,
+          notMap: { lever: true },
+        },
       );
       const lever = await this.resultLeversService.find(
         result.result_id,
