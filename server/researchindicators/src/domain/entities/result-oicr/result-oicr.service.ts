@@ -105,6 +105,7 @@ export class ResultOicrService {
         message: {
           socketFile: Buffer.from(template),
         },
+        bcc: process.env.ARI_MAPPED_BCC_SUBM_OICR,
       });
     }
   }
