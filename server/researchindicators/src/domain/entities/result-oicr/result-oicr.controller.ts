@@ -90,7 +90,7 @@ export class ResultOicrController {
         data,
         undefined,
         ReportingPlatformEnum.STAR,
-        this.resultUtil.nullResultCode,
+        this.resultUtil.nullResultId,
       )
       .then((result) =>
         ResponseUtils.format({

@@ -74,6 +74,10 @@ export class ResultsUtil {
     return this.currentResult?.result_official_code ?? null;
   }
 
+  get nullResultId(): number {
+    return this.currentResult?.result_id ?? null;
+  }
+
   get nullReportYearId(): number {
     return this.currentResult?.report_year_id ?? null;
   }
