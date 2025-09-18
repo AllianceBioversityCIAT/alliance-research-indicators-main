@@ -1055,7 +1055,10 @@ export class ResultsService {
   async findGeoLocation(resultId: number): Promise<SaveGeoLocationDto> {
     const result = await this.mainRepo.findOne({
       where: { result_id: resultId, is_active: true },
-      select: ['geo_scope_id'],
+      select: {
+        geo_scope_id: true,
+        comment_geo_scope: true,
+      },
     });
 
     const cliGeoScope = this._clarisaGeoScopeService.transformGeoScope(

@@ -2298,7 +2298,10 @@ describe('ResultsService', () => {
       // Assert
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         where: { result_id: resultId, is_active: true },
-        select: ['geo_scope_id'],
+        select: {
+          geo_scope_id: true,
+          comment_geo_scope: true,
+        },
       });
       expect(mockClarisaGeoScopeService.transformGeoScope).toHaveBeenCalledWith(
         mockGeoScopeId,
