@@ -60,7 +60,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package*.json ./
-COPY --from=build /app/src/go ./dist/src/go
+COPY --from=build /app/src/go ./src/go
 
 # Switch to non-root user
 USER appuser
