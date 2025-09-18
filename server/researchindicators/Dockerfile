@@ -1,3 +1,15 @@
+#################### GO BUILD STAGE ####################
+FROM golang:1.22-alpine AS go-build
+
+WORKDIR /workspace
+
+COPY src/go/go.mod src/go/go.sum ./
+RUN go mod download
+
+COPY src/go/ ./
+RUN mkdir -p bin && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/generate_excel .
+
+
 #################### BASE STAGE ####################
 FROM node:20.13.1-alpine AS base
 
@@ -16,6 +28,8 @@ RUN npm install  --ignore-scripts
 
 # Copy source code and config files
 COPY src ./src
+RUN rm -f ./src/go/bin/generate_excel*
+COPY --from=go-build /workspace/bin/generate_excel ./src/go/bin/generate_excel
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY eslint.config.mjs ./
@@ -38,6 +52,8 @@ RUN npm ci --only=production --ignore-scripts
 
 # Copy source code and config files
 COPY src ./src
+RUN rm -f ./src/go/bin/generate_excel*
+COPY --from=go-build /workspace/bin/generate_excel ./src/go/bin/generate_excel
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY package*.json ./
