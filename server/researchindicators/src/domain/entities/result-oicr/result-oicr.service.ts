@@ -90,7 +90,7 @@ export class ResultOicrService {
       result = await this.resultService.createResult(
         data.base_information,
         platform_code,
-        LeverRolesEnum.OICR_ALIGNMENT,
+        { leverEnum: LeverRolesEnum.OICR_ALIGNMENT, notMap: { lever: true } },
       );
       const lever = await this.resultLeversService.find(
         result.result_id,
@@ -113,7 +113,7 @@ export class ResultOicrService {
       });
     }
 
-    await this.updateOicrSteps(result.result_id, data, manager);
+    await this.updateOicrSteps(result.result_id, data, manager, !resultId);
 
     if (!resultId) {
       await this.sendMessageOicr(result.result_id);
@@ -208,8 +208,9 @@ export class ResultOicrService {
     resultId: number,
     data: CreateResultOicrDto,
     manager: EntityManager,
+    isNew: boolean = true,
   ) {
-    await this.stepOneOicr(data?.step_one, resultId, manager);
+    await this.stepOneOicr(data?.step_one, resultId, manager, isNew);
     await this.stepTwoOicr(data?.step_two, resultId, manager);
     await this.resultService.saveGeoLocation(resultId, data?.step_three);
     const tempGeneralComment =
@@ -281,6 +282,7 @@ export class ResultOicrService {
     data: StepOneOicrDto,
     resultId: number,
     manager?: EntityManager,
+    isNew: boolean = true,
   ) {
     const saveUsers: Partial<ResultUser> = {
       user_id: data?.main_contact_person?.user_id,
@@ -309,18 +311,20 @@ export class ResultOicrService {
       manager,
     );
 
-    const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
-      createdTags,
-    )
-      ? [data?.link_result]
-      : [];
-    await this.tempExternalOicrsService.create(
-      resultId,
-      saveLinkedResults,
-      'external_oicr_id',
-      undefined,
-      manager,
-    );
+    if (isNew) {
+      const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
+        createdTags,
+      )
+        ? [data?.link_result]
+        : [];
+      await this.tempExternalOicrsService.create(
+        resultId,
+        saveLinkedResults,
+        'external_oicr_id',
+        undefined,
+        manager,
+      );
+    }
 
     await this.mainRepo.update(resultId, {
       outcome_impact_statement: data.outcome_impact_statement,

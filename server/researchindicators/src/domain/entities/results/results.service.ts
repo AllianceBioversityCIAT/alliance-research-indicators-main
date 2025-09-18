@@ -81,6 +81,7 @@ import { CreateResultEvidenceDto } from '../result-evidences/dto/create-result-e
 import { ResultRegion } from '../result-regions/entities/result-region.entity';
 import { ClarisaSdg } from '../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 import { ResultUserAi } from '../result-users/entities/result-user-ai.entity';
+import { CreateResultConfigDto } from './dto/create-config.dto';
 
 @Injectable()
 export class ResultsService {
@@ -221,11 +222,20 @@ export class ResultsService {
     };
   }
 
+  private validateCreateConfig(configuration?: CreateResultConfigDto) {
+    const newConfig: CreateResultConfigDto = new CreateResultConfigDto();
+    newConfig.leverEnum = configuration?.leverEnum ?? LeverRolesEnum.ALIGNMENT;
+    newConfig.notMap.lever = configuration?.notMap?.lever ?? false;
+    newConfig.notMap.sdg = configuration?.notMap?.sdg ?? false;
+    return newConfig;
+  }
+
   async createResult(
     createResult: CreateResultDto,
     platform_code: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
-    leverEnum: LeverRolesEnum = LeverRolesEnum.ALIGNMENT,
+    configuration?: CreateResultConfigDto,
   ): Promise<Result> {
+    const config = this.validateCreateConfig(configuration);
     const { invalidFields, isValid } = validObject(createResult, [
       'contract_id',
       'indicator_id',
@@ -293,7 +303,7 @@ export class ResultsService {
       );
       const clarisaLever = await this._clarisaLeversService.findByName(lever);
 
-      if (clarisaLever) {
+      if (clarisaLever && !config.notMap.lever) {
         const primaryLever: Partial<ResultLever> = {
           lever_id: String(clarisaLever.id),
           is_primary: true,
@@ -303,7 +313,7 @@ export class ResultsService {
           result.result_id,
           primaryLever,
           'lever_id',
-          leverEnum,
+          config.leverEnum,
           manager,
           ['is_primary'],
         );
@@ -323,19 +333,21 @@ export class ResultsService {
         ['is_primary'],
       );
 
-      const tempSdg: Partial<ResultSdg>[] = agressoContract?.sdgs?.map(
-        (sdg) => ({
-          clarisa_sdg_id: sdg.id,
-        }),
-      );
+      if (!config.notMap.sdg) {
+        const tempSdg: Partial<ResultSdg>[] = agressoContract?.sdgs?.map(
+          (sdg) => ({
+            clarisa_sdg_id: sdg.id,
+          }),
+        );
 
-      await this._resultSdgsService.create(
-        result.result_id,
-        tempSdg,
-        'clarisa_sdg_id',
-        undefined,
-        manager,
-      );
+        await this._resultSdgsService.create(
+          result.result_id,
+          tempSdg,
+          'clarisa_sdg_id',
+          undefined,
+          manager,
+        );
+      }
 
       return result;
     });
@@ -1043,15 +1055,13 @@ export class ResultsService {
   }
 
   async findGeoLocation(resultId: number): Promise<SaveGeoLocationDto> {
-    const geoScopeId = await this.mainRepo
-      .findOne({
-        where: { result_id: resultId, is_active: true },
-        select: ['geo_scope_id'],
-      })
-      .then((result) => result?.geo_scope_id);
+    const result = await this.mainRepo.findOne({
+      where: { result_id: resultId, is_active: true },
+      select: ['geo_scope_id'],
+    });
 
     const cliGeoScope = this._clarisaGeoScopeService.transformGeoScope(
-      geoScopeId,
+      result.geo_scope_id,
       undefined,
       false,
     );
@@ -1086,6 +1096,7 @@ export class ResultsService {
       geo_scope_id: cliGeoScope,
       regions,
       countries,
+      comment_geo_scope: result.comment_geo_scope,
     };
   }
 

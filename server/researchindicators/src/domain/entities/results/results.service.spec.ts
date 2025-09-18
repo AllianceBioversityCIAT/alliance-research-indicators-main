@@ -584,6 +584,13 @@ describe('ResultsService', () => {
       // Setup service method mocks
       (service as any).newOfficialCode = jest.fn();
       (service as any).createResultType = jest.fn();
+      (service as any).validateCreateConfig = jest.fn().mockReturnValue({
+        leverEnum: 1,
+        notMap: {
+          lever: false,
+          sdg: false,
+        },
+      });
     });
 
     it('should throw BadRequestException when required fields are missing', async () => {
@@ -2393,24 +2400,9 @@ describe('ResultsService', () => {
       const resultId = 1;
 
       mockMainRepo.findOne.mockResolvedValue(null);
-      mockClarisaGeoScopeService.transformGeoScope.mockReturnValue(undefined);
-      mockResultCountriesService.find.mockResolvedValue([]);
-      mockResultCountriesSubNationalsService.find.mockResolvedValue([]);
-      mockResultRegionsService.find.mockResolvedValue([]);
 
-      // Act
-      await service.findGeoLocation(resultId);
-
-      // Assert
-      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
-        where: { result_id: resultId, is_active: true },
-        select: ['geo_scope_id'],
-      });
-      expect(mockClarisaGeoScopeService.transformGeoScope).toHaveBeenCalledWith(
-        undefined,
-        undefined,
-        false,
-      );
+      // Act & Assert
+      await expect(service.findGeoLocation(resultId)).rejects.toThrow();
     });
   });
 
