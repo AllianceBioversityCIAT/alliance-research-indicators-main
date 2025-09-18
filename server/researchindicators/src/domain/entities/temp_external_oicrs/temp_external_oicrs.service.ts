@@ -4,6 +4,11 @@ import { TempResultExternalOicr } from './entities/temp_result_external_oicr.ent
 import { DataSource, Repository } from 'typeorm';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { TempExternalOicr } from './entities/temp_external_oicr.entity';
+import { CreateResultOicrDto } from '../result-oicr/dto/create-result-oicr.dto';
+import { ResultLever } from '../result-levers/entities/result-lever.entity';
+import { ResultCountry } from '../result-countries/entities/result-country.entity';
+import { ResultRegion } from '../result-regions/entities/result-region.entity';
+import { SaveGeoLocationDto } from '../results/dto/save-geo-location.dto';
 
 @Injectable()
 export class TempExternalOicrsService extends BaseServiceSimple<
@@ -27,5 +32,39 @@ export class TempExternalOicrsService extends BaseServiceSimple<
         is_active: true,
       },
     });
+  }
+
+  async mappingExternalOicrs(externalOicrsId: number) {
+    const preLoad: CreateResultOicrDto = new CreateResultOicrDto();
+
+    const resExternal = await this.exteralRepo.findOne({
+      where: {
+        id: externalOicrsId,
+      },
+    });
+
+    const leverList: Partial<ResultLever>[] = resExternal?.lever_list
+      ?.split(';')
+      .map((item) => ({
+        lever_id: item.trim(),
+      }));
+
+    const geoLocation: SaveGeoLocationDto = new SaveGeoLocationDto();
+
+    geoLocation.countries = resExternal?.country_list
+      ?.split(';')
+      .map((item) => ({
+        isoAlpha2: item.trim(),
+      })) as ResultCountry[];
+
+    geoLocation.regions = resExternal?.region_list?.split(';').map((item) => ({
+      region_id: parseInt(item.trim()),
+    })) as ResultRegion[];
+
+    geoLocation.geo_scope_id = resExternal?.geo_scope_id;
+    geoLocation.comment_geo_scope = resExternal?.geo_scope_comment;
+
+    preLoad.step_two.contributor_lever = leverList as ResultLever[];
+    preLoad.step_three = geoLocation;
   }
 }

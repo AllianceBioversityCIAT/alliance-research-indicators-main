@@ -276,12 +276,18 @@ describe('ResultOicrService', () => {
       expect(mockResultsService.createResult).toHaveBeenCalledWith(
         mockCreateData.base_information,
         'STAR',
-        2,
+        {
+          leverEnum: 2,
+          notMap: {
+            lever: true,
+          },
+        },
       );
       expect((service as any).updateOicrSteps).toHaveBeenCalledWith(
         mockCreatedResult.result_id,
         mockCreateData,
         mockEntityManager,
+        true,
       );
       expect(service.sendMessageOicr).toHaveBeenCalledWith(
         mockCreatedResult.result_id,
@@ -313,7 +319,12 @@ describe('ResultOicrService', () => {
       expect(mockResultsService.createResult).toHaveBeenCalledWith(
         mockCreateData.base_information,
         'STAR',
-        2,
+        {
+          leverEnum: 2,
+          notMap: {
+            lever: true,
+          },
+        },
       );
     });
   });
