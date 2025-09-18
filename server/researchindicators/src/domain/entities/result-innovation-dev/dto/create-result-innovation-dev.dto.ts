@@ -24,11 +24,7 @@ export class ResultInnovationDevKnouldgeSharingDto {
   @ApiProperty({ required: false })
   results_achieved_expected?: string;
 
-  @ApiProperty({
-    required: false,
-    isArray: true,
-    type: ResultInnovationToolFunction,
-  })
+  @ApiProperty({ required: false, isArray: true, type: ResultInnovationToolFunction })
   tool_function_id?: ResultInnovationToolFunction[];
 
   @ApiProperty({ required: false })

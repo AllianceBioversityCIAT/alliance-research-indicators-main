@@ -11,9 +11,7 @@ describe('IndicatorPerItemController', () => {
       providers: [IndicatorPerItemService],
     }).compile();
 
-    controller = module.get<IndicatorPerItemController>(
-      IndicatorPerItemController,
-    );
+    controller = module.get<IndicatorPerItemController>(IndicatorPerItemController);
   });
 
   it('should be defined', () => {

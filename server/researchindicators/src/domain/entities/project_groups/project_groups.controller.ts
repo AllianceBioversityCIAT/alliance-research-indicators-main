@@ -1,4 +1,5 @@
-import { Controller } from '@nestjs/common';
+import { Controller} from '@nestjs/common';
 
 @Controller('project_structure')
-export class ProjectGroupsController {}
+export class ProjectGroupsController {
+}

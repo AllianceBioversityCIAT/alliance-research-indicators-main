@@ -39,8 +39,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       : '';
     const query = `
     select ac.*,
-    ifnull(cl.full_name, 'Not available' ) as lever,
-    ifnull(cl.id, 'Not available' ) as lever_id
+    ifnull(cl.full_name, 'Not available' ) as lever
     ${
       relations?.countries
         ? `,JSON_ARRAYAGG(

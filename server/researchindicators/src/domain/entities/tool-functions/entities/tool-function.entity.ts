@@ -18,7 +18,8 @@ export class ToolFunction extends AuditableEntity {
 
   @OneToMany(
     () => ResultInnovationToolFunction,
-    (resultInnovationToolFunction) => resultInnovationToolFunction.toolFunction,
+    (resultInnovationToolFunction) => 
+      resultInnovationToolFunction.toolFunction,
   )
   result_innovation_tool_functions!: ResultInnovationToolFunction[];
 }

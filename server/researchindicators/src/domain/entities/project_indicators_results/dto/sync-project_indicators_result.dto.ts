@@ -1,19 +1,19 @@
-import { IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional } from "class-validator";
 
 export class SyncProjectIndicatorsResultDto {
-  @IsOptional()
-  @IsNumber()
-  contribution_id: number;
+    @IsOptional()
+    @IsNumber()
+    contribution_id: number;
 
-  @IsNotEmpty()
-  @IsNumber()
-  result_id: number;
+    @IsNotEmpty()
+    @IsNumber()
+    result_id: number;
 
-  @IsNotEmpty()
-  @IsNumber()
-  indicator_id: number;
+    @IsNotEmpty()
+    @IsNumber()
+    indicator_id: number;
 
-  @IsNotEmpty()
-  @IsNumber()
-  contribution_value: number;
+    @IsNotEmpty()
+    @IsNumber()
+    contribution_value: number;
 }

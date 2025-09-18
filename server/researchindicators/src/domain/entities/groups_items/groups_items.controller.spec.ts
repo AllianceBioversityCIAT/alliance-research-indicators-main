@@ -23,8 +23,8 @@ describe('GroupsItemsController', () => {
         },
         {
           provide: ResultsUtil,
-          useValue: {
-            transform: jest.fn((data) => data), // mock simple
+          useValue: { 
+            transform: jest.fn((data) => data)  // mock simple
           },
         },
       ],
@@ -47,21 +47,21 @@ describe('GroupsItemsController', () => {
             custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
             id: 12,
             level: 1,
-            name: 'Test Level 1',
+            name: "Test Level 1",
           },
           {
-            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }],
+            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
             id: 13,
             level: 1,
-            name: 'Test Level 2',
-          },
+            name: "Test Level 2",
+          }
         ],
         structures: [
           {
             id: 1,
-            name: 'Test Structure',
-          },
-        ],
+            name: 'Test Structure'
+          }
+        ]
       };
       jest.spyOn(service, 'findAll').mockResolvedValue(mockResponse);
       const result = await controller.findAll(agreementId);
@@ -71,7 +71,7 @@ describe('GroupsItemsController', () => {
           description: 'Structure found',
           status: HttpStatus.OK,
           data: mockResponse,
-        }),
+        })
       );
     });
 
@@ -83,22 +83,22 @@ describe('GroupsItemsController', () => {
             custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
             id: 12,
             level: 1,
-            name: 'Test Level 1',
+            name: "Test Level 1",
           },
           {
             custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }],
             id: 13,
             level: 1,
-            name: 'Test Level 2',
-          },
+            name: "Test Level 2"
+          }
         ],
-        structures: [],
+        structures: []
       };
-
+      
       jest.spyOn(service, 'findAll').mockResolvedValue(mockResponse);
-
+      
       const result = await controller.findAll(agreementId);
-
+      
       expect(service.findAll).toHaveBeenCalledWith(agreementId);
       expect(result.data.structures).toHaveLength(0);
     });
@@ -113,14 +113,14 @@ describe('GroupsItemsController', () => {
             custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
             id: 12,
             level: 1,
-            name: 'Test Level 1',
+            name: "Test Level 1",
           },
           {
-            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }],
+            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
             id: 13,
             level: 1,
-            name: 'Test Level 2',
-          },
+            name: "Test Level 2",
+          }
         ],
         structures: [
           {
@@ -132,34 +132,32 @@ describe('GroupsItemsController', () => {
                 id: 2,
                 name: 'Child 1',
                 code: 'C001',
-                indicators: [],
-              },
-            ],
-          },
-        ],
+                indicators: []
+              }
+            ]
+          }
+        ]
       };
-
+      
       const mockServiceResponse = {
         message: 'Structures synchronized successfully',
         data: {
           parent: { id: 1, name: 'Parent Structure' },
-          child: { id: 2, name: 'Child Structure' },
-        },
+          child: { id: 2, name: 'Child Structure' }
+        }
       };
-
-      jest
-        .spyOn(service, 'syncStructures2')
-        .mockResolvedValue(mockServiceResponse);
-
+      
+      jest.spyOn(service, 'syncStructures2').mockResolvedValue(mockServiceResponse);
+      
       const result = await controller.handleAction(dto);
-
+      
       expect(service.syncStructures2).toHaveBeenCalledWith(dto);
       expect(result).toEqual(
         ResponseUtils.format({
           description: 'Structure found',
           status: HttpStatus.OK,
           data: mockServiceResponse,
-        }),
+        })
       );
     });
 
@@ -171,28 +169,26 @@ describe('GroupsItemsController', () => {
             custom_fields: [{ fieldID: 1, field_name: 'custom_field_1' }],
             id: 12,
             level: 1,
-            name: 'Test Level 1',
+            name: "Test Level 1",
           },
           {
-            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }],
+            custom_fields: [{ fieldID: 2, field_name: 'custom_field_2' }], 
             id: 13,
             level: 1,
-            name: 'Test Level 2',
-          },
+            name: "Test Level 2",
+          }
         ],
-        structures: [],
+        structures: []
       };
-
+      
       const mockServiceResponse = {
-        message: 'No structures to sync',
+        message: 'No structures to sync'
       };
-
-      jest
-        .spyOn(service, 'syncStructures2')
-        .mockResolvedValue(mockServiceResponse);
-
+      
+      jest.spyOn(service, 'syncStructures2').mockResolvedValue(mockServiceResponse);
+      
       const result = await controller.handleAction(dto);
-
+      
       expect(service.syncStructures2).toHaveBeenCalledWith(dto);
       expect(result.data.message).toBe('No structures to sync');
     });

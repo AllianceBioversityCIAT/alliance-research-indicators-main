@@ -9,7 +9,6 @@ import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ResultCountry } from '../result-countries/entities/result-country.entity';
 import { ResultRegion } from '../result-regions/entities/result-region.entity';
 import { SaveGeoLocationDto } from '../results/dto/save-geo-location.dto';
-import { ResultUser } from '../result-users/entities/result-user.entity';
 
 @Injectable()
 export class TempExternalOicrsService extends BaseServiceSimple<
@@ -35,7 +34,7 @@ export class TempExternalOicrsService extends BaseServiceSimple<
     });
   }
 
-  async metadata(externalOicrsId: number): Promise<CreateResultOicrDto> {
+  async mappingExternalOicrs(externalOicrsId: number) {
     const preLoad: CreateResultOicrDto = new CreateResultOicrDto();
 
     const resExternal = await this.exteralRepo.findOne({
@@ -43,11 +42,6 @@ export class TempExternalOicrsService extends BaseServiceSimple<
         id: externalOicrsId,
       },
     });
-
-    const mainContactPerson: Partial<ResultUser>[] =
-      resExternal?.main_contact_person_list
-        ?.split(';')
-        .map((item) => ({ user_id: item.trim() }));
 
     const leverList: Partial<ResultLever>[] = resExternal?.lever_list
       ?.split(';')
@@ -70,11 +64,7 @@ export class TempExternalOicrsService extends BaseServiceSimple<
     geoLocation.geo_scope_id = resExternal?.geo_scope_id;
     geoLocation.comment_geo_scope = resExternal?.geo_scope_comment;
 
-    preLoad.extra_info.maturity_level = parseInt(resExternal?.maturity_level);
-    preLoad.step_one.main_contact_person = mainContactPerson?.[0] as ResultUser;
     preLoad.step_two.contributor_lever = leverList as ResultLever[];
     preLoad.step_three = geoLocation;
-
-    return preLoad;
   }
 }

@@ -9,10 +9,6 @@ export class StepFourOicrDto {
   general_comment?: string;
 }
 
-export class ExtraInfoDto {
-  maturity_level?: number;
-}
-
 export class CreateResultOicrDto {
   @ApiProperty({ type: StepOneOicrDto })
   step_one: StepOneOicrDto;
@@ -24,5 +20,4 @@ export class CreateResultOicrDto {
   step_four: StepFourOicrDto;
   @ApiProperty({ type: CreateResultDto })
   base_information: CreateResultDto;
-  extra_info?: ExtraInfoDto;
 }

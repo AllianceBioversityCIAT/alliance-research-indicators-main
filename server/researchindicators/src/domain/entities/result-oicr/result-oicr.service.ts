@@ -37,8 +37,7 @@ import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_res
 import { isEmpty } from '../../shared/utils/object.utils';
 import {
   CountryDto,
-  LeverDto,
-  MainLeverDto,
+  LeverDto, MainLeverDto,
   ProjectDto,
   RegionDto,
   ResultMappedDto,
@@ -429,7 +428,7 @@ export class ResultOicrService {
       if (row.project_id && row.project_title) {
         projectsMap.set(row.project_id, {
           project_id: row.project_id,
-          project_title: row.project_title,
+          project_title: row.project_title
         });
       }
 
@@ -437,7 +436,7 @@ export class ResultOicrService {
         mainLeversMap.set(row.main_lever_id, {
           main_lever_id: row.main_lever_id,
           main_lever: row.main_lever,
-          main_lever_name: row.main_lever_name,
+          main_lever_name: row.main_lever_name
         });
       }
 
@@ -445,7 +444,7 @@ export class ResultOicrService {
         mainLeversMap.set(row.main_lever_id, {
           main_lever_id: row.main_lever_id,
           main_lever: row.main_lever,
-          main_lever_name: row.main_lever_name,
+          main_lever_name: row.main_lever_name
         });
       }
 
