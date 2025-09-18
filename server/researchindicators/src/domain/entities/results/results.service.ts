@@ -220,6 +220,8 @@ export class ResultsService {
     newConfig.leverEnum = configuration?.leverEnum ?? LeverRolesEnum.ALIGNMENT;
     newConfig.notMap.lever = configuration?.notMap?.lever ?? false;
     newConfig.notMap.sdg = configuration?.notMap?.sdg ?? false;
+    newConfig.result_status_id =
+      configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
     return newConfig;
   }
 
@@ -272,6 +274,7 @@ export class ResultsService {
           report_year_id: year,
           is_snapshot: false,
           platform_code,
+          result_status_id: config.result_status_id,
           ...this.currentUser.audit(SetAutitEnum.NEW),
         })
         .then((result) => {
