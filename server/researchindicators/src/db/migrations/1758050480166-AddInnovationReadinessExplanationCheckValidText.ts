@@ -1,13 +1,14 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddInnovationReadinessExplanationCheckValidText1758050480166 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+export class AddInnovationReadinessExplanationCheckValidText1758050480166
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
         DROP FUNCTION IF EXISTS \`innovation_dev_validation\`;
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
         CREATE FUNCTION \`innovation_dev_validation\`(result_code BIGINT) RETURNS tinyint(1)
         READS SQL DATA
         BEGIN
@@ -108,14 +109,14 @@ export class AddInnovationReadinessExplanationCheckValidText1758050480166 implem
                 AND IF(readinessLevel >= 7, knowledgeSharing, TRUE);
         END
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             DROP FUNCTION IF EXISTS \`innovation_dev_validation\`;
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE FUNCTION \`innovation_dev_validation\`(result_code BIGINT) RETURNS tinyint(1)
             READS SQL DATA
             BEGIN
@@ -215,7 +216,5 @@ export class AddInnovationReadinessExplanationCheckValidText1758050480166 implem
                     AND commonFields  
                     AND IF(readinessLevel >= 7, knowledgeSharing, TRUE);
             END`);
-
-    }
-
+  }
 }

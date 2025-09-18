@@ -26,14 +26,16 @@ describe('ProjectIndicatorsController', () => {
         },
         {
           provide: ResultsUtil,
-          useValue: { 
-            transform: jest.fn((data) => data)  // mock simple
+          useValue: {
+            transform: jest.fn((data) => data), // mock simple
           },
         },
       ],
     }).compile();
 
-    controller = module.get<ProjectIndicatorsController>(ProjectIndicatorsController);
+    controller = module.get<ProjectIndicatorsController>(
+      ProjectIndicatorsController,
+    );
     service = module.get<ProjectIndicatorsService>(ProjectIndicatorsService);
   });
 
@@ -115,9 +117,13 @@ describe('ProjectIndicatorsController', () => {
   describe('getContributionsByResult', () => {
     it('should return formatted response with contributions by result', async () => {
       const mockData = [{ id: 3 }];
-      (service.findContributionsByResult as jest.Mock).mockResolvedValue(mockData);
+      (service.findContributionsByResult as jest.Mock).mockResolvedValue(
+        mockData,
+      );
       const result = await controller.getContributionsByResult('agreement2');
-      expect(service.findContributionsByResult).toHaveBeenCalledWith('agreement2');
+      expect(service.findContributionsByResult).toHaveBeenCalledWith(
+        'agreement2',
+      );
       expect(result).toEqual({
         description: 'Contributions found',
         status: HttpStatus.OK,

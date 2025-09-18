@@ -18,13 +18,15 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 @UseInterceptors(SetUpInterceptor)
 @Controller()
 export class ProjectIndicatorsResultsController {
-
   constructor(
-    private readonly indicatorsResultsService: ProjectIndicatorsResultsService
+    private readonly indicatorsResultsService: ProjectIndicatorsResultsService,
   ) {}
 
   @Post('sync-contribution/:resultId')
-  async createResult(@Param('resultId') resultId: number, @Body() dtos: SyncProjectIndicatorsResultDto[]) {
+  async createResult(
+    @Param('resultId') resultId: number,
+    @Body() dtos: SyncProjectIndicatorsResultDto[],
+  ) {
     return await this.indicatorsResultsService
       .syncResultToIndicator(dtos, resultId)
       .then((data) =>
@@ -42,8 +44,8 @@ export class ProjectIndicatorsResultsController {
     @Param('agreementId') agreementId: string,
   ) {
     return await this.indicatorsResultsService
-    .findByResultId(resultId, agreementId)
-    .then((data) =>
+      .findByResultId(resultId, agreementId)
+      .then((data) =>
         ResponseUtils.format({
           description: 'Contributions retrieved successfully',
           status: HttpStatus.OK,

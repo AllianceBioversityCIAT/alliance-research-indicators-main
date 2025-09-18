@@ -56,7 +56,7 @@ export class GroupsItemsService {
           'custom_field_9',
           'custom_field_10',
         ],
-      });  
+      });
 
     const levels =
       projectGroups.length > 0
@@ -76,7 +76,7 @@ export class GroupsItemsService {
               custom_fields: [],
             },
           ];
-    
+
     const nodes = new Map<number, any>();
 
     for (const g of groups) {
@@ -104,9 +104,9 @@ export class GroupsItemsService {
           })) || [];
 
       const isRoot = !g.parent_id;
-      const definedCustomFields = levels.find(
-        (lvl) => lvl.level === (isRoot ? 1 : 2),
-      )?.custom_fields ?? [];
+      const definedCustomFields =
+        levels.find((lvl) => lvl.level === (isRoot ? 1 : 2))?.custom_fields ??
+        [];
 
       nodes.set(g.id, {
         id: g.id.toString(),
@@ -163,7 +163,7 @@ export class GroupsItemsService {
     g: any,
     definedFields: { fieldID: number; field_name: string }[],
   ) {
-    const result: { field: number; field_value: string | null}[] = [];
+    const result: { field: number; field_value: string | null }[] = [];
 
     for (const def of definedFields) {
       let value = g[`custom_field_${def.fieldID}`];
@@ -171,7 +171,6 @@ export class GroupsItemsService {
         value = null;
       }
       result.push({ field: def.fieldID, field_value: value });
-
     }
 
     return result;
@@ -485,7 +484,7 @@ export class GroupsItemsService {
     const { agreement_id, levels } = dto;
 
     for (const levelData of levels) {
-      const {name, level, custom_fields = [] } = levelData;
+      const { name, level, custom_fields = [] } = levelData;
 
       // Buscar registro existente por acuerdo y nivel
       let record = await manager.findOne(ProjectGroup, {

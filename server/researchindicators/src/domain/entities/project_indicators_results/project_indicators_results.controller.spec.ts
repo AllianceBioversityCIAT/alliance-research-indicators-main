@@ -23,15 +23,19 @@ describe('ProjectIndicatorsResultsController', () => {
         },
         {
           provide: ResultsUtil,
-          useValue: { 
-            transform: jest.fn((data) => data)  // mock simple
+          useValue: {
+            transform: jest.fn((data) => data), // mock simple
           },
         },
       ],
     }).compile();
 
-    controller = module.get<ProjectIndicatorsResultsController>(ProjectIndicatorsResultsController);
-    service = module.get<ProjectIndicatorsResultsService>(ProjectIndicatorsResultsService);
+    controller = module.get<ProjectIndicatorsResultsController>(
+      ProjectIndicatorsResultsController,
+    );
+    service = module.get<ProjectIndicatorsResultsService>(
+      ProjectIndicatorsResultsService,
+    );
   });
 
   it('should be defined', () => {
@@ -41,9 +45,13 @@ describe('ProjectIndicatorsResultsController', () => {
   describe('createResult', () => {
     it('should call service.syncResultToIndicator and return formatted response', async () => {
       const resultId = 1;
-      const dtos: SyncProjectIndicatorsResultDto[] = [{ indicatorId: 2, value: 10 } as any];
+      const dtos: SyncProjectIndicatorsResultDto[] = [
+        { indicatorId: 2, value: 10 } as any,
+      ];
       const serviceResult = [{ id: 1, indicatorId: 2, value: 10 }];
-      (service.syncResultToIndicator as jest.Mock).mockResolvedValue(serviceResult);
+      (service.syncResultToIndicator as jest.Mock).mockResolvedValue(
+        serviceResult,
+      );
 
       const expectedResponse = ResponseUtils.format({
         description: 'Contributions synced successfully',
@@ -52,7 +60,10 @@ describe('ProjectIndicatorsResultsController', () => {
       });
 
       const response = await controller.createResult(resultId, dtos);
-      expect(service.syncResultToIndicator).toHaveBeenCalledWith(dtos, resultId);
+      expect(service.syncResultToIndicator).toHaveBeenCalledWith(
+        dtos,
+        resultId,
+      );
       expect(response).toEqual(expectedResponse);
     });
   });
@@ -71,7 +82,10 @@ describe('ProjectIndicatorsResultsController', () => {
       });
 
       const response = await controller.findByResultId(resultId, agreementId);
-      expect(service.findByResultId).toHaveBeenCalledWith(resultId, agreementId);
+      expect(service.findByResultId).toHaveBeenCalledWith(
+        resultId,
+        agreementId,
+      );
       expect(response).toEqual(expectedResponse);
     });
   });

@@ -100,17 +100,18 @@ export class ProjectIndicatorsController {
   }
 
   @Get('excel/:agreementId')
-  async getExcel(@Param('agreementId') agreementId: string, @Res() res: Response) {
-    const { buffer, fileName } = await this.projectIndicatorsService.generarExcel(agreementId);
+  async getExcel(
+    @Param('agreementId') agreementId: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, fileName } =
+      await this.projectIndicatorsService.generarExcel(agreementId);
 
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${fileName}"`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
     res.end(buffer);
   }

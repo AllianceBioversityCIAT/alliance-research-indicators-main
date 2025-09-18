@@ -1,8 +1,4 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 
 @Entity('project_groups')

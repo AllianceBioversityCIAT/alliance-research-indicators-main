@@ -1,4 +1,10 @@
-import { IsEnum, IsInt, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StructureItemDto {
