@@ -62,6 +62,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/src/go ./src/go
 
+# Ensure Go helper binaries are executable
+RUN chmod +x /app/src/go/bin/generate_excel
+
 # Switch to non-root user
 USER appuser
 
