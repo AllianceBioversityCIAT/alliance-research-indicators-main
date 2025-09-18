@@ -1,5 +1,5 @@
 #################### GO BUILD STAGE ####################
-FROM golang:1.26-alpine AS go-build
+FROM golang:1.25-alpine AS go-build
 
 WORKDIR /workspace
 
