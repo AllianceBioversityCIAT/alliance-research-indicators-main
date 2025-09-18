@@ -225,8 +225,10 @@ export class ResultsService {
   private validateCreateConfig(configuration?: CreateResultConfigDto) {
     const newConfig: CreateResultConfigDto = new CreateResultConfigDto();
     newConfig.leverEnum = configuration?.leverEnum ?? LeverRolesEnum.ALIGNMENT;
-    newConfig.notMap.lever = configuration?.notMap?.lever ?? false;
-    newConfig.notMap.sdg = configuration?.notMap?.sdg ?? false;
+    newConfig.notMap = {
+      sdg: configuration?.notMap?.sdg ?? false,
+      lever: configuration?.notMap?.lever ?? false,
+    };
     newConfig.result_status_id =
       configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
     return newConfig;
@@ -935,12 +937,13 @@ export class ResultsService {
     resultId: number,
     saveGeoLocationDto: SaveGeoLocationDto,
   ) {
-    return this.dataSource.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       const geoScopeId: ClarisaGeoScopeEnum =
         this._clarisaGeoScopeService.transformGeoScope(
           saveGeoLocationDto.geo_scope_id,
           saveGeoLocationDto.countries,
         );
+
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
         comment_geo_scope: String(saveGeoLocationDto?.comment_geo_scope),
@@ -1052,9 +1055,8 @@ export class ResultsService {
       }
 
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
-
-      return this.findGeoLocation(resultId);
     });
+    return this.findGeoLocation(resultId);
   }
 
   async findGeoLocation(resultId: number): Promise<SaveGeoLocationDto> {

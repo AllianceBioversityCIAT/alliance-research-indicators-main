@@ -260,14 +260,14 @@ export class ResultOicrService {
   ) {
     const savePrimaryLevers: Partial<ResultLever>[] = data.primary_lever.map(
       (lever) => ({
-        lever_id: lever.lever_id,
+        lever_id: lever?.lever_id,
         is_primary: true,
       }),
     );
 
     const saveContributorLevers: Partial<ResultLever>[] =
       data.contributor_lever.map((lever) => ({
-        lever_id: lever.lever_id,
+        lever_id: lever?.lever_id,
         is_primary: false,
       }));
 
