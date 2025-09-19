@@ -1069,7 +1069,7 @@ export class ResultsService {
     });
 
     const cliGeoScope = this._clarisaGeoScopeService.transformGeoScope(
-      result.geo_scope_id,
+      result?.geo_scope_id,
       undefined,
       false,
     );
@@ -1104,7 +1104,7 @@ export class ResultsService {
       geo_scope_id: cliGeoScope,
       regions,
       countries,
-      comment_geo_scope: result.comment_geo_scope,
+      comment_geo_scope: result?.comment_geo_scope,
     };
   }
 
