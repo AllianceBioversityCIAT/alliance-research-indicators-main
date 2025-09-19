@@ -100,7 +100,7 @@ export class ResultOicrService {
     );
     if (template) {
       await this.messageMicroservice.sendEmail({
-        subject: `[STAR] - New OICR Submission #${messageData.result_code}`,
+        subject: `[STAR] - New OICR Request #${messageData.result_code}`,
         to: this.appConfig.SPRM_EMAIL_SAFE(this.currentUser.email),
         message: {
           socketFile: Buffer.from(template),
