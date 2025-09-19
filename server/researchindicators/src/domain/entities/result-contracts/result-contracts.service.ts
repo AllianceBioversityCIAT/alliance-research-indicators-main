@@ -26,6 +26,10 @@ export class ResultContractsService extends BaseServiceSimple<
     );
   }
 
+  async getLeverFromPrimaryContract(result_id: number): Promise<number> {
+    return this.mainRepo.findContractsLeverByResultId(result_id);
+  }
+
   async deleteAll(result_id: number, manager?: EntityManager) {
     const entityManager: Repository<ResultContract> = selectManager(
       manager,
