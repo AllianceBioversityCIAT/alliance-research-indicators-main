@@ -44,7 +44,10 @@ import {
 } from './dto/response-oicr-word-template.dto';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
-import { mergeArraysWithPriority } from '../../shared/utils/array.util';
+import {
+  filterByUniqueKeyWithPriority,
+  mergeArraysWithPriority,
+} from '../../shared/utils/array.util';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 
 @Injectable()
@@ -273,9 +276,15 @@ export class ResultOicrService {
 
     const allLevers = [...savePrimaryLevers, ...saveContributorLevers];
 
+    const datalever = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
+      allLevers,
+      'lever_id',
+      'is_primary',
+    );
+
     await this.resultLeversService.create(
       resultId,
-      allLevers,
+      datalever,
       'lever_id',
       LeverRolesEnum.OICR_ALIGNMENT,
       manager,
