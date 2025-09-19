@@ -49,6 +49,7 @@ import {
   mergeArraysWithPriority,
 } from '../../shared/utils/array.util';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { ResultContractsService } from '../result-contracts/result-contracts.service';
 
 @Injectable()
 export class ResultOicrService {
@@ -67,6 +68,7 @@ export class ResultOicrService {
     private readonly templateService: TemplateService,
     private readonly mainRepo: ResultOicrRepository,
     private readonly tempExternalOicrsService: TempExternalOicrsService,
+    private readonly resultContractService: ResultContractsService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -183,6 +185,8 @@ export class ResultOicrService {
       saveLinkedResults,
       'external_oicr_id',
     );
+
+    await this.updateDataUtil.updateLastUpdatedDate(resultId);
   }
 
   async findOicrs(resultId: number): Promise<UpdateOicrDto> {
@@ -231,6 +235,8 @@ export class ResultOicrService {
     await manager.getRepository(Result).update(resultId, {
       description: data?.step_one?.outcome_impact_statement,
     });
+
+    await this.updateDataUtil.updateLastUpdatedDate(resultId, manager);
   }
 
   async createOicrSteps(
@@ -409,8 +415,19 @@ export class ResultOicrService {
       LeverRolesEnum.OICR_ALIGNMENT,
     );
 
+    const leverId =
+      await this.resultContractService.getLeverFromPrimaryContract(resultId);
+
     return {
-      primary_lever: allLevers.filter((lever) => lever.is_primary),
+      primary_lever: allLevers
+        .filter((lever) => lever.is_primary)
+        .map(
+          (el) =>
+            ({
+              ...el,
+              is_contract_lever: el.lever_id == String(leverId),
+            }) as unknown as ResultLever,
+        ),
       contributor_lever: allLevers.filter((lever) => !lever.is_primary),
     };
   }

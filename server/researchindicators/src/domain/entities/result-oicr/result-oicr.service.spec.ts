@@ -24,6 +24,7 @@ import { ResultOicrRepository } from './repositories/result-oicr.repository';
 import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
+import { ResultContractsService } from '../result-contracts/result-contracts.service';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -42,6 +43,7 @@ describe('ResultOicrService', () => {
   let mockTemplateService: jest.Mocked<TemplateService>;
   let mockResultOicrRepository: jest.Mocked<ResultOicrRepository>;
   let mockTempExternalOicrsService: jest.Mocked<TempExternalOicrsService>;
+  let mockResultContractsService: jest.Mocked<ResultContractsService>;
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -148,6 +150,15 @@ describe('ResultOicrService', () => {
       remove: jest.fn(),
     } as any;
 
+    mockResultContractsService = {
+      find: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      deleteAll: jest.fn(),
+      findAllResultByContractId: jest.fn(),
+      getLeverFromPrimaryContract: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultOicrService,
@@ -167,6 +178,10 @@ describe('ResultOicrService', () => {
         { provide: AppConfig, useValue: mockAppConfig },
         { provide: TemplateService, useValue: mockTemplateService },
         { provide: ResultOicrRepository, useValue: mockResultOicrRepository },
+        {
+          provide: ResultContractsService,
+          useValue: mockResultContractsService,
+        },
         {
           provide: TempExternalOicrsService,
           useValue: mockTempExternalOicrsService,
@@ -629,6 +644,9 @@ describe('ResultOicrService', () => {
       ];
 
       mockResultLeversService.find.mockResolvedValue(mockAllLevers as any);
+      mockResultContractsService.getLeverFromPrimaryContract.mockResolvedValue(
+        null,
+      );
 
       // Act
       const result = await (service as any).findStepTwoOicr(resultId);
@@ -640,8 +658,8 @@ describe('ResultOicrService', () => {
       );
       expect(result).toEqual({
         primary_lever: [
-          { lever_id: '1', is_primary: true },
-          { lever_id: '3', is_primary: true },
+          { lever_id: '1', is_primary: true, is_contract_lever: false },
+          { lever_id: '3', is_primary: true, is_contract_lever: false },
         ],
         contributor_lever: [
           { lever_id: '2', is_primary: false },
@@ -655,6 +673,9 @@ describe('ResultOicrService', () => {
       const resultId = 123;
 
       mockResultLeversService.find.mockResolvedValue([]);
+      mockResultContractsService.getLeverFromPrimaryContract.mockResolvedValue(
+        null,
+      );
 
       // Act
       const result = await (service as any).findStepTwoOicr(resultId);
