@@ -22,8 +22,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
                     ac.project_lead_description as principal_investigator,
                     IFNULL(cl.full_name, 'No lever associated') as primary_lever,
                     IF(aus.carnet IS NOT NULL, CONCAT(aus.first_name, ', ',aus.last_name), 'Not Provided') as main_contact_person,
-                    r.description as oicr_description,
-                    '' as oicr_link
+                    r.description as oicr_description
                     FROM results r
                     INNER JOIN result_oicrs ro ON ro.result_id = r.result_id 
                     INNER JOIN result_contracts rc ON rc.result_id = r.result_id 
