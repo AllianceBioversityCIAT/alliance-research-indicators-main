@@ -6,5 +6,5 @@ export const LeverIcon: Record<string, string> = {
   'Lever 5': '/L5-Digital-Inclusion_COLOR.png',
   'Lever 6': '/L6-Crops-for-Nutrition_COLOR.png',
   'Lever 7': '/L7-Gender-Youth-and-Inclusion_COLOR.png',
-  'Lever 8': null,
+  'Lever 8': '/empty.png',
 };

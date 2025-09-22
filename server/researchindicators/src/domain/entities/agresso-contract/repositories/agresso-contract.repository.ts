@@ -74,6 +74,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       L5: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L5-Digital-Inclusion_COLOR.png',
       L6: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L6-Crops-for-Nutrition_COLOR.png',
       L7: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L7-Gender-Youth-and-Inclusion_COLOR.png',
+      L8: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/empty.png',
     };
 
     return result.map((item) => ({
