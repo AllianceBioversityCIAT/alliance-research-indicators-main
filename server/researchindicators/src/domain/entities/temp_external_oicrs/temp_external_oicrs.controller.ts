@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
 import { TempExternalOicrsService } from './temp_external_oicrs.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -18,5 +18,15 @@ export class TempExternalOicrsController {
         status: HttpStatus.OK,
       }),
     );
+  }
+
+  @Get(':id/metadata')
+  async findMetadata(@Param('id') id: number) {
+    const leverList = await this.service.mappingExternalOicrs(id);
+    return ResponseUtils.format({
+      data: leverList,
+      description: 'results found correctly',
+      status: HttpStatus.OK,
+    });
   }
 }

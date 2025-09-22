@@ -15,4 +15,12 @@ export class ClarisaLanguagesService extends ControlListBaseService<
       currentUser,
     );
   }
+
+  async findOneByiso3(iso3: string) {
+    return this.mainRepo.findOne({
+      where: {
+        iso_alpha_3: iso3,
+      },
+    });
+  }
 }

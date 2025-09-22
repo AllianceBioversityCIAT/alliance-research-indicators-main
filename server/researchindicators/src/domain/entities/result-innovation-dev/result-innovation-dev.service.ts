@@ -35,6 +35,8 @@ import { ClarisaInstitutionsService } from '../../tools/clarisa/entities/clarisa
 import { ClarisaInstitution } from '../../tools/clarisa/entities/clarisa-institutions/entities/clarisa-institution.entity';
 import { CreateResultInstitutionTypeDto } from '../result-institution-types/dto/create-result-institution-type.dto';
 import { ClarisaInstitutionTypesService } from '../../tools/clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
+import { ResultInnovationToolFunction } from '../result-innovation-tool-function/entities/result-innovation-tool-function.entity';
+import { ResultInnovationToolFunctionService } from '../result-innovation-tool-function/result-innovation-tool-function.service';
 @Injectable()
 export class ResultInnovationDevService {
   private readonly mainRepo: Repository<ResultInnovationDev>;
@@ -52,6 +54,7 @@ export class ResultInnovationDevService {
     private readonly _innovationDevAnticipatedUsersService: InnovationDevAnticipatedUsersService,
     private readonly _clarisaInstitutionsService: ClarisaInstitutionsService,
     private readonly _clarisaInstitutionTypesService: ClarisaInstitutionTypesService,
+    private readonly _resultInnovationToolFunctionService: ResultInnovationToolFunctionService,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultInnovationDev);
   }
@@ -208,6 +211,8 @@ export class ResultInnovationDevService {
           createResultInnovationDevDto?.innovation_nature_id,
         innovation_readiness_id:
           createResultInnovationDevDto?.innovation_readiness_id,
+        innovation_readiness_explanation:
+          createResultInnovationDevDto?.innovation_readiness_explanation,
         innovation_type_id: createResultInnovationDevDto?.innovation_type_id,
         no_sex_age_disaggregation:
           createResultInnovationDevDto?.no_sex_age_disaggregation,
@@ -353,6 +358,12 @@ export class ResultInnovationDevService {
       }));
     delete knowledgeSharingData?.link_to_result;
 
+    let toolFunction: Partial<ResultInnovationToolFunction>[] =
+      knowledgeSharingData?.tool_function_id?.map((id) => ({
+        tool_function_id: id?.tool_function_id,
+      }));
+    delete knowledgeSharingData?.link_to_result;
+
     if (!knowledgeSharingData?.is_knowledge_sharing || readinessLevel < 7) {
       const defaultAttributes: (keyof ResultInnovationDevKnouldgeSharingDto)[] =
         [
@@ -362,12 +373,12 @@ export class ResultInnovationDevService {
           'other_tools',
           'other_tools_integration',
           'results_achieved_expected',
-          'tool_function_id',
           'tool_useful_context',
         ];
       if (readinessLevel < 7) defaultAttributes.push('is_knowledge_sharing');
       setDefaultValueInObject(knowledgeSharingData, defaultAttributes);
       linkToResult = [];
+      toolFunction = [];
     }
 
     await this._linkResultsService.create(
@@ -375,6 +386,15 @@ export class ResultInnovationDevService {
       linkToResult,
       'other_result_id',
       LinkResultRolesEnum.INNOVATION_DEV,
+      manager,
+    );
+
+    await this._resultInnovationToolFunctionService.create(
+      resultId,
+      toolFunction,
+      'tool_function_id',
+      undefined,
+      manager,
     );
 
     await entityManager.update(resultId, {
@@ -389,7 +409,6 @@ export class ResultInnovationDevService {
       other_tools_integration: knowledgeSharingData?.other_tools_integration,
       results_achieved_expected:
         knowledgeSharingData?.results_achieved_expected,
-      tool_function_id: knowledgeSharingData?.tool_function_id,
       tool_useful_context: knowledgeSharingData?.tool_useful_context,
       ...this._currentUser.audit(SetAutitEnum.UPDATE),
     });
@@ -415,11 +434,18 @@ export class ResultInnovationDevService {
       ActorRolesEnum.INNOVATION_DEV,
     );
 
+    const tool_function_id = await this._resultInnovationToolFunctionService.find(
+      id,
+      null,
+    );
+
     return {
       short_title: resultInnovationDev.short_title,
       innovation_nature_id: resultInnovationDev.innovation_nature_id,
       innovation_type_id: resultInnovationDev.innovation_type_id,
       innovation_readiness_id: resultInnovationDev.innovation_readiness_id,
+      innovation_readiness_explanation:
+        resultInnovationDev.innovation_readiness_explanation,
       no_sex_age_disaggregation: resultInnovationDev.no_sex_age_disaggregation,
       anticipated_users_id: resultInnovationDev.anticipated_users_id,
       expected_outcome: resultInnovationDev.expected_outcome,
@@ -438,7 +464,7 @@ export class ResultInnovationDevService {
         tool_useful_context: resultInnovationDev.tool_useful_context,
         results_achieved_expected:
           resultInnovationDev.results_achieved_expected,
-        tool_function_id: resultInnovationDev.tool_function_id,
+        tool_function_id,
         is_used_beyond_original_context:
           resultInnovationDev.is_used_beyond_original_context,
         adoption_adaptation_context:

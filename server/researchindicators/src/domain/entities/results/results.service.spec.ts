@@ -24,6 +24,7 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
+import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
@@ -41,6 +42,8 @@ import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
 import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
+import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
+import { ResultEvidencesService } from '../result-evidences/result-evidences.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 
 describe('ResultsService', () => {
@@ -70,6 +73,9 @@ describe('ResultsService', () => {
   let mockResultInnovationDevService: jest.Mocked<ResultInnovationDevService>;
   let mockResultSdgsService: jest.Mocked<ResultSdgsService>;
   let mockResultOicrService: jest.Mocked<ResultOicrService>;
+  let mockClarisaCountriesService: jest.Mocked<ClarisaCountriesService>;
+  let mockResultInstitutionsService: jest.Mocked<ResultInstitutionsService>;
+  let mockResultEvidencesService: jest.Mocked<ResultEvidencesService>;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -93,6 +99,7 @@ describe('ResultsService', () => {
     mockResultContractsService = {
       find: jest.fn(),
       create: jest.fn(),
+      getPrimaryContract: jest.fn(),
     } as any;
 
     mockResultLeversService = {
@@ -200,6 +207,22 @@ describe('ResultsService', () => {
       create: jest.fn(),
     } as any;
 
+    mockClarisaCountriesService = {
+      findByNames: jest.fn(),
+    } as any;
+
+    mockResultInstitutionsService = {
+      create: jest.fn(),
+      find: jest.fn(),
+      findByCode: jest.fn(),
+    } as any;
+
+    mockResultEvidencesService = {
+      create: jest.fn(),
+      find: jest.fn(),
+      update: jest.fn(),
+    } as any;
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -270,6 +293,18 @@ describe('ResultsService', () => {
         {
           provide: ResultOicrService,
           useValue: mockResultOicrService,
+        },
+        {
+          provide: ClarisaCountriesService,
+          useValue: mockClarisaCountriesService,
+        },
+        {
+          provide: ResultInstitutionsService,
+          useValue: mockResultInstitutionsService,
+        },
+        {
+          provide: ResultEvidencesService,
+          useValue: mockResultEvidencesService,
         },
       ],
     }).compile();
@@ -469,6 +504,13 @@ describe('ResultsService', () => {
       // Setup service method mocks
       (service as any).newOfficialCode = jest.fn();
       (service as any).createResultType = jest.fn();
+      (service as any).validateCreateConfig = jest.fn().mockReturnValue({
+        leverEnum: 1,
+        notMap: {
+          lever: false,
+          sdg: false,
+        },
+      });
     });
 
     it('should throw BadRequestException when required fields are missing', async () => {
@@ -1929,10 +1971,14 @@ describe('ResultsService', () => {
         },
       };
       const mockPrincipalData = { is_principal: 1 };
+      const mockPrimaryContract = { contract_id: 'CONTRACT-001' };
 
       mockMainRepo.findOne.mockResolvedValue(mockResult as any);
       mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
         mockPrincipalData as any,
+      );
+      mockResultContractsService.getPrimaryContract.mockResolvedValue(
+        mockPrimaryContract as any,
       );
 
       // Act
@@ -1950,6 +1996,7 @@ describe('ResultsService', () => {
         created_by: mockResult.created_by,
         report_year: mockResult.report_year_id,
         is_principal_investigator: mockPrincipalData.is_principal === 1,
+        result_contract_id: mockPrimaryContract.contract_id,
       });
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         select: {
@@ -1988,6 +2035,7 @@ describe('ResultsService', () => {
       mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
         mockPrincipalData as any,
       );
+      mockResultContractsService.getPrimaryContract.mockResolvedValue(null);
 
       // Act & Assert
       await expect(service.findMetadataResult(resultId)).rejects.toThrow(
@@ -2257,7 +2305,10 @@ describe('ResultsService', () => {
       // Assert
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         where: { result_id: resultId, is_active: true },
-        select: ['geo_scope_id'],
+        select: {
+          geo_scope_id: true,
+          comment_geo_scope: true,
+        },
       });
       expect(mockClarisaGeoScopeService.transformGeoScope).toHaveBeenCalledWith(
         mockGeoScopeId,
@@ -2278,24 +2329,9 @@ describe('ResultsService', () => {
       const resultId = 1;
 
       mockMainRepo.findOne.mockResolvedValue(null);
-      mockClarisaGeoScopeService.transformGeoScope.mockReturnValue(undefined);
-      mockResultCountriesService.find.mockResolvedValue([]);
-      mockResultCountriesSubNationalsService.find.mockResolvedValue([]);
-      mockResultRegionsService.find.mockResolvedValue([]);
 
-      // Act
-      await service.findGeoLocation(resultId);
-
-      // Assert
-      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
-        where: { result_id: resultId, is_active: true },
-        select: ['geo_scope_id'],
-      });
-      expect(mockClarisaGeoScopeService.transformGeoScope).toHaveBeenCalledWith(
-        undefined,
-        undefined,
-        false,
-      );
+      // Act & Assert
+      await expect(service.findGeoLocation(resultId)).rejects.toThrow();
     });
   });
 

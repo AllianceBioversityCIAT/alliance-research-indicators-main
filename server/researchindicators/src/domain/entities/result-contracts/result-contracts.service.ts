@@ -26,6 +26,10 @@ export class ResultContractsService extends BaseServiceSimple<
     );
   }
 
+  async getLeverFromPrimaryContract(result_id: number): Promise<number> {
+    return this.mainRepo.findContractsLeverByResultId(result_id);
+  }
+
   async deleteAll(result_id: number, manager?: EntityManager) {
     const entityManager: Repository<ResultContract> = selectManager(
       manager,
@@ -38,6 +42,16 @@ export class ResultContractsService extends BaseServiceSimple<
         is_active: false,
       },
     );
+  }
+
+  async getPrimaryContract(result_id: number) {
+    return this.mainRepo.findOne({
+      where: {
+        result_id: result_id,
+        is_primary: true,
+        is_active: true,
+      },
+    });
   }
 
   protected lastRefactoredAfterSave<ContractRolesEnum>(

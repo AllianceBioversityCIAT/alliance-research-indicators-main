@@ -11,6 +11,11 @@ import { SessionTypesModule } from '../session-types/session-types.module';
 import { DeliveryModalitiesModule } from '../delivery-modalities/delivery-modalities.module';
 import { SessionFormatsModule } from '../session-formats/session-formats.module';
 import { DegreesModule } from '../degrees/degrees.module';
+import { SessionPurposesModule } from '../session-purposes/session-purposes.module';
+import { ClarisaCountriesModule } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.module';
+import { GendersModule } from '../genders/genders.module';
+import { AllianceUserStaffModule } from '../alliance-user-staff/alliance-user-staff.module';
+import { ClarisaLanguagesModule } from '../../tools/clarisa/entities/clarisa-languages/clarisa-languages.module';
 
 @Module({
   controllers: [ResultCapacitySharingController],
@@ -24,6 +29,11 @@ import { DegreesModule } from '../degrees/degrees.module';
     SessionFormatsModule,
     DeliveryModalitiesModule,
     DegreesModule,
+    SessionPurposesModule,
+    ClarisaCountriesModule,
+    GendersModule,
+    AllianceUserStaffModule,
+    ClarisaLanguagesModule,
   ],
   providers: [ResultCapacitySharingService, AiRoarMiningApp],
   exports: [ResultCapacitySharingService],

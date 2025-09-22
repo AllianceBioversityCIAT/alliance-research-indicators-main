@@ -11,6 +11,7 @@ import { ClarisaInnovationReadinessLevelsModule } from '../../tools/clarisa/enti
 import { InnovationDevAnticipatedUsersModule } from '../innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
 import { ClarisaInstitutionsModule } from '../../tools/clarisa/entities/clarisa-institutions/clarisa-institutions.module';
 import { ClarisaInstitutionTypesModule } from '../../tools/clarisa/entities/clarisa-institution-types/clarisa-institution-types.module';
+import { ResultInnovationToolFunctionModule } from '../result-innovation-tool-function/result-innovation-tool-function.module';
 
 @Module({
   controllers: [ResultInnovationDevController],
@@ -27,6 +28,7 @@ import { ClarisaInstitutionTypesModule } from '../../tools/clarisa/entities/clar
     InnovationDevAnticipatedUsersModule,
     ClarisaInstitutionsModule,
     ClarisaInstitutionTypesModule,
+    ResultInnovationToolFunctionModule,
   ],
 })
 export class ResultInnovationDevModule {}

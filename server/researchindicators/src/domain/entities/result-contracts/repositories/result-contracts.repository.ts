@@ -80,4 +80,18 @@ export class ResultContractsRepository extends Repository<ResultContract> {
       FindResultsContractDto[]
     >;
   }
+
+  async findContractsLeverByResultId(result_id: number): Promise<number> {
+    const query = `select cl.id 
+      from result_contracts rc 
+      inner join agresso_contracts ac on ac.agreement_id = rc.contract_id 
+      left join clarisa_levers cl on cl.short_name = REPLACE(ac.departmentId, 'L', 'Lever ')
+      where rc.result_id = ?
+        and rc.is_active = true
+        and rc.is_primary = true;`;
+
+    return this.query(query, [result_id]).then((response: { id: number }[]) =>
+      response?.length ? response[0].id : null,
+    );
+  }
 }
