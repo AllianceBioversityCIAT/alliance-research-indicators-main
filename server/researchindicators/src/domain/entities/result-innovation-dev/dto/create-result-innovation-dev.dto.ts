@@ -9,6 +9,7 @@ import {
 import { CreateResultActorDto } from '../../result-actors/dto/create-result-actor.dto';
 import { CreateResultInstitutionTypeDto } from '../../result-institution-types/dto/create-result-institution-type.dto';
 import { LinkResult } from '../../link-results/entities/link-result.entity';
+import { ResultInnovationToolFunction } from '../../result-innovation-tool-function/entities/result-innovation-tool-function.entity';
 
 export class ResultInnovationDevKnouldgeSharingDto {
   @ApiProperty({ required: false })
@@ -23,8 +24,8 @@ export class ResultInnovationDevKnouldgeSharingDto {
   @ApiProperty({ required: false })
   results_achieved_expected?: string;
 
-  @ApiProperty({ required: false })
-  tool_function_id?: number;
+  @ApiProperty({ required: false, isArray: true, type: ResultInnovationToolFunction })
+  tool_function_id?: ResultInnovationToolFunction[];
 
   @ApiProperty({ required: false })
   is_used_beyond_original_context?: boolean;
