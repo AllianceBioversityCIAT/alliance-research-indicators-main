@@ -44,6 +44,16 @@ export class ResultContractsService extends BaseServiceSimple<
     );
   }
 
+  async getPrimaryContract(result_id: number) {
+    return this.mainRepo.findOne({
+      where: {
+        result_id: result_id,
+        is_primary: true,
+        is_active: true,
+      },
+    });
+  }
+
   protected lastRefactoredAfterSave<ContractRolesEnum>(
     data: Partial<ResultContract>[],
     roleId?: ContractRolesEnum,
