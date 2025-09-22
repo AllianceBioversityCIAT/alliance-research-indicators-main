@@ -16,13 +16,13 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
     const query = ` SELECT 
                     r.result_official_code as result_code,
                     r.title as result_title,
+                    r.created_at as cration_date,
                     rc.contract_id as contract_code,
                     ac.description as contract_description,
                     ac.project_lead_description as principal_investigator,
                     IFNULL(cl.full_name, 'No lever associated') as primary_lever,
                     IF(aus.carnet IS NOT NULL, CONCAT(aus.first_name, ', ',aus.last_name), 'Not Provided') as main_contact_person,
-                    r.description as oicr_description,
-                    '' as oicr_link
+                    r.description as oicr_description
                     FROM results r
                     INNER JOIN result_oicrs ro ON ro.result_id = r.result_id 
                     INNER JOIN result_contracts rc ON rc.result_id = r.result_id 
@@ -43,7 +43,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
                     LIMIT 1;`;
 
     const result = await this.query(query, [resultId]).then((res) => res?.[0]);
-    result.oicr_link = `${this.appConfig.ARI_CLIENT_HOST}/result/${result.result_code}/general-information`;
+    result.oicr_link = `${this.appConfig.ARI_CLIENT_HOST}/project-detail/${result.contract_code}/project-results`;
     return result;
   }
 
