@@ -76,12 +76,12 @@ export class TempExternalOicrsService extends BaseServiceSimple<
 
     preLoad.step_one = {
       main_contact_person: mainContactPerson,
+      outcome_impact_statement: resExternal?.elaboration_narrative,
     } as StepOneOicrDto;
     preLoad.step_two = { contributor_lever: leverList } as StepTwoOicrDto;
     preLoad.step_three = geoLocation;
     preLoad.extra_info = {
       maturity_level: parseInt(resExternal?.maturity_level),
-      elaboration_narrative: resExternal?.elaboration_narrative,
     };
 
     return preLoad;
