@@ -639,6 +639,12 @@ export class ResultsService {
     return undefined;
   }
 
+  async validateResultTitle(title: string): Promise<boolean> {
+    return this.mainRepo
+      .findOne({ where: { title: title, is_active: true } })
+      .then((result) => result == null);
+  }
+
   async findResultAlignment(resultId: number) {
     const contracts = await this._resultContractsService.find(
       resultId,
