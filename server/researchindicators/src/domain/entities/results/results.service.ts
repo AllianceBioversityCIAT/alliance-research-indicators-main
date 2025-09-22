@@ -814,17 +814,15 @@ export class ResultsService {
       tmpNewData.result = newResult;
     }
 
-    {
-      if (!isEmpty(result?.sdg_targets)) {
-        const existingSdgs = await this.dataSource
-          .getRepository(ClarisaSdg)
-          .find({
-            where: { financial_code: In(result.sdg_targets) },
-          });
-        tmpNewData.sdgs = existingSdgs.map((el) => ({
-          clarisa_sdg_id: el.id,
-        })) as ResultSdg[];
-      }
+    if (!isEmpty(result?.sdg_targets)) {
+      const existingSdgs = await this.dataSource
+        .getRepository(ClarisaSdg)
+        .find({
+          where: { financial_code: In(result.sdg_targets) },
+        });
+      tmpNewData.sdgs = existingSdgs.map((el) => ({
+        clarisa_sdg_id: el.id,
+      })) as ResultSdg[];
     }
 
     {
