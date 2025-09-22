@@ -44,7 +44,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
                     LIMIT 1;`;
 
     const result = await this.query(query, [resultId]).then((res) => res?.[0]);
-    result.oicr_link = `${this.appConfig.ARI_CLIENT_HOST}/result/${result.result_code}/general-information`;
+    result.oicr_link = `${this.appConfig.ARI_CLIENT_HOST}/project-detail/${result.contract_code}/project-results`;
     return result;
   }
 
