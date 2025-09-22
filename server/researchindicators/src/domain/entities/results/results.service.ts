@@ -678,6 +678,9 @@ export class ResultsService {
       },
     });
 
+    const primaryContract =
+      await this._resultContractsService.getPrimaryContract(result_id);
+
     const { is_principal } = await this.mainRepo.metadataPrincipalInvestigator(
       result_id,
       this.currentUser.user_id,
@@ -688,6 +691,7 @@ export class ResultsService {
     }
 
     return {
+      result_contract_id: primaryContract?.contract_id,
       indicator_id: result?.indicator?.indicator_id,
       indicator_name: result?.indicator?.name,
       result_id: result?.result_id,

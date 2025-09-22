@@ -99,6 +99,7 @@ describe('ResultsService', () => {
     mockResultContractsService = {
       find: jest.fn(),
       create: jest.fn(),
+      getPrimaryContract: jest.fn(),
     } as any;
 
     mockResultLeversService = {
@@ -1970,10 +1971,14 @@ describe('ResultsService', () => {
         },
       };
       const mockPrincipalData = { is_principal: 1 };
+      const mockPrimaryContract = { contract_id: 'CONTRACT-001' };
 
       mockMainRepo.findOne.mockResolvedValue(mockResult as any);
       mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
         mockPrincipalData as any,
+      );
+      mockResultContractsService.getPrimaryContract.mockResolvedValue(
+        mockPrimaryContract as any,
       );
 
       // Act
@@ -1991,6 +1996,7 @@ describe('ResultsService', () => {
         created_by: mockResult.created_by,
         report_year: mockResult.report_year_id,
         is_principal_investigator: mockPrincipalData.is_principal === 1,
+        result_contract_id: mockPrimaryContract.contract_id,
       });
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         select: {
@@ -2029,6 +2035,7 @@ describe('ResultsService', () => {
       mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
         mockPrincipalData as any,
       );
+      mockResultContractsService.getPrimaryContract.mockResolvedValue(null);
 
       // Act & Assert
       await expect(service.findMetadataResult(resultId)).rejects.toThrow(
