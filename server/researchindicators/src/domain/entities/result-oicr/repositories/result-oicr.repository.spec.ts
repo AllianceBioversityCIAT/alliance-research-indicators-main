@@ -65,7 +65,7 @@ describe('ResultOicrRepository', () => {
       const expectedResult = {
         ...mockQueryResult[0],
         oicr_link:
-          'https://test-client.example.com/result/OICR-2024-001/general-information',
+          'https://test-client.example.com/project-detail/CONTRACT-001/project-results',
       };
 
       // Mock the query method
@@ -93,7 +93,7 @@ describe('ResultOicrRepository', () => {
       );
       expect(result).toEqual(expectedResult);
       expect(result.oicr_link).toBe(
-        'https://test-client.example.com/result/OICR-2024-001/general-information',
+        'https://test-client.example.com/project-detail/CONTRACT-001/project-results',
       );
     });
 
@@ -186,7 +186,7 @@ describe('ResultOicrRepository', () => {
         'ac.project_lead_description as principal_investigator',
       );
       expect(actualQuery).toContain(
-        "IFNULL(cl.full_name, 'No lever associated') as primary_lever",
+        "IFNULL(GROUP_CONCAT(cl.full_name separator ', '), 'No lever associated') as primary_lever",
       );
       expect(actualQuery).toContain(
         "IF(aus.carnet IS NOT NULL, CONCAT(aus.first_name, ', ',aus.last_name), 'Not Provided') as main_contact_person",
@@ -234,7 +234,7 @@ describe('ResultOicrRepository', () => {
 
       // Assert
       expect(result.oicr_link).toBe(
-        'http://localhost:3000/result/OICR-2024-002/general-information',
+        'http://localhost:3000/project-detail/CONTRACT-002/project-results',
       );
     });
 
@@ -262,7 +262,7 @@ describe('ResultOicrRepository', () => {
 
       // Assert
       expect(result.oicr_link).toBe(
-        'https://test-client.example.com/result/OICR-2024-001_special-chars/general-information',
+        'https://test-client.example.com/project-detail/CONTRACT-001/project-results',
       );
     });
   });

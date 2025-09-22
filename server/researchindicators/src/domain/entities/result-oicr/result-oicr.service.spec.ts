@@ -736,8 +736,9 @@ describe('ResultOicrService', () => {
         mockCurrentUser.email,
       );
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: '[STAR] - New OICR Submission #OICR-2024-001',
+        subject: '[STAR] - New OICR Request #OICR-2024-001',
         to: mockUserEmail,
+        bcc: undefined,
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
@@ -861,8 +862,9 @@ describe('ResultOicrService', () => {
         mockMessageData,
       );
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: '[STAR] - New OICR Submission #OICR-2024-004',
+        subject: '[STAR] - New OICR Request #OICR-2024-004',
         to: mockUserEmail,
+        bcc: undefined,
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
@@ -964,8 +966,9 @@ describe('ResultOicrService', () => {
 
       // Assert
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: `[STAR] - New OICR Submission #${specialResultCode}`,
+        subject: `[STAR] - New OICR Request #${specialResultCode}`,
         to: mockUserEmail,
+        bcc: undefined,
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
