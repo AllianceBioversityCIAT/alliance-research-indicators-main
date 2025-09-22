@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ClarisaSubNational } from './entities/clarisa-sub-national.entity';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
@@ -15,6 +15,15 @@ export class ClarisaSubNationalsService extends ControlListBaseService<
       dataSource.getRepository(ClarisaSubNational),
       currentUser,
     );
+  }
+
+  async findByCodes(code: string[]) {
+    return this.mainRepo.find({
+      where: {
+        code: In(code),
+        is_active: true,
+      },
+    });
   }
 
   async findSubNationalsByCountryIso2(isoAlpha2: string) {

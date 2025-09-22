@@ -51,6 +51,13 @@ export class ResultOicr extends AuditableEntity {
   })
   maturity_level_id: number;
 
+  @Column({
+    type: 'text',
+    name: 'elaboration_narrative',
+    nullable: true,
+  })
+  elaboration_narrative: string;
+
   @ManyToOne(() => MaturityLevel, (ml) => ml.result_oicr)
   @JoinColumn({
     name: 'maturity_level_id',

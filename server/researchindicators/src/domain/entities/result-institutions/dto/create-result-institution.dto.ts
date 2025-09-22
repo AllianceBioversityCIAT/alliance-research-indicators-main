@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ResultInstitution } from '../entities/result-institution.entity';
+import { ResultInstitutionAi } from '../entities/result-institution-ai.entity';
 
 export class CreateResultInstitutionDto {
   @ApiProperty({
@@ -9,6 +10,14 @@ export class CreateResultInstitutionDto {
     isArray: true,
   })
   institutions: ResultInstitution[];
+
+  @ApiProperty({
+    type: ResultInstitutionAi,
+    required: false,
+    description: 'Is a reference to the result id for AI mined partners',
+    isArray: true,
+  })
+  institutions_ai?: ResultInstitutionAi[];
 
   @ApiProperty({
     type: Boolean,

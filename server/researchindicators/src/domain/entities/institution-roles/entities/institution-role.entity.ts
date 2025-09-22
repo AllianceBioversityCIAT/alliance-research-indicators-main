@@ -1,6 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ResultInstitution } from '../../result-institutions/entities/result-institution.entity';
+import { ResultInstitutionAi } from '../../result-institutions/entities/result-institution-ai.entity';
 
 @Entity('institution_roles')
 export class InstitutionRole extends AuditableEntity {
@@ -21,4 +22,10 @@ export class InstitutionRole extends AuditableEntity {
     (resultInstitution) => resultInstitution.institution_role,
   )
   result_institutions!: ResultInstitution[];
+
+  @OneToMany(
+    () => ResultInstitutionAi,
+    (resultInstitutionAi) => resultInstitutionAi.institution_role,
+  )
+  result_institutions_ai!: ResultInstitutionAi[];
 }

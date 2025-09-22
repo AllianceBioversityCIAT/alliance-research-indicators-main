@@ -70,4 +70,11 @@ export class MetadataResultDto {
     required: true,
   })
   report_year: number;
+
+  @ApiProperty({
+    type: String,
+    description: 'The result contract id',
+    required: false,
+  })
+  result_contract_id: string;
 }
