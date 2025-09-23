@@ -8,6 +8,7 @@ import { StringKeys } from '../../shared/global-dto/types-global';
 import { AgressoContractRepository } from './repositories/agresso-contract.repository';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
+import { OrderFieldsEnum } from './enum/order-fields.enum';
 
 @Injectable()
 export class AgressoContractService {
@@ -60,10 +61,14 @@ export class AgressoContractService {
   async findAgressoContracts(
     onlyCurrentUser: TrueFalseEnum,
     filter?: Record<string, any>,
+    orderFields?: OrderFieldsEnum,
+    direction: 'ASC' | 'DESC' = 'ASC',
   ) {
     return this._agressoContractRepository.getContracts(
       filter,
       onlyCurrentUser == TrueFalseEnum.TRUE ? this.currentUser.user_id : null,
+      orderFields,
+      direction,
     );
   }
 }

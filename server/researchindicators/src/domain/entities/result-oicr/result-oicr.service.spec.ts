@@ -23,6 +23,8 @@ import { TemplateService } from '../../shared/auxiliar/template/template.service
 import { ResultOicrRepository } from './repositories/result-oicr.repository';
 import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
+import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
+import { ResultContractsService } from '../result-contracts/result-contracts.service';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -41,6 +43,7 @@ describe('ResultOicrService', () => {
   let mockTemplateService: jest.Mocked<TemplateService>;
   let mockResultOicrRepository: jest.Mocked<ResultOicrRepository>;
   let mockTempExternalOicrsService: jest.Mocked<TempExternalOicrsService>;
+  let mockResultContractsService: jest.Mocked<ResultContractsService>;
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -147,6 +150,15 @@ describe('ResultOicrService', () => {
       remove: jest.fn(),
     } as any;
 
+    mockResultContractsService = {
+      find: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      deleteAll: jest.fn(),
+      findAllResultByContractId: jest.fn(),
+      getLeverFromPrimaryContract: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultOicrService,
@@ -166,6 +178,10 @@ describe('ResultOicrService', () => {
         { provide: AppConfig, useValue: mockAppConfig },
         { provide: TemplateService, useValue: mockTemplateService },
         { provide: ResultOicrRepository, useValue: mockResultOicrRepository },
+        {
+          provide: ResultContractsService,
+          useValue: mockResultContractsService,
+        },
         {
           provide: TempExternalOicrsService,
           useValue: mockTempExternalOicrsService,
@@ -228,7 +244,6 @@ describe('ResultOicrService', () => {
           linked_result: [{ other_result_id: 456 }],
         } as any,
         step_two: {
-          initiatives: [{ clarisa_initiative_id: 1 }],
           primary_lever: [{ lever_id: 1 }],
           contributor_lever: [{ lever_id: 2 }],
         } as any,
@@ -247,15 +262,28 @@ describe('ResultOicrService', () => {
         update: jest.fn().mockResolvedValue(undefined),
       } as any;
 
+      const mockEntityManager = {
+        getRepository: jest.fn().mockReturnValue(mockResultRepo),
+      } as any;
+
       mockResultsService.createResult.mockResolvedValue(
         mockCreatedResult as any,
       );
       mockResultsService.saveGeoLocation.mockResolvedValue(undefined);
       mockResultOicrRepository.update.mockResolvedValue(undefined);
       mockDataSource.getRepository.mockReturnValue(mockResultRepo);
+      Object.defineProperty(mockDataSource, 'manager', {
+        value: mockEntityManager,
+        writable: true,
+      });
+      mockResultLeversService.find.mockResolvedValue([]);
 
-      jest.spyOn(service, 'stepOneOicr').mockResolvedValue(undefined as any);
-      jest.spyOn(service, 'stepTwoOicr').mockResolvedValue(undefined as any);
+      jest
+        .spyOn(service as any, 'updateOicrSteps')
+        .mockResolvedValue(undefined);
+      jest
+        .spyOn(service, 'sendMessageOicr')
+        .mockResolvedValue(undefined as any);
 
       // Act
       const result = await service.createOicr(mockCreateData);
@@ -263,30 +291,23 @@ describe('ResultOicrService', () => {
       // Assert
       expect(mockResultsService.createResult).toHaveBeenCalledWith(
         mockCreateData.base_information,
-      );
-      expect(service.stepOneOicr).toHaveBeenCalledWith(
-        mockCreateData.step_one,
-        mockCreatedResult.result_id,
-      );
-      expect(service.stepTwoOicr).toHaveBeenCalledWith(
-        mockCreateData.step_two,
-        mockCreatedResult.result_id,
-      );
-      expect(mockResultsService.saveGeoLocation).toHaveBeenCalledWith(
-        mockCreatedResult.result_id,
-        mockCreateData.step_three,
-      );
-      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(
-        mockCreatedResult.result_id,
+        'STAR',
         {
-          general_comment: mockCreateData.step_four.general_comment,
+          leverEnum: 2,
+          notMap: {
+            lever: true,
+          },
+          result_status_id: 9,
         },
       );
-      expect(mockResultRepo.update).toHaveBeenCalledWith(
+      expect((service as any).updateOicrSteps).toHaveBeenCalledWith(
         mockCreatedResult.result_id,
-        {
-          description: mockCreateData.step_one.outcome_impact_statement,
-        },
+        mockCreateData,
+        mockEntityManager,
+        true,
+      );
+      expect(service.sendMessageOicr).toHaveBeenCalledWith(
+        mockCreatedResult.result_id,
       );
       expect(result).toEqual(mockCreatedResult);
     });
@@ -314,6 +335,14 @@ describe('ResultOicrService', () => {
       );
       expect(mockResultsService.createResult).toHaveBeenCalledWith(
         mockCreateData.base_information,
+        'STAR',
+        {
+          leverEnum: 2,
+          notMap: {
+            lever: true,
+          },
+          result_status_id: 9,
+        },
       );
     });
   });
@@ -421,43 +450,22 @@ describe('ResultOicrService', () => {
     });
   });
 
-  describe('stepOneOicr', () => {});
-
   describe('stepTwoOicr', () => {
-    it('should execute step two operations in transaction', async () => {
+    it('should execute step two operations', async () => {
       // Arrange
       const resultId = 123;
-      const mockEntityManager = {} as any;
 
       const data: StepTwoOicrDto = {
-        initiatives: [
-          { clarisa_initiative_id: 1 },
-          { clarisa_initiative_id: 2 },
-        ] as any,
         primary_lever: [{ lever_id: '1' }] as any,
         contributor_lever: [{ lever_id: '2' }, { lever_id: '3' }] as any,
       };
 
-      // Mock the transaction to pass the mockEntityManager to the callback
-      mockDataSource.transaction.mockImplementation((callback: any) => {
-        return callback(mockEntityManager);
-      });
-
-      mockResultInitiativesService.create.mockResolvedValue(undefined);
       mockResultLeversService.create.mockResolvedValue(undefined);
 
       // Act
       await service.stepTwoOicr(data, resultId);
 
       // Assert
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockResultInitiativesService.create).toHaveBeenCalledWith(
-        resultId,
-        [{ clarisa_initiative_id: 1 }, { clarisa_initiative_id: 2 }],
-        'clarisa_initiative_id',
-        undefined,
-        mockEntityManager,
-      );
       expect(mockResultLeversService.create).toHaveBeenCalledWith(
         resultId,
         [
@@ -466,8 +474,8 @@ describe('ResultOicrService', () => {
           { lever_id: '3', is_primary: false },
         ],
         'lever_id',
+        LeverRolesEnum.OICR_ALIGNMENT,
         undefined,
-        mockEntityManager,
         ['is_primary'],
       );
     });
@@ -475,146 +483,89 @@ describe('ResultOicrService', () => {
     it('should handle empty arrays', async () => {
       // Arrange
       const resultId = 123;
-      const mockEntityManager = {} as any;
 
       const data: StepTwoOicrDto = {
-        initiatives: [],
         primary_lever: [],
         contributor_lever: [],
       };
 
-      // Mock the transaction to pass the mockEntityManager to the callback
-      mockDataSource.transaction.mockImplementation((callback: any) => {
-        return callback(mockEntityManager);
-      });
-
-      mockResultInitiativesService.create.mockResolvedValue(undefined);
       mockResultLeversService.create.mockResolvedValue(undefined);
 
       // Act
       await service.stepTwoOicr(data, resultId);
 
       // Assert
-      expect(mockResultInitiativesService.create).toHaveBeenCalledWith(
-        resultId,
-        [],
-        'clarisa_initiative_id',
-        undefined,
-        mockEntityManager,
-      );
       expect(mockResultLeversService.create).toHaveBeenCalledWith(
         resultId,
         [],
         'lever_id',
+        LeverRolesEnum.OICR_ALIGNMENT,
         undefined,
-        mockEntityManager,
         ['is_primary'],
       );
     });
   });
 
-  describe('findByResultIdAndSteps', () => {
+  describe('findModal', () => {
     const resultId = 123;
 
-    it('should call findStepOneIoicr for step 1', async () => {
+    it('should return complete OICR modal data', async () => {
       // Arrange
-      const step = 1;
       const stepOneResult = {
         main_contact_person: { user_id: 456 },
         tagging: [{ tag_id: 1 }],
         linked_result: [{ other_result_id: 789 }],
         outcome_impact_statement: 'Test statement',
       };
-      jest
-        .spyOn(service as any, 'findStepOneIoicr')
-        .mockResolvedValue(stepOneResult);
-
-      // Act
-      const result = await service.findByResultIdAndSteps(resultId, step);
-
-      // Assert
-      expect((service as any).findStepOneIoicr).toHaveBeenCalledWith(resultId);
-      expect(result).toEqual(stepOneResult);
-    });
-
-    it('should call findStepTwoOicr for step 2', async () => {
-      // Arrange
-      const step = 2;
       const stepTwoResult = {
-        initiatives: [{ clarisa_initiative_id: 1 }],
         primary_lever: [{ lever_id: '1', is_primary: true }],
         contributor_lever: [{ lever_id: '2', is_primary: false }],
       };
+
+      jest
+        .spyOn(service as any, 'findStepOneIoicr')
+        .mockResolvedValue(stepOneResult);
       jest
         .spyOn(service as any, 'findStepTwoOicr')
         .mockResolvedValue(stepTwoResult);
-
-      // Act
-      const result = await service.findByResultIdAndSteps(resultId, step);
-
-      // Assert
-      expect((service as any).findStepTwoOicr).toHaveBeenCalledWith(resultId);
-      expect(result).toEqual(stepTwoResult);
-    });
-
-    it('should call findGeoLocation for step 3', async () => {
-      // Arrange
-      const step = 3;
-      const geoLocationResult = {
+      mockResultsService.findGeoLocation = jest.fn().mockResolvedValue({
         geo_scope_id: 1,
-        countries: [],
         regions: [],
-      };
-      mockResultsService.findGeoLocation.mockResolvedValue(
-        geoLocationResult as any,
-      );
-
-      // Act
-      const result = await service.findByResultIdAndSteps(resultId, step);
-
-      // Assert
-      expect(mockResultsService.findGeoLocation).toHaveBeenCalledWith(resultId);
-      expect(result).toEqual(geoLocationResult);
-    });
-
-    it('should return general_comment for step 4', async () => {
-      // Arrange
-      const step = 4;
-      const generalComment = 'Test general comment';
-      const oicrEntity = { general_comment: generalComment };
-      mockResultOicrRepository.findOne.mockResolvedValue(oicrEntity as any);
-
-      // Act
-      const result = await service.findByResultIdAndSteps(resultId, step);
-
-      // Assert
-      expect(mockResultOicrRepository.findOne).toHaveBeenCalledWith({
-        where: { result_id: resultId },
-        select: { general_comment: true },
+        countries: [],
       });
-      expect(result).toBe(generalComment);
-    });
-
-    it('should return empty string when no general_comment found for step 4', async () => {
-      // Arrange
-      const step = 4;
-      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultsService.findBaseInfo = jest.fn().mockResolvedValue({
+        title: 'Test',
+        description: 'Test Description',
+      });
+      mockResultOicrRepository.findOne.mockResolvedValue({
+        general_comment: 'Test comment',
+      } as any);
 
       // Act
-      const result = await service.findByResultIdAndSteps(resultId, step);
+      const result = await service.findModal(resultId);
 
       // Assert
-      expect(result).toBe('');
+      expect((service as any).findStepOneIoicr).toHaveBeenCalledWith(resultId);
+      expect((service as any).findStepTwoOicr).toHaveBeenCalledWith(resultId);
+      expect(mockResultsService.findGeoLocation).toHaveBeenCalledWith(resultId);
+      expect(mockResultsService.findBaseInfo).toHaveBeenCalledWith(resultId);
+      expect(result.step_one).toEqual(stepOneResult);
+      expect(result.step_two).toEqual(stepTwoResult);
     });
 
-    it('should throw BadRequestException for invalid step', async () => {
+    it('should handle errors when finding modal data', async () => {
       // Arrange
-      const invalidStep = 5;
+      jest
+        .spyOn(service as any, 'findStepOneIoicr')
+        .mockRejectedValue(new Error('Step one error'));
+      jest.spyOn(service as any, 'findStepTwoOicr').mockResolvedValue({});
+      mockResultsService.findGeoLocation = jest.fn().mockResolvedValue({});
+      mockResultsService.findBaseInfo = jest.fn().mockResolvedValue({});
 
       // Act & Assert
-      await expect(
-        service.findByResultIdAndSteps(resultId, invalidStep),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.findModal(resultId)).rejects.toThrow(
+        'Step one error',
+      );
     });
   });
 
@@ -685,10 +636,6 @@ describe('ResultOicrService', () => {
     it('should find and return step two data', async () => {
       // Arrange
       const resultId = 123;
-      const mockInitiatives = [
-        { clarisa_initiative_id: 1 },
-        { clarisa_initiative_id: 2 },
-      ];
       const mockAllLevers = [
         { lever_id: '1', is_primary: true },
         { lever_id: '2', is_primary: false },
@@ -696,22 +643,23 @@ describe('ResultOicrService', () => {
         { lever_id: '4', is_primary: false },
       ];
 
-      mockResultInitiativesService.find.mockResolvedValue(
-        mockInitiatives as any,
-      );
       mockResultLeversService.find.mockResolvedValue(mockAllLevers as any);
+      mockResultContractsService.getLeverFromPrimaryContract.mockResolvedValue(
+        null,
+      );
 
       // Act
       const result = await (service as any).findStepTwoOicr(resultId);
 
       // Assert
-      expect(mockResultInitiativesService.find).toHaveBeenCalledWith(resultId);
-      expect(mockResultLeversService.find).toHaveBeenCalledWith(resultId);
+      expect(mockResultLeversService.find).toHaveBeenCalledWith(
+        resultId,
+        LeverRolesEnum.OICR_ALIGNMENT,
+      );
       expect(result).toEqual({
-        initiatives: mockInitiatives,
         primary_lever: [
-          { lever_id: '1', is_primary: true },
-          { lever_id: '3', is_primary: true },
+          { lever_id: '1', is_primary: true, is_contract_lever: false },
+          { lever_id: '3', is_primary: true, is_contract_lever: false },
         ],
         contributor_lever: [
           { lever_id: '2', is_primary: false },
@@ -724,15 +672,16 @@ describe('ResultOicrService', () => {
       // Arrange
       const resultId = 123;
 
-      mockResultInitiativesService.find.mockResolvedValue([]);
       mockResultLeversService.find.mockResolvedValue([]);
+      mockResultContractsService.getLeverFromPrimaryContract.mockResolvedValue(
+        null,
+      );
 
       // Act
       const result = await (service as any).findStepTwoOicr(resultId);
 
       // Assert
       expect(result).toEqual({
-        initiatives: [],
         primary_lever: [],
         contributor_lever: [],
       });
@@ -787,8 +736,9 @@ describe('ResultOicrService', () => {
         mockCurrentUser.email,
       );
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: '[STAR] - New OICR Submission #OICR-2024-001',
+        subject: '[STAR] - New OICR Request #OICR-2024-001',
         to: mockUserEmail,
+        bcc: undefined,
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
@@ -912,8 +862,9 @@ describe('ResultOicrService', () => {
         mockMessageData,
       );
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: '[STAR] - New OICR Submission #OICR-2024-004',
+        subject: '[STAR] - New OICR Request #OICR-2024-004',
         to: mockUserEmail,
+        bcc: undefined,
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
@@ -1015,8 +966,9 @@ describe('ResultOicrService', () => {
 
       // Assert
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: `[STAR] - New OICR Submission #${specialResultCode}`,
+        subject: `[STAR] - New OICR Request #${specialResultCode}`,
         to: mockUserEmail,
+        bcc: undefined,
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
@@ -1317,12 +1269,9 @@ describe('ResultOicrService', () => {
   });
 
   describe('stepOneOicr', () => {
-    it('should execute step one operations in transaction with temp external OICR', async () => {
+    it('should execute step one operations with temp external OICR', async () => {
       // Arrange
       const resultId = 123;
-      const mockEntityManager = {
-        update: jest.fn(),
-      } as any;
 
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
@@ -1334,11 +1283,6 @@ describe('ResultOicrService', () => {
       const createdTags = [{ tag_id: 1 }];
       const auditData = { updated_at: new Date() };
 
-      // Mock the transaction to pass the mockEntityManager to the callback
-      mockDataSource.transaction.mockImplementation((callback: any) => {
-        return callback(mockEntityManager);
-      });
-
       mockResultUsersService.create.mockResolvedValue(undefined);
       mockResultTagsService.create.mockResolvedValue(createdTags as any);
       mockTempExternalOicrsService.create.mockResolvedValue(undefined);
@@ -1349,14 +1293,12 @@ describe('ResultOicrService', () => {
       await service.stepOneOicr(data, resultId);
 
       // Assert
-      expect(mockDataSource.transaction).toHaveBeenCalled();
-
       expect(mockResultUsersService.create).toHaveBeenCalledWith(
         resultId,
         { user_id: data.main_contact_person.user_id },
         'user_id',
         UserRolesEnum.MAIN_CONTACT,
-        mockEntityManager,
+        undefined,
       );
 
       expect(mockResultTagsService.create).toHaveBeenCalledWith(
@@ -1364,7 +1306,7 @@ describe('ResultOicrService', () => {
         [{ tag_id: 1 }],
         'tag_id',
         undefined,
-        mockEntityManager,
+        undefined,
       );
 
       expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
@@ -1372,7 +1314,7 @@ describe('ResultOicrService', () => {
         [{ external_oicr_id: 789 }],
         'external_oicr_id',
         undefined,
-        mockEntityManager,
+        undefined,
       );
 
       expect(mockResultOicrRepository.update).toHaveBeenCalledWith(resultId, {
@@ -1384,7 +1326,6 @@ describe('ResultOicrService', () => {
     it('should handle empty linked_result when no tags created', async () => {
       // Arrange
       const resultId = 123;
-      const mockEntityManager = { update: jest.fn() } as any;
 
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
@@ -1394,10 +1335,6 @@ describe('ResultOicrService', () => {
       };
 
       const auditData = { updated_at: new Date() };
-
-      mockDataSource.transaction.mockImplementation((callback: any) => {
-        return callback(mockEntityManager);
-      });
 
       mockResultUsersService.create.mockResolvedValue(undefined);
       mockResultTagsService.create.mockResolvedValue([]); // No tags created
@@ -1414,14 +1351,13 @@ describe('ResultOicrService', () => {
         [], // Should pass empty array when no tags created
         'external_oicr_id',
         undefined,
-        mockEntityManager,
+        undefined,
       );
     });
 
     it('should handle null tagging array', async () => {
       // Arrange
       const resultId = 123;
-      const mockEntityManager = { update: jest.fn() } as any;
 
       const data: StepOneOicrDto = {
         main_contact_person: { user_id: 456 } as any,
@@ -1431,10 +1367,6 @@ describe('ResultOicrService', () => {
       };
 
       const auditData = { updated_at: new Date() };
-
-      mockDataSource.transaction.mockImplementation((callback: any) => {
-        return callback(mockEntityManager);
-      });
 
       mockResultUsersService.create.mockResolvedValue(undefined);
       mockResultTagsService.create.mockResolvedValue([]);
@@ -1451,14 +1383,16 @@ describe('ResultOicrService', () => {
         [], // Should handle null as empty array
         'tag_id',
         undefined,
-        mockEntityManager,
+        undefined,
       );
     });
   });
 
   describe('getResultOicrDetailsByOfficialCode', () => {
     it('should return null if there are no results', async () => {
-      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue([]);
+      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(
+        [],
+      );
 
       const result = await service.getResultOicrDetailsByOfficialCode(1);
 
@@ -1467,118 +1401,126 @@ describe('ResultOicrService', () => {
 
     it('should correctly map a result with all fields', async () => {
       const mockRawResults = [
-      {
-        result_id: 1,
-        result_code: 'OICR-001',
-        title: 'Result Title',
-        main_project_id: 'P1',
-        main_project_title: 'Main Project',
-        project_id: 'P2',
-        project_title: 'Secondary Project',
-        tag_id: 10,
-        tag_name: 'Test Tag',
-        outcome_impact_statement: 'Expected Impact',
-        main_lever_id: 'ML1',
-        main_lever: 'Main Lever',
-        main_lever_name: 'Main Lever Name',
-        lever_id: 'L1',
-        lever: 'Short Lever',
-        lever_name: 'Long Lever',
-        geographic_scope: 'Global',
-        region_code: 'R1',
-        region_name: 'Test Region',
-        country_code: 'C1',
-        country_name: 'Test Country',
-        comment_geo_scope: 'Scope Comment'
-      }
+        {
+          result_id: 1,
+          result_code: 'OICR-001',
+          title: 'Result Title',
+          main_project_id: 'P1',
+          main_project_title: 'Main Project',
+          project_id: 'P2',
+          project_title: 'Secondary Project',
+          tag_id: 10,
+          tag_name: 'Test Tag',
+          outcome_impact_statement: 'Expected Impact',
+          main_lever_id: 'ML1',
+          main_lever: 'Main Lever',
+          main_lever_name: 'Main Lever Name',
+          lever_id: 'L1',
+          lever: 'Short Lever',
+          lever_name: 'Long Lever',
+          geographic_scope: 'Global',
+          region_code: 'R1',
+          region_name: 'Test Region',
+          country_code: 'C1',
+          country_name: 'Test Country',
+          comment_geo_scope: 'Scope Comment',
+        },
       ];
 
-      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(mockRawResults);
+      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(
+        mockRawResults,
+      );
 
       const result = await service.getResultOicrDetailsByOfficialCode(1);
 
       expect(result).toEqual({
-      id: 1,
-      official_code: 'OICR-001',
-      title: 'Result Title',
-      main_project_id: 'P1',
-      main_project: 'Main Project',
-      other_projects: [
-        { project_id: 'P2', project_title: 'Secondary Project' }
-      ],
-      tag_id: 10,
-      tag_name: 'Test Tag',
-      outcome_impact_statement: 'Expected Impact',
-      main_levers: [
-        { main_lever_id: 'ML1', main_lever: 'Main Lever', main_lever_name: 'Main Lever Name' }
-      ],
-      other_levers: [
-        { lever_id: 'L1', lever_short: 'Short Lever', lever_full: 'Long Lever' }
-      ],
-      geographic_scope: 'Global',
-      regions: [
-        { region_code: 'R1', region_name: 'Test Region' }
-      ],
-      countries: [
-        { country_code: 'C1', country_name: 'Test Country' }
-      ],
-      geographic_scope_comments: 'Scope Comment'
+        id: 1,
+        official_code: 'OICR-001',
+        title: 'Result Title',
+        main_project_id: 'P1',
+        main_project: 'Main Project',
+        other_projects: [
+          { project_id: 'P2', project_title: 'Secondary Project' },
+        ],
+        tag_id: 10,
+        tag_name: 'Test Tag',
+        outcome_impact_statement: 'Expected Impact',
+        main_levers: [
+          {
+            main_lever_id: 'ML1',
+            main_lever: 'Main Lever',
+            main_lever_name: 'Main Lever Name',
+          },
+        ],
+        other_levers: [
+          {
+            lever_id: 'L1',
+            lever_short: 'Short Lever',
+            lever_full: 'Long Lever',
+          },
+        ],
+        geographic_scope: 'Global',
+        regions: [{ region_code: 'R1', region_name: 'Test Region' }],
+        countries: [{ country_code: 'C1', country_name: 'Test Country' }],
+        geographic_scope_comments: 'Scope Comment',
       });
     });
 
     it('should map multiple projects, levers, regions, and countries without duplicates', async () => {
       const mockRawResults = [
-      {
-        result_id: 2,
-        result_code: 'OICR-002',
-        title: 'Another result',
-        main_project_id: 'P10',
-        main_project_title: 'Project X',
-        project_id: 'P11',
-        project_title: 'Project Y',
-        tag_id: null,
-        tag_name: null,
-        outcome_impact_statement: null,
-        main_lever_id: 'ML2',
-        main_lever: 'Lever P',
-        main_lever_name: 'Main Lever P',
-        lever_id: 'L2',
-        lever: 'Short',
-        lever_name: 'Long',
-        geographic_scope: 'Regional',
-        region_code: 'R2',
-        region_name: 'Region Y',
-        country_code: 'C2',
-        country_name: 'Country Y',
-        comment_geo_scope: null
-      },
-      {
-        result_id: 2,
-        result_code: 'OICR-002',
-        title: 'Another result',
-        main_project_id: 'P10',
-        main_project_title: 'Project X',
-        project_id: 'P12',
-        project_title: 'Project Z',
-        tag_id: null,
-        tag_name: null,
-        outcome_impact_statement: null,
-        main_lever_id: 'ML2',
-        main_lever: 'Lever P',
-        main_lever_name: 'Main Lever P',
-        lever_id: 'L3',
-        lever: 'Other',
-        lever_name: 'Other long',
-        geographic_scope: 'Regional',
-        region_code: 'R3',
-        region_name: 'Region Z',
-        country_code: 'C3',
-        country_name: 'Country Z',
-        comment_geo_scope: null
-      }
+        {
+          result_id: 2,
+          result_code: 'OICR-002',
+          title: 'Another result',
+          main_project_id: 'P10',
+          main_project_title: 'Project X',
+          project_id: 'P11',
+          project_title: 'Project Y',
+          tag_id: null,
+          tag_name: null,
+          outcome_impact_statement: null,
+          main_lever_id: 'ML2',
+          main_lever: 'Lever P',
+          main_lever_name: 'Main Lever P',
+          lever_id: 'L2',
+          lever: 'Short',
+          lever_name: 'Long',
+          geographic_scope: 'Regional',
+          region_code: 'R2',
+          region_name: 'Region Y',
+          country_code: 'C2',
+          country_name: 'Country Y',
+          comment_geo_scope: null,
+        },
+        {
+          result_id: 2,
+          result_code: 'OICR-002',
+          title: 'Another result',
+          main_project_id: 'P10',
+          main_project_title: 'Project X',
+          project_id: 'P12',
+          project_title: 'Project Z',
+          tag_id: null,
+          tag_name: null,
+          outcome_impact_statement: null,
+          main_lever_id: 'ML2',
+          main_lever: 'Lever P',
+          main_lever_name: 'Main Lever P',
+          lever_id: 'L3',
+          lever: 'Other',
+          lever_name: 'Other long',
+          geographic_scope: 'Regional',
+          region_code: 'R3',
+          region_name: 'Region Z',
+          country_code: 'C3',
+          country_name: 'Country Z',
+          comment_geo_scope: null,
+        },
       ];
 
-      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(mockRawResults);
+      mockResultOicrRepository.getResultOicrDetailsByOfficialCode.mockResolvedValue(
+        mockRawResults,
+      );
 
       const result = await service.getResultOicrDetailsByOfficialCode(2);
 
@@ -1589,5 +1531,4 @@ describe('ResultOicrService', () => {
       expect(result.countries).toHaveLength(2);
     });
   });
-
 });

@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultCapacitySharing } from './entities/result-capacity-sharing.entity';
-import { selectManager } from '../../shared/utils/orm.util';
+import { cleanNumberForDB, selectManager } from '../../shared/utils/orm.util';
 import {
   CapDevGroupDto,
   CapDevIndividualDto,
@@ -30,6 +30,21 @@ import { DeliveryModalitiesService } from '../delivery-modalities/delivery-modal
 import { DeliveryModality } from '../delivery-modalities/entities/delivery-modality.entity';
 import { SessionFormatsService } from '../session-formats/session-formats.service';
 import { DegreesService } from '../degrees/degrees.service';
+import { SessionTypesService } from '../session-types/session-types.service';
+import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
+import { SessionPurposesService } from '../session-purposes/session-purposes.service';
+import { SessionPurposeEnum } from '../session-purposes/enum/session-purpose.enum';
+import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
+import { ResultCountry } from '../result-countries/entities/result-country.entity';
+import { GendersService } from '../genders/genders.service';
+import { isEmpty } from '../../shared/utils/object.utils';
+import { ResultInstitution } from '../result-institutions/entities/result-institution.entity';
+import { ResultInstitutionAi } from '../result-institutions/entities/result-institution-ai.entity';
+import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
+import { ResultUserAi } from '../result-users/entities/result-user-ai.entity';
+import { ResultUser } from '../result-users/entities/result-user.entity';
+import { ClarisaLanguagesService } from '../../tools/clarisa/entities/clarisa-languages/clarisa-languages.service';
+import { ResultLanguage } from '../result-languages/entities/result-language.entity';
 @Injectable()
 export class ResultCapacitySharingService {
   private mainRepo: Repository<ResultCapacitySharing>;
@@ -37,7 +52,7 @@ export class ResultCapacitySharingService {
     private dataSource: DataSource,
     private readonly _resultUserService: ResultUsersService,
     private readonly _resultLanguageService: ResultLanguagesService,
-    private readonly _resultInsitutionService: ResultInstitutionsService,
+    private readonly _resultInstitutionService: ResultInstitutionsService,
     private readonly _resultCountryService: ResultCountriesService,
     private readonly _currentUser: CurrentUserUtil,
     private readonly _updateDataUtil: UpdateDataUtil,
@@ -45,7 +60,13 @@ export class ResultCapacitySharingService {
     private readonly _sessionLengthsService: SessionLengthsService,
     private readonly _deliveryModalitiesService: DeliveryModalitiesService,
     private readonly _sessionFormatsService: SessionFormatsService,
+    private readonly _sessionTypesService: SessionTypesService,
     private readonly _degreesService: DegreesService,
+    private readonly _sessionPurposesService: SessionPurposesService,
+    private readonly _clarisaCountriesService: ClarisaCountriesService,
+    private readonly _gendersService: GendersService,
+    private readonly _allianceUserStaffService: AllianceUserStaffService,
+    private readonly _clarisaLanguagesService: ClarisaLanguagesService,
   ) {
     this.mainRepo = dataSource.getRepository(ResultCapacitySharing);
   }
@@ -79,9 +100,30 @@ export class ResultCapacitySharingService {
       )
     );
 
+    if (!isEmpty(rawData.training_supervisor)) {
+      const { acept, pending } = this._resultUserService.filterInstitutionsAi(
+        [rawData.training_supervisor],
+        UserRolesEnum.TRAINING_SUPERVISOR,
+      );
+
+      tempCapSharing.training_supervisor = !isEmpty(acept)
+        ? (acept[0] as ResultUser)
+        : null;
+
+      tempCapSharing.training_supervisor_ai = !isEmpty(pending)
+        ? (pending[0] as ResultUserAi)
+        : null;
+    }
+
     const sessionLength =
       await this._sessionLengthsService.findByName(clean_sessionLength);
     tempCapSharing.session_length_id = sessionLength?.session_length_id;
+
+    const clean_training_category = await nextToProcessAiRaw(
+      rawData?.training_category,
+      (name) => this._sessionTypesService.findByName(name),
+    );
+    tempCapSharing.session_type_id = clean_training_category?.session_type_id;
 
     const clean_sessionFormat = <string>(
       this._aiRoarMiningApp.cleanDataNotProvided(
@@ -95,12 +137,63 @@ export class ResultCapacitySharingService {
       deliveryModality?.delivery_modality_id;
     const degree = await this._degreesService.findByName(rawData.degree);
     tempCapSharing.degree_id = degree?.degree_id;
-    tempCapSharing.group = this.processedAiInfoGroup(rawData);
+    const clean_language = await nextToProcessAiRaw(
+      rawData?.language?.code,
+      (name) => this._clarisaLanguagesService.findOneByiso3(name),
+    );
+    tempCapSharing.training_supervisor_languages = clean_language
+      ? ({ language_id: clean_language.id } as ResultLanguage)
+      : null;
+    tempCapSharing.group = await this.processedAiInfoGroup(rawData);
+    tempCapSharing.individual = await this.processedAiInfoIndividual(rawData);
 
     return tempCapSharing;
   }
 
-  processedAiInfoGroup(rawData: ResultRawAi): CapDevGroupDto {
+  async processedAiInfoIndividual(
+    rawData: ResultRawAi,
+  ): Promise<CapDevIndividualDto> {
+    const tempCapSharing: CapDevIndividualDto = new CapDevIndividualDto();
+
+    tempCapSharing.trainee_name = <string>(
+      this._aiRoarMiningApp.cleanDataNotProvided(rawData.trainee_name, 'string')
+    );
+
+    const clean_nationality = await nextToProcessAiRaw(
+      rawData?.trainee_nationality?.code,
+      (name) => this._clarisaCountriesService.findByIso2([name]),
+    ).then((res) => (res && res.length > 0 ? res[0] : null));
+
+    tempCapSharing.nationality = clean_nationality
+      ? ({
+          isoAlpha2: clean_nationality.isoAlpha2,
+        } as ResultCountry)
+      : null;
+
+    const clean_gender = await nextToProcessAiRaw(
+      rawData.trainee_gender,
+      (name) => this._gendersService.findByName(name),
+    );
+    if (!isEmpty(rawData.trainee_affiliation)) {
+      const { acept, pending } =
+        this._resultInstitutionService.filterInstitutionsAi(
+          [rawData.trainee_affiliation],
+          InstitutionRolesEnum.TRAINEE_AFFILIATION,
+        );
+      tempCapSharing.affiliation = !isEmpty(acept)
+        ? (acept[0] as ResultInstitution)
+        : null;
+      tempCapSharing.affiliation_ai = !isEmpty(pending)
+        ? (pending[0] as ResultInstitutionAi)
+        : null;
+    }
+
+    tempCapSharing.gender_id = clean_gender?.gender_id;
+
+    return tempCapSharing;
+  }
+
+  async processedAiInfoGroup(rawData: ResultRawAi): Promise<CapDevGroupDto> {
     const tempCapSharing: CapDevGroupDto = new CapDevGroupDto();
     tempCapSharing.session_participants_female = <number>(
       this._aiRoarMiningApp.cleanDataNotProvided(
@@ -126,6 +219,28 @@ export class ResultCapacitySharingService {
       this._aiRoarMiningApp.cleanDataNotProvided(
         rawData.total_participants,
         'number',
+      )
+    );
+
+    if (rawData?.training_purpose) {
+      const clean_training_purpose = await nextToProcessAiRaw(
+        rawData.training_purpose,
+        (name) => this._sessionPurposesService.findByName(name),
+      );
+      tempCapSharing.session_purpose_id = clean_training_purpose
+        ? clean_training_purpose.session_purpose_id
+        : SessionPurposeEnum.OTHER;
+
+      tempCapSharing.session_purpose_description =
+        clean_training_purpose?.session_purpose_id == SessionPurposeEnum.OTHER
+          ? rawData.training_purpose
+          : null;
+    }
+
+    tempCapSharing.session_purpose_description = <string>(
+      this._aiRoarMiningApp.cleanDataNotProvided(
+        rawData.training_purpose,
+        'string',
       )
     );
 
@@ -156,7 +271,11 @@ export class ResultCapacitySharingService {
     return resultCapSharing;
   }
 
-  async update(resultId: number, updateData: UpdateResultCapacitySharingDto) {
+  async update(
+    resultId: number,
+    updateData: UpdateResultCapacitySharingDto,
+    isAi: boolean = false,
+  ) {
     const existResult = await this.mainRepo.findOne({
       where: {
         result_id: resultId,
@@ -191,6 +310,7 @@ export class ResultCapacitySharingService {
             result_id,
             updateData.individual,
             manager,
+            isAi,
           );
           break;
       }
@@ -203,6 +323,14 @@ export class ResultCapacitySharingService {
         manager,
       );
 
+      if (isAi && updateData?.training_supervisor_ai) {
+        await this._resultUserService.insertUserAi(
+          result_id,
+          [updateData?.training_supervisor_ai],
+          UserRolesEnum.TRAINING_SUPERVISOR,
+          manager,
+        );
+      }
       await this._resultLanguageService.create<LanguageRolesEnum>(
         resultId,
         updateData?.training_supervisor_languages,
@@ -227,11 +355,18 @@ export class ResultCapacitySharingService {
     );
 
     await entityManager.update(resultId, {
-      session_participants_female: updateData?.session_participants_female,
-      session_participants_male: updateData?.session_participants_male,
-      session_participants_non_binary:
+      session_participants_female: cleanNumberForDB(
+        updateData?.session_participants_female,
+      ),
+      session_participants_male: cleanNumberForDB(
+        updateData?.session_participants_male,
+      ),
+      session_participants_non_binary: cleanNumberForDB(
         updateData?.session_participants_non_binary,
-      session_participants_total: updateData?.session_participants_total,
+      ),
+      session_participants_total: cleanNumberForDB(
+        updateData?.session_participants_total,
+      ),
       session_purpose_id: updateData?.session_purpose_id,
       session_purpose_description: updateData?.session_purpose_description,
       is_attending_organization: updateData?.is_attending_organization,
@@ -241,7 +376,7 @@ export class ResultCapacitySharingService {
       ...this._currentUser.audit(SetAutitEnum.UPDATE),
     });
 
-    await this._resultInsitutionService.create<InstitutionRolesEnum>(
+    await this._resultInstitutionService.create<InstitutionRolesEnum>(
       resultId,
       updateData?.is_attending_organization
         ? updateData?.trainee_organization_representative
@@ -252,7 +387,7 @@ export class ResultCapacitySharingService {
     );
 
     //Unnecessary Data inactivate for group
-    await this._resultInsitutionService.create<InstitutionRolesEnum>(
+    await this._resultInstitutionService.create<InstitutionRolesEnum>(
       resultId,
       null,
       'institution_id',
@@ -273,6 +408,7 @@ export class ResultCapacitySharingService {
     resultId: number,
     updateData: CapDevIndividualDto,
     manager?: EntityManager,
+    isAi: boolean = false,
   ) {
     const entityManager: Repository<ResultCapacitySharing> = selectManager(
       manager,
@@ -294,13 +430,22 @@ export class ResultCapacitySharingService {
       is_attending_organization: null,
     });
 
-    await this._resultInsitutionService.create<InstitutionRolesEnum>(
+    await this._resultInstitutionService.create<InstitutionRolesEnum>(
       resultId,
       updateData?.affiliation,
       'institution_id',
       InstitutionRolesEnum.TRAINEE_AFFILIATION,
       manager,
     );
+
+    if (isAi && updateData?.affiliation_ai) {
+      await this._resultInstitutionService.insertInstitutionsAi(
+        resultId,
+        [updateData?.affiliation_ai],
+        InstitutionRolesEnum.TRAINEE_AFFILIATION,
+        manager,
+      );
+    }
 
     await this._resultCountryService.create<CountryRolesEnum>(
       resultId,
@@ -311,7 +456,7 @@ export class ResultCapacitySharingService {
     );
 
     //Unnecessary Data inactivate for individual
-    await this._resultInsitutionService.create<InstitutionRolesEnum>(
+    await this._resultInstitutionService.create<InstitutionRolesEnum>(
       resultId,
       null,
       'institution_id',
@@ -350,7 +495,7 @@ export class ResultCapacitySharingService {
 
     if (resultCapDev?.session_format_id === SessionFormatEnum.GROUP) {
       const institution =
-        await this._resultInsitutionService.findInstitutionsByRoleResult(
+        await this._resultInstitutionService.findInstitutionsByRoleResult(
           resultCapDev.result_id,
           InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE,
         );
@@ -370,7 +515,7 @@ export class ResultCapacitySharingService {
       resultCapDev?.session_format_id === SessionFormatEnum.INDIVIDUAL
     ) {
       const institution =
-        await this._resultInsitutionService.findOneInstitutionByRoleResult(
+        await this._resultInstitutionService.findOneInstitutionByRoleResult(
           resultCapDev.result_id,
           InstitutionRolesEnum.TRAINEE_AFFILIATION,
         );

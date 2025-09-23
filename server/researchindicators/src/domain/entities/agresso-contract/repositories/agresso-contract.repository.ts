@@ -7,6 +7,8 @@ import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { ContractResultCountDto } from '../dto/contract-result-count.dto';
 import { isEmpty } from '../../../shared/utils/object.utils';
 import { StringKeys } from '../../../shared/global-dto/types-global';
+import { OrderFieldsEnum } from '../enum/order-fields.enum';
+import { orderBy } from 'lodash';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -24,7 +26,9 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     relations?: Partial<StringKeys<AgressoContract>>,
   ) {
     let offset: number = null;
-    if (!isEmpty(pagination?.limit) && !isEmpty(pagination?.page)) {
+    if (!isEmpty(pagination?.limit)) {
+      pagination.page =
+        pagination.page < 1 || isEmpty(pagination.page) ? 1 : pagination.page;
       offset = (pagination.page - 1) * pagination.limit;
     }
     const filterWhere = Object.entries(where).filter(
@@ -37,7 +41,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       : '';
     const query = `
     select ac.*,
-    ifnull(cl.full_name, 'Not available' ) as lever
+    ifnull(cl.full_name, 'Not available' ) as lever,
+    cl.id as lever_id
     ${
       relations?.countries
         ? `,JSON_ARRAYAGG(
@@ -71,6 +76,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       L5: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L5-Digital-Inclusion_COLOR.png',
       L6: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L6-Crops-for-Nutrition_COLOR.png',
       L7: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/L7-Gender-Youth-and-Inclusion_COLOR.png',
+      L8: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/images/levers/empty.png',
     };
 
     return result.map((item) => ({
@@ -205,7 +211,28 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ).then((response) => (response.length > 0 ? response[0] : null));
   }
 
-  async getContracts(filter?: Record<string, any>, userId?: number) {
+  orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): string {
+    if (isEmpty(field)) return '';
+
+    const fieldMap: Record<OrderFieldsEnum, string> = {
+      [OrderFieldsEnum.START_DATE]: 'ac.start_date',
+      [OrderFieldsEnum.END_DATE]: 'ac.end_date',
+      [OrderFieldsEnum.END_DATE_GLOBAL]: 'ac.endDateGlobal',
+      [OrderFieldsEnum.END_DATE_FINANCE]: 'ac.endDatefinance',
+      [OrderFieldsEnum.CONTRACT_CODE]: 'ac.agreement_id',
+      [OrderFieldsEnum.PROJECT_NAME]: 'ac.projectDescription',
+      [OrderFieldsEnum.PRINCIPAL_INVESTIGATOR]: 'ac.project_lead_description',
+      [OrderFieldsEnum.STATUS]: 'ac.contract_status',
+    };
+    return `ORDER BY ${fieldMap[field] || 'ac.start_date'} ${direction} `;
+  }
+
+  async getContracts(
+    filter?: Record<string, any>,
+    userId?: number,
+    orderFields?: OrderFieldsEnum,
+    direction?: 'ASC' | 'DESC',
+  ) {
     const dateFilterClause = this.buildDateFilterClause(filter);
 
     const query = `
@@ -270,7 +297,34 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
     GROUP BY ac.agreement_id, cl.id;`;
 
-    return this.query(query) as Promise<ContractResultCountDto[]>;
+    return this.query(query).then((results) => {
+      if (orderFields) {
+        const fieldMapping = {
+          [OrderFieldsEnum.START_DATE]: 'start_date',
+          [OrderFieldsEnum.END_DATE]: 'end_date',
+          [OrderFieldsEnum.END_DATE_GLOBAL]: 'endDateGlobal',
+          [OrderFieldsEnum.END_DATE_FINANCE]: 'endDatefinance',
+          [OrderFieldsEnum.CONTRACT_CODE]: 'agreement_id',
+          [OrderFieldsEnum.PROJECT_NAME]: 'projectDescription',
+          [OrderFieldsEnum.PRINCIPAL_INVESTIGATOR]: 'project_lead_description',
+          [OrderFieldsEnum.STATUS]: 'contract_status',
+        };
+
+        const field = fieldMapping[orderFields];
+        const dir = (direction?.toLowerCase() as 'asc' | 'desc') || 'asc';
+
+        return this.sortResultsWithLodash(results, field, dir);
+      }
+      return results;
+    }) as Promise<ContractResultCountDto[]>;
+  }
+
+  private sortResultsWithLodash<T>(
+    data: T[],
+    field: string | string[],
+    direction: 'asc' | 'desc' | ('asc' | 'desc')[] = 'asc',
+  ): T[] {
+    return orderBy(data, field, direction);
   }
 
   private buildStatusFilterClause(statuses: string[]): string {

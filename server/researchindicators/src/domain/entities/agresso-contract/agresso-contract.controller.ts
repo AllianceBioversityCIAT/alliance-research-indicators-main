@@ -14,6 +14,7 @@ import { ServiceResponseDto } from '../../shared/global-dto/service-response.dto
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
+import { OrderFieldsEnum } from './enum/order-fields.enum';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -177,6 +178,18 @@ export class AgressoContractController {
     type: String,
     description: 'Filter by end date',
   })
+  @ApiQuery({
+    name: 'order-field',
+    required: false,
+    enum: OrderFieldsEnum,
+    description: 'Field to order by',
+  })
+  @ApiQuery({
+    name: 'direction',
+    required: false,
+    description: 'Order direction (ASC or DESC)',
+    enum: ['ASC', 'DESC'],
+  })
   async findContracts(
     @Query('current-user') currentUser: TrueFalseEnum,
     @Query('contract-code') contractCode: string,
@@ -186,17 +199,24 @@ export class AgressoContractController {
     @Query('status', ListParseToArrayPipe) status: AgressoContractStatus[],
     @Query('start-date') startDate: string,
     @Query('end-date') endDate: string,
+    @Query('order-field') orderField: OrderFieldsEnum,
+    @Query('direction') direction: 'ASC' | 'DESC' = 'ASC',
   ) {
     return this.agressoContractService
-      .findAgressoContracts(currentUser, {
-        contract_code: contractCode,
-        project_name: projectName,
-        principal_investigator: principalInvestigator,
-        lever: lever,
-        start_date: startDate,
-        end_date: endDate,
-        status: status.map((s) => AgressoContractStatus[s?.toUpperCase()]),
-      })
+      .findAgressoContracts(
+        currentUser,
+        {
+          contract_code: contractCode,
+          project_name: projectName,
+          principal_investigator: principalInvestigator,
+          lever: lever,
+          start_date: startDate,
+          end_date: endDate,
+          status: status.map((s) => AgressoContractStatus[s?.toUpperCase()]),
+        },
+        orderField,
+        direction,
+      )
       .then((response) =>
         ResponseUtils.format({
           description: 'Contracts found',

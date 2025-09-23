@@ -18,9 +18,7 @@ import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { ResultTag } from '../result-tags/entities/result-tag.entity';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
-import { ResultInitiativesService } from '../result-initiatives/result-initiatives.service';
 import { StepTwoOicrDto } from './dto/step-two-oicr.dto';
-import { ResultInitiative } from '../result-initiatives/entities/result-initiative.entity';
 import { ResultLeversService } from '../result-levers/result-levers.service';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ResultsService } from '../results/results.service';
@@ -37,7 +35,22 @@ import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_o
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
 import { isEmpty } from '../../shared/utils/object.utils';
-import { CountryDto, LeverDto, MainLeverDto, ProjectDto, RegionDto, ResultMappedDto} from './dto/response-oicr-word-template.dto';
+import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
+import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
+import {
+  filterByUniqueKeyWithPriority,
+  mergeArraysWithPriority,
+} from '../../shared/utils/array.util';
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { ResultContractsService } from '../result-contracts/result-contracts.service';
+import {
+  CountryDto,
+  LeverDto,
+  MainLeverDto,
+  ProjectDto,
+  RegionDto,
+  ResultMappedDto,
+} from './dto/response-oicr-word-template.dto';
 
 @Injectable()
 export class ResultOicrService {
@@ -48,7 +61,6 @@ export class ResultOicrService {
     private readonly resultUsersService: ResultUsersService,
     private readonly linkResultService: LinkResultsService,
     private readonly updateDataUtil: UpdateDataUtil,
-    private readonly resultInitiativesService: ResultInitiativesService,
     private readonly resultLeversService: ResultLeversService,
     @Inject(forwardRef(() => ResultsService))
     private readonly resultService: ResultsService,
@@ -57,6 +69,7 @@ export class ResultOicrService {
     private readonly templateService: TemplateService,
     private readonly mainRepo: ResultOicrRepository,
     private readonly tempExternalOicrsService: TempExternalOicrsService,
+    private readonly resultContractService: ResultContractsService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -71,40 +84,77 @@ export class ResultOicrService {
     });
   }
 
-  async createOicr(data: CreateResultOicrDto) {
-    const result = await this.resultService.createResult(data.base_information);
-    await this.stepOneOicr(data.step_one, result.result_id);
-    await this.stepTwoOicr(data.step_two, result.result_id);
-    await this.resultService.saveGeoLocation(result.result_id, data.step_three);
-    const tempGeneralComment =
-      typeof data?.step_four?.general_comment == 'string'
-        ? data.step_four.general_comment
-        : null;
-    await this.mainRepo.update(result.result_id, {
-      general_comment: tempGeneralComment,
-    });
-    await this.dataSource.getRepository(Result).update(result.result_id, {
-      description: data?.step_one?.outcome_impact_statement,
-    });
+  async createOicr(
+    data: CreateResultOicrDto,
+    manager?: EntityManager,
+    platform_code: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
+    resultId?: number,
+  ) {
+    manager = manager || this.dataSource.manager;
 
-    await this.sendMessageOicr(result.result_id);
+    let result: Result;
+    if (!resultId) {
+      result = await this.resultService.createResult(
+        data.base_information,
+        platform_code,
+        {
+          leverEnum: LeverRolesEnum.OICR_ALIGNMENT,
+          result_status_id: ResultStatusEnum.REQUESTED,
+          notMap: { lever: true },
+        },
+      );
+      const lever = await this.resultLeversService.find(
+        result.result_id,
+        LeverRolesEnum.OICR_ALIGNMENT,
+      );
+      const fullLevers = mergeArraysWithPriority<ResultLever>(
+        data?.step_two?.primary_lever,
+        lever,
+        'lever_id',
+      );
+      data.step_two.primary_lever = fullLevers as ResultLever[];
+    } else {
+      result = await this.dataSource.getRepository(Result).findOne({
+        where: {
+          result_id: resultId,
+          is_active: true,
+          is_ai: false,
+          is_snapshot: false,
+        },
+      });
+    }
+
+    await this.updateOicrSteps(result.result_id, data, manager, !resultId);
+
+    if (!resultId) {
+      await this.sendMessageOicr(result.result_id);
+    }
 
     return result;
   }
 
   async sendMessageOicr(resultId: number) {
     const messageData = await this.mainRepo.getDataToNewOicrMessage(resultId);
+    messageData.cration_date = new Date(messageData.cration_date)
+      .toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+      .toLowerCase();
+
     const template = await this.templateService._getTemplate(
       TemplateEnum.OICR_NOTIFICATION_CREATED,
       messageData,
     );
     if (template) {
       await this.messageMicroservice.sendEmail({
-        subject: `[STAR] - New OICR Submission #${messageData.result_code}`,
+        subject: `[STAR] - New OICR Request #${messageData.result_code}`,
         to: this.appConfig.SPRM_EMAIL_SAFE(this.currentUser.email),
         message: {
           socketFile: Buffer.from(template),
         },
+        bcc: process.env.ARI_MAPPED_BCC_SUBM_OICR,
       });
     }
   }
@@ -145,6 +195,8 @@ export class ResultOicrService {
       saveLinkedResults,
       'external_oicr_id',
     );
+
+    await this.updateDataUtil.updateLastUpdatedDate(resultId);
   }
 
   async findOicrs(resultId: number): Promise<UpdateOicrDto> {
@@ -174,6 +226,29 @@ export class ResultOicrService {
     };
   }
 
+  private async updateOicrSteps(
+    resultId: number,
+    data: CreateResultOicrDto,
+    manager: EntityManager,
+    isNew: boolean = true,
+  ) {
+    await this.stepOneOicr(data?.step_one, resultId, manager, isNew);
+    await this.stepTwoOicr(data?.step_two, resultId, manager);
+    await this.resultService.saveGeoLocation(resultId, data?.step_three);
+    const tempGeneralComment =
+      typeof data?.step_four?.general_comment == 'string'
+        ? data.step_four.general_comment
+        : null;
+    await manager.getRepository(ResultOicr).update(resultId, {
+      general_comment: tempGeneralComment,
+    });
+    await manager.getRepository(Result).update(resultId, {
+      description: data?.step_one?.outcome_impact_statement,
+    });
+
+    await this.updateDataUtil.updateLastUpdatedDate(resultId, manager);
+  }
+
   async createOicrSteps(
     resultId: number,
     data: CreateStepsOicrDto,
@@ -197,76 +272,76 @@ export class ResultOicrService {
     }
   }
 
-  async stepTwoOicr(data: StepTwoOicrDto, resultId: number) {
-    return this.dataSource.transaction(async (manager) => {
-      const saveInitiatives: Partial<ResultInitiative>[] = data.initiatives.map(
-        (initiative) => ({
-          clarisa_initiative_id: initiative.clarisa_initiative_id,
-        }),
-      );
-      await this.resultInitiativesService.create(
-        resultId,
-        saveInitiatives,
-        'clarisa_initiative_id',
-        undefined,
-        manager,
-      );
+  async stepTwoOicr(
+    data: StepTwoOicrDto,
+    resultId: number,
+    manager?: EntityManager,
+  ) {
+    const savePrimaryLevers: Partial<ResultLever>[] = data.primary_lever.map(
+      (lever) => ({
+        lever_id: lever?.lever_id,
+        is_primary: true,
+      }),
+    );
 
-      const savePrimaryLevers: Partial<ResultLever>[] = data.primary_lever.map(
-        (lever) => ({
-          lever_id: lever.lever_id,
-          is_primary: true,
-        }),
-      );
+    const saveContributorLevers: Partial<ResultLever>[] =
+      data.contributor_lever.map((lever) => ({
+        lever_id: lever?.lever_id,
+        is_primary: false,
+      }));
 
-      const saveContributorLevers: Partial<ResultLever>[] =
-        data.contributor_lever.map((lever) => ({
-          lever_id: lever.lever_id,
-          is_primary: false,
-        }));
+    const allLevers = [...savePrimaryLevers, ...saveContributorLevers];
 
-      const allLevers = [...savePrimaryLevers, ...saveContributorLevers];
+    const datalever = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
+      allLevers,
+      'lever_id',
+      'is_primary',
+    );
 
-      await this.resultLeversService.create(
-        resultId,
-        allLevers,
-        'lever_id',
-        undefined,
-        manager,
-        ['is_primary'],
-      );
-    });
+    await this.resultLeversService.create(
+      resultId,
+      datalever,
+      'lever_id',
+      LeverRolesEnum.OICR_ALIGNMENT,
+      manager,
+      ['is_primary'],
+    );
   }
 
-  async stepOneOicr(data: StepOneOicrDto, resultId: number) {
-    await this.dataSource.transaction(async (manager) => {
-      const saveUsers: Partial<ResultUser> = {
-        user_id: data?.main_contact_person?.user_id,
-      };
-      await this.resultUsersService.create(
-        resultId,
-        saveUsers,
-        'user_id',
-        UserRolesEnum.MAIN_CONTACT,
-        manager,
-      );
+  async stepOneOicr(
+    data: StepOneOicrDto,
+    resultId: number,
+    manager?: EntityManager,
+    isNew: boolean = true,
+  ) {
+    const saveUsers: Partial<ResultUser> = {
+      user_id: data?.main_contact_person?.user_id,
+    };
+    await this.resultUsersService.create(
+      resultId,
+      saveUsers,
+      'user_id',
+      UserRolesEnum.MAIN_CONTACT,
+      manager,
+    );
 
-      const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
-        ? [
-            {
-              tag_id: data?.tagging?.tag_id,
-            },
-          ]
-        : [];
+    const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
+      ? [
+          {
+            tag_id: data?.tagging?.tag_id,
+          },
+        ]
+      : [];
 
-      const createdTags = await this.resultTagsService.create(
-        resultId,
-        saveTags,
-        'tag_id',
-        undefined,
-        manager,
-      );
+    const createdTags = await this.resultTagsService.create(
+      resultId,
+      saveTags,
+      'tag_id',
+      undefined,
+      manager,
+    );
 
+    if (isNew) {
       const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
         createdTags,
       )
@@ -279,36 +354,39 @@ export class ResultOicrService {
         undefined,
         manager,
       );
+    }
 
-      await this.mainRepo.update(resultId, {
-        outcome_impact_statement: data.outcome_impact_statement,
-        ...this.currentUser.audit(SetAutitEnum.UPDATE),
-      });
+    await this.mainRepo.update(resultId, {
+      outcome_impact_statement: data.outcome_impact_statement,
+      ...this.currentUser.audit(SetAutitEnum.UPDATE),
     });
   }
 
-  async findByResultIdAndSteps(resultId: number, step: number) {
-    switch (step) {
-      case 1:
-        return this.findStepOneIoicr(resultId);
-      case 2:
-        return this.findStepTwoOicr(resultId);
-      case 3:
-        return this.resultService.findGeoLocation(resultId);
-      case 4:
-        return this.mainRepo
-          .findOne({
-            where: {
-              result_id: resultId,
-            },
-            select: {
-              general_comment: true,
-            },
-          })
-          .then((result) => result?.general_comment || '');
-      default:
-        throw new BadRequestException('Invalid step number');
-    }
+  async findModal(resultId: number): Promise<CreateResultOicrDto> {
+    const stepOne = await this.findStepOneIoicr(resultId);
+    const stepTwo = await this.findStepTwoOicr(resultId);
+    const stepThree = await this.resultService.findGeoLocation(resultId);
+    const baseInformation = await this.resultService.findBaseInfo(resultId);
+    const stepFour = await this.mainRepo
+      .findOne({
+        where: {
+          result_id: resultId,
+        },
+        select: {
+          general_comment: true,
+        },
+      })
+      .then((result) => result?.general_comment || '');
+
+    return {
+      step_one: stepOne,
+      step_two: stepTwo,
+      step_three: stepThree,
+      step_four: {
+        general_comment: stepFour,
+      },
+      base_information: baseInformation,
+    };
   }
 
   private async findStepOneIoicr(resultId: number): Promise<StepOneOicrDto> {
@@ -342,36 +420,51 @@ export class ResultOicrService {
   }
 
   private async findStepTwoOicr(resultId: number): Promise<StepTwoOicrDto> {
-    const initiatives = await this.resultInitiativesService.find(resultId);
-    const allLevers = await this.resultLeversService.find(resultId);
+    const allLevers = await this.resultLeversService.find(
+      resultId,
+      LeverRolesEnum.OICR_ALIGNMENT,
+    );
+
+    const leverId =
+      await this.resultContractService.getLeverFromPrimaryContract(resultId);
 
     return {
-      initiatives,
-      primary_lever: allLevers.filter((lever) => lever.is_primary),
+      primary_lever: allLevers
+        .filter((lever) => lever.is_primary)
+        .map(
+          (el) =>
+            ({
+              ...el,
+              is_contract_lever: el.lever_id == String(leverId),
+            }) as unknown as ResultLever,
+        ),
       contributor_lever: allLevers.filter((lever) => !lever.is_primary),
     };
   }
 
-  async getResultOicrDetailsByOfficialCode(resultId: number): Promise<ResultMappedDto> {
-    const rawResults = await this.mainRepo.getResultOicrDetailsByOfficialCode(resultId);
+  async getResultOicrDetailsByOfficialCode(
+    resultId: number,
+  ): Promise<ResultMappedDto> {
+    const rawResults =
+      await this.mainRepo.getResultOicrDetailsByOfficialCode(resultId);
 
     if (!rawResults || rawResults.length === 0) {
       return null;
     }
 
     const firstRow = rawResults[0];
-    
+
     const projectsMap = new Map<string, ProjectDto>();
     const leversMap = new Map<string, LeverDto>();
     const regionsMap = new Map<string, RegionDto>();
     const countriesMap = new Map<string, CountryDto>();
     const mainLeversMap = new Map<string, MainLeverDto>();
 
-    rawResults.forEach(row => {
+    rawResults.forEach((row) => {
       if (row.project_id && row.project_title) {
         projectsMap.set(row.project_id, {
           project_id: row.project_id,
-          project_title: row.project_title
+          project_title: row.project_title,
         });
       }
 
@@ -379,7 +472,7 @@ export class ResultOicrService {
         mainLeversMap.set(row.main_lever_id, {
           main_lever_id: row.main_lever_id,
           main_lever: row.main_lever,
-          main_lever_name: row.main_lever_name
+          main_lever_name: row.main_lever_name,
         });
       }
 
@@ -387,21 +480,21 @@ export class ResultOicrService {
         leversMap.set(row.lever_id, {
           lever_id: row.lever_id,
           lever_short: row.lever,
-          lever_full: row.lever_name
+          lever_full: row.lever_name,
         });
       }
 
       if (row.region_code && row.region_name) {
         regionsMap.set(row.region_code, {
           region_code: row.region_code,
-          region_name: row.region_name
+          region_name: row.region_name,
         });
       }
 
       if (row.country_code && row.country_name) {
         countriesMap.set(row.country_code, {
           country_code: row.country_code,
-          country_name: row.country_name
+          country_name: row.country_name,
         });
       }
     });
@@ -421,7 +514,7 @@ export class ResultOicrService {
       geographic_scope: firstRow.geographic_scope,
       regions: Array.from(regionsMap.values()),
       countries: Array.from(countriesMap.values()),
-      geographic_scope_comments: firstRow.comment_geo_scope
+      geographic_scope_comments: firstRow.comment_geo_scope,
     };
   }
 }

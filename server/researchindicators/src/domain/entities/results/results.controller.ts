@@ -350,6 +350,23 @@ export class ResultsController {
       );
   }
 
+  @ApiOperation({ summary: 'Validate result title' })
+  @ApiQuery({
+    name: 'title',
+    required: true,
+    type: String,
+    description: 'The title to be validated',
+  })
+  @Get(`validate-title`)
+  async validateResultTitle(@Query('title') title: string) {
+    const isValid = await this.resultsService.validateResultTitle(title);
+    return ResponseUtils.format({
+      description: 'Result title validation',
+      data: { isValid },
+      status: HttpStatus.OK,
+    });
+  }
+
   @ApiOperation({ summary: 'Update metadata' })
   @GetResultVersion()
   @Get(`${RESULT_CODE}/metadata`)

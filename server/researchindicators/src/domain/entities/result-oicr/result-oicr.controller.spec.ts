@@ -240,8 +240,9 @@ describe('ResultOicrController', () => {
 
       const expectedResponse = {
         data: expectedServiceResult,
-        description: 'Result OICR created successfully',
-        status: HttpStatus.CREATED,
+        description: 'Result OICR updated successfully',
+        status: HttpStatus.OK,
+        errors: undefined,
       };
 
       mockResultOicrService.createOicr.mockResolvedValue(
@@ -249,11 +250,17 @@ describe('ResultOicrController', () => {
       );
 
       // Act
-      const result = await controller.createResultOicr(mockCreateData);
+      const result = await controller.createResultOicr(
+        mockCreateData,
+        'TEST-001',
+      );
 
       // Assert
       expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(
         mockCreateData,
+        undefined,
+        'STAR',
+        undefined,
       );
       expect(result).toEqual(expectedResponse);
     });
@@ -275,11 +282,14 @@ describe('ResultOicrController', () => {
       mockResultOicrService.createOicr.mockRejectedValue(serviceError);
 
       // Act & Assert
-      await expect(controller.createResultOicr(mockCreateData)).rejects.toThrow(
-        'Service error occurred',
-      );
+      await expect(
+        controller.createResultOicr(mockCreateData, 'TEST-001'),
+      ).rejects.toThrow('Service error occurred');
       expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(
         mockCreateData,
+        undefined,
+        'STAR',
+        undefined,
       );
     });
 
@@ -322,14 +332,20 @@ describe('ResultOicrController', () => {
       );
 
       // Act
-      const result = await controller.createResultOicr(mockCreateData);
+      const result = await controller.createResultOicr(
+        mockCreateData,
+        'TEST-001',
+      );
 
       // Assert
       expect(mockResultOicrService.createOicr).toHaveBeenCalledWith(
         mockCreateData,
+        undefined,
+        'STAR',
+        undefined,
       );
       expect(result.data).toEqual(expectedServiceResult);
-      expect(result.status).toBe(HttpStatus.CREATED);
+      expect(result.status).toBe(HttpStatus.OK);
     });
 
     it('should format response correctly with all required fields', async () => {
@@ -346,15 +362,18 @@ describe('ResultOicrController', () => {
       mockResultOicrService.createOicr.mockResolvedValue(serviceResult as any);
 
       // Act
-      const result = await controller.createResultOicr(mockCreateData);
+      const result = await controller.createResultOicr(
+        mockCreateData,
+        'TEST-001',
+      );
 
       // Assert
       expect(result).toHaveProperty('data');
       expect(result).toHaveProperty('description');
       expect(result).toHaveProperty('status');
       expect(result.data).toEqual(serviceResult);
-      expect(result.description).toBe('Result OICR created successfully');
-      expect(result.status).toBe(HttpStatus.CREATED);
+      expect(result.description).toBe('Result OICR updated successfully');
+      expect(result.status).toBe(HttpStatus.OK);
     });
   });
 });

@@ -186,7 +186,7 @@ describe('ResultOicrRepository', () => {
         'ac.project_lead_description as principal_investigator',
       );
       expect(actualQuery).toContain(
-        "IFNULL(cl.full_name, 'No lever associated') as primary_lever",
+        "IFNULL(GROUP_CONCAT(cl.full_name separator ', '), 'No lever associated') as primary_lever",
       );
       expect(actualQuery).toContain(
         "IF(aus.carnet IS NOT NULL, CONCAT(aus.first_name, ', ',aus.last_name), 'Not Provided') as main_contact_person",

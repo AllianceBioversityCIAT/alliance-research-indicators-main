@@ -31,6 +31,13 @@ export class ClarisaInnovationReadinessLevel extends AuditableEntity {
   })
   definition?: string;
 
+  @Column({
+    name: 'additional_guidance',
+    type: 'text',
+    nullable: true,
+  })
+  additional_guidance?: string;
+
   @OneToMany(
     () => ResultInnovationDev,
     (resultInnovationDev) => resultInnovationDev.innovationReadiness,

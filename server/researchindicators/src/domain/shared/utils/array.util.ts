@@ -106,6 +106,27 @@ export const isArrayOfType = <T>(
   return arr.every(typeChecker);
 };
 
+export function intersection<A>(arrayA: A[], arrayB: A[]): A[] {
+  return arrayA.filter((item) => arrayB.includes(item));
+}
+
+export function mergeArraysWithPriority<T>(
+  arrayA: Partial<T>[],
+  arrayB: Partial<T>[],
+  comparisonKey: keyof T,
+): Partial<T>[] {
+  const result = [...arrayA];
+  const existingKeys = new Set(arrayA.map((item) => item[comparisonKey]));
+
+  arrayB.forEach((item) => {
+    if (!existingKeys.has(item[comparisonKey])) {
+      result.push(item);
+    }
+  });
+
+  return result;
+}
+
 export const getItemsAtLevel = <T extends { children?: T[] }>(
   items: T[],
   level: number,
