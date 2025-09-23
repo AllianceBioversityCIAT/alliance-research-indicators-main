@@ -34,7 +34,7 @@ export class ResultSdgsService extends BaseServiceSimple<
 
     const sdgsToInsert: Partial<ResultSdg>[] = [
       ...existingSdgs,
-      ...sdgs.filter((el) => el.clarisa_sdg_id),
+      ...(sdgs?.filter((el) => el.clarisa_sdg_id) ?? []),
     ];
 
     return this.create(
