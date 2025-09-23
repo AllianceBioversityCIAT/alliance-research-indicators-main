@@ -26,7 +26,9 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     relations?: Partial<StringKeys<AgressoContract>>,
   ) {
     let offset: number = null;
-    if (!isEmpty(pagination?.limit) && !isEmpty(pagination?.page)) {
+    if (!isEmpty(pagination?.limit)) {
+      pagination.page =
+        pagination.page < 1 || isEmpty(pagination.page) ? 1 : pagination.page;
       offset = (pagination.page - 1) * pagination.limit;
     }
     const filterWhere = Object.entries(where).filter(
