@@ -65,7 +65,7 @@ describe('ResultOicrRepository', () => {
       const expectedResult = {
         ...mockQueryResult[0],
         oicr_link:
-          'https://test-client.example.com/project-detail/CONTRACT-001/project-results',
+          'https://test-client.example.com/result/OICR-2024-001/general-information',
       };
 
       // Mock the query method
@@ -93,7 +93,7 @@ describe('ResultOicrRepository', () => {
       );
       expect(result).toEqual(expectedResult);
       expect(result.oicr_link).toBe(
-        'https://test-client.example.com/project-detail/CONTRACT-001/project-results',
+        'https://test-client.example.com/result/OICR-2024-001/general-information',
       );
     });
 
@@ -234,7 +234,7 @@ describe('ResultOicrRepository', () => {
 
       // Assert
       expect(result.oicr_link).toBe(
-        'http://localhost:3000/project-detail/CONTRACT-002/project-results',
+        'http://localhost:3000/result/OICR-2024-002/general-information',
       );
     });
 
@@ -262,7 +262,7 @@ describe('ResultOicrRepository', () => {
 
       // Assert
       expect(result.oicr_link).toBe(
-        'https://test-client.example.com/project-detail/CONTRACT-001/project-results',
+        'https://test-client.example.com/result/OICR-2024-001_special-chars/general-information',
       );
     });
   });
