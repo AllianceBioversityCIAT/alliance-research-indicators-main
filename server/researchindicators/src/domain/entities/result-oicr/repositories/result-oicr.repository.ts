@@ -49,7 +49,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
 
   async getResultOicrDetailsByOfficialCode(resultId: number) {
     const query = `
-      SELECT
+    SELECT
         r.result_id,
         r.result_official_code as result_code,
         r.title,
@@ -71,7 +71,8 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
         cr.name as region_name,
         cc.isoAlpha2 as country_code,
         cc.name as country_name,
-        r.comment_geo_scope
+        r.comment_geo_scope,
+        teo.handle_link
       FROM results r
       INNER JOIN result_oicrs ro ON ro.result_id = r.result_id
       INNER JOIN result_contracts rc_main 
@@ -107,7 +108,10 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
       LEFT JOIN result_countries rco on rco.result_id = r.result_id
         AND rco.is_active = TRUE
       LEFT JOIN clarisa_countries cc on cc.isoAlpha2 = rco.isoAlpha2
-      WHERE r.result_id = ?
+      LEFT JOIN TEMP_result_external_oicrs treo on treo.result_id = r.result_id
+        AND treo.is_active = TRUE
+      LEFT JOIN TEMP_external_oicrs teo on teo.id = treo.external_oicr_id
+      WHERE r.result_id = 3311
         AND r.is_active = TRUE;
     `;
     return await this.query(query, [resultId]);

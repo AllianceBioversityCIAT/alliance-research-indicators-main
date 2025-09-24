@@ -523,6 +523,7 @@ export class ResultOicrService {
       regions: Array.from(regionsMap.values()),
       countries: Array.from(countriesMap.values()),
       geographic_scope_comments: firstRow.comment_geo_scope,
+      handle_link: firstRow.handle_link,
     };
   }
 }

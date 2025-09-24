@@ -41,4 +41,5 @@ export class ResultMappedDto {
   regions: RegionDto[];
   countries: CountryDto[];
   geographic_scope_comments: string;
+  handle_link: string;
 }
