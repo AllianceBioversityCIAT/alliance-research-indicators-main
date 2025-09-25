@@ -514,16 +514,16 @@ export class ResultOicrService {
       main_project_id: firstRow.main_project_id,
       main_project: firstRow.main_project_title,
       other_projects: Array.from(projectsMap.values()),
-      tag_id: firstRow.tag_id,
-      tag_name: firstRow.tag_name,
-      outcome_impact_statement: firstRow.outcome_impact_statement,
+      tag_id: firstRow.tag_id ?? '',
+      tag_name: firstRow.tag_name ?? '',
+      outcome_impact_statement: firstRow.outcome_impact_statement ?? '',
       main_levers: Array.from(mainLeversMap.values()),
       other_levers: Array.from(leversMap.values()),
-      geographic_scope: firstRow.geographic_scope,
+      geographic_scope: firstRow.geographic_scope ?? '',
       regions: Array.from(regionsMap.values()),
       countries: Array.from(countriesMap.values()),
-      geographic_scope_comments: firstRow.comment_geo_scope,
-      handle_link: firstRow.handle_link,
+      geographic_scope_comments: firstRow.comment_geo_scope ?? '',
+      handle_link: firstRow.handle_link ?? '',
     };
   }
 }
