@@ -111,7 +111,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
       LEFT JOIN TEMP_result_external_oicrs treo on treo.result_id = r.result_id
         AND treo.is_active = TRUE
       LEFT JOIN TEMP_external_oicrs teo on teo.id = treo.external_oicr_id
-      WHERE r.result_id = 3311
+      WHERE r.result_id = ?
         AND r.is_active = TRUE;
     `;
     return await this.query(query, [resultId]);
