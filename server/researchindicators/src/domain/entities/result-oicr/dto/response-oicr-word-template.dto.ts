@@ -34,11 +34,12 @@ export class ResultMappedDto {
   other_projects: ProjectDto[];
   tag_id: number | null;
   tag_name: string | null;
-  outcome_impact_statement: string;
+  outcome_impact_statement: string | null;
   main_levers: MainLeverDto[];
   other_levers: LeverDto[];
-  geographic_scope: string;
+  geographic_scope: string | null;
   regions: RegionDto[];
   countries: CountryDto[];
-  geographic_scope_comments: string;
+  geographic_scope_comments: string | null;
+  handle_link: string | null;
 }
