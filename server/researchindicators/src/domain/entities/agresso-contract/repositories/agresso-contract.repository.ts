@@ -8,7 +8,8 @@ import { ContractResultCountDto } from '../dto/contract-result-count.dto';
 import { isEmpty } from '../../../shared/utils/object.utils';
 import { StringKeys } from '../../../shared/global-dto/types-global';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
-import { orderBy } from 'lodash';
+import { Indicator } from '../../indicators/entities/indicator.entity';
+import { MappedContractsDto } from '../dto/mapper-agresso-contract.dto';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -224,7 +225,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       [OrderFieldsEnum.PRINCIPAL_INVESTIGATOR]: 'ac.project_lead_description',
       [OrderFieldsEnum.STATUS]: 'ac.contract_status',
     };
-    return `ORDER BY ${fieldMap[field] || 'ac.start_date'} ${direction} `;
+    return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
 
   async getContracts(
@@ -232,99 +233,105 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     userId?: number,
     orderFields?: OrderFieldsEnum,
     direction?: 'ASC' | 'DESC',
+    pagination?: { page: number; limit: number },
   ) {
     const dateFilterClause = this.buildDateFilterClause(filter);
+    const indicators = await this.dataSource.getRepository(Indicator).find();
+    const operationOrder = isEmpty(orderFields)
+      ? `FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')`
+      : this.orderBy(orderFields, direction);
+    const orderBy = `ORDER BY ${operationOrder}`;
 
-    const query = `
-    SELECT 
-      ac.agreement_id, 
-      ac.projectDescription, 
-      ac.project_lead_description, 
-      ac.description,
-      ac.start_date, 
-      ac.end_date, 
-      ac.endDateGlobal,
-      ac.endDatefinance,
-      ac.contract_status,
-      JSON_ARRAYAGG(
-        JSON_OBJECT(
-          'indicator', JSON_OBJECT(
-            'indicator_id', i.indicator_id,
-            'name', i.name,
-            'description', i.description,
-            'indicator_type_id', i.indicator_type_id,
-            'long_description', i.long_description,
-            'icon_src', i.icon_src,
-            'other_names', i.other_names,
-            'is_active', i.is_active
-          ),
-          'count_results', 
-            (SELECT count(r.result_id)
-            FROM results r
-            INNER JOIN result_contracts rc ON rc.result_id = r.result_id
-            WHERE rc.contract_id = ac.agreement_id
-              AND r.indicator_id = i.indicator_id
-              AND r.is_active = 1
-              AND r.is_snapshot = false
-              AND rc.is_active = 1
-              ${userId ? `AND r.created_by = ${userId}` : ''})
-        )
-      ) AS indicators,
-      IF(cl.id IS NOT NULL, JSON_OBJECT('id', cl.id,
-    			'short_name', cl.short_name,
-    			'full_name', cl.full_name,
-    			'other_names', cl.other_names), NULL) as lever
-    FROM agresso_contracts ac
-    LEFT JOIN result_contracts rc on rc.contract_id = ac.agreement_id 
-    								and rc.is_active = true
-    								and rc.is_primary = true
-    ${
-      userId
-        ? `inner join results r on r.result_id = rc.result_id 
-    					and r.created_by = ${userId}
-              and r.is_active = true
-              and r.is_snapshot = false`
-        : ''
+    let offset: number = null;
+    if (!isEmpty(pagination?.limit)) {
+      pagination.page =
+        pagination.page < 1 || isEmpty(pagination.page) ? 1 : pagination.page;
+      offset = (pagination.page - 1) * pagination.limit;
     }
-    left join clarisa_levers cl on cl.short_name = CONCAT('Lever ', IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
-    CROSS JOIN indicators i
-    WHERE 1 = 1
-    ${filter?.contract_code ? `AND ac.agreement_id = '${filter.contract_code}'` : ''}
-    ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
-    ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
-    ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
-    ${dateFilterClause}
-    ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
-    GROUP BY ac.agreement_id, cl.id;`;
 
-    return this.query(query).then((results) => {
-      if (orderFields) {
-        const fieldMapping = {
-          [OrderFieldsEnum.START_DATE]: 'start_date',
-          [OrderFieldsEnum.END_DATE]: 'end_date',
-          [OrderFieldsEnum.END_DATE_GLOBAL]: 'endDateGlobal',
-          [OrderFieldsEnum.END_DATE_FINANCE]: 'endDatefinance',
-          [OrderFieldsEnum.CONTRACT_CODE]: 'agreement_id',
-          [OrderFieldsEnum.PROJECT_NAME]: 'projectDescription',
-          [OrderFieldsEnum.PRINCIPAL_INVESTIGATOR]: 'project_lead_description',
-          [OrderFieldsEnum.STATUS]: 'contract_status',
-        };
+    const newQuery = `
+    SELECT 
+        paginated_contracts.agreement_id,
+        paginated_contracts.projectDescription,
+        paginated_contracts.project_lead_description,
+        paginated_contracts.description,
+        paginated_contracts.start_date,
+        paginated_contracts.end_date,
+        paginated_contracts.endDateGlobal,
+        paginated_contracts.endDatefinance,
+        paginated_contracts.contract_status,
+        result_counts.indicator_id,
+        result_counts.total_results as count_results,
+        paginated_contracts.lever_id,
+        paginated_contracts.lever_short_name,
+        paginated_contracts.lever_full_name,
+        paginated_contracts.lever_other_names
+    FROM (
+        SELECT 
+            ac.agreement_id,
+            ac.projectDescription,
+            ac.project_lead_description,
+            ac.description,
+            ac.start_date,
+            ac.end_date,
+            ac.endDateGlobal,
+            ac.endDatefinance,
+            ac.contract_status,
+            cl.id as lever_id,
+            cl.short_name as lever_short_name,
+            cl.full_name as lever_full_name,
+            cl.other_names as lever_other_names
+        FROM agresso_contracts ac
+        LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
+            IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
+        WHERE 1=1
+        ${filter?.contract_code ? `AND ac.agreement_id = '${filter.contract_code}'` : ''}
+        ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
+        ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
+        ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
+        ${dateFilterClause}
+        ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
+        ${orderBy}
+        ${!isEmpty(offset) ? `LIMIT ${pagination.limit} OFFSET ${offset}` : ''}
+    ) paginated_contracts
+    LEFT JOIN (
+        SELECT 
+            rc.contract_id,
+            r.indicator_id,
+            COUNT(r.result_id) as total_results
+        FROM results r
+        INNER JOIN result_contracts rc ON rc.result_id = r.result_id
+        WHERE r.is_active = 1 
+          AND r.is_snapshot = FALSE 
+          AND rc.is_active = 1
+          ${userId ? `AND r.created_by = ${userId}` : ''}
+        GROUP BY rc.contract_id, r.indicator_id
+        HAVING COUNT(r.result_id) > 0 
+    ) result_counts ON result_counts.contract_id = paginated_contracts.agreement_id;
+    `;
 
-        const field = fieldMapping[orderFields];
-        const dir = (direction?.toLowerCase() as 'asc' | 'desc') || 'asc';
+    console.log(newQuery);
 
-        return this.sortResultsWithLodash(results, field, dir);
+    const rawResults = await this.query(newQuery);
+    const mapContracts = new Map<string, MappedContractsDto>();
+
+    rawResults.forEach((rawData) => {
+      const contractId = rawData.agreement_id;
+      if (!mapContracts.has(contractId)) {
+        const mappedContract = new MappedContractsDto(rawData, indicators);
+        mappedContract.setIndicatorCount(
+          rawData.indicator_id,
+          rawData.count_results,
+        );
+        mapContracts.set(contractId, mappedContract);
+      } else {
+        mapContracts
+          .get(contractId)
+          .setIndicatorCount(rawData.indicator_id, rawData.count_results);
       }
-      return results;
-    }) as Promise<ContractResultCountDto[]>;
-  }
+    });
 
-  private sortResultsWithLodash<T>(
-    data: T[],
-    field: string | string[],
-    direction: 'asc' | 'desc' | ('asc' | 'desc')[] = 'asc',
-  ): T[] {
-    return orderBy(data, field, direction);
+    return Array.from(mapContracts.values());
   }
 
   private buildStatusFilterClause(statuses: string[]): string {

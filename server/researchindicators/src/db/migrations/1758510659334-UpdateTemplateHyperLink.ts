@@ -1,8 +1,10 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
-import { TemplateEnum } from "../../domain/shared/auxiliar/template/enum/template.enum";
+import { MigrationInterface, QueryRunner } from 'typeorm';
+import { TemplateEnum } from '../../domain/shared/auxiliar/template/enum/template.enum';
 
-export class UpdateTemplateHyperLink1758510659334 implements MigrationInterface {
-   public async up(queryRunner: QueryRunner): Promise<void> {
+export class UpdateTemplateHyperLink1758510659334
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`UPDATE \`sec_template\`
         SET \`template\` = '<!DOCTYPE html>
             <html lang="en">
@@ -48,9 +50,9 @@ export class UpdateTemplateHyperLink1758510659334 implements MigrationInterface 
             </body>
             </html>'
         WHERE \`name\` = '${TemplateEnum.OICR_NOTIFICATION_CREATED}';`);
-        }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`UPDATE \`sec_template\`
         SET \`template\` = '<!DOCTYPE html>
             <html lang="en">
@@ -98,5 +100,5 @@ export class UpdateTemplateHyperLink1758510659334 implements MigrationInterface 
             </body>
             </html>'
         WHERE \`name\` = '${TemplateEnum.OICR_NOTIFICATION_CREATED}';`);
-    }
+  }
 }

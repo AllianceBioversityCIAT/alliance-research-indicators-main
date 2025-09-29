@@ -1,11 +1,14 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class InnovationReadinessAdditionalGuidance1758292242370 implements MigrationInterface {
+export class InnovationReadinessAdditionalGuidance1758292242370
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE \`clarisa_innovation_readiness_levels\` ADD \`additional_guidance\` text NULL`,
+    );
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE \`clarisa_innovation_readiness_levels\` ADD \`additional_guidance\` text NULL`);
-
-        await queryRunner.query(`
+    await queryRunner.query(`
         UPDATE \`clarisa_innovation_readiness_levels\`
         SET \`additional_guidance\` = CASE \`level\`
             WHEN 0 THEN 'No evidence is required.'
@@ -20,13 +23,12 @@ export class InnovationReadinessAdditionalGuidance1758292242370 implements Migra
             WHEN 9 THEN 'Level 9 is a validation stage confirming readiness based on results in real-world environments with limited or no involvement of CGIAR. Evidence may include field data demonstrating the innovation has achieved desired impact real-world conditions.'
         END
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             ALTER TABLE \`clarisa_innovation_readiness_levels\` 
             DROP COLUMN \`additional_guidance\`
         `);
-    }
-
+  }
 }

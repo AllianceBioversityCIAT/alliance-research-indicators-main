@@ -32,4 +32,9 @@ export class AgressoContractRawDto {
   public unit: string;
   public unitId: string;
   public sustainableDevelopmentGoals?: string;
+  public programAssistantId: string;
+  public programAssistantName: string;
+  public projectLeadId: string;
+  public researchAssistantName: string;
+  public researchAssistantId: string;
 }
