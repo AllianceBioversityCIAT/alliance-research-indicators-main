@@ -107,14 +107,13 @@ export class ResultOicrController {
   @GetResultVersion()
   async getWordTemplate() {
     return this.resultOicrService
-    .getResultOicrDetailsByOfficialCode(this.resultUtil.resultId)
-    .then((result) =>
-      ResponseUtils.format({
-        data: result,
-        description: 'Result OICR word template retrieved successfully',
-        status: HttpStatus.OK,
-      }),
-    );
+      .getResultOicrDetailsByOfficialCode(this.resultUtil.resultId)
+      .then((result) =>
+        ResponseUtils.format({
+          data: result,
+          description: 'Result OICR word template retrieved successfully',
+          status: HttpStatus.OK,
+        }),
+      );
   }
-
 }

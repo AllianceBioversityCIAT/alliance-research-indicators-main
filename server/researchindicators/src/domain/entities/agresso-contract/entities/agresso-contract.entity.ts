@@ -205,6 +205,39 @@ export class AgressoContract extends AuditableEntity {
   })
   officeId?: string;
 
+  @Column('varchar', {
+    name: 'programAssistantId',
+    length: 15,
+    nullable: true,
+  })
+  programAssistantId: string;
+
+  @Column('text', {
+    name: 'programAssistantName',
+    nullable: true,
+  })
+  programAssistantName: string;
+
+  @Column('varchar', {
+    length: 15,
+    name: 'projectLeadId',
+    nullable: true,
+  })
+  projectLeadId: string;
+
+  @Column('text', {
+    name: 'researchAssistantName',
+    nullable: true,
+  })
+  researchAssistantName: string;
+
+  @Column('varchar', {
+    name: 'researchAssistantId',
+    nullable: true,
+    length: 15,
+  })
+  researchAssistantId: string;
+
   @Column('json', {
     name: 'sdgs',
     nullable: true,
