@@ -259,6 +259,7 @@ describe('AgressoContractController', () => {
         'DESC',
         '1',
         '10',
+        'test query',
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -278,6 +279,7 @@ describe('AgressoContractController', () => {
         OrderFieldsEnum.START_DATE,
         'DESC',
         { limit: 10, page: 1 },
+        'test query',
       );
 
       expect(result).toEqual({
@@ -306,6 +308,7 @@ describe('AgressoContractController', () => {
         undefined,
         '1',
         '10',
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -322,6 +325,7 @@ describe('AgressoContractController', () => {
         undefined,
         'ASC',
         { limit: 10, page: 1 },
+        undefined,
       );
 
       expect(result).toEqual({
@@ -350,6 +354,7 @@ describe('AgressoContractController', () => {
         'ASC',
         '1',
         '10',
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -363,6 +368,7 @@ describe('AgressoContractController', () => {
         undefined,
         'ASC',
         { limit: 10, page: 1 },
+        undefined,
       );
     });
   });

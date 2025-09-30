@@ -304,6 +304,7 @@ describe('AgressoContractService', () => {
         OrderFieldsEnum.START_DATE,
         'DESC',
         undefined,
+        undefined,
       );
       expect(result).toEqual(expectedContracts);
     });
@@ -336,6 +337,7 @@ describe('AgressoContractService', () => {
         OrderFieldsEnum.PROJECT_NAME,
         'ASC',
         undefined,
+        undefined,
       );
       expect(result).toEqual(expectedContracts);
     });
@@ -355,6 +357,7 @@ describe('AgressoContractService', () => {
         null,
         OrderFieldsEnum.CONTRACT_CODE,
         'ASC',
+        undefined,
         undefined,
       );
       expect(result).toEqual(expectedContracts);
@@ -376,6 +379,7 @@ describe('AgressoContractService', () => {
         currentUser.user_id,
         undefined,
         'ASC',
+        undefined,
         undefined,
       );
       expect(result).toEqual(expectedContracts);

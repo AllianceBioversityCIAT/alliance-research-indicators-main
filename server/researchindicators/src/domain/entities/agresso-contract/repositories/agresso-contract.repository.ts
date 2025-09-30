@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
 import { AgressoContract } from '../entities/agresso-contract.entity';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
@@ -10,6 +10,10 @@ import { StringKeys } from '../../../shared/global-dto/types-global';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
 import { Indicator } from '../../indicators/entities/indicator.entity';
 import { MappedContractsDto } from '../dto/mapper-agresso-contract.dto';
+import {
+  escapeLikeString,
+  isValidText,
+} from '../../../shared/utils/query-sanitizer.util';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -234,7 +238,36 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     orderFields?: OrderFieldsEnum,
     direction?: 'ASC' | 'DESC',
     pagination?: { page: number; limit: number },
+    query?: string,
   ) {
+    let queryConditions = '';
+    if (!isEmpty(query) && !isValidText(query)) {
+      throw new BadRequestException('Invalid characters in query parameter');
+    } else if (!isEmpty(query)) {
+      const sanitizedQuery = !isEmpty(query)
+        ? escapeLikeString(query).split(' ')
+        : [];
+
+      const querySearch: (keyof AgressoContract)[] = [
+        'projectDescription',
+        'agreement_id',
+        'project_lead_description',
+      ];
+
+      queryConditions = querySearch
+        .map((field) => {
+          return sanitizedQuery
+            .map((value) => `ac.${field} LIKE '%${value}%'`)
+            .join(' OR ');
+        })
+        .join(' OR ');
+    }
+
+    const validFilter = (attr: string, filter: string) => {
+      if (isEmpty(attr)) return '';
+      return filter;
+    };
+
     const dateFilterClause = this.buildDateFilterClause(filter);
     const indicators = await this.dataSource.getRepository(Indicator).find();
     const operationOrder = isEmpty(orderFields)
@@ -269,12 +302,13 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
         ${userContracts(userId)}
     WHERE 1=1
-    ${filter?.contract_code ? `AND ac.agreement_id = '${filter.contract_code}'` : ''}
-    ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
-    ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
-    ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
+    ${validFilter(queryConditions, `AND (${queryConditions})`)}
+    ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter.contract_code}'`)}
+    ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter.project_name}%'`)}
+    ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'`)}
+    ${validFilter(filter?.lever, `AND cl.id in (${filter.lever.join(',')})`)}
     ${dateFilterClause}
-    ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
+    ${validFilter(filter?.status, this.buildStatusFilterClause(filter.status))}
   `;
 
       const countResult = await this.query(countQuery);
@@ -327,12 +361,13 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
         ${userContracts(userId)}
         WHERE 1=1
-        ${filter?.contract_code ? `AND ac.agreement_id = '${filter.contract_code}'` : ''}
-        ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
-        ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
-        ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
+        ${validFilter(queryConditions, `AND (${queryConditions})`)}
+        ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter?.contract_code}'`)}
+        ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter?.project_name}%'`)}
+        ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter?.principal_investigator}%'`)}
+        ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
         ${dateFilterClause}
-        ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
+        ${validFilter(filter?.status, this.buildStatusFilterClause(filter?.status))}
         ${orderBy}
         ${!isEmpty(offset) ? `LIMIT ${pagination.limit} OFFSET ${offset}` : ''}
     ) paginated_contracts
@@ -379,6 +414,9 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
   }
 
   private buildStatusFilterClause(statuses: string[]): string {
+    if (!statuses || !Array.isArray(statuses) || statuses.length === 0) {
+      return '';
+    }
     const statusList = statuses
       .map((status) => `'${status.toLowerCase()}'`)
       .join(',');
