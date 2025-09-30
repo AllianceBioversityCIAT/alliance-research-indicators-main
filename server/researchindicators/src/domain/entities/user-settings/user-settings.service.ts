@@ -53,7 +53,7 @@ export class UserSettingsService {
           value,
         });
         this.mainRepo.save(newSetting).catch(() => {
-          this.logger.error(
+          this.logger._error(
             `Failed to save new user setting: ${JSON.stringify(newSetting)}`,
           );
         });

@@ -40,7 +40,7 @@ export class ClarisaController {
   }
 
   private executeCloneEntities(type: string) {
-    this.logger.log(`Starting clone process for ${type}`);
+    this.logger._log(`Starting clone process for ${type}`);
     this.clarisaService.cloneAllClarisaEntities();
     return ResponseUtils.format({
       description: 'The clone process has been started',

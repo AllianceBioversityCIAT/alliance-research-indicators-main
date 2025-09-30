@@ -249,6 +249,47 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       offset = (pagination.page - 1) * pagination.limit;
     }
 
+    const userContracts = (userId?: number) =>
+      userId
+        ? `
+    INNER JOIN result_contracts rc ON rc.contract_id = ac.agreement_id AND rc.is_active = 1
+    INNER JOIN results r ON r.result_id = rc.result_id 
+        AND r.is_active = 1 
+        AND r.is_snapshot = FALSE 
+        AND r.created_by = ${userId}
+    `
+        : '';
+
+    let metadata = null;
+    if (!isEmpty(offset)) {
+      const countQuery = `
+    SELECT COUNT(DISTINCT ac.agreement_id) as total
+    FROM agresso_contracts ac
+    LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
+        IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
+        ${userContracts(userId)}
+    WHERE 1=1
+    ${filter?.contract_code ? `AND ac.agreement_id = '${filter.contract_code}'` : ''}
+    ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
+    ${filter?.principal_investigator ? `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'` : ''}
+    ${filter?.lever?.length ? `AND cl.id in (${filter.lever.join(',')})` : ''}
+    ${dateFilterClause}
+    ${filter?.status?.length ? this.buildStatusFilterClause(filter.status) : ''}
+  `;
+
+      const countResult = await this.query(countQuery);
+      const total = parseInt(countResult[0]?.total || '0');
+      const totalPages = Math.ceil(total / pagination.limit);
+      metadata = {
+        total,
+        page: pagination?.page,
+        limit: pagination?.limit,
+        totalPages,
+        hasNextPage: (pagination?.page || 1) < totalPages,
+        hasPreviousPage: (pagination?.page || 1) > 1,
+      };
+    }
+
     const newQuery = `
     SELECT 
         paginated_contracts.agreement_id,
@@ -267,7 +308,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         paginated_contracts.lever_full_name,
         paginated_contracts.lever_other_names
     FROM (
-        SELECT 
+        SELECT DISTINCT
             ac.agreement_id,
             ac.projectDescription,
             ac.project_lead_description,
@@ -284,6 +325,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         FROM agresso_contracts ac
         LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
+        ${userContracts(userId)}
         WHERE 1=1
         ${filter?.contract_code ? `AND ac.agreement_id = '${filter.contract_code}'` : ''}
         ${filter?.project_name ? `AND ac.projectDescription LIKE '%${filter.project_name}%'` : ''}
@@ -294,7 +336,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         ${orderBy}
         ${!isEmpty(offset) ? `LIMIT ${pagination.limit} OFFSET ${offset}` : ''}
     ) paginated_contracts
-    LEFT JOIN (
+    ${userId ? 'INNER' : 'LEFT'} JOIN (
         SELECT 
             rc.contract_id,
             r.indicator_id,
@@ -309,8 +351,6 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         HAVING COUNT(r.result_id) > 0 
     ) result_counts ON result_counts.contract_id = paginated_contracts.agreement_id;
     `;
-
-    console.log(newQuery);
 
     const rawResults = await this.query(newQuery);
     const mapContracts = new Map<string, MappedContractsDto>();
@@ -331,7 +371,11 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       }
     });
 
-    return Array.from(mapContracts.values());
+    const data = Array.from(mapContracts.values());
+    return {
+      data,
+      metadata,
+    };
   }
 
   private buildStatusFilterClause(statuses: string[]): string {

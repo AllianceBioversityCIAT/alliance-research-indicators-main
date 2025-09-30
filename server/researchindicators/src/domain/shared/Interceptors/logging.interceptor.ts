@@ -20,6 +20,7 @@ export class LoggingInterceptor implements NestInterceptor {
     let method: string = '';
     let url: string = '';
     let message: string = '';
+    let userId: string = null;
     if (contextType === 'http') {
       const ctx = context.switchToHttp();
       const request: Request = ctx.getRequest<Request>();
@@ -27,6 +28,7 @@ export class LoggingInterceptor implements NestInterceptor {
       method = request.method;
       url = request.url;
       message = `- By ${ip}`;
+      userId = (request as any)?.user?.sec_user_id;
     } else if (contextType === 'rpc') {
       const ctx = context.switchToRpc();
       const pattern = ctx.getContext().getPattern();
@@ -39,7 +41,8 @@ export class LoggingInterceptor implements NestInterceptor {
       .handle()
       .pipe(
         finalize(
-          () => ENV.SEE_ALL_LOGS && _logger.log(message, { method, url }),
+          () =>
+            ENV.SEE_ALL_LOGS && _logger._log(message, { method, url, userId }),
         ),
       );
   }
