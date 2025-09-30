@@ -528,8 +528,10 @@ describe('AgressoContractRepository', () => {
       expect(repository.query).toHaveBeenCalledWith(
         expect.stringContaining('ORDER BY'),
       );
-      expect(result).toBeInstanceOf(Array);
-      expect(result.length).toBeGreaterThanOrEqual(0);
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('metadata');
+      expect(result.data).toBeInstanceOf(Array);
+      expect(result.data.length).toBeGreaterThanOrEqual(0);
     });
 
     it('should get contracts without filters', async () => {
@@ -544,7 +546,9 @@ describe('AgressoContractRepository', () => {
       expect(repository.query).toHaveBeenCalledWith(
         expect.not.stringContaining('AND ac.agreement_id'),
       );
-      expect(result).toBeInstanceOf(Array);
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('metadata');
+      expect(result.data).toBeInstanceOf(Array);
     });
 
     it('should include user filter when userId is provided', async () => {
