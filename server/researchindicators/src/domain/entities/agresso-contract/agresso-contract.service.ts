@@ -64,6 +64,7 @@ export class AgressoContractService {
     orderFields?: OrderFieldsEnum,
     direction: 'ASC' | 'DESC' = 'ASC',
     pagination?: { page: number; limit: number },
+    query?: string,
   ) {
     return this._agressoContractRepository.getContracts(
       filter,
@@ -71,6 +72,7 @@ export class AgressoContractService {
       orderFields,
       direction,
       pagination,
+      query,
     );
   }
 }
