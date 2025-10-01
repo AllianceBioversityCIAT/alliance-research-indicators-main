@@ -39,7 +39,7 @@ export class ResultUsersService extends BaseServiceSimple<
     const aceptUsers: Partial<ResultUser>[] = [];
     const pendingUsers: Partial<ResultUserAi>[] = [];
     for (const user of users) {
-      if (parseInt(user.similarity_score) >= 80)
+      if (parseInt(user.similarity_score) >= 70)
         aceptUsers.push({
           user_id: user.code,
         });
