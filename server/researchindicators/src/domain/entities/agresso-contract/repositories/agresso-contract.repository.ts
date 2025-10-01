@@ -249,7 +249,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         : [];
 
       const querySearch: (keyof AgressoContract)[] = [
-        'projectDescription',
+        'description',
         'agreement_id',
         'project_lead_description',
       ];
