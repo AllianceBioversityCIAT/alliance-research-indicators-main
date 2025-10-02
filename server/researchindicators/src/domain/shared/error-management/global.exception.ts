@@ -34,7 +34,7 @@ export class GlobalExceptions implements ExceptionFilter {
     _logger._error((exception as InternalServerErrorException)?.stack, {
       method: request.method,
       url: request.url,
-      userId: (request as any)?.user?.sec_user_id,
+      userId: request?.user?.sec_user_id,
     });
     response.status(status).json(res);
   }
