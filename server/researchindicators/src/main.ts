@@ -65,11 +65,11 @@ async function microservice() {
   await appSocket
     .listen()
     .then(() => {
-      logger.debug(`Microservice is already listening`);
+      logger._debug(`Microservice is already listening`);
     })
     .catch((err) => {
-      logger.error(`Microservice present an error`);
-      logger.error(err);
+      logger._error(`Microservice present an error`);
+      logger._error(err);
     });
 }
 

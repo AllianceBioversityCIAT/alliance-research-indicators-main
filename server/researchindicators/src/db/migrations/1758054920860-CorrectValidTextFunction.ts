@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CorrectValidTextFunction1758054920860 implements MigrationInterface {
-
+export class CorrectValidTextFunction1758054920860
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
-
     await queryRunner.query(`
       DROP FUNCTION IF EXISTS valid_text;
     `);
@@ -23,7 +23,6 @@ export class CorrectValidTextFunction1758054920860 implements MigrationInterface
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-
     await queryRunner.query(`
       DROP FUNCTION IF EXISTS valid_text;
     `);
@@ -37,5 +36,4 @@ export class CorrectValidTextFunction1758054920860 implements MigrationInterface
         END
     `);
   }
-
 }

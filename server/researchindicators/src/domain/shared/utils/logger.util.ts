@@ -1,13 +1,12 @@
 import { ExecutionContext, Logger } from '@nestjs/common';
 import { env } from 'process';
 
-export class LoggerUtil {
-  private readonly logger: Logger;
+export class LoggerUtil extends Logger {
   private readonly componentName: string;
 
   constructor(config: LoggerUtilDto) {
+    super(env.ARI_APP_NAME);
     this.componentName = this.getComponentName(config);
-    this.logger = new Logger(env.ARI_APP_NAME);
   }
 
   private getComponentName(config?: any): string {
@@ -51,10 +50,19 @@ export class LoggerUtil {
     componentName: string,
     additional?: LoggerUtilAdditionalDto,
   ): string {
+    let message = componentName;
     if (additional) {
-      return `${componentName} [${additional.method}]: ${additional.url}`;
+      if (additional.method) {
+        message += ` [${additional.method}]`;
+      }
+      if (additional.userId) {
+        message += ` [USER_ID:${additional.userId}]`;
+      }
+      if (additional.url) {
+        message += `: ${additional.url}`;
+      }
     }
-    return componentName;
+    return message;
   }
 
   private formatMessage(
@@ -64,23 +72,23 @@ export class LoggerUtil {
     return `${this.appendAdditionalInfo(this.componentName, additionalParams)} ${message}`;
   }
 
-  log(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
-    this.logger.log(this.formatMessage(message, additionalParams));
+  _log(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
+    super.log(this.formatMessage(message, additionalParams));
   }
-  error(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
-    this.logger.error(this.formatMessage(message, additionalParams));
+  _error(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
+    super.error(this.formatMessage(message, additionalParams));
   }
-  warn(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
-    this.logger.warn(this.formatMessage(message, additionalParams));
+  _warn(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
+    super.warn(this.formatMessage(message, additionalParams));
   }
-  debug?(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
-    this.logger.debug(this.formatMessage(message, additionalParams));
+  _debug(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
+    super.debug(this.formatMessage(message, additionalParams));
   }
-  verbose?(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
-    this.logger.verbose(this.formatMessage(message, additionalParams));
+  _verbose(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
+    super.verbose(this.formatMessage(message, additionalParams));
   }
-  fatal?(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
-    this.logger.fatal(this.formatMessage(message, additionalParams));
+  _fatal(message: any, additionalParams?: LoggerUtilAdditionalDto): void {
+    super.error(this.formatMessage(message, additionalParams));
   }
 }
 
@@ -99,4 +107,5 @@ export class LoggerUtilCustomDto {
 export class LoggerUtilAdditionalDto {
   public url?: string;
   public method?: string;
+  public userId?: string;
 }

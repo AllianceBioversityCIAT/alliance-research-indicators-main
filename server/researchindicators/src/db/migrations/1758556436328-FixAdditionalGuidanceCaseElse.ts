@@ -1,9 +1,10 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class FixAdditionalGuidanceCaseElse1758556436328 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+export class FixAdditionalGuidanceCaseElse1758556436328
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             UPDATE \`clarisa_innovation_readiness_levels\`
             SET \`additional_guidance\` = CASE \`level\`
                 WHEN 0 THEN 'No evidence is required.'
@@ -19,13 +20,12 @@ export class FixAdditionalGuidanceCaseElse1758556436328 implements MigrationInte
                 ELSE NULL
             END
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             UPDATE \`clarisa_innovation_readiness_levels\`
             SET \`additional_guidance\` = NULL
         `);
-    }
-
+  }
 }

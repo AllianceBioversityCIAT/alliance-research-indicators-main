@@ -190,6 +190,24 @@ export class AgressoContractController {
     description: 'Order direction (ASC or DESC)',
     enum: ['ASC', 'DESC'],
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number for pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page for pagination',
+  })
+  @ApiQuery({
+    name: 'query',
+    required: false,
+    type: String,
+    description: 'Search query to filter results',
+  })
   async findContracts(
     @Query('current-user') currentUser: TrueFalseEnum,
     @Query('contract-code') contractCode: string,
@@ -200,6 +218,9 @@ export class AgressoContractController {
     @Query('start-date') startDate: string,
     @Query('end-date') endDate: string,
     @Query('order-field') orderField: OrderFieldsEnum,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query('query') query: string,
     @Query('direction') direction: 'ASC' | 'DESC' = 'ASC',
   ) {
     return this.agressoContractService
@@ -216,6 +237,8 @@ export class AgressoContractController {
         },
         orderField,
         direction,
+        { limit: +limit, page: +page },
+        query,
       )
       .then((response) =>
         ResponseUtils.format({

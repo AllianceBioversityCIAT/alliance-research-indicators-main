@@ -63,12 +63,16 @@ export class AgressoContractService {
     filter?: Record<string, any>,
     orderFields?: OrderFieldsEnum,
     direction: 'ASC' | 'DESC' = 'ASC',
+    pagination?: { page: number; limit: number },
+    query?: string,
   ) {
     return this._agressoContractRepository.getContracts(
       filter,
       onlyCurrentUser == TrueFalseEnum.TRUE ? this.currentUser.user_id : null,
       orderFields,
       direction,
+      pagination,
+      query,
     );
   }
 }

@@ -31,7 +31,7 @@ export class ResponseInterceptor implements NestInterceptor {
         if (contextType === 'rpc') {
           const ctxRpc = context.switchToRpc();
           const pattern = ctxRpc.getContext().getPattern();
-          _logger.verbose(`- By Alliance Main`, {
+          _logger._verbose(`- By Alliance Main`, {
             method: 'socket',
             url: pattern,
           });
@@ -67,6 +67,7 @@ export class ResponseInterceptor implements NestInterceptor {
           res?.stack,
           request.method,
           request.url,
+          (request as any)?.user?.sec_user_id,
         );
 
         response.status(modifiedData?.status);
@@ -82,23 +83,24 @@ export class ResponseInterceptor implements NestInterceptor {
     error?: any,
     method?: string,
     url?: string,
+    userId?: string,
   ) {
     if (
       status >= HttpStatus.AMBIGUOUS &&
       status < HttpStatus.INTERNAL_SERVER_ERROR
     ) {
-      logger.warn(message, { method, url });
-      logger.warn(error, { method, url });
+      logger._warn(message, { method, url, userId });
+      logger._warn(error, { method, url, userId });
     } else if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      logger.error(message, { method, url });
-      logger.error(error, { method, url });
+      logger._error(message, { method, url, userId });
+      logger._error(error, { method, url, userId });
     } else if (
       !ENV.IS_PRODUCTION &&
       ENV.SEE_ALL_LOGS &&
       status >= HttpStatus.OK &&
       status < HttpStatus.AMBIGUOUS
     ) {
-      logger.verbose(message, { method, url });
+      logger._verbose(message, { method, url, userId });
     }
   }
 

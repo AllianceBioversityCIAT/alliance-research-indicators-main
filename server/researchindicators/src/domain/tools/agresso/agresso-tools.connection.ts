@@ -34,7 +34,7 @@ export class Agresso implements ConnectionInterface {
       this.client.addHttpHeader('username', env.ARI_AGRESSO_USER);
       this.client.addHttpHeader('password', env.ARI_AGRESSO_PASS);
     } catch (err) {
-      this.logger.error(err);
+      this.logger._error(err);
     }
   }
 

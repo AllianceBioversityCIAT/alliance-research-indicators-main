@@ -2,7 +2,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 import { TemplateEnum } from '../../domain/shared/auxiliar/template/enum/template.enum';
 
 export class UpdateOicrTemplate1758213806118 implements MigrationInterface {
-    public async up(queryRunner: QueryRunner): Promise<void> {
+  public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`UPDATE \`sec_template\`
         SET \`template\` = '<!DOCTYPE html>
             <html lang="en">
@@ -50,9 +50,9 @@ export class UpdateOicrTemplate1758213806118 implements MigrationInterface {
             </body>
             </html>'
         WHERE \`name\` = '${TemplateEnum.OICR_NOTIFICATION_CREATED}';`);
-        }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`UPDATE \`sec_template\`
         SET \`template\` = '<!DOCTYPE html>
             <html lang="en">

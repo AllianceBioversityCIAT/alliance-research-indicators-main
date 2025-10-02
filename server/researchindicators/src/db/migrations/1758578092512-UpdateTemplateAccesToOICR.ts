@@ -1,10 +1,11 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
-import { TemplateEnum } from "../../domain/shared/auxiliar/template/enum/template.enum";
+import { MigrationInterface, QueryRunner } from 'typeorm';
+import { TemplateEnum } from '../../domain/shared/auxiliar/template/enum/template.enum';
 
-export class UpdateTemplateAccesToOICR1758578092512 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`UPDATE \`sec_template\`
+export class UpdateTemplateAccesToOICR1758578092512
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`UPDATE \`sec_template\`
             SET \`template\` = '<!DOCTYPE html>
                 <html lang="en">
                 <head>
@@ -51,11 +52,10 @@ export class UpdateTemplateAccesToOICR1758578092512 implements MigrationInterfac
                 </body>
                 </html>'
             WHERE \`name\` = '${TemplateEnum.OICR_NOTIFICATION_CREATED}';`);
-                
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`UPDATE \`sec_template\`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`UPDATE \`sec_template\`
             SET \`template\` = '<!DOCTYPE html>
                 <html lang="en">
                 <head>
@@ -100,6 +100,5 @@ export class UpdateTemplateAccesToOICR1758578092512 implements MigrationInterfac
                 </body>
                 </html>'
             WHERE \`name\` = '${TemplateEnum.OICR_NOTIFICATION_CREATED}';`);
-    }
-
+  }
 }

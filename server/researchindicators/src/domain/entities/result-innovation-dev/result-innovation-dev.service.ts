@@ -434,10 +434,8 @@ export class ResultInnovationDevService {
       ActorRolesEnum.INNOVATION_DEV,
     );
 
-    const tool_function_id = await this._resultInnovationToolFunctionService.find(
-      id,
-      null,
-    );
+    const tool_function_id =
+      await this._resultInnovationToolFunctionService.find(id, null);
 
     return {
       short_title: resultInnovationDev.short_title,

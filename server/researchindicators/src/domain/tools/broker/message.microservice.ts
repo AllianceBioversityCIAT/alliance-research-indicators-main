@@ -43,6 +43,6 @@ export class MessageMicroservice extends BrokerConnectionBase {
       },
     };
     this.client.emit('send', parsedMessage);
-    this._logger.log(`Email "${message.subject}" in process to send`);
+    this._logger._log(`Email "${message.subject}" in process to send`);
   }
 }

@@ -1463,6 +1463,7 @@ describe('ResultOicrService', () => {
         regions: [{ region_code: 'R1', region_name: 'Test Region' }],
         countries: [{ country_code: 'C1', country_name: 'Test Country' }],
         geographic_scope_comments: 'Scope Comment',
+        handle_link: '',
       });
     });
 
