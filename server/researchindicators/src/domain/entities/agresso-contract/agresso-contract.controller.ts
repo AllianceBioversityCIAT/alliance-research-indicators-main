@@ -218,10 +218,10 @@ export class AgressoContractController {
     @Query('start-date') startDate: string,
     @Query('end-date') endDate: string,
     @Query('order-field') orderField: OrderFieldsEnum,
-    @Query('direction') direction: 'ASC' | 'DESC' = 'ASC',
     @Query('page') page: string,
     @Query('limit') limit: string,
     @Query('query') query: string,
+    @Query('direction') direction: 'ASC' | 'DESC' = 'ASC',
   ) {
     return this.agressoContractService
       .findAgressoContracts(
