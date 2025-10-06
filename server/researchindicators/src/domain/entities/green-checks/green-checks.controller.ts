@@ -61,7 +61,7 @@ export class GreenChecksController {
     @Query('status') statusId: string,
   ) {
     return this.greenChecksService
-      .changeStatus(this._resultsUtil.resultId, +statusId, comment)
+      .statusManagement(this._resultsUtil.resultId, +statusId, comment)
       .then(() =>
         ResponseUtils.format({
           description: 'Status changed to ' + ResultStatusEnum[+statusId],

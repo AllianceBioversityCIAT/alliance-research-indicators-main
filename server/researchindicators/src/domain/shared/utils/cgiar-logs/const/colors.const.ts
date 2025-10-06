@@ -1,0 +1,9 @@
+export const BOLD = '\x1B[1m';
+export const RESET = '\x1B[0m';
+export const GREEN = '\x1B[32m';
+export const YELLOW = '\x1B[33m';
+export const RED = '\x1B[31m';
+export const MAGENTA_BRIGHT = '\x1B[95m';
+export const CYAN_BRIGHT = '\x1B[96m';
+export const YELLOW_DARK = '\x1B[38;5;3m';
+export const COLOR_RESET = '\x1B[39m';
