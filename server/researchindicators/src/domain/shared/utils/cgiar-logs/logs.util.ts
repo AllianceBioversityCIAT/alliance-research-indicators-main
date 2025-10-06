@@ -96,6 +96,7 @@ export class CgiarLogger extends Logger {
     } else {
       try {
         formattedMessage = JSON.stringify(message);
+        /* eslint-disable @typescript-eslint/no-unused-vars */
       } catch (_error) {
         formattedMessage = '<Could not stringify message>';
       }
