@@ -256,10 +256,10 @@ describe('AgressoContractController', () => {
         '2023-01-01',
         '2023-12-31',
         OrderFieldsEnum.START_DATE,
-        'DESC',
         '1',
         '10',
         'test query',
+        'DESC',
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -305,9 +305,9 @@ describe('AgressoContractController', () => {
         undefined,
         undefined,
         undefined,
-        undefined,
         '1',
         '10',
+        undefined,
         undefined,
       );
 
@@ -351,10 +351,10 @@ describe('AgressoContractController', () => {
         undefined,
         undefined,
         undefined,
-        'ASC',
         '1',
         '10',
         undefined,
+        'ASC',
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
