@@ -51,6 +51,8 @@ import {
   RegionDto,
   ResultMappedDto,
 } from './dto/response-oicr-word-template.dto';
+import { ReviewDto } from './dto/review.dto';
+import { StaffGroupsEnum } from '../staff-groups/enum/staff-groups.enum';
 
 @Injectable()
 export class ResultOicrService {
@@ -440,6 +442,24 @@ export class ResultOicrService {
         ),
       contributor_lever: allLevers.filter((lever) => !lever.is_primary),
     };
+  }
+
+  async review(resultId: number, data: ReviewDto) {
+    const existingRecord = await this.mainRepo.findOne({
+      where: {
+        is_active: true,
+        oicr_internal_code: data?.oicr_internal_code,
+      },
+    });
+    if (existingRecord)
+      throw new BadRequestException('OICR Internal Code already exists');
+
+    await this.mainRepo.update(resultId, {
+      oicr_internal_code: data.oicr_internal_code,
+      mel_regional_expert_id: data.mel_regional_expert,
+      mel_staff_group_id: StaffGroupsEnum.MEL_REGIONAL_EXPERT,
+      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+    });
   }
 
   async getResultOicrDetailsByOfficialCode(

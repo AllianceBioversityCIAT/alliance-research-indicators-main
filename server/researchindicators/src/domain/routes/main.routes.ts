@@ -55,6 +55,7 @@ import { ProjectIndicatorsResultsModule } from '../entities/project_indicators_r
 import { ResultOicrModule } from '../entities/result-oicr/result-oicr.module';
 import { MaturityLevelModule } from '../entities/maturity-level/maturity-level.module';
 import { TempExternalOicrsModule } from '../entities/temp_external_oicrs/temp_external_oicrs.module';
+import { AllianceUserStaffGroupsModule } from '../entities/alliance-user-staff-groups/alliance-user-staff-groups.module';
 
 const capSharingChildren: Routes = [
   {
@@ -116,6 +117,12 @@ const ResultsChildren: Routes = [
   {
     path: 'alliance-user-staff',
     module: AllianceUserStaffModule,
+    children: [
+      {
+        path: 'by-groups',
+        module: AllianceUserStaffGroupsModule,
+      },
+    ],
   },
   {
     path: 'contracts',

@@ -24,6 +24,9 @@ import { TemplateService } from '../../shared/auxiliar/template/template.service
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { ResultsUtil } from '../../shared/utils/results.util';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultOicrService } from '../result-oicr/result-oicr.service';
+import { OptionalBody } from './dto/optional-body.dto';
 
 @Injectable()
 export class GreenChecksService {
@@ -35,6 +38,7 @@ export class GreenChecksService {
     private readonly templateService: TemplateService,
     private readonly appConfig: AppConfig,
     private readonly _resultsUtil: ResultsUtil,
+    private readonly resultOicrService: ResultOicrService,
   ) {}
 
   async findByResultId(resultId: number) {
@@ -54,6 +58,7 @@ export class GreenChecksService {
     resultId: number,
     statusId: ResultStatusEnum,
     comment?: string,
+    body?: OptionalBody,
   ) {
     if (statusId === ResultStatusEnum.DELETED) {
       throw new ConflictException(
@@ -87,6 +92,7 @@ export class GreenChecksService {
     const otherData = await this.otherFunctions(
       resultStatusId,
       this._resultsUtil.statusId,
+      body,
     );
 
     const responseHistory = await this.saveHistory(resultId, saveHistory);
@@ -106,6 +112,12 @@ export class GreenChecksService {
     comment: string,
     currentStatus: ResultStatusEnum,
   ) {
+    if (currentStatus === status) {
+      throw new ConflictException(
+        'The result is already in the desired status',
+      );
+    }
+
     switch (status) {
       case ResultStatusEnum.REVISED:
       case ResultStatusEnum.REJECTED:
@@ -124,6 +136,13 @@ export class GreenChecksService {
           comment,
           currentStatus,
         );
+      case ResultStatusEnum.OICR_APPROVED:
+        return this.changeToOicrApproved(
+          resultId,
+          status,
+          comment,
+          currentStatus,
+        );
       default:
         throw new ConflictException('Invalid status');
     }
@@ -131,7 +150,8 @@ export class GreenChecksService {
 
   private async otherFunctions(
     status: ResultStatusEnum,
-    currentStatus: ResultStatusEnum, // eslint-disable-line @typescript-eslint/no-unused-vars
+    currentStatus: ResultStatusEnum,
+    body?: OptionalBody,
   ): Promise<any | null> {
     if (status === ResultStatusEnum.APPROVED) {
       return this.greenCheckRepository.createSnapshot(
@@ -140,7 +160,28 @@ export class GreenChecksService {
       );
     }
 
+    if (
+      this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
+      status === ResultStatusEnum.OICR_APPROVED
+    ) {
+      await this.resultOicrService.review(this._resultsUtil.resultId, body);
+    }
+
     return null;
+  }
+
+  private changeToOicrApproved(
+    resultId: number,
+    status: ResultStatusEnum,
+    comment: string,
+    currentStatus: ResultStatusEnum,
+  ) {
+    if (currentStatus !== ResultStatusEnum.REQUESTED)
+      throw new ConflictException(
+        'Only OIRC in requested status can be OICR approved',
+      );
+
+    return this.createHistoryObject(resultId, currentStatus, status, comment);
   }
 
   private changeToReviewStatus(
@@ -149,16 +190,19 @@ export class GreenChecksService {
     comment: string,
     currentStatus: ResultStatusEnum,
   ): SubmissionHistory {
-    if (currentStatus === status) {
-      throw new ConflictException(
-        'The result is already in the desired status',
-      );
-    }
     if (currentStatus !== ResultStatusEnum.SUBMITTED) {
       throw new ConflictException(
         `Only results in submitted status can be ${ResultStatusNameEnum[status]}`,
       );
     }
+
+    if (
+      [ResultStatusEnum.REVISED, ResultStatusEnum.REJECTED].includes(status) &&
+      isEmpty(comment)
+    )
+      throw new BadRequestException(
+        `The comment is required when changing to ${ResultStatusNameEnum[status]} status`,
+      );
 
     return this.createHistoryObject(resultId, currentStatus, status, comment);
   }
@@ -182,10 +226,6 @@ export class GreenChecksService {
       throw new ConflictException(errorMessage);
     }
 
-    if (status === currentStatus)
-      throw new ConflictException(
-        'The result is already in the desired status',
-      );
     if (currentStatus === ResultStatusEnum.SUBMITTED && isEmpty(comment))
       throw new BadRequestException(
         'The comment is required when changing from submitted to draft',

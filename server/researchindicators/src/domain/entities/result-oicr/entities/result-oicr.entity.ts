@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { MaturityLevel } from '../../maturity-level/entities/maturity-level.entity';
+import { AllianceUserStaffGroup } from '../../alliance-user-staff-groups/entities/alliance-user-staff-group.entity';
 
 @Entity('result_oicrs')
 export class ResultOicr extends AuditableEntity {
@@ -57,6 +58,35 @@ export class ResultOicr extends AuditableEntity {
     nullable: true,
   })
   elaboration_narrative: string;
+
+  @Column({
+    type: 'varchar',
+    length: 10,
+    name: 'mel_regional_expert',
+    nullable: true,
+  })
+  mel_regional_expert_id: string;
+
+  @Column({
+    type: 'text',
+    name: 'sharepoint_link',
+    nullable: true,
+  })
+  sharepoint_link: string;
+
+  @Column({
+    type: 'bigint',
+    name: 'mel_staff_group_id',
+    nullable: true,
+  })
+  mel_staff_group_id: number;
+
+  @ManyToOne(() => AllianceUserStaffGroup, (ausg) => ausg.staffGroupOicr)
+  @JoinColumn([
+    { name: 'mel_regional_expert', referencedColumnName: 'carnet' },
+    { name: 'mel_staff_group_id', referencedColumnName: 'staff_group_id' },
+  ])
+  mel_regional_expert: AllianceUserStaffGroup;
 
   @ManyToOne(() => MaturityLevel, (ml) => ml.result_oicr)
   @JoinColumn({
