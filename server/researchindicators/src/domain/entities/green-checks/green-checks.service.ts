@@ -214,14 +214,15 @@ export class GreenChecksService {
     currentStatus: ResultStatusEnum,
   ): SubmissionHistory {
     if (
-      !(
-        currentStatus === ResultStatusEnum.SUBMITTED ||
-        currentStatus === ResultStatusEnum.DRAFT
-      )
+      ![
+        ResultStatusEnum.SUBMITTED,
+        ResultStatusEnum.DRAFT,
+        ResultStatusEnum.REVISED,
+      ].includes(status)
     ) {
       const errorMessage =
         status === ResultStatusEnum.SUBMITTED
-          ? 'Only results in draft status can be changed to submitted'
+          ? 'Only results in draft or revised status can be changed to submitted'
           : 'Only results in submitted status can be changed to draft';
       throw new ConflictException(errorMessage);
     }

@@ -954,7 +954,7 @@ export class ResultsService {
 
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
-        comment_geo_scope: String(saveGeoLocationDto?.comment_geo_scope),
+        comment_geo_scope: saveGeoLocationDto?.comment_geo_scope ?? null,
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 

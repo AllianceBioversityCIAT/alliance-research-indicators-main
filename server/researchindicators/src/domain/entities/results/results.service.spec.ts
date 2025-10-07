@@ -2307,7 +2307,7 @@ describe('ResultsService', () => {
         resultId,
         expect.objectContaining({
           geo_scope_id: transformedGeoScopeId,
-          comment_geo_scope: 'undefined',
+          comment_geo_scope: null,
         }),
       );
       expect(result).toEqual(saveGeoLocationDto);
