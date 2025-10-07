@@ -12,6 +12,7 @@ export enum ResultStatusEnum {
   REJECTED = 7,
   DELETED = 8,
   REQUESTED = 9,
+  OICR_APPROVED = 10,
 }
 
 export const ResultStatusNameEnum = {
@@ -24,6 +25,7 @@ export const ResultStatusNameEnum = {
   7: 'Rejected',
   8: 'Deleted',
   9: 'Requested',
+  10: 'OICR Approved',
 };
 
 export const getTemplateByStatus = (

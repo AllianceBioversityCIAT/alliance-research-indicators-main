@@ -1,6 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ResultUser } from '../../result-users/entities/result-user.entity';
+import { AllianceUserStaffGroup } from '../../alliance-user-staff-groups/entities/alliance-user-staff-group.entity';
 
 @Entity('alliance_user_staff')
 export class AllianceUserStaff extends AuditableEntity {
@@ -43,4 +44,10 @@ export class AllianceUserStaff extends AuditableEntity {
 
   @OneToMany(() => ResultUser, (result_user) => result_user.user)
   result_users!: ResultUser[];
+
+  @OneToMany(
+    () => AllianceUserStaffGroup,
+    (allianceUserStaffGroup) => allianceUserStaffGroup.allianceUserStaff,
+  )
+  allianceUserStaffGroups!: AllianceUserStaffGroup[];
 }

@@ -76,6 +76,11 @@ export class ResultsUtil {
     return this.currentResult.result_status_id;
   }
 
+  get indicatorId(): number {
+    if (!this.currentResult) throw new BadRequestException('Result not found');
+    return this.currentResult.indicator_id;
+  }
+
   get nullResultCode(): number {
     return this.currentResult?.result_official_code ?? null;
   }
@@ -90,6 +95,10 @@ export class ResultsUtil {
 
   get nullStatusId(): number {
     return this.currentResult?.result_status_id ?? null;
+  }
+
+  get nullIndicatorId(): number {
+    return this.currentResult?.indicator_id ?? null;
   }
 }
 

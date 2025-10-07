@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpStatus,
@@ -9,7 +10,13 @@ import {
 } from '@nestjs/common';
 import { GreenChecksService } from './green-checks.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
-import { ApiBearerAuth, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import {
@@ -17,6 +24,8 @@ import {
   ParamOrQueryEnum,
 } from '../../shared/decorators/versioning.decorator';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { ReviewDto } from '../result-oicr/dto/review.dto';
+import { OptionalBody } from './dto/optional-body.dto';
 
 @ApiTags('Results')
 @ApiBearerAuth()
@@ -55,13 +64,15 @@ export class GreenChecksController {
     type: 'string',
     required: false,
   })
+  @ApiBody({ type: ReviewDto })
   @GetResultVersion(ParamOrQueryEnum.QUERY)
   async submitResult(
     @Query('comment') comment: string,
     @Query('status') statusId: string,
+    @Body() body: OptionalBody,
   ) {
     return this.greenChecksService
-      .statusManagement(this._resultsUtil.resultId, +statusId, comment)
+      .statusManagement(this._resultsUtil.resultId, +statusId, comment, body)
       .then(() =>
         ResponseUtils.format({
           description: 'Status changed to ' + ResultStatusEnum[+statusId],
