@@ -136,6 +136,13 @@ export class GreenChecksService {
           comment,
           currentStatus,
         );
+      case ResultStatusEnum.POSTPONE:
+        return this.changeToReviewOicrStatus(
+          resultId,
+          status,
+          comment,
+          currentStatus,
+        );
       case ResultStatusEnum.OICR_APPROVED:
         return this.changeToOicrApproved(
           resultId,
@@ -184,15 +191,42 @@ export class GreenChecksService {
     return this.createHistoryObject(resultId, currentStatus, status, comment);
   }
 
+  private changeToReviewOicrStatus(
+    resultId: number,
+    status: ResultStatusEnum,
+    comment: string,
+    currentStatus: ResultStatusEnum,
+  ) {
+    if (currentStatus !== ResultStatusEnum.REQUESTED)
+      throw new ConflictException(
+        `Only OIRC in requested status can be ${ResultStatusNameEnum[status]} status`,
+      );
+
+    return this.createHistoryObject(resultId, currentStatus, status, comment);
+  }
+
   private changeToReviewStatus(
     resultId: number,
     status: ResultStatusEnum,
     comment: string,
     currentStatus: ResultStatusEnum,
   ): SubmissionHistory {
-    if (currentStatus !== ResultStatusEnum.SUBMITTED) {
+    if (
+      ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.REQUESTED].includes(
+        currentStatus,
+      )
+    ) {
       throw new ConflictException(
-        `Only results in submitted status can be ${ResultStatusNameEnum[status]}`,
+        `Only results in submitted or requested status can be ${ResultStatusNameEnum[status]}`,
+      );
+    }
+
+    if (
+      currentStatus === ResultStatusEnum.REQUESTED &&
+      status !== ResultStatusEnum.REJECTED
+    ) {
+      throw new ConflictException(
+        `Only results in requested status can be changed to ${ResultStatusNameEnum[ResultStatusEnum.REJECTED]} status`,
       );
     }
 
