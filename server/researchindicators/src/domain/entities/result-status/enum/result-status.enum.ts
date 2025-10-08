@@ -13,6 +13,7 @@ export enum ResultStatusEnum {
   DELETED = 8,
   REQUESTED = 9,
   OICR_APPROVED = 10,
+  POSTPONE = 11,
 }
 
 export const ResultStatusNameEnum = {
@@ -26,6 +27,7 @@ export const ResultStatusNameEnum = {
   8: 'Deleted',
   9: 'Requested',
   10: 'OICR Approved',
+  11: 'OICR Postpone',
 };
 
 export const getTemplateByStatus = (
