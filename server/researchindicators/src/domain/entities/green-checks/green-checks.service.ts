@@ -371,28 +371,14 @@ export class GreenChecksService {
         'Result not found or not approved for new reporting cycle',
       );
     }
-
-    return repoResult
-      .update(
-        {
+    const result = await this.dataSource
+      .getRepository(Result)
+      .findOne({
+        where: {
           result_official_code: resultCode,
-          is_snapshot: false,
           is_active: true,
+          is_snapshot: false,
         },
-        {
-          report_year_id: newReportYear,
-          result_status_id: ResultStatusEnum.DRAFT,
-          ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
-        },
-      )
-      .then(() => {
-        return this.dataSource.getRepository(Result).findOne({
-          where: {
-            result_official_code: resultCode,
-            is_active: true,
-            is_snapshot: false,
-          },
-        });
       })
       .then(async (result) => {
         const newHistory = this.createHistoryObject(
@@ -402,8 +388,26 @@ export class GreenChecksService {
           null,
         );
         await this.saveHistory(result.result_id, newHistory);
-
         return result;
       });
+
+    await repoResult.update(
+      {
+        result_official_code: resultCode,
+        is_snapshot: false,
+        is_active: true,
+      },
+      {
+        report_year_id: newReportYear,
+        result_status_id: ResultStatusEnum.DRAFT,
+        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+      },
+    );
+
+    return {
+      ...result,
+      report_year_id: newReportYear,
+      result_status_id: ResultStatusEnum.DRAFT,
+    };
   }
 }
