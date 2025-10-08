@@ -117,4 +117,9 @@ export class ResultOpensearchDto {
     type: 'text',
   })
   keywords!: string[];
+
+  @OpenSearchProperty({
+    type: 'keyword',
+  })
+  platform_code?: string;
 }
