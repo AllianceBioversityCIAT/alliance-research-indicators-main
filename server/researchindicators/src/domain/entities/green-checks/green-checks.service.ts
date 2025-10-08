@@ -89,13 +89,13 @@ export class GreenChecksService {
       this._resultsUtil.statusId,
     );
 
+    const responseHistory = await this.saveHistory(resultId, saveHistory);
+
     const otherData = await this.otherFunctions(
       resultStatusId,
       this._resultsUtil.statusId,
       body,
     );
-
-    const responseHistory = await this.saveHistory(resultId, saveHistory);
 
     await this.prepareEmail(
       resultId,
