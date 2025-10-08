@@ -26,6 +26,7 @@ import {
   PropertyDescriptor,
   SearchFields,
 } from './types/base-open-search.types';
+import { isEmpty } from '../../../shared/utils/object.utils';
 
 export abstract class BaseOpenSearchApi<
   Entity,
@@ -390,7 +391,8 @@ export abstract class BaseOpenSearchApi<
       >(`${this._index}/_search`, elasticQuery, this._config),
     )
       .then((response) => {
-        return response.data?.hits?.hits?.map((hit) => ({
+        if (isEmpty(response?.data?.hits?.hits)) return [];
+        return response.data.hits.hits.map((hit) => ({
           ...hit._source,
           score: hit._score,
         }));
