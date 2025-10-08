@@ -1,6 +1,7 @@
 import { TemplateEnum } from '../../../shared/auxiliar/template/enum/template.enum';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { ResultsUtil } from '../../../shared/utils/results.util';
+import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 
 export enum ResultStatusEnum {
   EDITING = 1,
@@ -40,10 +41,7 @@ export const getTemplateByStatus = (
       template: TemplateEnum.REVISE_RESULT,
       subject: `[${appConfig.ARI_MIS}] Action Required: Revision Requested for Result ${result.resultCode}`,
     },
-    [ResultStatusEnum.REJECTED]: {
-      template: TemplateEnum.REJECTED_RESULT,
-      subject: `[${appConfig.ARI_MIS}] Result ${result.resultCode} Rejected`,
-    },
+    [ResultStatusEnum.REJECTED]: rejectedSubject(result, appConfig),
     [ResultStatusEnum.APPROVED]: {
       template: TemplateEnum.APPROVAL_RESULT,
       subject: `[${appConfig.ARI_MIS}] Result ${result.resultCode} has been approved`,
@@ -52,9 +50,33 @@ export const getTemplateByStatus = (
       template: TemplateEnum.SUBMITTED_RESULT,
       subject: `[${appConfig.ARI_MIS}] Result ${result.resultCode}, Action Required: Review New Result Submission`,
     },
+    [ResultStatusEnum.OICR_APPROVED]: {
+      template: TemplateEnum.OICR_APPROVED,
+      subject: `[${appConfig.ARI_MIS}] OICR ${result.resultCode} has been approved`,
+    },
+    [ResultStatusEnum.POSTPONE]: {
+      template: TemplateEnum.OICR_POSTPONE,
+      subject: `[${appConfig.ARI_MIS}] OICR ${result.resultCode} has been postponed`,
+    },
   };
 
   return templates[status];
+};
+
+const rejectedSubject = (
+  result: ResultsUtil,
+  appConfig: AppConfig,
+): TemplateStatus => {
+  if (result.indicatorId === IndicatorsEnum.OICR) {
+    return {
+      template: TemplateEnum.OICR_REJECTED,
+      subject: `[${appConfig.ARI_MIS}] - Your OICR request has been rejected`,
+    };
+  }
+  return {
+    template: TemplateEnum.REJECTED_RESULT,
+    subject: `[${appConfig.ARI_MIS}] Result ${result.resultCode} Rejected`,
+  };
 };
 
 export type TemplateStatus = {

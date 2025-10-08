@@ -11,6 +11,7 @@ import {
   FindGeneralDataTemplateDto,
 } from '../dto/find-general-data-template.dto';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
+import { MessageOicrDto } from '../dto/message-oicr.dto';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -218,6 +219,42 @@ export class GreenCheckRepository {
     const result: FindDataForSubmissionDto = await this.dataSource
       .query(query, [resultId])
       .then((result) => (result?.length ? result[0] : null));
+
+    return result;
+  }
+
+  async oircData(
+    resultId: number,
+    metadatos: { url: string },
+  ): Promise<MessageOicrDto> {
+    const query = `SELECT r.title,
+                    ro.oicr_internal_code as oicr_number,
+                    CONCAT(aus.first_name, ', ',aus.last_name) as mel_expert_name,
+                    CONCAT(su.first_name, ', ',su.last_name ) as requester_by,
+                    IFNULL(ro.sharepoint_link, 'To be shared by MEL Regional Expert') as sharepoint_url,
+                    CONCAT(su2.first_name, ', ',su2.last_name ) as reviewed_by,
+                    sh.created_at as decision_date,
+                    sh.submission_comment as justification,
+                    ${metadatos?.url ?? 'NULL'} as url,
+                    su.email as requester_by_email,
+                    su2.email as reviewed_by_email,
+                    aus.email as mel_expert_email
+                  FROM results r
+                  LEFT JOIN result_oicrs ro ON ro.result_id = r.result_id 
+                  LEFT JOIN alliance_user_staff aus ON aus.carnet = ro.mel_regional_expert
+                  LEFT JOIN sec_users su ON su.sec_user_id = r.created_by 
+                  LEFT JOIN submission_history sh ON sh.result_id = r.result_id 
+                  LEFT JOIN sec_users su2 ON su2.sec_user_id = sh.created_by 
+                  WHERE sh.is_active = TRUE
+                    AND sh.from_status_id = 9
+                  ORDER BY sh.created_at DESC
+                  LIMIT 1;`;
+
+    const result: MessageOicrDto = await this.dataSource
+      .query(query, [resultId])
+      .then((result) => (result?.length ? result[0] : null));
+
+    result.url = metadatos?.url;
 
     return result;
   }
