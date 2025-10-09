@@ -12,6 +12,7 @@ import {
 } from '../dto/find-general-data-template.dto';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { MessageOicrDto } from '../dto/message-oicr.dto';
+import { formatString } from '../../../shared/utils/queries.util';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -235,7 +236,7 @@ export class GreenCheckRepository {
                     CONCAT(su2.first_name, ', ',su2.last_name ) as reviewed_by,
                     sh.created_at as decision_date,
                     sh.submission_comment as justification,
-                    ${metadatos?.url ?? 'NULL'} as url,
+                    ${formatString(metadatos?.url) ?? 'NULL'} as url,
                     su.email as requester_by_email,
                     su2.email as reviewed_by_email,
                     aus.email as mel_expert_email
@@ -255,6 +256,7 @@ export class GreenCheckRepository {
       .then((result) => (result?.length ? result[0] : null));
 
     result.url = metadatos?.url;
+    result.decision_date = new Date(result.decision_date).toDateString();
 
     return result;
   }
