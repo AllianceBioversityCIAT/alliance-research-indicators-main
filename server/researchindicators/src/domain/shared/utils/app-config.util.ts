@@ -312,7 +312,15 @@ export class AppConfig {
     return process.env.ARI_SPRM_EMAIL;
   }
 
+  get INTERNAL_EMAIL_LIST(): string {
+    return process.env.ARI_MAPPED_BCC_SUBM_OICR;
+  }
+
   SPRM_EMAIL_SAFE(currentUserEmail: string): string {
     return this.ARI_IS_PRODUCTION ? this.SPRM_EMAIL : currentUserEmail;
+  }
+
+  SET_SAFE_EMAIL(email: string, alternativeEmail: string): string {
+    return this.ARI_IS_PRODUCTION ? email : alternativeEmail;
   }
 }

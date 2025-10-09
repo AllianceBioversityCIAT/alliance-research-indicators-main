@@ -27,6 +27,7 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { OptionalBody } from './dto/optional-body.dto';
+import { MessageOicrDto } from './dto/message-oicr.dto';
 
 @Injectable()
 export class GreenChecksService {
@@ -302,6 +303,73 @@ export class GreenChecksService {
     });
   }
 
+  async prepareDataToEmail(
+    resultId: number,
+    toStatusId: ResultStatusEnum,
+    fromStatusId: ResultStatusEnum,
+    templateName: TemplateEnum,
+  ) {
+    let prepareData = null;
+    if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
+      prepareData = this.greenCheckRepository.oircData(resultId, {
+        url: `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`,
+      });
+    } else if (toStatusId === ResultStatusEnum.SUBMITTED) {
+      prepareData = this.greenCheckRepository
+        .getDataForSubmissionResult(resultId)
+        .then(async (data) => {
+          const newData = {
+            pi_name: data.pi_name
+              .split(',')
+              .map((name) =>
+                name
+                  .trim()
+                  .toLowerCase()
+                  .split(' ')
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(' '),
+              )
+              .join(', '),
+            sub_last_name: this.currentUserUtil.user.last_name,
+            sub_first_name: this.currentUserUtil.user.first_name,
+            result_id: data.result_id,
+            title: data.title,
+            project_name: data.project_name,
+            support_email: this.appConfig.ARI_SUPPORT_EMAIL,
+            content_support_email: this.appConfig.ARI_CONTENT_SUPPORT_EMAIL,
+            system_name: this.appConfig.ARI_MIS,
+            rev_email:
+              data.contributor_id == this.currentUserUtil.user_id
+                ? data.contributor_email
+                : [
+                    data.contributor_email,
+                    this.currentUserUtil.user.email,
+                  ].join(', '),
+            url: `${this.appConfig.ARI_CLIENT_HOST}/result/${data.result_id}/general-information`,
+            indicator: data.indicator,
+          };
+          const template = await this.templateService._getTemplate(
+            TemplateEnum.SUBMITTED_RESULT,
+            newData,
+          );
+          return { template, data: newData };
+        });
+    } else {
+      prepareData = this.greenCheckRepository
+        .getDataForReviseResult(resultId, toStatusId, fromStatusId)
+        .then(async (data) => {
+          data['url'] =
+            `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`;
+          const template = await this.templateService._getTemplate(
+            templateName,
+            data,
+          );
+          return { template, data };
+        });
+    }
+    return prepareData;
+  }
+
   async prepareEmail(
     resultId: number,
     toStatusId: ResultStatusEnum,
@@ -312,74 +380,46 @@ export class GreenChecksService {
       this._resultsUtil,
       this.appConfig,
     );
-    const prepareData =
-      toStatusId === ResultStatusEnum.SUBMITTED
-        ? this.greenCheckRepository
-            .getDataForSubmissionResult(resultId)
-            .then(async (data) => {
-              const newData = {
-                pi_name: data.pi_name
-                  .split(',')
-                  .map((name) =>
-                    name
-                      .trim()
-                      .toLowerCase()
-                      .split(' ')
-                      .map(
-                        (word) => word.charAt(0).toUpperCase() + word.slice(1),
-                      )
-                      .join(' '),
-                  )
-                  .join(', '),
-                sub_last_name: this.currentUserUtil.user.last_name,
-                sub_first_name: this.currentUserUtil.user.first_name,
-                result_id: data.result_id,
-                title: data.title,
-                project_name: data.project_name,
-                support_email: this.appConfig.ARI_SUPPORT_EMAIL,
-                content_support_email: this.appConfig.ARI_CONTENT_SUPPORT_EMAIL,
-                system_name: this.appConfig.ARI_MIS,
-                rev_email:
-                  data.contributor_id == this.currentUserUtil.user_id
-                    ? data.contributor_email
-                    : [
-                        data.contributor_email,
-                        this.currentUserUtil.user.email,
-                      ].join(', '),
-                url: `${this.appConfig.ARI_CLIENT_HOST}/result/${data.result_id}/general-information`,
-                indicator: data.indicator,
-              };
-              const template = await this.templateService._getTemplate(
-                TemplateEnum.SUBMITTED_RESULT,
-                newData,
-              );
-              return { template, data: newData };
-            })
-        : this.greenCheckRepository
-            .getDataForReviseResult(resultId, toStatusId, fromStatusId)
-            .then(async (data) => {
-              data['url'] =
-                `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`;
-              const template = await this.templateService._getTemplate(
-                templateName,
-                data,
-              );
-              return { template, data };
-            });
 
-    await prepareData.then(({ data, template }) =>
-      this.messageMicroservice.sendEmail({
-        to:
+    const prepareData = this.prepareDataToEmail(
+      resultId,
+      toStatusId,
+      fromStatusId,
+      templateName,
+    );
+
+    await prepareData.then(({ data, template }) => {
+      let toSend = '';
+      let ccSend = '';
+      const bccSend = this.appConfig.INTERNAL_EMAIL_LIST;
+      if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
+        const tempData = data as unknown as MessageOicrDto;
+        const prepareCcEmail = [tempData.reviewed_by_email];
+        if (toStatusId === ResultStatusEnum.OICR_APPROVED) {
+          prepareCcEmail.push(tempData.mel_expert_email);
+        }
+        toSend = tempData.requester_by_email;
+        ccSend = this.appConfig.SET_SAFE_EMAIL(
+          prepareCcEmail.join(','),
+          this.currentUserUtil.user.email,
+        );
+      } else {
+        toSend =
           toStatusId === ResultStatusEnum.SUBMITTED
             ? this.currentUserUtil.user.email
-            : data.sub_email,
-        cc: data.rev_email,
+            : data.sub_email;
+        ccSend = data.rev_email;
+      }
+      this.messageMicroservice.sendEmail({
+        to: toSend,
+        cc: ccSend,
+        bcc: bccSend,
         subject: subject,
         message: {
           socketFile: Buffer.from(template),
         },
-      }),
-    );
+      });
+    });
   }
 
   async getSubmissionHistory(resultId: number): Promise<SubmissionHistory[]> {
