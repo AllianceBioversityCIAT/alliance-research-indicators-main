@@ -35,6 +35,7 @@ export const getTemplateByStatus = (
   status: ResultStatusEnum,
   result: ResultsUtil,
   appConfig: AppConfig,
+  otherData?: Record<string, unknown>,
 ) => {
   const templates: { [key in ResultStatusEnum]?: TemplateStatus } = {
     [ResultStatusEnum.REVISED]: {
@@ -52,11 +53,11 @@ export const getTemplateByStatus = (
     },
     [ResultStatusEnum.OICR_APPROVED]: {
       template: TemplateEnum.OICR_APPROVED,
-      subject: `[${appConfig.ARI_MIS}] OICR ${result.resultCode} has been approved`,
+      subject: `[${appConfig.ARI_MIS}] OICR ${otherData?.oicr_number} has been approved`,
     },
     [ResultStatusEnum.POSTPONE]: {
       template: TemplateEnum.OICR_POSTPONE,
-      subject: `[${appConfig.ARI_MIS}] OICR ${result.resultCode} has been postponed`,
+      subject: `[${appConfig.ARI_MIS}] OICR ${otherData?.oicr_number} has been postponed`,
     },
   };
 

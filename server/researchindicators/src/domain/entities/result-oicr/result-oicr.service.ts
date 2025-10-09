@@ -449,6 +449,7 @@ export class ResultOicrService {
       where: {
         is_active: true,
         oicr_internal_code: data?.oicr_internal_code,
+        result_id: Not(resultId),
       },
     });
     if (existingRecord)

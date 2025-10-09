@@ -102,6 +102,7 @@ export class GreenChecksService {
       resultId,
       resultStatusId,
       this._resultsUtil.statusId,
+      body,
     );
 
     return otherData ? otherData : responseHistory;
@@ -311,9 +312,17 @@ export class GreenChecksService {
   ) {
     let prepareData = null;
     if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
-      prepareData = this.greenCheckRepository.oircData(resultId, {
-        url: `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`,
-      });
+      prepareData = this.greenCheckRepository
+        .oircData(resultId, {
+          url: `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`,
+        })
+        .then(async (data) => {
+          const template = await this.templateService._getTemplate(
+            templateName,
+            data,
+          );
+          return { template, data };
+        });
     } else if (toStatusId === ResultStatusEnum.SUBMITTED) {
       prepareData = this.greenCheckRepository
         .getDataForSubmissionResult(resultId)
@@ -374,11 +383,20 @@ export class GreenChecksService {
     resultId: number,
     toStatusId: ResultStatusEnum,
     fromStatusId: ResultStatusEnum,
+    body?: OptionalBody,
   ) {
+    let metadatos = null;
+    if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
+      metadatos = {
+        oicr_number: body?.oicr_internal_code,
+      };
+    }
+
     const { template: templateName, subject } = getTemplateByStatus(
       toStatusId,
       this._resultsUtil,
       this.appConfig,
+      metadatos,
     );
 
     const prepareData = this.prepareDataToEmail(
