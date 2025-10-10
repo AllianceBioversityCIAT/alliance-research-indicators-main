@@ -28,6 +28,8 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { OptionalBody } from './dto/optional-body.dto';
 import { MessageOicrDto } from './dto/message-oicr.dto';
+import { validateRoles } from '../../shared/utils/roles.util';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 @Injectable()
 export class GreenChecksService {
@@ -120,6 +122,8 @@ export class GreenChecksService {
       );
     }
 
+    this.prevalidateFunctions(status);
+
     switch (status) {
       case ResultStatusEnum.REVISED:
       case ResultStatusEnum.REJECTED:
@@ -154,6 +158,24 @@ export class GreenChecksService {
         );
       default:
         throw new ConflictException('Invalid status');
+    }
+  }
+
+  private prevalidateFunctions(status: ResultStatusEnum) {
+    if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
+      this.prevalidateOicrFunctions(status);
+    }
+  }
+
+  private prevalidateOicrFunctions(status: ResultStatusEnum): void {
+    if (
+      [
+        ResultStatusEnum.OICR_APPROVED,
+        ResultStatusEnum.POSTPONE,
+        ResultStatusEnum.REJECTED,
+      ].includes(status)
+    ) {
+      validateRoles(this.currentUserUtil, SecRolesEnum.GENERAL_ADMIN);
     }
   }
 

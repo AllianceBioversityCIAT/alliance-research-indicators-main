@@ -25,6 +25,7 @@ export class AppSecretRepository extends Repository<AppSecret> {
           JSON_ARRAYAGG(sur.role_id) as roles
       from sec_users su
       left join sec_user_roles sur on sur.user_id = su.sec_user_id 
+                                  and sur.is_active = true
       where su.sec_user_id = ?
           and su.is_active = true
       group by su.sec_user_id

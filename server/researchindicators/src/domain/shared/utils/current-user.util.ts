@@ -20,6 +20,10 @@ export class CurrentUserUtil {
     return (this.request['user'] as User).email;
   }
 
+  get roles(): number[] {
+    return (this.request['user'] as User)?.roles || [];
+  }
+
   public audit(set: SetAutitEnum = SetAutitEnum.NEW): Partial<AuditableEntity> {
     switch (set) {
       case SetAutitEnum.NEW:
