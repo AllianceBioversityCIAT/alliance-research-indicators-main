@@ -30,4 +30,11 @@ export class User extends AuditableEntity {
     required: false,
   })
   email: string;
+
+  @ApiProperty({
+    example: [1, 2, 3],
+    description: 'Roles',
+    type: [Number],
+  })
+  roles: number[];
 }
