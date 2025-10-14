@@ -111,9 +111,10 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
 
     const institutionsPath = await this.ciService.clonePath();
     const institutionLocation: Partial<ClarisaInstitutionLocation>[] = [];
-    await this.base<CreateClarisaInstitutionDto, ClarisaInstitution>(
+    await this.baseBatches<CreateClarisaInstitutionDto, ClarisaInstitution>(
       institutionsPath,
       ClarisaInstitution,
+      100,
       (data) => institutionMapper(data, institutionLocation),
     );
 

@@ -66,7 +66,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${whereClause}
     GROUP BY 
       	ac.agreement_id,
-        cl.full_name
+        cl.id
     order by FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')
     ${!isEmpty(offset) ? `LIMIT ${pagination.limit} OFFSET ${offset}` : ''};
     `;
