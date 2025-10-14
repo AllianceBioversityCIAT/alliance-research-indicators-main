@@ -69,7 +69,10 @@ import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
 import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
-import { intersection } from '../../shared/utils/array.util';
+import {
+  intersection,
+  mergeArraysWithPriority,
+} from '../../shared/utils/array.util';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { CreateResultInstitutionDto } from '../result-institutions/dto/create-result-institution.dto';
@@ -590,7 +593,7 @@ export class ResultsService {
     alignmentData: ResultAlignmentDto,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
-    const { contracts, levers } = alignmentData;
+    const { contracts, primary_lever, contributor_lever } = alignmentData;
     await this.dataSource.transaction(async (manager) => {
       await this._resultContractsService.create<ContractRolesEnum>(
         resultId,
@@ -605,13 +608,24 @@ export class ResultsService {
       );
 
       const primaryLevers =
-        levers?.length == 1
-          ? levers.map((el) => ({ ...el, is_primary: true }))
-          : levers;
+        primary_lever?.length == 1
+          ? primary_lever.map((el) => ({ ...el, is_primary: true }))
+          : [];
+
+      const contributorLevers =
+        contributor_lever?.length > 0
+          ? contributor_lever.map((el) => ({ ...el, is_primary: false }))
+          : [];
+
+      const fullLevers = mergeArraysWithPriority<ResultLever>(
+        primaryLevers,
+        contributorLevers,
+        'lever_id',
+      );
 
       await this._resultLeversService.create<LeverRolesEnum>(
         resultId,
-        primaryLevers,
+        fullLevers,
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         manager,
@@ -660,7 +674,8 @@ export class ResultsService {
 
     const resultAlignment: ResultAlignmentDto = {
       contracts,
-      levers,
+      primary_lever: levers.filter((el) => el.is_primary),
+      contributor_lever: levers.filter((el) => !el.is_primary),
       result_sdgs,
     };
 

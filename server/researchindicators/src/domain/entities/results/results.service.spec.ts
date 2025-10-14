@@ -1992,7 +1992,8 @@ describe('ResultsService', () => {
       const resultId = 1;
       const updateResultAlignmentDto = {
         contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
-        levers: [{ lever_id: '5', is_primary: true }] as any,
+        primary_lever: [{ lever_id: '5', is_primary: true }] as any,
+        contributor_lever: [{ lever_id: '6', is_primary: false }] as any,
       };
 
       const errorMessage = 'Contract service error';

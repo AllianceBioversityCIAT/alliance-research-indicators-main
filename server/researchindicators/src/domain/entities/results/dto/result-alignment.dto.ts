@@ -10,11 +10,11 @@ export class ResultAlignmentDto {
   })
   public contracts: ResultContract[];
 
-  @ApiProperty({
-    type: ResultLever,
-    isArray: true,
-  })
-  public levers: ResultLever[];
+  @ApiProperty({ type: [ResultLever] })
+  primary_lever: ResultLever[];
+
+  @ApiProperty({ type: [ResultLever] })
+  contributor_lever: ResultLever[];
 
   @ApiProperty({
     type: ResultSdg,
