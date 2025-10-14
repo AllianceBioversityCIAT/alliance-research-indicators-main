@@ -4,7 +4,6 @@ import { EntityManager, Repository } from 'typeorm';
 import { ResultLever } from './entities/result-lever.entity';
 import { selectManager } from '../../shared/utils/orm.util';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
-import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import {
   CurrentUserUtil,
   SetAutitEnum,
@@ -39,12 +38,8 @@ export class ResultLeversService extends BaseServiceSimple<
 
   protected lastRefactoredAfterSave<Enum>(
     data: Partial<ResultLever>[],
-    roleId?: Enum,
+    roleId?: Enum, // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Partial<ResultLever>[] {
-    let dataToSave: Partial<ResultLever>[] = null;
-    if (roleId === LeverRolesEnum.ALIGNMENT) {
-      dataToSave = this.unsetMultiplesPrimary<ResultLever>(data);
-    }
-    return dataToSave ?? data;
+    return data;
   }
 }

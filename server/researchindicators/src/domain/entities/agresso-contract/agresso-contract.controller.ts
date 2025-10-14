@@ -51,7 +51,7 @@ export class AgressoContractController {
     required: false,
     description: 'Show countries',
   })
-  @ApiOperation({ summary: 'Find all contracts' })
+  @ApiOperation({ summary: 'Find all contracts', deprecated: true })
   find(
     @Query('project') project: string,
     @Query('funding_type') fundingType: string,
