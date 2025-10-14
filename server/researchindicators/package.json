@@ -6,7 +6,11 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && npm run build:admin",
+    "build:admin": "vite build",
+    "build:prod": "nest build && npm run build:admin",
+    "dev": "concurrently \"npm run start:dev\" \"npm run dev:admin\" --names \"API,ADMIN\" --prefix-colors \"blue,magenta\"",
+    "dev:admin": "vite",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -44,6 +48,8 @@
     "@nestjs/typeorm": "^10.0.2",
     "@types/bcrypt": "^6.0.0",
     "@types/multer": "^1.4.12",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.5",
     "bcrypt": "^6.0.0",
@@ -60,6 +66,9 @@
     "lodash": "^4.17.21",
     "mssql": "^10.0.4",
     "mysql2": "^3.11.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "soap": "^1.1.7",
@@ -77,6 +86,8 @@
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
@@ -88,7 +99,9 @@
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "^7.1.9",
+    "vite-plugin-ssr": "^0.4.142"
   },
   "jest": {
     "moduleFileExtensions": [
