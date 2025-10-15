@@ -99,7 +99,7 @@ export class AiRawInstitution {
     description: 'Unique identifier for the institution',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   institution_id: string;
 
   @ApiProperty({
@@ -133,7 +133,7 @@ export class AiRawUser {
     description: 'code of the user',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   code: string;
 
   @ApiProperty({
