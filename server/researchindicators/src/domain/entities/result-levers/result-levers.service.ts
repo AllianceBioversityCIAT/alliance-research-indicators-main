@@ -10,6 +10,7 @@ import {
 } from '../../shared/utils/current-user.util';
 import { updateArray } from '../../shared/utils/array.util';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
+import { isEmpty } from '../../shared/utils/object.utils';
 
 @Injectable()
 export class ResultLeversService extends BaseServiceSimple<
@@ -47,16 +48,19 @@ export class ResultLeversService extends BaseServiceSimple<
 
   async comparerClientToServer(
     resultId: number,
-    clientResultLevers: ResultLever[],
+    clientResultLevers: Partial<ResultLever>[],
     role: LeverRolesEnum,
+    serverResultLevers?: Partial<ResultLever>[],
   ) {
-    const serverResultLevers = await this.mainRepo.find({
-      where: {
-        result_id: resultId,
-        is_active: true,
-        lever_role_id: role,
-      },
-    });
+    if (!isEmpty(serverResultLevers)) {
+      serverResultLevers = await this.mainRepo.find({
+        where: {
+          result_id: resultId,
+          is_active: true,
+          lever_role_id: role,
+        },
+      });
+    }
 
     return updateArray(
       clientResultLevers,

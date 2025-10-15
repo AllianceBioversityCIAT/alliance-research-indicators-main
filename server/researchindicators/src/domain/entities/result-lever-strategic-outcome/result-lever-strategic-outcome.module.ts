@@ -5,5 +5,6 @@ import { ResultLeverStrategicOutcomeController } from './result-lever-strategic-
 @Module({
   controllers: [ResultLeverStrategicOutcomeController],
   providers: [ResultLeverStrategicOutcomeService],
+  exports: [ResultLeverStrategicOutcomeService],
 })
 export class ResultLeverStrategicOutcomeModule {}

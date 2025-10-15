@@ -46,6 +46,7 @@ import { ResultInstitutionsService } from '../result-institutions/result-institu
 import { ResultEvidencesService } from '../result-evidences/result-evidences.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { QueryService } from '../../shared/utils/query.service';
+import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -78,6 +79,7 @@ describe('ResultsService', () => {
   let mockResultInstitutionsService: jest.Mocked<ResultInstitutionsService>;
   let mockResultEvidencesService: jest.Mocked<ResultEvidencesService>;
   let mockQueryService: jest.Mocked<QueryService>;
+  let mockResultLeverStrategicOutcomeService: jest.Mocked<ResultLeverStrategicOutcomeService>;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -229,6 +231,10 @@ describe('ResultsService', () => {
       deleteFullResultById: jest.fn(),
     } as any;
 
+    mockResultLeverStrategicOutcomeService = {
+      create: jest.fn(),
+    } as any;
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -315,6 +321,10 @@ describe('ResultsService', () => {
         {
           provide: QueryService,
           useValue: mockQueryService,
+        },
+        {
+          provide: ResultLeverStrategicOutcomeService,
+          useValue: mockResultLeverStrategicOutcomeService,
         },
       ],
     }).compile();

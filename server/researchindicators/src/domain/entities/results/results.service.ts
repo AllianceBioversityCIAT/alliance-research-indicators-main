@@ -87,6 +87,7 @@ import { ResultUserAi } from '../result-users/entities/result-user-ai.entity';
 import { CreateResultConfigDto } from './dto/create-config.dto';
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 import { QueryService } from '../../shared/utils/query.service';
+import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 
 @Injectable()
 export class ResultsService {
@@ -122,6 +123,7 @@ export class ResultsService {
     private readonly _resultInstitutionsService: ResultInstitutionsService,
     private readonly _resultEvidencesService: ResultEvidencesService,
     private readonly _queryService: QueryService,
+    private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -626,6 +628,11 @@ export class ResultsService {
         'lever_id',
       );
 
+      const activeLevers = await this._resultLeversService.find(
+        resultId,
+        LeverRolesEnum.ALIGNMENT,
+      );
+
       await this._resultLeversService.create<LeverRolesEnum>(
         resultId,
         fullLevers,
@@ -637,6 +644,24 @@ export class ResultsService {
           is_primary: false,
         },
       );
+
+      const emergedLever =
+        await this._resultLeversService.comparerClientToServer(
+          resultId,
+          primaryLevers,
+          LeverRolesEnum.ALIGNMENT,
+          activeLevers,
+        );
+
+      for (const lever of emergedLever) {
+        await this._resultLeverStrategicOutcomeService.create(
+          lever.result_lever_id,
+          lever?.result_lever_strategic_outcomes ?? [],
+          'lever_strategic_outcome_id',
+          undefined,
+          manager,
+        );
+      }
 
       await this._resultSdgsService.create(
         resultId,
@@ -673,11 +698,24 @@ export class ResultsService {
       LeverRolesEnum.ALIGNMENT,
     );
 
+    const primaryLevers = levers.filter((el) => el.is_primary);
+
+    const strategicOutcomes =
+      await this._resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds(
+        primaryLevers.map((el) => el.result_lever_id),
+      );
+
+    primaryLevers.forEach((lever) => {
+      lever.result_lever_strategic_outcomes = strategicOutcomes.filter(
+        (so) => so.result_lever_id === lever.result_lever_id,
+      );
+    });
+
     const result_sdgs = await this._resultSdgsService.find(resultId);
 
     const resultAlignment: ResultAlignmentDto = {
       contracts,
-      primary_levers: levers.filter((el) => el.is_primary),
+      primary_levers: primaryLevers,
       contributor_levers: levers.filter((el) => !el.is_primary),
       result_sdgs,
     };

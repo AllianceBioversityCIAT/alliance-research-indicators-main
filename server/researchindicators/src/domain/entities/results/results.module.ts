@@ -34,6 +34,7 @@ import { ResultOicrModule } from '../result-oicr/result-oicr.module';
 import { ClarisaCountriesModule } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.module';
 import { ResultInstitutionsModule } from '../result-institutions/result-institutions.module';
 import { ResultEvidencesModule } from '../result-evidences/result-evidences.module';
+import { ResultLeverStrategicOutcomeModule } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.module';
 
 @Module({
   controllers: [ResultsController],
@@ -69,6 +70,7 @@ import { ResultEvidencesModule } from '../result-evidences/result-evidences.modu
     ClarisaCountriesModule,
     ResultInstitutionsModule,
     ResultEvidencesModule,
+    ResultLeverStrategicOutcomeModule,
   ],
   providers: [
     ResultsService,
