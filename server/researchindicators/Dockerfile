@@ -33,6 +33,7 @@ COPY --from=go-build /workspace/bin/generate_excel ./src/go/bin/generate_excel
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY eslint.config.mjs ./
+COPY vite.config.ts ./
 
 # Build the app
 RUN npm run build
@@ -58,6 +59,7 @@ COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY package*.json ./
 COPY eslint.config.mjs ./
+COPY vite.config.ts ./
 
 # Build the app
 RUN npm run build
