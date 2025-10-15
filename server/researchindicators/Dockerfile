@@ -49,7 +49,8 @@ CMD ["npm", "run", "start"]
 FROM base AS build
 
 # Install production dependencies securely (no script execution)
-RUN npm ci --only=production --ignore-scripts
+#RUN npm ci --only=production --ignore-scripts
+RUN npm ci --ignore-scripts
 
 # Copy source code and config files
 COPY src ./src
