@@ -35,6 +35,10 @@ export const formatArrayToQuery = <T>(array: T[]): string => {
   return array.map((item) => `'${item}'`).join(',');
 };
 
+export const formatString = (str: string): string => {
+  return `'${str.replace(/'/g, "''")}'`;
+};
+
 export const notOption = (isNot: boolean, isArray: boolean) => {
   if (!isNot) return '';
   return isArray ? 'NOT' : '!';

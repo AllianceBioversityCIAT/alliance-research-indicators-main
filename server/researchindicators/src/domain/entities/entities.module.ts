@@ -69,6 +69,8 @@ import { ResultInitiativesModule } from './result-initiatives/result-initiatives
 import { TempExternalOicrsModule } from './temp_external_oicrs/temp_external_oicrs.module';
 import { MaturityLevelModule } from './maturity-level/maturity-level.module';
 import { ResultInnovationToolFunctionModule } from './result-innovation-tool-function/result-innovation-tool-function.module';
+import { AllianceUserStaffGroupsModule } from './alliance-user-staff-groups/alliance-user-staff-groups.module';
+import { StaffGroupsModule } from './staff-groups/staff-groups.module';
 
 @Module({
   imports: [
@@ -142,6 +144,8 @@ import { ResultInnovationToolFunctionModule } from './result-innovation-tool-fun
     TempExternalOicrsModule,
     MaturityLevelModule,
     ResultInnovationToolFunctionModule,
+    AllianceUserStaffGroupsModule,
+    StaffGroupsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

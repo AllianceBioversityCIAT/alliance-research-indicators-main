@@ -39,6 +39,7 @@ export class ResultRepository
 		r.geo_scope_id,
 		r.report_year_id,
 		r.result_status_id,
+    r.platform_code,
 		JSON_OBJECT('result_status_id', rs.result_status_id,
 					'name', rs.name,
 					'description', rs.description) as result_status,
