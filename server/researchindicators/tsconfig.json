@@ -17,6 +17,10 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "resolveJsonModule": true
-  }
+    "resolveJsonModule": true,
+    "jsx": "react",
+    "esModuleInterop": true,
+    "moduleResolution": "node"
+  },
+  "exclude": ["node_modules", "dist", "vite.config.ts"]
 }
