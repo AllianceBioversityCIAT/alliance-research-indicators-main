@@ -11,7 +11,7 @@ RUN mkdir -p bin && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/genera
 
 
 #################### BASE STAGE ####################
-FROM node:20.13.1-alpine AS base
+FROM node:22.12.0-alpine AS base
 
 # Set working directory
 WORKDIR /app
@@ -64,7 +64,7 @@ RUN npm run build
 
 
 #################### PRODUCTION STAGE ####################
-FROM --platform=linux/amd64 node:20.13.1-alpine AS production
+FROM --platform=linux/amd64 node:22.12.0-alpine AS production
 
 # Set working directory
 WORKDIR /app
