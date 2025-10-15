@@ -18,8 +18,11 @@ export class ReactRendererService {
       this.manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
       console.log('Vite manifest loaded successfully');
     } catch (error) {
+      console.error('Error loading Vite manifest:', error);
       console.warn('Vite manifest not found. Run: npm run build:admin');
-      console.warn('Falling back to development mode (Vite dev server on port 5173)');
+      console.warn(
+        'Falling back to development mode (Vite dev server on port 5173)',
+      );
     }
   }
 
@@ -126,7 +129,9 @@ export class ReactRendererService {
     if (!entry || !entry.css) return '';
 
     return entry.css
-      .map((css: string) => `<link rel="stylesheet" href="/admin/public/${css}">`)
+      .map(
+        (css: string) => `<link rel="stylesheet" href="/admin/public/${css}">`,
+      )
       .join('\n    ');
   }
 }

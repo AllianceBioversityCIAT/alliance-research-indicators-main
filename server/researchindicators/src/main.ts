@@ -19,18 +19,36 @@ async function httpservice() {
     origin: ['http://localhost:5173', 'http://localhost:3001'],
     credentials: true,
   });
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "http://localhost:5173", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", "http://localhost:5173", "ws://localhost:5173"],
-        fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            'http://localhost:5173',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
+          ],
+          styleSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
+          ],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: [
+            "'self'",
+            'http://localhost:5173',
+            'ws://localhost:5173',
+          ],
+          fontSrc: ["'self'", 'https://cdnjs.cloudflare.com'],
+        },
       },
-    },
-  }));
+    }),
+  );
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
