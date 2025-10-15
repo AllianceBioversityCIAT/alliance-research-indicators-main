@@ -53,6 +53,7 @@ import { ResultOicrModule } from '../entities/result-oicr/result-oicr.module';
 import { MaturityLevelModule } from '../entities/maturity-level/maturity-level.module';
 import { TempExternalOicrsModule } from '../entities/temp_external_oicrs/temp_external_oicrs.module';
 import { AllianceUserStaffGroupsModule } from '../entities/alliance-user-staff-groups/alliance-user-staff-groups.module';
+import { LeverStrategicOutcomeModule } from '../entities/lever-strategic-outcome/lever-strategic-outcome.module';
 
 const capSharingChildren: Routes = [
   {
@@ -280,6 +281,10 @@ const children: Routes = [
   {
     path: 'gender',
     module: GendersModule,
+  },
+  {
+    path: 'lever-strategic-outcome',
+    module: LeverStrategicOutcomeModule,
   },
   {
     path: 'tags',

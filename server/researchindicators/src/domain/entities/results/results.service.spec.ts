@@ -45,6 +45,7 @@ import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { ResultEvidencesService } from '../result-evidences/result-evidences.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
+import { QueryService } from '../../shared/utils/query.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -76,6 +77,7 @@ describe('ResultsService', () => {
   let mockClarisaCountriesService: jest.Mocked<ClarisaCountriesService>;
   let mockResultInstitutionsService: jest.Mocked<ResultInstitutionsService>;
   let mockResultEvidencesService: jest.Mocked<ResultEvidencesService>;
+  let mockQueryService: jest.Mocked<QueryService>;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -223,6 +225,10 @@ describe('ResultsService', () => {
       update: jest.fn(),
     } as any;
 
+    mockQueryService = {
+      deleteFullResultById: jest.fn(),
+    } as any;
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -305,6 +311,10 @@ describe('ResultsService', () => {
         {
           provide: ResultEvidencesService,
           useValue: mockResultEvidencesService,
+        },
+        {
+          provide: QueryService,
+          useValue: mockQueryService,
         },
       ],
     }).compile();
@@ -1911,8 +1921,8 @@ describe('ResultsService', () => {
       const resultId = 1;
       const updateResultAlignmentDto = {
         contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
-        primary_lever: [{ lever_id: '5', is_primary: true }] as any,
-        contributor_lever: [{ lever_id: '6', is_primary: false }] as any,
+        primary_levers: [{ lever_id: '5', is_primary: true }] as any,
+        contributor_levers: [{ lever_id: '6', is_primary: false }] as any,
       };
 
       const errorMessage = 'Contract service error';
