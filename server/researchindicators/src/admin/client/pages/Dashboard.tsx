@@ -19,17 +19,17 @@ interface Activity {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ initialData }) => {
-  const [stats, setStats] = useState<Stats>(
+  const [stats] = useState<Stats>(
     initialData?.stats || {
       totalUsers: 0,
       totalResults: 0,
       activeProjects: 0,
       pendingReviews: 0,
-    }
+    },
   );
 
-  const [recentActivity, setRecentActivity] = useState<Activity[]>(
-    initialData?.recentActivity || []
+  const [recentActivity] = useState<Activity[]>(
+    initialData?.recentActivity || [],
   );
 
   // Si necesitas cargar datos del API en el cliente

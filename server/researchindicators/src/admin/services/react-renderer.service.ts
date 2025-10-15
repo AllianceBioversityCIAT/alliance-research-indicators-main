@@ -126,7 +126,7 @@ export class ReactRendererService {
     if (!this.manifest) return '';
 
     const entry = this.manifest['src/admin/client/entry-client.tsx'];
-    if (!entry || !entry.css) return '';
+    if (!entry?.css) return '';
 
     return entry.css
       .map(
