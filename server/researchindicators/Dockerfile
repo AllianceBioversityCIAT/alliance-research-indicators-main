@@ -1,5 +1,5 @@
 #################### BASE STAGE ####################
-FROM node:20.13.1-alpine AS base
+FROM node:22.12.0-alpine AS base
 
 # Set working directory
 WORKDIR /app
@@ -19,6 +19,7 @@ COPY src ./src
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY eslint.config.mjs ./
+COPY vite.config.ts ./
 
 # Build the app
 RUN npm run build
@@ -34,7 +35,8 @@ CMD ["npm", "run", "start"]
 FROM base AS build
 
 # Install production dependencies securely (no script execution)
-RUN npm ci --only=production --ignore-scripts
+#RUN npm ci --only=production --ignore-scripts
+RUN npm ci --ignore-scripts
 
 # Copy source code and config files
 COPY src ./src
@@ -42,13 +44,14 @@ COPY tsconfig*.json ./
 COPY nest-cli.json ./
 COPY package*.json ./
 COPY eslint.config.mjs ./
+COPY vite.config.ts ./
 
 # Build the app
 RUN npm run build
 
 
 #################### PRODUCTION STAGE ####################
-FROM --platform=linux/amd64 node:20.13.1-alpine AS production
+FROM --platform=linux/amd64 node:22.12.0-alpine AS production
 
 # Set working directory
 WORKDIR /app
