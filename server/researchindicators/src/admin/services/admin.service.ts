@@ -20,9 +20,21 @@ export class AdminService {
    */
   async getRecentActivity() {
     return [
-      { action: 'User login', user: 'admin@example.com', timestamp: new Date() },
-      { action: 'Result created', user: 'researcher@example.com', timestamp: new Date() },
-      { action: 'Project updated', user: 'manager@example.com', timestamp: new Date() },
+      {
+        action: 'User login',
+        user: 'admin@example.com',
+        timestamp: new Date(),
+      },
+      {
+        action: 'Result created',
+        user: 'researcher@example.com',
+        timestamp: new Date(),
+      },
+      {
+        action: 'Project updated',
+        user: 'manager@example.com',
+        timestamp: new Date(),
+      },
     ];
   }
 }
