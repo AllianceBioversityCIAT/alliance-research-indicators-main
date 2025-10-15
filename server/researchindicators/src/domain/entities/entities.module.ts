@@ -76,6 +76,8 @@ import { MaturityLevelModule } from './maturity-level/maturity-level.module';
 import { ResultInnovationToolFunctionModule } from './result-innovation-tool-function/result-innovation-tool-function.module';
 import { AllianceUserStaffGroupsModule } from './alliance-user-staff-groups/alliance-user-staff-groups.module';
 import { StaffGroupsModule } from './staff-groups/staff-groups.module';
+import { ResultLeverStrategicOutcomeModule } from './result-lever-strategic-outcome/result-lever-strategic-outcome.module';
+import { LeverStrategicOutcomeModule } from './lever-strategic-outcome/lever-strategic-outcome.module';
 
 @Module({
   imports: [
@@ -156,6 +158,8 @@ import { StaffGroupsModule } from './staff-groups/staff-groups.module';
     ResultInnovationToolFunctionModule,
     AllianceUserStaffGroupsModule,
     StaffGroupsModule,
+    ResultLeverStrategicOutcomeModule,
+    LeverStrategicOutcomeModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

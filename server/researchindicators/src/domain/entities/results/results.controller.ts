@@ -9,10 +9,13 @@ import {
   Query,
   UseGuards,
   UseInterceptors,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiQuery,
   ApiTags,
@@ -26,7 +29,7 @@ import { SaveGeoLocationDto } from './dto/save-geo-location.dto';
 import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
 import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
-import { ResultRawAi } from './dto/result-ai.dto';
+import { ResultRawAi, RootAi } from './dto/result-ai.dto';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
@@ -388,8 +391,10 @@ export class ResultsController {
     return this.resultsService.formalizeResult(resultAi).then((data) =>
       ResponseUtils.format({
         data: data,
-        description: 'AI Result created',
-        status: HttpStatus.CREATED,
+        description: data.error
+          ? 'Error creating AI Result'
+          : 'AI Result created',
+        status: data.error ? HttpStatus.BAD_GATEWAY : HttpStatus.CREATED,
       }),
     );
   }
@@ -397,14 +402,27 @@ export class ResultsController {
   @ApiOperation({ summary: 'Create results from AI bulk' })
   @Post('ai/formalize/bulk')
   @Roles(SecRolesEnum.DEVELOPER)
-  async createResultFromAiBulk(@Body() results: ResultRawAi[]) {
-    return this.resultsService.createResultFromAiBulk(results).then((data) =>
-      ResponseUtils.format({
-        data: data,
-        description: 'AI Results created',
-        status: HttpStatus.CREATED,
-      }),
-    );
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  @ApiBody({ type: RootAi })
+  async createResultFromAiBulk(
+    @Body()
+    data: RootAi,
+  ) {
+    return this.resultsService
+      .createResultFromAiBulk(data.results)
+      .then((data) =>
+        ResponseUtils.format({
+          data: data,
+          description: 'AI Results created',
+          status: HttpStatus.CREATED,
+        }),
+      );
   }
 
   @ApiOperation({ summary: 'Save data for Geo Location' })
