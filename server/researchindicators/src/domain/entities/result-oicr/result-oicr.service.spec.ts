@@ -293,7 +293,7 @@ describe('ResultOicrService', () => {
         mockCreateData.base_information,
         'STAR',
         {
-          leverEnum: 2,
+          leverEnum: 1,
           notMap: {
             lever: true,
           },
@@ -337,7 +337,7 @@ describe('ResultOicrService', () => {
         mockCreateData.base_information,
         'STAR',
         {
-          leverEnum: 2,
+          leverEnum: 1,
           notMap: {
             lever: true,
           },
@@ -474,7 +474,7 @@ describe('ResultOicrService', () => {
           { lever_id: '3', is_primary: false },
         ],
         'lever_id',
-        LeverRolesEnum.OICR_ALIGNMENT,
+        LeverRolesEnum.ALIGNMENT,
         undefined,
         ['is_primary'],
       );
@@ -499,7 +499,7 @@ describe('ResultOicrService', () => {
         resultId,
         [],
         'lever_id',
-        LeverRolesEnum.OICR_ALIGNMENT,
+        LeverRolesEnum.ALIGNMENT,
         undefined,
         ['is_primary'],
       );
@@ -654,7 +654,7 @@ describe('ResultOicrService', () => {
       // Assert
       expect(mockResultLeversService.find).toHaveBeenCalledWith(
         resultId,
-        LeverRolesEnum.OICR_ALIGNMENT,
+        LeverRolesEnum.ALIGNMENT,
       );
       expect(result).toEqual({
         primary_lever: [

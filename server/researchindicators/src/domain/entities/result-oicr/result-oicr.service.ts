@@ -100,14 +100,14 @@ export class ResultOicrService {
         data.base_information,
         platform_code,
         {
-          leverEnum: LeverRolesEnum.OICR_ALIGNMENT,
+          leverEnum: LeverRolesEnum.ALIGNMENT,
           result_status_id: ResultStatusEnum.REQUESTED,
           notMap: { lever: true },
         },
       );
       const lever = await this.resultLeversService.find(
         result.result_id,
-        LeverRolesEnum.OICR_ALIGNMENT,
+        LeverRolesEnum.ALIGNMENT,
       );
       const fullLevers = mergeArraysWithPriority<ResultLever>(
         data?.step_two?.primary_lever,
@@ -304,7 +304,7 @@ export class ResultOicrService {
       resultId,
       datalever,
       'lever_id',
-      LeverRolesEnum.OICR_ALIGNMENT,
+      LeverRolesEnum.ALIGNMENT,
       manager,
       ['is_primary'],
     );
@@ -424,7 +424,7 @@ export class ResultOicrService {
   private async findStepTwoOicr(resultId: number): Promise<StepTwoOicrDto> {
     const allLevers = await this.resultLeversService.find(
       resultId,
-      LeverRolesEnum.OICR_ALIGNMENT,
+      LeverRolesEnum.ALIGNMENT,
     );
 
     const leverId =
