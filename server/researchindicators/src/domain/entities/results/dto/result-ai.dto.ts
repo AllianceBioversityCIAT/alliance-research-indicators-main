@@ -217,7 +217,7 @@ export class ResultRawAi {
     description: 'The year of the result',
   })
   @IsNotEmpty()
-  @IsNumber()
+  @IsString()
   year: number;
 
   @ApiProperty({
