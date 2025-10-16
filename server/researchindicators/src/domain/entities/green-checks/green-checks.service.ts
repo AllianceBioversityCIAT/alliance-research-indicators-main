@@ -276,12 +276,11 @@ export class GreenChecksService {
         ResultStatusEnum.SUBMITTED,
         ResultStatusEnum.DRAFT,
         ResultStatusEnum.REVISED,
-      ].includes(status)
+        ResultStatusEnum.REQUESTED,
+      ].includes(currentStatus) &&
+      ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.DRAFT].includes(status)
     ) {
-      const errorMessage =
-        status === ResultStatusEnum.SUBMITTED
-          ? 'Only results in draft or revised status can be changed to submitted'
-          : 'Only results in submitted status can be changed to draft';
+      const errorMessage = `Only results in ${ResultStatusNameEnum[ResultStatusEnum.DRAFT]}, ${ResultStatusNameEnum[ResultStatusEnum.REVISED]} or ${ResultStatusNameEnum[ResultStatusEnum.REQUESTED]} status can be changed to ${ResultStatusNameEnum[status]} status`;
       throw new ConflictException(errorMessage);
     }
 
