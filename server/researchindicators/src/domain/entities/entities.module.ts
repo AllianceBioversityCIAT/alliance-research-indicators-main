@@ -73,6 +73,10 @@ import { AllianceUserStaffGroupsModule } from './alliance-user-staff-groups/alli
 import { StaffGroupsModule } from './staff-groups/staff-groups.module';
 import { ResultLeverStrategicOutcomeModule } from './result-lever-strategic-outcome/result-lever-strategic-outcome.module';
 import { LeverStrategicOutcomeModule } from './lever-strategic-outcome/lever-strategic-outcome.module';
+import { ResultQuantificationsModule } from './result-quantifications/result-quantifications.module';
+import { QuantificationRolesModule } from './quantification-roles/quantification-roles.module';
+import { ResultNotableReferencesModule } from './result-notable-references/result-notable-references.module';
+import { NotableReferenceTypesModule } from './notable-reference-types/notable-reference-types.module';
 
 @Module({
   imports: [
@@ -150,6 +154,10 @@ import { LeverStrategicOutcomeModule } from './lever-strategic-outcome/lever-str
     StaffGroupsModule,
     ResultLeverStrategicOutcomeModule,
     LeverStrategicOutcomeModule,
+    ResultQuantificationsModule,
+    QuantificationRolesModule,
+    ResultNotableReferencesModule,
+    NotableReferenceTypesModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

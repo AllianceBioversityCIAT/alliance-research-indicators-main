@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ResultTag } from '../../result-tags/entities/result-tag.entity';
 import { TempResultExternalOicr } from '../../temp_external_oicrs/entities/temp_result_external_oicr.entity';
+import { ResultQuantification } from '../../result-quantifications/entities/result-quantification.entity';
+import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
 
 export class UpdateOicrDto {
   @ApiProperty({
@@ -33,4 +35,13 @@ export class UpdateOicrDto {
 
   @ApiProperty({ type: TempResultExternalOicr })
   link_result: Partial<TempResultExternalOicr>;
+
+  @ApiProperty({ type: [ResultQuantification] })
+  actual_count: ResultQuantification[];
+
+  @ApiProperty({ type: [ResultQuantification] })
+  extrapolate_estimates: ResultQuantification[];
+
+  @ApiProperty({ type: [ResultNotableReference] })
+  notable_references: ResultNotableReference[];
 }

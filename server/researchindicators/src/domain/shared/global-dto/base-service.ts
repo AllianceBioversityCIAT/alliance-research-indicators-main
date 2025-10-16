@@ -290,4 +290,158 @@ export abstract class BaseServiceSimple<
     // Override this method to add custom validation
     return data;
   }
+
+  /**
+   * @param resultId - The result ID
+   * @param dataToSave - Data to save (can be single object or array)
+   * @param compositeKeys - Array of field names to compare for uniqueness (e.g., ['field1', 'field2', 'field3'])
+   * @param dataRole - Optional role ID
+   * @param manager - Optional entity manager for transactions
+   * @param otherAttributes - Additional attributes to include in the comparison
+   * @returns Promise<Entity[]>
+   * @description This method upserts data based on composite key comparison.
+   * It compares records using multiple fields to determine uniqueness.
+   * - Records matching all composite keys will be reused/updated
+   * - Records not in the incoming array will be soft-deleted (is_active = false)
+   * - Only makes 2-3 DB calls regardless of data size
+   *
+   * @example
+   * // Compare by 3 fields: number, unit, description
+   * upsertByCompositeKeys(
+   *   123,
+   *   [{number: 1, unit: 'kg', description: 'test'}],
+   *   ['number', 'unit', 'description'],
+   *   roleId
+   * )
+   */
+  public async upsertByCompositeKeys<Enum extends string | number>(
+    resultId: number,
+    dataToSave: Partial<Entity> | Partial<Entity>[],
+    compositeKeys: (keyof Entity & string)[],
+    dataRole?: Enum,
+    manager?: EntityManager,
+    otherAttributes?: (keyof Entity & string)[],
+  ): Promise<Entity[]> {
+    const entityManager: RepositoryData | Repository<Entity> = selectManager<
+      Entity,
+      RepositoryData
+    >(manager, this.entity, this.mainRepo);
+
+    const dataToSaveArray = formatDataToArray<Partial<Entity>>(dataToSave);
+
+    if (!dataToSaveArray || dataToSaveArray.length === 0) {
+      // If no data, deactivate all existing records
+      const whereData: FindOptionsWhere<any> = {
+        [this.resultKey]: resultId,
+        is_active: true,
+      };
+      if (dataRole && this.roleKey) {
+        whereData[this.roleKey] = dataRole;
+      }
+      await entityManager.update(whereData, { is_active: false } as any);
+      return [];
+    }
+
+    await this.createCustomValidation(dataToSaveArray);
+
+    // 1. Get all existing records (active and inactive)
+    const whereData: FindOptionsWhere<any> = {
+      [this.resultKey]: resultId,
+    };
+
+    const formatWhitDataRole: any = {};
+    if (dataRole && this.roleKey) {
+      whereData[this.roleKey] = dataRole;
+      formatWhitDataRole[this.roleKey] = dataRole;
+    }
+
+    const existingRecords = await entityManager.find({
+      where: whereData,
+    });
+
+    // 2. Create a function to generate composite key
+    const generateCompositeKey = (item: Partial<Entity>): string => {
+      return compositeKeys
+        .map((key) => {
+          const value = item[key];
+          return value !== null && value !== undefined ? String(value) : '';
+        })
+        .join('|');
+    };
+
+    // 3. Create a map of existing records by composite key
+    const existingMap = new Map<string, Entity>();
+    existingRecords.forEach((record) => {
+      const key = generateCompositeKey(record);
+      existingMap.set(key, record);
+    });
+
+    // 4. Process incoming data
+    const processedData: Partial<Entity>[] = [];
+    const idsToKeepActive: any[] = [];
+
+    for (const item of dataToSaveArray) {
+      const key = generateCompositeKey(item);
+      const existing = existingMap.get(key);
+
+      if (existing) {
+        // Reuse existing record
+        processedData.push({
+          ...existing,
+          ...this.setOtherAttributes(otherAttributes, item),
+          ...formatWhitDataRole,
+          is_active: true,
+        });
+        idsToKeepActive.push(existing[this.primaryKey]);
+      } else {
+        // Create new record
+        const newRecord: any = {
+          [this.resultKey]: resultId,
+          ...formatWhitDataRole,
+          ...this.setOtherAttributes(otherAttributes, item),
+        };
+
+        // Add composite key values
+        compositeKeys.forEach((key) => {
+          newRecord[key] = item[key];
+        });
+
+        newRecord.is_active = true;
+        processedData.push(newRecord);
+      }
+    }
+
+    // 5. Deactivate records not in the incoming array
+    const activeExistingIds = existingRecords
+      .filter((r) => r.is_active)
+      .map((r) => r[this.primaryKey]);
+
+    const idsToDeactivate = activeExistingIds.filter(
+      (id) => !idsToKeepActive.includes(id),
+    );
+
+    if (idsToDeactivate.length > 0) {
+      await entityManager.update(
+        {
+          [this.primaryKey]: In(idsToDeactivate),
+        } as any,
+        { is_active: false } as any,
+      );
+    }
+
+    // 6. Save all data (TypeORM upserts automatically if id exists)
+    const finalDataToSave = this.lastRefactoredAfterSave(
+      processedData,
+      dataRole,
+    ).map((data) => ({
+      ...data,
+      ...this.currentUser.audit(SetAutitEnum.BOTH),
+    }));
+
+    const savedRecords = (await entityManager.save(
+      finalDataToSave as DeepPartial<Entity>[],
+    )) as Entity[];
+
+    return savedRecords.filter((r) => r.is_active === true);
+  }
 }

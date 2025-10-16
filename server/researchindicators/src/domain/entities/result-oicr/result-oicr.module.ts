@@ -12,6 +12,8 @@ import { TemplateModule } from '../../shared/auxiliar/template/template.module';
 import { ResultOicrRepository } from './repositories/result-oicr.repository';
 import { TempExternalOicrsModule } from '../temp_external_oicrs/temp_external_oicrs.module';
 import { ResultContractsModule } from '../result-contracts/result-contracts.module';
+import { ResultQuantificationsModule } from '../result-quantifications/result-quantifications.module';
+import { ResultNotableReferencesModule } from '../result-notable-references/result-notable-references.module';
 
 @Module({
   controllers: [ResultOicrController],
@@ -26,6 +28,8 @@ import { ResultContractsModule } from '../result-contracts/result-contracts.modu
     TemplateModule,
     TempExternalOicrsModule,
     ResultContractsModule,
+    ResultQuantificationsModule,
+    ResultNotableReferencesModule,
   ],
   exports: [ResultOicrService, ResultOicrRepository],
 })
