@@ -413,18 +413,20 @@ export class GreenChecksService {
       };
     }
 
-    const { template: templateName, subject } = getTemplateByStatus(
+    const emailConfig = getTemplateByStatus(
       toStatusId,
       this._resultsUtil,
       this.appConfig,
       metadatos,
     );
 
+    if (!emailConfig) return;
+
     const prepareData = this.prepareDataToEmail(
       resultId,
       toStatusId,
       fromStatusId,
-      templateName,
+      emailConfig.template,
     );
 
     await prepareData.then(({ data, template }) => {
@@ -453,7 +455,7 @@ export class GreenChecksService {
         to: toSend,
         cc: ccSend,
         bcc: bccSend,
-        subject: subject,
+        subject: emailConfig.subject,
         message: {
           socketFile: Buffer.from(template),
         },

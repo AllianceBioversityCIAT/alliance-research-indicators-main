@@ -39,6 +39,21 @@ export const getTemplateByStatus = (
 ) => {
   const oicrNumber =
     typeof otherData?.oicr_number == 'string' ? otherData.oicr_number : '';
+  status =
+    result.indicatorId === IndicatorsEnum.OICR &&
+    status === ResultStatusEnum.DRAFT
+      ? ResultStatusEnum.OICR_APPROVED
+      : status;
+  if (
+    ![
+      ResultStatusEnum.REVISED,
+      ResultStatusEnum.REJECTED,
+      ResultStatusEnum.APPROVED,
+      ResultStatusEnum.POSTPONE,
+      ResultStatusEnum.OICR_APPROVED,
+    ].includes(status)
+  )
+    return null;
   const templates: { [key in ResultStatusEnum]?: TemplateStatus } = {
     [ResultStatusEnum.REVISED]: {
       template: TemplateEnum.REVISE_RESULT,
