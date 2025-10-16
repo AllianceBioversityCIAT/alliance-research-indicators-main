@@ -15,7 +15,6 @@ import {
   IsOptional,
   ValidateNested,
   IsNotEmpty,
-  IsNumberString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -114,7 +113,7 @@ export class AiRawInstitution {
     type: String,
     description: 'Similarity score of the institution',
   })
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   similarity_score: string;
 }
@@ -140,7 +139,7 @@ export class AiRawUser {
     type: String,
     description: 'similarity score of the user',
   })
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
   similarity_score: string;
 }
@@ -218,7 +217,7 @@ export class ResultRawAi {
     description: 'The year of the result',
   })
   @IsNotEmpty()
-  @IsNumberString()
+  @IsNumber()
   year: number;
 
   @ApiProperty({

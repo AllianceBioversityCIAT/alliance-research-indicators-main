@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface UsersProps {
   initialData?: any;
@@ -12,7 +12,7 @@ interface User {
 }
 
 const Users: React.FC<UsersProps> = ({ initialData }) => {
-  const [users, setUsers] = useState<User[]>(initialData?.users || []);
+  const [users] = useState<User[]>(initialData?.users || []);
 
   return (
     <div className="container-fluid">

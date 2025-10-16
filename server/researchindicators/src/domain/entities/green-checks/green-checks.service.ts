@@ -107,7 +107,7 @@ export class GreenChecksService {
       body,
     );
 
-    return otherData ? otherData : responseHistory;
+    return otherData ?? responseHistory;
   }
 
   private processStatus(
