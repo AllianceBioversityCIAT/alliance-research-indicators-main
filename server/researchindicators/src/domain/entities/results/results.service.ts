@@ -70,8 +70,8 @@ import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
 import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
 import {
+  filterByUniqueKeyWithPriority,
   intersection,
-  mergeArraysWithPriority,
 } from '../../shared/utils/array.util';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
@@ -611,6 +611,8 @@ export class ResultsService {
           ? primary_levers.map((el) => ({
               lever_id: el.lever_id,
               is_primary: true,
+              result_lever_strategic_outcomes:
+                el?.result_lever_strategic_outcomes,
             }))
           : [];
 
@@ -622,10 +624,10 @@ export class ResultsService {
             }))
           : [];
 
-      const fullLevers = mergeArraysWithPriority<ResultLever>(
-        primaryLevers,
-        contributorLevers,
+      const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
+        [...primaryLevers, ...contributorLevers],
         'lever_id',
+        'is_primary',
       );
 
       const activeLevers = await this._resultLeversService.find(
@@ -652,8 +654,10 @@ export class ResultsService {
           LeverRolesEnum.ALIGNMENT,
           activeLevers,
         );
+      console.log(primaryLevers);
 
       for (const lever of emergedLever) {
+        console.log(lever);
         await this._resultLeverStrategicOutcomeService.create(
           lever.result_lever_id,
           lever?.result_lever_strategic_outcomes ?? [],
