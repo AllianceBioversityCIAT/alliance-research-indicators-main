@@ -16,19 +16,22 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
   };
 
   return (
-    <header className="header">
+    <header className="admin-header">
       <div className="header-content">
         <div className="header-left">
-          <button className="sidebar-toggle" onClick={onToggleSidebar}>
+          <button className="mobile-menu-button" onClick={onToggleSidebar}>
             <i className="fas fa-bars"></i>
           </button>
           <h1 className="page-title">{getPageTitle()}</h1>
         </div>
         <div className="header-right">
-          <div className="user-info">
-            <span className="user-name">Administrator</span>
+          <div className="user-menu">
             <div className="user-avatar">
               <i className="fas fa-user-circle"></i>
+            </div>
+            <div className="user-info">
+              <span className="user-name">Administrator</span>
+              <span className="user-role">Admin</span>
             </div>
           </div>
         </div>

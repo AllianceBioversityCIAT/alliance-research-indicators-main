@@ -4,19 +4,19 @@ interface StatsCardProps {
   title: string;
   value: number | string;
   icon: string;
-  color: 'primary' | 'success' | 'warning' | 'danger';
+  color?: 'primary' | 'success' | 'warning' | 'danger'; // Optional now
 }
 
-const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, color }) => {
+const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon }) => {
   return (
-    <div className={`stats-card bg-${color}`}>
-      <div className="stats-icon">
-        <i className={`fas ${icon}`}></i>
+    <div className="stat-card">
+      <div className="stat-card-header">
+        <div className="stat-card-icon">
+          <i className={`fas ${icon}`}></i>
+        </div>
       </div>
-      <div className="stats-content">
-        <h3>{value}</h3>
-        <p>{title}</p>
-      </div>
+      <div className="stat-card-value">{value}</div>
+      <div className="stat-card-label">{title}</div>
     </div>
   );
 };

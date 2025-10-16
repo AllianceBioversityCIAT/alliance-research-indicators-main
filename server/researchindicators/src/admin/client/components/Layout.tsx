@@ -14,14 +14,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="wrapper">
+    <div className="admin-layout">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className={`sidebar-overlay ${sidebarOpen ? 'active' : ''}`}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
       <div className="main-content">
         <Header onToggleSidebar={toggleSidebar} />
         <div className="content-wrapper">
           {children}
         </div>
-        <footer className="footer">
+        <footer className="admin-footer">
           <div className="footer-content">
             <p>&copy; {new Date().getFullYear()} Research Indicators Admin Panel. All rights reserved.</p>
           </div>

@@ -14,51 +14,90 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <aside className={`sidebar ${isOpen ? 'active' : ''}`}>
-      <div className="sidebar-header">
-        <h3>Admin Panel</h3>
-      </div>
-      <nav className="sidebar-nav">
-        <ul>
-          <li>
-            <Link
-              to="/admin/dashboard"
-              className={isActive('/admin/dashboard') || isActive('/admin')}
-              onClick={onClose}
-            >
-              <i className="fas fa-tachometer-alt"></i>
-              <span>Dashboard</span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              to="/admin/users"
-              className={isActive('/admin/users')}
-              onClick={onClose}
-            >
-              <i className="fas fa-users"></i>
-              <span>Users</span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              to="/admin/settings"
-              className={isActive('/admin/settings')}
-              onClick={onClose}
-            >
-              <i className="fas fa-cog"></i>
-              <span>Settings</span>
-            </Link>
-          </li>
-          <li>
-            <a href="/swagger" target="_blank">
-              <i className="fas fa-code"></i>
-              <span>API Docs</span>
-            </a>
-          </li>
-        </ul>
-      </nav>
-    </aside>
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="admin-sidebar desktop">
+        <div className="sidebar-content">
+          <div className="sidebar-header">
+            <h2 className="sidebar-logo">Admin Panel</h2>
+            <p className="sidebar-subtitle">Research Indicators</p>
+          </div>
+          <nav className="sidebar-nav">
+            <div className="nav-section">
+              <h3 className="nav-section-title">Main</h3>
+              <Link
+                to="/admin/dashboard"
+                className={`nav-item ${isActive('/admin/dashboard') || isActive('/admin')}`}
+              >
+                <i className="fas fa-tachometer-alt nav-item-icon"></i>
+                <span>Dashboard</span>
+              </Link>
+              <Link
+                to="/admin/users"
+                className={`nav-item ${isActive('/admin/users')}`}
+              >
+                <i className="fas fa-users nav-item-icon"></i>
+                <span>Users</span>
+              </Link>
+              <Link
+                to="/admin/settings"
+                className={`nav-item ${isActive('/admin/settings')}`}
+              >
+                <i className="fas fa-cog nav-item-icon"></i>
+                <span>Settings</span>
+              </Link>
+              <a href="/swagger" target="_blank" className="nav-item">
+                <i className="fas fa-code nav-item-icon"></i>
+                <span>API Docs</span>
+              </a>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      {/* Mobile Sidebar */}
+      <aside className={`admin-sidebar mobile ${isOpen ? 'active' : ''}`}>
+        <div className="sidebar-content">
+          <div className="sidebar-header">
+            <h2 className="sidebar-logo">Admin Panel</h2>
+            <p className="sidebar-subtitle">Research Indicators</p>
+          </div>
+          <nav className="sidebar-nav">
+            <div className="nav-section">
+              <h3 className="nav-section-title">Main</h3>
+              <Link
+                to="/admin/dashboard"
+                className={`nav-item ${isActive('/admin/dashboard') || isActive('/admin')}`}
+                onClick={onClose}
+              >
+                <i className="fas fa-tachometer-alt nav-item-icon"></i>
+                <span>Dashboard</span>
+              </Link>
+              <Link
+                to="/admin/users"
+                className={`nav-item ${isActive('/admin/users')}`}
+                onClick={onClose}
+              >
+                <i className="fas fa-users nav-item-icon"></i>
+                <span>Users</span>
+              </Link>
+              <Link
+                to="/admin/settings"
+                className={`nav-item ${isActive('/admin/settings')}`}
+                onClick={onClose}
+              >
+                <i className="fas fa-cog nav-item-icon"></i>
+                <span>Settings</span>
+              </Link>
+              <a href="/swagger" target="_blank" className="nav-item" onClick={onClose}>
+                <i className="fas fa-code nav-item-icon"></i>
+                <span>API Docs</span>
+              </a>
+            </div>
+          </nav>
+        </div>
+      </aside>
+    </>
   );
 };
 

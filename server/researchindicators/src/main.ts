@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { env } from 'process';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { json, urlencoded } from 'express';
+import cookieParser from 'cookie-parser';
 import { AppMicroserviceModule } from './app-microservice.module';
 import { LoggerUtil } from './domain/shared/utils/logger.util';
 import helmet from 'helmet';
@@ -37,20 +38,28 @@ async function httpservice() {
             "'unsafe-inline'",
             'https://cdn.jsdelivr.net',
             'https://cdnjs.cloudflare.com',
+            'https://fonts.googleapis.com',
+          ],
+          fontSrc: [
+            "'self'",
+            'https://cdnjs.cloudflare.com',
+            'https://fonts.gstatic.com',
           ],
           imgSrc: ["'self'", 'data:', 'https:'],
           connectSrc: [
             "'self'",
             'http://localhost:5173',
             'ws://localhost:5173',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
           ],
-          fontSrc: ["'self'", 'https://cdnjs.cloudflare.com'],
         },
       },
     }),
   );
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
+  app.use(cookieParser());
 
   // Serve static files for admin panel (React build files)
   app.useStaticAssets(join(__dirname, 'admin', 'public'), {

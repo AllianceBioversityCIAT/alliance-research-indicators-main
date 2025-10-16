@@ -41,76 +41,61 @@ const Dashboard: React.FC<DashboardProps> = ({ initialData }) => {
   }, [initialData]);
 
   return (
-    <div className="container-fluid">
+    <>
       {/* Stats Cards */}
-      <div className="row mb-4">
-        <div className="col-md-3">
-          <StatsCard
-            title="Total Users"
-            value={stats.totalUsers}
-            icon="fa-users"
-            color="primary"
-          />
-        </div>
-        <div className="col-md-3">
-          <StatsCard
-            title="Total Results"
-            value={stats.totalResults}
-            icon="fa-file-alt"
-            color="success"
-          />
-        </div>
-        <div className="col-md-3">
-          <StatsCard
-            title="Active Projects"
-            value={stats.activeProjects}
-            icon="fa-project-diagram"
-            color="warning"
-          />
-        </div>
-        <div className="col-md-3">
-          <StatsCard
-            title="Pending Reviews"
-            value={stats.pendingReviews}
-            icon="fa-clock"
-            color="danger"
-          />
-        </div>
+      <div className="stats-grid">
+        <StatsCard
+          title="Total Users"
+          value={stats.totalUsers}
+          icon="fa-users"
+        />
+        <StatsCard
+          title="Total Results"
+          value={stats.totalResults}
+          icon="fa-file-alt"
+        />
+        <StatsCard
+          title="Active Projects"
+          value={stats.activeProjects}
+          icon="fa-project-diagram"
+        />
+        <StatsCard
+          title="Pending Reviews"
+          value={stats.pendingReviews}
+          icon="fa-clock"
+        />
       </div>
 
       {/* Recent Activity */}
-      <div className="row">
-        <div className="col-md-12">
-          <div className="card">
-            <div className="card-header">
-              <h5 className="card-title">Recent Activity</h5>
-            </div>
-            <div className="card-body">
-              <div className="table-responsive">
-                <table className="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>Action</th>
-                      <th>User</th>
-                      <th>Timestamp</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentActivity.map((activity, index) => (
-                      <tr key={index}>
-                        <td>{activity.action}</td>
-                        <td>{activity.user}</td>
-                        <td>{new Date(activity.timestamp).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+      <div className="activity-card">
+        <div className="activity-card-header">
+          <h3 className="activity-card-title">
+            <i className="fas fa-history"></i>
+            Recent Activity
+          </h3>
+        </div>
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>User</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentActivity.map((activity, index) => (
+                <tr key={index}>
+                  <td>{activity.action}</td>
+                  <td>{activity.user}</td>
+                  <td>{new Date(activity.timestamp).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
