@@ -661,10 +661,8 @@ export class ResultsService {
           LeverRolesEnum.ALIGNMENT,
           activeLevers,
         );
-      console.log(primaryLevers);
 
       for (const lever of emergedLever) {
-        console.log(lever);
         await this._resultLeverStrategicOutcomeService.create(
           lever.result_lever_id,
           lever?.result_lever_strategic_outcomes ?? [],
