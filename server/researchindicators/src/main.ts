@@ -15,10 +15,7 @@ const logger: LoggerUtil = new LoggerUtil({
 });
 async function httpservice() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:3001'],
-    credentials: true,
-  });
+  app.enableCors();
   app.use(
     helmet({
       contentSecurityPolicy: {
