@@ -53,6 +53,9 @@ import {
 } from './dto/response-oicr-word-template.dto';
 import { ReviewDto } from './dto/review.dto';
 import { StaffGroupsEnum } from '../staff-groups/enum/staff-groups.enum';
+import { ResultQuantificationsService } from '../result-quantifications/result-quantifications.service';
+import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
+import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
 
 @Injectable()
 export class ResultOicrService {
@@ -72,6 +75,8 @@ export class ResultOicrService {
     private readonly mainRepo: ResultOicrRepository,
     private readonly tempExternalOicrsService: TempExternalOicrsService,
     private readonly resultContractService: ResultContractsService,
+    private readonly resultQuantificationsService: ResultQuantificationsService,
+    private readonly resultNotableReferencesService: ResultNotableReferencesService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -198,6 +203,26 @@ export class ResultOicrService {
       'external_oicr_id',
     );
 
+    await this.resultQuantificationsService.upsertByCompositeKeys(
+      resultId,
+      data?.actual_count ?? [],
+      ['quantification_number', 'unit', 'description'],
+      QuantificationRolesEnum.ACTUAL_COUNT,
+    );
+
+    await this.resultQuantificationsService.upsertByCompositeKeys(
+      resultId,
+      data?.extrapolate_estimates ?? [],
+      ['quantification_number', 'unit', 'description'],
+      QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+    );
+
+    await this.resultNotableReferencesService.upsertByCompositeKeys(
+      resultId,
+      data?.notable_references ?? [],
+      ['notable_reference_type_id', 'link'],
+    );
+
     await this.updateDataUtil.updateLastUpdatedDate(resultId);
   }
 
@@ -217,6 +242,15 @@ export class ResultOicrService {
       .find(resultId)
       .then((links) => links?.[0]);
 
+    const quantifications =
+      await this.resultQuantificationsService.findByResultIdAndRoles(resultId, [
+        QuantificationRolesEnum.ACTUAL_COUNT,
+        QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+      ]);
+
+    const notable_references =
+      await this.resultNotableReferencesService.find(resultId);
+
     return {
       general_comment: oicr?.general_comment,
       maturity_level_id: oicr?.maturity_level_id,
@@ -225,6 +259,16 @@ export class ResultOicrService {
       short_outcome_impact_statement: oicr?.short_outcome_impact_statement,
       tagging,
       link_result,
+      actual_count: quantifications?.filter(
+        (q) =>
+          q.quantification_role_id === QuantificationRolesEnum.ACTUAL_COUNT,
+      ),
+      extrapolate_estimates: quantifications?.filter(
+        (q) =>
+          q.quantification_role_id ===
+          QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+      ),
+      notable_references,
     };
   }
 

@@ -49,6 +49,9 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 1,
         link_result: { temp_result_id: 123 } as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
       const serviceResult = { success: true };
       const expectedResult = {
@@ -80,6 +83,9 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 1,
         link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
       const serviceError = new Error('Service error');
 
@@ -111,6 +117,9 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 2,
         link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
       const expectedResult = { success: true };
 
@@ -138,6 +147,9 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 1,
         link_result: { temp_result_id: 123 } as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
       const expectedResult = {
         data: serviceResult,
@@ -188,6 +200,9 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 2,
         link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
 
       mockResultOicrService.findOicrs.mockResolvedValue(expectedResult);

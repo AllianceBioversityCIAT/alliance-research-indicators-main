@@ -25,6 +25,8 @@ import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_o
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
+import { ResultQuantificationsService } from '../result-quantifications/result-quantifications.service';
+import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -44,6 +46,8 @@ describe('ResultOicrService', () => {
   let mockResultOicrRepository: jest.Mocked<ResultOicrRepository>;
   let mockTempExternalOicrsService: jest.Mocked<TempExternalOicrsService>;
   let mockResultContractsService: jest.Mocked<ResultContractsService>;
+  let mockResultQuantificationsService: jest.Mocked<any>;
+  let mockResultNotableReferencesService: jest.Mocked<any>;
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -159,6 +163,20 @@ describe('ResultOicrService', () => {
       getLeverFromPrimaryContract: jest.fn(),
     } as any;
 
+    mockResultQuantificationsService = {
+      findByResultIdAndRoles: jest.fn().mockResolvedValue([]),
+      upsertQuantificationsByRole: jest.fn(),
+      upsertByCompositeKeys: jest.fn().mockResolvedValue([]),
+    } as any;
+
+    mockResultNotableReferencesService = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
+      upsertByCompositeKeys: jest.fn().mockResolvedValue([]),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultOicrService,
@@ -185,6 +203,14 @@ describe('ResultOicrService', () => {
         {
           provide: TempExternalOicrsService,
           useValue: mockTempExternalOicrsService,
+        },
+        {
+          provide: ResultQuantificationsService,
+          useValue: mockResultQuantificationsService,
+        },
+        {
+          provide: ResultNotableReferencesService,
+          useValue: mockResultNotableReferencesService,
         },
       ],
     }).compile();
@@ -1026,6 +1052,9 @@ describe('ResultOicrService', () => {
         general_comment: 'Updated general comment',
         maturity_level_id: 2,
         link_result: { external_oicr_id: 456 } as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
 
       const auditData = { updated_at: new Date() };
@@ -1082,6 +1111,9 @@ describe('ResultOicrService', () => {
         general_comment: 'Comment',
         maturity_level_id: 1,
         link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
 
       const existingOicr = { id: 456, oicr_internal_code: 'EXISTING-CODE' };
@@ -1119,6 +1151,9 @@ describe('ResultOicrService', () => {
         general_comment: 'Comment',
         maturity_level_id: 1,
         link_result: undefined as any, // Test undefined handling
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
 
       const auditData = { updated_at: new Date() };
@@ -1178,6 +1213,9 @@ describe('ResultOicrService', () => {
           mockOicrEntity.short_outcome_impact_statement,
         tagging: mockTagging[0] as any,
         link_result: mockLinkResult[0] as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1219,6 +1257,9 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: undefined,
         tagging: mockTagging[0] as any,
         link_result: mockLinkResult[0] as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(null);
@@ -1254,6 +1295,9 @@ describe('ResultOicrService', () => {
           mockOicrEntity.short_outcome_impact_statement,
         tagging: undefined as any,
         link_result: undefined as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);

@@ -57,6 +57,7 @@ import { MaturityLevelModule } from '../entities/maturity-level/maturity-level.m
 import { TempExternalOicrsModule } from '../entities/temp_external_oicrs/temp_external_oicrs.module';
 import { AllianceUserStaffGroupsModule } from '../entities/alliance-user-staff-groups/alliance-user-staff-groups.module';
 import { LeverStrategicOutcomeModule } from '../entities/lever-strategic-outcome/lever-strategic-outcome.module';
+import { NotableReferenceTypesModule } from '../entities/notable-reference-types/notable-reference-types.module';
 
 const capSharingChildren: Routes = [
   {
@@ -344,6 +345,10 @@ const children: Routes = [
   {
     path: 'contributions',
     module: ProjectIndicatorsResultsModule,
+  },
+  {
+    path: 'notable-reference-types',
+    module: NotableReferenceTypesModule,
   },
 ];
 
