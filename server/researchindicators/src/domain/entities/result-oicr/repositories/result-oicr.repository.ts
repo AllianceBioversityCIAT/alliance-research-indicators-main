@@ -32,7 +32,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
                     INNER JOIN agresso_contracts ac ON ac.agreement_id = rc.contract_id 
                     LEFT JOIN result_levers rl ON rl.result_id = r.result_id 
                                                 AND rl.is_primary = TRUE
-                                                AND rl.lever_role_id = 2
+                                                AND rl.lever_role_id = 1
                     LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id 
                     LEFT JOIN result_users ru ON ru.result_id = r.result_id 
                                                 AND ru.is_active = TRUE
@@ -88,12 +88,12 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
       LEFT JOIN agresso_contracts ac 
         ON ac.agreement_id = rc.contract_id
       LEFT JOIN result_levers rl_main ON rl_main.result_id = r.result_id 
-        AND rl_main.lever_role_id = 2
+        AND rl_main.lever_role_id = 1
         AND rl_main.is_active = TRUE 
         AND rl_main.is_primary = 1
       LEFT JOIN clarisa_levers cl_main ON cl_main.id = rl_main.lever_id
       LEFT JOIN result_levers rl ON rl.result_id = r.result_id 
-        AND rl.lever_role_id = 2
+        AND rl.lever_role_id = 1
         AND rl.is_active = TRUE 
         AND rl.is_primary = 0
       LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id 
