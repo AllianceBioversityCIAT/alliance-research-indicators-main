@@ -6,7 +6,7 @@ export class InsertNewStatusOicrPostpone1759937879517
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `INSERT INTO result_status (result_status_id, name) VALUES (${ResultStatusEnum.POSTPONE}, 'Postpone')`,
+      `INSERT INTO result_status (result_status_id, name) VALUES (${ResultStatusEnum.POSTPONE}, 'Postponed')`,
     );
   }
 
