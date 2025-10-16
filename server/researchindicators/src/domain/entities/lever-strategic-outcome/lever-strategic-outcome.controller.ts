@@ -1,7 +1,7 @@
-import { Controller, Get, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
 import { LeverStrategicOutcomeService } from './lever-strategic-outcome.service';
 import { BaseController } from '../../shared/global-dto/base-controller';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 
 @ApiTags('Lever Strategic Outcome')
@@ -13,7 +13,13 @@ export class LeverStrategicOutcomeController extends BaseController<LeverStrateg
   }
 
   @Get('by-lever/:lever_id')
-  async findByLeverId(lever_id: number) {
+  @ApiParam({
+    name: 'lever_id',
+    type: Number,
+    description: 'ID of the Lever',
+    example: 1,
+  })
+  async findByLeverId(@Param('lever_id') lever_id: number) {
     return this.service.findByLeverId(lever_id).then((data) =>
       ResponseUtils.format({
         data,
