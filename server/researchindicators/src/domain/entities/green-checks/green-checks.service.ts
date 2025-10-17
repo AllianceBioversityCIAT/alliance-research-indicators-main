@@ -18,7 +18,7 @@ import {
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
 import { ResultStatus } from '../result-status/entities/result-status.entity';
-import { isEmpty } from '../../shared/utils/object.utils';
+import { isEmpty, validObject } from '../../shared/utils/object.utils';
 import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
@@ -270,7 +270,25 @@ export class GreenChecksService {
     status: ResultStatusEnum,
     comment: string,
     currentStatus: ResultStatusEnum,
+    body?: OptionalBody,
   ): SubmissionHistory {
+    if (
+      this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
+      status === ResultStatusEnum.DRAFT &&
+      currentStatus === ResultStatusEnum.REQUESTED
+    ) {
+      const valid = validObject(body, [
+        'mel_regional_expert',
+        'oicr_internal_code',
+      ]);
+      if (!valid.isValid) {
+        throw new BadRequestException(
+          `The following fields are required to move OICR to draft status: ${valid.invalidFields.join(
+            ', ',
+          )}`,
+        );
+      }
+    }
     if (
       ![
         ResultStatusEnum.SUBMITTED,
