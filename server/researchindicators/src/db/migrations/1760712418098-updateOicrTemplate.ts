@@ -3,7 +3,7 @@ import { TemplateEnum } from '../../domain/shared/auxiliar/template/enum/templat
 
 export class UpdateOicrTemplate1760712418098 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`UPDATE sec_template SET name = '<!DOCTYPE html>
+    await queryRunner.query(`UPDATE sec_template SET template = '<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -46,7 +46,7 @@ export class UpdateOicrTemplate1760712418098 implements MigrationInterface {
 </html>
 ' WHERE name = '${TemplateEnum.OICR_APPROVED}';`);
 
-    await queryRunner.query(`UPDATE sec_template SET name = '<!DOCTYPE html>
+    await queryRunner.query(`UPDATE sec_template SET template = '<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -89,7 +89,7 @@ export class UpdateOicrTemplate1760712418098 implements MigrationInterface {
 </html>
 ' WHERE name = '${TemplateEnum.OICR_POSTPONE}';`);
 
-    await queryRunner.query(`UPDATE sec_template SET name = '<!DOCTYPE html>
+    await queryRunner.query(`UPDATE sec_template SET template = '<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />

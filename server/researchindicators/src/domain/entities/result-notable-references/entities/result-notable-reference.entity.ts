@@ -21,7 +21,7 @@ export class ResultNotableReference extends AuditableEntity {
   @Column({
     type: 'bigint',
     name: 'notable_reference_type_id',
-    nullable: false,
+    nullable: true,
   })
   @ApiProperty()
   notable_reference_type_id: number;
@@ -29,7 +29,7 @@ export class ResultNotableReference extends AuditableEntity {
   @Column({
     type: 'text',
     name: 'link',
-    nullable: false,
+    nullable: true,
   })
   @ApiProperty()
   link: string;

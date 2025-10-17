@@ -503,6 +503,7 @@ export class ResultOicrService {
       oicr_internal_code: data.oicr_internal_code,
       mel_regional_expert_id: data.mel_regional_expert,
       mel_staff_group_id: StaffGroupsEnum.MEL_REGIONAL_EXPERT,
+      sharepoint_link: data.sharepoint_link,
       ...this.currentUser.audit(SetAutitEnum.UPDATE),
     });
   }
