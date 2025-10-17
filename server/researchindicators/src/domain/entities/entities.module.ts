@@ -82,6 +82,7 @@ import { ResultQuantificationsModule } from './result-quantifications/result-qua
 import { QuantificationRolesModule } from './quantification-roles/quantification-roles.module';
 import { ResultNotableReferencesModule } from './result-notable-references/result-notable-references.module';
 import { NotableReferenceTypesModule } from './notable-reference-types/notable-reference-types.module';
+import { InformativeRolesModule } from './informative-roles/informative-roles.module';
 
 @Module({
   imports: [
@@ -168,6 +169,7 @@ import { NotableReferenceTypesModule } from './notable-reference-types/notable-r
     QuantificationRolesModule,
     ResultNotableReferencesModule,
     NotableReferenceTypesModule,
+    InformativeRolesModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

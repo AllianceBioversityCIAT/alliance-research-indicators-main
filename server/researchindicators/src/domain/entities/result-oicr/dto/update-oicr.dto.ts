@@ -44,4 +44,14 @@ export class UpdateOicrDto {
 
   @ApiProperty({ type: [ResultNotableReference] })
   notable_references: ResultNotableReference[];
+
+  @ApiProperty({
+    type: Boolean,
+  })
+  for_external_use: boolean;
+
+  @ApiProperty({
+    type: String,
+  })
+  for_external_use_description: string;
 }

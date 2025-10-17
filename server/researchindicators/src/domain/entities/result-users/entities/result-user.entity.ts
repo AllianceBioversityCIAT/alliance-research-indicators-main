@@ -10,6 +10,7 @@ import { Result } from '../../results/entities/result.entity';
 import { UserRole } from '../../user-roles/entities/user-role.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
+import { InformativeRole } from '../../informative-roles/entities/informative-role.entity';
 
 @Entity('result_users')
 export class ResultUser extends AuditableEntity {
@@ -53,6 +54,20 @@ export class ResultUser extends AuditableEntity {
     nullable: false,
   })
   user_role_id!: number;
+
+  @Column({
+    type: 'bigint',
+    name: 'informative_role_id',
+    nullable: true,
+  })
+  informative_role_id?: number;
+
+  @ManyToOne(
+    () => InformativeRole,
+    (informativeRole) => informativeRole.result_users,
+  )
+  @JoinColumn({ name: 'informative_role_id' })
+  informativeRole!: InformativeRole;
 
   @ManyToOne(() => AllianceUserStaff, (user) => user.result_users)
   @JoinColumn({ name: 'user_id' })
