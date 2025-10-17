@@ -59,6 +59,7 @@ import { AllianceUserStaffGroupsModule } from '../entities/alliance-user-staff-g
 import { LeverStrategicOutcomeModule } from '../entities/lever-strategic-outcome/lever-strategic-outcome.module';
 import { NotableReferenceTypesModule } from '../entities/notable-reference-types/notable-reference-types.module';
 import { InformativeRolesModule } from '../entities/informative-roles/informative-roles.module';
+import { ResultUsersModule } from '../entities/result-users/result-users.module';
 
 const capSharingChildren: Routes = [
   {
@@ -354,6 +355,10 @@ const children: Routes = [
   {
     path: 'informative-roles',
     module: InformativeRolesModule,
+  },
+  {
+    path: 'result-user',
+    module: ResultUsersModule,
   },
 ];
 
