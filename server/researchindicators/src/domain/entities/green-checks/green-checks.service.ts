@@ -90,6 +90,7 @@ export class GreenChecksService {
       resultStatusId,
       comment,
       this._resultsUtil.statusId,
+      body,
     );
 
     const responseHistory = await this.saveHistory(resultId, saveHistory);
@@ -115,6 +116,7 @@ export class GreenChecksService {
     status: ResultStatusEnum,
     comment: string,
     currentStatus: ResultStatusEnum,
+    body?: OptionalBody,
   ) {
     if (currentStatus === status) {
       throw new ConflictException(
@@ -141,6 +143,7 @@ export class GreenChecksService {
           status,
           comment,
           currentStatus,
+          body,
         );
       case ResultStatusEnum.POSTPONE:
         return this.changeToReviewOicrStatus(
@@ -360,6 +363,7 @@ export class GreenChecksService {
             templateName,
             data,
           );
+
           return { template, data };
         });
     } else if (toStatusId === ResultStatusEnum.SUBMITTED) {

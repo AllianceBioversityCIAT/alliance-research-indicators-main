@@ -13,6 +13,7 @@ import {
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { MessageOicrDto } from '../dto/message-oicr.dto';
 import { formatString } from '../../../shared/utils/queries.util';
+import { format } from 'date-fns';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -230,7 +231,7 @@ export class GreenCheckRepository {
   ): Promise<MessageOicrDto> {
     const query = `SELECT r.title,
                     ro.oicr_internal_code as oicr_number,
-                    CONCAT(aus.first_name, ', ',aus.last_name) as mel_expert_name,
+                    CONCAT(aus.first_name, ' ',aus.last_name) as mel_expert_name,
                     CONCAT(su.first_name, ', ',su.last_name ) as requester_by,
                     IFNULL(ro.sharepoint_link, 'To be shared by MEL Regional Expert') as sharepoint_url,
                     CONCAT(su2.first_name, ', ',su2.last_name ) as reviewed_by,
@@ -256,7 +257,10 @@ export class GreenCheckRepository {
       .then((result) => (result?.length ? result[0] : null));
 
     result.url = metadatos?.url;
-    result.decision_date = new Date(result.decision_date).toDateString();
+    result.decision_date = format(
+      new Date(result.decision_date),
+      "dd/MM/yyyy 'at' HH:mm",
+    );
 
     return result;
   }
