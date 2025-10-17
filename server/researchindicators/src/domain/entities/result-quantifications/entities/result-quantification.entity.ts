@@ -21,7 +21,7 @@ export class ResultQuantification extends AuditableEntity {
   @Column({
     type: 'bigint',
     name: 'quantification_number',
-    nullable: false,
+    nullable: true,
   })
   @ApiProperty()
   quantification_number: number;
@@ -29,7 +29,7 @@ export class ResultQuantification extends AuditableEntity {
   @Column({
     type: 'text',
     name: 'unit',
-    nullable: false,
+    nullable: true,
   })
   @ApiProperty()
   unit: string;
