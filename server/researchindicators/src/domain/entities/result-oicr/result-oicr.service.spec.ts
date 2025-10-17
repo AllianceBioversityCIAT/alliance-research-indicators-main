@@ -1055,6 +1055,8 @@ describe('ResultOicrService', () => {
         actual_count: [],
         extrapolate_estimates: [],
         notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'Test description',
       };
 
       const auditData = { updated_at: new Date() };
@@ -1084,6 +1086,8 @@ describe('ResultOicrService', () => {
           updateData.short_outcome_impact_statement,
         general_comment: updateData.general_comment,
         maturity_level_id: updateData.maturity_level_id,
+        for_external_use: updateData.for_external_use,
+        for_external_use_description: updateData.for_external_use_description,
         ...auditData,
       });
 
@@ -1114,6 +1118,8 @@ describe('ResultOicrService', () => {
         actual_count: [],
         extrapolate_estimates: [],
         notable_references: [],
+        for_external_use: false,
+        for_external_use_description: '',
       };
 
       const existingOicr = { id: 456, oicr_internal_code: 'EXISTING-CODE' };
@@ -1136,6 +1142,8 @@ describe('ResultOicrService', () => {
           updateData.short_outcome_impact_statement,
         general_comment: updateData.general_comment,
         maturity_level_id: updateData.maturity_level_id,
+        for_external_use: updateData.for_external_use,
+        for_external_use_description: updateData.for_external_use_description,
         ...auditData,
       });
     });
@@ -1154,6 +1162,8 @@ describe('ResultOicrService', () => {
         actual_count: [],
         extrapolate_estimates: [],
         notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'Test external use',
       };
 
       const auditData = { updated_at: new Date() };
@@ -1192,6 +1202,8 @@ describe('ResultOicrService', () => {
         oicr_internal_code: 'OICR-2024-001',
         outcome_impact_statement: 'Test outcome statement',
         short_outcome_impact_statement: 'Short statement',
+        for_external_use: false,
+        for_external_use_description: '',
       };
 
       const mockTagging = [
@@ -1216,6 +1228,9 @@ describe('ResultOicrService', () => {
         actual_count: [],
         extrapolate_estimates: [],
         notable_references: [],
+        for_external_use: mockOicrEntity.for_external_use,
+        for_external_use_description:
+          mockOicrEntity.for_external_use_description,
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1260,6 +1275,8 @@ describe('ResultOicrService', () => {
         actual_count: [],
         extrapolate_estimates: [],
         notable_references: [],
+        for_external_use: undefined,
+        for_external_use_description: undefined,
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(null);
@@ -1284,6 +1301,8 @@ describe('ResultOicrService', () => {
         oicr_internal_code: 'TEST-001',
         outcome_impact_statement: 'Test statement',
         short_outcome_impact_statement: 'Short statement',
+        for_external_use: false,
+        for_external_use_description: '',
       };
 
       const expectedResult: UpdateOicrDto = {
@@ -1298,6 +1317,9 @@ describe('ResultOicrService', () => {
         actual_count: [],
         extrapolate_estimates: [],
         notable_references: [],
+        for_external_use: mockOicrEntity.for_external_use,
+        for_external_use_description:
+          mockOicrEntity.for_external_use_description,
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);

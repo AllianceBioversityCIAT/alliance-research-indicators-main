@@ -81,6 +81,20 @@ export class ResultOicr extends AuditableEntity {
   })
   mel_staff_group_id: number;
 
+  @Column({
+    type: 'boolean',
+    name: 'for_external_use',
+    default: true,
+  })
+  for_external_use: boolean;
+
+  @Column({
+    type: 'text',
+    name: 'for_external_use_description',
+    nullable: true,
+  })
+  for_external_use_description: string;
+
   @ManyToOne(() => AllianceUserStaffGroup, (ausg) => ausg.staffGroupOicr)
   @JoinColumn([
     { name: 'mel_regional_expert', referencedColumnName: 'carnet' },

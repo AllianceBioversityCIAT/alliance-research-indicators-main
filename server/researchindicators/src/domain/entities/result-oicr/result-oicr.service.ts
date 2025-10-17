@@ -183,6 +183,8 @@ export class ResultOicrService {
       short_outcome_impact_statement: data?.short_outcome_impact_statement,
       general_comment: data?.general_comment,
       maturity_level_id: data?.maturity_level_id,
+      for_external_use: data?.for_external_use,
+      for_external_use_description: data?.for_external_use_description,
       ...this.currentUser.audit(SetAutitEnum.UPDATE),
     });
 
@@ -269,6 +271,8 @@ export class ResultOicrService {
           QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
       ),
       notable_references,
+      for_external_use: oicr?.for_external_use,
+      for_external_use_description: oicr?.for_external_use_description,
     };
   }
 

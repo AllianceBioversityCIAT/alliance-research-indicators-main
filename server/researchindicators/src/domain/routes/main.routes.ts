@@ -55,6 +55,7 @@ import { TempExternalOicrsModule } from '../entities/temp_external_oicrs/temp_ex
 import { AllianceUserStaffGroupsModule } from '../entities/alliance-user-staff-groups/alliance-user-staff-groups.module';
 import { LeverStrategicOutcomeModule } from '../entities/lever-strategic-outcome/lever-strategic-outcome.module';
 import { NotableReferenceTypesModule } from '../entities/notable-reference-types/notable-reference-types.module';
+import { InformativeRolesModule } from '../entities/informative-roles/informative-roles.module';
 
 const capSharingChildren: Routes = [
   {
@@ -334,6 +335,10 @@ const children: Routes = [
   {
     path: 'notable-reference-types',
     module: NotableReferenceTypesModule,
+  },
+  {
+    path: 'informative-roles',
+    module: InformativeRolesModule,
   },
 ];
 
