@@ -27,6 +27,7 @@ import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
 import { ResultQuantificationsService } from '../result-quantifications/result-quantifications.service';
 import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
+import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -48,6 +49,7 @@ describe('ResultOicrService', () => {
   let mockResultContractsService: jest.Mocked<ResultContractsService>;
   let mockResultQuantificationsService: jest.Mocked<any>;
   let mockResultNotableReferencesService: jest.Mocked<any>;
+  let mockResultImpactAreasService: jest.Mocked<any>;
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -177,6 +179,13 @@ describe('ResultOicrService', () => {
       upsertByCompositeKeys: jest.fn().mockResolvedValue([]),
     } as any;
 
+    mockResultImpactAreasService = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultOicrService,
@@ -211,6 +220,10 @@ describe('ResultOicrService', () => {
         {
           provide: ResultNotableReferencesService,
           useValue: mockResultNotableReferencesService,
+        },
+        {
+          provide: ResultImpactAreasService,
+          useValue: mockResultImpactAreasService,
         },
       ],
     }).compile();
@@ -1057,6 +1070,7 @@ describe('ResultOicrService', () => {
         notable_references: [],
         for_external_use: true,
         for_external_use_description: 'Test description',
+        result_impact_areas: [],
       };
 
       const auditData = { updated_at: new Date() };
@@ -1120,6 +1134,7 @@ describe('ResultOicrService', () => {
         notable_references: [],
         for_external_use: false,
         for_external_use_description: '',
+        result_impact_areas: [],
       };
 
       const existingOicr = { id: 456, oicr_internal_code: 'EXISTING-CODE' };
@@ -1164,6 +1179,7 @@ describe('ResultOicrService', () => {
         notable_references: [],
         for_external_use: true,
         for_external_use_description: 'Test external use',
+        result_impact_areas: [],
       };
 
       const auditData = { updated_at: new Date() };
@@ -1231,6 +1247,7 @@ describe('ResultOicrService', () => {
         for_external_use: mockOicrEntity.for_external_use,
         for_external_use_description:
           mockOicrEntity.for_external_use_description,
+        result_impact_areas: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1277,6 +1294,7 @@ describe('ResultOicrService', () => {
         notable_references: [],
         for_external_use: undefined,
         for_external_use_description: undefined,
+        result_impact_areas: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(null);
@@ -1320,6 +1338,7 @@ describe('ResultOicrService', () => {
         for_external_use: mockOicrEntity.for_external_use,
         for_external_use_description:
           mockOicrEntity.for_external_use_description,
+        result_impact_areas: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);

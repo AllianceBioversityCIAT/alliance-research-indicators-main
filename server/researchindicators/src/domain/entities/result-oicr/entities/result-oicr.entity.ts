@@ -84,7 +84,7 @@ export class ResultOicr extends AuditableEntity {
   @Column({
     type: 'boolean',
     name: 'for_external_use',
-    default: true,
+    nullable: true,
   })
   for_external_use: boolean;
 

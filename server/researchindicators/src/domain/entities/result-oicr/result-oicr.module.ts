@@ -14,6 +14,7 @@ import { TempExternalOicrsModule } from '../temp_external_oicrs/temp_external_oi
 import { ResultContractsModule } from '../result-contracts/result-contracts.module';
 import { ResultQuantificationsModule } from '../result-quantifications/result-quantifications.module';
 import { ResultNotableReferencesModule } from '../result-notable-references/result-notable-references.module';
+import { ResultImpactAreasModule } from '../result-impact-areas/result-impact-areas.module';
 
 @Module({
   controllers: [ResultOicrController],
@@ -30,6 +31,7 @@ import { ResultNotableReferencesModule } from '../result-notable-references/resu
     ResultContractsModule,
     ResultQuantificationsModule,
     ResultNotableReferencesModule,
+    ResultImpactAreasModule,
   ],
   exports: [ResultOicrService, ResultOicrRepository],
 })
