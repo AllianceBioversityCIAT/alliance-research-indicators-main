@@ -41,6 +41,7 @@ import { ResultInstitutionAi } from '../../result-institutions/entities/result-i
 import { ResultUserAi } from '../../result-users/entities/result-user-ai.entity';
 import { ResultQuantification } from '../../result-quantifications/entities/result-quantification.entity';
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
+import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -313,4 +314,10 @@ export class Result extends AuditableEntity {
     (resultNotableReference) => resultNotableReference.result,
   )
   result_notable_references?: ResultNotableReference[];
+
+  @OneToMany(
+    () => ResultImpactArea,
+    (resultImpactArea) => resultImpactArea.result,
+  )
+  resultImpactAreas?: ResultImpactArea[];
 }

@@ -54,6 +54,7 @@ describe('ResultOicrController', () => {
         notable_references: [],
         for_external_use: true,
         for_external_use_description: 'For external use test',
+        result_impact_areas: [],
       };
       const serviceResult = { success: true };
       const expectedResult = {
@@ -90,6 +91,7 @@ describe('ResultOicrController', () => {
         notable_references: [],
         for_external_use: false,
         for_external_use_description: '',
+        result_impact_areas: [],
       };
       const serviceError = new Error('Service error');
 
@@ -126,6 +128,7 @@ describe('ResultOicrController', () => {
         notable_references: [],
         for_external_use: true,
         for_external_use_description: 'External use test 2',
+        result_impact_areas: [],
       };
       const expectedResult = { success: true };
 
@@ -158,6 +161,7 @@ describe('ResultOicrController', () => {
         notable_references: [],
         for_external_use: true,
         for_external_use_description: 'Service result test',
+        result_impact_areas: [],
       };
       const expectedResult = {
         data: serviceResult,
@@ -213,6 +217,7 @@ describe('ResultOicrController', () => {
         notable_references: [],
         for_external_use: false,
         for_external_use_description: '',
+        result_impact_areas: [],
       };
 
       mockResultOicrService.findOicrs.mockResolvedValue(expectedResult);

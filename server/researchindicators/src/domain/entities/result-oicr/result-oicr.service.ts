@@ -56,6 +56,7 @@ import { StaffGroupsEnum } from '../staff-groups/enum/staff-groups.enum';
 import { ResultQuantificationsService } from '../result-quantifications/result-quantifications.service';
 import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
 import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
+import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
 
 @Injectable()
 export class ResultOicrService {
@@ -77,6 +78,7 @@ export class ResultOicrService {
     private readonly resultContractService: ResultContractsService,
     private readonly resultQuantificationsService: ResultQuantificationsService,
     private readonly resultNotableReferencesService: ResultNotableReferencesService,
+    private readonly resultImpactAreasService: ResultImpactAreasService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -225,6 +227,15 @@ export class ResultOicrService {
       ['notable_reference_type_id', 'link'],
     );
 
+    await this.resultImpactAreasService.create(
+      resultId,
+      data?.result_impact_areas ?? [],
+      'impact_area_id',
+      undefined,
+      undefined,
+      ['impact_area_score_id'],
+    );
+
     await this.updateDataUtil.updateLastUpdatedDate(resultId);
   }
 
@@ -250,6 +261,9 @@ export class ResultOicrService {
         QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
       ]);
 
+    const result_impact_areas =
+      await this.resultImpactAreasService.find(resultId);
+
     const notable_references =
       await this.resultNotableReferencesService.find(resultId);
 
@@ -273,6 +287,7 @@ export class ResultOicrService {
       notable_references,
       for_external_use: oicr?.for_external_use,
       for_external_use_description: oicr?.for_external_use_description,
+      result_impact_areas,
     };
   }
 

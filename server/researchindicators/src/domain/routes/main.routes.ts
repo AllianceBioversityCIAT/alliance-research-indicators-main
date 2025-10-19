@@ -60,6 +60,7 @@ import { LeverStrategicOutcomeModule } from '../entities/lever-strategic-outcome
 import { NotableReferenceTypesModule } from '../entities/notable-reference-types/notable-reference-types.module';
 import { InformativeRolesModule } from '../entities/informative-roles/informative-roles.module';
 import { ResultUsersModule } from '../entities/result-users/result-users.module';
+import { ImpactAreaScoreModule } from '../entities/impact-area-score/impact-area-score.module';
 
 const capSharingChildren: Routes = [
   {
@@ -359,6 +360,10 @@ const children: Routes = [
   {
     path: 'result-user',
     module: ResultUsersModule,
+  },
+  {
+    path: 'impact-area-score',
+    module: ImpactAreaScoreModule,
   },
 ];
 

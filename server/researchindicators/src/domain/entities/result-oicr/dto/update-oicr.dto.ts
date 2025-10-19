@@ -3,6 +3,7 @@ import { ResultTag } from '../../result-tags/entities/result-tag.entity';
 import { TempResultExternalOicr } from '../../temp_external_oicrs/entities/temp_result_external_oicr.entity';
 import { ResultQuantification } from '../../result-quantifications/entities/result-quantification.entity';
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
+import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
 
 export class UpdateOicrDto {
   @ApiProperty({
@@ -54,4 +55,7 @@ export class UpdateOicrDto {
     type: String,
   })
   for_external_use_description: string;
+
+  @ApiProperty({ type: [ResultImpactArea] })
+  result_impact_areas: ResultImpactArea[];
 }

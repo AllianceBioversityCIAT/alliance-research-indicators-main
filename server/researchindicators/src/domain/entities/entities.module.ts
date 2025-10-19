@@ -83,6 +83,8 @@ import { QuantificationRolesModule } from './quantification-roles/quantification
 import { ResultNotableReferencesModule } from './result-notable-references/result-notable-references.module';
 import { NotableReferenceTypesModule } from './notable-reference-types/notable-reference-types.module';
 import { InformativeRolesModule } from './informative-roles/informative-roles.module';
+import { ResultImpactAreasModule } from './result-impact-areas/result-impact-areas.module';
+import { ImpactAreaScoreModule } from './impact-area-score/impact-area-score.module';
 
 @Module({
   imports: [
@@ -170,6 +172,8 @@ import { InformativeRolesModule } from './informative-roles/informative-roles.mo
     ResultNotableReferencesModule,
     NotableReferenceTypesModule,
     InformativeRolesModule,
+    ResultImpactAreasModule,
+    ImpactAreaScoreModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
