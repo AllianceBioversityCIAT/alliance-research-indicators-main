@@ -70,7 +70,7 @@ export const getTemplateByStatus = (
     },
     [ResultStatusEnum.OICR_APPROVED]: {
       template: TemplateEnum.OICR_APPROVED,
-      subject: `[${appConfig.ARI_MIS}] - Your OICR ${oicrNumber} has been approved`,
+      subject: `[${appConfig.ARI_MIS}] - Your OICR ${oicrNumber} request has been approved`,
     },
     [ResultStatusEnum.POSTPONE]: {
       template: TemplateEnum.OICR_POSTPONE,
