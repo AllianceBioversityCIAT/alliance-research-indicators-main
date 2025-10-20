@@ -614,7 +614,7 @@ export class ResultsService {
       );
 
       const primaryLevers: Partial<ResultLever>[] =
-        primary_levers?.length == 1
+        primary_levers?.length > 0
           ? primary_levers.map((el) => ({
               lever_id: el.lever_id,
               is_primary: true,

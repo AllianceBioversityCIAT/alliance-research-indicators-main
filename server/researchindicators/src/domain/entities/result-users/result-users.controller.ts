@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpStatus,
   Param,
   Post,
   UseInterceptors,
@@ -13,6 +14,8 @@ import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { SaveAuthorContcatDto } from './dto/save-author-contact.dto';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import { ResponseUtils } from '../../shared/utils/response.utils';
 
 @ApiTags('Result Users')
 @ApiBearerAuth()
@@ -26,31 +29,52 @@ export class ResultUsersController {
   ) {}
 
   @Get(`author-contact/by-result/${RESULT_CODE}`)
-  @ApiParam({ name: 'resultId', type: Number })
-  async findAuthorContactUserByResultId(@Param('resultId') resultId: number) {
-    return this.resultUsersService.findAuthorContactUserByResultId(resultId);
+  @GetResultVersion()
+  async findAuthorContactUserByResultId() {
+    return this.resultUsersService
+      .findAuthorContactUserByResultId(this._resultUtil.resultId)
+      .then((res) =>
+        ResponseUtils.format({
+          data: res,
+          description: 'Author contact user retrieved successfully',
+          status: HttpStatus.OK,
+        }),
+      );
   }
 
   @Post(`author-contact/save-by-result/${RESULT_CODE}`)
   @ApiParam({ name: 'resultId', type: Number })
   @ApiBody({ type: SaveAuthorContcatDto })
+  @GetResultVersion()
   async saveAuthorContactUserByResultId(@Body() data: SaveAuthorContcatDto) {
-    return this.resultUsersService.saveAuthorContactUserByResultId(
-      this._resultUtil.resultId,
-      data,
-    );
+    return this.resultUsersService
+      .saveAuthorContactUserByResultId(this._resultUtil.resultId, data)
+      .then((res) =>
+        ResponseUtils.format({
+          data: res,
+          description: 'Author contact user saved successfully',
+          status: HttpStatus.CREATED,
+        }),
+      );
   }
 
-  @Delete('author-contact/:resultUserId/by-result/:resultId')
+  @Delete(`author-contact/:resultUserId/by-result/${RESULT_CODE}`)
   @ApiParam({ name: 'resultUserId', type: Number })
-  @ApiParam({ name: 'resultId', type: Number })
+  @GetResultVersion()
   async deleteAuthorContactUserByResultId(
     @Param('resultUserId') resultUserId: number,
-    @Param('resultId') resultId: number,
   ) {
-    return this.resultUsersService.deleteAuthorContactByResultIdAndKey(
-      resultId,
-      resultUserId,
-    );
+    return this.resultUsersService
+      .deleteAuthorContactByResultIdAndKey(
+        this._resultUtil.resultId,
+        resultUserId,
+      )
+      .then((res) =>
+        ResponseUtils.format({
+          data: res,
+          description: 'Author contact user deleted successfully',
+          status: HttpStatus.OK,
+        }),
+      );
   }
 }
