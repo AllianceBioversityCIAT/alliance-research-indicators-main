@@ -74,7 +74,7 @@ export const getTemplateByStatus = (
     },
     [ResultStatusEnum.POSTPONE]: {
       template: TemplateEnum.OICR_POSTPONE,
-      subject: `[${appConfig.ARI_MIS}] - Your OICR ${oicrNumber} has been postponed`,
+      subject: `[${appConfig.ARI_MIS}] - Your OICR request has been postponed`,
     },
   };
 

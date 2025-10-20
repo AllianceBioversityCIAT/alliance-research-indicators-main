@@ -13,7 +13,7 @@ import {
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { MessageOicrDto } from '../dto/message-oicr.dto';
 import { formatString } from '../../../shared/utils/queries.util';
-import { format } from 'date-fns';
+import { format } from 'date-fns-tz';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -227,7 +227,7 @@ export class GreenCheckRepository {
 
   async oircData(
     resultId: number,
-    metadatos: { url: string },
+    metadatos: { url: string; historyId?: number },
   ): Promise<MessageOicrDto> {
     const query = `SELECT r.title,
                     ro.oicr_internal_code as oicr_number,
@@ -246,6 +246,7 @@ export class GreenCheckRepository {
                   LEFT JOIN alliance_user_staff aus ON aus.carnet = ro.mel_regional_expert
                   LEFT JOIN sec_users su ON su.sec_user_id = r.created_by 
                   LEFT JOIN submission_history sh ON sh.result_id = r.result_id 
+                                                  ${metadatos?.historyId ? `AND sh.submission_history_id = ${metadatos.historyId}` : ''}
                   LEFT JOIN sec_users su2 ON su2.sec_user_id = sh.created_by 
                   WHERE sh.is_active = TRUE
                     AND sh.from_status_id = 9
@@ -258,8 +259,9 @@ export class GreenCheckRepository {
 
     result.url = metadatos?.url;
     result.decision_date = format(
-      new Date(result.decision_date),
+      new Date(result.decision_date).toISOString(),
       "dd/MM/yyyy 'at' HH:mm",
+      { timeZone: 'Europe/Rome' },
     );
 
     return result;
