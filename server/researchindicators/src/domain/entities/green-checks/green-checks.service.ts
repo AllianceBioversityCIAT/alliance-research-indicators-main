@@ -106,6 +106,7 @@ export class GreenChecksService {
       resultStatusId,
       this._resultsUtil.statusId,
       body,
+      responseHistory,
     );
 
     return otherData ?? responseHistory;
@@ -342,7 +343,14 @@ export class GreenChecksService {
         ...this.currentUserUtil.audit(SetAutitEnum.NEW),
       });
 
-      return response;
+      const history = await manager.getRepository(SubmissionHistory).findOne({
+        where: {
+          submission_history_id:
+            response.identifiers?.[0].submission_history_id,
+        },
+      });
+
+      return history;
     });
   }
 
@@ -351,12 +359,14 @@ export class GreenChecksService {
     toStatusId: ResultStatusEnum,
     fromStatusId: ResultStatusEnum,
     templateName: TemplateEnum,
+    history?: SubmissionHistory,
   ) {
     let prepareData = null;
     if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
       prepareData = this.greenCheckRepository
         .oircData(resultId, {
           url: `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`,
+          historyId: history?.submission_history_id,
         })
         .then(async (data) => {
           const template = await this.templateService._getTemplate(
@@ -427,6 +437,7 @@ export class GreenChecksService {
     toStatusId: ResultStatusEnum,
     fromStatusId: ResultStatusEnum,
     body?: OptionalBody,
+    history?: SubmissionHistory,
   ) {
     let metadatos = null;
     if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
@@ -449,6 +460,7 @@ export class GreenChecksService {
       toStatusId,
       fromStatusId,
       emailConfig.template,
+      history,
     );
 
     await prepareData.then(({ data, template }) => {

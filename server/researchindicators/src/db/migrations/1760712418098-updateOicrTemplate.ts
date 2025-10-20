@@ -61,7 +61,6 @@ export class UpdateOicrTemplate1760712418098 implements MigrationInterface {
     </p>
     <br />
     <ul>
-      <li><b>OICR No.:</b> {{oicr_number}}</li>
       <li><b>OICR Title:</b> {{title}}</li>
       <li><b>Reviewer:</b> {{reviewed_by}}</li>
       <li><b>Decision Date:</b> {{decision_date}}</li>
