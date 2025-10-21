@@ -4,6 +4,7 @@ import { TempResultExternalOicr } from '../../temp_external_oicrs/entities/temp_
 import { ResultQuantification } from '../../result-quantifications/entities/result-quantification.entity';
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
 import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
+import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 
 export class UpdateOicrDto {
   @ApiProperty({
@@ -33,6 +34,16 @@ export class UpdateOicrDto {
     type: Number,
   })
   maturity_level_id: number;
+
+  @ApiProperty({
+    type: String,
+  })
+  sharepoint_link?: string;
+
+  @ApiProperty({
+    type: AllianceUserStaff,
+  })
+  mel_regional_expert?: AllianceUserStaff;
 
   @ApiProperty({ type: TempResultExternalOicr })
   link_result: Partial<TempResultExternalOicr>;

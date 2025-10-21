@@ -16,6 +16,7 @@ import { ResultQuantificationsModule } from '../result-quantifications/result-qu
 import { ResultNotableReferencesModule } from '../result-notable-references/result-notable-references.module';
 import { ResultImpactAreasModule } from '../result-impact-areas/result-impact-areas.module';
 import { ResultImpactAreaGlobalTargetsModule } from '../result-impact-area-global-targets/result-impact-area-global-targets.module';
+import { AllianceUserStaffGroupsModule } from '../alliance-user-staff-groups/alliance-user-staff-groups.module';
 
 @Module({
   controllers: [ResultOicrController],
@@ -34,6 +35,7 @@ import { ResultImpactAreaGlobalTargetsModule } from '../result-impact-area-globa
     ResultNotableReferencesModule,
     ResultImpactAreasModule,
     ResultImpactAreaGlobalTargetsModule,
+    AllianceUserStaffGroupsModule,
   ],
   exports: [ResultOicrService, ResultOicrRepository],
 })
