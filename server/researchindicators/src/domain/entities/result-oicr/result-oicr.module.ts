@@ -15,6 +15,7 @@ import { ResultContractsModule } from '../result-contracts/result-contracts.modu
 import { ResultQuantificationsModule } from '../result-quantifications/result-quantifications.module';
 import { ResultNotableReferencesModule } from '../result-notable-references/result-notable-references.module';
 import { ResultImpactAreasModule } from '../result-impact-areas/result-impact-areas.module';
+import { ResultImpactAreaGlobalTargetsModule } from '../result-impact-area-global-targets/result-impact-area-global-targets.module';
 
 @Module({
   controllers: [ResultOicrController],
@@ -32,6 +33,7 @@ import { ResultImpactAreasModule } from '../result-impact-areas/result-impact-ar
     ResultQuantificationsModule,
     ResultNotableReferencesModule,
     ResultImpactAreasModule,
+    ResultImpactAreaGlobalTargetsModule,
   ],
   exports: [ResultOicrService, ResultOicrRepository],
 })

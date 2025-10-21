@@ -40,6 +40,7 @@ import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import {
   filterByUniqueKeyWithPriority,
   mergeArraysWithPriority,
+  removeDuplicatesByKeys,
 } from '../../shared/utils/array.util';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
@@ -57,6 +58,7 @@ import { ResultQuantificationsService } from '../result-quantifications/result-q
 import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
 import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
 import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
+import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
 
 @Injectable()
 export class ResultOicrService {
@@ -79,6 +81,7 @@ export class ResultOicrService {
     private readonly resultQuantificationsService: ResultQuantificationsService,
     private readonly resultNotableReferencesService: ResultNotableReferencesService,
     private readonly resultImpactAreasService: ResultImpactAreasService,
+    private readonly resultImpactAreaGlobalTargetsService: ResultImpactAreaGlobalTargetsService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -227,14 +230,27 @@ export class ResultOicrService {
       ['notable_reference_type_id', 'link'],
     );
 
+    const impactToSave = removeDuplicatesByKeys(
+      data?.result_impact_areas ?? [],
+      ['impact_area_id'],
+    );
+
     await this.resultImpactAreasService.create(
       resultId,
-      data?.result_impact_areas ?? [],
+      impactToSave,
       'impact_area_id',
       undefined,
       undefined,
       ['impact_area_score_id'],
     );
+
+    for (const impactArea of impactToSave) {
+      await this.resultImpactAreaGlobalTargetsService.create(
+        impactArea.id,
+        impactArea?.result_impact_area_global_targets ?? [],
+        'global_target_id',
+      );
+    }
 
     await this.updateDataUtil.updateLastUpdatedDate(resultId);
   }
