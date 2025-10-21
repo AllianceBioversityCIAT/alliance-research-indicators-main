@@ -37,6 +37,7 @@ export class ResultImpactArea extends AuditableEntity {
   @Column({
     type: 'bigint',
     name: 'impact_area_score_id',
+    nullable: true,
   })
   @ApiProperty()
   impact_area_score_id: number;
