@@ -1081,7 +1081,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Updated general comment',
         maturity_level_id: 2,
         sharepoint_link: 'https://sharepoint.example.com/test',
-        mel_regional_expert: { user_id: 123 } as any,
+        mel_regional_expert_id: { user_id: 123 } as any,
         link_result: { external_oicr_id: 456 } as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1120,6 +1120,9 @@ describe('ResultOicrService', () => {
         maturity_level_id: updateData.maturity_level_id,
         for_external_use: updateData.for_external_use,
         for_external_use_description: updateData.for_external_use_description,
+        mel_regional_expert_id: updateData.mel_regional_expert_id,
+        mel_staff_group_id: 1,
+        sharepoint_link: updateData.sharepoint_link,
         ...auditData,
       });
 
@@ -1147,7 +1150,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Comment',
         maturity_level_id: 1,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         link_result: null as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1179,6 +1182,9 @@ describe('ResultOicrService', () => {
         maturity_level_id: updateData.maturity_level_id,
         for_external_use: updateData.for_external_use,
         for_external_use_description: updateData.for_external_use_description,
+        mel_regional_expert_id: updateData.mel_regional_expert_id,
+        mel_staff_group_id: 1,
+        sharepoint_link: updateData.sharepoint_link,
         ...auditData,
       });
     });
@@ -1194,7 +1200,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Comment',
         maturity_level_id: 1,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         link_result: undefined as any, // Test undefined handling
         actual_count: [],
         extrapolate_estimates: [],
@@ -1238,7 +1244,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Test general comment',
         maturity_level_id: 2,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         oicr_internal_code: 'OICR-2024-001',
         outcome_impact_statement: 'Test outcome statement',
         short_outcome_impact_statement: 'Short statement',
@@ -1264,8 +1270,7 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement:
           mockOicrEntity.short_outcome_impact_statement,
         sharepoint_link: mockOicrEntity.sharepoint_link,
-        mel_regional_expert:
-          mockOicrEntity.mel_regional_expert?.allianceUserStaff,
+        mel_regional_expert_id: mockOicrEntity.mel_regional_expert_id,
         tagging: mockTagging[0] as any,
         link_result: mockLinkResult[0] as any,
         actual_count: [],
@@ -1292,11 +1297,6 @@ describe('ResultOicrService', () => {
           is_active: true,
           result_id: resultId,
         },
-        relations: {
-          mel_regional_expert: {
-            allianceUserStaff: true,
-          },
-        },
       });
 
       expect(mockResultTagsService.find).toHaveBeenCalledWith(resultId);
@@ -1320,7 +1320,7 @@ describe('ResultOicrService', () => {
         outcome_impact_statement: undefined,
         short_outcome_impact_statement: undefined,
         sharepoint_link: undefined,
-        mel_regional_expert: undefined,
+        mel_regional_expert_id: undefined,
         tagging: mockTagging[0] as any,
         link_result: mockLinkResult[0] as any,
         actual_count: [],
@@ -1354,7 +1354,7 @@ describe('ResultOicrService', () => {
         outcome_impact_statement: 'Test statement',
         short_outcome_impact_statement: 'Short statement',
         sharepoint_link: null,
-        mel_regional_expert: null,
+        mel_regional_expert_id: null,
         for_external_use: false,
         for_external_use_description: '',
       };
@@ -1367,7 +1367,7 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement:
           mockOicrEntity.short_outcome_impact_statement,
         sharepoint_link: mockOicrEntity.sharepoint_link,
-        mel_regional_expert: undefined, // Service returns allianceUserStaff property
+        mel_regional_expert_id: null, // Service returns allianceUserStaff property
         tagging: undefined as any,
         link_result: undefined as any,
         actual_count: [],
@@ -1669,7 +1669,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Test comment',
         maturity_level_id: 1,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         link_result: null as any,
         actual_count: [
           {
@@ -1741,7 +1741,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Test comment',
         maturity_level_id: 2,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         link_result: null as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1791,7 +1791,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Test comment',
         maturity_level_id: 3,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         link_result: null as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1879,7 +1879,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Available for collaboration',
         maturity_level_id: 4,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         link_result: null as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1907,6 +1907,9 @@ describe('ResultOicrService', () => {
         maturity_level_id: updateData.maturity_level_id,
         for_external_use: true,
         for_external_use_description: updateData.for_external_use_description,
+        mel_regional_expert_id: updateData.mel_regional_expert_id,
+        mel_staff_group_id: 1,
+        sharepoint_link: updateData.sharepoint_link,
         updated_at: expect.any(Date),
       });
     });
@@ -1922,7 +1925,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Test comment',
         maturity_level_id: 1,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         link_result: null as any,
         actual_count: null as any, // Test null handling
         extrapolate_estimates: undefined as any, // Test undefined handling
@@ -1985,7 +1988,7 @@ describe('ResultOicrService', () => {
         general_comment: 'Comprehensive test comment',
         maturity_level_id: 3,
         sharepoint_link: null as any,
-        mel_regional_expert: null as any,
+        mel_regional_expert_id: null as any,
         oicr_internal_code: 'COMP-TEST-001',
         outcome_impact_statement: 'Comprehensive outcome statement',
         short_outcome_impact_statement: 'Short comprehensive statement',
