@@ -15,6 +15,7 @@ export enum ClarisaPathEnum {
   VALIDATE_SECRET = 'api/app-secrets/validate',
   SDG = 'api/sdgs',
   IMPACT_AREAS = 'api/impact-areas',
+  GLOBAL_TARGETS = 'api/global-targets',
 }
 
 export enum SearchToOpenSearchEnum {
