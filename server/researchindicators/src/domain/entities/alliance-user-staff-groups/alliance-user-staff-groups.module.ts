@@ -5,5 +5,6 @@ import { AllianceUserStaffGroupsController } from './alliance-user-staff-groups.
 @Module({
   controllers: [AllianceUserStaffGroupsController],
   providers: [AllianceUserStaffGroupsService],
+  exports: [AllianceUserStaffGroupsService],
 })
 export class AllianceUserStaffGroupsModule {}

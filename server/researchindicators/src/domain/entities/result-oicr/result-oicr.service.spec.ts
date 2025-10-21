@@ -194,6 +194,7 @@ describe('ResultOicrService', () => {
       create: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
+      findByResultImpactAreaIds: jest.fn().mockResolvedValue([]),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -1078,6 +1079,8 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Updated short statement',
         general_comment: 'Updated general comment',
         maturity_level_id: 2,
+        sharepoint_link: 'https://sharepoint.example.com/test',
+        mel_regional_expert: { user_id: 123 } as any,
         link_result: { external_oicr_id: 456 } as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1142,6 +1145,8 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Comment',
         maturity_level_id: 1,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         link_result: null as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1187,6 +1192,8 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Comment',
         maturity_level_id: 1,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         link_result: undefined as any, // Test undefined handling
         actual_count: [],
         extrapolate_estimates: [],
@@ -1229,6 +1236,8 @@ describe('ResultOicrService', () => {
       const mockOicrEntity = {
         general_comment: 'Test general comment',
         maturity_level_id: 2,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         oicr_internal_code: 'OICR-2024-001',
         outcome_impact_statement: 'Test outcome statement',
         short_outcome_impact_statement: 'Short statement',
@@ -1253,6 +1262,9 @@ describe('ResultOicrService', () => {
         outcome_impact_statement: mockOicrEntity.outcome_impact_statement,
         short_outcome_impact_statement:
           mockOicrEntity.short_outcome_impact_statement,
+        sharepoint_link: mockOicrEntity.sharepoint_link,
+        mel_regional_expert:
+          mockOicrEntity.mel_regional_expert?.allianceUserStaff,
         tagging: mockTagging[0] as any,
         link_result: mockLinkResult[0] as any,
         actual_count: [],
@@ -1279,6 +1291,11 @@ describe('ResultOicrService', () => {
           is_active: true,
           result_id: resultId,
         },
+        relations: {
+          mel_regional_expert: {
+            allianceUserStaff: true,
+          },
+        },
       });
 
       expect(mockResultTagsService.find).toHaveBeenCalledWith(resultId);
@@ -1301,6 +1318,8 @@ describe('ResultOicrService', () => {
         oicr_internal_code: undefined,
         outcome_impact_statement: undefined,
         short_outcome_impact_statement: undefined,
+        sharepoint_link: undefined,
+        mel_regional_expert: undefined,
         tagging: mockTagging[0] as any,
         link_result: mockLinkResult[0] as any,
         actual_count: [],
@@ -1333,6 +1352,8 @@ describe('ResultOicrService', () => {
         oicr_internal_code: 'TEST-001',
         outcome_impact_statement: 'Test statement',
         short_outcome_impact_statement: 'Short statement',
+        sharepoint_link: null,
+        mel_regional_expert: null,
         for_external_use: false,
         for_external_use_description: '',
       };
@@ -1344,6 +1365,8 @@ describe('ResultOicrService', () => {
         outcome_impact_statement: mockOicrEntity.outcome_impact_statement,
         short_outcome_impact_statement:
           mockOicrEntity.short_outcome_impact_statement,
+        sharepoint_link: mockOicrEntity.sharepoint_link,
+        mel_regional_expert: undefined, // Service returns allianceUserStaff property
         tagging: undefined as any,
         link_result: undefined as any,
         actual_count: [],
@@ -1644,6 +1667,8 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short outcome',
         general_comment: 'Test comment',
         maturity_level_id: 1,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         link_result: null as any,
         actual_count: [
           {
@@ -1714,6 +1739,8 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short outcome',
         general_comment: 'Test comment',
         maturity_level_id: 2,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         link_result: null as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1762,6 +1789,8 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short outcome',
         general_comment: 'Test comment',
         maturity_level_id: 3,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         link_result: null as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1834,6 +1863,8 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short external outcome',
         general_comment: 'Available for collaboration',
         maturity_level_id: 4,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         link_result: null as any,
         actual_count: [],
         extrapolate_estimates: [],
@@ -1875,6 +1906,8 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short outcome',
         general_comment: 'Test comment',
         maturity_level_id: 1,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         link_result: null as any,
         actual_count: null as any, // Test null handling
         extrapolate_estimates: undefined as any, // Test undefined handling
@@ -1936,6 +1969,8 @@ describe('ResultOicrService', () => {
       const mockOicrEntity = {
         general_comment: 'Comprehensive test comment',
         maturity_level_id: 3,
+        sharepoint_link: null as any,
+        mel_regional_expert: null as any,
         oicr_internal_code: 'COMP-TEST-001',
         outcome_impact_statement: 'Comprehensive outcome statement',
         short_outcome_impact_statement: 'Short comprehensive statement',

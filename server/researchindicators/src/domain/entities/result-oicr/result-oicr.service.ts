@@ -261,6 +261,11 @@ export class ResultOicrService {
         is_active: true,
         result_id: resultId,
       },
+      relations: {
+        mel_regional_expert: {
+          allianceUserStaff: true,
+        },
+      },
     });
 
     const tagging = await this.resultTagsService
@@ -280,6 +285,17 @@ export class ResultOicrService {
     const result_impact_areas =
       await this.resultImpactAreasService.find(resultId);
 
+    const globalTargets =
+      await this.resultImpactAreaGlobalTargetsService.findByResultImpactAreaIds(
+        result_impact_areas.map((ri) => ri.id),
+      );
+
+    result_impact_areas.forEach((ria) => {
+      ria.result_impact_area_global_targets = globalTargets.filter(
+        (gt) => gt.result_impact_area_id === ria.id,
+      );
+    });
+
     const notable_references =
       await this.resultNotableReferencesService.find(resultId);
 
@@ -291,6 +307,8 @@ export class ResultOicrService {
       short_outcome_impact_statement: oicr?.short_outcome_impact_statement,
       tagging,
       link_result,
+      sharepoint_link: oicr?.sharepoint_link,
+      mel_regional_expert: oicr?.mel_regional_expert?.allianceUserStaff,
       actual_count: quantifications?.filter(
         (q) =>
           q.quantification_role_id === QuantificationRolesEnum.ACTUAL_COUNT,

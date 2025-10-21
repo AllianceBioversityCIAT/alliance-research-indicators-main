@@ -22,7 +22,7 @@ export class CreateInformativeRoles1760728368286 implements MigrationInterface {
       `INSERT INTO \`informative_roles\` (id, name) VALUES (${InformativeRolesEnum.AUTHOR}, 'Author'), (${InformativeRolesEnum.CONTACT_PERSON}, 'Contact Person'), (${InformativeRolesEnum.BOTH}, 'Both');`,
     );
     await queryRunner.query(
-      `INSERT INTO \`user_roles\` (user_role_id, name) VALUES (${UserRolesEnum.AUTORS_CONTACT}, 'Informative Role Author');`,
+      `INSERT INTO \`user_roles\` (user_role_id, name) VALUES (${UserRolesEnum.AUTHORS_CONTACT}, 'Informative Role Author');`,
     );
   }
 

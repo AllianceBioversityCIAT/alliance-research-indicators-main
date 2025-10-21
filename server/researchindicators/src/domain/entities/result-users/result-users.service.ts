@@ -37,7 +37,7 @@ export class ResultUsersService extends BaseServiceSimple<
     return this.mainRepo.findOne({
       where: {
         result_id: resultId,
-        user_role_id: UserRolesEnum.AUTORS_CONTACT,
+        user_role_id: UserRolesEnum.AUTHORS_CONTACT,
         is_active: true,
       },
       relations: {
@@ -52,7 +52,7 @@ export class ResultUsersService extends BaseServiceSimple<
       {
         result_user_id: key,
         result_id: resultId,
-        user_role_id: UserRolesEnum.AUTORS_CONTACT,
+        user_role_id: UserRolesEnum.AUTHORS_CONTACT,
       },
       { is_active: false, ...this.currentUser.audit(SetAutitEnum.UPDATE) },
     );
@@ -71,7 +71,7 @@ export class ResultUsersService extends BaseServiceSimple<
         where: {
           result_id: resultId,
           user_id: targetUserId,
-          user_role_id: UserRolesEnum.AUTORS_CONTACT,
+          user_role_id: UserRolesEnum.AUTHORS_CONTACT,
           is_active: true,
         },
       });
@@ -190,7 +190,7 @@ export class ResultUsersService extends BaseServiceSimple<
       where: {
         result_id: resultId,
         user_id: targetUserId,
-        user_role_id: UserRolesEnum.AUTORS_CONTACT,
+        user_role_id: UserRolesEnum.AUTHORS_CONTACT,
         informative_role_id: informativeRoleId,
       },
     });
@@ -210,7 +210,7 @@ export class ResultUsersService extends BaseServiceSimple<
       const newRole = repository.create({
         result_id: resultId,
         user_id: targetUserId,
-        user_role_id: UserRolesEnum.AUTORS_CONTACT,
+        user_role_id: UserRolesEnum.AUTHORS_CONTACT,
         informative_role_id: informativeRoleId,
         is_active: true,
         ...this.currentUser.audit(SetAutitEnum.NEW),
