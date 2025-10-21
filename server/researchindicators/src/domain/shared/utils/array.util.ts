@@ -171,4 +171,19 @@ export const filterByUniqueKeyWithPriority = <T>(
   return Array.from(map.values());
 };
 
+export const removeDuplicatesByKeys = <T>(
+  array: T[],
+  keys: (keyof T)[],
+): T[] => {
+  const seen = new Set();
+  return array.filter((item) => {
+    const compositeKey = keys.map((key) => item[key]).join('|');
+    if (seen.has(compositeKey)) {
+      return false;
+    }
+    seen.add(compositeKey);
+    return true;
+  });
+};
+
 export type ArrayType<T> = T extends (infer U)[] ? U : T;

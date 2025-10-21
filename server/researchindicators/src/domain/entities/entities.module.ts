@@ -80,6 +80,7 @@ import { NotableReferenceTypesModule } from './notable-reference-types/notable-r
 import { InformativeRolesModule } from './informative-roles/informative-roles.module';
 import { ResultImpactAreasModule } from './result-impact-areas/result-impact-areas.module';
 import { ImpactAreaScoreModule } from './impact-area-score/impact-area-score.module';
+import { ResultImpactAreaGlobalTargetsModule } from './result-impact-area-global-targets/result-impact-area-global-targets.module';
 
 @Module({
   imports: [
@@ -164,6 +165,7 @@ import { ImpactAreaScoreModule } from './impact-area-score/impact-area-score.mod
     InformativeRolesModule,
     ResultImpactAreasModule,
     ImpactAreaScoreModule,
+    ResultImpactAreaGlobalTargetsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
