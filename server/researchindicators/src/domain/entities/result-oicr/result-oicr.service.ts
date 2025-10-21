@@ -190,6 +190,11 @@ export class ResultOicrService {
       maturity_level_id: data?.maturity_level_id,
       for_external_use: data?.for_external_use,
       for_external_use_description: data?.for_external_use_description,
+      mel_regional_expert_id: data?.mel_regional_expert_id,
+      mel_staff_group_id: StaffGroupsEnum.MEL_REGIONAL_EXPERT,
+      sharepoint_link: isEmpty(data?.sharepoint_link?.trim())
+        ? null
+        : data.sharepoint_link,
       ...this.currentUser.audit(SetAutitEnum.UPDATE),
     });
 
@@ -271,11 +276,6 @@ export class ResultOicrService {
         is_active: true,
         result_id: resultId,
       },
-      relations: {
-        mel_regional_expert: {
-          allianceUserStaff: true,
-        },
-      },
     });
 
     const tagging = await this.resultTagsService
@@ -318,7 +318,7 @@ export class ResultOicrService {
       tagging,
       link_result,
       sharepoint_link: oicr?.sharepoint_link,
-      mel_regional_expert: oicr?.mel_regional_expert?.allianceUserStaff,
+      mel_regional_expert_id: oicr?.mel_regional_expert_id,
       actual_count: quantifications?.filter(
         (q) =>
           q.quantification_role_id === QuantificationRolesEnum.ACTUAL_COUNT,

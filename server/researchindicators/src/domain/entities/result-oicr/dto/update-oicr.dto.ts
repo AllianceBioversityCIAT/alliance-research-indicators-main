@@ -43,7 +43,7 @@ export class UpdateOicrDto {
   @ApiProperty({
     type: AllianceUserStaff,
   })
-  mel_regional_expert?: AllianceUserStaff;
+  mel_regional_expert_id?: string;
 
   @ApiProperty({ type: TempResultExternalOicr })
   link_result: Partial<TempResultExternalOicr>;
