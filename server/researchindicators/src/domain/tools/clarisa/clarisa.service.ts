@@ -31,6 +31,7 @@ import { ClarisaInstitutionLocation } from './entities/clarisa-institution-locat
 import { ClarisaSdg } from './entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 import { ResClarisaValidateConectioDto } from './dto/clarisa-create-conection.dto';
 import { ClarisaImpactArea } from './entities/clarisa-impact-areas/entities/clarisa-impact-area.entity';
+import { ClarisaGlobalTarget } from './entities/clarisa-global-targets/entities/clarisa-global-target.entity';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -93,6 +94,11 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
    */
   async cloneAllClarisaEntities(): Promise<void> {
     this._logger.debug('Cloning all entities from Clarisa API');
+
+    await this.base<ClarisaGlobalTarget>(
+      ClarisaPathEnum.GLOBAL_TARGETS,
+      ClarisaGlobalTarget,
+    );
 
     await this.base<ClarisaImpactArea>(
       ClarisaPathEnum.IMPACT_AREAS,
