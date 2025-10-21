@@ -184,7 +184,7 @@ describe('ResultOicrService', () => {
 
     mockResultImpactAreasService = {
       find: jest.fn().mockResolvedValue([]),
-      create: jest.fn(),
+      create: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
       remove: jest.fn(),
     } as any;
@@ -195,6 +195,7 @@ describe('ResultOicrService', () => {
       update: jest.fn(),
       remove: jest.fn(),
       findByResultImpactAreaIds: jest.fn().mockResolvedValue([]),
+      disableAllByResultId: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -1822,6 +1823,20 @@ describe('ResultOicrService', () => {
       mockResultTagsService.create.mockResolvedValue(undefined);
       mockTempExternalOicrsService.create.mockResolvedValue(undefined);
       mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      // Mock the create method to return the saved impact areas
+      mockResultImpactAreasService.create.mockResolvedValue([
+        {
+          id: mockImpactAreaId,
+          impact_area_id: 1,
+          impact_area_score_id: 2,
+        },
+        {
+          id: 102,
+          impact_area_id: 2,
+          impact_area_score_id: 1,
+        },
+      ]);
 
       // Act
       await service.updateOicr(resultId, updateData);

@@ -235,7 +235,7 @@ export class ResultOicrService {
       ['impact_area_id'],
     );
 
-    await this.resultImpactAreasService.create(
+    const savedImpactAreas = await this.resultImpactAreasService.create(
       resultId,
       impactToSave,
       'impact_area_id',
@@ -244,7 +244,17 @@ export class ResultOicrService {
       ['impact_area_score_id'],
     );
 
-    for (const impactArea of impactToSave) {
+    savedImpactAreas.forEach((impactArea) => {
+      impactArea.result_impact_area_global_targets = impactToSave.find(
+        (ia) => ia.impact_area_id === impactArea.impact_area_id,
+      )?.result_impact_area_global_targets;
+    });
+
+    await this.resultImpactAreaGlobalTargetsService.disableAllByResultId(
+      resultId,
+    );
+
+    for (const impactArea of savedImpactAreas) {
       await this.resultImpactAreaGlobalTargetsService.create(
         impactArea.id,
         impactArea?.result_impact_area_global_targets ?? [],
