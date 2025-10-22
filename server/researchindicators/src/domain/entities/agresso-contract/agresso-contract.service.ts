@@ -68,7 +68,7 @@ export class AgressoContractService {
   ) {
     return this._agressoContractRepository.getContracts(
       filter,
-      onlyCurrentUser == TrueFalseEnum.TRUE ? this.currentUser.user_id : null,
+      onlyCurrentUser == TrueFalseEnum.TRUE ? this.currentUser.user : null,
       orderFields,
       direction,
       pagination,
