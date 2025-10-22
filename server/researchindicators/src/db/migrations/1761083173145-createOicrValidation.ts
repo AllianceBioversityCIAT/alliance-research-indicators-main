@@ -74,7 +74,7 @@ export class CreateOicrValidation1761083173145 implements MigrationInterface {
                                     LEFT JOIN result_impact_area_global_target riagt ON riagt.result_impact_area_id = ria.id
                                                                                     AND riagt.is_active = TRUE
                                     WHERE ria.result_id = result_code
-                                        AND ria.impact_area_score_id = 2
+                                        AND ria.impact_area_score_id = 3
                                     GROUP BY ria.id) temp;
                                         
                                     RETURN general_validation;     

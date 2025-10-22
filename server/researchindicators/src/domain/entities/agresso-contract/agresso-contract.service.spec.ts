@@ -39,6 +39,7 @@ describe('AgressoContractService', () => {
 
   const mockCurrentUser = {
     user_id: 123,
+    user: { sec_user_id: 123 } as any,
     getUserId: jest.fn().mockReturnValue(123),
   };
 
@@ -300,7 +301,7 @@ describe('AgressoContractService', () => {
 
       expect(repository.getContracts).toHaveBeenCalledWith(
         filter,
-        currentUser.user_id,
+        currentUser.user,
         OrderFieldsEnum.START_DATE,
         'DESC',
         undefined,
@@ -376,7 +377,7 @@ describe('AgressoContractService', () => {
 
       expect(repository.getContracts).toHaveBeenCalledWith(
         undefined,
-        currentUser.user_id,
+        currentUser.user,
         undefined,
         'ASC',
         undefined,

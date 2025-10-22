@@ -14,6 +14,7 @@ import {
   escapeLikeString,
   isValidText,
 } from '../../../shared/utils/query-sanitizer.util';
+import { User } from '../../../complementary-entities/secondary/user/user.entity';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -234,7 +235,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
 
   async getContracts(
     filter?: Record<string, any>,
-    userId?: number,
+    user?: User,
     orderFields?: OrderFieldsEnum,
     direction?: 'ASC' | 'DESC',
     pagination?: { page: number; limit: number },
@@ -285,11 +286,10 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     const userContracts = (userId?: number) =>
       userId
         ? `
-    INNER JOIN result_contracts rc ON rc.contract_id = ac.agreement_id AND rc.is_active = 1
-    INNER JOIN results r ON r.result_id = rc.result_id 
+    LEFT JOIN result_contracts rc ON rc.contract_id = ac.agreement_id AND rc.is_active = 1
+    LEFT JOIN results r ON r.result_id = rc.result_id 
         AND r.is_active = 1 
         AND r.is_snapshot = FALSE 
-        AND r.created_by = ${userId}
     `
         : '';
 
@@ -300,8 +300,9 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     FROM agresso_contracts ac
     LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
         IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
-        ${userContracts(userId)}
+        ${userContracts(user?.sec_user_id)}
     WHERE 1=1
+    ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR (ac.project_lead_description like '%${user.first_name}%' AND ac.project_lead_description like '%${user.last_name}%'))` : ''}
     ${validFilter(queryConditions, `AND (${queryConditions})`)}
     ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter.contract_code}'`)}
     ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter.project_name}%'`)}
@@ -359,8 +360,9 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         FROM agresso_contracts ac
         LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
-        ${userContracts(userId)}
+        ${userContracts(user?.sec_user_id)}
         WHERE 1=1
+        ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR (ac.project_lead_description like '%${user.first_name}%' AND ac.project_lead_description like '%${user.last_name}%'))` : ''}
         ${validFilter(queryConditions, `AND (${queryConditions})`)}
         ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter?.contract_code}'`)}
         ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter?.project_name}%'`)}
@@ -371,7 +373,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         ${orderBy}
         ${!isEmpty(offset) ? `LIMIT ${pagination.limit} OFFSET ${offset}` : ''}
     ) paginated_contracts
-    ${userId ? 'INNER' : 'LEFT'} JOIN (
+    LEFT JOIN (
         SELECT 
             rc.contract_id,
             r.indicator_id,
@@ -381,7 +383,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         WHERE r.is_active = 1 
           AND r.is_snapshot = FALSE 
           AND rc.is_active = 1
-          ${userId ? `AND r.created_by = ${userId}` : ''}
+          ${user?.sec_user_id ? `AND r.created_by = ${user?.sec_user_id}` : ''}
         GROUP BY rc.contract_id, r.indicator_id
         HAVING COUNT(r.result_id) > 0 
     ) result_counts ON result_counts.contract_id = paginated_contracts.agreement_id;

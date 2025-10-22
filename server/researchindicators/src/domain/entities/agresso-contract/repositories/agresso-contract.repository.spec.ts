@@ -478,7 +478,7 @@ describe('AgressoContractRepository', () => {
           AgressoContractStatus.COMPLETED,
         ],
       };
-      const userId = 123;
+      const userId = { sec_user_id: 123 } as any;
       const orderFields = OrderFieldsEnum.START_DATE;
       const direction = 'DESC';
 
@@ -552,13 +552,13 @@ describe('AgressoContractRepository', () => {
     });
 
     it('should include user filter when userId is provided', async () => {
-      const userId = 456;
+      const userId = { sec_user_id: 456 } as any;
       (repository.query as jest.Mock).mockResolvedValue([]);
 
       await repository.getContracts({}, userId);
 
       expect(repository.query).toHaveBeenCalledWith(
-        expect.stringContaining(`AND r.created_by = ${userId}`),
+        expect.stringContaining(`AND r.created_by = ${userId.sec_user_id}`),
       );
     });
 
