@@ -58,6 +58,10 @@ export class GreenCheckRepository {
     return `innovation_dev_validation(${result_key}) as innovation_dev`;
   }
 
+  oicrValidation(result_key: string) {
+    return `oicr_validation(${result_key}) as oicr`;
+  }
+
   async calculateGreenChecks(result_id: number): Promise<FindGreenChecksDto> {
     const indicator: IndicatorsEnum = await this.dataSource
       .getRepository(Result)
@@ -73,16 +77,16 @@ export class GreenCheckRepository {
     const result_key = 'r.result_id';
     switch (indicator) {
       case IndicatorsEnum.POLICY_CHANGE:
-        spesificQuery = this.policyChangeValidation(result_key);
+        spesificQuery += `,${this.policyChangeValidation(result_key)}`;
         break;
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
-        spesificQuery = this.capSharingValidation(result_key);
+        spesificQuery += `,${this.capSharingValidation(result_key)}`;
         break;
       case IndicatorsEnum.INNOVATION_DEV:
-        spesificQuery = this.innovationDevValidation(result_key);
+        spesificQuery += `,${this.innovationDevValidation(result_key)}`;
         break;
       case IndicatorsEnum.OICR:
-        spesificQuery = `1 as oicr`;
+        spesificQuery += `,${this.oicrValidation(result_key)}`;
         break;
     }
 
@@ -97,11 +101,11 @@ export class GreenCheckRepository {
 
     const query = `
             SELECT
-                ${this.generalInformationValidation(result_key)},
-                ${this.alignmentValidation(result_key)},
-                ${this.geoLocationValidation(result_key)},
-                ${this.partnersValidation(result_key)},
-                ${this.evidencesValidation(result_key)},
+                ${this.generalInformationValidation(result_key)}
+                ,${this.alignmentValidation(result_key)}
+                ,${this.geoLocationValidation(result_key)}
+                ,${this.partnersValidation(result_key)}
+                ,${this.evidencesValidation(result_key)}
                 ${spesificQuery}
             FROM results r
             WHERE r.result_id = ?
