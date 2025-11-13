@@ -34,7 +34,7 @@ export class ResultUsersService extends BaseServiceSimple<
   }
 
   async findAuthorContactUserByResultId(resultId: number) {
-    return this.mainRepo.findOne({
+    return this.mainRepo.find({
       where: {
         result_id: resultId,
         user_role_id: UserRolesEnum.AUTHORS_CONTACT,
