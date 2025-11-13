@@ -187,7 +187,7 @@ export class GreenChecksService {
     status: ResultStatusEnum,
     currentStatus: ResultStatusEnum,
     body?: OptionalBody,
-  ): Promise<any | null> {
+  ): Promise<Result> {
     if (status === ResultStatusEnum.APPROVED) {
       return this.greenCheckRepository.createSnapshot(
         this._resultsUtil.resultCode,

@@ -1,4 +1,5 @@
 import { AuditableEntity } from '../global-dto/auditable.entity';
+import { isEmpty } from './object.utils';
 
 /**
  *
@@ -177,7 +178,17 @@ export const removeDuplicatesByKeys = <T>(
 ): T[] => {
   const seen = new Set();
   return array.filter((item) => {
-    const compositeKey = keys.map((key) => item[key]).join('|');
+    const compositeKey = keys
+      .map((key) => {
+        const value = item[key];
+        if (isEmpty(value)) {
+          return '';
+        }
+        return typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value);
+      })
+      .join('|');
     if (seen.has(compositeKey)) {
       return false;
     }

@@ -193,7 +193,7 @@ export class CgiarLogger extends Logger {
     const methodMatch = methodOnlyPattern.exec(line);
 
     if (methodMatch) {
-      const filePathPattern = /\/([^\/]+)\.ts:/;
+      const filePathPattern = /\/([^/]+)\.ts:/;
       const fileMatch = filePathPattern.exec(line);
       const className = fileMatch ? fileMatch[1] : 'UnknownClass';
       const methodName = methodMatch[1] || 'UnknownMethod';
