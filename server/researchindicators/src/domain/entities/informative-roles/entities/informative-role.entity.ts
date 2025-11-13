@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ResultUser } from '../../result-users/entities/result-user.entity';
 
@@ -17,6 +17,6 @@ export class InformativeRole extends AuditableEntity {
   })
   name: string;
 
-  @ManyToOne(() => ResultUser, (resultUser) => resultUser.informativeRole)
+  @OneToMany(() => ResultUser, (resultUser) => resultUser.informativeRole)
   result_users!: ResultUser[];
 }
