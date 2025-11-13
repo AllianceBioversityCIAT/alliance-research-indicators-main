@@ -42,7 +42,7 @@ export class ResultUsersService extends BaseServiceSimple<
       },
       relations: {
         user: true,
-        role: true,
+        informativeRole: true,
       },
     });
   }
