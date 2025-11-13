@@ -43,7 +43,6 @@ export class ResultUsersController {
   }
 
   @Post(`author-contact/save-by-result/${RESULT_CODE}`)
-  @ApiParam({ name: 'resultId', type: Number })
   @ApiBody({ type: SaveAuthorContcatDto })
   @GetResultVersion()
   async saveAuthorContactUserByResultId(@Body() data: SaveAuthorContcatDto) {
