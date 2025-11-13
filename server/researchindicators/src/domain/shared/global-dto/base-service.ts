@@ -364,7 +364,12 @@ export abstract class BaseServiceSimple<
       return compositeKeys
         .map((key) => {
           const value = item[key];
-          return value !== null && value !== undefined ? String(value) : '';
+          if (isEmpty(value)) {
+            return '';
+          }
+          return typeof value === 'object'
+            ? JSON.stringify(value)
+            : String(value);
         })
         .join('|');
     };

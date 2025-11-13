@@ -65,12 +65,10 @@ export class ResultUsersService extends BaseServiceSimple<
     return await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(ResultUser);
 
-      const targetUserId = body.user_id;
-
       const existingRoles = await repository.find({
         where: {
           result_id: resultId,
-          user_id: targetUserId,
+          user_id: body.user_id,
           user_role_id: UserRolesEnum.AUTHORS_CONTACT,
           is_active: true,
         },
@@ -78,106 +76,169 @@ export class ResultUsersService extends BaseServiceSimple<
 
       const newInformativeRole = body.informative_role_id;
 
-      const existingInformativeRoles = existingRoles.map(
-        (role) => role.informative_role_id,
-      );
-
       if (newInformativeRole === InformativeRolesEnum.BOTH) {
-        const hasBothActive = existingInformativeRoles.includes(
-          InformativeRolesEnum.BOTH,
-        );
-
-        if (hasBothActive) {
-          return existingRoles.find(
-            (role) => role.informative_role_id === InformativeRolesEnum.BOTH,
-          );
-        }
-
-        const individualRoles = existingRoles.filter(
-          (role) => role.informative_role_id !== InformativeRolesEnum.BOTH,
-        );
-
-        if (individualRoles.length > 0) {
-          const individualRoleIds = individualRoles.map(
-            (role) => role.result_user_id,
-          );
-          await repository.update(individualRoleIds, { is_active: false });
-        }
-
-        return await this.upsertAuthorContactRole(
+        return await this.handleBothRole(
           repository,
           resultId,
-          targetUserId,
-          InformativeRolesEnum.BOTH,
+          body.user_id,
+          existingRoles,
         );
-      } else if (
+      }
+
+      if (
         newInformativeRole === InformativeRolesEnum.AUTHOR ||
         newInformativeRole === InformativeRolesEnum.CONTACT_PERSON
       ) {
-        const hasAuthor = existingInformativeRoles.includes(
-          InformativeRolesEnum.AUTHOR,
+        return await this.handleIndividualRole(
+          repository,
+          resultId,
+          body.user_id,
+          newInformativeRole,
+          existingRoles,
         );
-        const hasContact = existingInformativeRoles.includes(
-          InformativeRolesEnum.CONTACT_PERSON,
-        );
-        const hasBoth = existingInformativeRoles.includes(
-          InformativeRolesEnum.BOTH,
-        );
-
-        if (hasBoth) {
-          const bothRole = existingRoles.find(
-            (role) => role.informative_role_id === InformativeRolesEnum.BOTH,
-          );
-
-          if (bothRole) {
-            await repository.update(bothRole.result_user_id, {
-              is_active: false,
-            });
-          }
-
-          return await this.upsertAuthorContactRole(
-            repository,
-            resultId,
-            targetUserId,
-            newInformativeRole,
-          );
-        }
-
-        const wouldHaveBothRoles =
-          (newInformativeRole === InformativeRolesEnum.AUTHOR && hasContact) ||
-          (newInformativeRole === InformativeRolesEnum.CONTACT_PERSON &&
-            hasAuthor);
-
-        if (wouldHaveBothRoles) {
-          const individualRoles = existingRoles.filter(
-            (role) => role.informative_role_id !== InformativeRolesEnum.BOTH,
-          );
-
-          if (individualRoles.length > 0) {
-            const individualRoleIds = individualRoles.map(
-              (role) => role.result_user_id,
-            );
-            await repository.update(individualRoleIds, { is_active: false });
-          }
-
-          return await this.upsertAuthorContactRole(
-            repository,
-            resultId,
-            targetUserId,
-            InformativeRolesEnum.BOTH,
-          );
-        } else {
-          return await this.upsertAuthorContactRole(
-            repository,
-            resultId,
-            targetUserId,
-            newInformativeRole,
-          );
-        }
       }
 
       throw new Error('Invalid informative_role_id provided');
     });
+  }
+
+  private async handleBothRole(
+    repository: Repository<ResultUser>,
+    resultId: number,
+    targetUserId: string,
+    existingRoles: ResultUser[],
+  ): Promise<ResultUser> {
+    const existingBothRole = this.findRoleByType(
+      existingRoles,
+      InformativeRolesEnum.BOTH,
+    );
+
+    if (existingBothRole) {
+      return existingBothRole;
+    }
+
+    await this.deactivateIndividualRoles(repository, existingRoles);
+
+    return await this.upsertAuthorContactRole(
+      repository,
+      resultId,
+      targetUserId,
+      InformativeRolesEnum.BOTH,
+    );
+  }
+
+  private async handleIndividualRole(
+    repository: Repository<ResultUser>,
+    resultId: number,
+    targetUserId: string,
+    newInformativeRole: InformativeRolesEnum,
+    existingRoles: ResultUser[],
+  ): Promise<ResultUser> {
+    const existingInformativeRoles = existingRoles.map(
+      (role) => role.informative_role_id,
+    );
+
+    const hasBoth = existingInformativeRoles.includes(
+      InformativeRolesEnum.BOTH,
+    );
+
+    if (hasBoth) {
+      return await this.replaceBothWithIndividual(
+        repository,
+        resultId,
+        targetUserId,
+        newInformativeRole,
+        existingRoles,
+      );
+    }
+
+    const shouldUpgradeToBoth = this.shouldUpgradeToBothRole(
+      newInformativeRole,
+      existingInformativeRoles,
+    );
+
+    if (shouldUpgradeToBoth) {
+      await this.deactivateIndividualRoles(repository, existingRoles);
+      return await this.upsertAuthorContactRole(
+        repository,
+        resultId,
+        targetUserId,
+        InformativeRolesEnum.BOTH,
+      );
+    }
+
+    return await this.upsertAuthorContactRole(
+      repository,
+      resultId,
+      targetUserId,
+      newInformativeRole,
+    );
+  }
+
+  private async replaceBothWithIndividual(
+    repository: Repository<ResultUser>,
+    resultId: number,
+    targetUserId: string,
+    newInformativeRole: InformativeRolesEnum,
+    existingRoles: ResultUser[],
+  ): Promise<ResultUser> {
+    const bothRole = this.findRoleByType(
+      existingRoles,
+      InformativeRolesEnum.BOTH,
+    );
+
+    if (bothRole) {
+      await repository.update(bothRole.result_user_id, {
+        is_active: false,
+      });
+    }
+
+    return await this.upsertAuthorContactRole(
+      repository,
+      resultId,
+      targetUserId,
+      newInformativeRole,
+    );
+  }
+
+  private findRoleByType(
+    existingRoles: ResultUser[],
+    roleType: InformativeRolesEnum,
+  ): ResultUser | undefined {
+    return existingRoles.find((role) => role.informative_role_id === roleType);
+  }
+
+  private async deactivateIndividualRoles(
+    repository: Repository<ResultUser>,
+    existingRoles: ResultUser[],
+  ): Promise<void> {
+    const individualRoles = existingRoles.filter(
+      (role) => role.informative_role_id !== InformativeRolesEnum.BOTH,
+    );
+
+    if (individualRoles.length > 0) {
+      const individualRoleIds = individualRoles.map(
+        (role) => role.result_user_id,
+      );
+      await repository.update(individualRoleIds, { is_active: false });
+    }
+  }
+
+  private shouldUpgradeToBothRole(
+    newInformativeRole: InformativeRolesEnum,
+    existingInformativeRoles: InformativeRolesEnum[],
+  ): boolean {
+    const hasAuthor = existingInformativeRoles.includes(
+      InformativeRolesEnum.AUTHOR,
+    );
+    const hasContact = existingInformativeRoles.includes(
+      InformativeRolesEnum.CONTACT_PERSON,
+    );
+
+    return (
+      (newInformativeRole === InformativeRolesEnum.AUTHOR && hasContact) ||
+      (newInformativeRole === InformativeRolesEnum.CONTACT_PERSON && hasAuthor)
+    );
   }
 
   private async upsertAuthorContactRole(
