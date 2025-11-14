@@ -69,4 +69,6 @@ export class ResultImpactArea extends AuditableEntity {
     type: [ResultImpactAreaGlobalTarget],
   })
   result_impact_area_global_targets: ResultImpactAreaGlobalTarget[];
+
+  global_target_id: number;
 }

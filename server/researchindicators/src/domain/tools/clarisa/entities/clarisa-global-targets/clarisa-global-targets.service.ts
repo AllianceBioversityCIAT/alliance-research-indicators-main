@@ -16,4 +16,13 @@ export class ClarisaGlobalTargetsService extends ControlListBaseService<
       currentUser,
     );
   }
+
+  async findGlobalTargetsByImpactArea(impactAreaId: number) {
+    return this.mainRepo.find({
+      where: {
+        is_active: true,
+        impactAreaId: impactAreaId,
+      },
+    });
+  }
 }
