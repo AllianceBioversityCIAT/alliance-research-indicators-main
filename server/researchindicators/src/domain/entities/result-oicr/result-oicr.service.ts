@@ -301,9 +301,14 @@ export class ResultOicrService {
       );
 
     result_impact_areas.forEach((ria) => {
-      ria.result_impact_area_global_targets = globalTargets.filter(
+      const globalTargetsForRia = globalTargets.filter(
         (gt) => gt.result_impact_area_id === ria.id,
       );
+      ria.result_impact_area_global_targets = globalTargetsForRia;
+      ria['global_target_id'] =
+        globalTargetsForRia.length > 0
+          ? globalTargetsForRia[0].global_target_id
+          : null;
     });
 
     const notable_references =
