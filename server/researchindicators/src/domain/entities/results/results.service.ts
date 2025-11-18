@@ -69,7 +69,10 @@ import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
 import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
-import { intersection } from '../../shared/utils/array.util';
+import {
+  filterByUniqueKeyWithPriority,
+  intersection,
+} from '../../shared/utils/array.util';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { CreateResultInstitutionDto } from '../result-institutions/dto/create-result-institution.dto';
@@ -82,9 +85,13 @@ import { ResultRegion } from '../result-regions/entities/result-region.entity';
 import { ClarisaSdg } from '../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 import { ResultUserAi } from '../result-users/entities/result-user-ai.entity';
 import { CreateResultConfigDto } from './dto/create-config.dto';
+import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
+import { QueryService } from '../../shared/utils/query.service';
+import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 
 @Injectable()
 export class ResultsService {
+  private readonly logger = new CgiarLogger(ResultsService.name);
   constructor(
     private readonly dataSource: DataSource,
     private readonly mainRepo: ResultRepository,
@@ -115,6 +122,8 @@ export class ResultsService {
     private readonly _clarisaCountriesService: ClarisaCountriesService,
     private readonly _resultInstitutionsService: ResultInstitutionsService,
     private readonly _resultEvidencesService: ResultEvidencesService,
+    private readonly _queryService: QueryService,
+    private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -583,7 +592,7 @@ export class ResultsService {
     alignmentData: ResultAlignmentDto,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
-    const { contracts, levers } = alignmentData;
+    const { contracts, primary_levers, contributor_levers } = alignmentData;
     await this.dataSource.transaction(async (manager) => {
       await this._resultContractsService.create<ContractRolesEnum>(
         resultId,
@@ -597,14 +606,38 @@ export class ResultsService {
         },
       );
 
-      const primaryLevers =
-        levers?.length == 1
-          ? levers.map((el) => ({ ...el, is_primary: true }))
-          : levers;
+      const primaryLevers: Partial<ResultLever>[] =
+        primary_levers?.length > 0
+          ? primary_levers.map((el) => ({
+              lever_id: el.lever_id,
+              is_primary: true,
+              result_lever_strategic_outcomes:
+                el?.result_lever_strategic_outcomes,
+            }))
+          : [];
+
+      const contributorLevers: Partial<ResultLever>[] =
+        contributor_levers?.length > 0
+          ? contributor_levers.map((el) => ({
+              lever_id: el.lever_id,
+              is_primary: false,
+            }))
+          : [];
+
+      const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
+        [...primaryLevers, ...contributorLevers],
+        'lever_id',
+        'is_primary',
+      );
+
+      const activeLevers = await this._resultLeversService.find(
+        resultId,
+        LeverRolesEnum.ALIGNMENT,
+      );
 
       await this._resultLeversService.create<LeverRolesEnum>(
         resultId,
-        primaryLevers,
+        fullLevers,
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         manager,
@@ -613,6 +646,24 @@ export class ResultsService {
           is_primary: false,
         },
       );
+
+      const emergedLever =
+        await this._resultLeversService.comparerClientToServer(
+          resultId,
+          primaryLevers,
+          LeverRolesEnum.ALIGNMENT,
+          activeLevers,
+        );
+
+      for (const lever of emergedLever) {
+        await this._resultLeverStrategicOutcomeService.create(
+          lever.result_lever_id,
+          lever?.result_lever_strategic_outcomes ?? [],
+          'lever_strategic_outcome_id',
+          undefined,
+          manager,
+        );
+      }
 
       await this._resultSdgsService.create(
         resultId,
@@ -649,11 +700,25 @@ export class ResultsService {
       LeverRolesEnum.ALIGNMENT,
     );
 
+    const primaryLevers = levers.filter((el) => el.is_primary);
+
+    const strategicOutcomes =
+      await this._resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds(
+        primaryLevers.map((el) => el.result_lever_id),
+      );
+
+    primaryLevers.forEach((lever) => {
+      lever.result_lever_strategic_outcomes = strategicOutcomes.filter(
+        (so) => so.result_lever_id === lever.result_lever_id,
+      );
+    });
+
     const result_sdgs = await this._resultSdgsService.find(resultId);
 
     const resultAlignment: ResultAlignmentDto = {
       contracts,
-      levers,
+      primary_levers: primaryLevers,
+      contributor_levers: levers.filter((el) => !el.is_primary),
       result_sdgs,
     };
 
@@ -721,60 +786,79 @@ export class ResultsService {
   }
 
   async formalizeResult(result: ResultRawAi) {
-    const processedResult = await this.createResultFromAiRoar(result);
-    const newResult = await this.createResult(processedResult.result);
-    await this.updateGeneralInfo(
-      newResult.result_id,
-      processedResult.generalInformation,
-    );
+    let resultExists: Result = null;
+    try {
+      const processedResult = await this.createResultFromAiRoar(result);
+      const newResult = await this.createResult(processedResult.result);
+      resultExists = newResult;
+      await this.updateGeneralInfo(
+        newResult.result_id,
+        processedResult.generalInformation,
+      );
 
-    await this._resultSdgsService.saveSdgAi(
-      newResult.result_id,
-      processedResult?.sdgs,
-    );
+      await this._resultSdgsService.saveSdgAi(
+        newResult.result_id,
+        processedResult?.sdgs,
+      );
 
-    await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
-    await this._resultInstitutionsService.updatePartners(
-      newResult.result_id,
-      processedResult?.partners,
-      true,
-    );
-    await this._resultEvidencesService.updateResultEvidences(
-      newResult.result_id,
-      processedResult?.evidences,
-    );
-    switch (newResult.indicator_id) {
-      case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
-        await this._resultCapacitySharingService.update(
-          newResult.result_id,
-          processedResult.capSharing,
-          true,
+      await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
+      await this._resultInstitutionsService.updatePartners(
+        newResult.result_id,
+        processedResult?.partners,
+        true,
+      );
+      await this._resultEvidencesService.updateResultEvidences(
+        newResult.result_id,
+        processedResult?.evidences,
+      );
+      switch (newResult.indicator_id) {
+        case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
+          await this._resultCapacitySharingService.update(
+            newResult.result_id,
+            processedResult.capSharing,
+            true,
+          );
+          break;
+        case IndicatorsEnum.POLICY_CHANGE:
+          await this._resultPolicyChangeService.update(
+            newResult.result_id,
+            processedResult.policyChange,
+          );
+          break;
+        case IndicatorsEnum.INNOVATION_DEV:
+          await this._resultInnovationDevService.update(
+            newResult.result_id,
+            processedResult.innovationDev,
+          );
+          break;
+      }
+
+      return { ...newResult, error: false };
+    } catch (error) {
+      if (resultExists) {
+        this.logger.error(
+          `Error processing result ${resultExists.result_id}, rolling back. Error: ${error.message}`,
         );
-        break;
-      case IndicatorsEnum.POLICY_CHANGE:
-        await this._resultPolicyChangeService.update(
-          newResult.result_id,
-          processedResult.policyChange,
-        );
-        break;
-      case IndicatorsEnum.INNOVATION_DEV:
-        await this._resultInnovationDevService.update(
-          newResult.result_id,
-          processedResult.innovationDev,
-        );
-        break;
+        await this._queryService.deleteFullResultById(resultExists.result_id);
+      }
+      this.logger.error(`Error processing AI result: ${error.message}`);
+      return { ...result, error: true, message_error: error?.name || error };
     }
-
-    return newResult;
   }
 
   async createResultFromAiBulk(results: ResultRawAi[]) {
-    const resultsCreated: Result[] = [];
+    const resultsCreated: (
+      | Result
+      | { error?: boolean; message_error?: string }
+    )[] = [];
     for (const result of results) {
       const newResult = await this.formalizeResult(result);
       resultsCreated.push(newResult);
     }
-    return resultsCreated;
+    return {
+      results_errors: resultsCreated.filter((el) => (el as any).error),
+      results_created: resultsCreated.filter((el) => !(el as any).error),
+    };
   }
 
   async validateAiRawCountries(countries: AiRawCountry) {
@@ -947,7 +1031,7 @@ export class ResultsService {
 
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
-        comment_geo_scope: String(saveGeoLocationDto?.comment_geo_scope),
+        comment_geo_scope: saveGeoLocationDto?.comment_geo_scope ?? null,
         ...this.currentUser.audit(SetAutitEnum.UPDATE),
       });
 

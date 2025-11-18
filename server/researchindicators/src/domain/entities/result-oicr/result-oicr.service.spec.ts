@@ -25,6 +25,11 @@ import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_o
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
+import { ResultQuantificationsService } from '../result-quantifications/result-quantifications.service';
+import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
+import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
+import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
+import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -44,6 +49,10 @@ describe('ResultOicrService', () => {
   let mockResultOicrRepository: jest.Mocked<ResultOicrRepository>;
   let mockTempExternalOicrsService: jest.Mocked<TempExternalOicrsService>;
   let mockResultContractsService: jest.Mocked<ResultContractsService>;
+  let mockResultQuantificationsService: jest.Mocked<any>;
+  let mockResultNotableReferencesService: jest.Mocked<any>;
+  let mockResultImpactAreasService: jest.Mocked<any>;
+  let mockResultImpactAreaGlobalTargetsService: jest.Mocked<any>;
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -159,6 +168,36 @@ describe('ResultOicrService', () => {
       getLeverFromPrimaryContract: jest.fn(),
     } as any;
 
+    mockResultQuantificationsService = {
+      findByResultIdAndRoles: jest.fn().mockResolvedValue([]),
+      upsertQuantificationsByRole: jest.fn(),
+      upsertByCompositeKeys: jest.fn().mockResolvedValue([]),
+    } as any;
+
+    mockResultNotableReferencesService = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
+      upsertByCompositeKeys: jest.fn().mockResolvedValue([]),
+    } as any;
+
+    mockResultImpactAreasService = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue([]),
+      update: jest.fn(),
+      remove: jest.fn(),
+    } as any;
+
+    mockResultImpactAreaGlobalTargetsService = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      update: jest.fn(),
+      remove: jest.fn(),
+      findByResultImpactAreaIds: jest.fn().mockResolvedValue([]),
+      disableAllByResultId: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultOicrService,
@@ -185,6 +224,22 @@ describe('ResultOicrService', () => {
         {
           provide: TempExternalOicrsService,
           useValue: mockTempExternalOicrsService,
+        },
+        {
+          provide: ResultQuantificationsService,
+          useValue: mockResultQuantificationsService,
+        },
+        {
+          provide: ResultNotableReferencesService,
+          useValue: mockResultNotableReferencesService,
+        },
+        {
+          provide: ResultImpactAreasService,
+          useValue: mockResultImpactAreasService,
+        },
+        {
+          provide: ResultImpactAreaGlobalTargetsService,
+          useValue: mockResultImpactAreaGlobalTargetsService,
         },
       ],
     }).compile();
@@ -293,7 +348,7 @@ describe('ResultOicrService', () => {
         mockCreateData.base_information,
         'STAR',
         {
-          leverEnum: 2,
+          leverEnum: 1,
           notMap: {
             lever: true,
           },
@@ -337,7 +392,7 @@ describe('ResultOicrService', () => {
         mockCreateData.base_information,
         'STAR',
         {
-          leverEnum: 2,
+          leverEnum: 1,
           notMap: {
             lever: true,
           },
@@ -474,7 +529,7 @@ describe('ResultOicrService', () => {
           { lever_id: '3', is_primary: false },
         ],
         'lever_id',
-        LeverRolesEnum.OICR_ALIGNMENT,
+        LeverRolesEnum.ALIGNMENT,
         undefined,
         ['is_primary'],
       );
@@ -499,7 +554,7 @@ describe('ResultOicrService', () => {
         resultId,
         [],
         'lever_id',
-        LeverRolesEnum.OICR_ALIGNMENT,
+        LeverRolesEnum.ALIGNMENT,
         undefined,
         ['is_primary'],
       );
@@ -654,7 +709,7 @@ describe('ResultOicrService', () => {
       // Assert
       expect(mockResultLeversService.find).toHaveBeenCalledWith(
         resultId,
-        LeverRolesEnum.OICR_ALIGNMENT,
+        LeverRolesEnum.ALIGNMENT,
       );
       expect(result).toEqual({
         primary_lever: [
@@ -1025,7 +1080,15 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Updated short statement',
         general_comment: 'Updated general comment',
         maturity_level_id: 2,
+        sharepoint_link: 'https://sharepoint.example.com/test',
+        mel_regional_expert_id: { user_id: 123 } as any,
         link_result: { external_oicr_id: 456 } as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'Test description',
+        result_impact_areas: [],
       };
 
       const auditData = { updated_at: new Date() };
@@ -1055,6 +1118,11 @@ describe('ResultOicrService', () => {
           updateData.short_outcome_impact_statement,
         general_comment: updateData.general_comment,
         maturity_level_id: updateData.maturity_level_id,
+        for_external_use: updateData.for_external_use,
+        for_external_use_description: updateData.for_external_use_description,
+        mel_regional_expert_id: updateData.mel_regional_expert_id,
+        mel_staff_group_id: 1,
+        sharepoint_link: updateData.sharepoint_link,
         ...auditData,
       });
 
@@ -1081,7 +1149,15 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Comment',
         maturity_level_id: 1,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
         link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: false,
+        for_external_use_description: '',
+        result_impact_areas: [],
       };
 
       const existingOicr = { id: 456, oicr_internal_code: 'EXISTING-CODE' };
@@ -1104,6 +1180,11 @@ describe('ResultOicrService', () => {
           updateData.short_outcome_impact_statement,
         general_comment: updateData.general_comment,
         maturity_level_id: updateData.maturity_level_id,
+        for_external_use: updateData.for_external_use,
+        for_external_use_description: updateData.for_external_use_description,
+        mel_regional_expert_id: updateData.mel_regional_expert_id,
+        mel_staff_group_id: 1,
+        sharepoint_link: updateData.sharepoint_link,
         ...auditData,
       });
     });
@@ -1118,7 +1199,15 @@ describe('ResultOicrService', () => {
         short_outcome_impact_statement: 'Short statement',
         general_comment: 'Comment',
         maturity_level_id: 1,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
         link_result: undefined as any, // Test undefined handling
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'Test external use',
+        result_impact_areas: [],
       };
 
       const auditData = { updated_at: new Date() };
@@ -1154,9 +1243,13 @@ describe('ResultOicrService', () => {
       const mockOicrEntity = {
         general_comment: 'Test general comment',
         maturity_level_id: 2,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
         oicr_internal_code: 'OICR-2024-001',
         outcome_impact_statement: 'Test outcome statement',
         short_outcome_impact_statement: 'Short statement',
+        for_external_use: false,
+        for_external_use_description: '',
       };
 
       const mockTagging = [
@@ -1176,8 +1269,17 @@ describe('ResultOicrService', () => {
         outcome_impact_statement: mockOicrEntity.outcome_impact_statement,
         short_outcome_impact_statement:
           mockOicrEntity.short_outcome_impact_statement,
+        sharepoint_link: mockOicrEntity.sharepoint_link,
+        mel_regional_expert_id: mockOicrEntity.mel_regional_expert_id,
         tagging: mockTagging[0] as any,
         link_result: mockLinkResult[0] as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: mockOicrEntity.for_external_use,
+        for_external_use_description:
+          mockOicrEntity.for_external_use_description,
+        result_impact_areas: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1217,8 +1319,16 @@ describe('ResultOicrService', () => {
         oicr_internal_code: undefined,
         outcome_impact_statement: undefined,
         short_outcome_impact_statement: undefined,
+        sharepoint_link: undefined,
+        mel_regional_expert_id: undefined,
         tagging: mockTagging[0] as any,
         link_result: mockLinkResult[0] as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: undefined,
+        for_external_use_description: undefined,
+        result_impact_areas: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(null);
@@ -1243,6 +1353,10 @@ describe('ResultOicrService', () => {
         oicr_internal_code: 'TEST-001',
         outcome_impact_statement: 'Test statement',
         short_outcome_impact_statement: 'Short statement',
+        sharepoint_link: null,
+        mel_regional_expert_id: null,
+        for_external_use: false,
+        for_external_use_description: '',
       };
 
       const expectedResult: UpdateOicrDto = {
@@ -1252,8 +1366,17 @@ describe('ResultOicrService', () => {
         outcome_impact_statement: mockOicrEntity.outcome_impact_statement,
         short_outcome_impact_statement:
           mockOicrEntity.short_outcome_impact_statement,
+        sharepoint_link: mockOicrEntity.sharepoint_link,
+        mel_regional_expert_id: null, // Service returns allianceUserStaff property
         tagging: undefined as any,
         link_result: undefined as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: mockOicrEntity.for_external_use,
+        for_external_use_description:
+          mockOicrEntity.for_external_use_description,
+        result_impact_areas: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1530,6 +1653,495 @@ describe('ResultOicrService', () => {
       expect(result.other_levers).toHaveLength(2);
       expect(result.regions).toHaveLength(2);
       expect(result.countries).toHaveLength(2);
+    });
+  });
+
+  // New tests to validate new implementations
+  describe('updateOicr - New Implementations', () => {
+    it('should properly handle quantifications (actual_count and extrapolate_estimates)', async () => {
+      // Arrange
+      const resultId = 123;
+      const updateData: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-QUANT-001',
+        tagging: null as any,
+        outcome_impact_statement: 'Test outcome',
+        short_outcome_impact_statement: 'Short outcome',
+        general_comment: 'Test comment',
+        maturity_level_id: 1,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
+        link_result: null as any,
+        actual_count: [
+          {
+            quantification_number: 100,
+            unit: 'people',
+            description: 'People reached',
+          } as any,
+          {
+            quantification_number: 50,
+            unit: 'organizations',
+            description: 'Organizations involved',
+          } as any,
+        ],
+        extrapolate_estimates: [
+          {
+            quantification_number: 1000,
+            unit: 'people',
+            description: 'Estimated future reach',
+          } as any,
+        ],
+        notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'Available for external partnerships',
+        result_impact_areas: [],
+      };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue({ updated_at: new Date() });
+      mockResultTagsService.create.mockResolvedValue(undefined);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      // Act
+      await service.updateOicr(resultId, updateData);
+
+      // Assert
+      expect(
+        mockResultQuantificationsService.upsertByCompositeKeys,
+      ).toHaveBeenCalledWith(
+        resultId,
+        updateData.actual_count,
+        ['quantification_number', 'unit', 'description'],
+        QuantificationRolesEnum.ACTUAL_COUNT,
+      );
+
+      expect(
+        mockResultQuantificationsService.upsertByCompositeKeys,
+      ).toHaveBeenCalledWith(
+        resultId,
+        updateData.extrapolate_estimates,
+        ['quantification_number', 'unit', 'description'],
+        QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+      );
+
+      expect(mockUpdateDataUtil.updateLastUpdatedDate).toHaveBeenCalledWith(
+        resultId,
+      );
+    });
+
+    it('should properly handle notable_references', async () => {
+      // Arrange
+      const resultId = 456;
+      const updateData: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-REF-001',
+        tagging: null as any,
+        outcome_impact_statement: 'Test outcome',
+        short_outcome_impact_statement: 'Short outcome',
+        general_comment: 'Test comment',
+        maturity_level_id: 2,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
+        link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [
+          {
+            notable_reference_type_id: 1,
+            link: 'https://example.com/research-paper',
+          } as any,
+          {
+            notable_reference_type_id: 2,
+            link: 'https://example.com/news-article',
+          } as any,
+        ],
+        for_external_use: false,
+        for_external_use_description: '',
+        result_impact_areas: [],
+      };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue({ updated_at: new Date() });
+      mockResultTagsService.create.mockResolvedValue(undefined);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      // Act
+      await service.updateOicr(resultId, updateData);
+
+      // Assert
+      expect(
+        mockResultNotableReferencesService.upsertByCompositeKeys,
+      ).toHaveBeenCalledWith(resultId, updateData.notable_references, [
+        'notable_reference_type_id',
+        'link',
+      ]);
+    });
+
+    it('should properly handle result_impact_areas with global targets', async () => {
+      // Arrange
+      const resultId = 789;
+      const mockImpactAreaId = 101;
+      const updateData: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-IMPACT-001',
+        tagging: null as any,
+        outcome_impact_statement: 'Test outcome',
+        short_outcome_impact_statement: 'Short outcome',
+        general_comment: 'Test comment',
+        maturity_level_id: 3,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
+        link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'Public research initiative',
+        result_impact_areas: [
+          {
+            id: mockImpactAreaId,
+            impact_area_id: 1,
+            impact_area_score_id: 2,
+            result_impact_area_global_targets: [
+              { global_target_id: 1 } as any,
+              { global_target_id: 3 } as any,
+            ],
+          } as any,
+          {
+            id: 102,
+            impact_area_id: 2,
+            impact_area_score_id: 1,
+            result_impact_area_global_targets: [{ global_target_id: 2 } as any],
+          } as any,
+        ],
+      };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue({ updated_at: new Date() });
+      mockResultTagsService.create.mockResolvedValue(undefined);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      // Mock the create method to return the saved impact areas
+      mockResultImpactAreasService.create.mockResolvedValue([
+        {
+          id: mockImpactAreaId,
+          impact_area_id: 1,
+          impact_area_score_id: 2,
+        },
+        {
+          id: 102,
+          impact_area_id: 2,
+          impact_area_score_id: 1,
+        },
+      ]);
+
+      // Act
+      await service.updateOicr(resultId, updateData);
+
+      // Assert
+      expect(mockResultImpactAreasService.create).toHaveBeenCalledWith(
+        resultId,
+        updateData.result_impact_areas,
+        'impact_area_id',
+        undefined,
+        undefined,
+        ['impact_area_score_id'],
+      );
+
+      expect(
+        mockResultImpactAreaGlobalTargetsService.create,
+      ).toHaveBeenCalledWith(
+        mockImpactAreaId,
+        updateData.result_impact_areas[0].result_impact_area_global_targets,
+        'global_target_id',
+      );
+
+      expect(
+        mockResultImpactAreaGlobalTargetsService.create,
+      ).toHaveBeenCalledWith(
+        102,
+        updateData.result_impact_areas[1].result_impact_area_global_targets,
+        'global_target_id',
+      );
+    });
+
+    it('should handle for_external_use fields correctly', async () => {
+      // Arrange
+      const resultId = 999;
+      const updateData: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-EXTERNAL-001',
+        tagging: null as any,
+        outcome_impact_statement: 'External use outcome',
+        short_outcome_impact_statement: 'Short external outcome',
+        general_comment: 'Available for collaboration',
+        maturity_level_id: 4,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
+        link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: true,
+        for_external_use_description:
+          'This research is available for external partnerships and collaboration opportunities. Contact our team for more information.',
+        result_impact_areas: [],
+      };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue({ updated_at: new Date() });
+
+      // Act
+      await service.updateOicr(resultId, updateData);
+
+      // Assert
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(resultId, {
+        oicr_internal_code: updateData.oicr_internal_code,
+        outcome_impact_statement: updateData.outcome_impact_statement,
+        short_outcome_impact_statement:
+          updateData.short_outcome_impact_statement,
+        general_comment: updateData.general_comment,
+        maturity_level_id: updateData.maturity_level_id,
+        for_external_use: true,
+        for_external_use_description: updateData.for_external_use_description,
+        mel_regional_expert_id: updateData.mel_regional_expert_id,
+        mel_staff_group_id: 1,
+        sharepoint_link: updateData.sharepoint_link,
+        updated_at: expect.any(Date),
+      });
+    });
+
+    it('should handle null/undefined values for new fields gracefully', async () => {
+      // Arrange
+      const resultId = 111;
+      const updateData: UpdateOicrDto = {
+        oicr_internal_code: 'TEST-NULL-001',
+        tagging: null as any,
+        outcome_impact_statement: 'Test outcome',
+        short_outcome_impact_statement: 'Short outcome',
+        general_comment: 'Test comment',
+        maturity_level_id: 1,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
+        link_result: null as any,
+        actual_count: null as any, // Test null handling
+        extrapolate_estimates: undefined as any, // Test undefined handling
+        notable_references: null as any,
+        for_external_use: null as any,
+        for_external_use_description: null as any,
+        result_impact_areas: null as any,
+      };
+
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue({ updated_at: new Date() });
+
+      // Act
+      await service.updateOicr(resultId, updateData);
+
+      // Assert - Should handle null/undefined gracefully by passing empty arrays
+      expect(
+        mockResultQuantificationsService.upsertByCompositeKeys,
+      ).toHaveBeenCalledWith(
+        resultId,
+        [], // Should convert null to empty array
+        ['quantification_number', 'unit', 'description'],
+        QuantificationRolesEnum.ACTUAL_COUNT,
+      );
+
+      expect(
+        mockResultQuantificationsService.upsertByCompositeKeys,
+      ).toHaveBeenCalledWith(
+        resultId,
+        [], // Should convert undefined to empty array
+        ['quantification_number', 'unit', 'description'],
+        QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+      );
+
+      expect(
+        mockResultNotableReferencesService.upsertByCompositeKeys,
+      ).toHaveBeenCalledWith(
+        resultId,
+        [], // Should convert null to empty array
+        ['notable_reference_type_id', 'link'],
+      );
+
+      expect(mockResultImpactAreasService.create).toHaveBeenCalledWith(
+        resultId,
+        [], // Should convert null to empty array
+        'impact_area_id',
+        undefined,
+        undefined,
+        ['impact_area_score_id'],
+      );
+    });
+  });
+
+  describe('findOicrs - New Implementations', () => {
+    it('should properly retrieve and structure all new data fields', async () => {
+      // Arrange
+      const resultId = 555;
+      const mockOicrEntity = {
+        general_comment: 'Comprehensive test comment',
+        maturity_level_id: 3,
+        sharepoint_link: null as any,
+        mel_regional_expert_id: null as any,
+        oicr_internal_code: 'COMP-TEST-001',
+        outcome_impact_statement: 'Comprehensive outcome statement',
+        short_outcome_impact_statement: 'Short comprehensive statement',
+        for_external_use: true,
+        for_external_use_description:
+          'Available for external collaboration and research partnerships',
+      };
+
+      const mockQuantifications = [
+        {
+          quantification_role_id: QuantificationRolesEnum.ACTUAL_COUNT,
+          quantification_number: 150,
+          unit: 'farmers',
+          description: 'Farmers trained',
+        },
+        {
+          quantification_role_id: QuantificationRolesEnum.ACTUAL_COUNT,
+          quantification_number: 25,
+          unit: 'organizations',
+          description: 'Partner organizations',
+        },
+        {
+          quantification_role_id: QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+          quantification_number: 1500,
+          unit: 'farmers',
+          description: 'Estimated future impact',
+        },
+      ];
+
+      const mockNotableReferences = [
+        {
+          notable_reference_type_id: 1,
+          link: 'https://example.com/research-publication',
+        },
+        {
+          notable_reference_type_id: 2,
+          link: 'https://example.com/policy-document',
+        },
+      ];
+
+      const mockResultImpactAreas = [
+        {
+          id: 201,
+          impact_area_id: 1,
+          impact_area_score_id: 3,
+        },
+        {
+          id: 202,
+          impact_area_id: 2,
+          impact_area_score_id: 2,
+        },
+      ];
+
+      mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
+      mockResultTagsService.find.mockResolvedValue([]);
+      mockTempExternalOicrsService.find.mockResolvedValue([]);
+      mockResultQuantificationsService.findByResultIdAndRoles.mockResolvedValue(
+        mockQuantifications,
+      );
+      mockResultNotableReferencesService.find.mockResolvedValue(
+        mockNotableReferences,
+      );
+      mockResultImpactAreasService.find.mockResolvedValue(
+        mockResultImpactAreas,
+      );
+
+      // Act
+      const result = await service.findOicrs(resultId);
+
+      // Assert
+      expect(
+        mockResultQuantificationsService.findByResultIdAndRoles,
+      ).toHaveBeenCalledWith(resultId, [
+        QuantificationRolesEnum.ACTUAL_COUNT,
+        QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+      ]);
+
+      expect(mockResultNotableReferencesService.find).toHaveBeenCalledWith(
+        resultId,
+      );
+      expect(mockResultImpactAreasService.find).toHaveBeenCalledWith(resultId);
+
+      expect(result.for_external_use).toBe(true);
+      expect(result.for_external_use_description).toBe(
+        'Available for external collaboration and research partnerships',
+      );
+
+      expect(result.actual_count).toHaveLength(2);
+      expect(result.actual_count[0].quantification_number).toBe(150);
+      expect(result.actual_count[1].quantification_number).toBe(25);
+
+      expect(result.extrapolate_estimates).toHaveLength(1);
+      expect(result.extrapolate_estimates[0].quantification_number).toBe(1500);
+
+      expect(result.notable_references).toEqual(mockNotableReferences);
+      expect(result.result_impact_areas).toEqual(mockResultImpactAreas);
+    });
+
+    it('should correctly filter quantifications by role', async () => {
+      // Arrange
+      const resultId = 666;
+      const mockMixedQuantifications = [
+        {
+          quantification_role_id: QuantificationRolesEnum.ACTUAL_COUNT,
+          quantification_number: 100,
+          unit: 'people',
+        },
+        {
+          quantification_role_id: QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+          quantification_number: 500,
+          unit: 'people',
+        },
+        {
+          quantification_role_id: 999, // Some other role
+          quantification_number: 200,
+          unit: 'other',
+        },
+        {
+          quantification_role_id: QuantificationRolesEnum.ACTUAL_COUNT,
+          quantification_number: 50,
+          unit: 'organizations',
+        },
+      ];
+
+      mockResultOicrRepository.findOne.mockResolvedValue({} as any);
+      mockResultTagsService.find.mockResolvedValue([]);
+      mockTempExternalOicrsService.find.mockResolvedValue([]);
+      mockResultQuantificationsService.findByResultIdAndRoles.mockResolvedValue(
+        mockMixedQuantifications,
+      );
+      mockResultNotableReferencesService.find.mockResolvedValue([]);
+      mockResultImpactAreasService.find.mockResolvedValue([]);
+
+      // Act
+      const result = await service.findOicrs(resultId);
+
+      // Assert
+      expect(result.actual_count).toHaveLength(2);
+      expect(
+        result.actual_count.every(
+          (q) =>
+            q.quantification_role_id === QuantificationRolesEnum.ACTUAL_COUNT,
+        ),
+      ).toBe(true);
+
+      expect(result.extrapolate_estimates).toHaveLength(1);
+      expect(
+        result.extrapolate_estimates.every(
+          (q) =>
+            q.quantification_role_id ===
+            QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+        ),
+      ).toBe(true);
     });
   });
 });

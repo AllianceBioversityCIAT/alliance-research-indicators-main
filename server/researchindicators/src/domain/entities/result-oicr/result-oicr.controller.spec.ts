@@ -49,6 +49,12 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 1,
         link_result: { temp_result_id: 123 } as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'For external use test',
+        result_impact_areas: [],
       };
       const serviceResult = { success: true };
       const expectedResult = {
@@ -80,6 +86,12 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 1,
         link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: false,
+        for_external_use_description: '',
+        result_impact_areas: [],
       };
       const serviceError = new Error('Service error');
 
@@ -111,6 +123,12 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 2,
         link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'External use test 2',
+        result_impact_areas: [],
       };
       const expectedResult = { success: true };
 
@@ -138,6 +156,12 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 1,
         link_result: { temp_result_id: 123 } as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: true,
+        for_external_use_description: 'Service result test',
+        result_impact_areas: [],
       };
       const expectedResult = {
         data: serviceResult,
@@ -188,6 +212,12 @@ describe('ResultOicrController', () => {
         general_comment: 'Test comment',
         maturity_level_id: 2,
         link_result: null as any,
+        actual_count: [],
+        extrapolate_estimates: [],
+        notable_references: [],
+        for_external_use: false,
+        for_external_use_description: '',
+        result_impact_areas: [],
       };
 
       mockResultOicrService.findOicrs.mockResolvedValue(expectedResult);

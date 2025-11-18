@@ -7,23 +7,29 @@ import { GreenCheckRepository } from './repository/green-checks.repository';
 import { FindGreenChecksDto } from './dto/find-green-checks.dto';
 import { DataSource } from 'typeorm';
 import { Result } from '../results/entities/result.entity';
-import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import {
+  getTemplateByStatus,
+  ResultStatusEnum,
+  ResultStatusNameEnum,
+} from '../result-status/enum/result-status.enum';
 import { SubmissionHistory } from './entities/submission-history.entity';
 import {
   CurrentUserUtil,
   SetAutitEnum,
 } from '../../shared/utils/current-user.util';
 import { ResultStatus } from '../result-status/entities/result-status.entity';
-import { isEmpty } from '../../shared/utils/object.utils';
+import { isEmpty, validObject } from '../../shared/utils/object.utils';
 import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
-import {
-  FindGeneralDataTemplateDto,
-  SubmissionEmailTemplateDataDto,
-} from './dto/find-general-data-template.dto';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { ResultsUtil } from '../../shared/utils/results.util';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultOicrService } from '../result-oicr/result-oicr.service';
+import { OptionalBody } from './dto/optional-body.dto';
+import { MessageOicrDto } from './dto/message-oicr.dto';
+import { validateRoles } from '../../shared/utils/roles.util';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 @Injectable()
 export class GreenChecksService {
@@ -35,6 +41,7 @@ export class GreenChecksService {
     private readonly templateService: TemplateService,
     private readonly appConfig: AppConfig,
     private readonly _resultsUtil: ResultsUtil,
+    private readonly resultOicrService: ResultOicrService,
   ) {}
 
   async findByResultId(resultId: number) {
@@ -50,273 +57,444 @@ export class GreenChecksService {
     return greenChecks;
   }
 
-  async changeStatus(resultId: number, status: number, comment: string) {
-    if (status === ResultStatusEnum.DELETED)
+  async statusManagement(
+    resultId: number,
+    statusId: ResultStatusEnum,
+    comment?: string,
+    body?: OptionalBody,
+  ) {
+    if (statusId === ResultStatusEnum.DELETED) {
       throw new ConflictException(
         'The deleted status is available only for the delete endpoint',
       );
+    }
 
-    const resultStatus = await this.dataSource
+    const resultStatusId = await this.dataSource
       .getRepository(ResultStatus)
       .findOne({
         where: {
           is_active: true,
-          result_status_id: status,
+          result_status_id: statusId,
         },
-      });
-
-    if (!resultStatus) throw new ConflictException('Invalid status');
-
-    const currentStatus: number = await this.dataSource
-      .getRepository(Result)
-      .findOne({
-        where: {
-          result_id: resultId,
-          is_active: true,
+        select: {
+          result_status_id: true,
         },
       })
-      .then((result) => result.result_status_id);
-
-    if (currentStatus === ResultStatusEnum.APPROVED)
-      throw new ConflictException('The result is already approved');
-    if ([ResultStatusEnum.DRAFT, ResultStatusEnum.SUBMITTED].includes(status)) {
-      return this.submmitedAndUnsubmmitedProcess(
-        resultId,
-        comment,
-        currentStatus,
-      );
-    } else if (
-      [
-        ResultStatusEnum.REVISED,
-        ResultStatusEnum.APPROVED,
-        ResultStatusEnum.REJECTED,
-      ].includes(status)
-    ) {
-      if (currentStatus !== ResultStatusEnum.SUBMITTED)
-        throw new ConflictException('Invalid current status');
-
-      const tempComment = ResultStatusEnum.APPROVED === status ? null : comment;
-
-      if (
-        [ResultStatusEnum.REVISED, ResultStatusEnum.REJECTED].includes(
-          status,
-        ) &&
-        isEmpty(tempComment)
-      )
-        throw new BadRequestException('Comment is required');
-
-      return this.saveHistory(
-        resultId,
-        tempComment,
-        currentStatus,
-        status,
-      ).then(async (data) => {
-        switch (status) {
-          case ResultStatusEnum.REVISED:
-            this.prepareEmail(
-              resultId,
-              ResultStatusEnum.SUBMITTED,
-              ResultStatusEnum.REVISED,
-              TemplateEnum.REVISE_RESULT,
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              (data) =>
-                `[${this.appConfig.ARI_MIS}] Action Required: Revision Requested for Result ${this._resultsUtil.resultCode}`,
-            );
-            break;
-          case ResultStatusEnum.REJECTED:
-            this.prepareEmail(
-              resultId,
-              ResultStatusEnum.SUBMITTED,
-              ResultStatusEnum.REJECTED,
-              TemplateEnum.REJECTED_RESULT,
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              (data) =>
-                `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode} Rejected`,
-            );
-            break;
-          case ResultStatusEnum.APPROVED: {
-            const result = await this.greenCheckRepository.createSnapshot(
-              this._resultsUtil.resultCode,
-              this._resultsUtil.nullReportYearId,
-            );
-            this.prepareEmail(
-              resultId,
-              ResultStatusEnum.SUBMITTED,
-              ResultStatusEnum.APPROVED,
-              TemplateEnum.APPROVAL_RESULT,
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              (data) =>
-                `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode} has been approved`,
-            );
-            return result;
-          }
-        }
-        return data;
+      .then((res) => {
+        if (!res) throw new ConflictException('Invalid status');
+        return res?.result_status_id;
       });
+
+    const saveHistory = this.processStatus(
+      resultId,
+      resultStatusId,
+      comment,
+      this._resultsUtil.statusId,
+      body,
+    );
+
+    const responseHistory = await this.saveHistory(resultId, saveHistory);
+
+    const otherData = await this.otherFunctions(
+      resultStatusId,
+      this._resultsUtil.statusId,
+      body,
+    );
+
+    await this.prepareEmail(
+      resultId,
+      resultStatusId,
+      this._resultsUtil.statusId,
+      body,
+      responseHistory,
+    );
+
+    return otherData ?? responseHistory;
+  }
+
+  private processStatus(
+    resultId: number,
+    status: ResultStatusEnum,
+    comment: string,
+    currentStatus: ResultStatusEnum,
+    body?: OptionalBody,
+  ) {
+    if (currentStatus === status) {
+      throw new ConflictException(
+        'The result is already in the desired status',
+      );
+    }
+
+    this.prevalidateFunctions(status);
+
+    switch (status) {
+      case ResultStatusEnum.REVISED:
+      case ResultStatusEnum.REJECTED:
+      case ResultStatusEnum.APPROVED:
+        return this.changeToReviewStatus(
+          resultId,
+          status,
+          comment,
+          currentStatus,
+        );
+      case ResultStatusEnum.SUBMITTED:
+      case ResultStatusEnum.DRAFT:
+        return this.changeToSubmittedUnsubmitted(
+          resultId,
+          status,
+          comment,
+          currentStatus,
+          body,
+        );
+      case ResultStatusEnum.POSTPONE:
+        return this.changeToReviewOicrStatus(
+          resultId,
+          status,
+          comment,
+          currentStatus,
+        );
+      case ResultStatusEnum.OICR_APPROVED:
+        return this.changeToOicrApproved(
+          resultId,
+          status,
+          comment,
+          currentStatus,
+        );
+      default:
+        throw new ConflictException('Invalid status');
     }
   }
 
-  async saveHistory(
-    resultId: number,
-    comment: string,
-    currentStatus: number,
-    newStatus: ResultStatusEnum,
-  ) {
-    return this.dataSource.transaction(async (manager) => {
-      await manager.getRepository(Result).update(resultId, {
-        result_status_id: newStatus,
-        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
-      });
-
-      const response = await manager.getRepository(SubmissionHistory).insert({
-        result_id: resultId,
-        submission_comment: comment,
-        from_status_id: currentStatus,
-        to_status_id: newStatus,
-        ...this.currentUserUtil.audit(SetAutitEnum.NEW),
-      });
-
-      return response;
-    });
+  private prevalidateFunctions(status: ResultStatusEnum) {
+    if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
+      this.prevalidateOicrFunctions(status);
+    }
   }
 
-  async submmitedAndUnsubmmitedProcess(
+  private prevalidateOicrFunctions(status: ResultStatusEnum): void {
+    if (
+      [
+        ResultStatusEnum.OICR_APPROVED,
+        ResultStatusEnum.POSTPONE,
+        ResultStatusEnum.REJECTED,
+      ].includes(status)
+    ) {
+      validateRoles(this.currentUserUtil, SecRolesEnum.GENERAL_ADMIN);
+    }
+  }
+
+  private async otherFunctions(
+    status: ResultStatusEnum,
+    currentStatus: ResultStatusEnum,
+    body?: OptionalBody,
+  ): Promise<Result> {
+    if (status === ResultStatusEnum.APPROVED) {
+      return this.greenCheckRepository.createSnapshot(
+        this._resultsUtil.resultCode,
+        this._resultsUtil.nullReportYearId,
+      );
+    }
+
+    if (
+      this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
+      status === ResultStatusEnum.DRAFT
+    ) {
+      await this.resultOicrService.review(this._resultsUtil.resultId, body);
+    }
+
+    return null;
+  }
+
+  private changeToOicrApproved(
     resultId: number,
+    status: ResultStatusEnum,
     comment: string,
-    currentStatus: number,
+    currentStatus: ResultStatusEnum,
   ) {
+    if (currentStatus !== ResultStatusEnum.REQUESTED)
+      throw new ConflictException(
+        'Only OIRC in requested status can be OICR approved',
+      );
+
+    return this.createHistoryObject(resultId, currentStatus, status, comment);
+  }
+
+  private changeToReviewOicrStatus(
+    resultId: number,
+    status: ResultStatusEnum,
+    comment: string,
+    currentStatus: ResultStatusEnum,
+  ) {
+    if (currentStatus !== ResultStatusEnum.REQUESTED)
+      throw new ConflictException(
+        `Only OIRC in requested status can be ${ResultStatusNameEnum[status]} status`,
+      );
+
+    return this.createHistoryObject(resultId, currentStatus, status, comment);
+  }
+
+  private changeToReviewStatus(
+    resultId: number,
+    status: ResultStatusEnum,
+    comment: string,
+    currentStatus: ResultStatusEnum,
+  ): SubmissionHistory {
+    if (
+      ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.REQUESTED].includes(
+        currentStatus,
+      )
+    ) {
+      throw new ConflictException(
+        `Only results in submitted or requested status can be ${ResultStatusNameEnum[status]}`,
+      );
+    }
+
+    if (
+      currentStatus === ResultStatusEnum.REQUESTED &&
+      status !== ResultStatusEnum.REJECTED
+    ) {
+      throw new ConflictException(
+        `Only results in requested status can be changed to ${ResultStatusNameEnum[ResultStatusEnum.REJECTED]} status`,
+      );
+    }
+
+    if (
+      [ResultStatusEnum.REVISED, ResultStatusEnum.REJECTED].includes(status) &&
+      isEmpty(comment)
+    )
+      throw new BadRequestException(
+        `The comment is required when changing to ${ResultStatusNameEnum[status]} status`,
+      );
+
+    return this.createHistoryObject(resultId, currentStatus, status, comment);
+  }
+
+  private changeToSubmittedUnsubmitted(
+    resultId: number,
+    status: ResultStatusEnum,
+    comment: string,
+    currentStatus: ResultStatusEnum,
+    body?: OptionalBody,
+  ): SubmissionHistory {
+    if (
+      this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
+      status === ResultStatusEnum.DRAFT &&
+      currentStatus === ResultStatusEnum.REQUESTED
+    ) {
+      const valid = validObject(body, [
+        'mel_regional_expert',
+        'oicr_internal_code',
+      ]);
+      if (!valid.isValid) {
+        throw new BadRequestException(
+          `The following fields are required to move OICR to draft status: ${valid.invalidFields.join(
+            ', ',
+          )}`,
+        );
+      }
+    }
     if (
       ![
         ResultStatusEnum.SUBMITTED,
         ResultStatusEnum.DRAFT,
         ResultStatusEnum.REVISED,
-      ].includes(currentStatus)
-    )
-      throw new ConflictException('Invalid current status');
-
-    const validation = await this.greenCheckRepository.canSubmit(
-      this.currentUserUtil.user_id,
-      resultId,
-    );
-
-    if (!validation) {
-      throw new ConflictException('You are not allowed to submit this result');
+        ResultStatusEnum.REQUESTED,
+      ].includes(currentStatus) &&
+      ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.DRAFT].includes(status)
+    ) {
+      const errorMessage = `Only results in ${ResultStatusNameEnum[ResultStatusEnum.DRAFT]}, ${ResultStatusNameEnum[ResultStatusEnum.REVISED]} or ${ResultStatusNameEnum[ResultStatusEnum.REQUESTED]} status can be changed to ${ResultStatusNameEnum[status]} status`;
+      throw new ConflictException(errorMessage);
     }
 
-    const result_status_id =
-      currentStatus === ResultStatusEnum.SUBMITTED
-        ? ResultStatusEnum.DRAFT
-        : ResultStatusEnum.SUBMITTED;
+    if (currentStatus === ResultStatusEnum.SUBMITTED && isEmpty(comment))
+      throw new BadRequestException(
+        'The comment is required when changing from submitted to draft',
+      );
+    return this.createHistoryObject(resultId, currentStatus, status, comment);
+  }
 
-    if (result_status_id === ResultStatusEnum.DRAFT && isEmpty(comment))
-      throw new BadRequestException('Comment is required');
+  private createHistoryObject(
+    resultId: number,
+    from?: ResultStatusEnum,
+    to?: ResultStatusEnum,
+    comment?: string,
+  ): SubmissionHistory {
+    const history = new SubmissionHistory();
+    history.submission_comment = comment;
+    history.from_status_id = from;
+    history.to_status_id = to;
+    history.result_id = resultId;
+    history.created_by = this.currentUserUtil.user_id;
+    return history;
+  }
 
-    const { completness } = await this.findByResultId(resultId);
+  async saveHistory(resultId: number, historyObject: SubmissionHistory) {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Result).update(resultId, {
+        result_status_id: historyObject.to_status_id,
+        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+      });
 
-    if (ResultStatusEnum.SUBMITTED === result_status_id && !completness) {
-      throw new ConflictException('The result is not complete');
-    }
+      const response = await manager.getRepository(SubmissionHistory).insert({
+        result_id: resultId,
+        submission_comment: historyObject.submission_comment,
+        from_status_id: historyObject.from_status_id,
+        to_status_id: historyObject.to_status_id,
+        ...this.currentUserUtil.audit(SetAutitEnum.NEW),
+      });
 
-    return this.saveHistory(
-      resultId,
-      comment,
-      currentStatus,
-      result_status_id,
-    ).then(async (res) => {
-      if (result_status_id === ResultStatusEnum.SUBMITTED) {
-        this.prepareEmailForSubmission(
-          resultId,
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          (data) =>
-            `[${this.appConfig.ARI_MIS}] Result ${this._resultsUtil.resultCode}, Action Required: Review New Result Submission`,
-        );
-      }
-      return res;
+      const history = await manager.getRepository(SubmissionHistory).findOne({
+        where: {
+          submission_history_id:
+            response.identifiers?.[0].submission_history_id,
+        },
+      });
+
+      return history;
     });
+  }
+
+  async prepareDataToEmail(
+    resultId: number,
+    toStatusId: ResultStatusEnum,
+    fromStatusId: ResultStatusEnum,
+    templateName: TemplateEnum,
+    history?: SubmissionHistory,
+  ) {
+    let prepareData = null;
+    if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
+      prepareData = this.greenCheckRepository
+        .oircData(resultId, {
+          url: `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`,
+          historyId: history?.submission_history_id,
+        })
+        .then(async (data) => {
+          const template = await this.templateService._getTemplate(
+            templateName,
+            data,
+          );
+
+          return { template, data };
+        });
+    } else if (toStatusId === ResultStatusEnum.SUBMITTED) {
+      prepareData = this.greenCheckRepository
+        .getDataForSubmissionResult(resultId)
+        .then(async (data) => {
+          const newData = {
+            pi_name: data.pi_name
+              .split(',')
+              .map((name) =>
+                name
+                  .trim()
+                  .toLowerCase()
+                  .split(' ')
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(' '),
+              )
+              .join(', '),
+            sub_last_name: this.currentUserUtil.user.last_name,
+            sub_first_name: this.currentUserUtil.user.first_name,
+            result_id: data.result_id,
+            title: data.title,
+            project_name: data.project_name,
+            support_email: this.appConfig.ARI_SUPPORT_EMAIL,
+            content_support_email: this.appConfig.ARI_CONTENT_SUPPORT_EMAIL,
+            system_name: this.appConfig.ARI_MIS,
+            rev_email:
+              data.contributor_id == this.currentUserUtil.user_id
+                ? data.contributor_email
+                : [
+                    data.contributor_email,
+                    this.currentUserUtil.user.email,
+                  ].join(', '),
+            url: `${this.appConfig.ARI_CLIENT_HOST}/result/${data.result_id}/general-information`,
+            indicator: data.indicator,
+          };
+          const template = await this.templateService._getTemplate(
+            TemplateEnum.SUBMITTED_RESULT,
+            newData,
+          );
+          return { template, data: newData };
+        });
+    } else {
+      prepareData = this.greenCheckRepository
+        .getDataForReviseResult(resultId, toStatusId, fromStatusId)
+        .then(async (data) => {
+          data['url'] =
+            `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`;
+          const template = await this.templateService._getTemplate(
+            templateName,
+            data,
+          );
+          return { template, data };
+        });
+    }
+    return prepareData;
   }
 
   async prepareEmail(
     resultId: number,
     toStatusId: ResultStatusEnum,
     fromStatusId: ResultStatusEnum,
-    templateName: TemplateEnum,
-    subject: (data: FindGeneralDataTemplateDto) => string,
+    body?: OptionalBody,
+    history?: SubmissionHistory,
   ) {
-    await this.greenCheckRepository
-      .getDataForReviseResult(resultId, toStatusId, fromStatusId)
-      .then(async (data) => {
-        data['url'] =
-          `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`;
-        const template = await this.templateService._getTemplate(
-          templateName,
-          data,
-        );
-        return { template, data };
-      })
-      .then(({ data, template }) =>
-        this.messageMicroservice.sendEmail({
-          to: data.sub_email,
-          cc: data.rev_email,
-          subject: subject(data),
-          message: {
-            socketFile: Buffer.from(template),
-          },
-        }),
-      );
-  }
+    let metadatos = null;
+    if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
+      metadatos = {
+        oicr_number: body?.oicr_internal_code,
+      };
+    }
 
-  async prepareEmailForSubmission(
-    resultId: number,
-    subject: (data: SubmissionEmailTemplateDataDto) => string,
-  ) {
-    await this.greenCheckRepository
-      .getDataForSubmissionResult(resultId)
-      .then(async (data) => {
-        const newData = {
-          pi_name: data.pi_name
-            .split(',')
-            .map((name) =>
-              name
-                .trim()
-                .toLowerCase()
-                .split(' ')
-                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' '),
-            )
-            .join(', '),
-          sub_last_name: this.currentUserUtil.user.last_name,
-          sub_first_name: this.currentUserUtil.user.first_name,
-          result_id: data.result_id,
-          title: data.title,
-          project_name: data.project_name,
-          support_email: this.appConfig.ARI_SUPPORT_EMAIL,
-          content_support_email: this.appConfig.ARI_CONTENT_SUPPORT_EMAIL,
-          system_name: this.appConfig.ARI_MIS,
-          rev_email:
-            data.contributor_id == this.currentUserUtil.user_id
-              ? data.contributor_email
-              : [data.contributor_email, this.currentUserUtil.user.email].join(
-                  ', ',
-                ),
-          url: `${this.appConfig.ARI_CLIENT_HOST}/result/${data.result_id}/general-information`,
-          indicator: data.indicator,
-        };
-        const template = await this.templateService._getTemplate(
-          TemplateEnum.SUBMITTED_RESULT,
-          newData,
+    const emailConfig = getTemplateByStatus(
+      toStatusId,
+      this._resultsUtil,
+      this.appConfig,
+      metadatos,
+    );
+
+    if (!emailConfig) return;
+
+    const prepareData = this.prepareDataToEmail(
+      resultId,
+      toStatusId,
+      fromStatusId,
+      emailConfig.template,
+      history,
+    );
+
+    await prepareData.then(({ data, template }) => {
+      let toSend = '';
+      let ccSend = '';
+      const bccSend = this.appConfig.INTERNAL_EMAIL_LIST;
+      if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
+        const tempData = data as unknown as MessageOicrDto;
+        const prepareCcEmail = [tempData.reviewed_by_email];
+        if (toStatusId === ResultStatusEnum.OICR_APPROVED) {
+          prepareCcEmail.push(tempData.mel_expert_email);
+        }
+        toSend = tempData.requester_by_email;
+        ccSend = this.appConfig.SET_SAFE_EMAIL(
+          prepareCcEmail.join(','),
+          this.currentUserUtil.user.email,
         );
-        return { template, data: newData };
-      })
-      .then(({ data, template }) =>
-        this.messageMicroservice.sendEmail({
-          to: this.currentUserUtil.user.email,
-          cc: data.rev_email,
-          subject: subject(data),
-          message: {
-            socketFile: Buffer.from(template),
-          },
-        }),
-      );
+      } else {
+        toSend =
+          toStatusId === ResultStatusEnum.SUBMITTED
+            ? this.currentUserUtil.user.email
+            : data.sub_email;
+        ccSend = data.rev_email;
+      }
+      this.messageMicroservice.sendEmail({
+        to: toSend,
+        cc: ccSend,
+        bcc: bccSend,
+        subject: emailConfig.subject,
+        message: {
+          socketFile: Buffer.from(template),
+        },
+      });
+    });
   }
 
   async getSubmissionHistory(resultId: number): Promise<SubmissionHistory[]> {
@@ -342,38 +520,43 @@ export class GreenChecksService {
         'Result not found or not approved for new reporting cycle',
       );
     }
-
-    return repoResult
-      .update(
-        {
+    const result = await this.dataSource
+      .getRepository(Result)
+      .findOne({
+        where: {
           result_official_code: resultCode,
-          is_snapshot: false,
           is_active: true,
+          is_snapshot: false,
         },
-        {
-          report_year_id: newReportYear,
-          result_status_id: ResultStatusEnum.DRAFT,
-          ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
-        },
-      )
-      .then(() => {
-        return this.dataSource.getRepository(Result).findOne({
-          where: {
-            result_official_code: resultCode,
-            is_active: true,
-            is_snapshot: false,
-          },
-        });
       })
       .then(async (result) => {
-        await this.saveHistory(
+        const newHistory = this.createHistoryObject(
           result.result_id,
-          null,
           result.result_status_id,
           ResultStatusEnum.DRAFT,
+          null,
         );
-
+        await this.saveHistory(result.result_id, newHistory);
         return result;
       });
+
+    await repoResult.update(
+      {
+        result_official_code: resultCode,
+        is_snapshot: false,
+        is_active: true,
+      },
+      {
+        report_year_id: newReportYear,
+        result_status_id: ResultStatusEnum.DRAFT,
+        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+      },
+    );
+
+    return {
+      ...result,
+      report_year_id: newReportYear,
+      result_status_id: ResultStatusEnum.DRAFT,
+    };
   }
 }

@@ -1,3 +1,4 @@
+import { LeverIcon } from '../../../tools/clarisa/entities/clarisa-levers/enum/LeversIcons.enum';
 import { Indicator } from '../../indicators/entities/indicator.entity';
 
 export class RawgressoContractDto {
@@ -52,12 +53,16 @@ export class AgressoContractLeverDto {
   public full_name: string;
   public short_name: string;
   public other_names: string;
+  public lever_url: string;
 
   constructor(rawData: Partial<RawgressoContractDto>) {
     this.id = Number(rawData.lever_id);
     this.full_name = rawData.lever_full_name;
     this.short_name = rawData.lever_short_name;
     this.other_names = rawData.lever_other_names;
+    this.lever_url = LeverIcon[rawData.lever_short_name]
+      ? `${process.env.ARI_BUCKET_URL}/images/levers${LeverIcon[rawData.lever_short_name]}`
+      : 'Not available';
   }
 }
 

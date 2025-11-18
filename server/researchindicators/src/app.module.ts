@@ -26,6 +26,7 @@ import { ResultOpenSearchModule } from './domain/tools/open-search/results/resul
 import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integration.module';
 import { DynamoFeedbackModule } from './domain/tools/dynamo-feedback/dynamo-feedback.module';
 import { AllianceStaffOpenSearchModule } from './domain/tools/open-search/alliance-staff/alliance-staff.opensearch.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AllianceStaffOpenSearchModule } from './domain/tools/open-search/allian
     AllianceStaffOpenSearchModule,
     TipIntegrationModule,
     DynamoFeedbackModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
@@ -66,10 +68,32 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(JwtMiddleware)
-      .exclude({
-        path: '/api/configuration/:key',
-        method: RequestMethod.GET,
-      })
+      .exclude(
+        {
+          path: '/api/configuration/:key',
+          method: RequestMethod.GET,
+        },
+        {
+          method: RequestMethod.GET,
+          path: '/',
+        },
+        {
+          path: '/admin(.*)',
+          method: RequestMethod.ALL,
+        },
+        {
+          path: '/admin/public(.*)',
+          method: RequestMethod.ALL,
+        },
+        {
+          path: '/.well-known(.*)',
+          method: RequestMethod.ALL,
+        },
+        {
+          path: '/favicon.ico',
+          method: RequestMethod.GET,
+        },
+      )
       .forRoutes({
         path: '*',
         method: RequestMethod.ALL,

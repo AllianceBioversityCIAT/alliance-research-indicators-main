@@ -1,4 +1,5 @@
 import { AuditableEntity } from '../global-dto/auditable.entity';
+import { isEmpty } from './object.utils';
 
 /**
  *
@@ -169,6 +170,31 @@ export const filterByUniqueKeyWithPriority = <T>(
   }
 
   return Array.from(map.values());
+};
+
+export const removeDuplicatesByKeys = <T>(
+  array: T[],
+  keys: (keyof T)[],
+): T[] => {
+  const seen = new Set();
+  return array.filter((item) => {
+    const compositeKey = keys
+      .map((key) => {
+        const value = item[key];
+        if (isEmpty(value)) {
+          return '';
+        }
+        return typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value);
+      })
+      .join('|');
+    if (seen.has(compositeKey)) {
+      return false;
+    }
+    seen.add(compositeKey);
+    return true;
+  });
 };
 
 export type ArrayType<T> = T extends (infer U)[] ? U : T;

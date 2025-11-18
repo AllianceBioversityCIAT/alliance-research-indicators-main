@@ -8,15 +8,51 @@ import { json, urlencoded } from 'express';
 import { AppMicroserviceModule } from './app-microservice.module';
 import { LoggerUtil } from './domain/shared/utils/logger.util';
 import helmet from 'helmet';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 const logger: LoggerUtil = new LoggerUtil({
   name: 'bootstrap',
 });
 async function httpservice() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableCors();
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            'http://localhost:5173',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
+          ],
+          styleSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
+          ],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: [
+            "'self'",
+            'http://localhost:5173',
+            'ws://localhost:5173',
+          ],
+          fontSrc: ["'self'", 'https://cdnjs.cloudflare.com'],
+        },
+      },
+    }),
+  );
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
+
+  // Serve static files for admin panel (React build files)
+  app.useStaticAssets(join(__dirname, 'admin', 'public'), {
+    prefix: '/admin/public/',
+  });
   const config = new DocumentBuilder()
     .setTitle('Research Indicators API')
     .setDescription(

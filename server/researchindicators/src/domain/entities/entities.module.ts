@@ -69,6 +69,18 @@ import { ResultInitiativesModule } from './result-initiatives/result-initiatives
 import { TempExternalOicrsModule } from './temp_external_oicrs/temp_external_oicrs.module';
 import { MaturityLevelModule } from './maturity-level/maturity-level.module';
 import { ResultInnovationToolFunctionModule } from './result-innovation-tool-function/result-innovation-tool-function.module';
+import { AllianceUserStaffGroupsModule } from './alliance-user-staff-groups/alliance-user-staff-groups.module';
+import { StaffGroupsModule } from './staff-groups/staff-groups.module';
+import { ResultLeverStrategicOutcomeModule } from './result-lever-strategic-outcome/result-lever-strategic-outcome.module';
+import { LeverStrategicOutcomeModule } from './lever-strategic-outcome/lever-strategic-outcome.module';
+import { ResultQuantificationsModule } from './result-quantifications/result-quantifications.module';
+import { QuantificationRolesModule } from './quantification-roles/quantification-roles.module';
+import { ResultNotableReferencesModule } from './result-notable-references/result-notable-references.module';
+import { NotableReferenceTypesModule } from './notable-reference-types/notable-reference-types.module';
+import { InformativeRolesModule } from './informative-roles/informative-roles.module';
+import { ResultImpactAreasModule } from './result-impact-areas/result-impact-areas.module';
+import { ImpactAreaScoreModule } from './impact-area-score/impact-area-score.module';
+import { ResultImpactAreaGlobalTargetsModule } from './result-impact-area-global-targets/result-impact-area-global-targets.module';
 
 @Module({
   imports: [
@@ -142,6 +154,18 @@ import { ResultInnovationToolFunctionModule } from './result-innovation-tool-fun
     TempExternalOicrsModule,
     MaturityLevelModule,
     ResultInnovationToolFunctionModule,
+    AllianceUserStaffGroupsModule,
+    StaffGroupsModule,
+    ResultLeverStrategicOutcomeModule,
+    LeverStrategicOutcomeModule,
+    ResultQuantificationsModule,
+    QuantificationRolesModule,
+    ResultNotableReferencesModule,
+    NotableReferenceTypesModule,
+    InformativeRolesModule,
+    ResultImpactAreasModule,
+    ImpactAreaScoreModule,
+    ResultImpactAreaGlobalTargetsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

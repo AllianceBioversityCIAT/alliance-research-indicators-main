@@ -40,6 +40,7 @@ import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import {
   filterByUniqueKeyWithPriority,
   mergeArraysWithPriority,
+  removeDuplicatesByKeys,
 } from '../../shared/utils/array.util';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
@@ -51,6 +52,13 @@ import {
   RegionDto,
   ResultMappedDto,
 } from './dto/response-oicr-word-template.dto';
+import { ReviewDto } from './dto/review.dto';
+import { StaffGroupsEnum } from '../staff-groups/enum/staff-groups.enum';
+import { ResultQuantificationsService } from '../result-quantifications/result-quantifications.service';
+import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
+import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
+import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
+import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
 
 @Injectable()
 export class ResultOicrService {
@@ -70,6 +78,10 @@ export class ResultOicrService {
     private readonly mainRepo: ResultOicrRepository,
     private readonly tempExternalOicrsService: TempExternalOicrsService,
     private readonly resultContractService: ResultContractsService,
+    private readonly resultQuantificationsService: ResultQuantificationsService,
+    private readonly resultNotableReferencesService: ResultNotableReferencesService,
+    private readonly resultImpactAreasService: ResultImpactAreasService,
+    private readonly resultImpactAreaGlobalTargetsService: ResultImpactAreaGlobalTargetsService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -98,14 +110,14 @@ export class ResultOicrService {
         data.base_information,
         platform_code,
         {
-          leverEnum: LeverRolesEnum.OICR_ALIGNMENT,
+          leverEnum: LeverRolesEnum.ALIGNMENT,
           result_status_id: ResultStatusEnum.REQUESTED,
           notMap: { lever: true },
         },
       );
       const lever = await this.resultLeversService.find(
         result.result_id,
-        LeverRolesEnum.OICR_ALIGNMENT,
+        LeverRolesEnum.ALIGNMENT,
       );
       const fullLevers = mergeArraysWithPriority<ResultLever>(
         data?.step_two?.primary_lever,
@@ -176,6 +188,13 @@ export class ResultOicrService {
       short_outcome_impact_statement: data?.short_outcome_impact_statement,
       general_comment: data?.general_comment,
       maturity_level_id: data?.maturity_level_id,
+      for_external_use: data?.for_external_use,
+      for_external_use_description: data?.for_external_use_description,
+      mel_regional_expert_id: data?.mel_regional_expert_id,
+      mel_staff_group_id: StaffGroupsEnum.MEL_REGIONAL_EXPERT,
+      sharepoint_link: isEmpty(data?.sharepoint_link?.trim())
+        ? null
+        : data.sharepoint_link,
       ...this.currentUser.audit(SetAutitEnum.UPDATE),
     });
 
@@ -196,6 +215,60 @@ export class ResultOicrService {
       'external_oicr_id',
     );
 
+    await this.resultQuantificationsService.upsertByCompositeKeys(
+      resultId,
+      data?.actual_count ?? [],
+      ['quantification_number', 'unit', 'description'],
+      QuantificationRolesEnum.ACTUAL_COUNT,
+    );
+
+    await this.resultQuantificationsService.upsertByCompositeKeys(
+      resultId,
+      data?.extrapolate_estimates ?? [],
+      ['quantification_number', 'unit', 'description'],
+      QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+    );
+
+    await this.resultNotableReferencesService.upsertByCompositeKeys(
+      resultId,
+      data?.notable_references ?? [],
+      ['notable_reference_type_id', 'link'],
+    );
+
+    const impactToSave = removeDuplicatesByKeys(
+      data?.result_impact_areas ?? [],
+      ['impact_area_id'],
+    );
+
+    const savedImpactAreas = await this.resultImpactAreasService.create(
+      resultId,
+      impactToSave,
+      'impact_area_id',
+      undefined,
+      undefined,
+      ['impact_area_score_id'],
+    );
+
+    savedImpactAreas.forEach((impactArea) => {
+      impactArea.result_impact_area_global_targets = impactToSave.find(
+        (ia) => ia.impact_area_id === impactArea.impact_area_id,
+      )?.result_impact_area_global_targets;
+    });
+
+    await this.resultImpactAreaGlobalTargetsService.disableAllByResultId(
+      resultId,
+    );
+
+    for (const impactArea of savedImpactAreas) {
+      await this.resultImpactAreaGlobalTargetsService.create(
+        impactArea.id,
+        impactArea?.global_target_id
+          ? [{ global_target_id: impactArea.global_target_id }]
+          : [],
+        'global_target_id',
+      );
+    }
+
     await this.updateDataUtil.updateLastUpdatedDate(resultId);
   }
 
@@ -215,6 +288,34 @@ export class ResultOicrService {
       .find(resultId)
       .then((links) => links?.[0]);
 
+    const quantifications =
+      await this.resultQuantificationsService.findByResultIdAndRoles(resultId, [
+        QuantificationRolesEnum.ACTUAL_COUNT,
+        QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+      ]);
+
+    const result_impact_areas =
+      await this.resultImpactAreasService.find(resultId);
+
+    const globalTargets =
+      await this.resultImpactAreaGlobalTargetsService.findByResultImpactAreaIds(
+        result_impact_areas.map((ri) => ri.id),
+      );
+
+    result_impact_areas.forEach((ria) => {
+      const globalTargetsForRia = globalTargets.filter(
+        (gt) => gt.result_impact_area_id === ria.id,
+      );
+      ria.result_impact_area_global_targets = globalTargetsForRia;
+      ria.global_target_id =
+        globalTargetsForRia.length > 0
+          ? globalTargetsForRia[0].global_target_id
+          : null;
+    });
+
+    const notable_references =
+      await this.resultNotableReferencesService.find(resultId);
+
     return {
       general_comment: oicr?.general_comment,
       maturity_level_id: oicr?.maturity_level_id,
@@ -223,6 +324,21 @@ export class ResultOicrService {
       short_outcome_impact_statement: oicr?.short_outcome_impact_statement,
       tagging,
       link_result,
+      sharepoint_link: oicr?.sharepoint_link,
+      mel_regional_expert_id: oicr?.mel_regional_expert_id,
+      actual_count: quantifications?.filter(
+        (q) =>
+          q.quantification_role_id === QuantificationRolesEnum.ACTUAL_COUNT,
+      ),
+      extrapolate_estimates: quantifications?.filter(
+        (q) =>
+          q.quantification_role_id ===
+          QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+      ),
+      notable_references,
+      for_external_use: oicr?.for_external_use,
+      for_external_use_description: oicr?.for_external_use_description,
+      result_impact_areas,
     };
   }
 
@@ -302,7 +418,7 @@ export class ResultOicrService {
       resultId,
       datalever,
       'lever_id',
-      LeverRolesEnum.OICR_ALIGNMENT,
+      LeverRolesEnum.ALIGNMENT,
       manager,
       ['is_primary'],
     );
@@ -422,7 +538,7 @@ export class ResultOicrService {
   private async findStepTwoOicr(resultId: number): Promise<StepTwoOicrDto> {
     const allLevers = await this.resultLeversService.find(
       resultId,
-      LeverRolesEnum.OICR_ALIGNMENT,
+      LeverRolesEnum.ALIGNMENT,
     );
 
     const leverId =
@@ -440,6 +556,28 @@ export class ResultOicrService {
         ),
       contributor_lever: allLevers.filter((lever) => !lever.is_primary),
     };
+  }
+
+  async review(resultId: number, data: ReviewDto) {
+    const existingRecord = await this.mainRepo.findOne({
+      where: {
+        is_active: true,
+        oicr_internal_code: data?.oicr_internal_code,
+        result_id: Not(resultId),
+      },
+    });
+    if (existingRecord)
+      throw new BadRequestException('OICR Internal Code already exists');
+
+    await this.mainRepo.update(resultId, {
+      oicr_internal_code: data.oicr_internal_code,
+      mel_regional_expert_id: data.mel_regional_expert,
+      mel_staff_group_id: StaffGroupsEnum.MEL_REGIONAL_EXPERT,
+      sharepoint_link: isEmpty(data?.sharepoint_link?.trim())
+        ? null
+        : data.sharepoint_link,
+      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+    });
   }
 
   async getResultOicrDetailsByOfficialCode(

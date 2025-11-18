@@ -54,6 +54,8 @@ export class JwtMiddleware implements NestMiddleware {
         origin ?? ip,
       );
 
+      if (!isValid.isValid) throw new UnauthorizedException('Invalid token');
+
       req.user = isValid.user;
       return next();
     } else {

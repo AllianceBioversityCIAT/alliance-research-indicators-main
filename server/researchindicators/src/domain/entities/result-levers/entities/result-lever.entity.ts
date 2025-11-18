@@ -3,6 +3,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
@@ -10,6 +11,7 @@ import { LeverRole } from '../../lever-roles/entities/lever-role.entity';
 import { Result } from '../../results/entities/result.entity';
 import { ClarisaLever } from '../../../tools/clarisa/entities/clarisa-levers/entities/clarisa-lever.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { ResultLeverStrategicOutcome } from '../../result-lever-strategic-outcome/entities/result-lever-strategic-outcome.entity';
 
 @Entity('result_levers')
 export class ResultLever extends AuditableEntity {
@@ -75,4 +77,11 @@ export class ResultLever extends AuditableEntity {
   @ManyToOne(() => ClarisaLever, (clarisaLever) => clarisaLever.result_levers)
   @JoinColumn({ name: 'lever_id' })
   lever!: ClarisaLever;
+
+  @OneToMany(
+    () => ResultLeverStrategicOutcome,
+    (result_lever_strategic_outcome) =>
+      result_lever_strategic_outcome.result_lever,
+  )
+  result_lever_strategic_outcomes: ResultLeverStrategicOutcome[];
 }

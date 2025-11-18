@@ -30,6 +30,8 @@ import { CreateSecretDto, MisSimpleInfoDto } from './dto/clarisa.types';
 import { ClarisaInstitutionLocation } from './entities/clarisa-institution-locations/entities/clarisa-institution-location.entity';
 import { ClarisaSdg } from './entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 import { ResClarisaValidateConectioDto } from './dto/clarisa-create-conection.dto';
+import { ClarisaImpactArea } from './entities/clarisa-impact-areas/entities/clarisa-impact-area.entity';
+import { ClarisaGlobalTarget } from './entities/clarisa-global-targets/entities/clarisa-global-target.entity';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -93,6 +95,16 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
   async cloneAllClarisaEntities(): Promise<void> {
     this._logger.debug('Cloning all entities from Clarisa API');
 
+    await this.base<ClarisaGlobalTarget>(
+      ClarisaPathEnum.GLOBAL_TARGETS,
+      ClarisaGlobalTarget,
+    );
+
+    await this.base<ClarisaImpactArea>(
+      ClarisaPathEnum.IMPACT_AREAS,
+      ClarisaImpactArea,
+    );
+
     await this.base<ClarisaSdg>(ClarisaPathEnum.SDG, ClarisaSdg);
 
     await this.base<ClarisaRegion>(ClarisaPathEnum.REGIONS, ClarisaRegion);
@@ -111,9 +123,10 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
 
     const institutionsPath = await this.ciService.clonePath();
     const institutionLocation: Partial<ClarisaInstitutionLocation>[] = [];
-    await this.base<CreateClarisaInstitutionDto, ClarisaInstitution>(
+    await this.baseBatches<CreateClarisaInstitutionDto, ClarisaInstitution>(
       institutionsPath,
       ClarisaInstitution,
+      100,
       (data) => institutionMapper(data, institutionLocation),
     );
 

@@ -46,6 +46,7 @@ export class ResultsUtil {
           result_official_code: true,
           result_id: true,
           indicator_id: true,
+          result_status_id: true,
         },
         where,
       })
@@ -70,6 +71,16 @@ export class ResultsUtil {
     return this.currentResult.result_official_code;
   }
 
+  get statusId(): number {
+    if (!this.currentResult) throw new BadRequestException('Result not found');
+    return this.currentResult.result_status_id;
+  }
+
+  get indicatorId(): number {
+    if (!this.currentResult) throw new BadRequestException('Result not found');
+    return this.currentResult.indicator_id;
+  }
+
   get nullResultCode(): number {
     return this.currentResult?.result_official_code ?? null;
   }
@@ -80,6 +91,14 @@ export class ResultsUtil {
 
   get nullReportYearId(): number {
     return this.currentResult?.report_year_id ?? null;
+  }
+
+  get nullStatusId(): number {
+    return this.currentResult?.result_status_id ?? null;
+  }
+
+  get nullIndicatorId(): number {
+    return this.currentResult?.indicator_id ?? null;
   }
 }
 

@@ -49,13 +49,18 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     const aceptInstitutions: Partial<ResultInstitution>[] = [];
     const pendingInstitutions: Partial<ResultInstitutionAi>[] = [];
     for (const institution of institutios) {
-      if (parseInt(institution.similarity_score) >= 70)
+      if (
+        parseInt(institution.similarity_score) >= 70 &&
+        institution?.institution_id
+      )
         aceptInstitutions.push({
           institution_id: parseInt(institution.institution_id),
         });
       else
         pendingInstitutions.push({
-          institution_id: parseInt(institution.institution_id),
+          institution_id: institution?.institution_id
+            ? parseInt(institution.institution_id)
+            : null,
           institution_role_id: institution_role,
           institution_name: institution.institution_name,
           score: parseInt(institution.similarity_score),

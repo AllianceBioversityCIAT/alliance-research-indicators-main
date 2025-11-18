@@ -26,7 +26,7 @@ export class GlobalExceptions implements ExceptionFilter {
     const res: ServerResponseDto<unknown> = {
       description: description,
       status: status,
-      errors: error,
+      errors: exception?.response?.message ? exception.response.message : error,
       timestamp: new Date().toISOString(),
       path: request.url,
     };

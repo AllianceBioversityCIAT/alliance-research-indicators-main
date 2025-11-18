@@ -11,6 +11,9 @@ import {
   FindGeneralDataTemplateDto,
 } from '../dto/find-general-data-template.dto';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
+import { MessageOicrDto } from '../dto/message-oicr.dto';
+import { formatString } from '../../../shared/utils/queries.util';
+import { format } from 'date-fns-tz';
 
 @Injectable()
 export class GreenCheckRepository {
@@ -55,6 +58,10 @@ export class GreenCheckRepository {
     return `innovation_dev_validation(${result_key}) as innovation_dev`;
   }
 
+  oicrValidation(result_key: string) {
+    return `oicr_validation(${result_key}) as oicr`;
+  }
+
   async calculateGreenChecks(result_id: number): Promise<FindGreenChecksDto> {
     const indicator: IndicatorsEnum = await this.dataSource
       .getRepository(Result)
@@ -70,16 +77,16 @@ export class GreenCheckRepository {
     const result_key = 'r.result_id';
     switch (indicator) {
       case IndicatorsEnum.POLICY_CHANGE:
-        spesificQuery = this.policyChangeValidation(result_key);
+        spesificQuery += `,${this.policyChangeValidation(result_key)}`;
         break;
       case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
-        spesificQuery = this.capSharingValidation(result_key);
+        spesificQuery += `,${this.capSharingValidation(result_key)}`;
         break;
       case IndicatorsEnum.INNOVATION_DEV:
-        spesificQuery = this.innovationDevValidation(result_key);
+        spesificQuery += `,${this.innovationDevValidation(result_key)}`;
         break;
       case IndicatorsEnum.OICR:
-        spesificQuery = `1 as oicr`;
+        spesificQuery += `,${this.oicrValidation(result_key)}`;
         break;
     }
 
@@ -94,11 +101,11 @@ export class GreenCheckRepository {
 
     const query = `
             SELECT
-                ${this.generalInformationValidation(result_key)},
-                ${this.alignmentValidation(result_key)},
-                ${this.geoLocationValidation(result_key)},
-                ${this.partnersValidation(result_key)},
-                ${this.evidencesValidation(result_key)},
+                ${this.generalInformationValidation(result_key)}
+                ,${this.alignmentValidation(result_key)}
+                ,${this.geoLocationValidation(result_key)}
+                ,${this.partnersValidation(result_key)}
+                ,${this.evidencesValidation(result_key)}
                 ${spesificQuery}
             FROM results r
             WHERE r.result_id = ?
@@ -218,6 +225,48 @@ export class GreenCheckRepository {
     const result: FindDataForSubmissionDto = await this.dataSource
       .query(query, [resultId])
       .then((result) => (result?.length ? result[0] : null));
+
+    return result;
+  }
+
+  async oircData(
+    resultId: number,
+    metadatos: { url: string; historyId?: number },
+  ): Promise<MessageOicrDto> {
+    const query = `SELECT r.title,
+                    ro.oicr_internal_code as oicr_number,
+                    CONCAT(aus.first_name, ' ',aus.last_name) as mel_expert_name,
+                    CONCAT(su.first_name, ', ',su.last_name ) as requester_by,
+                    IFNULL(ro.sharepoint_link, 'To be shared by MEL Regional Expert') as sharepoint_url,
+                    CONCAT(su2.first_name, ', ',su2.last_name ) as reviewed_by,
+                    sh.created_at as decision_date,
+                    sh.submission_comment as justification,
+                    ${formatString(metadatos?.url) ?? 'NULL'} as url,
+                    su.email as requester_by_email,
+                    su2.email as reviewed_by_email,
+                    aus.email as mel_expert_email
+                  FROM results r
+                  LEFT JOIN result_oicrs ro ON ro.result_id = r.result_id 
+                  LEFT JOIN alliance_user_staff aus ON aus.carnet = ro.mel_regional_expert
+                  LEFT JOIN sec_users su ON su.sec_user_id = r.created_by 
+                  LEFT JOIN submission_history sh ON sh.result_id = r.result_id 
+                                                  ${metadatos?.historyId ? `AND sh.submission_history_id = ${metadatos.historyId}` : ''}
+                  LEFT JOIN sec_users su2 ON su2.sec_user_id = sh.created_by 
+                  WHERE sh.is_active = TRUE
+                    AND sh.from_status_id = 9
+                  ORDER BY sh.created_at DESC
+                  LIMIT 1;`;
+
+    const result: MessageOicrDto = await this.dataSource
+      .query(query, [resultId])
+      .then((result) => (result?.length ? result[0] : null));
+
+    result.url = metadatos?.url;
+    result.decision_date = format(
+      new Date(result.decision_date).toISOString(),
+      "dd/MM/yyyy 'at' HH:mm",
+      { timeZone: 'Europe/Rome' },
+    );
 
     return result;
   }
