@@ -792,6 +792,27 @@ export class ResultsService {
       .then((result) => result != null);
   }
 
+  async filterResultByIndicators(
+    resultIds: number[],
+    indicators: IndicatorsEnum[],
+    not: boolean = false,
+  ): Promise<number[]> {
+    if (isEmpty(indicators)) {
+      return resultIds;
+    }
+
+    const results = await this.mainRepo.find({
+      select: { result_id: true },
+      where: {
+        result_id: In(resultIds),
+        indicator_id: not ? Not(In(indicators)) : In(indicators),
+        is_active: true,
+      },
+    });
+
+    return results.map((el) => el.result_id);
+  }
+
   async formalizeResult(result: ResultRawAi) {
     let resultExists: Result = null;
     try {

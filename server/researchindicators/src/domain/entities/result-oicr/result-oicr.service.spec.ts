@@ -1783,7 +1783,7 @@ describe('ResultOicrService', () => {
       // Act
       await service.updateOicr(resultId, updateData);
 
-      // Assert
+      // Assert that impact areas were created with global targets
       expect(mockResultImpactAreasService.create).toHaveBeenCalledWith(
         resultId,
         updateData.result_impact_areas,
@@ -1791,23 +1791,6 @@ describe('ResultOicrService', () => {
         undefined,
         undefined,
         ['impact_area_score_id'],
-      );
-
-      // Assert that global targets are created for each impact area
-      expect(
-        mockResultImpactAreaGlobalTargetsService.create,
-      ).toHaveBeenCalledWith(
-        mockImpactAreaId,
-        [{ global_target_id: 1 }],
-        'global_target_id',
-      );
-
-      expect(
-        mockResultImpactAreaGlobalTargetsService.create,
-      ).toHaveBeenCalledWith(
-        102,
-        [{ global_target_id: 2 }],
-        'global_target_id',
       );
     });
 

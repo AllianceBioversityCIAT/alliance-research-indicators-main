@@ -61,6 +61,7 @@ import { NotableReferenceTypesModule } from '../entities/notable-reference-types
 import { InformativeRolesModule } from '../entities/informative-roles/informative-roles.module';
 import { ResultUsersModule } from '../entities/result-users/result-users.module';
 import { ImpactAreaScoreModule } from '../entities/impact-area-score/impact-area-score.module';
+import { LinkResultsModule } from '../entities/link-results/link-results.module';
 
 const capSharingChildren: Routes = [
   {
@@ -364,6 +365,10 @@ const children: Routes = [
   {
     path: 'impact-area-score',
     module: ImpactAreaScoreModule,
+  },
+  {
+    path: 'link-results',
+    module: LinkResultsModule,
   },
 ];
 
