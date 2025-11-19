@@ -13,7 +13,6 @@ import { ResultOicrRepository } from './repositories/result-oicr.repository';
 import { TempExternalOicrsModule } from '../temp_external_oicrs/temp_external_oicrs.module';
 import { ResultContractsModule } from '../result-contracts/result-contracts.module';
 import { ResultQuantificationsModule } from '../result-quantifications/result-quantifications.module';
-import { ResultNotableReferencesModule } from '../result-notable-references/result-notable-references.module';
 import { ResultImpactAreasModule } from '../result-impact-areas/result-impact-areas.module';
 import { ResultImpactAreaGlobalTargetsModule } from '../result-impact-area-global-targets/result-impact-area-global-targets.module';
 import { AllianceUserStaffGroupsModule } from '../alliance-user-staff-groups/alliance-user-staff-groups.module';
@@ -32,7 +31,6 @@ import { AllianceUserStaffGroupsModule } from '../alliance-user-staff-groups/all
     TempExternalOicrsModule,
     ResultContractsModule,
     ResultQuantificationsModule,
-    ResultNotableReferencesModule,
     ResultImpactAreasModule,
     ResultImpactAreaGlobalTargetsModule,
     AllianceUserStaffGroupsModule,

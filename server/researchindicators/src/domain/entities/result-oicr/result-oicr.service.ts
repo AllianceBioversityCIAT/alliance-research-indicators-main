@@ -56,7 +56,6 @@ import { ReviewDto } from './dto/review.dto';
 import { StaffGroupsEnum } from '../staff-groups/enum/staff-groups.enum';
 import { ResultQuantificationsService } from '../result-quantifications/result-quantifications.service';
 import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
-import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
 import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
 import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
 
@@ -79,7 +78,6 @@ export class ResultOicrService {
     private readonly tempExternalOicrsService: TempExternalOicrsService,
     private readonly resultContractService: ResultContractsService,
     private readonly resultQuantificationsService: ResultQuantificationsService,
-    private readonly resultNotableReferencesService: ResultNotableReferencesService,
     private readonly resultImpactAreasService: ResultImpactAreasService,
     private readonly resultImpactAreaGlobalTargetsService: ResultImpactAreaGlobalTargetsService,
   ) {}
@@ -229,12 +227,6 @@ export class ResultOicrService {
       QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
     );
 
-    await this.resultNotableReferencesService.upsertByCompositeKeys(
-      resultId,
-      data?.notable_references ?? [],
-      ['notable_reference_type_id', 'link'],
-    );
-
     const impactToSave = removeDuplicatesByKeys(
       data?.result_impact_areas ?? [],
       ['impact_area_id'],
@@ -316,9 +308,6 @@ export class ResultOicrService {
           : null;
     });
 
-    const notable_references =
-      await this.resultNotableReferencesService.find(resultId);
-
     return {
       general_comment: oicr?.general_comment,
       maturity_level_id: oicr?.maturity_level_id,
@@ -338,7 +327,6 @@ export class ResultOicrService {
           q.quantification_role_id ===
           QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
       ),
-      notable_references,
       for_external_use: oicr?.for_external_use,
       for_external_use_description: oicr?.for_external_use_description,
       result_impact_areas,
