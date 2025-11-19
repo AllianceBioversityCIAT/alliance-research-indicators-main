@@ -1803,16 +1803,13 @@ describe('ResultOicrService', () => {
             id: mockImpactAreaId,
             impact_area_id: 1,
             impact_area_score_id: 2,
-            result_impact_area_global_targets: [
-              { global_target_id: 1 } as any,
-              { global_target_id: 3 } as any,
-            ],
+            global_target_id: 1,
           } as any,
           {
             id: 102,
             impact_area_id: 2,
             impact_area_score_id: 1,
-            result_impact_area_global_targets: [{ global_target_id: 2 } as any],
+            global_target_id: 2,
           } as any,
         ],
       };
@@ -1830,18 +1827,20 @@ describe('ResultOicrService', () => {
           id: mockImpactAreaId,
           impact_area_id: 1,
           impact_area_score_id: 2,
+          global_target_id: 1,
         },
         {
           id: 102,
           impact_area_id: 2,
           impact_area_score_id: 1,
+          global_target_id: 2,
         },
       ]);
 
       // Act
       await service.updateOicr(resultId, updateData);
 
-      // Assert
+      // Assert that impact areas were created with global targets
       expect(mockResultImpactAreasService.create).toHaveBeenCalledWith(
         resultId,
         updateData.result_impact_areas,
@@ -1849,22 +1848,6 @@ describe('ResultOicrService', () => {
         undefined,
         undefined,
         ['impact_area_score_id'],
-      );
-
-      expect(
-        mockResultImpactAreaGlobalTargetsService.create,
-      ).toHaveBeenCalledWith(
-        mockImpactAreaId,
-        updateData.result_impact_areas[0].result_impact_area_global_targets,
-        'global_target_id',
-      );
-
-      expect(
-        mockResultImpactAreaGlobalTargetsService.create,
-      ).toHaveBeenCalledWith(
-        102,
-        updateData.result_impact_areas[1].result_impact_area_global_targets,
-        'global_target_id',
       );
     });
 
