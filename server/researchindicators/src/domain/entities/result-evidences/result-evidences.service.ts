@@ -7,6 +7,9 @@ import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { isEmpty } from '../../shared/utils/object.utils';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
+import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
+import { ResultsUtil } from '../../shared/utils/results.util';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 @Injectable()
 export class ResultEvidencesService extends BaseServiceSimple<
   ResultEvidence,
@@ -16,6 +19,8 @@ export class ResultEvidencesService extends BaseServiceSimple<
     private dataSource: DataSource,
     currentUser: CurrentUserUtil,
     private readonly _updateDataUtil: UpdateDataUtil,
+    private readonly resultNotableReferencesService: ResultNotableReferencesService,
+    private readonly _resultsUtil: ResultsUtil,
   ) {
     super(
       ResultEvidence,
@@ -31,11 +36,19 @@ export class ResultEvidencesService extends BaseServiceSimple<
     resultEvidences: CreateResultEvidenceDto,
   ) {
     return this.dataSource.transaction(async (manager) => {
-      const { evidence } = resultEvidences;
-      const filterEvidence = evidence?.filter(
+      const filterEvidence = resultEvidences?.evidence?.filter(
         (el) =>
           !isEmpty(el?.evidence_description) || !isEmpty(el?.evidence_url),
       );
+
+      if (this._resultsUtil.indicatorId == IndicatorsEnum.OICR) {
+        await this.resultNotableReferencesService.upsertByCompositeKeys(
+          resultId,
+          resultEvidences?.notable_references ?? [],
+          ['notable_reference_type_id', 'link'],
+        );
+      }
+
       return await this.create(
         resultId,
         filterEvidence,
@@ -61,8 +74,17 @@ export class ResultEvidencesService extends BaseServiceSimple<
       },
     });
 
-    return {
+    const returnEvidences = {
       evidence: resultEvidences,
+      notable_references: null,
     };
+
+    if (this._resultsUtil.indicatorId == IndicatorsEnum.OICR) {
+      const notableReferences =
+        await this.resultNotableReferencesService.find(resultId);
+      returnEvidences.notable_references = notableReferences;
+    }
+
+    return returnEvidences;
   }
 }
