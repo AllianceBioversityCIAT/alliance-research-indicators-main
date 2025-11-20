@@ -62,6 +62,10 @@ export class GreenCheckRepository {
     return `oicr_validation(${result_key}) as oicr`;
   }
 
+  link_resultValidation(result_key: string) {
+    return `link_result_validation(${result_key}) as link_result`;
+  }
+
   async calculateGreenChecks(result_id: number): Promise<FindGreenChecksDto> {
     const indicator: IndicatorsEnum = await this.dataSource
       .getRepository(Result)
@@ -106,6 +110,7 @@ export class GreenCheckRepository {
                 ,${this.geoLocationValidation(result_key)}
                 ,${this.partnersValidation(result_key)}
                 ,${this.evidencesValidation(result_key)}
+                ,${this.link_resultValidation(result_key)}
                 ${spesificQuery}
             FROM results r
             WHERE r.result_id = ?
