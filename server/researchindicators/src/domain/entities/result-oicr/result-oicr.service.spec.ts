@@ -1783,7 +1783,7 @@ describe('ResultOicrService', () => {
       // Act
       await service.updateOicr(resultId, updateData);
 
-      // Assert
+      // Assert that impact areas were created with global targets
       expect(mockResultImpactAreasService.create).toHaveBeenCalledWith(
         resultId,
         updateData.result_impact_areas,

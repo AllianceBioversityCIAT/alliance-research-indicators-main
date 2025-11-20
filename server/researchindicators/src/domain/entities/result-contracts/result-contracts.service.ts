@@ -6,6 +6,7 @@ import { selectManager } from '../../shared/utils/orm.util';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { ContractRolesEnum } from './enum/contract-roles.enum';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { isEmpty } from '../../shared/utils/object.utils';
 
 @Injectable()
 export class ResultContractsService extends BaseServiceSimple<
@@ -52,6 +53,11 @@ export class ResultContractsService extends BaseServiceSimple<
         is_active: true,
       },
     });
+  }
+
+  getPrincipalContractByResultsIds(resultsIds: number[]) {
+    if (isEmpty(resultsIds)) return [];
+    return this.mainRepo.getPrimaryContractByResultIds(resultsIds);
   }
 
   protected lastRefactoredAfterSave<ContractRolesEnum>(

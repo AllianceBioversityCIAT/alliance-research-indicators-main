@@ -94,4 +94,37 @@ export class ResultContractsRepository extends Repository<ResultContract> {
       response?.length ? response[0].id : null,
     );
   }
+
+  async getPrimaryContractByResultIds(
+    resultIds: number[],
+  ): Promise<ResultContract[]> {
+    const query = `SELECT 
+      rc.contract_id,
+      rc.result_id,
+      rc.is_active,
+      rc.is_primary,
+      ac.*
+    FROM result_contracts rc 
+      JOIN agresso_contracts ac ON ac.agreement_id = rc.contract_id 
+    WHERE rc.is_primary = TRUE
+      AND rc.is_active = TRUE
+      AND rc.result_id IN (?);`;
+    const results = await this.query(query, [resultIds]);
+    const response: ResultContract[] = [];
+
+    results.forEach((res: any) => {
+      const resultContract = new ResultContract();
+      resultContract.contract_id = res.contract_id;
+      resultContract.result_id = res.result_id;
+      resultContract.is_active = res.is_active;
+      resultContract.is_primary = res.is_primary;
+      delete res.contract_id;
+      delete res.result_id;
+      delete res.is_active;
+      delete res.is_primary;
+      resultContract.agresso_contract = res;
+      response.push(resultContract);
+    });
+    return response;
+  }
 }
