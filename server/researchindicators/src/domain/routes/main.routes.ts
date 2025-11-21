@@ -59,6 +59,7 @@ import { InformativeRolesModule } from '../entities/informative-roles/informativ
 import { ResultUsersModule } from '../entities/result-users/result-users.module';
 import { ImpactAreaScoreModule } from '../entities/impact-area-score/impact-area-score.module';
 import { LinkResultsModule } from '../entities/link-results/link-results.module';
+import { ResultStatusTransitionsModule } from '../entities/result-status-transitions/result-status-transitions.module';
 
 const capSharingChildren: Routes = [
   {
@@ -116,6 +117,12 @@ const ResultsChildren: Routes = [
   {
     path: 'status',
     module: ResultStatusModule,
+    children: [
+      {
+        path: 'transitions',
+        module: ResultStatusTransitionsModule,
+      },
+    ],
   },
   {
     path: 'alliance-user-staff',
