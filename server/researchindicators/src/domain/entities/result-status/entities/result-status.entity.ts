@@ -3,6 +3,7 @@ import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
 import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
+import { ResultStatusTransition } from '../../result-status-transitions/entities/result-status-transition.entity';
 
 @Entity('result_status')
 export class ResultStatus extends AuditableEntity {
@@ -47,4 +48,16 @@ export class ResultStatus extends AuditableEntity {
     (submissionHistory) => submissionHistory.to_status,
   )
   submission_histories_to!: SubmissionHistory[];
+
+  @OneToMany(
+    () => ResultStatusTransition,
+    (resultStatusTransition) => resultStatusTransition.from_status,
+  )
+  fromResultStatusTransitions!: ResultStatusTransition[];
+
+  @OneToMany(
+    () => ResultStatusTransition,
+    (resultStatusTransition) => resultStatusTransition.to_status,
+  )
+  toResultStatusTransitions!: ResultStatusTransition[];
 }

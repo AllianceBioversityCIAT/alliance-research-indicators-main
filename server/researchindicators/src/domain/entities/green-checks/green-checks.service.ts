@@ -160,9 +160,50 @@ export class GreenChecksService {
           comment,
           currentStatus,
         );
+      case ResultStatusEnum.SCIENCE_EDITION:
+      case ResultStatusEnum.KM_CURATION:
+      case ResultStatusEnum.PUBLISHED:
+        return this.changeBasicStatusOicrs(
+          resultId,
+          status,
+          comment,
+          currentStatus,
+        );
       default:
         throw new ConflictException('Invalid status');
     }
+  }
+
+  private changeBasicStatusOicrs(
+    resultId: number,
+    status: ResultStatusEnum,
+    comment: string,
+    currentStatus: ResultStatusEnum,
+  ) {
+    const OICR_STATUS_TRANSITIONS = {
+      [ResultStatusEnum.SCIENCE_EDITION]: {
+        allowedFrom: [ResultStatusEnum.DRAFT],
+        message:
+          'Only results in draft status can be changed to Science Edition status',
+      },
+      [ResultStatusEnum.KM_CURATION]: {
+        allowedFrom: [ResultStatusEnum.SCIENCE_EDITION],
+        message:
+          'Only results in Science Edition status can be changed to KM Curation status',
+      },
+      [ResultStatusEnum.PUBLISHED]: {
+        allowedFrom: [ResultStatusEnum.KM_CURATION],
+        message:
+          'Only results in KM Curation status can be changed to Published status',
+      },
+    };
+
+    const transition = OICR_STATUS_TRANSITIONS[status];
+
+    if (transition && !transition.allowedFrom.includes(currentStatus)) {
+      throw new ConflictException(transition.message);
+    }
+    return this.createHistoryObject(resultId, currentStatus, status, comment);
   }
 
   private prevalidateFunctions(status: ResultStatusEnum) {
@@ -432,6 +473,20 @@ export class GreenChecksService {
     return prepareData;
   }
 
+  private exitPrepareEmail(status: ResultStatusEnum) {
+    if (
+      [
+        ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.KM_CURATION,
+        ResultStatusEnum.PUBLISHED,
+      ].includes(status)
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
   async prepareEmail(
     resultId: number,
     toStatusId: ResultStatusEnum,
@@ -439,9 +494,11 @@ export class GreenChecksService {
     body?: OptionalBody,
     history?: SubmissionHistory,
   ) {
-    let metadatos = null;
+    if (this.exitPrepareEmail(toStatusId)) return;
+
+    let metaData = null;
     if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
-      metadatos = {
+      metaData = {
         oicr_number: body?.oicr_internal_code,
       };
     }
@@ -450,7 +507,7 @@ export class GreenChecksService {
       toStatusId,
       this._resultsUtil,
       this.appConfig,
-      metadatos,
+      metaData,
     );
 
     if (!emailConfig) return;
