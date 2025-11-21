@@ -1747,12 +1747,17 @@ describe('ResultOicrService', () => {
             impact_area_id: 1,
             impact_area_score_id: 2,
             global_target_id: 1,
+            result_impact_area_global_targets: [
+              { global_target_id: 1 } as any,
+              { global_target_id: 3 } as any,
+            ],
           } as any,
           {
             id: 102,
             impact_area_id: 2,
             impact_area_score_id: 1,
             global_target_id: 2,
+            result_impact_area_global_targets: [{ global_target_id: 2 } as any],
           } as any,
         ],
       };
@@ -1765,20 +1770,28 @@ describe('ResultOicrService', () => {
       mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
 
       // Mock the create method to return the saved impact areas
-      mockResultImpactAreasService.create.mockResolvedValue([
-        {
-          id: mockImpactAreaId,
-          impact_area_id: 1,
-          impact_area_score_id: 2,
-          global_target_id: 1,
-        },
-        {
-          id: 102,
-          impact_area_id: 2,
-          impact_area_score_id: 1,
-          global_target_id: 2,
-        },
-      ]);
+      mockResultImpactAreasService.create.mockImplementation(async () => {
+        return [
+          {
+            id: mockImpactAreaId,
+            impact_area_id: 1,
+            impact_area_score_id: 2,
+            global_target_id: 1,
+            result_impact_area_global_targets:
+              updateData.result_impact_areas[0]
+                .result_impact_area_global_targets,
+          },
+          {
+            id: 102,
+            impact_area_id: 2,
+            impact_area_score_id: 1,
+            global_target_id: 2,
+            result_impact_area_global_targets:
+              updateData.result_impact_areas[1]
+                .result_impact_area_global_targets,
+          },
+        ];
+      });
 
       // Act
       await service.updateOicr(resultId, updateData);
@@ -1791,6 +1804,22 @@ describe('ResultOicrService', () => {
         undefined,
         undefined,
         ['impact_area_score_id'],
+      );
+
+      expect(
+        mockResultImpactAreaGlobalTargetsService.create,
+      ).toHaveBeenCalledWith(
+        mockImpactAreaId,
+        [{ global_target_id: 1 }],
+        'global_target_id',
+      );
+
+      expect(
+        mockResultImpactAreaGlobalTargetsService.create,
+      ).toHaveBeenCalledWith(
+        102,
+        [{ global_target_id: 2 }],
+        'global_target_id',
       );
     });
 

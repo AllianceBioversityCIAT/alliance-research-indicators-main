@@ -86,6 +86,7 @@ import { InformativeRolesModule } from './informative-roles/informative-roles.mo
 import { ResultImpactAreasModule } from './result-impact-areas/result-impact-areas.module';
 import { ImpactAreaScoreModule } from './impact-area-score/impact-area-score.module';
 import { ResultImpactAreaGlobalTargetsModule } from './result-impact-area-global-targets/result-impact-area-global-targets.module';
+import { ResultStatusTransitionsModule } from './result-status-transitions/result-status-transitions.module';
 
 @Module({
   imports: [
@@ -176,6 +177,7 @@ import { ResultImpactAreaGlobalTargetsModule } from './result-impact-area-global
     ResultImpactAreasModule,
     ImpactAreaScoreModule,
     ResultImpactAreaGlobalTargetsModule,
+    ResultStatusTransitionsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
