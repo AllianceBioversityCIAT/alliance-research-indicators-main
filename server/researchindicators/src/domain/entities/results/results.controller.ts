@@ -170,6 +170,12 @@ export class ResultsController {
     type: String,
     description: 'filter by result codes',
   })
+  @ApiQuery({
+    name: 'platform-code',
+    required: false,
+    type: String,
+    description: 'filter by platform code',
+  })
   @ApiOperation({ summary: 'Find all results' })
   @Get()
   async find(
@@ -191,6 +197,7 @@ export class ResultsController {
     @Query('create-user-codes', ListParseToArrayPipe) userCode: string[],
     @Query('years', ListParseToArrayPipe) years: string[],
     @Query('result-codes', ListParseToArrayPipe) resultCodes: string[],
+    @Query('platform-code', ListParseToArrayPipe) platform_code: string[],
   ) {
     return this.resultsService
       .findResults({
@@ -212,6 +219,7 @@ export class ResultsController {
         user_codes: userCode,
         years: years,
         resultCodes: resultCodes,
+        platform_code: platform_code,
       })
       .then((el) =>
         ResponseUtils.format({
