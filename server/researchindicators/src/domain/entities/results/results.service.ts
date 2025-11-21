@@ -146,6 +146,7 @@ export class ResultsService {
       user_codes: filters?.user_codes,
       years: filters?.years,
       resultCodes: filters?.resultCodes,
+      platform_code: filters?.platform_code,
     });
   }
 

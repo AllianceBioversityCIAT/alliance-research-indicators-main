@@ -267,6 +267,7 @@ export class ResultRepository
     const haveUsersCodes = !isEmpty(filters?.user_codes);
     const haveYears = !isEmpty(filters?.years);
     const haveResultCodes = !isEmpty(filters?.resultCodes);
+    const havePlatformCodes = !isEmpty(filters?.platform_code);
 
     let limit: string = '';
 
@@ -294,6 +295,7 @@ export class ResultRepository
 		r.geo_scope_id,
 		r.result_status_id,
 		r.report_year_id,
+    r.external_link,
 		IF(
         COUNT(r2.report_year_id) = 0,
         JSON_ARRAY(),
@@ -326,6 +328,7 @@ export class ResultRepository
 		${haveStatusCodes ? `AND r.result_status_id IN (${formatArrayToQuery<string>(filters.status_codes)})` : ''}
 		${haveYears ? `AND r.report_year_id IN (${formatArrayToQuery<string>(filters.years)})` : ''}
 		${haveUsersCodes ? `AND r.created_by IN (${formatArrayToQuery<string>(filters.user_codes)})` : ''}
+    ${havePlatformCodes ? `AND r.platform_code IN (${formatArrayToQuery<string>(filters.platform_code)})` : ''}
 	GROUP BY r.result_id
 		${queryParts.result_audit_data?.groupBy}
 		${queryParts.contracts?.groupBy}
@@ -368,6 +371,7 @@ export interface ResultFiltersInterface {
   user_codes: string[];
   years: string[];
   resultCodes: string[];
+  platform_code?: string[];
 }
 
 export interface CreateResultQueryInterface {
