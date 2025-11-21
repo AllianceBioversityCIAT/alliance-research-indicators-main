@@ -182,9 +182,9 @@ export class GreenChecksService {
   ) {
     const OICR_STATUS_TRANSITIONS = {
       [ResultStatusEnum.SCIENCE_EDITION]: {
-        allowedFrom: [ResultStatusEnum.DRAFT],
+        allowedFrom: [ResultStatusEnum.DRAFT, ResultStatusEnum.KM_CURATION],
         message:
-          'Only results in draft status can be changed to Science Edition status',
+          'Only results in draft or KM Curation status can be changed to Science Edition status',
       },
       [ResultStatusEnum.KM_CURATION]: {
         allowedFrom: [ResultStatusEnum.SCIENCE_EDITION],
@@ -266,7 +266,11 @@ export class GreenChecksService {
     comment: string,
     currentStatus: ResultStatusEnum,
   ) {
-    if (currentStatus !== ResultStatusEnum.REQUESTED)
+    if (
+      ![ResultStatusEnum.REQUESTED, ResultStatusEnum.SCIENCE_EDITION].includes(
+        currentStatus,
+      )
+    )
       throw new ConflictException(
         `Only OIRC in requested status can be ${ResultStatusNameEnum[status]} status`,
       );
@@ -280,22 +284,15 @@ export class GreenChecksService {
     comment: string,
     currentStatus: ResultStatusEnum,
   ): SubmissionHistory {
-    if (
-      ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.REQUESTED].includes(
-        currentStatus,
-      )
-    ) {
+    const isOicr = this._resultsUtil.indicatorId === IndicatorsEnum.OICR;
+
+    const allowedStatuses = isOicr
+      ? [ResultStatusEnum.DRAFT, ResultStatusEnum.REQUESTED]
+      : [ResultStatusEnum.SUBMITTED];
+
+    if (!allowedStatuses.includes(currentStatus)) {
       throw new ConflictException(
         `Only results in submitted or requested status can be ${ResultStatusNameEnum[status]}`,
-      );
-    }
-
-    if (
-      currentStatus === ResultStatusEnum.REQUESTED &&
-      status !== ResultStatusEnum.REJECTED
-    ) {
-      throw new ConflictException(
-        `Only results in requested status can be changed to ${ResultStatusNameEnum[ResultStatusEnum.REJECTED]} status`,
       );
     }
 
@@ -340,10 +337,11 @@ export class GreenChecksService {
         ResultStatusEnum.DRAFT,
         ResultStatusEnum.REVISED,
         ResultStatusEnum.REQUESTED,
+        ResultStatusEnum.SCIENCE_EDITION,
       ].includes(currentStatus) &&
       ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.DRAFT].includes(status)
     ) {
-      const errorMessage = `Only results in ${ResultStatusNameEnum[ResultStatusEnum.DRAFT]}, ${ResultStatusNameEnum[ResultStatusEnum.REVISED]} or ${ResultStatusNameEnum[ResultStatusEnum.REQUESTED]} status can be changed to ${ResultStatusNameEnum[status]} status`;
+      const errorMessage = `Only results in ${ResultStatusNameEnum[ResultStatusEnum.DRAFT]}, ${ResultStatusNameEnum[ResultStatusEnum.SCIENCE_EDITION]}, ${ResultStatusNameEnum[ResultStatusEnum.REVISED]} or ${ResultStatusNameEnum[ResultStatusEnum.REQUESTED]} status can be changed to ${ResultStatusNameEnum[status]} status`;
       throw new ConflictException(errorMessage);
     }
 
