@@ -90,7 +90,8 @@ export class GreenCheckRepository {
         spesificQuery += `,${this.innovationDevValidation(result_key)}`;
         break;
       case IndicatorsEnum.OICR:
-        spesificQuery += `,${this.oicrValidation(result_key)}`;
+        spesificQuery += `,${this.oicrValidation(result_key)}
+        ,${this.link_resultValidation(result_key)}`;
         break;
     }
 
@@ -110,7 +111,6 @@ export class GreenCheckRepository {
                 ,${this.geoLocationValidation(result_key)}
                 ,${this.partnersValidation(result_key)}
                 ,${this.evidencesValidation(result_key)}
-                ,${this.link_resultValidation(result_key)}
                 ${spesificQuery}
             FROM results r
             WHERE r.result_id = ?
