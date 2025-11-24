@@ -42,9 +42,15 @@ export class ResultEvidencesService extends BaseServiceSimple<
       );
 
       if (this._resultsUtil.indicatorId == IndicatorsEnum.OICR) {
+        const filterNotableReferences =
+          resultEvidences?.notable_references?.filter(
+            (el) =>
+              !isEmpty(el?.link) || !isEmpty(el?.notable_reference_type_id),
+          );
+
         await this.resultNotableReferencesService.upsertByCompositeKeys(
           resultId,
-          resultEvidences?.notable_references ?? [],
+          filterNotableReferences ?? [],
           ['notable_reference_type_id', 'link'],
         );
       }
