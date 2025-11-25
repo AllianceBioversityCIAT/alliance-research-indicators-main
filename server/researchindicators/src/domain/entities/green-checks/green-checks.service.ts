@@ -472,13 +472,18 @@ export class GreenChecksService {
     return prepareData;
   }
 
-  private exitPrepareEmail(status: ResultStatusEnum) {
+  private exitPrepareEmail(
+    status: ResultStatusEnum,
+    fromStatus?: ResultStatusEnum,
+  ) {
     if (
       [
         ResultStatusEnum.SCIENCE_EDITION,
         ResultStatusEnum.KM_CURATION,
         ResultStatusEnum.PUBLISHED,
-      ].includes(status)
+      ].includes(status) ||
+      (status === ResultStatusEnum.DRAFT &&
+        fromStatus === ResultStatusEnum.SCIENCE_EDITION)
     ) {
       return true;
     }
@@ -493,7 +498,7 @@ export class GreenChecksService {
     body?: OptionalBody,
     history?: SubmissionHistory,
   ) {
-    if (this.exitPrepareEmail(toStatusId)) return;
+    if (this.exitPrepareEmail(toStatusId, fromStatusId)) return;
 
     let metaData = null;
     if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
