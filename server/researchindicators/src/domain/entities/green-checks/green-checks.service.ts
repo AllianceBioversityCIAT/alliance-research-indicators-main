@@ -160,9 +160,50 @@ export class GreenChecksService {
           comment,
           currentStatus,
         );
+      case ResultStatusEnum.SCIENCE_EDITION:
+      case ResultStatusEnum.KM_CURATION:
+      case ResultStatusEnum.PUBLISHED:
+        return this.changeBasicStatusOicrs(
+          resultId,
+          status,
+          comment,
+          currentStatus,
+        );
       default:
         throw new ConflictException('Invalid status');
     }
+  }
+
+  private changeBasicStatusOicrs(
+    resultId: number,
+    status: ResultStatusEnum,
+    comment: string,
+    currentStatus: ResultStatusEnum,
+  ) {
+    const OICR_STATUS_TRANSITIONS = {
+      [ResultStatusEnum.SCIENCE_EDITION]: {
+        allowedFrom: [ResultStatusEnum.DRAFT, ResultStatusEnum.KM_CURATION],
+        message:
+          'Only results in draft or KM Curation status can be changed to Science Edition status',
+      },
+      [ResultStatusEnum.KM_CURATION]: {
+        allowedFrom: [ResultStatusEnum.SCIENCE_EDITION],
+        message:
+          'Only results in Science Edition status can be changed to KM Curation status',
+      },
+      [ResultStatusEnum.PUBLISHED]: {
+        allowedFrom: [ResultStatusEnum.KM_CURATION],
+        message:
+          'Only results in KM Curation status can be changed to Published status',
+      },
+    };
+
+    const transition = OICR_STATUS_TRANSITIONS[status];
+
+    if (transition && !transition.allowedFrom.includes(currentStatus)) {
+      throw new ConflictException(transition.message);
+    }
+    return this.createHistoryObject(resultId, currentStatus, status, comment);
   }
 
   private prevalidateFunctions(status: ResultStatusEnum) {
@@ -197,7 +238,8 @@ export class GreenChecksService {
 
     if (
       this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
-      status === ResultStatusEnum.DRAFT
+      status === ResultStatusEnum.DRAFT &&
+      currentStatus === ResultStatusEnum.REQUESTED
     ) {
       await this.resultOicrService.review(this._resultsUtil.resultId, body);
     }
@@ -225,7 +267,11 @@ export class GreenChecksService {
     comment: string,
     currentStatus: ResultStatusEnum,
   ) {
-    if (currentStatus !== ResultStatusEnum.REQUESTED)
+    if (
+      ![ResultStatusEnum.REQUESTED, ResultStatusEnum.SCIENCE_EDITION].includes(
+        currentStatus,
+      )
+    )
       throw new ConflictException(
         `Only OIRC in requested status can be ${ResultStatusNameEnum[status]} status`,
       );
@@ -239,22 +285,15 @@ export class GreenChecksService {
     comment: string,
     currentStatus: ResultStatusEnum,
   ): SubmissionHistory {
-    if (
-      ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.REQUESTED].includes(
-        currentStatus,
-      )
-    ) {
+    const isOicr = this._resultsUtil.indicatorId === IndicatorsEnum.OICR;
+
+    const allowedStatuses = isOicr
+      ? [ResultStatusEnum.DRAFT, ResultStatusEnum.REQUESTED]
+      : [ResultStatusEnum.SUBMITTED];
+
+    if (!allowedStatuses.includes(currentStatus)) {
       throw new ConflictException(
         `Only results in submitted or requested status can be ${ResultStatusNameEnum[status]}`,
-      );
-    }
-
-    if (
-      currentStatus === ResultStatusEnum.REQUESTED &&
-      status !== ResultStatusEnum.REJECTED
-    ) {
-      throw new ConflictException(
-        `Only results in requested status can be changed to ${ResultStatusNameEnum[ResultStatusEnum.REJECTED]} status`,
       );
     }
 
@@ -299,10 +338,11 @@ export class GreenChecksService {
         ResultStatusEnum.DRAFT,
         ResultStatusEnum.REVISED,
         ResultStatusEnum.REQUESTED,
+        ResultStatusEnum.SCIENCE_EDITION,
       ].includes(currentStatus) &&
       ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.DRAFT].includes(status)
     ) {
-      const errorMessage = `Only results in ${ResultStatusNameEnum[ResultStatusEnum.DRAFT]}, ${ResultStatusNameEnum[ResultStatusEnum.REVISED]} or ${ResultStatusNameEnum[ResultStatusEnum.REQUESTED]} status can be changed to ${ResultStatusNameEnum[status]} status`;
+      const errorMessage = `Only results in ${ResultStatusNameEnum[ResultStatusEnum.DRAFT]}, ${ResultStatusNameEnum[ResultStatusEnum.SCIENCE_EDITION]}, ${ResultStatusNameEnum[ResultStatusEnum.REVISED]} or ${ResultStatusNameEnum[ResultStatusEnum.REQUESTED]} status can be changed to ${ResultStatusNameEnum[status]} status`;
       throw new ConflictException(errorMessage);
     }
 
@@ -432,6 +472,25 @@ export class GreenChecksService {
     return prepareData;
   }
 
+  private exitPrepareEmail(
+    status: ResultStatusEnum,
+    fromStatus?: ResultStatusEnum,
+  ) {
+    if (
+      [
+        ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.KM_CURATION,
+        ResultStatusEnum.PUBLISHED,
+      ].includes(status) ||
+      (status === ResultStatusEnum.DRAFT &&
+        fromStatus === ResultStatusEnum.SCIENCE_EDITION)
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
   async prepareEmail(
     resultId: number,
     toStatusId: ResultStatusEnum,
@@ -439,9 +498,11 @@ export class GreenChecksService {
     body?: OptionalBody,
     history?: SubmissionHistory,
   ) {
-    let metadatos = null;
+    if (this.exitPrepareEmail(toStatusId, fromStatusId)) return;
+
+    let metaData = null;
     if (this._resultsUtil.indicatorId === IndicatorsEnum.OICR) {
-      metadatos = {
+      metaData = {
         oicr_number: body?.oicr_internal_code,
       };
     }
@@ -450,7 +511,7 @@ export class GreenChecksService {
       toStatusId,
       this._resultsUtil,
       this.appConfig,
-      metadatos,
+      metaData,
     );
 
     if (!emailConfig) return;
@@ -473,7 +534,10 @@ export class GreenChecksService {
         if (toStatusId === ResultStatusEnum.OICR_APPROVED) {
           prepareCcEmail.push(tempData.mel_expert_email);
         }
-        toSend = tempData.requester_by_email;
+        toSend = this.appConfig.SET_SAFE_EMAIL(
+          tempData.requester_by_email,
+          this.currentUserUtil.user.email,
+        );
         ccSend = this.appConfig.SET_SAFE_EMAIL(
           prepareCcEmail.join(','),
           this.currentUserUtil.user.email,

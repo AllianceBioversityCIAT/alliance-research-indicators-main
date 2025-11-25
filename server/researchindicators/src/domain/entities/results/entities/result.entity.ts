@@ -165,6 +165,12 @@ export class Result extends AuditableEntity {
   })
   is_partner_not_applicable?: boolean;
 
+  @Column('text', {
+    name: 'external_link',
+    nullable: true,
+  })
+  external_link?: string;
+
   @ManyToOne(
     () => ReportingPlatform,
     (reportingPlatform) => reportingPlatform.results,

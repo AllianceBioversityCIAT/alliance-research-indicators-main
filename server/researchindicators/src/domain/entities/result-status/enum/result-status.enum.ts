@@ -15,6 +15,9 @@ export enum ResultStatusEnum {
   REQUESTED = 9,
   OICR_APPROVED = 10,
   POSTPONE = 11,
+  SCIENCE_EDITION = 12,
+  KM_CURATION = 13,
+  PUBLISHED = 14,
 }
 
 export const ResultStatusNameEnum = {
@@ -29,6 +32,9 @@ export const ResultStatusNameEnum = {
   9: 'Requested',
   10: 'OICR Approved',
   11: 'OICR Postpone',
+  12: 'Science Edition',
+  13: 'KM Curation',
+  14: 'Published',
 };
 
 export const getTemplateByStatus = (
