@@ -529,7 +529,10 @@ export class GreenChecksService {
         if (toStatusId === ResultStatusEnum.OICR_APPROVED) {
           prepareCcEmail.push(tempData.mel_expert_email);
         }
-        toSend = tempData.requester_by_email;
+        toSend = this.appConfig.SET_SAFE_EMAIL(
+          tempData.requester_by_email,
+          this.currentUserUtil.user.email,
+        );
         ccSend = this.appConfig.SET_SAFE_EMAIL(
           prepareCcEmail.join(','),
           this.currentUserUtil.user.email,
