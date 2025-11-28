@@ -17,6 +17,8 @@ export class RawgressoContractDto {
   public lever_short_name: string;
   public lever_full_name: string;
   public lever_other_names: string;
+  public is_science_program: boolean;
+  public funding_type: string;
 
   constructor(partial: Partial<RawgressoContractDto>) {
     Object.assign(this, partial);
@@ -79,6 +81,8 @@ export class MappedContractsDto {
   public count_results: number;
   public indicators: AgressoContractIndicatorObjectDto[];
   public levers: AgressoContractLeverDto;
+  public is_science_program: boolean;
+  public funding_type: string;
 
   constructor(rawData: Partial<RawgressoContractDto>, indicators: Indicator[]) {
     this.agreement_id = rawData.agreement_id;
@@ -91,6 +95,8 @@ export class MappedContractsDto {
     this.endDatefinance = rawData.endDatefinance;
     this.contract_status = rawData.contract_status;
     this.count_results = rawData.count_results;
+    this.is_science_program = Boolean(rawData.is_science_program);
+    this.funding_type = rawData.funding_type;
     this.indicators = indicators.map(
       (indicator) => new AgressoContractIndicatorObjectDto(indicator, 0),
     );

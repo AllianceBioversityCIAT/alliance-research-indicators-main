@@ -208,6 +208,12 @@ export class AgressoContractController {
     type: String,
     description: 'Search query to filter results',
   })
+  @ApiQuery({
+    name: 'exclude-pooled-funding',
+    required: false,
+    description: 'Exclude pooled funding contracts from results',
+    enum: TrueFalseEnum,
+  })
   async findContracts(
     @Query('current-user') currentUser: TrueFalseEnum,
     @Query('contract-code') contractCode: string,
@@ -222,6 +228,7 @@ export class AgressoContractController {
     @Query('limit') limit: string,
     @Query('query') query: string,
     @Query('direction') direction: 'ASC' | 'DESC' = 'ASC',
+    @Query('exclude-pooled-funding') excludePooledFunding: TrueFalseEnum,
   ) {
     return this.agressoContractService
       .findAgressoContracts(
@@ -234,6 +241,7 @@ export class AgressoContractController {
           start_date: startDate,
           end_date: endDate,
           status: status.map((s) => AgressoContractStatus[s?.toUpperCase()]),
+          exclude_pooled_funding: excludePooledFunding == TrueFalseEnum.TRUE,
         },
         orderField,
         direction,
