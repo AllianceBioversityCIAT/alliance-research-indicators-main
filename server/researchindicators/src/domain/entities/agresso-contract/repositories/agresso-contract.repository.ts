@@ -342,7 +342,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         paginated_contracts.lever_short_name,
         paginated_contracts.lever_full_name,
         paginated_contracts.lever_other_names,
-        paginated_contracts.is_science_program
+        paginated_contracts.is_science_program,
+        paginated_contracts.funding_type
     FROM (
         SELECT DISTINCT
             ac.agreement_id,
@@ -358,7 +359,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             cl.short_name as lever_short_name,
             cl.full_name as lever_full_name,
             cl.other_names as lever_other_names,
-            IF(pfc.id IS NOT NULL, TRUE, FALSE) AS is_science_program
+            IF(pfc.id IS NOT NULL, TRUE, FALSE) AS is_science_program,
+            ac.funding_type
         FROM agresso_contracts ac
         LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
