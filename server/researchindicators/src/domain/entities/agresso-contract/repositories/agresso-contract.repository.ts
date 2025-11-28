@@ -368,7 +368,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
                                               AND pfc.is_active = TRUE
         ${userContracts(user?.sec_user_id)}
         WHERE 1=1
-        ${filter?.exclude_pooled_funding ? `AND pfc.id IS NULL AND pfc.funding_type <> 'W1/W2'` : ''}
+        ${filter?.exclude_pooled_funding ? `AND pfc.id IS NULL AND ac.funding_type <> 'W1/W2'` : ''}
         ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR (ac.project_lead_description like '%${user.first_name}%' AND ac.project_lead_description like '%${user.last_name}%'))` : ''}
         ${validFilter(queryConditions, `AND (${queryConditions})`)}
         ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter?.contract_code}'`)}
