@@ -341,7 +341,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         paginated_contracts.lever_id,
         paginated_contracts.lever_short_name,
         paginated_contracts.lever_full_name,
-        paginated_contracts.lever_other_names
+        paginated_contracts.lever_other_names,
+        paginated_contracts.is_science_program
     FROM (
         SELECT DISTINCT
             ac.agreement_id,
@@ -356,12 +357,16 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             cl.id as lever_id,
             cl.short_name as lever_short_name,
             cl.full_name as lever_full_name,
-            cl.other_names as lever_other_names
+            cl.other_names as lever_other_names,
+            IF(pfc.id IS NOT NULL, TRUE, FALSE) AS is_science_program
         FROM agresso_contracts ac
         LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
+        LEFT JOIN pooled_funding_contracts pfc ON pfc.agreement_id = ac.agreement_id
+                                              AND pfc.is_active = TRUE
         ${userContracts(user?.sec_user_id)}
         WHERE 1=1
+        ${filter?.exclude_pooled_funding ? `AND pfc.id IS NULL` : ''}
         ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR (ac.project_lead_description like '%${user.first_name}%' AND ac.project_lead_description like '%${user.last_name}%'))` : ''}
         ${validFilter(queryConditions, `AND (${queryConditions})`)}
         ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter?.contract_code}'`)}

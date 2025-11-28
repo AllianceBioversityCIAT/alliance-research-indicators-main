@@ -260,6 +260,7 @@ describe('AgressoContractController', () => {
         '10',
         'test query',
         'DESC',
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -275,6 +276,7 @@ describe('AgressoContractController', () => {
             AgressoContractStatus.ONGOING,
             AgressoContractStatus.COMPLETED,
           ],
+          exclude_pooled_funding: false,
         },
         OrderFieldsEnum.START_DATE,
         'DESC',
@@ -309,6 +311,7 @@ describe('AgressoContractController', () => {
         '10',
         undefined,
         undefined,
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -321,6 +324,7 @@ describe('AgressoContractController', () => {
           start_date: undefined,
           end_date: undefined,
           status: [],
+          exclude_pooled_funding: false,
         },
         undefined,
         'ASC',
@@ -355,6 +359,7 @@ describe('AgressoContractController', () => {
         '10',
         undefined,
         'ASC',
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
