@@ -4,6 +4,7 @@ import { AgressoContractCountry } from '../../agresso-contract-countries/entitie
 import { UserAgressoContract } from '../../user-agresso-contracts/entities/user-agresso-contract.entity';
 import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
 import { ClarisaSdg } from '../../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
+import { PooledFundingContract } from '../../pooled-funding-contracts/entities/pooled-funding-contract.entity';
 
 @Entity('agresso_contracts')
 export class AgressoContract extends AuditableEntity {
@@ -262,4 +263,10 @@ export class AgressoContract extends AuditableEntity {
     (resultContract) => resultContract.agresso_contract,
   )
   result_contracts?: ResultContract[];
+
+  @OneToMany(
+    () => PooledFundingContract,
+    (pooledFundingContract) => pooledFundingContract.agresso_contract,
+  )
+  pooled_funding_contracts?: PooledFundingContract[];
 }
