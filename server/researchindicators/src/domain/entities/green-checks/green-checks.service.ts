@@ -187,7 +187,10 @@ export class GreenChecksService {
           'Only results in draft or KM Curation status can be changed to Science Edition status',
       },
       [ResultStatusEnum.KM_CURATION]: {
-        allowedFrom: [ResultStatusEnum.SCIENCE_EDITION],
+        allowedFrom: [
+          ResultStatusEnum.SCIENCE_EDITION,
+          ResultStatusEnum.PUBLISHED,
+        ],
         message:
           'Only results in Science Edition status can be changed to KM Curation status',
       },
