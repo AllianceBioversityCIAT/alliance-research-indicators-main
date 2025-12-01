@@ -271,9 +271,11 @@ export class GreenChecksService {
     currentStatus: ResultStatusEnum,
   ) {
     if (
-      ![ResultStatusEnum.REQUESTED, ResultStatusEnum.SCIENCE_EDITION].includes(
-        currentStatus,
-      )
+      ![
+        ResultStatusEnum.REQUESTED,
+        ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.DRAFT,
+      ].includes(currentStatus)
     )
       throw new ConflictException(
         `Only OIRC in requested status can be ${ResultStatusNameEnum[status]} status`,
