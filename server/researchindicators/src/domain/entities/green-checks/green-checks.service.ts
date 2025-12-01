@@ -412,6 +412,7 @@ export class GreenChecksService {
         .oircData(resultId, {
           url: `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`,
           historyId: history?.submission_history_id,
+          is_requested: fromStatusId === ResultStatusEnum.REQUESTED,
         })
         .then(async (data) => {
           const template = await this.templateService._getTemplate(

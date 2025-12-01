@@ -236,7 +236,7 @@ export class GreenCheckRepository {
 
   async oircData(
     resultId: number,
-    metadatos: { url: string; historyId?: number },
+    metadatos: { url: string; historyId?: number; is_requested?: boolean },
   ): Promise<MessageOicrDto> {
     const query = `SELECT r.title,
                     ro.oicr_internal_code as oicr_number,
@@ -258,7 +258,7 @@ export class GreenCheckRepository {
                                                   ${metadatos?.historyId ? `AND sh.submission_history_id = ${metadatos.historyId}` : ''}
                   LEFT JOIN sec_users su2 ON su2.sec_user_id = sh.created_by 
                   WHERE sh.is_active = TRUE
-                    AND sh.from_status_id = 9
+                    ${metadatos?.is_requested ? `AND sh.from_status_id = 9` : ''}
                   ORDER BY sh.created_at DESC
                   LIMIT 1;`;
 
