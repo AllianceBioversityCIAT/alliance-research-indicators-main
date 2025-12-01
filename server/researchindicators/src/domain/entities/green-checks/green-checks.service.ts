@@ -344,6 +344,7 @@ export class GreenChecksService {
         ResultStatusEnum.REVISED,
         ResultStatusEnum.REQUESTED,
         ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.POSTPONE,
       ].includes(currentStatus) &&
       ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.DRAFT].includes(status)
     ) {
