@@ -32,7 +32,7 @@ export class ClarisaInstitutionsService extends ControlListBaseService<
   ) {
     const query = this.mainRepo
       .createQueryBuilder('institution')
-      .where('1=1')
+      .where('1=1 AND institution.is_active = :isActive', { isActive: true })
       .orderBy('institution.code', 'ASC');
 
     if (location == TrueFalseEnum.TRUE) {
