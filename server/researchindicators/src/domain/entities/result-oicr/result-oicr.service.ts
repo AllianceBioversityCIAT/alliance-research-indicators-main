@@ -242,9 +242,12 @@ export class ResultOicrService {
     );
 
     savedImpactAreas.forEach((impactArea) => {
-      impactArea.result_impact_area_global_targets = impactToSave.find(
+      const tempImpactArea = impactToSave.find(
         (ia) => ia.impact_area_id === impactArea.impact_area_id,
-      )?.result_impact_area_global_targets;
+      );
+      impactArea.result_impact_area_global_targets =
+        tempImpactArea?.result_impact_area_global_targets;
+      impactArea.global_target_id = tempImpactArea?.global_target_id;
     });
 
     await this.resultImpactAreaGlobalTargetsService.disableAllByResultId(
