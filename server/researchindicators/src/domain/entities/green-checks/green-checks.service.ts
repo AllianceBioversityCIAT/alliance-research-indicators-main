@@ -293,7 +293,11 @@ export class GreenChecksService {
     const isOicr = this._resultsUtil.indicatorId === IndicatorsEnum.OICR;
 
     const allowedStatuses = isOicr
-      ? [ResultStatusEnum.DRAFT, ResultStatusEnum.REQUESTED]
+      ? [
+          ResultStatusEnum.DRAFT,
+          ResultStatusEnum.REQUESTED,
+          ResultStatusEnum.POSTPONE,
+        ]
       : [ResultStatusEnum.SUBMITTED];
 
     if (!allowedStatuses.includes(currentStatus)) {
