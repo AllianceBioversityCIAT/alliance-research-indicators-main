@@ -56,7 +56,7 @@ export class LinkResultsController {
       .saveLinkResults(
         this._resultUtil.resultId,
         body,
-        [IndicatorsEnum.KNOWLEDGE_PRODUCT, IndicatorsEnum.OICR],
+        [IndicatorsEnum.OICR],
         LinkResultRolesEnum.LINK_RESULT_SECTION,
       )
       .then((existingLinkResults) =>

@@ -93,13 +93,13 @@ export class GreenChecksService {
       body,
     );
 
-    const responseHistory = await this.saveHistory(resultId, saveHistory);
-
     const otherData = await this.otherFunctions(
       resultStatusId,
       this._resultsUtil.statusId,
       body,
     );
+
+    const responseHistory = await this.saveHistory(resultId, saveHistory);
 
     await this.prepareEmail(
       resultId,
@@ -271,9 +271,11 @@ export class GreenChecksService {
     currentStatus: ResultStatusEnum,
   ) {
     if (
-      ![ResultStatusEnum.REQUESTED, ResultStatusEnum.SCIENCE_EDITION].includes(
-        currentStatus,
-      )
+      ![
+        ResultStatusEnum.REQUESTED,
+        ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.DRAFT,
+      ].includes(currentStatus)
     )
       throw new ConflictException(
         `Only OIRC in requested status can be ${ResultStatusNameEnum[status]} status`,
@@ -342,6 +344,8 @@ export class GreenChecksService {
         ResultStatusEnum.REVISED,
         ResultStatusEnum.REQUESTED,
         ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.POSTPONE,
+        ResultStatusEnum.REJECTED,
       ].includes(currentStatus) &&
       ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.DRAFT].includes(status)
     ) {
@@ -410,6 +414,7 @@ export class GreenChecksService {
         .oircData(resultId, {
           url: `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`,
           historyId: history?.submission_history_id,
+          is_requested: fromStatusId === ResultStatusEnum.REQUESTED,
         })
         .then(async (data) => {
           const template = await this.templateService._getTemplate(
