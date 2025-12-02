@@ -147,6 +147,7 @@ export class ResultsService {
       years: filters?.years,
       resultCodes: filters?.resultCodes,
       platform_code: filters?.platform_code,
+      filter_primary_contract: filters?.filter_primary_contract,
     });
   }
 
