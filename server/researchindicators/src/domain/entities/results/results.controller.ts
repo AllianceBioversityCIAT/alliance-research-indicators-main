@@ -176,6 +176,12 @@ export class ResultsController {
     type: String,
     description: 'filter by platform code',
   })
+  @ApiQuery({
+    name: 'filter-primary-contract',
+    required: false,
+    type: String,
+    description: 'filter by primary contract',
+  })
   @ApiOperation({ summary: 'Find all results' })
   @Get()
   async find(
@@ -198,6 +204,8 @@ export class ResultsController {
     @Query('years', ListParseToArrayPipe) years: string[],
     @Query('result-codes', ListParseToArrayPipe) resultCodes: string[],
     @Query('platform-code', ListParseToArrayPipe) platform_code: string[],
+    @Query('filter-primary-contract', ListParseToArrayPipe)
+    filterPrimaryContract: string[],
   ) {
     return this.resultsService
       .findResults({
@@ -220,6 +228,7 @@ export class ResultsController {
         years: years,
         resultCodes: resultCodes,
         platform_code: platform_code,
+        filter_primary_contract: filterPrimaryContract,
       })
       .then((el) =>
         ResponseUtils.format({
