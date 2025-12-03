@@ -6,32 +6,56 @@ import { AuditableEntity } from '../global-dto/auditable.entity';
 
 @Injectable({ scope: Scope.REQUEST })
 export class CurrentUserUtil {
+  private systemUser: User | null = null;
+  private forceSystemUser: boolean = false;
   constructor(@Inject(REQUEST) private readonly request: Request) {}
 
+  setSystemUser(user: Partial<User>, forceSystemUser: boolean = false) {
+    this.systemUser = user ? (user as User) : null;
+    this.forceSystemUser = forceSystemUser;
+  }
+
+  clearSystemUser() {
+    this.systemUser = null;
+    this.forceSystemUser = false;
+  }
+
   get user(): User {
+    if (this.systemUser || this.forceSystemUser) {
+      return this.systemUser;
+    }
     return this.request['user'];
   }
 
   get user_id(): number {
-    return (this.request['user'] as User).sec_user_id;
+    if (this.systemUser || this.forceSystemUser) {
+      return this.systemUser?.sec_user_id;
+    }
+    return (this.request['user'] as User)?.sec_user_id;
   }
 
   get email(): string {
-    return (this.request['user'] as User).email;
+    if (this.systemUser || this.forceSystemUser) {
+      return this.systemUser?.email;
+    }
+    return (this.request['user'] as User)?.email;
   }
 
   get roles(): number[] {
+    if (this.systemUser || this.forceSystemUser) {
+      return this.systemUser?.roles;
+    }
     return (this.request['user'] as User)?.roles || [];
   }
 
   public audit(set: SetAutitEnum = SetAutitEnum.NEW): Partial<AuditableEntity> {
     switch (set) {
       case SetAutitEnum.NEW:
-        return { created_by: this.user_id };
+        return { created_by: this?.user_id };
       case SetAutitEnum.UPDATE:
-        return { updated_by: this.user_id };
+        return { updated_by: this?.user_id };
       case SetAutitEnum.BOTH:
-        return { created_by: this.user_id, updated_by: this.user_id };
+        return { created_by: this?.user_id, updated_by: this?.user_id };
     }
   }
 }
@@ -41,3 +65,4 @@ export enum SetAutitEnum {
   UPDATE,
   BOTH,
 }
+4376;

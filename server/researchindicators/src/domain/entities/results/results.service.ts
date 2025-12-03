@@ -7,7 +7,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, EntityManager, In, Not } from 'typeorm';
+import { DataSource, EntityManager, FindOneOptions, In, Not } from 'typeorm';
 import {
   ResultFiltersInterface,
   ResultRepository,
@@ -88,6 +88,7 @@ import { CreateResultConfigDto } from './dto/create-config.dto';
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
+import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 
 @Injectable()
 export class ResultsService {
@@ -124,6 +125,7 @@ export class ResultsService {
     private readonly _resultEvidencesService: ResultEvidencesService,
     private readonly _queryService: QueryService,
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
+    private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -148,6 +150,10 @@ export class ResultsService {
       resultCodes: filters?.resultCodes,
       platform_code: filters?.platform_code,
     });
+  }
+
+  async findOne(options: FindOneOptions<Result>) {
+    return this.mainRepo.findOne(options);
   }
 
   async findResultTIPData(options: { year?: number; productType?: number }) {
@@ -234,6 +240,7 @@ export class ResultsService {
     };
     newConfig.result_status_id =
       configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
+    newConfig.notContract = configuration?.notContract ?? false;
     return newConfig;
   }
 
@@ -241,14 +248,23 @@ export class ResultsService {
     createResult: CreateResultDto,
     platform_code: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
     configuration?: CreateResultConfigDto,
+    officialCode?: number,
   ): Promise<Result> {
     const config = this.validateCreateConfig(configuration);
-    const { invalidFields, isValid } = validObject(createResult, [
-      'contract_id',
+    const validationFields: (keyof CreateResultDto | string)[] = [
       'indicator_id',
       'title',
       'year',
-    ]);
+    ];
+
+    if (!config.notContract) {
+      validationFields.push('contract_id');
+    }
+
+    const { invalidFields, isValid } = validObject<CreateResultDto>(
+      createResult,
+      validationFields as unknown as (keyof CreateResultDto)[],
+    );
 
     if (!isValid) {
       throw new BadRequestException(`Invalid fields: ${invalidFields}`);
@@ -282,7 +298,7 @@ export class ResultsService {
           indicator_id,
           title,
           is_ai: createResult.is_ai ?? false,
-          result_official_code: newOfficialCode,
+          result_official_code: officialCode ?? newOfficialCode,
           report_year_id: year,
           is_snapshot: false,
           platform_code,
@@ -401,6 +417,9 @@ export class ResultsService {
         break;
       case IndicatorsEnum.OICR:
         await this._resultOicrService.create(resultId, manager);
+        break;
+      case IndicatorsEnum.KNOWLEDGE_PRODUCT:
+        await this._resultKnowledgeProductService.create(resultId, manager);
         break;
       default:
         break;

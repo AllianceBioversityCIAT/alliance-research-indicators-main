@@ -8,4 +8,5 @@ export class CreateResultConfigDto {
     lever?: boolean;
     sdg?: boolean;
   };
+  notContract?: boolean;
 }

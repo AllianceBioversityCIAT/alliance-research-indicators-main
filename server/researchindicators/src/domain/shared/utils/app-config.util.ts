@@ -323,4 +323,12 @@ export class AppConfig {
   SET_SAFE_EMAIL(email: string, alternativeEmail: string): string {
     return this.ARI_IS_PRODUCTION ? email : alternativeEmail;
   }
+
+  get TIP_API_URL(): string {
+    return process.env.ARI_TIP_API_URL;
+  }
+
+  get TIP_TOKEN(): string {
+    return process.env.ARI_TIP_TOKEN;
+  }
 }

@@ -10,6 +10,7 @@ import { AppConfig } from '../../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
+import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 
 @Injectable()
 export class ResultRepository
@@ -349,6 +350,74 @@ export class ResultRepository
       (res: { result_id: number; is_principal: number }[]) =>
         res?.length ? res[0] : { result_id: result_id, is_principal: 0 },
     );
+  }
+
+  async findUserByCarnetId(carnetId: string): Promise<SecUser> {
+    const query = `SELECT su.*
+    FROM sec_users su
+    WHERE su.carnet = ?
+      AND su.is_active = TRUE
+    LIMIT 1;`;
+
+    return this.query(query, [carnetId]).then((res: SecUser[]) =>
+      res?.length ? res[0] : null,
+    );
+  }
+
+  async findUserByEmail(email: string): Promise<SecUser> {
+    const query = `SELECT su.*
+    FROM sec_users su
+    WHERE su.email = ?
+      AND su.is_active = TRUE
+    LIMIT 1;`;
+
+    return this.query(query, [email]).then((res: SecUser[]) =>
+      res?.length ? res[0] : null,
+    );
+  }
+
+  async findUserByEmailOrCarnet(
+    carnet?: string,
+    email?: string,
+  ): Promise<SecUser> {
+    if (!carnet && !email) {
+      return null;
+    }
+    if (!isEmpty(carnet)) {
+      const userByCarnet = await this.findUserByCarnetId(carnet);
+      if (userByCarnet) {
+        return userByCarnet;
+      }
+    }
+    if (!isEmpty(email)) {
+      const userByEmail = await this.findUserByEmail(email);
+      if (userByEmail) {
+        return userByEmail;
+      }
+    }
+    return null;
+  }
+
+  async createUserInSecUsers(newUser: SecUser): Promise<SecUser> {
+    const query = `INSERT INTO ${this.appConfig.ARI_MYSQL_NAME}.sec_users
+    (first_name, last_name, email, carnet, status_id, is_active)
+    VALUES (?, ?, ?, ?, ?, TRUE);`;
+
+    await this.query(query, [
+      newUser.first_name,
+      newUser.last_name,
+      newUser.email,
+      newUser.carnet,
+      1,
+    ]);
+
+    const createdUser = await this.findUserByCarnetId(newUser.carnet);
+    return createdUser;
+  }
+
+  async unpdateCarnetUser(userId: number, carnet: string) {
+    const query = `UPDATE sec_users SET carnet = ? WHERE sec_user_id = ?`;
+    await this.query(query, [carnet, userId]);
   }
 }
 
