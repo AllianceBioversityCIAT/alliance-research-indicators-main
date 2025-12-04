@@ -204,7 +204,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
               AND r.indicator_id = i.indicator_id
               AND r.is_active = 1
               AND r.is_snapshot = false
-              AND rc.is_active = 1)
+              AND rc.is_active = 1
+              AND rc.is_primary = 1)
         )
       ) AS indicators
     FROM agresso_contracts ac
