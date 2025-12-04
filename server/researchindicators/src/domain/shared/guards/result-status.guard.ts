@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Result } from '../../entities/results/entities/result.entity';
-import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
+import {
+  ResultStatusEnum,
+  ResultStatusNameEnum,
+} from '../../entities/result-status/enum/result-status.enum';
 import { ResultsUtil } from '../utils/results.util';
 
 @Injectable()
@@ -27,12 +30,22 @@ export class ResultStatusGuard implements CanActivate {
     });
 
     if (
-      ![ResultStatusEnum.DRAFT, ResultStatusEnum.REVISED].includes(
-        result.result_status_id,
-      )
+      ![
+        ResultStatusEnum.DRAFT,
+        ResultStatusEnum.REVISED,
+        ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.KM_CURATION,
+        ResultStatusEnum.PUBLISHED,
+      ].includes(result.result_status_id)
     ) {
       throw new BadRequestException(
-        'Only results in editing status can be edited',
+        `Only results in ${[
+          ResultStatusNameEnum[ResultStatusEnum.DRAFT],
+          ResultStatusNameEnum[ResultStatusEnum.REVISED],
+          ResultStatusNameEnum[ResultStatusEnum.SCIENCE_EDITION],
+          ResultStatusNameEnum[ResultStatusEnum.KM_CURATION],
+          ResultStatusNameEnum[ResultStatusEnum.PUBLISHED],
+        ].join(', ')} status can be edited`,
       );
     }
 
