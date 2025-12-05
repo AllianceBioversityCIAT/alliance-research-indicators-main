@@ -349,7 +349,7 @@ export class ResultRepository
 		ORDER BY r.result_official_code ${sort_order}
 		${limit}
 	`;
-    console.log(mainQuery);
+
     return this.query(mainQuery);
   }
 

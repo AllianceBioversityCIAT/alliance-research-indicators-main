@@ -57,6 +57,7 @@ export const getTemplateByStatus = (
       ResultStatusEnum.APPROVED,
       ResultStatusEnum.POSTPONE,
       ResultStatusEnum.OICR_APPROVED,
+      ResultStatusEnum.SUBMITTED,
     ].includes(status)
   )
     return null;
