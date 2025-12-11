@@ -230,6 +230,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       [OrderFieldsEnum.PROJECT_NAME]: 'ac.projectDescription',
       [OrderFieldsEnum.PRINCIPAL_INVESTIGATOR]: 'ac.project_lead_description',
       [OrderFieldsEnum.STATUS]: 'ac.contract_status',
+      [OrderFieldsEnum.LEAD_CENTER]: 'ac.ubwClientDescription',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
