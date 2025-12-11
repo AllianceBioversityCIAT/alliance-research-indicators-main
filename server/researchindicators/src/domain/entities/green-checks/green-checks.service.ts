@@ -242,7 +242,9 @@ export class GreenChecksService {
     if (
       this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
       status === ResultStatusEnum.DRAFT &&
-      currentStatus === ResultStatusEnum.REQUESTED
+      [ResultStatusEnum.REQUESTED, ResultStatusEnum.POSTPONE].includes(
+        currentStatus,
+      )
     ) {
       await this.resultOicrService.review(this._resultsUtil.resultId, body);
     }
