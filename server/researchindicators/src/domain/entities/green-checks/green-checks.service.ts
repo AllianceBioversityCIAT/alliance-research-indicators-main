@@ -290,6 +290,7 @@ export class GreenChecksService {
         ResultStatusEnum.REQUESTED,
         ResultStatusEnum.SCIENCE_EDITION,
         ResultStatusEnum.DRAFT,
+        ResultStatusEnum.REJECTED,
       ].includes(currentStatus)
     )
       throw new ConflictException(
