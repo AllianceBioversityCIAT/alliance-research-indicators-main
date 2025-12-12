@@ -305,10 +305,7 @@ describe('ClarisaInitiativesService', () => {
           is_active: true,
           name: expect.objectContaining({
             _type: 'in',
-            _value: [
-              "'Climate Adaptation Initiative'",
-              "'Food Security Program'",
-            ],
+            _value: ['Climate Adaptation Initiative', 'Food Security Program'],
           }),
         },
       });
@@ -324,7 +321,7 @@ describe('ClarisaInitiativesService', () => {
           is_active: true,
           name: expect.objectContaining({
             _type: 'in',
-            _value: ["'Climate Adaptation Initiative'"],
+            _value: ['Climate Adaptation Initiative'],
           }),
         },
       });

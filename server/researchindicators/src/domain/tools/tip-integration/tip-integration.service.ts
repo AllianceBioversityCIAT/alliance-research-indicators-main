@@ -12,18 +12,15 @@ import {
   TipKnowledgeProductDto,
   TipKnowledgeProductsResponseDto,
   TipRegionDto,
-  TipSubmitterDto,
 } from './dto/response-year-tip.dto';
 import { ClarisaRegionsService } from '../clarisa/entities/clarisa-regions/clarisa-regions.service';
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
-import { UpdateGeneralInformation } from '../../entities/results/dto/update-general-information.dto';
 import { ResultRepository } from '../../entities/results/repositories/result.repository';
 import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../../entities/result-users/entities/result-user.entity';
 import { ClarisaLeversService } from '../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultLever } from '../../entities/result-levers/entities/result-lever.entity';
-import { ResultAlignmentDto } from '../../entities/results/dto/result-alignment.dto';
 import { ResultContract } from '../../entities/result-contracts/entities/result-contract.entity';
 import { ClarisaCountriesService } from '../clarisa/entities/clarisa-countries/clarisa-countries.service';
 import { ResultRegion } from '../../entities/result-regions/entities/result-region.entity';
@@ -40,6 +37,10 @@ import { ResultStatusEnum } from '../../entities/result-status/enum/result-statu
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import {
+  filterByUniqueKeyWithPriority,
+  mergeArraysWithPriority,
+} from '../../shared/utils/array.util';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -84,7 +85,7 @@ export class TipIntegrationService extends BaseApi {
     if (isEmpty(year) || year != 2025) {
       throw new BadRequestException('Only year 2025 is supported');
     }
-    const limit = 200;
+    const limit = 50;
     let offset = 0;
     let pendingData = true;
     while (pendingData) {
@@ -305,6 +306,20 @@ export class TipIntegrationService extends BaseApi {
           findResult.result_id,
           result.generalInformation,
         );
+
+        const tempAlignment = await this.resultsService.findResultAlignment(
+          findResult.result_id,
+        );
+
+        result.alignments.primary_levers = filterByUniqueKeyWithPriority(
+          mergeArraysWithPriority<ResultLever>(
+            tempAlignment.primary_levers,
+            result.alignments.primary_levers,
+            'lever_id',
+          ),
+          'lever_id',
+          'is_primary',
+        ) as ResultLever[];
 
         await this.resultsService.updateResultAlignment(
           findResult.result_id,
