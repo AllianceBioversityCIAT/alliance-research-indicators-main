@@ -92,6 +92,20 @@ export class GreenChecksService {
       this._resultsUtil.statusId,
       body,
     );
+    const currentStatus = this._resultsUtil.statusId;
+
+    if (
+      this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
+      statusId === ResultStatusEnum.DRAFT &&
+      [ResultStatusEnum.REQUESTED, ResultStatusEnum.POSTPONE].includes(
+        currentStatus,
+      )
+    ) {
+      await this.resultOicrService.validateOicrInternalCode(
+        resultId,
+        body?.oicr_internal_code,
+      );
+    }
 
     const responseHistory = await this.saveHistory(resultId, saveHistory);
     const otherData = await this.otherFunctions(
@@ -99,7 +113,7 @@ export class GreenChecksService {
       this._resultsUtil.statusId,
       body,
     );
-    const currentStatus = this._resultsUtil.statusId;
+
     await this.prepareEmail(
       resultId,
       resultStatusId,
@@ -276,6 +290,7 @@ export class GreenChecksService {
         ResultStatusEnum.REQUESTED,
         ResultStatusEnum.SCIENCE_EDITION,
         ResultStatusEnum.DRAFT,
+        ResultStatusEnum.REJECTED,
       ].includes(currentStatus)
     )
       throw new ConflictException(
