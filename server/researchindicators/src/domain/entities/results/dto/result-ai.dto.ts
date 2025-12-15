@@ -587,7 +587,6 @@ export class ResultRawAi {
     required: false,
   })
   @IsOptional()
-  @IsNumber()
   assess_readiness: number;
 
   @ApiProperty({
