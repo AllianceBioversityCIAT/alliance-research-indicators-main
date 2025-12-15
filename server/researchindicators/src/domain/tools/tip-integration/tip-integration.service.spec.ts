@@ -2,6 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TipIntegrationService } from './tip-integration.service';
 import { ResultsService } from '../../entities/results/results.service';
 import { AppConfig } from '../../shared/utils/app-config.util';
+import { ResultRepository } from '../../entities/results/repositories/result.repository';
+import { ClarisaLeversService } from '../clarisa/entities/clarisa-levers/clarisa-levers.service';
+import { ClarisaRegionsService } from '../clarisa/entities/clarisa-regions/clarisa-regions.service';
+import { ClarisaCountriesService } from '../clarisa/entities/clarisa-countries/clarisa-countries.service';
+import { QueryService } from '../../shared/utils/query.service';
+import { HttpService } from '@nestjs/axios';
+import { DataSource } from 'typeorm';
+import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import * as mapperModule from './mapper/tip-integration.mapper';
 
 describe('TipIntegrationService', () => {
@@ -13,9 +22,22 @@ describe('TipIntegrationService', () => {
       providers: [
         TipIntegrationService,
         { provide: ResultsService, useValue: { findResultTIPData: jest.fn() } },
+        { provide: ResultRepository, useValue: {} },
+        { provide: ClarisaLeversService, useValue: {} },
+        { provide: ClarisaRegionsService, useValue: {} },
+        { provide: ClarisaCountriesService, useValue: {} },
+        { provide: QueryService, useValue: {} },
+        { provide: HttpService, useValue: { get: jest.fn() } },
+        { provide: DataSource, useValue: {} },
+        { provide: ResultKnowledgeProductService, useValue: {} },
+        { provide: CurrentUserUtil, useValue: {} },
         {
           provide: AppConfig,
-          useValue: { ARI_CLIENT_HOST: 'http://client.example' },
+          useValue: {
+            ARI_CLIENT_HOST: 'http://client.example',
+            TIP_API_URL: 'http://tip.example',
+            TIP_TOKEN: 'test-token',
+          },
         },
       ],
     }).compile();
