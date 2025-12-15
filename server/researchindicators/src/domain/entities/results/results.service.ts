@@ -900,8 +900,21 @@ export class ResultsService {
       this.logger.error(
         `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`,
       );
+      const tempExistsResult = await this.dataSource
+        .getRepository(Result)
+        .findOne({
+          select: { result_official_code: true, platform_code: true },
+          where: { title: result.title },
+        });
+
       this._resultsUtil.clearManually();
-      return { ...result, error: true, message_error: error?.name || error };
+      return {
+        ...result,
+        result_official_code: tempExistsResult?.result_official_code,
+        platform_code: tempExistsResult?.platform_code,
+        error: true,
+        message_error: error?.name || error,
+      };
     }
   }
 
