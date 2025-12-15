@@ -1,4 +1,4 @@
-import { DeepPartial, EntityManager, Repository } from 'typeorm';
+import { DataSource, DeepPartial, Repository } from 'typeorm';
 import { Result } from '../entities/result.entity';
 import { Injectable } from '@nestjs/common';
 import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
@@ -11,6 +11,7 @@ import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 
 @Injectable()
 export class ResultRepository
@@ -18,11 +19,11 @@ export class ResultRepository
   implements ElasticFindEntity<ResultOpensearchDto>
 {
   constructor(
-    private readonly entityManager: EntityManager,
     private readonly appConfig: AppConfig,
     private readonly currentUserUtil: CurrentUserUtil,
+    private readonly dataSource: DataSource,
   ) {
-    super(Result, entityManager);
+    super(Result, dataSource.createEntityManager());
   }
 
   findDataForOpenSearch(
@@ -367,6 +368,7 @@ export class ResultRepository
   }
 
   async findUserByCarnetId(carnetId: string): Promise<SecUser> {
+    if (isEmpty(carnetId)) return null;
     const query = `SELECT su.*
     FROM sec_users su
     WHERE su.carnet = ?
@@ -379,6 +381,7 @@ export class ResultRepository
   }
 
   async findUserByEmail(email: string): Promise<SecUser> {
+    if (isEmpty(email)) return null;
     const query = `SELECT su.*
     FROM sec_users su
     WHERE su.email = ?
@@ -413,6 +416,12 @@ export class ResultRepository
   }
 
   async createUserInSecUsers(newUser: SecUser): Promise<SecUser> {
+    const allianceUserStaff = await this.dataSource
+      .getRepository(AllianceUserStaff)
+      .findOne({
+        where: { carnet: newUser.carnet, is_active: true },
+      });
+
     const query = `INSERT INTO ${this.appConfig.ARI_MYSQL_NAME}.sec_users
     (first_name, last_name, email, carnet, status_id, is_active)
     VALUES (?, ?, ?, ?, ?, TRUE);`;
@@ -421,11 +430,14 @@ export class ResultRepository
       newUser.first_name,
       newUser.last_name,
       newUser.email,
-      newUser.carnet,
+      isEmpty(allianceUserStaff) ? null : newUser.carnet,
       1,
     ]);
 
-    const createdUser = await this.findUserByCarnetId(newUser.carnet);
+    const createdUser = await this.findUserByEmailOrCarnet(
+      isEmpty(allianceUserStaff) ? null : newUser.carnet,
+      newUser.email,
+    );
     return createdUser;
   }
 
