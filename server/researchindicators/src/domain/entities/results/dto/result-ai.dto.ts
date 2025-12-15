@@ -15,6 +15,7 @@ import {
   IsOptional,
   ValidateNested,
   IsNotEmpty,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -90,6 +91,20 @@ export class ResultInnovationActorDetailedDto {
   @IsString()
   @IsOptional()
   age_group: string;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Combined gender and age group of the actor',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(/^(Men|Women):\s(Youth|Non-youth)$/, {
+    each: true,
+    message:
+      'Each gender_age must be in format "Men: Youth", "Men: Non-youth", "Women: Youth", or "Women: Non-youth"',
+  })
+  @IsOptional()
+  gender_age: string[];
 }
 
 export class AiRawInstitution {
@@ -216,7 +231,7 @@ export class ResultRawAi {
     type: Number,
     description: 'The year of the result',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   year: number;
 
@@ -435,7 +450,6 @@ export class ResultRawAi {
     required: false,
   })
   @IsOptional()
-  @IsNumber()
   non_binary_participants: number;
 
   @ApiProperty({
@@ -573,7 +587,6 @@ export class ResultRawAi {
     required: false,
   })
   @IsOptional()
-  @IsNumber()
   assess_readiness: number;
 
   @ApiProperty({
@@ -624,9 +637,7 @@ export class ResultRawAi {
     required: false,
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  organization_sub_type: string[];
+  organization_sub_type: string | string[];
 
   @ApiProperty({
     type: [String],

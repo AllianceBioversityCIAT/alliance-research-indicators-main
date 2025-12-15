@@ -23,4 +23,12 @@ export class ClarisaCountriesService extends ControlListBaseService<
       },
     });
   }
+
+  async findByUm49Codes(um49Code: number[]): Promise<ClarisaCountry[]> {
+    return this.mainRepo.find({
+      where: {
+        code: In(um49Code),
+      },
+    });
+  }
 }

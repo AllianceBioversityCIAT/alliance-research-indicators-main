@@ -10,6 +10,7 @@ import { AppConfig } from '../../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
+import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 
 @Injectable()
 export class ResultRepository
@@ -233,6 +234,18 @@ export class ResultRepository
     }
   }
 
+  filterByPrimaryContract(primaryContracts: string[]) {
+    if (isEmpty(primaryContracts)) return '';
+    const query = `INNER JOIN (SELECT 
+                      DISTINCT rc.result_id 
+                    FROM result_contracts rc 
+                      INNER JOIN agresso_contracts ac ON rc.contract_id = ac.agreement_id 
+                    WHERE rc.is_active = TRUE
+                      AND rc.is_primary = TRUE
+                      AND rc.contract_id IN (${primaryContracts.map((code) => `'${code}'`).join(',')})) fpc ON fpc.result_id = r.result_id `;
+    return query;
+  }
+
   async findResultsFilters(filters?: Partial<ResultFiltersInterface>) {
     const queryParts: DeepPartial<CreateResultQueryInterface> = {
       contracts: {
@@ -296,11 +309,7 @@ export class ResultRepository
 		r.result_status_id,
 		r.report_year_id,
     r.external_link,
-		IF(
-        COUNT(r2.report_year_id) = 0,
-        JSON_ARRAY(),
-        CAST(CONCAT('[', GROUP_CONCAT(r2.report_year_id ORDER BY r2.report_year_id DESC), ']') AS JSON)
-    	) AS snapshot_years,
+		COALESCE(r2.snapshot_years, JSON_ARRAY()) as snapshot_years,
 		r.is_active
 		${queryParts.result_audit_data?.select}
 		${queryParts.result_status?.select}
@@ -309,10 +318,16 @@ export class ResultRepository
 		${queryParts.contracts?.select}
 	FROM results r
 		LEFT JOIN (SELECT temp.result_official_code,
-					temp.report_year_id
-					FROM results temp
-					WHERE temp.is_active = TRUE
-					AND temp.is_snapshot = TRUE) r2 ON r.result_official_code = r2.result_official_code
+                                        IF(
+								        COUNT(temp.report_year_id) = 0,
+								        JSON_ARRAY(),
+								        CAST(CONCAT('[', GROUP_CONCAT(temp.report_year_id ORDER BY temp.report_year_id DESC), ']') AS JSON)
+								    	) AS snapshot_years
+                                        FROM results temp
+                                        WHERE temp.is_active = TRUE
+                                        AND temp.is_snapshot = TRUE
+                                        GROUP BY result_official_code) r2 ON r.result_official_code = r2.result_official_code
+    ${this.filterByPrimaryContract(filters?.filter_primary_contract)}
 		${queryParts.result_audit_data?.join}
 		${queryParts.result_status?.join}
 		${queryParts.indicators?.join}
@@ -350,6 +365,74 @@ export class ResultRepository
         res?.length ? res[0] : { result_id: result_id, is_principal: 0 },
     );
   }
+
+  async findUserByCarnetId(carnetId: string): Promise<SecUser> {
+    const query = `SELECT su.*
+    FROM sec_users su
+    WHERE su.carnet = ?
+      AND su.is_active = TRUE
+    LIMIT 1;`;
+
+    return this.query(query, [carnetId]).then((res: SecUser[]) =>
+      res?.length ? res[0] : null,
+    );
+  }
+
+  async findUserByEmail(email: string): Promise<SecUser> {
+    const query = `SELECT su.*
+    FROM sec_users su
+    WHERE su.email = ?
+      AND su.is_active = TRUE
+    LIMIT 1;`;
+
+    return this.query(query, [email]).then((res: SecUser[]) =>
+      res?.length ? res[0] : null,
+    );
+  }
+
+  async findUserByEmailOrCarnet(
+    carnet?: string,
+    email?: string,
+  ): Promise<SecUser> {
+    if (!carnet && !email) {
+      return null;
+    }
+    if (!isEmpty(carnet)) {
+      const userByCarnet = await this.findUserByCarnetId(carnet);
+      if (userByCarnet) {
+        return userByCarnet;
+      }
+    }
+    if (!isEmpty(email)) {
+      const userByEmail = await this.findUserByEmail(email);
+      if (userByEmail) {
+        return userByEmail;
+      }
+    }
+    return null;
+  }
+
+  async createUserInSecUsers(newUser: SecUser): Promise<SecUser> {
+    const query = `INSERT INTO ${this.appConfig.ARI_MYSQL_NAME}.sec_users
+    (first_name, last_name, email, carnet, status_id, is_active)
+    VALUES (?, ?, ?, ?, ?, TRUE);`;
+
+    await this.query(query, [
+      newUser.first_name,
+      newUser.last_name,
+      newUser.email,
+      newUser.carnet,
+      1,
+    ]);
+
+    const createdUser = await this.findUserByCarnetId(newUser.carnet);
+    return createdUser;
+  }
+
+  async unpdateCarnetUser(userId: number, carnet: string) {
+    const query = `UPDATE sec_users SET carnet = ? WHERE sec_user_id = ?`;
+    await this.query(query, [carnet, userId]);
+  }
 }
 
 export interface ResultFiltersInterface {
@@ -372,6 +455,7 @@ export interface ResultFiltersInterface {
   years: string[];
   resultCodes: string[];
   platform_code?: string[];
+  filter_primary_contract?: string[];
 }
 
 export interface CreateResultQueryInterface {

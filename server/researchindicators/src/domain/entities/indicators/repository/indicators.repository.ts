@@ -29,6 +29,7 @@ export class IndicatorRepository extends Repository<Indicator> {
         LEFT JOIN results r on
         	r.indicator_id = i.indicator_id
         	AND r.is_active = 1
+			AND r.is_snapshot = 0
         	AND r.created_by = ${this.currentUser.user_id}
         WHERE
         	i.is_active = TRUE

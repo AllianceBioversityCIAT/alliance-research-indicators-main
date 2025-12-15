@@ -152,6 +152,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        [],
       );
 
       expect(service.findResults).toHaveBeenCalledWith({
@@ -174,6 +175,7 @@ describe('ResultsController', () => {
         years: [],
         resultCodes: [],
         platform_code: [],
+        filter_primary_contract: [],
       });
       expect(result).toEqual(expectedResponse);
     });
@@ -203,6 +205,7 @@ describe('ResultsController', () => {
         ['2023'],
         ['RES1'],
         [],
+        [],
       );
 
       expect(service.findResults).toHaveBeenCalledWith({
@@ -225,6 +228,7 @@ describe('ResultsController', () => {
         years: ['2023'],
         resultCodes: ['RES1'],
         platform_code: [],
+        filter_primary_contract: [],
       });
     });
 
@@ -245,6 +249,7 @@ describe('ResultsController', () => {
           false,
           false,
           'asc',
+          [],
           [],
           [],
           [],
@@ -277,6 +282,7 @@ describe('ResultsController', () => {
         false,
         false,
         'asc',
+        [],
         [],
         [],
         [],
@@ -677,6 +683,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        [],
       );
 
       expect(mockResponseUtils.format).toHaveBeenCalledWith({
@@ -726,6 +733,7 @@ describe('ResultsController', () => {
           [],
           [],
           [],
+          [],
         ),
       ).rejects.toThrow('Service unavailable');
     });
@@ -765,6 +773,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        [],
       );
 
       expect(service.findResults).toHaveBeenCalledWith(
@@ -791,6 +800,7 @@ describe('ResultsController', () => {
         true,
         false,
         'asc',
+        [],
         [],
         [],
         [],
@@ -842,6 +852,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        [],
       );
       const findGeneralPromise = controller.findGeneralInformation();
 
@@ -868,6 +879,7 @@ describe('ResultsController', () => {
         false,
         false,
         'asc',
+        [],
         [],
         [],
         [],

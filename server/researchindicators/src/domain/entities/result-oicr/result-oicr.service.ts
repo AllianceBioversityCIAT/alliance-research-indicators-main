@@ -549,6 +549,18 @@ export class ResultOicrService {
     };
   }
 
+  async validateOicrInternalCode(resultId: number, oicrInternalCode: string) {
+    const existingRecord = await this.mainRepo.findOne({
+      where: {
+        is_active: true,
+        oicr_internal_code: oicrInternalCode,
+        result_id: Not(resultId),
+      },
+    });
+    if (existingRecord)
+      throw new BadRequestException('OICR Internal Code already exists');
+  }
+
   async review(resultId: number, data: ReviewDto) {
     const existingRecord = await this.mainRepo.findOne({
       where: {
