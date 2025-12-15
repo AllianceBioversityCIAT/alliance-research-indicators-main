@@ -89,6 +89,7 @@ import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
+import { ResultsUtil } from '../../shared/utils/results.util';
 
 @Injectable()
 export class ResultsService {
@@ -126,6 +127,7 @@ export class ResultsService {
     private readonly _queryService: QueryService,
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
+    private readonly _resultsUtil: ResultsUtil,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -832,6 +834,7 @@ export class ResultsService {
       const processedResult = await this.createResultFromAiRoar(result);
       const newResult = await this.createResult(processedResult.result);
       resultExists = newResult;
+      await this._resultsUtil.setCurrentResult(newResult.result_id);
       await this.updateGeneralInfo(
         newResult.result_id,
         processedResult.generalInformation,
@@ -883,6 +886,7 @@ export class ResultsService {
         await this._queryService.deleteFullResultById(resultExists.result_id);
       }
       this.logger.error(`Error processing AI result: ${error.message}`);
+      this._resultsUtil.clearManually();
       return { ...result, error: true, message_error: error?.name || error };
     }
   }

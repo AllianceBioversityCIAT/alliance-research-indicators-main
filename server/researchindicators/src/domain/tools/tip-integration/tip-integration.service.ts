@@ -335,6 +335,9 @@ export class TipIntegrationService extends BaseApi {
           findResult.result_id,
           result.knowledgeProduct,
         );
+        this.logger.debug(
+          `Processed result ${findResult.result_official_code} from TIP.`,
+        );
         this.logger.log(
           `Successfully processed result ${findResult.result_id} from TIP.`,
         );

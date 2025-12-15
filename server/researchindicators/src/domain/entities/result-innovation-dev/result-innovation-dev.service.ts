@@ -90,12 +90,15 @@ export class ResultInnovationDevService {
       const actorTypeCode = await this._clarisaActorTypesService
         .findByName(actor.type)
         .then((res) => res?.code);
-
       const isOther = ClarisaActorTypesEnum.OTHER === actorTypeCode;
       newActors.push({
         actor_type_id: actorTypeCode,
         actor_role_id: ActorRolesEnum.INNOVATION_DEV,
         actor_type_custom_name: isOther ? actor.other_actor_type : null,
+        men_not_youth: actor.gender_age.includes('Men: Non-youth'),
+        men_youth: actor.gender_age.includes('Men: Youth'),
+        women_not_youth: actor.gender_age.includes('Women: Non-youth'),
+        women_youth: actor.gender_age.includes('Women: Youth'),
       });
     }
     innovationDev.actors = newActors as CreateResultActorDto[];
@@ -128,10 +131,13 @@ export class ResultInnovationDevService {
           preProcessedTypes,
         )
       : [];
+    const newArray: string[] = Array.isArray(result?.organization_sub_type)
+      ? result?.organization_sub_type
+      : result?.organization_sub_type !== 'Not collected'
+        ? [result?.organization_sub_type]
+        : [];
 
-    const preProcessedSubTypes = this.processDataArrayString(
-      result?.organization_sub_type,
-    );
+    const preProcessedSubTypes = this.processDataArrayString(newArray);
 
     const clarisaInstitutionsSubType = preProcessedSubTypes.length
       ? await this._clarisaInstitutionTypesService.findByLikeNames(
