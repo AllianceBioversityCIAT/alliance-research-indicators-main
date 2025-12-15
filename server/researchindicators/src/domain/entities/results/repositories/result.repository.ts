@@ -11,7 +11,6 @@ import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
-import { dataSource } from '../../../../db/config/mysql/orm.config';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 
 @Injectable()
