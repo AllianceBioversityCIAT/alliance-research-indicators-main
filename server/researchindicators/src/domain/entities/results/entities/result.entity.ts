@@ -42,6 +42,7 @@ import { ResultUserAi } from '../../result-users/entities/result-user-ai.entity'
 import { ResultQuantification } from '../../result-quantifications/entities/result-quantification.entity';
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
 import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
+import { ResultKnowledgeProduct } from '../../result-knowledge-product/entities/result-knowledge-product.entity';
 
 @Entity('results')
 export class Result extends AuditableEntity {
@@ -326,4 +327,7 @@ export class Result extends AuditableEntity {
     (resultImpactArea) => resultImpactArea.result,
   )
   resultImpactAreas?: ResultImpactArea[];
+
+  @OneToMany(() => ResultKnowledgeProduct, (rkp) => rkp.result)
+  knowledge_products?: ResultKnowledgeProduct[];
 }

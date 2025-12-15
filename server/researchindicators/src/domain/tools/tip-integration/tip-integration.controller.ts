@@ -4,6 +4,7 @@ import {
   Query,
   UseInterceptors,
   HttpStatus,
+  Patch,
 } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { TipIntegrationService } from './tip-integration.service';
@@ -60,6 +61,25 @@ export class TipIntegrationController {
       .then((data) =>
         ResponseUtils.format({
           description: 'IPR data found successfully',
+          status: HttpStatus.OK,
+          data: data,
+        }),
+      );
+  }
+
+  @Patch('ipr-data/sync')
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+  })
+  @ApiOperation({ summary: 'Sync IPR data with TIP' })
+  async syncIprData(@Query('year') year?: number) {
+    return this.tipIntegrationService
+      .getKnowledgeProductsByYear(year)
+      .then((data) =>
+        ResponseUtils.format({
+          description: 'IPR data synced successfully',
           status: HttpStatus.OK,
           data: data,
         }),

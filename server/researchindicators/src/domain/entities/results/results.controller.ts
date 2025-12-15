@@ -404,6 +404,13 @@ export class ResultsController {
 
   @ApiOperation({ summary: 'The result created from the ia is formalized' })
   @Post('ai/formalize')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
   async formalizeAIResult(@Body() resultAi: ResultRawAi) {
     return this.resultsService.formalizeResult(resultAi).then((data) =>
       ResponseUtils.format({

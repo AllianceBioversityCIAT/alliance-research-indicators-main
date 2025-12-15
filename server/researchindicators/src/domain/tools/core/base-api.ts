@@ -21,6 +21,7 @@ export abstract class BaseApi {
     loggerContext: string,
     protected user?: string,
     protected pass?: string,
+    protected token?: string,
   ) {
     this.logger = new Logger(loggerContext);
   }
@@ -37,6 +38,9 @@ export abstract class BaseApi {
         // allow legacy server connections
         secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT,
       }),
+      headers: {
+        Authorization: 'Bearer ' + this.token,
+      },
     };
   }
 
