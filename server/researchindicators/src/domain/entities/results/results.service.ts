@@ -398,7 +398,10 @@ export class ResultsService {
     const firstInsertion: number = 1;
     const lastCode: number = await this.mainRepo
       .findOne({
-        where: { is_active: In([true, false]) },
+        where: {
+          is_active: In([true, false]),
+          platform_code: ReportingPlatformEnum.STAR,
+        },
         order: { result_official_code: 'DESC' },
       })
       .then((result) => {
@@ -893,7 +896,10 @@ export class ResultsService {
         );
         await this._queryService.deleteFullResultById(resultExists.result_id);
       }
-      this.logger.error(`Error processing AI result: ${error.message}`);
+
+      this.logger.error(
+        `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`,
+      );
       this._resultsUtil.clearManually();
       return { ...result, error: true, message_error: error?.name || error };
     }
