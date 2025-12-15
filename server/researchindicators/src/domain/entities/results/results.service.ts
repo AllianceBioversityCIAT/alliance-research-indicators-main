@@ -904,7 +904,7 @@ export class ResultsService {
         .getRepository(Result)
         .findOne({
           select: { result_official_code: true, platform_code: true },
-          where: { title: result.title },
+          where: { title: result.title, is_active: true },
         });
 
       this._resultsUtil.clearManually();
