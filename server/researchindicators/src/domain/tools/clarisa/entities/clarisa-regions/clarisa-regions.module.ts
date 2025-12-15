@@ -5,5 +5,6 @@ import { ClarisaRegionsController } from './clarisa-regions.controller';
 @Module({
   controllers: [ClarisaRegionsController],
   providers: [ClarisaRegionsService],
+  exports: [ClarisaRegionsService],
 })
 export class ClarisaRegionsModule {}

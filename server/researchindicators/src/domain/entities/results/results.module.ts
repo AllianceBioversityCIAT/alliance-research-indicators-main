@@ -35,6 +35,7 @@ import { ClarisaCountriesModule } from '../../tools/clarisa/entities/clarisa-cou
 import { ResultInstitutionsModule } from '../result-institutions/result-institutions.module';
 import { ResultEvidencesModule } from '../result-evidences/result-evidences.module';
 import { ResultLeverStrategicOutcomeModule } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.module';
+import { ResultKnowledgeProductModule } from '../result-knowledge-product/result-knowledge-product.module';
 
 @Module({
   controllers: [ResultsController],
@@ -71,6 +72,7 @@ import { ResultLeverStrategicOutcomeModule } from '../result-lever-strategic-out
     ResultInstitutionsModule,
     ResultEvidencesModule,
     ResultLeverStrategicOutcomeModule,
+    ResultKnowledgeProductModule,
   ],
   providers: [
     ResultsService,
