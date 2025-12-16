@@ -41,6 +41,7 @@ import {
   filterByUniqueKeyWithPriority,
   mergeArraysWithPriority,
 } from '../../shared/utils/array.util';
+import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -301,7 +302,11 @@ export class TipIntegrationService extends BaseApi {
           createNewResult = await this.resultsService.createResult(
             result.createResult,
             ReportingPlatformEnum.TIP,
-            { notContract: true, result_status_id: ResultStatusEnum.APPROVED },
+            {
+              notContract: true,
+              result_status_id: ResultStatusEnum.APPROVED,
+              validateTitle: false,
+            },
             result.official_code,
           );
           findResult = createNewResult;
@@ -313,7 +318,6 @@ export class TipIntegrationService extends BaseApi {
             `Updating result ${findResult.result_official_code} from TIP.`,
           );
         }
-
         await this.dataSource
           .getRepository(Result)
           .update(findResult.result_id, {
@@ -324,6 +328,9 @@ export class TipIntegrationService extends BaseApi {
         await this.resultsService.updateGeneralInfo(
           findResult.result_id,
           result.generalInformation,
+          TrueFalseEnum.FALSE,
+          false,
+          false,
         );
 
         const tempAlignment = await this.resultsService.findResultAlignment(

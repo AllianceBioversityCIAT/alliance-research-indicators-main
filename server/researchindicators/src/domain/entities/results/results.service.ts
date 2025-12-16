@@ -251,6 +251,7 @@ export class ResultsService {
     newConfig.result_status_id =
       configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
     newConfig.notContract = configuration?.notContract ?? false;
+    newConfig.validateTitle = configuration?.validateTitle ?? true;
     return newConfig;
   }
 
@@ -289,7 +290,7 @@ export class ResultsService {
         relations: { indicator: true },
       })
       .then((result) => {
-        if (result) {
+        if (result && config?.validateTitle) {
           throw customErrorResponse<Result>({
             message: result,
             name: `Please enter a unique title. Review the existing result by selecting this link: ${result.indicator.name} - ${result.title}`,
@@ -485,6 +486,7 @@ export class ResultsService {
     generalInformation: UpdateGeneralInformation,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
     isAi: boolean = false,
+    validateTitle: boolean = true,
   ) {
     return this.dataSource.transaction(async (manager) => {
       const existsResult = await manager
@@ -498,7 +500,7 @@ export class ResultsService {
           },
         });
 
-      if (existsResult) {
+      if (existsResult && validateTitle) {
         throw new ConflictException(
           'The name of the result is already registered',
         );

@@ -9,4 +9,5 @@ export class CreateResultConfigDto {
     sdg?: boolean;
   };
   notContract?: boolean;
+  validateTitle?: boolean;
 }
