@@ -402,6 +402,18 @@ export class ResultsController {
       );
   }
 
+  @ApiOperation({ summary: 'Find general report' })
+  @Get('general-report/all')
+  async findGeneralReport() {
+    return this.resultsService.generalReport().then((result) =>
+      ResponseUtils.format({
+        description: 'General report was found correctly',
+        data: result,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
   @ApiOperation({ summary: 'The result created from the ia is formalized' })
   @Post('ai/formalize')
   @UsePipes(
