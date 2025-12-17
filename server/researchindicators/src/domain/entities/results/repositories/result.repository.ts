@@ -234,31 +234,28 @@ export class ResultRepository
     haveCode: boolean,
   ): void {
     if (filters?.levers) {
-      const tempQuery = `
-			  JSON_OBJECT('result_lever_id', rl.result_lever_id,
-					  'result_id', rl.result_id,
-					  'lever_role_id', rl.lever_role_id,
-					  'lever_id', rl.lever_id,
-					  'is_primary', rl.is_primary,
-					  'is_active', rl.is_active,
-					  'lever', JSON_OBJECT('id', cl.id,
-										   'short_name', cl.short_name,
-										   'full_name', cl.full_name,
-										   'other_names', cl.other_names))
-		  `;
-      queryParts.levers.select = `,JSON_ARRAYAGG(COALESCE(${tempQuery})) as result_levers`;
-
-      if (filters?.primary_lever) {
-        queryParts.levers.groupBy = `,rl.result_lever_id`;
-      }
+      queryParts.levers.select = `,tmp_rl.result_levers as result_levers`;
     }
 
     if (haveCode || filters?.levers) {
       queryParts.levers.join = `
-		  LEFT JOIN result_levers rl ON rl.result_id = r.result_id
-								AND rl.is_active = TRUE 
-								${filters?.primary_lever ? `AND rl.is_primary = TRUE` : ''}
-		LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id`;
+		  LEFT JOIN (SELECT JSON_ARRAYAGG(COALESCE(
+                          JSON_OBJECT('result_lever_id', rl.result_lever_id,
+                                          'result_id', rl.result_id,
+                                          'lever_role_id', rl.lever_role_id,
+                                          'lever_id', rl.lever_id,
+                                          'is_primary', rl.is_primary,
+                                          'is_active', rl.is_active,
+                                          'lever', JSON_OBJECT('id', cl.id,
+                                                                                   'short_name', cl.short_name,
+                                                                                   'full_name', cl.full_name,
+                                                                                   'other_names', cl.other_names))
+                  )) as result_levers, rl.result_id 
+FROM result_levers rl 
+	LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id
+WHERE  rl.is_active = TRUE 
+        ${filters?.primary_lever ? `AND rl.is_primary = TRUE` : ''}
+GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     }
   }
 
