@@ -1260,6 +1260,10 @@ export class ResultsService {
     };
   }
 
+  async generalReport() {
+    return this.mainRepo.generalReport();
+  }
+
   async findLastUpdatedResultByCurrentUser(take: number) {
     return this.mainRepo
       .find({
