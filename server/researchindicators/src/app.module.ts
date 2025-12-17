@@ -27,7 +27,6 @@ import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integra
 import { DynamoFeedbackModule } from './domain/tools/dynamo-feedback/dynamo-feedback.module';
 import { AllianceStaffOpenSearchModule } from './domain/tools/open-search/alliance-staff/alliance-staff.opensearch.module';
 import { AdminModule } from './admin/admin.module';
-import { CronModule } from './domain/tools/cron-jobs/cron.module';
 
 @Module({
   imports: [
@@ -45,7 +44,6 @@ import { CronModule } from './domain/tools/cron-jobs/cron.module';
     TipIntegrationModule,
     DynamoFeedbackModule,
     AdminModule,
-    CronModule,
   ],
   controllers: [AppController],
   providers: [
