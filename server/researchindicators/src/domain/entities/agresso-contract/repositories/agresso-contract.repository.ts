@@ -204,7 +204,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
               AND r.indicator_id = i.indicator_id
               AND r.is_active = 1
               AND r.is_snapshot = false
-              AND rc.is_active = 1)
+              AND rc.is_active = 1
+              AND rc.is_primary = 1)
         )
       ) AS indicators
     FROM agresso_contracts ac
@@ -229,6 +230,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       [OrderFieldsEnum.PROJECT_NAME]: 'ac.projectDescription',
       [OrderFieldsEnum.PRINCIPAL_INVESTIGATOR]: 'ac.project_lead_description',
       [OrderFieldsEnum.STATUS]: 'ac.contract_status',
+      [OrderFieldsEnum.LEAD_CENTER]: 'ac.ubwClientDescription',
+      [OrderFieldsEnum.LEVER]: 'cl.id',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
@@ -343,7 +346,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         paginated_contracts.lever_full_name,
         paginated_contracts.lever_other_names,
         paginated_contracts.is_science_program,
-        paginated_contracts.funding_type
+        paginated_contracts.funding_type,
+        paginated_contracts.ubwClientDescription
     FROM (
         SELECT DISTINCT
             ac.agreement_id,
@@ -360,7 +364,12 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             cl.full_name as lever_full_name,
             cl.other_names as lever_other_names,
             IF(pfc.id IS NOT NULL, TRUE, FALSE) AS is_science_program,
-            ac.funding_type
+            ac.funding_type,
+            CASE 
+                WHEN ac.ubwClientDescription = 'ExCIAT' THEN 'CIAT'
+                WHEN ac.ubwClientDescription = 'ExBIO' THEN 'Bioversity International'
+                ELSE ac.ubwClientDescription
+            END AS ubwClientDescription
         FROM agresso_contracts ac
         LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))

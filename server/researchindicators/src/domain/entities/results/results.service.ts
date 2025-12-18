@@ -7,7 +7,7 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, EntityManager, In, Not } from 'typeorm';
+import { DataSource, EntityManager, FindOneOptions, In, Not } from 'typeorm';
 import {
   ResultFiltersInterface,
   ResultRepository,
@@ -88,6 +88,8 @@ import { CreateResultConfigDto } from './dto/create-config.dto';
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
+import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
+import { ResultsUtil } from '../../shared/utils/results.util';
 
 @Injectable()
 export class ResultsService {
@@ -124,6 +126,8 @@ export class ResultsService {
     private readonly _resultEvidencesService: ResultEvidencesService,
     private readonly _queryService: QueryService,
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
+    private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
+    private readonly _resultsUtil: ResultsUtil,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -147,7 +151,12 @@ export class ResultsService {
       years: filters?.years,
       resultCodes: filters?.resultCodes,
       platform_code: filters?.platform_code,
+      filter_primary_contract: filters?.filter_primary_contract,
     });
+  }
+
+  async findOne(options: FindOneOptions<Result>) {
+    return this.mainRepo.findOne(options);
   }
 
   async findResultTIPData(options: { year?: number; productType?: number }) {
@@ -234,6 +243,8 @@ export class ResultsService {
     };
     newConfig.result_status_id =
       configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
+    newConfig.notContract = configuration?.notContract ?? false;
+    newConfig.validateTitle = configuration?.validateTitle ?? true;
     return newConfig;
   }
 
@@ -241,14 +252,23 @@ export class ResultsService {
     createResult: CreateResultDto,
     platform_code: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
     configuration?: CreateResultConfigDto,
+    officialCode?: number,
   ): Promise<Result> {
     const config = this.validateCreateConfig(configuration);
-    const { invalidFields, isValid } = validObject(createResult, [
-      'contract_id',
+    const validationFields: (keyof CreateResultDto | string)[] = [
       'indicator_id',
       'title',
       'year',
-    ]);
+    ];
+
+    if (!config.notContract) {
+      validationFields.push('contract_id');
+    }
+
+    const { invalidFields, isValid } = validObject<CreateResultDto>(
+      createResult,
+      validationFields as unknown as (keyof CreateResultDto)[],
+    );
 
     if (!isValid) {
       throw new BadRequestException(`Invalid fields: ${invalidFields}`);
@@ -263,7 +283,7 @@ export class ResultsService {
         relations: { indicator: true },
       })
       .then((result) => {
-        if (result) {
+        if (result && config?.validateTitle) {
           throw customErrorResponse<Result>({
             message: result,
             name: `Please enter a unique title. Review the existing result by selecting this link: ${result.indicator.name} - ${result.title}`,
@@ -282,7 +302,7 @@ export class ResultsService {
           indicator_id,
           title,
           is_ai: createResult.is_ai ?? false,
-          result_official_code: newOfficialCode,
+          result_official_code: officialCode ?? newOfficialCode,
           report_year_id: year,
           is_snapshot: false,
           platform_code,
@@ -372,7 +392,10 @@ export class ResultsService {
     const firstInsertion: number = 1;
     const lastCode: number = await this.mainRepo
       .findOne({
-        where: { is_active: In([true, false]) },
+        where: {
+          is_active: In([true, false]),
+          platform_code: ReportingPlatformEnum.STAR,
+        },
         order: { result_official_code: 'DESC' },
       })
       .then((result) => {
@@ -401,6 +424,9 @@ export class ResultsService {
         break;
       case IndicatorsEnum.OICR:
         await this._resultOicrService.create(resultId, manager);
+        break;
+      case IndicatorsEnum.KNOWLEDGE_PRODUCT:
+        await this._resultKnowledgeProductService.create(resultId, manager);
         break;
       default:
         break;
@@ -453,6 +479,7 @@ export class ResultsService {
     generalInformation: UpdateGeneralInformation,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
     isAi: boolean = false,
+    validateTitle: boolean = true,
   ) {
     return this.dataSource.transaction(async (manager) => {
       const existsResult = await manager
@@ -466,7 +493,7 @@ export class ResultsService {
           },
         });
 
-      if (existsResult) {
+      if (existsResult && validateTitle) {
         throw new ConflictException(
           'The name of the result is already registered',
         );
@@ -813,6 +840,7 @@ export class ResultsService {
       const processedResult = await this.createResultFromAiRoar(result);
       const newResult = await this.createResult(processedResult.result);
       resultExists = newResult;
+      await this._resultsUtil.setCurrentResult(newResult.result_id);
       await this.updateGeneralInfo(
         newResult.result_id,
         processedResult.generalInformation,
@@ -863,8 +891,25 @@ export class ResultsService {
         );
         await this._queryService.deleteFullResultById(resultExists.result_id);
       }
-      this.logger.error(`Error processing AI result: ${error.message}`);
-      return { ...result, error: true, message_error: error?.name || error };
+
+      this.logger.error(
+        `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`,
+      );
+      const tempExistsResult = await this.dataSource
+        .getRepository(Result)
+        .findOne({
+          select: { result_official_code: true, platform_code: true },
+          where: { title: result.title, is_active: true },
+        });
+
+      this._resultsUtil.clearManually();
+      return {
+        ...result,
+        result_official_code: tempExistsResult?.result_official_code,
+        platform_code: tempExistsResult?.platform_code,
+        error: true,
+        message_error: error?.name || error,
+      };
     }
   }
 
@@ -1213,6 +1258,10 @@ export class ResultsService {
       countries,
       comment_geo_scope: result?.comment_geo_scope,
     };
+  }
+
+  async generalReport() {
+    return this.mainRepo.generalReport();
   }
 
   async findLastUpdatedResultByCurrentUser(take: number) {

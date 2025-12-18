@@ -7,4 +7,6 @@ export enum OrderFieldsEnum {
   PROJECT_NAME = 'project-name',
   PRINCIPAL_INVESTIGATOR = 'principal-investigator',
   STATUS = 'status',
+  LEAD_CENTER = 'lead-center',
+  LEVER = 'lever',
 }

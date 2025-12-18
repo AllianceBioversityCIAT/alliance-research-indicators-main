@@ -353,4 +353,12 @@ export class AppConfig {
   get OPEN_SEARCH_PRMS_PASS(): string {
     return process.env.ARI_OPEN_SEARCH_PRMS_PASS;
   }
+
+  get TIP_API_URL(): string {
+    return process.env.ARI_TIP_API_URL;
+  }
+
+  get TIP_TOKEN(): string {
+    return process.env.ARI_TIP_TOKEN;
+  }
 }

@@ -83,6 +83,7 @@ import { ImpactAreaScoreModule } from './impact-area-score/impact-area-score.mod
 import { ResultImpactAreaGlobalTargetsModule } from './result-impact-area-global-targets/result-impact-area-global-targets.module';
 import { ResultStatusTransitionsModule } from './result-status-transitions/result-status-transitions.module';
 import { PooledFundingContractsModule } from './pooled-funding-contracts/pooled-funding-contracts.module';
+import { ResultKnowledgeProductModule } from './result-knowledge-product/result-knowledge-product.module';
 
 @Module({
   imports: [
@@ -170,6 +171,7 @@ import { PooledFundingContractsModule } from './pooled-funding-contracts/pooled-
     ResultImpactAreaGlobalTargetsModule,
     ResultStatusTransitionsModule,
     PooledFundingContractsModule,
+    ResultKnowledgeProductModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

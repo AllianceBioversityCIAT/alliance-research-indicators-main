@@ -236,7 +236,7 @@ export class GreenCheckRepository {
 
   async oircData(
     resultId: number,
-    metadatos: { url: string; historyId?: number },
+    metadatos: { url: string; historyId?: number; is_requested?: boolean },
   ): Promise<MessageOicrDto> {
     const query = `SELECT r.title,
                     ro.oicr_internal_code as oicr_number,
@@ -258,7 +258,7 @@ export class GreenCheckRepository {
                                                   ${metadatos?.historyId ? `AND sh.submission_history_id = ${metadatos.historyId}` : ''}
                   LEFT JOIN sec_users su2 ON su2.sec_user_id = sh.created_by 
                   WHERE sh.is_active = TRUE
-                    AND sh.from_status_id = 9
+                    ${metadatos?.is_requested ? `AND sh.from_status_id = 9` : ''}
                   ORDER BY sh.created_at DESC
                   LIMIT 1;`;
 
@@ -300,17 +300,38 @@ export class GreenCheckRepository {
     fromStatusId: ResultStatusEnum,
   ): Promise<FindGeneralDataTemplateDto> {
     const query = `
-    select sh.*,
-    	JSON_OBJECT('sec_user_id', su.sec_user_id,
-    				'first_name', su.first_name,
-    				'last_name', su.last_name,
-    				'email', su.email) as user
-    from submission_history sh 
-    inner join sec_users su on su.sec_user_id = sh.created_by 
-    where sh.result_id = ?
-    	and sh.is_active = true
-    order by sh.created_at desc
-    limit 2;
+    SELECT 
+      sh.created_at,
+      sh.created_by,
+      sh.updated_at,
+      sh.updated_by,
+      sh.is_active,
+      sh.deleted_at,
+      sh.submission_history_id,
+      sh.result_id,
+      sh.submission_comment,
+      sh.from_status_id,
+      sh.to_status_id,
+      JSON_OBJECT(
+        'sec_user_id', su.sec_user_id,
+        'first_name', su.first_name,
+        'last_name', su.last_name,
+        'email', su.email
+      ) AS user
+    FROM submission_history sh
+    INNER JOIN sec_users su ON su.sec_user_id = sh.created_by
+    INNER JOIN (
+      SELECT to_status_id, MAX(created_at) AS max_created_at
+      FROM submission_history
+      WHERE result_id = ?
+        AND is_active = TRUE
+        AND to_status_id IN (${toStatusId}, ${fromStatusId})
+      GROUP BY to_status_id
+    ) latest ON latest.to_status_id = sh.to_status_id AND latest.max_created_at = sh.created_at
+    WHERE sh.result_id = ?
+      AND sh.is_active = TRUE
+      AND sh.to_status_id IN (${toStatusId}, ${fromStatusId})
+    ORDER BY sh.to_status_id;
     `;
 
     const queryResult = `
@@ -329,12 +350,11 @@ export class GreenCheckRepository {
 
     const history = await this.dataSource.query<FindGreenChecksUserDto[]>(
       query,
-      [resultId],
+      [resultId, resultId],
     );
 
-    const subData = history.find((d) => d.to_status_id === toStatusId);
-    const revData = history.find((d) => d.to_status_id === fromStatusId);
-
+    const revData = history.find((d) => d.to_status_id === toStatusId);
+    const subData = history.find((d) => d.to_status_id === fromStatusId);
     return {
       sub_last_name: subData.user.last_name,
       sub_first_name: subData.user.first_name,

@@ -238,7 +238,7 @@ describe('TagsService', () => {
           is_active: true,
           name: expect.objectContaining({
             _type: 'in',
-            _value: ["'Technology'", "'Innovation'"],
+            _value: ['Technology', 'Innovation'],
           }),
         },
       });
@@ -254,7 +254,7 @@ describe('TagsService', () => {
           is_active: true,
           name: expect.objectContaining({
             _type: 'in',
-            _value: ["'Technology'"],
+            _value: ['Technology'],
           }),
         },
       });

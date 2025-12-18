@@ -92,9 +92,22 @@ export class GreenChecksService {
       this._resultsUtil.statusId,
       body,
     );
+    const currentStatus = this._resultsUtil.statusId;
+
+    if (
+      this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
+      statusId === ResultStatusEnum.DRAFT &&
+      [ResultStatusEnum.REQUESTED, ResultStatusEnum.POSTPONE].includes(
+        currentStatus,
+      )
+    ) {
+      await this.resultOicrService.validateOicrInternalCode(
+        resultId,
+        body?.oicr_internal_code,
+      );
+    }
 
     const responseHistory = await this.saveHistory(resultId, saveHistory);
-
     const otherData = await this.otherFunctions(
       resultStatusId,
       this._resultsUtil.statusId,
@@ -104,7 +117,7 @@ export class GreenChecksService {
     await this.prepareEmail(
       resultId,
       resultStatusId,
-      this._resultsUtil.statusId,
+      currentStatus,
       body,
       responseHistory,
     );
@@ -242,7 +255,9 @@ export class GreenChecksService {
     if (
       this._resultsUtil.indicatorId === IndicatorsEnum.OICR &&
       status === ResultStatusEnum.DRAFT &&
-      currentStatus === ResultStatusEnum.REQUESTED
+      [ResultStatusEnum.REQUESTED, ResultStatusEnum.POSTPONE].includes(
+        currentStatus,
+      )
     ) {
       await this.resultOicrService.review(this._resultsUtil.resultId, body);
     }
@@ -271,9 +286,12 @@ export class GreenChecksService {
     currentStatus: ResultStatusEnum,
   ) {
     if (
-      ![ResultStatusEnum.REQUESTED, ResultStatusEnum.SCIENCE_EDITION].includes(
-        currentStatus,
-      )
+      ![
+        ResultStatusEnum.REQUESTED,
+        ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.DRAFT,
+        ResultStatusEnum.REJECTED,
+      ].includes(currentStatus)
     )
       throw new ConflictException(
         `Only OIRC in requested status can be ${ResultStatusNameEnum[status]} status`,
@@ -291,7 +309,11 @@ export class GreenChecksService {
     const isOicr = this._resultsUtil.indicatorId === IndicatorsEnum.OICR;
 
     const allowedStatuses = isOicr
-      ? [ResultStatusEnum.DRAFT, ResultStatusEnum.REQUESTED]
+      ? [
+          ResultStatusEnum.DRAFT,
+          ResultStatusEnum.REQUESTED,
+          ResultStatusEnum.POSTPONE,
+        ]
       : [ResultStatusEnum.SUBMITTED];
 
     if (!allowedStatuses.includes(currentStatus)) {
@@ -342,6 +364,8 @@ export class GreenChecksService {
         ResultStatusEnum.REVISED,
         ResultStatusEnum.REQUESTED,
         ResultStatusEnum.SCIENCE_EDITION,
+        ResultStatusEnum.POSTPONE,
+        ResultStatusEnum.REJECTED,
       ].includes(currentStatus) &&
       ![ResultStatusEnum.SUBMITTED, ResultStatusEnum.DRAFT].includes(status)
     ) {
@@ -410,6 +434,7 @@ export class GreenChecksService {
         .oircData(resultId, {
           url: `${this.appConfig.ARI_CLIENT_HOST}/result/${this._resultsUtil.resultCode}/general-information`,
           historyId: history?.submission_history_id,
+          is_requested: fromStatusId === ResultStatusEnum.REQUESTED,
         })
         .then(async (data) => {
           const template = await this.templateService._getTemplate(
@@ -537,14 +562,8 @@ export class GreenChecksService {
         if (toStatusId === ResultStatusEnum.OICR_APPROVED) {
           prepareCcEmail.push(tempData.mel_expert_email);
         }
-        toSend = this.appConfig.SET_SAFE_EMAIL(
-          tempData.requester_by_email,
-          this.currentUserUtil.user.email,
-        );
-        ccSend = this.appConfig.SET_SAFE_EMAIL(
-          prepareCcEmail.join(','),
-          this.currentUserUtil.user.email,
-        );
+        toSend = tempData.requester_by_email;
+        ccSend = prepareCcEmail.join(',');
       } else {
         toSend =
           toStatusId === ResultStatusEnum.SUBMITTED

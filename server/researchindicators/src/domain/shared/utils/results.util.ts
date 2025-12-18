@@ -56,6 +56,30 @@ export class ResultsUtil {
       });
   }
 
+  async setCurrentResult(resultId: number) {
+    const tempResult = await this.dataSource
+      .getRepository(Result)
+      .findOne({
+        select: {
+          report_year_id: true,
+          result_official_code: true,
+          result_id: true,
+          indicator_id: true,
+          result_status_id: true,
+        },
+        where: { result_id: resultId, is_active: true },
+      })
+      .then((result) => {
+        this.currentResult = result;
+        return result;
+      });
+    this.currentResult = tempResult;
+  }
+
+  clearManually() {
+    this.currentResult = null;
+  }
+
   get result(): Result {
     if (!this.currentResult) throw new BadRequestException('Result not found');
     return this.currentResult;

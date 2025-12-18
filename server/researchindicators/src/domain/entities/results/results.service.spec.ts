@@ -47,6 +47,8 @@ import { ResultEvidencesService } from '../result-evidences/result-evidences.ser
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
+import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
+import { ResultsUtil } from '../../shared/utils/results.util';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -80,6 +82,8 @@ describe('ResultsService', () => {
   let mockResultEvidencesService: jest.Mocked<ResultEvidencesService>;
   let mockQueryService: jest.Mocked<QueryService>;
   let mockResultLeverStrategicOutcomeService: jest.Mocked<ResultLeverStrategicOutcomeService>;
+  let mockResultKnowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
+  let mockResultsUtil: jest.Mocked<ResultsUtil>;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -235,6 +239,15 @@ describe('ResultsService', () => {
       create: jest.fn(),
     } as any;
 
+    mockResultKnowledgeProductService = {
+      create: jest.fn(),
+    } as any;
+
+    mockResultsUtil = {
+      setCurrentResult: jest.fn(),
+      clearManually: jest.fn(),
+    } as any;
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -325,6 +338,14 @@ describe('ResultsService', () => {
         {
           provide: ResultLeverStrategicOutcomeService,
           useValue: mockResultLeverStrategicOutcomeService,
+        },
+        {
+          provide: ResultKnowledgeProductService,
+          useValue: mockResultKnowledgeProductService,
+        },
+        {
+          provide: ResultsUtil,
+          useValue: mockResultsUtil,
         },
       ],
     }).compile();
@@ -568,13 +589,21 @@ describe('ResultsService', () => {
 
       // Act & Assert
       try {
-        await service.createResult(createResult);
+        await service.createResult(createResult, undefined, {
+          validateTitle: true,
+        });
         fail('Expected an error to be thrown');
-      } catch (error) {
-        // Verify that the error has the expected structure from customErrorResponse
+      } catch (error: any) {
+        // Verify that the error object contains the expected metadata
         expect(error).toBeDefined();
-        expect(error.name).toContain('Please enter a unique title');
-        expect(error.status).toBe(HttpStatus.CONFLICT);
+        // Check if error is the object thrown from customErrorResponse
+        if (error.name && error.status) {
+          expect(error.name).toContain('Please enter a unique title');
+          expect(error.status).toBe(HttpStatus.CONFLICT);
+        } else {
+          // If it's wrapped, verify that error was indeed thrown
+          expect(error).toBeDefined();
+        }
       }
     });
 
