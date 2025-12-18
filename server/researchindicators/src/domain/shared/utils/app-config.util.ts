@@ -323,4 +323,34 @@ export class AppConfig {
   SET_SAFE_EMAIL(email: string, alternativeEmail: string): string {
     return this.ARI_IS_PRODUCTION ? email : alternativeEmail;
   }
+
+  /**
+   * Get the OpenSearch PRMS host
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_PRMS_HOST(): string {
+    return process.env.ARI_OPEN_SEARCH_PRMS_HOST;
+  }
+
+  /**
+   * Get the OpenSearch PRMS user
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_PRMS_USER(): string {
+    return process.env.ARI_OPEN_SEARCH_PRMS_USER;
+  }
+
+  /**
+   * Get the OpenSearch PRMS password
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_PRMS_PASS(): string {
+    return process.env.ARI_OPEN_SEARCH_PRMS_PASS;
+  }
 }
