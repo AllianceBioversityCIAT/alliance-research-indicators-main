@@ -44,6 +44,7 @@ export class TipKnowledgeProductDto {
   submitter: TipSubmitterDto | null;
   type: string[];
   abstract: string;
+  created_at: Date;
 }
 
 export class TipKnowledgeProductsResponseDto {
@@ -61,6 +62,8 @@ export class TipKnowledgeProductsResponseDto {
 export class ResultsTipMapping {
   official_code: number;
   resultOfficialCode: number;
+  external_link: string;
+  created_at: Date;
   userData: SecUser;
   createResult: CreateResultDto;
   generalInformation: UpdateGeneralInformation;

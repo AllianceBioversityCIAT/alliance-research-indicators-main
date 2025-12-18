@@ -1,4 +1,4 @@
-import { DeepPartial, EntityManager, Repository } from 'typeorm';
+import { DataSource, DeepPartial, Repository } from 'typeorm';
 import { Result } from '../entities/result.entity';
 import { Injectable } from '@nestjs/common';
 import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
@@ -11,6 +11,7 @@ import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 
 @Injectable()
 export class ResultRepository
@@ -18,11 +19,11 @@ export class ResultRepository
   implements ElasticFindEntity<ResultOpensearchDto>
 {
   constructor(
-    private readonly entityManager: EntityManager,
     private readonly appConfig: AppConfig,
     private readonly currentUserUtil: CurrentUserUtil,
+    private readonly dataSource: DataSource,
   ) {
-    super(Result, entityManager);
+    super(Result, dataSource.createEntityManager());
   }
 
   findDataForOpenSearch(
@@ -70,6 +71,95 @@ export class ResultRepository
 			r.report_year_id,
 			r.result_status_id
 	`;
+    return this.query(query);
+  }
+
+  async generalReport() {
+    const query = `SELECT
+                    r.result_official_code as 'Code',
+                    r.platform_code as 'Platform Code',
+                    r.title as 'Title',
+                    IFNULL(rc.contract_id, 'Not provided') as 'Projects',
+                    i.name as 'Indicator',
+                    GROUP_CONCAT(cl.short_name SEPARATOR ', ') as 'Levers',
+                    r.report_year_id as 'Live version',
+                    ry.ap_year as 'Approved versions',
+                    CONCAT(su.first_name, su.last_name) as 'Creator',
+                    CONCAT(aus.first_name, ' ', aus.last_name) as 'Main contact person',
+                    DATE_FORMAT(r.created_at , '%d/%m/%Y') as 'Creation date',
+                    ac.description as 'Project title',
+                    ac.project_lead_description as 'Project principal investigator',
+                    r.description as 'Result desciption',
+                    GROUP_CONCAT(CONCAT('- url: ',re.evidence_url, '\n',
+                              '  description: ',re.evidence_description, '\n',
+                              '  is public: ',IF(re.is_private,'FALSE', 'TRUE')) SEPARATOR '\n') as 'Evidences',
+                    cgs.name as 'Geographic scope',
+                    GROUP_CONCAT(cc.name SEPARATOR ', ') as 'Countries specified',
+                    GROUP_CONCAT(cr.name SEPARATOR ', ') as 'Regions specified',
+                    GROUP_CONCAT(ci.name SEPARATOR ', ') as 'Partners involved',
+                    GROUP_CONCAT(ci2.name SEPARATOR ', ') as 'Were the trainees attending on behalf of an organization? (CapSha)',
+                    ps.name as 'Policy stage',
+                    pt.name as 'Policy type',
+                    cit.name as 'Innovation type',
+                    cic.name as 'Innovation nature',
+                    CONCAT(cirl.\`level\`, ': ',cirl.name) as 'Innovation readiness level',
+                    rcs.session_participants_total as 'Number people trained TOTAL',
+                    rcs.session_participants_female as 'Number people trained FEMALE',
+                    rcs.session_participants_male as 'Number people trained MALE',
+                    rcs.session_participants_non_binary as 'Number people trained NON BINARY',
+                    sl.name as 'Length training',
+                    dm.name as 'Delivery modality' 
+                  FROM results r
+                    LEFT JOIN result_contracts rc ON rc.result_id = r.result_id 
+                                  AND rc.is_primary = TRUE
+                                  AND rc.is_active = TRUE
+                    LEFT JOIN agresso_contracts ac ON ac.agreement_id = rc.contract_id 
+                    LEFT JOIN indicators i ON r.indicator_id = i.indicator_id 
+                    LEFT JOIN result_levers rl ON rl.result_id = r.result_id 
+                                AND rl.is_primary = TRUE
+                                AND rl.is_active = TRUE
+                    LEFT JOIN clarisa_levers cl ON cl.id  = rl.lever_id 
+                    LEFT JOIN (SELECT GROUP_CONCAT(r2.report_year_id SEPARATOR ', ') ap_year, r2.result_official_code   
+                          FROM results r2
+                          WHERE r2.is_active = TRUE
+                            AND r2.is_snapshot = TRUE
+                          GROUP BY r2.result_official_code ) ry ON ry.result_official_code = r.result_official_code
+                    LEFT JOIN sec_users su ON su.sec_user_id = r.created_by 
+                    LEFT JOIN result_evidences re ON re.result_id = r.result_id 
+                                  AND re.is_active = TRUE
+                    LEFT JOIN clarisa_geo_scope cgs ON cgs.code = r.geo_scope_id
+                    LEFT JOIN result_countries rc2 ON rc2.result_id = r.result_id 	
+                                    AND rc2.is_active = TRUE
+                    LEFT JOIN clarisa_countries cc ON rc2.isoAlpha2 = cc.isoAlpha2
+                    LEFT JOIN result_regions rr ON rr.result_id = r.result_id 
+                                  AND rr.is_active = TRUE
+                    LEFT JOIN clarisa_regions cr ON cr.um49Code = rr.region_id 
+                    LEFT JOIN result_institutions ri ON ri.result_id = r.result_id 
+                                    AND ri.institution_role_id = 3
+                                    AND ri.is_active = TRUE
+                    LEFT JOIN clarisa_institutions ci ON ci.code = ri.institution_id 
+                    LEFT JOIN result_institutions ri2 ON ri2.result_id = r.result_id 
+                                    AND ri2.institution_role_id = 2
+                                    AND ri.is_active = TRUE
+                    LEFT JOIN clarisa_institutions ci2 ON ci2.code = ri2.institution_id 
+                    LEFT JOIN result_policy_change rpc ON rpc.result_id = r.result_id 
+                                    AND rpc.is_active = TRUE 
+                    LEFT JOIN policy_stage ps ON ps.policy_stage_id = rpc.policy_stage_id 
+                    LEFT JOIN policy_types pt ON pt.policy_type_id = rpc.policy_type_id 
+                    LEFT JOIN result_innovation_dev rid ON rid.result_id = r.result_id 
+                                      AND rid.is_active = TRUE
+                    LEFT JOIN clarisa_innovation_types cit ON cit.code = rid.innovation_type_id 
+                    LEFT JOIN clarisa_innovation_characteristics cic ON cic.id = rid.innovation_nature_id 
+                    LEFT JOIN clarisa_innovation_readiness_levels cirl ON cirl.id = rid.innovation_readiness_id
+                    LEFT JOIN result_users ru ON ru.result_id = r.result_id 
+                                AND ru.user_role_id = 1
+                    LEFT JOIN alliance_user_staff aus ON aus.carnet = ru.user_id 
+                    LEFT JOIN result_capacity_sharing rcs ON rcs.result_id = r.result_id 
+                    LEFT JOIN session_lengths sl ON sl.session_length_id = rcs.session_length_id 
+                    LEFT JOIN delivery_modalities dm ON dm.delivery_modality_id = rcs.delivery_modality_id 
+                  WHERE r.is_active = TRUE 
+                    AND r.is_snapshot = FALSE
+                  GROUP BY r.result_id;`;
     return this.query(query);
   }
 
@@ -144,31 +234,28 @@ export class ResultRepository
     haveCode: boolean,
   ): void {
     if (filters?.levers) {
-      const tempQuery = `
-			  JSON_OBJECT('result_lever_id', rl.result_lever_id,
-					  'result_id', rl.result_id,
-					  'lever_role_id', rl.lever_role_id,
-					  'lever_id', rl.lever_id,
-					  'is_primary', rl.is_primary,
-					  'is_active', rl.is_active,
-					  'lever', JSON_OBJECT('id', cl.id,
-										   'short_name', cl.short_name,
-										   'full_name', cl.full_name,
-										   'other_names', cl.other_names))
-		  `;
-      queryParts.levers.select = `,JSON_ARRAYAGG(COALESCE(${tempQuery})) as result_levers`;
-
-      if (filters?.primary_lever) {
-        queryParts.levers.groupBy = `,rl.result_lever_id`;
-      }
+      queryParts.levers.select = `,tmp_rl.result_levers as result_levers`;
     }
 
     if (haveCode || filters?.levers) {
       queryParts.levers.join = `
-		  LEFT JOIN result_levers rl ON rl.result_id = r.result_id
-								AND rl.is_active = TRUE 
-								${filters?.primary_lever ? `AND rl.is_primary = TRUE` : ''}
-		LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id`;
+		  LEFT JOIN (SELECT JSON_ARRAYAGG(COALESCE(
+                          JSON_OBJECT('result_lever_id', rl.result_lever_id,
+                                          'result_id', rl.result_id,
+                                          'lever_role_id', rl.lever_role_id,
+                                          'lever_id', rl.lever_id,
+                                          'is_primary', rl.is_primary,
+                                          'is_active', rl.is_active,
+                                          'lever', JSON_OBJECT('id', cl.id,
+                                                                                   'short_name', cl.short_name,
+                                                                                   'full_name', cl.full_name,
+                                                                                   'other_names', cl.other_names))
+                  )) as result_levers, rl.result_id 
+FROM result_levers rl 
+	LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id
+WHERE  rl.is_active = TRUE 
+        ${filters?.primary_lever ? `AND rl.is_primary = TRUE` : ''}
+GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     }
   }
 
@@ -367,6 +454,7 @@ export class ResultRepository
   }
 
   async findUserByCarnetId(carnetId: string): Promise<SecUser> {
+    if (isEmpty(carnetId)) return null;
     const query = `SELECT su.*
     FROM sec_users su
     WHERE su.carnet = ?
@@ -379,6 +467,7 @@ export class ResultRepository
   }
 
   async findUserByEmail(email: string): Promise<SecUser> {
+    if (isEmpty(email)) return null;
     const query = `SELECT su.*
     FROM sec_users su
     WHERE su.email = ?
@@ -413,6 +502,12 @@ export class ResultRepository
   }
 
   async createUserInSecUsers(newUser: SecUser): Promise<SecUser> {
+    const allianceUserStaff = await this.dataSource
+      .getRepository(AllianceUserStaff)
+      .findOne({
+        where: { carnet: newUser.carnet, is_active: true },
+      });
+
     const query = `INSERT INTO ${this.appConfig.ARI_MYSQL_NAME}.sec_users
     (first_name, last_name, email, carnet, status_id, is_active)
     VALUES (?, ?, ?, ?, ?, TRUE);`;
@@ -421,11 +516,14 @@ export class ResultRepository
       newUser.first_name,
       newUser.last_name,
       newUser.email,
-      newUser.carnet,
+      isEmpty(allianceUserStaff) ? null : newUser.carnet,
       1,
     ]);
 
-    const createdUser = await this.findUserByCarnetId(newUser.carnet);
+    const createdUser = await this.findUserByEmailOrCarnet(
+      isEmpty(allianceUserStaff) ? null : newUser.carnet,
+      newUser.email,
+    );
     return createdUser;
   }
 

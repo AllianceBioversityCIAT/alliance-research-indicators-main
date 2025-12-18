@@ -41,6 +41,7 @@ import {
   filterByUniqueKeyWithPriority,
   mergeArraysWithPriority,
 } from '../../shared/utils/array.util';
+import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -226,6 +227,9 @@ export class TipIntegrationService extends BaseApi {
         notable_references: [],
       };
 
+      resultMapped.external_link = result.link;
+      resultMapped.created_at = result.created_at;
+
       resultMapped.knowledgeProduct = {
         type: result.type.join(', '),
         citation: result.citation,
@@ -282,6 +286,7 @@ export class TipIntegrationService extends BaseApi {
 
   async createKpInStar(results: ResultsTipMapping[]) {
     for (const result of results) {
+      this.logger.debug(`Processing result ${result.official_code} from TIP.`);
       this._currentUser.setSystemUser(result.userData, true);
       let createNewResult: Result = null;
       try {
@@ -297,14 +302,35 @@ export class TipIntegrationService extends BaseApi {
           createNewResult = await this.resultsService.createResult(
             result.createResult,
             ReportingPlatformEnum.TIP,
-            { notContract: true, result_status_id: ResultStatusEnum.APPROVED },
+            {
+              notContract: true,
+              result_status_id: ResultStatusEnum.APPROVED,
+              validateTitle: false,
+            },
             result.official_code,
           );
           findResult = createNewResult;
+          this.logger.debug(
+            `Creating new result ${findResult.result_official_code} from TIP.`,
+          );
+        } else {
+          this.logger.debug(
+            `Updating result ${findResult.result_official_code} from TIP.`,
+          );
         }
+        await this.dataSource
+          .getRepository(Result)
+          .update(findResult.result_id, {
+            external_link: result.external_link,
+            created_at: result.created_at,
+          });
+
         await this.resultsService.updateGeneralInfo(
           findResult.result_id,
           result.generalInformation,
+          TrueFalseEnum.FALSE,
+          false,
+          false,
         );
 
         const tempAlignment = await this.resultsService.findResultAlignment(
@@ -335,7 +361,7 @@ export class TipIntegrationService extends BaseApi {
           findResult.result_id,
           result.knowledgeProduct,
         );
-        this.logger.debug(
+        this.logger.log(
           `Processed result ${findResult.result_official_code} from TIP.`,
         );
         this.logger.log(
@@ -353,6 +379,9 @@ export class TipIntegrationService extends BaseApi {
         this.logger.error(`Error processing tip result: ${error.message}`);
       }
       this._currentUser.clearSystemUser();
+      this.logger.debug(
+        `Finished processing result ${result.official_code} from TIP.`,
+      );
     }
   }
 }
