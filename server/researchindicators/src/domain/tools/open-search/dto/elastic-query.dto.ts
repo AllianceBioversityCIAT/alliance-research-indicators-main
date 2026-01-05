@@ -44,7 +44,7 @@ export type OpenSearchOperator<T> = {
 // Defines an OpenSearch query that includes boolean logic and other operators
 export type OpenSearchQuery<T> = {
   bool?: OpenSearchBool<T>;
-  match_all?: {};
+  match_all?: Record<string, never>;
 } & OpenSearchOperator<T>;
 
 // Defines an Elastic query including sorting options

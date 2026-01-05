@@ -6,11 +6,7 @@ import { ResultAlignmentDto } from '../../entities/results/dto/result-alignment.
 import { SaveGeoLocationDto } from '../../entities/results/dto/save-geo-location.dto';
 import { UpdateGeneralInformation } from '../../entities/results/dto/update-general-information.dto';
 
-export abstract class ExternalMappersInterface<T> {
-  abstract mapToExternalCreateResultDto(res: T[]): Promise<void>;
-}
-
-export class ExternalMappersDto {
+export class ResultsExtarnalDataMapping {
   official_code: number;
   resultOfficialCode: number;
   external_link: string;

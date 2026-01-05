@@ -24,7 +24,7 @@ export abstract class BaseExternalOpenSearchApi<
   constructor(
     protected readonly httpService: HttpService,
     protected readonly _appConfig: AppConfig,
-    private readonly opensearchHost: string,
+    opensearchHost: string,
     private readonly opensearchUser: string,
     private readonly opensearchPass: string,
     customPrimaryKey: keyof OpenSearchEntity,
@@ -171,8 +171,6 @@ export abstract class BaseExternalOpenSearchApi<
         ...wildcardQueries,
       );
     }
-
-    console.log(JSON.stringify(query, null, 2));
 
     return query;
   }
