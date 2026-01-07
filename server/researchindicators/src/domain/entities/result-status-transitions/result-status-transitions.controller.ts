@@ -1,6 +1,6 @@
 import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
 import { ResultStatusTransitionsService } from './result-status-transitions.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 
 @ApiTags('Results')
@@ -12,6 +12,9 @@ export class ResultStatusTransitionsController {
   ) {}
 
   @Get('next-statuses/:fromStatusId')
+  @ApiOperation({
+    deprecated: true,
+  })
   async findNextStatuses(@Param('fromStatusId') fromStatusId: number) {
     return this.resultStatusTransitionsService
       .findNextStatuses(fromStatusId)
