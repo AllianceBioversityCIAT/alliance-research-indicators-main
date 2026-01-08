@@ -2047,6 +2047,7 @@ describe('ResultsService', () => {
         report_year: mockResult.report_year_id,
         is_principal_investigator: mockPrincipalData.is_principal === 1,
         result_contract_id: mockPrimaryContract.contract_id,
+        result_status: mockResult.result_status,
       });
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         select: {
@@ -2061,6 +2062,10 @@ describe('ResultsService', () => {
           title: true,
           result_status: {
             name: true,
+            description: true,
+            config: true as any,
+            editable_roles: true,
+            result_status_id: true,
           },
           created_by: true,
         },

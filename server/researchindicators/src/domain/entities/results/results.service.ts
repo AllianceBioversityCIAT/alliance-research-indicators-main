@@ -766,7 +766,11 @@ export class ResultsService {
         result_status_id: true,
         title: true,
         result_status: {
+          result_status_id: true,
           name: true,
+          description: true,
+          config: true as any,
+          editable_roles: true,
         },
         created_by: true,
       },
@@ -801,6 +805,7 @@ export class ResultsService {
       created_by: result?.created_by,
       report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
+      result_status: result?.result_status,
     };
   }
 
