@@ -10,7 +10,7 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { selectManager } from '../../shared/utils/orm.util';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { LinkResult } from '../link-results/entities/link-result.entity';
@@ -56,7 +56,7 @@ export class ResultPolicyChangeService {
 
     const resultPolicyChange = entityManager.save({
       result_id: result_id,
-      ...this.currentUser.audit(SetAutitEnum.NEW),
+      ...this.currentUser.audit(SetAuditEnum.NEW),
     });
     return resultPolicyChange;
   }
@@ -118,7 +118,7 @@ export class ResultPolicyChangeService {
         policy_type_id: createResultPolicyChangeDto?.policy_type_id,
         policy_stage_id: createResultPolicyChangeDto?.policy_stage_id,
         evidence_stage: createResultPolicyChangeDto?.evidence_stage,
-        ...this.currentUser.audit(SetAutitEnum.BOTH),
+        ...this.currentUser.audit(SetAuditEnum.BOTH),
       });
 
       await this._updateDataUtil.updateLastUpdatedDate(result_id, manager);

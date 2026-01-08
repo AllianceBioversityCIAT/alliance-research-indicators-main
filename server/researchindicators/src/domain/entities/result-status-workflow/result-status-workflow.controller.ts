@@ -1,16 +1,25 @@
 import {
+  Body,
   Controller,
   Get,
   HttpStatus,
   Param,
+  Post,
   UseInterceptors,
 } from '@nestjs/common';
 import { ResultStatusWorkflowService } from './result-status-workflow.service';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
+import { AditionalDataChangeStatusDto } from './dto/aditional-data.dto';
 
 @Controller()
 @ApiTags('Results')
@@ -69,6 +78,33 @@ export class ResultStatusWorkflowController {
         ResponseUtils.format({
           data: result,
           description: 'Next steps found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @Post(`change-status/${RESULT_CODE}/to-status/:toStatusId(\\d+)`)
+  @GetResultVersion()
+  @ApiBody({ type: AditionalDataChangeStatusDto })
+  @ApiParam({
+    name: 'toStatusId',
+    description: 'To status id',
+    type: Number,
+    required: true,
+  })
+  @ApiOperation({
+    summary: 'Change status by result id',
+  })
+  async changeStatus(
+    @Body() body: AditionalDataChangeStatusDto,
+    @Param('toStatusId') toStatusId: string,
+  ) {
+    return this.resultStatusWorkflowService
+      .changeStatus(this._resultsUtil.resultId, +toStatusId, body)
+      .then((result) =>
+        ResponseUtils.format({
+          data: result,
+          description: 'Status changed',
           status: HttpStatus.OK,
         }),
       );

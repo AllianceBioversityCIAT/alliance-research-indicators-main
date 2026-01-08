@@ -4,7 +4,7 @@ import { ResultInstitutionType } from './entities/result-institution-type.entity
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { CreateResultInstitutionTypeDto } from './dto/create-result-institution-type.dto';
 import { ClarisaInstitutionTypeEnum } from '../../tools/clarisa/entities/clarisa-institution-types/enum/clarisa-institution-type.enum';
@@ -159,7 +159,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         institution_type_custom_name: null,
         institution_type_id: null,
         sub_institution_type_id: null,
-        ...this.currentUser.audit(SetAutitEnum.UPDATE),
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
       };
     } else {
       return {
@@ -174,7 +174,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         is_organization_known: false,
         institution_id: null,
         is_active: true,
-        ...this.currentUser.audit(SetAutitEnum.UPDATE),
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
       };
     }
   }
@@ -226,9 +226,9 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         is_active: true,
         ...this.currentUser.audit(
           defaultValue(
-            SetAutitEnum.UPDATE,
+            SetAuditEnum.UPDATE,
             !isEmpty(existData),
-            SetAutitEnum.NEW,
+            SetAuditEnum.NEW,
           ),
         ),
       };
@@ -247,9 +247,9 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
         is_active: true,
         ...this.currentUser.audit(
           defaultValue(
-            SetAutitEnum.UPDATE,
+            SetAuditEnum.UPDATE,
             !isEmpty(existData),
-            SetAutitEnum.NEW,
+            SetAuditEnum.NEW,
           ),
         ),
       };

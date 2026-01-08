@@ -15,7 +15,7 @@ import {
 import { SubmissionHistory } from './entities/submission-history.entity';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { ResultStatus } from '../result-status/entities/result-status.entity';
 import { isEmpty, validObject } from '../../shared/utils/object.utils';
@@ -399,7 +399,7 @@ export class GreenChecksService {
     return this.dataSource.transaction(async (manager) => {
       await manager.getRepository(Result).update(resultId, {
         result_status_id: historyObject.to_status_id,
-        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+        ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
       });
 
       const response = await manager.getRepository(SubmissionHistory).insert({
@@ -407,7 +407,7 @@ export class GreenChecksService {
         submission_comment: historyObject.submission_comment,
         from_status_id: historyObject.from_status_id,
         to_status_id: historyObject.to_status_id,
-        ...this.currentUserUtil.audit(SetAutitEnum.NEW),
+        ...this.currentUserUtil.audit(SetAuditEnum.NEW),
       });
 
       const history = await manager.getRepository(SubmissionHistory).findOne({
@@ -635,7 +635,7 @@ export class GreenChecksService {
       {
         report_year_id: newReportYear,
         result_status_id: ResultStatusEnum.DRAFT,
-        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+        ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
       },
     );
 

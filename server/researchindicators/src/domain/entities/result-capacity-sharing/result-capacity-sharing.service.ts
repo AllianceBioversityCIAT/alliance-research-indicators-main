@@ -19,7 +19,7 @@ import { SessionFormatEnum } from '../session-formats/enums/session-format.enum'
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { Result } from '../results/entities/result.entity';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
@@ -266,7 +266,7 @@ export class ResultCapacitySharingService {
 
     const resultCapSharing = entityManager.save({
       result_id: result_id,
-      ...this._currentUser.audit(SetAutitEnum.NEW),
+      ...this._currentUser.audit(SetAuditEnum.NEW),
     });
     return resultCapSharing;
   }
@@ -298,7 +298,7 @@ export class ResultCapacitySharingService {
         end_date: updateData?.end_date,
         degree_id: updateData?.degree_id,
         session_length_id: updateData?.session_length_id,
-        ...this._currentUser.audit(SetAutitEnum.UPDATE),
+        ...this._currentUser.audit(SetAuditEnum.UPDATE),
       });
 
       switch (updateData?.session_format_id) {
@@ -373,7 +373,7 @@ export class ResultCapacitySharingService {
       //Unnecessary fields null asignation
       trainee_name: null,
       gender_id: null,
-      ...this._currentUser.audit(SetAutitEnum.UPDATE),
+      ...this._currentUser.audit(SetAuditEnum.UPDATE),
     });
 
     await this._resultInstitutionService.create<InstitutionRolesEnum>(
@@ -419,7 +419,7 @@ export class ResultCapacitySharingService {
     await entityManager.update(resultId, {
       trainee_name: updateData?.trainee_name,
       gender_id: updateData?.gender_id,
-      ...this._currentUser.audit(SetAutitEnum.UPDATE),
+      ...this._currentUser.audit(SetAuditEnum.UPDATE),
       //Unnecessary fields null asignation
       session_participants_female: null,
       session_participants_male: null,

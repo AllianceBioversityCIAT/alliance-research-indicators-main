@@ -1,5 +1,6 @@
 import {
   Column,
+  DeepPartial,
   Entity,
   JoinColumn,
   ManyToOne,
@@ -8,6 +9,7 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ResultStatus } from '../../result-status/entities/result-status.entity';
 import { Indicator } from '../../indicators/entities/indicator.entity';
+import { ConfigWorkflowDto } from '../config/config-workflow';
 
 @Entity('result_status_workflow')
 export class ResultStatusWorkflow extends AuditableEntity {
@@ -37,6 +39,13 @@ export class ResultStatusWorkflow extends AuditableEntity {
     nullable: false,
   })
   to_status_id!: number;
+
+  @Column({
+    type: 'json',
+    name: 'config',
+    nullable: true,
+  })
+  config!: DeepPartial<ConfigWorkflowDto>;
 
   @ManyToOne(() => Indicator, (indicator) => indicator.result_status_workflows)
   @JoinColumn({ name: 'indicator_id' })
