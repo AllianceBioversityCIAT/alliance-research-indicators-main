@@ -146,10 +146,16 @@ export class GreenCheckRepository {
           	'result_status_id', r.result_status_id) as result,
           JSON_OBJECT( 
           	'result_status_id', rs1.result_status_id,
-          	'name', rs1.name ) as from_status,
+          	'name', rs1.name,
+          	'description', rs1.description,
+          	'config', rs1.config,
+          	'editable_roles', rs1.editable_roles) as from_status,
           JSON_OBJECT( 
           	'result_status_id', rs2.result_status_id,
-          	'name', rs2.name ) as to_status,
+          	'name', rs2.name,
+          	'description', rs2.description,
+          	'config', rs2.config,
+          	'editable_roles', rs2.editable_roles) as to_status,
           JSON_OBJECT(
           	'sec_user_id', su1.sec_user_id,
           	'email', su1.email,
