@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { DataSource, In } from 'typeorm';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { Template } from '../../shared/auxiliar/template/entities/template.entity';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
 import { ResultStatusWorkflow } from './entities/result-status-workflow.entity';
@@ -7,12 +7,30 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { isEmpty } from '../../shared/utils/object.utils';
 import { Result } from '../results/entities/result.entity';
 import { ResultStatus } from '../result-status/entities/result-status.entity';
+import { StatusWorkflowFunctionHandlerService } from './function-handler.service';
+import { SubmissionHistory } from '../green-checks/entities/submission-history.entity';
+import {
+  CurrentUserUtil,
+  SetAuditEnum,
+} from '../../shared/utils/current-user.util';
+import { AditionalDataChangeStatusDto } from './dto/aditional-data.dto';
+import { StatusTransitionTree } from './satus-graph';
+import {
+  ConfigWorkflowAction,
+  ConfigWorkflowActionEmail,
+  ConfigWorkflowActionFunction,
+  ConfigWorkflowDto,
+  ConfigWorkFlowTypeEnum,
+  GeneralDataDto,
+} from './config/config-workflow';
 
 @Injectable()
 export class ResultStatusWorkflowService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentResult: ResultsUtil,
+    private readonly currentUserUtil: CurrentUserUtil,
+    private readonly handlerService: StatusWorkflowFunctionHandlerService,
   ) {}
 
   private async getTemplate(template: TemplateEnum): Promise<string> {
@@ -37,16 +55,30 @@ export class ResultStatusWorkflowService {
   }
 
   async getAllStatusesByindicatorId(indicatorId: number) {
-    return this.dataSource.getRepository(ResultStatusWorkflow).find({
-      where: {
-        indicator_id: indicatorId,
-        is_active: true,
-      },
-      relations: {
-        from_status: true,
-        to_status: true,
-      },
-    });
+    return this.dataSource
+      .getRepository(ResultStatusWorkflow)
+      .find({
+        where: {
+          indicator_id: indicatorId,
+          is_active: true,
+        },
+        relations: {
+          from_status: true,
+          to_status: true,
+        },
+      })
+      .then((statuses) =>
+        statuses.map((el) => {
+          delete el.config;
+          return el;
+        }),
+      );
+  }
+
+  async getHierarchicalTreeByIndicatorId(indicatorId: number) {
+    const statuses = await this.getAllStatusesByindicatorId(indicatorId);
+    const tree = new StatusTransitionTree(statuses);
+    return tree.getHierarchicalTree();
   }
 
   async getConfigWorkflowByIndicatorAndFromStatus(
@@ -96,5 +128,135 @@ export class ResultStatusWorkflowService {
       indicatorId,
       currentStatusId,
     );
+  }
+
+  async changeStatus(
+    resultId: number,
+    toStatusId: number,
+    aditionalData: AditionalDataChangeStatusDto,
+  ) {
+    const result = await this.dataSource.getRepository(Result).findOne({
+      where: {
+        result_id: resultId,
+        is_active: true,
+      },
+    });
+    if (!result) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const transitionStatus = await this.dataSource
+      .getRepository(ResultStatusWorkflow)
+      .findOne({
+        where: {
+          indicator_id: result.indicator_id,
+          from_status_id: result.result_status_id,
+          to_status_id: toStatusId,
+          is_active: true,
+        },
+      });
+    if (!transitionStatus) {
+      throw new NotFoundException('Is not a valid status change');
+    }
+
+    const history = this._createHistory(
+      transitionStatus,
+      result,
+      aditionalData,
+    );
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(SubmissionHistory).insert(history);
+      await manager.getRepository(Result).update(resultId, {
+        result_status_id: toStatusId,
+        ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
+      });
+    });
+  }
+
+  private sortActionsByPriority(
+    actions: ConfigWorkflowAction[],
+    priorityOrder?: ConfigWorkFlowTypeEnum[],
+  ): ConfigWorkflowAction[] {
+    const defaultOrder = [
+      ConfigWorkFlowTypeEnum.VALIDATION,
+      ConfigWorkFlowTypeEnum.FUNCTION,
+      ConfigWorkFlowTypeEnum.EMAIL,
+    ];
+
+    const order = priorityOrder || defaultOrder;
+
+    const priorityMap = new Map<ConfigWorkFlowTypeEnum, number>();
+    order.forEach((type, index) => {
+      priorityMap.set(type, index);
+    });
+
+    return [...actions].sort((a, b) => {
+      const priorityA = priorityMap.get(a.type) ?? Number.MAX_SAFE_INTEGER;
+      const priorityB = priorityMap.get(b.type) ?? Number.MAX_SAFE_INTEGER;
+      return priorityA - priorityB;
+    });
+  }
+
+  private async _executeConfigWorkflow(
+    config: ConfigWorkflowDto,
+    manager: EntityManager,
+    generalData: GeneralDataDto,
+  ) {
+    if (config?.actions?.length === 0) return;
+    const workflowActions = {
+      [ConfigWorkFlowTypeEnum.FUNCTION]: async (
+        action: ConfigWorkflowAction,
+      ) => {
+        const config: ConfigWorkflowActionFunction =
+          action.config as ConfigWorkflowActionFunction;
+        await this.handlerService?.[config?.function_name](
+          generalData,
+          manager,
+        );
+      },
+      [ConfigWorkFlowTypeEnum.VALIDATION]: async (
+        action: ConfigWorkflowAction,
+      ) => {
+        const config: ConfigWorkflowActionFunction =
+          action.config as ConfigWorkflowActionFunction;
+        await this.handlerService?.[config?.function_name](
+          generalData,
+          manager,
+        );
+      },
+      [ConfigWorkFlowTypeEnum.EMAIL]: async (action: ConfigWorkflowAction) => {
+        const config = action.config as ConfigWorkflowActionEmail;
+        const tempalte = await this.handlerService.getTemplate(
+          config?.template,
+          manager,
+        );
+        const customData = await this.handlerService?.[
+          config?.custom_data_resolver
+        ](generalData, manager);
+
+        generalData['template'] = tempalte;
+        generalData['customData'] = customData;
+        await this.handlerService.sendEmail(generalData, manager);
+      },
+    };
+    const sortedActions = this.sortActionsByPriority(config.actions);
+    for (const action of sortedActions) {
+      await workflowActions[action.type](action);
+    }
+  }
+
+  private _createHistory(
+    transitionStatus: ResultStatusWorkflow,
+    result: Result,
+    aditionalData: AditionalDataChangeStatusDto,
+  ) {
+    const history = new SubmissionHistory();
+    history.result_id = result.result_id;
+    history.from_status_id = transitionStatus.from_status_id;
+    history.to_status_id = transitionStatus.to_status_id;
+    history.submission_comment = aditionalData.submission_comment;
+    history.created_by = this.currentUserUtil.user_id;
+    return history;
   }
 }

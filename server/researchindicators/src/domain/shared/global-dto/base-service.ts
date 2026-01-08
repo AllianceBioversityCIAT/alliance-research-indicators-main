@@ -16,7 +16,7 @@ import {
 import { AuditableEntity } from './auditable.entity';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { isEmpty } from '../utils/object.utils';
-import { CurrentUserUtil, SetAutitEnum } from '../utils/current-user.util';
+import { CurrentUserUtil, SetAuditEnum } from '../utils/current-user.util';
 
 export abstract class BaseServiceProperties<
   Entity extends AuditableEntity,
@@ -193,7 +193,7 @@ export abstract class BaseServiceSimple<
       dataRole,
     ).map((data) => ({
       ...data,
-      ...this.currentUser.audit(SetAutitEnum.BOTH),
+      ...this.currentUser.audit(SetAuditEnum.BOTH),
     }));
 
     const response = (
@@ -440,7 +440,7 @@ export abstract class BaseServiceSimple<
       dataRole,
     ).map((data) => ({
       ...data,
-      ...this.currentUser.audit(SetAutitEnum.BOTH),
+      ...this.currentUser.audit(SetAuditEnum.BOTH),
     }));
 
     const savedRecords = (await entityManager.save(

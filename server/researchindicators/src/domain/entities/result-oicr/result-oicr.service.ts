@@ -10,7 +10,7 @@ import { StepOneOicrDto } from './dto/step-one-oicr.dto';
 import { ResultTagsService } from '../result-tags/result-tags.service';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { ResultUsersService } from '../result-users/result-users.service';
 import { ResultUser } from '../result-users/entities/result-user.entity';
@@ -90,7 +90,7 @@ export class ResultOicrService {
     );
     return entityManager.save({
       result_id: resultId,
-      ...this.currentUser.audit(SetAutitEnum.NEW),
+      ...this.currentUser.audit(SetAuditEnum.NEW),
     });
   }
 
@@ -193,7 +193,7 @@ export class ResultOicrService {
       sharepoint_link: isEmpty(data?.sharepoint_link?.trim())
         ? null
         : data.sharepoint_link,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
 
     const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
@@ -465,7 +465,7 @@ export class ResultOicrService {
 
     await this.mainRepo.update(resultId, {
       outcome_impact_statement: data.outcome_impact_statement,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
   }
 
@@ -579,7 +579,7 @@ export class ResultOicrService {
       sharepoint_link: isEmpty(data?.sharepoint_link?.trim())
         ? null
         : data.sharepoint_link,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
   }
 

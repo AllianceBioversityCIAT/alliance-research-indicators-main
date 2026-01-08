@@ -31,7 +31,7 @@ import { AgressoContractService } from '../agresso-contract/agresso-contract.ser
 import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { CreateResultDto } from './dto/create-result.dto';
-import { SetAutitEnum } from '../../shared/utils/current-user.util';
+import { SetAuditEnum } from '../../shared/utils/current-user.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ContractRolesEnum } from '../result-contracts/enum/contract-roles.enum';
@@ -1549,7 +1549,7 @@ describe('ResultsService', () => {
         title: updateGeneralInfoDto.title,
         description: updateGeneralInfoDto.description,
         report_year_id: updateGeneralInfoDto.year,
-        ...mockCurrentUser.audit(SetAutitEnum.UPDATE),
+        ...mockCurrentUser.audit(SetAuditEnum.UPDATE),
       });
 
       expect(mockResultKeywordsService.transformData).toHaveBeenCalledWith(
