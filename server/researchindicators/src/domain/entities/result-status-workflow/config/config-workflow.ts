@@ -2,6 +2,7 @@ import { isEmpty } from 'lodash';
 import { TemplateEnum } from '../../../shared/auxiliar/template/enum/template.enum';
 import { DeepPartial } from 'typeorm';
 import { Result } from '../../results/entities/result.entity';
+import { AditionalDataChangeStatusDto } from '../dto/aditional-data.dto';
 
 export interface ConfigWorkflow {
   actions: ConfigWorkflowAction[];
@@ -32,6 +33,7 @@ export class ConfigWorkflowAction {
 export class ConfigWorkflowActionEmail {
   template: TemplateEnum;
   custom_data_resolver: string;
+  custom_config_email: string;
 
   constructor(data: ConfigWorkflowActionEmail) {
     this.template = data?.template;
@@ -67,32 +69,53 @@ export class ConfigWorkflowDto implements ConfigWorkflow {
 }
 
 export class GeneralDataDto {
-  result: Result;
-  template: string;
-  customData?: {
-    title?: string;
-    oicr_number?: string;
-    mel_expert_name?: string;
-    requester_by?: string;
-    sharepoint_url?: string;
-    reviewed_by?: string;
-    decision_date?: string;
-    justification?: string;
-    requester_by_email?: string;
-    reviewed_by_email?: string;
-    mel_expert_email?: string;
-    pi_name?: string;
-    sub_last_name?: string;
-    sub_first_name?: string;
-    result_id?: number;
-    result_code?: string;
-    platform_code?: string;
-    project_name?: string;
-    support_email?: string;
-    content_support_email?: string;
-    system_name: string;
-    rev_email?: string;
-    url?: string;
-    indicator?: string;
-  };
+  result: Result = null;
+  configEmail: ConfigEmailDto = new ConfigEmailDto();
+  customData: CustomDataDto = new CustomDataDto();
+  aditionalData: AditionalDataChangeStatusDto =
+    new AditionalDataChangeStatusDto();
+}
+
+export class ConfigEmailDto {
+  to: string[] = [];
+  cc: string[] = [];
+  bcc: string[] = [];
+  subject: string = null;
+  body: string = null;
+  rawTemplate: string = null;
+  templateCode: string = null;
+}
+
+export class CustomDataDto {
+  title?: string = null;
+  oicr_number?: string = null;
+  mel_expert_name?: string;
+  requester_by?: string = null;
+  sharepoint_url?: string = null;
+  reviewed_by?: string = null;
+  decision_date?: string = null;
+  justification?: string = null;
+  requester_by_email?: string = null;
+  reviewed_by_email?: string = null;
+  mel_expert_email?: string = null;
+  result_id?: number = null;
+  result_code?: string = null;
+  platform_code?: string = null;
+  project_name?: string = null;
+  support_email?: string = null;
+  content_support_email?: string = null;
+  system_name: string = null;
+  rev_email?: string = null;
+  url?: string = null;
+  principal_investigator: SimpleUserDto = new SimpleUserDto();
+  action_executor: SimpleUserDto = new SimpleUserDto();
+  submitter: SimpleUserDto = new SimpleUserDto();
+  result_owner: SimpleUserDto = new SimpleUserDto();
+  indicator_name?: string = null;
+  indicator_id?: number = null;
+}
+
+export class SimpleUserDto {
+  name: string = null;
+  email: string = null;
 }

@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, EntityManager, In } from 'typeorm';
-import { Template } from '../../shared/auxiliar/template/entities/template.entity';
-import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource, DeepPartial, EntityManager, In } from 'typeorm';
 import { ResultStatusWorkflow } from './entities/result-status-workflow.entity';
 import { ResultsUtil } from '../../shared/utils/results.util';
-import { isEmpty } from '../../shared/utils/object.utils';
+import { cleanName, isEmpty } from '../../shared/utils/object.utils';
 import { Result } from '../results/entities/result.entity';
 import { ResultStatus } from '../result-status/entities/result-status.entity';
 import { StatusWorkflowFunctionHandlerService } from './function-handler.service';
@@ -23,27 +25,23 @@ import {
   ConfigWorkFlowTypeEnum,
   GeneralDataDto,
 } from './config/config-workflow';
+import Handlebars from 'handlebars';
 
 @Injectable()
 export class ResultStatusWorkflowService {
+  private _validateFunction(functionName: string) {
+    if (isEmpty(this.handlerService?.[functionName]))
+      throw new InternalServerErrorException(
+        `The configuration of change status is not valid`,
+      );
+  }
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentResult: ResultsUtil,
     private readonly currentUserUtil: CurrentUserUtil,
     private readonly handlerService: StatusWorkflowFunctionHandlerService,
   ) {}
-
-  private async getTemplate(template: TemplateEnum): Promise<string> {
-    return this.dataSource
-      .getRepository(Template)
-      .findOne({
-        where: {
-          name: template,
-          is_active: true,
-        },
-      })
-      .then((res) => res.template);
-  }
 
   private async getStatusesByIds(statusIds: number[]) {
     return this.dataSource.getRepository(ResultStatus).find({
@@ -155,9 +153,21 @@ export class ResultStatusWorkflowService {
           is_active: true,
         },
       });
+
     if (!transitionStatus) {
       throw new NotFoundException('Is not a valid status change');
     }
+
+    const generalData = new GeneralDataDto();
+
+    generalData.result = result;
+    generalData.aditionalData = aditionalData;
+    generalData.customData.action_executor.name =
+      cleanName(this.currentUserUtil.user.first_name) +
+      ' ' +
+      cleanName(this.currentUserUtil.user.last_name);
+    generalData.customData.action_executor.email =
+      this.currentUserUtil.user.email;
 
     const history = this._createHistory(
       transitionStatus,
@@ -171,13 +181,18 @@ export class ResultStatusWorkflowService {
         result_status_id: toStatusId,
         ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
       });
+      await this._executeConfigWorkflow(
+        transitionStatus.config,
+        manager,
+        generalData,
+      );
     });
   }
 
   private sortActionsByPriority(
-    actions: ConfigWorkflowAction[],
+    actions: DeepPartial<ConfigWorkflowAction>[],
     priorityOrder?: ConfigWorkFlowTypeEnum[],
-  ): ConfigWorkflowAction[] {
+  ): DeepPartial<ConfigWorkflowAction>[] {
     const defaultOrder = [
       ConfigWorkFlowTypeEnum.VALIDATION,
       ConfigWorkFlowTypeEnum.FUNCTION,
@@ -199,50 +214,67 @@ export class ResultStatusWorkflowService {
   }
 
   private async _executeConfigWorkflow(
-    config: ConfigWorkflowDto,
+    config: DeepPartial<ConfigWorkflowDto>,
     manager: EntityManager,
     generalData: GeneralDataDto,
   ) {
     if (config?.actions?.length === 0) return;
     const workflowActions = {
       [ConfigWorkFlowTypeEnum.FUNCTION]: async (
-        action: ConfigWorkflowAction,
+        action: DeepPartial<ConfigWorkflowAction>,
       ) => {
         const config: ConfigWorkflowActionFunction =
           action.config as ConfigWorkflowActionFunction;
+        this._validateFunction(config?.function_name);
         await this.handlerService?.[config?.function_name](
           generalData,
           manager,
         );
       },
       [ConfigWorkFlowTypeEnum.VALIDATION]: async (
-        action: ConfigWorkflowAction,
+        action: DeepPartial<ConfigWorkflowAction>,
       ) => {
+        console.log('validation');
         const config: ConfigWorkflowActionFunction =
           action.config as ConfigWorkflowActionFunction;
+
+        this._validateFunction(config?.function_name);
         await this.handlerService?.[config?.function_name](
           generalData,
           manager,
         );
       },
-      [ConfigWorkFlowTypeEnum.EMAIL]: async (action: ConfigWorkflowAction) => {
+      [ConfigWorkFlowTypeEnum.EMAIL]: async (
+        action: DeepPartial<ConfigWorkflowAction>,
+      ) => {
+        console.log('email');
         const config = action.config as ConfigWorkflowActionEmail;
-        const tempalte = await this.handlerService.getTemplate(
-          config?.template,
+        generalData.configEmail.templateCode = config.template;
+        generalData.configEmail.rawTemplate =
+          await this.handlerService.getTemplate(generalData, manager);
+
+        this._validateFunction(config?.custom_data_resolver);
+        await this.handlerService?.[config?.custom_data_resolver](
+          generalData,
           manager,
         );
-        const customData = await this.handlerService?.[
-          config?.custom_data_resolver
-        ](generalData, manager);
 
-        generalData['template'] = tempalte;
-        generalData['customData'] = customData;
+        this._validateFunction(config?.custom_config_email);
+        await this.handlerService?.[config?.custom_config_email](
+          generalData,
+          manager,
+        );
+        generalData.configEmail.body = Handlebars.compile(
+          generalData.configEmail.rawTemplate,
+        )(generalData.customData);
         await this.handlerService.sendEmail(generalData, manager);
       },
     };
-    const sortedActions = this.sortActionsByPriority(config.actions);
-    for (const action of sortedActions) {
-      await workflowActions[action.type](action);
+    if (!isEmpty(config?.actions)) {
+      const sortedActions = this.sortActionsByPriority(config.actions);
+      for (const action of sortedActions) {
+        await workflowActions[action.type](action);
+      }
     }
   }
 
