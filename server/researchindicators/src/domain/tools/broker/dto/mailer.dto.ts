@@ -12,11 +12,11 @@ export class EmailBody {
   @ApiProperty()
   subject: string;
   @ApiProperty()
-  to: string;
+  to: string | string[];
   @ApiProperty()
-  cc?: string;
+  cc?: string | string[];
   @ApiProperty()
-  bcc?: string;
+  bcc?: string | string[];
   @ApiProperty()
   message: EmailBodyMessage;
 }
