@@ -11,19 +11,23 @@ export class FindGeneralDataTemplateDto {
   indicator: string;
 }
 
-export class FindDataForSubmissionDto {
+export class FindGeneralCustomDataDto {
   owner_id: number;
   owner_first_name: string;
   owner_last_name: string;
   owner_email: string;
   principal_investigator_first_name: string;
   principal_investigator_last_name: string;
-  principal_investigator_name: string;
+  principal_investigator_email: string;
   result_official_code: string;
   result_id: number;
   result_title: string;
   project_name: string;
   indicator: string;
+  action_executor_first_name: string;
+  action_executor_last_name: string;
+  action_executor_email: string;
+  description: string;
 }
 
 export class SubmissionEmailTemplateDataDto {

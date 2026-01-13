@@ -6,10 +6,7 @@ import { Result } from '../../results/entities/result.entity';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { FindGreenChecksUserDto } from '../dto/find-green-checks-user.dto';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
-import {
-  FindDataForSubmissionDto,
-  FindGeneralDataTemplateDto,
-} from '../dto/find-general-data-template.dto';
+import { FindGeneralDataTemplateDto } from '../dto/find-general-data-template.dto';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { MessageOicrDto } from '../dto/message-oicr.dto';
 import { formatString } from '../../../shared/utils/queries.util';
@@ -208,9 +205,7 @@ export class GreenCheckRepository {
     return principal == 1 || (roles == 1 && result == 1);
   }
 
-  async getDataForSubmissionResult(
-    resultId: number,
-  ): Promise<FindDataForSubmissionDto> {
+  async getDataForSubmissionResult(resultId: number) {
     const query = `
       select 
         su.sec_user_id as contributor_id,
@@ -233,7 +228,7 @@ export class GreenCheckRepository {
       limit 1;
     `;
 
-    const result: FindDataForSubmissionDto = await this.dataSource
+    const result = await this.dataSource
       .query(query, [resultId])
       .then((result) => (result?.length ? result[0] : null));
 

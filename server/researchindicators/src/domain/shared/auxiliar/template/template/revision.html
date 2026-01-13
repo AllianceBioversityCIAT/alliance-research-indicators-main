@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Revision</title>
+  </head>
+  <body>
+    <p>Dear {{submitter.name}},</p>
+    <p>
+      The result
+      <a href="{{url}}">{{indicator_name}} {{result_code}} - {{title}}</a> has
+      been reviewed by <b>{{action_executor.name}}</b>, and a revision has been
+      <b>requested</b>.
+    </p>
+    <p>
+      <b>Feedback provided: </b><br />
+      <i>"{{description}}"</i>
+    </p>
+    <p>
+      The result is now editable again. Please make the necessary adjustments
+      based on the feedback received and submit it again for review.
+    </p>
+    <p>Best regards,<br /><b>{{platform_code}} System Notification</b></p>
+    <p>
+      <i>This is an automated email. Please do not reply.</i>
+    </p>
+  </body>
+</html>

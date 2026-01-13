@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>acepted</title>
+  </head>
+  <body>
+    <p>Dear {{submitter.name}},</p>
+    <p>
+      The result
+      <a href="{{url}}">{{indicator_name}} {{result_code}} - {{title}}</a> has
+      been <b>approved</b> by <b>{{action_executor.name}}</b>.
+    </p>
+    <p>You may access the result here: <a href="{{url}}">{{url}}</a></p>
+    <p>
+      Following this approval, the result will be included in the Alliance
+      Results Dashboard in due course.
+    </p>
+    <p>Best regards,<br /><b>{{platform_code}} System Notification</b></p>
+    <p>
+      <i>This is an automated email. Please do not reply.</i>
+    </p>
+  </body>
+</html>
