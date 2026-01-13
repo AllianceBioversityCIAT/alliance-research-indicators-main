@@ -3,24 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>no acepted</title>
+    <title>accepted</title>
   </head>
   <body>
     <p>Dear {{submitter.name}},</p>
     <p>
       The result
       <a href="{{url}}">{{indicator_name}} {{result_code}} - {{title}}</a> has
-      been reviewed by <b>{{action_executor.name}}</b>, and was
-      <b>not approved</b>.
-    </p>
-    <p>
-      <b>Reason provided: </b><br />
-      <i>"{{description}}"</i>
+      been <b>approved</b> by <b>{{action_executor.name}}</b>.
     </p>
     <p>You may access the result here: <a href="{{url}}">{{url}}</a></p>
     <p>
-      If you have any questions regarding this decision, please contact
-      {{action_executor.name}}.
+      Following this approval, the result will be included in the Alliance
+      Results Dashboard in due course.
     </p>
     <p>Best regards,<br /><b>{{platform_code}} System Notification</b></p>
     <p>
