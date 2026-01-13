@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>no acepted</title>
+  </head>
+  <body>
+    <p>Dear {{submitter.name}},</p>
+    <p>
+      The result
+      <a href="{{url}}">{{indicator_name}} {{result_code}} - {{title}}</a> has
+      been reviewed by <b>{{action_executor.name}}</b>, and was
+      <b>not approved</b>.
+    </p>
+    <p>
+      <b>Reason provided: </b><br />
+      <i>"{{description}}"</i>
+    </p>
+    <p>You may access the result here: <a href="{{url}}">{{url}}</a></p>
+    <p>
+      If you have any questions regarding this decision, please contact
+      {{action_executor.name}}.
+    </p>
+    <p>Best regards,<br /><b>{{platform_code}} System Notification</b></p>
+    <p>
+      <i>This is an automated email. Please do not reply.</i>
+    </p>
+  </body>
+</html>

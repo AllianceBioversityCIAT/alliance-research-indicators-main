@@ -113,6 +113,7 @@ export class CustomDataDto {
   result_owner: SimpleUserDto = new SimpleUserDto();
   indicator_name?: string = null;
   indicator_id?: number = null;
+  description?: string = null;
 }
 
 export class SimpleUserDto {

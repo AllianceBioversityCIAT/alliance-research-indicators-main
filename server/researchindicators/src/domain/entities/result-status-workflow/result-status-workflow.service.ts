@@ -234,7 +234,6 @@ export class ResultStatusWorkflowService {
       [ConfigWorkFlowTypeEnum.VALIDATION]: async (
         action: DeepPartial<ConfigWorkflowAction>,
       ) => {
-        console.log('validation');
         const config: ConfigWorkflowActionFunction =
           action.config as ConfigWorkflowActionFunction;
 
@@ -247,7 +246,6 @@ export class ResultStatusWorkflowService {
       [ConfigWorkFlowTypeEnum.EMAIL]: async (
         action: DeepPartial<ConfigWorkflowAction>,
       ) => {
-        console.log('email');
         const config = action.config as ConfigWorkflowActionEmail;
         generalData.configEmail.templateCode = config.template;
         generalData.configEmail.rawTemplate =

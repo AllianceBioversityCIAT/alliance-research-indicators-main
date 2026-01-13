@@ -38,7 +38,6 @@ export class StatusWorkflowFunctionHandlerService {
   }
 
   async sendEmail(generalData: GeneralDataDto, _manager: EntityManager) {
-    console.log(generalData.configEmail.subject);
     await this.messageMicroservice.sendEmail({
       to: generalData.configEmail.to,
       cc: generalData.configEmail.cc,
@@ -78,7 +77,57 @@ export class StatusWorkflowFunctionHandlerService {
 
     generalData.configEmail.cc = ccEmails;
     generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] Result ${generalData.customData.result_code} Action required: Review new result submission`;
-    console.log(generalData.configEmail);
+  }
+
+  async revisionConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    await this.generalRevisionConfigEmail(generalData, _manager);
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] Action required: Revision requested for result ${generalData.customData.result_code}`;
+  }
+
+  async approvedConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    await this.generalRevisionConfigEmail(generalData, _manager);
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] Result ${generalData.customData.result_code} has been approved`;
+  }
+
+  async noApprovedConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    await this.generalRevisionConfigEmail(generalData, _manager);
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] The result ${generalData.customData.result_code} was not approved`;
+  }
+
+  async generalRevisionConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    generalData.configEmail.to = [generalData.customData.submitter.email];
+
+    let ccEmails: string[] = [];
+
+    if (
+      generalData.customData.action_executor.email ==
+      generalData.customData.result_owner.email
+    ) {
+      ccEmails.push(generalData.customData.result_owner.email);
+    } else {
+      ccEmails.push(
+        generalData.customData.action_executor.email,
+        generalData.customData.result_owner.email,
+      );
+    }
+
+    ccEmails = ccEmails.filter(
+      (email) => !generalData.configEmail.to.includes(email),
+    );
+
+    generalData.configEmail.cc = ccEmails;
   }
 
   async findCustomDataSubmitted(
@@ -90,6 +139,23 @@ export class StatusWorkflowFunctionHandlerService {
       this.dataSource.createEntityManager(),
     );
     await this.mainRepo.getDataForSubmissionResult(
+      generalData.result.result_id,
+      generalData,
+      entityManager,
+    );
+    return { ...generalData };
+  }
+
+  async findCustomDataForRevision(
+    generalData: GeneralDataDto,
+    manager: EntityManager,
+  ): Promise<GeneralDataDto> {
+    const entityManager = transactionManager(
+      manager,
+      this.dataSource.createEntityManager(),
+    );
+
+    await this.mainRepo.getDataForRevisionResult(
       generalData.result.result_id,
       generalData,
       entityManager,
