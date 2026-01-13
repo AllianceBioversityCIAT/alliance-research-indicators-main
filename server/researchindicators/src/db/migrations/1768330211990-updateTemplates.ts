@@ -47,7 +47,7 @@ export class UpdateTemplates1768330211990 implements MigrationInterface {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>no acepted</title>
+    <title>no accepted</title>
   </head>
   <body>
     <p>Dear {{submitter.name}},</p>
@@ -84,7 +84,7 @@ export class UpdateTemplates1768330211990 implements MigrationInterface {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>acepted</title>
+    <title>accepted</title>
   </head>
   <body>
     <p>Dear {{submitter.name}},</p>
