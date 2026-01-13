@@ -49,6 +49,10 @@ export class StatusWorkflowFunctionHandlerService {
     });
   }
 
+  async createSnapshot(generalData: GeneralDataDto, manager: EntityManager) {
+    await this.mainRepo.createSnapshot(generalData, manager);
+  }
+
   async submittedConfigEmail(
     generalData: GeneralDataDto,
     _manager: EntityManager,

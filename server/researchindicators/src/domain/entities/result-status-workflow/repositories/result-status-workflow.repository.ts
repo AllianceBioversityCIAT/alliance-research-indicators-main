@@ -10,6 +10,7 @@ import {
   cleanText,
   isEmpty,
 } from '../../../shared/utils/object.utils';
+import { Result } from '../../results/entities/result.entity';
 
 @Injectable()
 export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkflow> {
@@ -90,6 +91,40 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
       generalData?.aditionalData?.submission_comment;
 
     return generalData;
+  }
+
+  async createSnapshot(generalData: GeneralDataDto, manager: EntityManager) {
+    const entityManager = transactionManager(
+      manager,
+      this.dataSource.createEntityManager(),
+    );
+
+    const deleteQuery = `CALL SP_delete_result_version(?, ?)`;
+    const snapshotResult = await entityManager.getRepository(Result).findOne({
+      where: {
+        is_snapshot: true,
+        result_official_code: generalData.result.result_official_code,
+        report_year_id: generalData.result.report_year_id,
+      },
+    });
+
+    if (snapshotResult) {
+      await entityManager
+        .query(deleteQuery, [
+          generalData.result.result_official_code,
+          generalData.result.report_year_id,
+        ])
+        .catch(() => {
+          throw new Error('Error deleting snapshot');
+        });
+    }
+
+    const query = `CALL SP_versioning(?);`;
+    return entityManager
+      .query<Result>(query, [generalData.result.result_official_code])
+      .catch(() => {
+        throw new Error('Error creating snapshot');
+      });
   }
 
   async getDataForSubmissionResult(
