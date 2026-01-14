@@ -86,6 +86,11 @@ export class ConfigEmailDto {
   templateCode: string = null;
 }
 
+export class ContractCustomDataDto {
+  code: string = null;
+  title: string = null;
+}
+
 export class CustomDataDto {
   title?: string = null;
   oicr_number?: string = null;
@@ -107,6 +112,9 @@ export class CustomDataDto {
   system_name: string = null;
   rev_email?: string = null;
   url?: string = null;
+  download_url?: string = null;
+  created_at?: Date = null;
+  contract: ContractCustomDataDto = new ContractCustomDataDto();
   principal_investigator: SimpleUserDto = new SimpleUserDto();
   action_executor: SimpleUserDto = new SimpleUserDto();
   submitter: SimpleUserDto = new SimpleUserDto();

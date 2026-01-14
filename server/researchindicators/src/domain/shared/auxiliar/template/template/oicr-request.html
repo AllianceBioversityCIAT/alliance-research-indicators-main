@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <p>Dear SPRM team,</p>
+    <p>
+      A new preliminary OICR submission has been created in STAR. Please find
+      the details below:
+    </p>
+    <ul>
+      <li>OICR ID: {{oicr_number}}</li>
+      <li>OICR Title: {{title}}</li>
+      <li>Associated Project: {{contract.code}} - {{contract.title}}</li>
+      <li>Principal Investigator: {{principal_investigator.name}}</li>
+      <li>Request Date: {{created_at}}</li>
+    </ul>
+    <p>
+      You can access the submission directly through STAR:
+      <a href="{{url}}">{{url}}</a> <br />Additionally, you may download the
+      submission as a Word document using the following link:
+      <a href="{{download_url}}">{{download_url}}</a>
+    </p>
+    <p>Best regards,<br /><b>{{platform_code}} System Notification</b></p>
+    <p>
+      <i>This is an automated email. Please do not reply.</i>
+    </p>
+  </body>
+</html>
