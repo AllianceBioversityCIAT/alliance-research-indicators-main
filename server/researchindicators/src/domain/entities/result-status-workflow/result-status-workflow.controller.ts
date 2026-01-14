@@ -47,6 +47,22 @@ export class ResultStatusWorkflowController {
       );
   }
 
+  @Get('hierarchical-tree/:indicatorId(\\d+)')
+  @ApiOperation({
+    summary: 'Get hierarchical tree by indicator id',
+  })
+  async getHierarchicalTree(@Param('indicatorId') indicatorId: number) {
+    return this.resultStatusWorkflowService
+      .getHierarchicalTreeByIndicatorId(indicatorId)
+      .then((result) =>
+        ResponseUtils.format({
+          data: result,
+          description: 'Hierarchical tree found',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
   @Get('config/indicator/:indicatorId(\\d+)/from-status/:fromStatusId(\\d+)')
   @ApiOperation({
     summary: 'Get config workflow by indicator id and from status id',

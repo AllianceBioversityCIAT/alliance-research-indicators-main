@@ -7,6 +7,9 @@ interface StatusNode {
   name: string;
   description: string;
   config: any;
+  action_description: string;
+  editable_roles: number[];
+  hasCircularReference: boolean;
   transitions: {
     to: StatusNode[];
     from: StatusNode[];
@@ -48,11 +51,14 @@ export class StatusTransitionTree {
 
     uniqueStatuses.forEach((status, statusId) => {
       const node: StatusNode = {
+        editable_roles: status.editable_roles,
         status: status,
         statusId: statusId,
         name: status.name,
         description: status.description,
         config: status.config,
+        action_description: status.action_description,
+        hasCircularReference: false,
         transitions: {
           to: [],
           from: [],
@@ -133,8 +139,12 @@ export class StatusTransitionTree {
     if (visited.has(node.statusId)) {
       return {
         id: node.statusId,
-        name: `${node.name} (ref)`,
-        description: 'Referencia circular',
+        name: node.name,
+        description: node.description,
+        hasCircularReference: true,
+        action_description: node.action_description,
+        config: node.config,
+        editable_roles: node.editable_roles,
         children: [],
       };
     }
