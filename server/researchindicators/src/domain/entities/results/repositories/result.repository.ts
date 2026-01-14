@@ -286,6 +286,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 					  'description', rs.description,
             'config', rs.config,
             'editable_roles', rs.editable_roles,
+            'action_description', rs.action_description,
 					  'is_active', rs.is_active) as result_status`;
       queryParts.result_status.join = `LEFT JOIN result_status rs ON rs.result_status_id = r.result_status_id`;
     }
