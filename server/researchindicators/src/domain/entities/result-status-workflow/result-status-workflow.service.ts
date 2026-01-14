@@ -52,6 +52,58 @@ export class ResultStatusWorkflowService {
     });
   }
 
+  private async getStatusDepthMapByIndicatorId(indicatorId: number) {
+    const transitions = await this.getAllStatusesByindicatorId(indicatorId);
+    const tree = new StatusTransitionTree(transitions as any);
+    const graph = tree.getGraph();
+
+    const depth = new Map<number, number>();
+    const queue: { id: number; d: number }[] = [];
+
+    const roots =
+      graph.rootNodes.length > 0
+        ? graph.rootNodes
+        : Array.from(graph.nodes.values());
+
+    for (const r of roots) {
+      const existing = depth.get(r.statusId);
+      if (existing === undefined || 0 < existing) {
+        depth.set(r.statusId, 0);
+        queue.push({ id: r.statusId, d: 0 });
+      }
+    }
+
+    while (queue.length > 0) {
+      const { id, d } = queue.shift();
+      const node = graph.nodes.get(id);
+      if (!node) continue;
+
+      for (const nxt of node.transitions.to) {
+        const nd = d + 1;
+        const prev = depth.get(nxt.statusId);
+        if (prev === undefined || nd < prev) {
+          depth.set(nxt.statusId, nd);
+          queue.push({ id: nxt.statusId, d: nd });
+        }
+      }
+    }
+
+    return depth;
+  }
+
+  private getTransitionDirection(
+    fromStatusId: number,
+    toStatusId: number,
+    depthMap: Map<number, number>,
+  ): 'forward' | 'backward' | 'unknown' {
+    const fromDepth = depthMap.get(fromStatusId);
+    const toDepth = depthMap.get(toStatusId);
+    if (fromDepth === undefined || toDepth === undefined) return 'unknown';
+    if (toDepth > fromDepth) return 'forward';
+    if (toDepth < fromDepth) return 'backward';
+    return 'unknown';
+  }
+
   async getAllStatusesByindicatorId(indicatorId: number) {
     return this.dataSource
       .getRepository(ResultStatusWorkflow)
@@ -96,7 +148,27 @@ export class ResultStatusWorkflowService {
 
     if (showOnlyWorkflow) return statuses;
 
-    return this.getStatusesByIds(statuses.map((el) => el.to_status_id));
+    const toStatusIds = statuses.map((el) => el.to_status_id);
+    const [toStatuses, depthMap] = await Promise.all([
+      this.getStatusesByIds(toStatusIds),
+      this.getStatusDepthMapByIndicatorId(indicatorId),
+    ]);
+
+    const statusById = new Map<number, ResultStatus>(
+      toStatuses.map((s) => [s.result_status_id, s]),
+    );
+
+    return toStatusIds
+      .map((toId) => statusById.get(toId))
+      .filter((s) => !!s)
+      .map((s) => ({
+        ...s,
+        transition_direction: this.getTransitionDirection(
+          fromStatusId,
+          s.result_status_id,
+          depthMap,
+        ),
+      }));
   }
 
   async getNextStepsByResultId(resultId: number) {
