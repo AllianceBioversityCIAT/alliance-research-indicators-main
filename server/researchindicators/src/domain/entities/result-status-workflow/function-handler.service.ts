@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, Not } from 'typeorm';
 import { Template } from '../../shared/auxiliar/template/entities/template.entity';
 import { GeneralDataDto } from './config/config-workflow';
 import { ResultStatusWorkflowRepository } from './repositories/result-status-workflow.repository';
@@ -8,6 +8,13 @@ import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 import { isEmpty } from '../../shared/utils/object.utils';
+import { ResultOicr } from '../result-oicr/entities/result-oicr.entity';
+import { StaffGroupsEnum } from '../staff-groups/enum/staff-groups.enum';
+import {
+  CurrentUserUtil,
+  SetAuditEnum,
+} from '../../shared/utils/current-user.util';
+import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 
 @Injectable()
 export class StatusWorkflowFunctionHandlerService {
@@ -18,6 +25,8 @@ export class StatusWorkflowFunctionHandlerService {
     private readonly messageMicroservice: MessageMicroservice,
     private readonly appConfig: AppConfig,
     private readonly greenCheckRepository: GreenCheckRepository,
+    private readonly currentUser: CurrentUserUtil,
+    private readonly updateDataUtil: UpdateDataUtil,
   ) {
     this.mainRepo = resultStatusWorkflowRepository;
   }
@@ -185,6 +194,42 @@ export class StatusWorkflowFunctionHandlerService {
       throw new BadRequestException(
         'There are still sections pending before the results can be submitted.',
       );
+  }
+
+  async reviewOicr(generalData: GeneralDataDto, manager: EntityManager) {
+    const entityManager = transactionManager(
+      manager,
+      this.dataSource.createEntityManager(),
+    );
+    const oicrRepo = entityManager.getRepository(ResultOicr);
+    const oicrInternalCode = generalData.aditionalData.oicr_internal_code
+      .toUpperCase()
+      .trim();
+    const existingRecord = await oicrRepo.findOne({
+      where: {
+        is_active: true,
+        oicr_internal_code: oicrInternalCode,
+        result_id: Not(generalData.result.result_id),
+      },
+    });
+
+    if (existingRecord)
+      throw new BadRequestException('The OICR Internal Code already exists');
+
+    const sharepointLink = generalData.aditionalData.sharepoint_link.trim();
+    await oicrRepo.update(generalData.result.result_id, {
+      oicr_internal_code: oicrInternalCode,
+      mel_regional_expert_id: generalData.aditionalData.mel_regional_expert,
+      mel_staff_group_id: StaffGroupsEnum.MEL_REGIONAL_EXPERT,
+      sharepoint_link: isEmpty(sharepointLink) ? null : sharepointLink,
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    });
+
+    await this.updateDataUtil.updateLastUpdatedDate(
+      generalData.result.result_id,
+      entityManager,
+      this.currentUser.user_id,
+    );
   }
 
   async commentValidation(
