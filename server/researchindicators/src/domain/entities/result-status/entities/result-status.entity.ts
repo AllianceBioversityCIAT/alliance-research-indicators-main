@@ -46,6 +46,12 @@ export class ResultStatus extends AuditableEntity {
   })
   config!: DeepPartial<ResultStatusConfig>;
 
+  @Column('text', {
+    name: 'action_description',
+    nullable: true,
+  })
+  action_description!: string;
+
   @OneToMany(() => Result, (result) => result.result_status)
   results!: Result[];
 
