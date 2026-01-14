@@ -146,13 +146,15 @@ export class GreenCheckRepository {
           	'name', rs1.name,
           	'description', rs1.description,
           	'config', rs1.config,
-          	'editable_roles', rs1.editable_roles) as from_status,
+          	'editable_roles', rs1.editable_roles,
+            'action_description', rs1.action_description) as from_status,
           JSON_OBJECT( 
           	'result_status_id', rs2.result_status_id,
           	'name', rs2.name,
           	'description', rs2.description,
           	'config', rs2.config,
-          	'editable_roles', rs2.editable_roles) as to_status,
+          	'editable_roles', rs2.editable_roles,
+            'action_description', rs2.action_description) as to_status,
           JSON_OBJECT(
           	'sec_user_id', su1.sec_user_id,
           	'email', su1.email,
