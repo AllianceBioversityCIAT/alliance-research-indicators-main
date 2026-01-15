@@ -30,6 +30,8 @@ import { ResultNotableReferencesService } from '../result-notable-references/res
 import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
 import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
 import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
+import { Result } from '../results/entities/result.entity';
+import { StatusWorkflowFunctionHandlerService } from '../result-status-workflow/function-handler.service';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -53,6 +55,7 @@ describe('ResultOicrService', () => {
   let mockResultNotableReferencesService: jest.Mocked<any>;
   let mockResultImpactAreasService: jest.Mocked<any>;
   let mockResultImpactAreaGlobalTargetsService: jest.Mocked<any>;
+  let mockStatusWorkflowFunctionHandlerService: jest.Mocked<StatusWorkflowFunctionHandlerService>;
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -72,6 +75,11 @@ describe('ResultOicrService', () => {
     mockCurrentUser = {
       user_id: 123,
       email: 'test@example.com',
+      user: {
+        first_name: 'Test',
+        last_name: 'User',
+        email: 'test@example.com',
+      },
       audit: jest.fn(),
     } as any;
 
@@ -198,6 +206,11 @@ describe('ResultOicrService', () => {
       disableAllByResultId: jest.fn().mockResolvedValue(undefined),
     } as any;
 
+    mockStatusWorkflowFunctionHandlerService = {
+      findCustomDataForOicr: jest.fn(),
+      oicrRequestConfigEmail: jest.fn(),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultOicrService,
@@ -240,6 +253,10 @@ describe('ResultOicrService', () => {
         {
           provide: ResultImpactAreaGlobalTargetsService,
           useValue: mockResultImpactAreaGlobalTargetsService,
+        },
+        {
+          provide: StatusWorkflowFunctionHandlerService,
+          useValue: mockStatusWorkflowFunctionHandlerService,
         },
       ],
     }).compile();
@@ -363,6 +380,7 @@ describe('ResultOicrService', () => {
       );
       expect(service.sendMessageOicr).toHaveBeenCalledWith(
         mockCreatedResult.result_id,
+        mockCreatedResult,
       );
       expect(result).toEqual(mockCreatedResult);
     });
@@ -744,6 +762,26 @@ describe('ResultOicrService', () => {
   });
 
   describe('sendMessageOicr', () => {
+    let oicrCustomData: any;
+
+    beforeEach(() => {
+      oicrCustomData = undefined;
+      mockStatusWorkflowFunctionHandlerService.findCustomDataForOicr.mockImplementation(
+        async (generalData: any) => {
+          if (oicrCustomData) {
+            generalData.customData = {
+              ...(generalData.customData ?? {}),
+              ...oicrCustomData,
+            };
+          }
+          return generalData;
+        },
+      );
+      mockStatusWorkflowFunctionHandlerService.oicrRequestConfigEmail.mockResolvedValue(
+        undefined,
+      );
+    });
+
     it('should send email notification when template is generated successfully', async () => {
       // Arrange
       const resultId = 123;
@@ -767,6 +805,7 @@ describe('ResultOicrService', () => {
       mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
         mockMessageData,
       );
+      oicrCustomData = mockMessageData;
       mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
       mockAppConfig.SPRM_EMAIL_SAFE.mockReturnValue(mockUserEmail);
       // Set up current user email via mock
@@ -777,7 +816,9 @@ describe('ResultOicrService', () => {
       });
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(
@@ -785,7 +826,7 @@ describe('ResultOicrService', () => {
       ).toHaveBeenCalledWith(resultId);
       expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
         TemplateEnum.OICR_NOTIFICATION_CREATED,
-        mockMessageData,
+        expect.objectContaining(mockMessageData),
       );
       expect(mockAppConfig.SPRM_EMAIL_SAFE).toHaveBeenCalledWith(
         mockCurrentUser.email,
@@ -819,10 +860,13 @@ describe('ResultOicrService', () => {
       mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
         mockMessageData,
       );
+      oicrCustomData = mockMessageData;
       mockTemplateService._getTemplate.mockResolvedValue(null);
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(
@@ -830,7 +874,7 @@ describe('ResultOicrService', () => {
       ).toHaveBeenCalledWith(resultId);
       expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
         TemplateEnum.OICR_NOTIFICATION_CREATED,
-        mockMessageData,
+        expect.objectContaining(mockMessageData),
       );
       expect(mockMessageMicroservice.sendEmail).not.toHaveBeenCalled();
     });
@@ -854,10 +898,13 @@ describe('ResultOicrService', () => {
       mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
         mockMessageData,
       );
+      oicrCustomData = mockMessageData;
       mockTemplateService._getTemplate.mockResolvedValue(undefined);
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(
@@ -865,7 +912,7 @@ describe('ResultOicrService', () => {
       ).toHaveBeenCalledWith(resultId);
       expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
         TemplateEnum.OICR_NOTIFICATION_CREATED,
-        mockMessageData,
+        expect.objectContaining(mockMessageData),
       );
       expect(mockMessageMicroservice.sendEmail).not.toHaveBeenCalled();
     });
@@ -893,6 +940,7 @@ describe('ResultOicrService', () => {
       mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
         mockMessageData,
       );
+      oicrCustomData = mockMessageData;
       mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
       mockAppConfig.SPRM_EMAIL_SAFE.mockReturnValue(mockUserEmail);
       // Set up current user email via mock
@@ -900,21 +948,29 @@ describe('ResultOicrService', () => {
         value: 'original-user@example.com',
         writable: true,
       });
+      Object.defineProperty(mockCurrentUser, 'user', {
+        value: {
+          first_name: 'Test',
+          last_name: 'User',
+          email: mockCurrentUser.email,
+        },
+        writable: true,
+      });
       mockMessageMicroservice.sendEmail.mockRejectedValue(
         new Error('Email service unavailable'),
       );
 
       // Act & Assert
-      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
-        'Email service unavailable',
-      );
+      await expect(
+        service.sendMessageOicr(resultId, { result_id: resultId } as Result),
+      ).rejects.toThrow('Email service unavailable');
 
       expect(
         mockResultOicrRepository.getDataToNewOicrMessage,
       ).toHaveBeenCalledWith(resultId);
       expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
         TemplateEnum.OICR_NOTIFICATION_CREATED,
-        mockMessageData,
+        expect.objectContaining(mockMessageData),
       );
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
         subject: '[STAR] - New OICR Request #OICR-2024-004',
@@ -936,9 +992,9 @@ describe('ResultOicrService', () => {
       );
 
       // Act & Assert
-      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
-        'Result not found',
-      );
+      await expect(
+        service.sendMessageOicr(resultId, { result_id: resultId } as Result),
+      ).rejects.toThrow('Result not found');
 
       expect(
         mockResultOicrRepository.getDataToNewOicrMessage,
@@ -968,19 +1024,20 @@ describe('ResultOicrService', () => {
       mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
         mockMessageData,
       );
+      oicrCustomData = mockMessageData;
       mockTemplateService._getTemplate.mockRejectedValue(templateError);
 
       // Act & Assert
-      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
-        'Template generation failed',
-      );
+      await expect(
+        service.sendMessageOicr(resultId, { result_id: resultId } as Result),
+      ).rejects.toThrow('Template generation failed');
 
       expect(
         mockResultOicrRepository.getDataToNewOicrMessage,
       ).toHaveBeenCalledWith(resultId);
       expect(mockTemplateService._getTemplate).toHaveBeenCalledWith(
         TemplateEnum.OICR_NOTIFICATION_CREATED,
-        mockMessageData,
+        expect.objectContaining(mockMessageData),
       );
       expect(mockMessageMicroservice.sendEmail).not.toHaveBeenCalled();
     });
@@ -1009,15 +1066,26 @@ describe('ResultOicrService', () => {
       mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
         mockMessageData,
       );
+      oicrCustomData = mockMessageData;
       mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
       mockAppConfig.SPRM_EMAIL_SAFE.mockReturnValue(mockUserEmail);
       Object.defineProperty(mockCurrentUser, 'email', {
         value: 'original-user@example.com',
         writable: true,
       });
+      Object.defineProperty(mockCurrentUser, 'user', {
+        value: {
+          first_name: 'Test',
+          last_name: 'User',
+          email: mockCurrentUser.email,
+        },
+        writable: true,
+      });
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
@@ -1052,10 +1120,13 @@ describe('ResultOicrService', () => {
       mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
         mockMessageData,
       );
+      oicrCustomData = mockMessageData;
       mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(mockTemplateService._getTemplate).toHaveBeenCalledTimes(1);
@@ -1065,7 +1136,7 @@ describe('ResultOicrService', () => {
       // Verify that the correct template enum is used (should be OICR_NOTIFICATION_CREATED)
       expect(templateEnum).toBe(TemplateEnum.OICR_NOTIFICATION_CREATED);
       // Verify that the message data is passed correctly
-      expect(messageData).toEqual(mockMessageData);
+      expect(messageData).toEqual(expect.objectContaining(mockMessageData));
     });
   });
 

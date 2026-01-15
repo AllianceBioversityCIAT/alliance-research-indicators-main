@@ -15,6 +15,10 @@ import { GreenChecksModule } from '../green-checks/green-checks.module';
     MessageMicroservice,
   ],
   imports: [GreenChecksModule],
-  exports: [ResultStatusWorkflowService, ResultStatusWorkflowRepository],
+  exports: [
+    ResultStatusWorkflowService,
+    ResultStatusWorkflowRepository,
+    StatusWorkflowFunctionHandlerService,
+  ],
 })
 export class ResultStatusWorkflowModule {}
