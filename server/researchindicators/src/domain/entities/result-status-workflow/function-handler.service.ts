@@ -181,6 +181,22 @@ export class StatusWorkflowFunctionHandlerService {
     return { ...generalData };
   }
 
+  async findCustomDataForOicr(
+    generalData: GeneralDataDto,
+    manager: EntityManager,
+  ): Promise<GeneralDataDto> {
+    const entityManager = transactionManager(
+      manager,
+      this.dataSource.createEntityManager(),
+    );
+    await this.mainRepo.getOicrGeneralData(
+      generalData.result.result_id,
+      generalData,
+      entityManager,
+    );
+    return { ...generalData };
+  }
+
   async completenessValidation(
     generalData: GeneralDataDto,
     _manager: EntityManager,
@@ -253,6 +269,54 @@ export class StatusWorkflowFunctionHandlerService {
   private roleGenericValidation(roles: SecRolesEnum[]) {
     if (roles.includes(SecRolesEnum.SUP_ADMIN)) return true;
     return false;
+  }
+
+  async oicrGeneralConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    generalData.configEmail.to = [generalData.customData.result_owner.email];
+    const tempCCEmails: string[] = [...this.appConfig.SPRM_EMAIL_ARRAY];
+    if (
+      generalData.customData.principal_investigator.email ==
+      generalData.customData.regional_expert.email
+    ) {
+      tempCCEmails.push(generalData.customData.regional_expert.email);
+    } else {
+      tempCCEmails.push(
+        generalData.customData.principal_investigator.email,
+        generalData.customData.regional_expert.email,
+      );
+    }
+
+    const ccEmails = tempCCEmails.filter(
+      (email) => !generalData.configEmail.to.includes(email),
+    );
+    generalData.configEmail.cc = ccEmails;
+  }
+
+  async oicrApprovalConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    await this.oicrGeneralConfigEmail(generalData, _manager);
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.oicr_internal_code} has been accepted`;
+  }
+
+  async oicrPostponeConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    await this.oicrGeneralConfigEmail(generalData, _manager);
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.oicr_internal_code} was marked as postponed`;
+  }
+
+  async oicrRejectedConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    await this.oicrGeneralConfigEmail(generalData, _manager);
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.oicr_internal_code} was marked as rejected`;
   }
 
   async commentValidation(

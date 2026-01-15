@@ -93,8 +93,6 @@ export class ContractCustomDataDto {
 
 export class CustomDataDto {
   title?: string = null;
-  oicr_number?: string = null;
-  mel_expert_name?: string;
   requester_by?: string = null;
   sharepoint_url?: string = null;
   reviewed_by?: string = null;
@@ -102,7 +100,6 @@ export class CustomDataDto {
   justification?: string = null;
   requester_by_email?: string = null;
   reviewed_by_email?: string = null;
-  mel_expert_email?: string = null;
   result_id?: number = null;
   result_code?: string = null;
   platform_code?: string = null;
@@ -112,7 +109,7 @@ export class CustomDataDto {
   rev_email?: string = null;
   url?: string = null;
   download_url?: string = null;
-  created_at?: Date = null;
+  created_at?: string = null;
   contract: ContractCustomDataDto = new ContractCustomDataDto();
   principal_investigator: SimpleUserDto = new SimpleUserDto();
   action_executor: SimpleUserDto = new SimpleUserDto();

@@ -312,12 +312,20 @@ export class AppConfig {
     return process.env.ARI_SPRM_EMAIL;
   }
 
+  get SPRM_EMAIL_ARRAY(): string[] {
+    return process.env.ARI_SPRM_EMAIL.split(',');
+  }
+
   get INTERNAL_EMAIL_LIST(): string {
     return process.env.ARI_MAPPED_BCC_SUBM_OICR;
   }
 
   get INTERNAL_EMAIL_LIST_ARRAY(): string[] {
     return process.env.ARI_MAPPED_BCC_SUBM_OICR.split(',');
+  }
+
+  get PRINCIPAL_INVESTIGATOR_EMAIL_ARRAY(): string[] {
+    return process.env.ARI_PI_EMAIL.split(',');
   }
 
   SPRM_EMAIL_SAFE(currentUserEmail: string): string {

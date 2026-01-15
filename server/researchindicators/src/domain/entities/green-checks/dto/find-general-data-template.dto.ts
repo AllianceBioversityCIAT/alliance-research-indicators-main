@@ -30,10 +30,11 @@ export class FindGeneralCustomDataDto {
   description: string;
   oicr_internal_code: string;
   project_code: string;
-  created_at: Date;
+  created_at: string;
   mel_regional_expert_first_name: string;
   mel_regional_expert_last_name: string;
   mel_regional_expert_email: string;
+  sharepoint_link: string;
 }
 
 export class SubmissionEmailTemplateDataDto {

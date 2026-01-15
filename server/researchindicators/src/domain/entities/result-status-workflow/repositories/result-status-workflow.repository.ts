@@ -31,7 +31,8 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
       this.dataSource.createEntityManager(),
     );
     const query = this.getGeneralQuery({
-      select: `,ro.oicr_internal_code,
+      select: `ro.oicr_internal_code,
+                ro.sharepoint_link,
                 aus2.first_name as mel_regional_expert_first_name,
                 aus2.last_name as mel_regional_expert_last_name,
                 aus2.email as mel_regional_expert_email`,
@@ -45,6 +46,8 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
 
     this.setCustomGeneralData(generalData, resultData);
     generalData.customData.oicr_internal_code = resultData?.oicr_internal_code;
+    generalData.customData.sharepoint_url = resultData?.sharepoint_link;
+    generalData.customData.download_url = 'COMING SOON';
     generalData.customData.regional_expert = {
       name: `${cleanName(resultData.mel_regional_expert_first_name)} ${cleanName(resultData.mel_regional_expert_last_name)}`,
       email: cleanText(resultData.mel_regional_expert_email),
@@ -65,6 +68,7 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
         r.result_official_code,
         r.result_id,
         r.title as result_title,
+        DATE_FORMAT(r.created_at , '%d/%m/%Y') as created_at,
         ac.description as project_name,
         ac.agreement_id as project_code,
         i.name as indicator
@@ -204,6 +208,7 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     generalData.customData.result_code = customData.result_official_code;
     generalData.customData.result_id = customData.result_id;
     generalData.customData.platform_code = this.appConfig.ARI_MIS;
+    generalData.customData.created_at = customData.created_at;
     generalData.customData.url = `${this.appConfig.ARI_CLIENT_HOST}/result/${customData.result_official_code}/general-information`;
     return generalData;
   }
