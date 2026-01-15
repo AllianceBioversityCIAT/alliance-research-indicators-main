@@ -3,14 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OICR Request</title>
+    <title>OICR No Accepted</title>
   </head>
   <body>
-    <p>Dear SPRM team,</p>
-    <p>
-      A new preliminary OICR submission has been created in STAR. Please find
-      the details below:
-    </p>
+    <p>Dear {{submitter.name}},</p>
+    <p>Your OICR submission has been reviewed and was <b>not accepted</b>.</p>
+    <p>Please find the details below:</p>
     <ul>
       <li><b>OICR ID:</b> {{oicr_number}}</li>
       <li><b>OICR Title:</b> {{title}}</li>
@@ -19,10 +17,12 @@
       <li><b>Request Date:</b> {{created_at}}</li>
     </ul>
     <p>
-      You can access the submission directly through STAR:
-      <a href="{{url}}">{{url}}</a> <br />Additionally, you may download the
-      submission as a Word document using the following link:
-      <a href="{{download_url}}">{{download_url}}</a>
+      Justification provided: <br />
+      {{justification}}
+    </p>
+    <p>
+      You can access your submission directly through STAR:
+      <a href="{{url}}">{{url}}</a>
     </p>
     <p>Best regards,<br /><b>{{platform_code}} System Notification</b></p>
     <p>

@@ -106,7 +106,6 @@ export class CustomDataDto {
   result_id?: number = null;
   result_code?: string = null;
   platform_code?: string = null;
-  project_name?: string = null;
   support_email?: string = null;
   content_support_email?: string = null;
   system_name: string = null;
@@ -119,9 +118,11 @@ export class CustomDataDto {
   action_executor: SimpleUserDto = new SimpleUserDto();
   submitter: SimpleUserDto = new SimpleUserDto();
   result_owner: SimpleUserDto = new SimpleUserDto();
+  regional_expert: SimpleUserDto = new SimpleUserDto();
   indicator_name?: string = null;
   indicator_id?: number = null;
   description?: string = null;
+  oicr_internal_code: string = null;
 }
 
 export class SimpleUserDto {

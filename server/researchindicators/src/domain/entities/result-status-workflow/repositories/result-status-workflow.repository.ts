@@ -21,6 +21,37 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     super(ResultStatusWorkflow, dataSource.createEntityManager());
   }
 
+  async getOicrGeneralData(
+    resultId: number,
+    generalData: GeneralDataDto,
+    manager: EntityManager,
+  ) {
+    const entityManager = transactionManager(
+      manager,
+      this.dataSource.createEntityManager(),
+    );
+    const query = this.getGeneralQuery({
+      select: `,ro.oicr_internal_code,
+                aus2.first_name as mel_regional_expert_first_name,
+                aus2.last_name as mel_regional_expert_last_name,
+                aus2.email as mel_regional_expert_email`,
+      join: `inner join result_oicrs ro on ro.result_id = r.result_id and ro.is_active = true
+             left join alliance_user_staff aus2 on aus2.carnet = ro.mel_regional_expert `,
+    });
+
+    const resultData: FindGeneralCustomDataDto = await entityManager
+      .query(query, [resultId])
+      .then((result) => (result?.length ? result[0] : null));
+
+    this.setCustomGeneralData(generalData, resultData);
+    generalData.customData.oicr_internal_code = resultData?.oicr_internal_code;
+    generalData.customData.regional_expert = {
+      name: `${cleanName(resultData.mel_regional_expert_first_name)} ${cleanName(resultData.mel_regional_expert_last_name)}`,
+      email: cleanText(resultData.mel_regional_expert_email),
+    };
+    return generalData;
+  }
+
   getGeneralQuery(config?: GeneralQueryUpdate): string {
     return `
       select 
@@ -35,6 +66,7 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
         r.result_id,
         r.title as result_title,
         ac.description as project_name,
+        ac.agreement_id as project_code,
         i.name as indicator
         ${isEmpty(config?.select) ? '' : `,${config.select}`}
       from results r 
@@ -163,8 +195,11 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
       name: `${cleanName(customData.principal_investigator_first_name)} ${cleanName(customData.principal_investigator_last_name)}`,
       email: cleanText(customData.principal_investigator_email),
     };
+    generalData.customData.contract = {
+      code: customData.project_code,
+      title: customData.project_name,
+    };
     generalData.customData.title = customData.result_title;
-    generalData.customData.project_name = customData.project_name;
     generalData.customData.indicator_name = customData.indicator;
     generalData.customData.result_code = customData.result_official_code;
     generalData.customData.result_id = customData.result_id;
@@ -175,8 +210,8 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
 }
 
 export class GeneralQueryUpdate {
-  select: string;
-  where: string;
-  join: string;
-  order: string;
+  select?: string;
+  where?: string;
+  join?: string;
+  order?: string;
 }

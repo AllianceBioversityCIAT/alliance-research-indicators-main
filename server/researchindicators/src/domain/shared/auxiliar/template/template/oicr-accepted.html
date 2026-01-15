@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OICR Accepted</title>
+</head>
+<body>
+    <p>Dear {{submitter.name}},</p>
+    <p>Your OICR submission has been <b>accepted</b>. The development of the OICR will continue with backstopping from the PISA-SPRM team</p>
+    <p>Please find the details below:
+        <ul>
+            <li><b>OICR ID:</b> {{oicr_number}}</li>
+            <li><b>OICR Title:</b> {{title}}</li>
+            <li><b>Associated Project:</b> {{contract.code}} - {{contract.title}}</li>
+            <li><b>Sharepoint Folder Link:</b> {{sharepoint_url}}</li>
+            <li><b>Assigned MEL Regional Expert:</b> {{mel_expert_name}}</li>
+            <li><b>Principal Investigator:</b> {{principal_investigator.name}}</li>
+            <li><b>Request Date:</b> {{created_at}}</li>
+        </ul>
+    </p>
+    <p>Please use the assigned folder link for documentation and next steps.</p>
+    <p>Best regards,<br /><b>{{platform_code}} System Notification</b></p>
+    <p>
+      <i>This is an automated email. Please do not reply.</i>
+    </p>
+</body>
+</html>
+

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { DataSource, EntityManager, Not } from 'typeorm';
 import { Template } from '../../shared/auxiliar/template/entities/template.entity';
 import { GeneralDataDto } from './config/config-workflow';
@@ -15,6 +19,7 @@ import {
   SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 @Injectable()
 export class StatusWorkflowFunctionHandlerService {
@@ -230,6 +235,24 @@ export class StatusWorkflowFunctionHandlerService {
       entityManager,
       this.currentUser.user_id,
     );
+  }
+
+  async oicrRoleChangeStatusValidation(
+    _generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    const { roles } = this.currentUser;
+    if (this.roleGenericValidation(roles)) return;
+
+    if (!roles.includes(SecRolesEnum.GENERAL_ADMIN))
+      throw new ForbiddenException(
+        'You are not authorized to perform this action',
+      );
+  }
+
+  private roleGenericValidation(roles: SecRolesEnum[]) {
+    if (roles.includes(SecRolesEnum.SUP_ADMIN)) return true;
+    return false;
   }
 
   async commentValidation(
