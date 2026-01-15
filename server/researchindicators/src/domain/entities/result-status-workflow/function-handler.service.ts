@@ -319,6 +319,15 @@ export class StatusWorkflowFunctionHandlerService {
     generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.oicr_internal_code} was marked as rejected`;
   }
 
+  async oicrRequestConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    generalData.configEmail.to = this.appConfig.SPRM_EMAIL_ARRAY;
+    generalData.configEmail.cc = [generalData.customData.action_executor.email];
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - New OICR Request - ID ${generalData.customData.result_code}`;
+  }
+
   async commentValidation(
     generalData: GeneralDataDto,
     _manager: EntityManager,

@@ -30,6 +30,7 @@ import { ResultNotableReferencesService } from '../result-notable-references/res
 import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
 import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
 import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
+import { Result } from '../results/entities/result.entity';
 
 describe('ResultOicrService', () => {
   let service: ResultOicrService;
@@ -777,7 +778,9 @@ describe('ResultOicrService', () => {
       });
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(
@@ -822,7 +825,9 @@ describe('ResultOicrService', () => {
       mockTemplateService._getTemplate.mockResolvedValue(null);
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(
@@ -857,7 +862,9 @@ describe('ResultOicrService', () => {
       mockTemplateService._getTemplate.mockResolvedValue(undefined);
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(
@@ -905,9 +912,9 @@ describe('ResultOicrService', () => {
       );
 
       // Act & Assert
-      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
-        'Email service unavailable',
-      );
+      await expect(
+        service.sendMessageOicr(resultId, { result_id: resultId } as Result),
+      ).rejects.toThrow('Email service unavailable');
 
       expect(
         mockResultOicrRepository.getDataToNewOicrMessage,
@@ -936,9 +943,9 @@ describe('ResultOicrService', () => {
       );
 
       // Act & Assert
-      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
-        'Result not found',
-      );
+      await expect(
+        service.sendMessageOicr(resultId, { result_id: resultId } as Result),
+      ).rejects.toThrow('Result not found');
 
       expect(
         mockResultOicrRepository.getDataToNewOicrMessage,
@@ -971,9 +978,9 @@ describe('ResultOicrService', () => {
       mockTemplateService._getTemplate.mockRejectedValue(templateError);
 
       // Act & Assert
-      await expect(service.sendMessageOicr(resultId)).rejects.toThrow(
-        'Template generation failed',
-      );
+      await expect(
+        service.sendMessageOicr(resultId, { result_id: resultId } as Result),
+      ).rejects.toThrow('Template generation failed');
 
       expect(
         mockResultOicrRepository.getDataToNewOicrMessage,
@@ -1017,7 +1024,9 @@ describe('ResultOicrService', () => {
       });
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
@@ -1055,7 +1064,9 @@ describe('ResultOicrService', () => {
       mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
 
       // Act
-      await service.sendMessageOicr(resultId);
+      await service.sendMessageOicr(resultId, {
+        result_id: resultId,
+      } as Result);
 
       // Assert
       expect(mockTemplateService._getTemplate).toHaveBeenCalledTimes(1);

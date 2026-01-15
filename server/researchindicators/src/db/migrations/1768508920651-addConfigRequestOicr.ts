@@ -1,4 +1,12 @@
-<!doctype html>
+import { MigrationInterface, QueryRunner } from 'typeorm';
+import { TemplateEnum } from '../../domain/shared/auxiliar/template/enum/template.enum';
+
+export class AddConfigRequestOicr1768508920651 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `UPDATE sec_template SET template = ? WHERE name = ?`,
+      [
+        `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -30,3 +38,16 @@
     </p>
   </body>
 </html>
+`,
+        TemplateEnum.OICR_NOTIFICATION_CREATED,
+      ],
+    );
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `UPDATE sec_template SET template = ? WHERE name = ?`,
+      [null, TemplateEnum.OICR_NOTIFICATION_CREATED],
+    );
+  }
+}
