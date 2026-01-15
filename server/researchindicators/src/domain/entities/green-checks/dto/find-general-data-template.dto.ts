@@ -28,6 +28,13 @@ export class FindGeneralCustomDataDto {
   action_executor_last_name: string;
   action_executor_email: string;
   description: string;
+  oicr_internal_code: string;
+  project_code: string;
+  created_at: string;
+  mel_regional_expert_first_name: string;
+  mel_regional_expert_last_name: string;
+  mel_regional_expert_email: string;
+  sharepoint_link: string;
 }
 
 export class SubmissionEmailTemplateDataDto {

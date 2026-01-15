@@ -93,8 +93,6 @@ export class ContractCustomDataDto {
 
 export class CustomDataDto {
   title?: string = null;
-  oicr_number?: string = null;
-  mel_expert_name?: string;
   requester_by?: string = null;
   sharepoint_url?: string = null;
   reviewed_by?: string = null;
@@ -102,26 +100,26 @@ export class CustomDataDto {
   justification?: string = null;
   requester_by_email?: string = null;
   reviewed_by_email?: string = null;
-  mel_expert_email?: string = null;
   result_id?: number = null;
   result_code?: string = null;
   platform_code?: string = null;
-  project_name?: string = null;
   support_email?: string = null;
   content_support_email?: string = null;
   system_name: string = null;
   rev_email?: string = null;
   url?: string = null;
   download_url?: string = null;
-  created_at?: Date = null;
+  created_at?: string = null;
   contract: ContractCustomDataDto = new ContractCustomDataDto();
   principal_investigator: SimpleUserDto = new SimpleUserDto();
   action_executor: SimpleUserDto = new SimpleUserDto();
   submitter: SimpleUserDto = new SimpleUserDto();
   result_owner: SimpleUserDto = new SimpleUserDto();
+  regional_expert: SimpleUserDto = new SimpleUserDto();
   indicator_name?: string = null;
   indicator_id?: number = null;
   description?: string = null;
+  oicr_internal_code: string = null;
 }
 
 export class SimpleUserDto {
