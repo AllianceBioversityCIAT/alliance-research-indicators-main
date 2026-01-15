@@ -176,12 +176,13 @@ export class ResultOicrService {
     );
     if (template) {
       await this.messageMicroservice.sendEmail({
-        subject: `[STAR] - New OICR Request #${messageData.result_code}`,
-        to: this.appConfig.SPRM_EMAIL_SAFE(this.currentUser.email),
+        subject: generalData.configEmail.subject,
+        to: generalData.configEmail.to,
+        cc: generalData.configEmail.cc,
         message: {
           socketFile: Buffer.from(template),
         },
-        bcc: process.env.ARI_MAPPED_BCC_SUBM_OICR,
+        bcc: this.appConfig.INTERNAL_EMAIL_LIST_ARRAY,
       });
     }
   }

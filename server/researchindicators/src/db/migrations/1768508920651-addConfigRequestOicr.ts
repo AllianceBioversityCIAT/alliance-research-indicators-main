@@ -20,7 +20,7 @@ export class AddConfigRequestOicr1768508920651 implements MigrationInterface {
       the details below:
     </p>
     <ul>
-      <li><b>OICR ID:</b> {{oicr_internal_code}}</li>
+      <li><b>OICR ID:</b> {{result_code}}</li>
       <li><b>OICR Title:</b> {{title}}</li>
       <li><b>Associated Project:</b> {{contract.code}} - {{contract.title}}</li>
       <li><b>Principal Investigator:</b> {{principal_investigator.name}}</li>
