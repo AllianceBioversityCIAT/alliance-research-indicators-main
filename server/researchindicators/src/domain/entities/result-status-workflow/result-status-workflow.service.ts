@@ -240,15 +240,26 @@ export class ResultStatusWorkflowService {
       cleanName(this.currentUserUtil.user.last_name);
     generalData.customData.action_executor.email =
       this.currentUserUtil.user.email;
+    generalData.customData.action_executor.id = this.currentUserUtil.user_id;
 
     const history = this._createHistory(
       transitionStatus,
       result,
       aditionalData,
     );
-
     await this.dataSource.transaction(async (manager) => {
-      await manager.getRepository(SubmissionHistory).insert(history);
+      const insertResponse = await manager
+        .getRepository(SubmissionHistory)
+        .insert(history);
+      const historyResult = await manager
+        .getRepository(SubmissionHistory)
+        .findOne({
+          where: {
+            submission_history_id:
+              insertResponse.identifiers[0].submission_history_id,
+          },
+        });
+      generalData.history = historyResult;
       await manager.getRepository(Result).update(resultId, {
         result_status_id: toStatusId,
         ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),

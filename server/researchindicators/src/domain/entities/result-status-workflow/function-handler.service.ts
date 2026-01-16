@@ -121,6 +121,18 @@ export class StatusWorkflowFunctionHandlerService {
     generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] The result ${generalData.customData.result_code} was not approved`;
   }
 
+  async isPiValidation(generalData: GeneralDataDto, _manager: EntityManager) {
+    const isPi = await this.mainRepo.isPi(
+      generalData.result.result_id,
+      generalData.customData.action_executor.id,
+    );
+    if (!isPi) {
+      throw new ForbiddenException(
+        'You are not authorized to perform this action',
+      );
+    }
+  }
+
   async generalRevisionConfigEmail(
     generalData: GeneralDataDto,
     _manager: EntityManager,
@@ -269,6 +281,23 @@ export class StatusWorkflowFunctionHandlerService {
   private roleGenericValidation(roles: SecRolesEnum[]) {
     if (roles.includes(SecRolesEnum.SUP_ADMIN)) return true;
     return false;
+  }
+
+  async directlyApprovedConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    generalData.configEmail.to = [
+      generalData.customData.principal_investigator.email,
+    ];
+
+    const tempCCEmails: string[] = [generalData.customData.result_owner.email];
+    const ccEmails = tempCCEmails.filter(
+      (email) => !generalData.configEmail.to.includes(email),
+    );
+
+    generalData.configEmail.cc = ccEmails;
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] Result ${generalData.customData.result_code} successfully submitted and approved`;
   }
 
   async oicrGeneralConfigEmail(
