@@ -58,7 +58,7 @@ export class AddConfigPostponeOicr1768506174155 implements MigrationInterface {
     </ul>
     <p>
       Justification provided: <br />
-      {{description}}
+       <i>"{{description}}"</i>
     </p>
     <p>
       You can access your submission directly through STAR:
