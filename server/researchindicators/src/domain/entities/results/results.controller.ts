@@ -244,7 +244,10 @@ export class ResultsController {
   @ApiOperation({ summary: 'Find all results versions' })
   async findAllVersions() {
     return this.resultsService
-      .findResultVersions(this._resultsUtil.resultCode)
+      .findResultVersions(
+        this._resultsUtil.resultCode,
+        this._resultsUtil.platformCode,
+      )
       .then((el) =>
         ResponseUtils.format({
           description: 'Results versions found',

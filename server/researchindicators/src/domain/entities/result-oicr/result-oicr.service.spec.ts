@@ -127,6 +127,9 @@ describe('ResultOicrService', () => {
     mockAppConfig = {
       get: jest.fn(),
       SPRM_EMAIL_SAFE: jest.fn().mockReturnValue('test@example.com'),
+      SPRM_EMAIL_ARRAY: ['to@example.com'],
+      INTERNAL_EMAIL_LIST_ARRAY: ['internal@example.com'],
+      ARI_MIS: 'STAR',
       ARI_CLIENT_HOST: 'http://localhost:3000',
     } as any;
 
@@ -777,8 +780,15 @@ describe('ResultOicrService', () => {
           return generalData;
         },
       );
-      mockStatusWorkflowFunctionHandlerService.oicrRequestConfigEmail.mockResolvedValue(
-        undefined,
+      mockStatusWorkflowFunctionHandlerService.oicrRequestConfigEmail.mockImplementation(
+        async (generalData: any) => {
+          generalData.configEmail.to = mockAppConfig.SPRM_EMAIL_ARRAY;
+          generalData.configEmail.cc = [
+            generalData.customData?.action_executor?.email,
+          ].filter(Boolean);
+          generalData.configEmail.subject = `[${mockAppConfig.ARI_MIS}] - New OICR Request - ID ${generalData.customData?.result_code}`;
+          return generalData;
+        },
       );
     });
 
@@ -800,14 +810,12 @@ describe('ResultOicrService', () => {
 
       const mockTemplate =
         '<html><body>Test email template with OICR data</body></html>';
-      const mockUserEmail = 'test-user@example.com';
 
       mockResultOicrRepository.getDataToNewOicrMessage.mockResolvedValue(
         mockMessageData,
       );
       oicrCustomData = mockMessageData;
       mockTemplateService._getTemplate.mockResolvedValue(mockTemplate);
-      mockAppConfig.SPRM_EMAIL_SAFE.mockReturnValue(mockUserEmail);
       // Set up current user email via mock
       const originalEmail = 'original-user@example.com';
       Object.defineProperty(mockCurrentUser, 'email', {
@@ -828,16 +836,14 @@ describe('ResultOicrService', () => {
         TemplateEnum.OICR_NOTIFICATION_CREATED,
         expect.objectContaining(mockMessageData),
       );
-      expect(mockAppConfig.SPRM_EMAIL_SAFE).toHaveBeenCalledWith(
-        mockCurrentUser.email,
-      );
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: '[STAR] - New OICR Request #OICR-2024-001',
-        to: mockUserEmail,
-        bcc: undefined,
+        subject: `[${mockAppConfig.ARI_MIS}] - New OICR Request - ID ${mockMessageData.result_code}`,
+        to: mockAppConfig.SPRM_EMAIL_ARRAY,
+        cc: [mockCurrentUser.user.email],
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
+        bcc: mockAppConfig.INTERNAL_EMAIL_LIST_ARRAY,
       });
     });
 
@@ -973,12 +979,13 @@ describe('ResultOicrService', () => {
         expect.objectContaining(mockMessageData),
       );
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: '[STAR] - New OICR Request #OICR-2024-004',
-        to: mockUserEmail,
-        bcc: undefined,
+        subject: `[${mockAppConfig.ARI_MIS}] - New OICR Request - ID ${mockMessageData.result_code}`,
+        to: mockAppConfig.SPRM_EMAIL_ARRAY,
+        cc: [mockCurrentUser.user.email],
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
+        bcc: mockAppConfig.INTERNAL_EMAIL_LIST_ARRAY,
       });
     });
 
@@ -1089,12 +1096,13 @@ describe('ResultOicrService', () => {
 
       // Assert
       expect(mockMessageMicroservice.sendEmail).toHaveBeenCalledWith({
-        subject: `[STAR] - New OICR Request #${specialResultCode}`,
-        to: mockUserEmail,
-        bcc: undefined,
+        subject: `[${mockAppConfig.ARI_MIS}] - New OICR Request - ID ${specialResultCode}`,
+        to: mockAppConfig.SPRM_EMAIL_ARRAY,
+        cc: [mockCurrentUser.user.email],
         message: {
           socketFile: Buffer.from(mockTemplate),
         },
+        bcc: mockAppConfig.INTERNAL_EMAIL_LIST_ARRAY,
       });
     });
 

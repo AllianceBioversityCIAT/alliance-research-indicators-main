@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Directly Approved</title>
+  </head>
+  <body>
+    <p>Dear {{principal_investigator.name}},</p>
+    <p>
+      You have successfully submitted a new result in STAR for the project
+      {{contract.code}} - {{contract.title}}. As you are the Principal
+      Investigator and the submitter, this result has been automatically
+      approved in accordance with STAR validation rules. This action has been
+      recorded in the change history for tracking and audit purposes.
+    </p>
+    <p>You can view the approved result by clicking the link below:</p>
+    <p><a href="{{url}}">{{indicator_name}} {{result_code}} - {{title}}</a></p>
+    <p>
+      If you have any questions or need assistance, please reach out through the
+      available support channels: <br />{{support_email}}
+    </p>
+    <p>Best regards,<br /><b>{{platform_code}} System Notification</b></p>
+    <p>
+      <i>This is an automated email. Please do not reply.</i>
+    </p>
+  </body>
+</html>

@@ -582,7 +582,7 @@ export class ResultsService {
     return generalInformation;
   }
 
-  async findResultVersions(resultCode: number) {
+  async findResultVersions(resultCode: number, platformCode: string) {
     const select = {
       result_id: true,
       result_official_code: true,
@@ -592,6 +592,7 @@ export class ResultsService {
     const where = {
       result_official_code: resultCode,
       is_active: true,
+      platform_code: platformCode,
     };
     const versions = await this.mainRepo.find({
       select,

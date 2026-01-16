@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultStatusWorkflow } from '../entities/result-status-workflow.entity';
 import { GeneralDataDto } from '../config/config-workflow';
@@ -14,6 +14,9 @@ import { Result } from '../../results/entities/result.entity';
 
 @Injectable()
 export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkflow> {
+  private readonly logger: Logger = new Logger(
+    ResultStatusWorkflowRepository.name,
+  );
   constructor(
     private dataSource: DataSource,
     private readonly appConfig: AppConfig,
@@ -51,6 +54,10 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     generalData.customData.regional_expert = {
       name: `${cleanName(resultData.mel_regional_expert_first_name)} ${cleanName(resultData.mel_regional_expert_last_name)}`,
       email: cleanText(resultData.mel_regional_expert_email),
+    };
+    generalData.customData.submitter = {
+      name: generalData.customData.result_owner.name,
+      email: generalData.customData.result_owner.email,
     };
     generalData.customData.description =
       generalData?.aditionalData?.submission_comment;
@@ -160,7 +167,8 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     const query = `CALL SP_versioning(?);`;
     return entityManager
       .query<Result>(query, [generalData.result.result_official_code])
-      .catch(() => {
+      .catch((error) => {
+        this.logger.error(error);
         throw new Error('Error creating snapshot');
       });
   }

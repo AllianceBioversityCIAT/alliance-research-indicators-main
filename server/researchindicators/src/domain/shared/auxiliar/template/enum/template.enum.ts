@@ -10,6 +10,7 @@ export enum TemplateEnum {
   OICR_APPROVED = 'oicr-approved-result',
   OICR_POSTPONE = 'oicr-postpone-result',
   OICR_REJECTED = 'oicr-rejected-result',
+  DIRECTLY_APPROVED = 'directly-approved',
 }
 
 export type WelcomeEmailTemplate = {

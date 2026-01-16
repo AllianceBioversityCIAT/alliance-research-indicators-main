@@ -1902,6 +1902,7 @@ describe('ResultsService', () => {
     it('should return result versions for a valid result code', async () => {
       // Arrange
       const resultCode = 12345;
+      const platformCode = 'STAR';
       const mockVersions = [
         { result_id: 1, title: 'Version 1', version: 1 },
         { result_id: 2, title: 'Version 2', version: 2 },
@@ -1913,7 +1914,7 @@ describe('ResultsService', () => {
         .mockResolvedValueOnce(mockLive as any); // Second call for live
 
       // Act
-      const result = await service.findResultVersions(resultCode);
+      const result = await service.findResultVersions(resultCode, platformCode);
 
       // Assert
       expect(result).toEqual({
@@ -1926,12 +1927,13 @@ describe('ResultsService', () => {
     it('should return empty arrays when no versions found', async () => {
       // Arrange
       const resultCode = 99999;
+      const platformCode = 'STAR';
       mockMainRepo.find
         .mockResolvedValueOnce([]) // First call for versions
         .mockResolvedValueOnce([]); // Second call for live
 
       // Act
-      const result = await service.findResultVersions(resultCode);
+      const result = await service.findResultVersions(resultCode, platformCode);
 
       // Assert
       expect(result).toEqual({
