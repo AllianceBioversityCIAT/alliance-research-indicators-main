@@ -58,7 +58,7 @@ export class AddConfigNoAcceptedOicr1768507069767
     </ul>
     <p>
       Justification provided: <br />
-      {{description}}
+      <i>"{{description}}"</i>
     </p>
     <p>
       You can access your submission directly through STAR:
