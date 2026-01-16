@@ -3,6 +3,7 @@ import { TemplateEnum } from '../../../shared/auxiliar/template/enum/template.en
 import { DeepPartial } from 'typeorm';
 import { Result } from '../../results/entities/result.entity';
 import { AditionalDataChangeStatusDto } from '../dto/aditional-data.dto';
+import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
 
 export interface ConfigWorkflow {
   actions: ConfigWorkflowAction[];
@@ -74,6 +75,7 @@ export class GeneralDataDto {
   customData: CustomDataDto = new CustomDataDto();
   aditionalData: AditionalDataChangeStatusDto =
     new AditionalDataChangeStatusDto();
+  history: SubmissionHistory = new SubmissionHistory();
 }
 
 export class ConfigEmailDto {
@@ -125,4 +127,5 @@ export class CustomDataDto {
 export class SimpleUserDto {
   name: string = null;
   email: string = null;
+  id: number = null;
 }

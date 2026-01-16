@@ -38,7 +38,8 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
                 ro.sharepoint_link,
                 aus2.first_name as mel_regional_expert_first_name,
                 aus2.last_name as mel_regional_expert_last_name,
-                aus2.email as mel_regional_expert_email`,
+                aus2.email as mel_regional_expert_email,
+                aus2.carnet as mel_regional_expert_id`,
       join: `inner join result_oicrs ro on ro.result_id = r.result_id and ro.is_active = true
              left join alliance_user_staff aus2 on aus2.carnet = ro.mel_regional_expert `,
     });
@@ -54,10 +55,12 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     generalData.customData.regional_expert = {
       name: `${cleanName(resultData.mel_regional_expert_first_name)} ${cleanName(resultData.mel_regional_expert_last_name)}`,
       email: cleanText(resultData.mel_regional_expert_email),
+      id: resultData.mel_regional_expert_id,
     };
     generalData.customData.submitter = {
       name: generalData.customData.result_owner.name,
       email: generalData.customData.result_owner.email,
+      id: generalData.customData.result_owner.id,
     };
     generalData.customData.description =
       generalData?.aditionalData?.submission_comment;
@@ -71,6 +74,7 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
         su.first_name as owner_first_name,
         su.last_name as owner_last_name,
         su.email as owner_email,
+        aus.carnet as principal_investigator_id,
         aus.first_name as principal_investigator_first_name,
         aus.last_name as principal_investigator_last_name,
         aus.email as principal_investigator_email,
@@ -130,6 +134,7 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     generalData.customData.submitter = {
       name: `${cleanName(resultData.action_executor_first_name)} ${cleanName(resultData.action_executor_last_name)}`,
       email: cleanText(resultData.action_executor_email),
+      id: resultData.action_executor_id,
     };
 
     generalData.customData.description =
@@ -173,6 +178,23 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
       });
   }
 
+  async isPi(resultId: number, userId: number) {
+    const query = `
+      select su.sec_user_id 
+      from result_contracts rc 
+        inner join agresso_contracts ac on ac.agreement_id = rc.contract_id 
+        inner join alliance_user_staff aus on aus.carnet = ac.projectLeadId 
+        inner join sec_users su on su.email = aus.email 
+      where rc.result_id = ?
+          and rc.is_primary = true
+          and rc.is_active = true
+          and su.sec_user_id = ?
+          limit 1;
+    `;
+    const result = await this.dataSource.query(query, [resultId, userId]);
+    return result?.length > 0;
+  }
+
   async getDataForSubmissionResult(
     resultId: number,
     generalData: GeneralDataDto,
@@ -191,6 +213,7 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     generalData.customData.submitter = {
       name: generalData.customData.action_executor.name,
       email: generalData.customData.action_executor.email,
+      id: generalData.customData.action_executor.id,
     };
 
     this.setCustomGeneralData(generalData, resultData);
@@ -204,10 +227,12 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     generalData.customData.result_owner = {
       name: `${cleanName(customData.owner_first_name)} ${cleanName(customData.owner_last_name)}`,
       email: cleanText(customData.owner_email),
+      id: customData.owner_id,
     };
     generalData.customData.principal_investigator = {
       name: `${cleanName(customData.principal_investigator_first_name)} ${cleanName(customData.principal_investigator_last_name)}`,
       email: cleanText(customData.principal_investigator_email),
+      id: customData.principal_investigator_id,
     };
     generalData.customData.contract = {
       code: customData.project_code,
