@@ -173,6 +173,12 @@ export class Result extends AuditableEntity {
   })
   external_link?: string;
 
+  @Column('text', {
+    name: 'document_link',
+    nullable: true,
+  })
+  document_link?: string;
+
   @ManyToOne(
     () => ReportingPlatform,
     (reportingPlatform) => reportingPlatform.results,
