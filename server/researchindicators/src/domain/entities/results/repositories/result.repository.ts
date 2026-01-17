@@ -396,6 +396,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 		r.result_status_id,
 		r.report_year_id,
     r.external_link,
+    r.public_link,
 		COALESCE(r2.snapshot_years, JSON_ARRAY()) as snapshot_years,
 		r.is_active
 		${queryParts.result_audit_data?.select}
