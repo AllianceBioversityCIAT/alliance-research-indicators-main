@@ -338,7 +338,9 @@ export class TipIntegrationService extends BaseApi {
             `Creating new result ${findResult.result_official_code} from TIP.`,
           );
         } else {
-          await this.resultKnowledgeProductService.activeKpByResultId(findResult.result_id);
+          await this.resultKnowledgeProductService.activeKpByResultId(
+            findResult.result_id,
+          );
           this.logger.debug(
             `Updating result ${findResult.result_official_code} from TIP.`,
           );
