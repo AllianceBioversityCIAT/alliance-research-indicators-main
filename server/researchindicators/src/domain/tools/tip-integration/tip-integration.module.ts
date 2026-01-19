@@ -7,6 +7,7 @@ import { ClarisaRegionsModule } from '../clarisa/entities/clarisa-regions/claris
 import { ClarisaLeversModule } from '../clarisa/entities/clarisa-levers/clarisa-levers.module';
 import { ClarisaCountriesModule } from '../clarisa/entities/clarisa-countries/clarisa-countries.module';
 import { ResultKnowledgeProductModule } from '../../entities/result-knowledge-product/result-knowledge-product.module';
+import { TipIntegrationRepository } from './repository/tip-integration.repository';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ResultKnowledgeProductModule } from '../../entities/result-knowledge-pr
     ResultKnowledgeProductModule,
   ],
   controllers: [TipIntegrationController],
-  providers: [TipIntegrationService],
+  providers: [TipIntegrationService, TipIntegrationRepository],
+  exports: [TipIntegrationRepository],
 })
 export class TipIntegrationModule {}
