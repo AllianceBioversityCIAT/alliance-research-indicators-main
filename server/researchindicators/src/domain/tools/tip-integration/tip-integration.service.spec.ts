@@ -12,6 +12,7 @@ import { DataSource } from 'typeorm';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import * as mapperModule from './mapper/tip-integration.mapper';
+import { TipIntegrationRepository } from './repository/tip-integration.repository';
 
 describe('TipIntegrationService', () => {
   let service: TipIntegrationService;
@@ -39,6 +40,7 @@ describe('TipIntegrationService', () => {
             TIP_TOKEN: 'test-token',
           },
         },
+        { provide: TipIntegrationRepository, useValue: {} },
       ],
     }).compile();
 

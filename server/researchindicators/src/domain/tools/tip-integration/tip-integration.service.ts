@@ -42,6 +42,7 @@ import {
   mergeArraysWithPriority,
 } from '../../shared/utils/array.util';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
+import { TipIntegrationRepository } from './repository/tip-integration.repository';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -57,6 +58,7 @@ export class TipIntegrationService extends BaseApi {
     private readonly dataSource: DataSource,
     private readonly resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _currentUser: CurrentUserUtil,
+    private readonly tipIntegrationRepository: TipIntegrationRepository,
   ) {
     super(
       httpService,
@@ -82,6 +84,14 @@ export class TipIntegrationService extends BaseApi {
     );
   }
 
+  async inactiveAllTipResults(resultCodes: number[]): Promise<void> {
+    const tipResultIds =
+      await this.tipIntegrationRepository.allTipResultId(resultCodes);
+    for (const resultId of tipResultIds) {
+      await this.tipIntegrationRepository.inactiveAllTipResults(resultId);
+    }
+  }
+
   async getKnowledgeProductsByYear(year: number) {
     if (isEmpty(year) || year != 2025) {
       throw new BadRequestException('Only year 2025 is supported');
@@ -89,6 +99,7 @@ export class TipIntegrationService extends BaseApi {
     const limit = 50;
     let offset = 0;
     let pendingData = true;
+    const resultSaved: number[] = [];
     while (pendingData) {
       const response = await firstValueFrom(
         this.getRequest<TipKnowledgeProductsResponseDto>(
@@ -110,9 +121,10 @@ export class TipIntegrationService extends BaseApi {
           );
         });
       const mappedData = await this.processing(response.data, year);
-      await this.createKpInStar(mappedData);
+      await this.createKpInStar(mappedData, resultSaved);
       if (response.data_count < limit) {
         pendingData = false;
+        await this.inactiveAllTipResults(resultSaved);
       } else {
         offset += limit;
       }
@@ -169,15 +181,18 @@ export class TipIntegrationService extends BaseApi {
         }
       }
 
-      const carnet = resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
+      const carnet =
+        resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
 
       resultMapped.generalInformation = {
         title: result.name,
         year: year,
         description: result.abstract,
-        main_contact_person: !isEmpty(carnet) ? {
-          user_id: carnet,
-        } as ResultUser : null,
+        main_contact_person: !isEmpty(carnet)
+          ? ({
+              user_id: carnet,
+            } as ResultUser)
+          : null,
       };
 
       const primaryLever = await this.mapLevers(result.levers);
@@ -284,16 +299,19 @@ export class TipIntegrationService extends BaseApi {
     newUser.email = user.email;
     newUser.carnet = user.carnet;
     if (isEmpty(user.email)) {
-      this.logger.warn(`User ${user.carnet} has no email, skipping user creation.`);
+      this.logger.warn(
+        `User ${user.carnet} has no email, skipping user creation.`,
+      );
       return null;
     }
     return this.resultRepository.createUserInSecUsers(newUser);
   }
 
-  async createKpInStar(results: ResultsTipMapping[]) {
+  async createKpInStar(results: ResultsTipMapping[], resultSaved: number[]) {
     for (const result of results) {
       this.logger.debug(`Processing result ${result.official_code} from TIP.`);
       this._currentUser.setSystemUser(result.userData, true);
+      resultSaved.push(result.official_code);
       let createNewResult: Result = null;
       try {
         let findResult = await this.dataSource.getRepository(Result).findOne({
