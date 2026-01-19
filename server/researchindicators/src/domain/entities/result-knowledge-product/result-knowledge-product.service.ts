@@ -40,4 +40,10 @@ export class ResultKnowledgeProductService {
     });
     return this.mainRepo.findOne({ where: { result_id: resultId } });
   }
+
+  async activeKpByResultId(resultId: number) {
+    await this.mainRepo.update(resultId, {
+      is_active: true,
+    });
+  }
 }
