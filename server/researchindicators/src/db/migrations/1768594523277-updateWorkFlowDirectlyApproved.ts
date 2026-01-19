@@ -7,7 +7,7 @@ export class UpdateWorkFlowDirectlyApproved1768594523277
     await queryRunner.query(
       `UPDATE result_status_workflow SET config = ?, from_status_id = ?, to_status_id = ? WHERE id = ?`,
       [
-        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "getDataForSubmissionResult"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
+        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "findCustomDataSubmitted"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
         4,
         6,
         45,
@@ -16,7 +16,7 @@ export class UpdateWorkFlowDirectlyApproved1768594523277
     await queryRunner.query(
       `UPDATE result_status_workflow SET config = ?, from_status_id = ?, to_status_id = ? WHERE id = ?`,
       [
-        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "getDataForSubmissionResult"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
+        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "findCustomDataSubmitted"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
         4,
         6,
         46,
@@ -25,7 +25,7 @@ export class UpdateWorkFlowDirectlyApproved1768594523277
     await queryRunner.query(
       `UPDATE result_status_workflow SET config = ?, from_status_id = ?, to_status_id = ? WHERE id = ?`,
       [
-        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "getDataForSubmissionResult"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
+        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "findCustomDataSubmitted"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
         4,
         6,
         47,
@@ -34,7 +34,7 @@ export class UpdateWorkFlowDirectlyApproved1768594523277
     await queryRunner.query(
       `UPDATE result_status_workflow SET config = ?, from_status_id = ?, to_status_id = ? WHERE id = ?`,
       [
-        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "getDataForSubmissionResult"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
+        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "findCustomDataSubmitted"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
         4,
         6,
         48,
@@ -43,7 +43,7 @@ export class UpdateWorkFlowDirectlyApproved1768594523277
     await queryRunner.query(
       `UPDATE result_status_workflow SET config = ?, from_status_id = ?, to_status_id = ? WHERE id = ?`,
       [
-        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "getDataForSubmissionResult"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
+        '{"actions": [{"type": "email", "config": {"template": "directly-approved", "custom_config_email": "directlyApprovedConfigEmail", "custom_data_resolver": "findCustomDataSubmitted"}, "enabled": true}, {"type": "function", "config": {"function_name": "createSnapshot"}, "enabled": true}, {"type": "validation", "config": {"function_name": "isPiValidation"}, "enabled": true}]}',
         4,
         6,
         49,

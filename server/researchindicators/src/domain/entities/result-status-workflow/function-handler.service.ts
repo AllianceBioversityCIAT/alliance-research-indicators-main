@@ -122,6 +122,8 @@ export class StatusWorkflowFunctionHandlerService {
   }
 
   async isPiValidation(generalData: GeneralDataDto, _manager: EntityManager) {
+    const { roles } = this.currentUser;
+    if (this.roleGenericValidation(roles)) return;
     const isPi = await this.mainRepo.isPi(
       generalData.result.result_id,
       generalData.customData.action_executor.id,
