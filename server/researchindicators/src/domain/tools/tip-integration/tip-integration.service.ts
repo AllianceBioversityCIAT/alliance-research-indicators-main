@@ -328,7 +328,7 @@ export class TipIntegrationService extends BaseApi {
             ReportingPlatformEnum.TIP,
             {
               notContract: true,
-              result_status_id: ResultStatusEnum.APPROVED,
+              result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
               validateTitle: false,
             },
             result.official_code,
@@ -338,6 +338,9 @@ export class TipIntegrationService extends BaseApi {
             `Creating new result ${findResult.result_official_code} from TIP.`,
           );
         } else {
+          await this.resultKnowledgeProductService.activeKpByResultId(
+            findResult.result_id,
+          );
           this.logger.debug(
             `Updating result ${findResult.result_official_code} from TIP.`,
           );
