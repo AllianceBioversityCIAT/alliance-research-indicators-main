@@ -169,7 +169,7 @@ export class TipIntegrationService extends BaseApi {
         }
       }
 
-      const carnet = resultMapped?.userData?.carnet ?? result?.submitter?.email;
+      const carnet = resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
 
       resultMapped.generalInformation = {
         title: result.name,
