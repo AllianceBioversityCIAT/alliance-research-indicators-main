@@ -169,13 +169,15 @@ export class TipIntegrationService extends BaseApi {
         }
       }
 
+      const carnet = resultMapped?.userData?.carnet ?? result?.submitter?.email;
+
       resultMapped.generalInformation = {
         title: result.name,
         year: year,
         description: result.abstract,
-        main_contact_person: {
-          user_id: resultMapped.userData?.carnet,
-        } as ResultUser,
+        main_contact_person: !isEmpty(carnet) ? {
+          user_id: carnet,
+        } as ResultUser : null,
       };
 
       const primaryLever = await this.mapLevers(result.levers);
@@ -281,6 +283,10 @@ export class TipIntegrationService extends BaseApi {
     newUser.last_name = user.last_name;
     newUser.email = user.email;
     newUser.carnet = user.carnet;
+    if (isEmpty(user.email)) {
+      this.logger.warn(`User ${user.carnet} has no email, skipping user creation.`);
+      return null;
+    }
     return this.resultRepository.createUserInSecUsers(newUser);
   }
 
