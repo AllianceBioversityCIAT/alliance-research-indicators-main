@@ -64,5 +64,31 @@ export class PrmsResponseDto {
     last_updated_date: Date;
     last_pop_up_viewed: Date;
   };
+  obj_result_by_initiatives: PrmsResultByInitiativesDto[];
   result_knowledge_product_array: PrmsKnowledgeProductDto[];
 }
+
+export class PrmsResultByInitiativesDto {
+  id: number;
+  result_id: string;
+  initiative_id: number;
+  initiative_role_id: string;
+  is_active: boolean;
+  created_by: number;
+  created_date: Date;
+  last_updated_by: number;
+  last_updated_date: Date;
+  obj_initiative: PrmsInitiativeDto;
+}
+
+export class PrmsInitiativeDto {
+  id: number;
+  official_code: string;
+  name: string;
+  short_name: string;
+  active: boolean;
+  portfolio_id: number;
+  toc_id: number;
+  cgiar_entity_type_id: string;
+}
+
