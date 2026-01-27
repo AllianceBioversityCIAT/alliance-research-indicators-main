@@ -331,7 +331,7 @@ export class StatusWorkflowFunctionHandlerService {
     _manager: EntityManager,
   ) {
     await this.oicrGeneralConfigEmail(generalData, _manager);
-    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.oicr_internal_code} has been accepted`;
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.result_code} has been accepted`;
   }
 
   async oicrPostponeConfigEmail(
@@ -339,7 +339,7 @@ export class StatusWorkflowFunctionHandlerService {
     _manager: EntityManager,
   ) {
     await this.oicrGeneralConfigEmail(generalData, _manager);
-    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.oicr_internal_code} was marked as postponed`;
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.result_code} was marked as postponed`;
   }
 
   async oicrRejectedConfigEmail(
@@ -347,7 +347,7 @@ export class StatusWorkflowFunctionHandlerService {
     _manager: EntityManager,
   ) {
     await this.oicrGeneralConfigEmail(generalData, _manager);
-    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.oicr_internal_code} was marked as rejected`;
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - Your requested OICR ${generalData.customData.result_code} was marked as rejected`;
   }
 
   async oicrRequestConfigEmail(
