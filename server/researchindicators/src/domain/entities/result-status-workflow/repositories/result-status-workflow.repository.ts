@@ -244,7 +244,7 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     generalData.customData.result_id = customData.result_id;
     generalData.customData.platform_code = this.appConfig.ARI_MIS;
     generalData.customData.created_at = customData.created_at;
-    generalData.customData.url = `${this.appConfig.ARI_CLIENT_HOST}/result/${customData.result_official_code}/general-information`;
+    generalData.customData.url = `${this.appConfig.ARI_CLIENT_HOST}/result/${this.appConfig.ARI_MIS}-${customData.result_official_code}/general-information`;
     return generalData;
   }
 }
