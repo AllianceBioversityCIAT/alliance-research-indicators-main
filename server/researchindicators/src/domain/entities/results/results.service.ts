@@ -90,6 +90,7 @@ import { QueryService } from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
+import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 
 @Injectable()
 export class ResultsService {
@@ -334,7 +335,7 @@ export class ResultsService {
       const agressoContract =
         await this._agressoContractService.findOne(contract_id);
       const lever = this._clarisaLeversService.homologatedData(
-        agressoContract.departmentId,
+        agressoContract?.departmentId,
       );
       const clarisaLever = await this._clarisaLeversService.findByName(lever);
 
@@ -921,7 +922,7 @@ export class ResultsService {
         result_official_code: tempExistsResult?.result_official_code,
         platform_code: tempExistsResult?.platform_code,
         error: true,
-        message_error: error?.name || error,
+        message_error: error?.message || error,
       };
     }
   }
@@ -963,6 +964,21 @@ export class ResultsService {
 
   async createResultFromAiRoar(result: ResultRawAi) {
     const tmpNewData: ResultAiDto = new ResultAiDto();
+    if (result?.contract_code) {
+      const agressoContract = await this.dataSource
+        .getRepository(AgressoContract)
+        .findOne({
+          where: {
+            agreement_id: result.contract_code,
+          },
+        });
+      if (!agressoContract) {
+        throw new NotFoundException(
+          `Agresso contract ${result.contract_code} not found`,
+        );
+      }
+    }
+
     {
       const newResult: CreateResultDto = new CreateResultDto();
       newResult.title = result.title;
