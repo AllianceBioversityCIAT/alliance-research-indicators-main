@@ -296,7 +296,7 @@ export class StatusWorkflowFunctionHandlerService {
     const tempCCEmails: string[] = [generalData.customData.result_owner.email];
     const ccEmails = tempCCEmails.filter(
       (email) => !generalData.configEmail.to.includes(email),
-    );
+    ).filter(email => !isEmpty(email));
 
     generalData.configEmail.cc = ccEmails;
     generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] Result ${generalData.customData.result_code} successfully submitted and approved`;
@@ -322,7 +322,7 @@ export class StatusWorkflowFunctionHandlerService {
 
     const ccEmails = tempCCEmails.filter(
       (email) => !generalData.configEmail.to.includes(email),
-    );
+    ).filter(email => !isEmpty(email));
     generalData.configEmail.cc = ccEmails;
   }
 
