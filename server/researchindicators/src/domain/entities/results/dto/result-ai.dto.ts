@@ -677,6 +677,22 @@ export class ResultRawAi {
     message: 'The value must be "Yes" or "No"',
   })
   potential_asset: string;
+
+  @IsOptional()
+  @IsString()
+  potential_asset_description: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(Yes|No)$/, {
+    message: 'The value must be "Yes" or "No"',
+  })
+  requires_further_development: string;
+
+  @IsOptional()
+  @IsString()
+  requires_further_development_description: string;
+
 }
 
 export class RootAi {

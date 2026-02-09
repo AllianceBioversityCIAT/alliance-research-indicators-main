@@ -131,7 +131,7 @@ export class ResultsService {
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -648,19 +648,19 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -972,7 +972,7 @@ export class ResultsService {
   async createMappingIpRights(result: ResultRawAi) {
     const tempIpRights: UpdateIpRightDto = new UpdateIpRightDto();
 
-    if (isEmpty(result?.asset_ip_owner_id)) {
+    if (!isEmpty(result?.asset_ip_owner_id)) {
       const assetIpOwner = await this.dataSource
         .getRepository(IntellectualPropertyOwner)
         .findOne({
@@ -1000,6 +1000,13 @@ export class ResultsService {
     tempIpRights.potential_asset = result?.potential_asset
       ? result?.potential_asset === 'Yes'
       : null;
+    tempIpRights.potential_asset_description =
+      result?.potential_asset_description;
+    tempIpRights.requires_futher_development = result?.requires_further_development
+      ? result?.requires_further_development === 'Yes'
+      : null;
+    tempIpRights.requires_futher_development_description =
+      result?.requires_further_development_description;
     return tempIpRights;
   }
 
@@ -1188,8 +1195,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },
