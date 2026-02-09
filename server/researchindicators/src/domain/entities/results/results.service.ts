@@ -91,6 +91,8 @@ import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-ou
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
+import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
+import { IntellectualPropertyOwner } from '../intellectual-property-owners/entities/intellectual-property-owner.entity';
 
 @Injectable()
 export class ResultsService {
@@ -852,6 +854,11 @@ export class ResultsService {
         processedResult?.sdgs,
       );
 
+      await this._resultIpRightsService.update(
+        newResult.result_id,
+        processedResult?.ipRights,
+      );
+
       await this.saveGeoLocation(newResult.result_id, processedResult.geoScope);
       await this._resultInstitutionsService.updatePartners(
         newResult.result_id,
@@ -947,6 +954,40 @@ export class ResultsService {
       tempCountries.result_countries_sub_nationals = tempSubNational;
     }
     return tempCountries;
+  }
+
+  async createMappingIpRights(result: ResultRawAi) {
+    const tempIpRights: UpdateIpRightDto = new UpdateIpRightDto();
+
+    if (isEmpty(result?.asset_ip_owner_id)) {
+      const assetIpOwner = await this.dataSource
+        .getRepository(IntellectualPropertyOwner)
+        .findOne({
+          where: {
+            intellectual_property_owner_id: result.asset_ip_owner_id,
+          },
+        })
+        .then((assetIpOwner) => {
+          if (!assetIpOwner) {
+            throw new NotFoundException(
+              `Intellectual property owner ${result.asset_ip_owner_id} not found`,
+            );
+          }
+          return assetIpOwner;
+        });
+      tempIpRights.asset_ip_owner = assetIpOwner.intellectual_property_owner_id;
+    }
+    tempIpRights.asset_ip_owner_description =
+      result?.asset_ip_owner_description;
+    tempIpRights.publicity_restriction = result?.publicity_restriction
+      ? result?.publicity_restriction === 'Yes'
+      : null;
+    tempIpRights.publicity_restriction_description =
+      result?.publicity_restriction_description;
+    tempIpRights.potential_asset = result?.potential_asset
+      ? result?.potential_asset === 'Yes'
+      : null;
+    return tempIpRights;
   }
 
   async createResultFromAiRoar(result: ResultRawAi) {
@@ -1091,6 +1132,12 @@ export class ResultsService {
         tmpNewData.innovationDev =
           await this._resultInnovationDevService.processedAiInfo(result);
         break;
+    }
+
+    {
+      const tempIpRights: UpdateIpRightDto =
+        await this.createMappingIpRights(result);
+      tmpNewData.ipRights = tempIpRights;
     }
 
     this.dataSource.getRepository(TempResultAi).save({
