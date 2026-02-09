@@ -18,6 +18,7 @@ import {
   Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { UpdateIpRightDto } from '../../result-ip-rights/dto/update-ip-right.dto';
 
 export class ResultAiDto {
   result: CreateResultDto;
@@ -29,6 +30,7 @@ export class ResultAiDto {
   partners?: CreateResultInstitutionDto;
   evidences?: CreateResultEvidenceDto;
   sdgs?: ResultSdg[];
+  ipRights?: UpdateIpRightDto;
 }
 
 export class CountryAreas {
@@ -648,6 +650,33 @@ export class ResultRawAi {
   @IsArray()
   @IsString({ each: true })
   other_organization_type: string[];
+
+  @IsOptional()
+  @IsNumber()
+  asset_ip_owner_id: number;
+
+  @IsOptional()
+  @IsString()
+  asset_ip_owner_description: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(Yes|No)$/, {
+    message: 'The value must be "Yes" or "No"',
+  })
+  publicity_restriction: string;
+
+  @IsOptional()
+  @IsString()
+  publicity_restriction_description: string;
+
+  @IsOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(/^(Yes|No)$/, {
+    message: 'The value must be "Yes" or "No"',
+  })
+  potential_asset: string;
 }
 
 export class RootAi {
