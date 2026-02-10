@@ -84,6 +84,7 @@ import { ResultImpactAreaGlobalTargetsModule } from './result-impact-area-global
 import { ResultStatusTransitionsModule } from './result-status-transitions/result-status-transitions.module';
 import { PooledFundingContractsModule } from './pooled-funding-contracts/pooled-funding-contracts.module';
 import { ResultKnowledgeProductModule } from './result-knowledge-product/result-knowledge-product.module';
+import { ResultStatusWorkflowModule } from './result-status-workflow/result-status-workflow.module';
 
 @Module({
   imports: [
@@ -172,6 +173,7 @@ import { ResultKnowledgeProductModule } from './result-knowledge-product/result-
     ResultStatusTransitionsModule,
     PooledFundingContractsModule,
     ResultKnowledgeProductModule,
+    ResultStatusWorkflowModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })

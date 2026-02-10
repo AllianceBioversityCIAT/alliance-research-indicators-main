@@ -6,7 +6,7 @@ import { UserService } from '../../complementary-entities/secondary/user/user.se
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { ResultUserAi } from './entities/result-user-ai.entity';
 import { isEmpty } from 'lodash';
@@ -54,7 +54,7 @@ export class ResultUsersService extends BaseServiceSimple<
         result_id: resultId,
         user_role_id: UserRolesEnum.AUTHORS_CONTACT,
       },
-      { is_active: false, ...this.currentUser.audit(SetAutitEnum.UPDATE) },
+      { is_active: false, ...this.currentUser.audit(SetAuditEnum.UPDATE) },
     );
   }
 
@@ -260,7 +260,7 @@ export class ResultUsersService extends BaseServiceSimple<
       if (!existingRole.is_active) {
         await repository.update(existingRole.result_user_id, {
           is_active: true,
-          ...this.currentUser.audit(SetAutitEnum.UPDATE),
+          ...this.currentUser.audit(SetAuditEnum.UPDATE),
         });
         return await repository.findOne({
           where: { result_user_id: existingRole.result_user_id },
@@ -274,7 +274,7 @@ export class ResultUsersService extends BaseServiceSimple<
         user_role_id: UserRolesEnum.AUTHORS_CONTACT,
         informative_role_id: informativeRoleId,
         is_active: true,
-        ...this.currentUser.audit(SetAutitEnum.NEW),
+        ...this.currentUser.audit(SetAuditEnum.NEW),
       });
 
       return await repository.save(newRole);

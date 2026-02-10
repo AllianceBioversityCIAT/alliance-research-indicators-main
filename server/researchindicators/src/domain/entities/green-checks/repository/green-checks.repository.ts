@@ -6,10 +6,7 @@ import { Result } from '../../results/entities/result.entity';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { FindGreenChecksUserDto } from '../dto/find-green-checks-user.dto';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
-import {
-  FindDataForSubmissionDto,
-  FindGeneralDataTemplateDto,
-} from '../dto/find-general-data-template.dto';
+import { FindGeneralDataTemplateDto } from '../dto/find-general-data-template.dto';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { MessageOicrDto } from '../dto/message-oicr.dto';
 import { formatString } from '../../../shared/utils/queries.util';
@@ -146,10 +143,18 @@ export class GreenCheckRepository {
           	'result_status_id', r.result_status_id) as result,
           JSON_OBJECT( 
           	'result_status_id', rs1.result_status_id,
-          	'name', rs1.name ) as from_status,
+          	'name', rs1.name,
+          	'description', rs1.description,
+          	'config', rs1.config,
+          	'editable_roles', rs1.editable_roles,
+            'action_description', rs1.action_description) as from_status,
           JSON_OBJECT( 
           	'result_status_id', rs2.result_status_id,
-          	'name', rs2.name ) as to_status,
+          	'name', rs2.name,
+          	'description', rs2.description,
+          	'config', rs2.config,
+          	'editable_roles', rs2.editable_roles,
+            'action_description', rs2.action_description) as to_status,
           JSON_OBJECT(
           	'sec_user_id', su1.sec_user_id,
           	'email', su1.email,
@@ -202,9 +207,7 @@ export class GreenCheckRepository {
     return principal == 1 || (roles == 1 && result == 1);
   }
 
-  async getDataForSubmissionResult(
-    resultId: number,
-  ): Promise<FindDataForSubmissionDto> {
+  async getDataForSubmissionResult(resultId: number) {
     const query = `
       select 
         su.sec_user_id as contributor_id,
@@ -227,7 +230,7 @@ export class GreenCheckRepository {
       limit 1;
     `;
 
-    const result: FindDataForSubmissionDto = await this.dataSource
+    const result = await this.dataSource
       .query(query, [resultId])
       .then((result) => (result?.length ? result[0] : null));
 

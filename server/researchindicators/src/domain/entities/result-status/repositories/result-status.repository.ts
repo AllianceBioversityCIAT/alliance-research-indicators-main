@@ -19,7 +19,14 @@ export class ResultStatusRepository extends Repository<ResultStatus> {
         	rs.result_status_id ,
         	rs.name,
         	rs.description,
-        	COUNT(r.result_id) as amount_results
+        	COUNT(r.result_id) as amount_results,
+          JSON_OBJECT('result_status_id', rs.result_status_id,
+					  'name', rs.name,
+					  'description', rs.description,
+            'config', rs.config,
+            'editable_roles', rs.editable_roles,
+            'action_description', rs.action_description,
+					  'is_active', rs.is_active) as result_status
         FROM
         	result_status rs
         LEFT JOIN results r on

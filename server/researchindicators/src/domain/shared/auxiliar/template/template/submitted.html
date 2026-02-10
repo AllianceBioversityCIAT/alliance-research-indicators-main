@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Submitted Result</title>
+  </head>
+  <body>
+    <p>Dear {{principal_investigator.name}},</p>
+    <p>
+      {{submitter.name}} has submitted a new result in STAR for the project
+      {{result_code}} - {{title}}. To complete the submission process, your
+      review and approval are required.
+    </p>
+    <p>You can access the result and take action by clicking the link below:</p>
+    <p><a href="{{url}}">{{indicator_name}} {{result_code}} - {{title}}</a></p>
+    <p>
+      If you have any questions or need assistance, please reach out through the
+      available support channels: <br />{{support_email}}
+    </p>
+    <p>Best regards, <br /><b>{{platform_code}} System Notification</b></p>
+    <p><i>This is an automated email. Please do not reply.</i></p>
+  </body>
+</html>

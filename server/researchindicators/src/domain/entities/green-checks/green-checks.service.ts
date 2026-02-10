@@ -15,7 +15,7 @@ import {
 import { SubmissionHistory } from './entities/submission-history.entity';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { ResultStatus } from '../result-status/entities/result-status.entity';
 import { isEmpty, validObject } from '../../shared/utils/object.utils';
@@ -399,7 +399,7 @@ export class GreenChecksService {
     return this.dataSource.transaction(async (manager) => {
       await manager.getRepository(Result).update(resultId, {
         result_status_id: historyObject.to_status_id,
-        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+        ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
       });
 
       const response = await manager.getRepository(SubmissionHistory).insert({
@@ -407,7 +407,7 @@ export class GreenChecksService {
         submission_comment: historyObject.submission_comment,
         from_status_id: historyObject.from_status_id,
         to_status_id: historyObject.to_status_id,
-        ...this.currentUserUtil.audit(SetAutitEnum.NEW),
+        ...this.currentUserUtil.audit(SetAuditEnum.NEW),
       });
 
       const history = await manager.getRepository(SubmissionHistory).findOne({
@@ -449,32 +449,21 @@ export class GreenChecksService {
         .getDataForSubmissionResult(resultId)
         .then(async (data) => {
           const newData = {
-            pi_name: data.pi_name
-              .split(',')
-              .map((name) =>
-                name
-                  .trim()
-                  .toLowerCase()
-                  .split(' ')
-                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(' '),
-              )
-              .join(', '),
+            pi_name: `${data.principal_investigator_first_name} ${data.principal_investigator_last_name}`,
             sub_last_name: this.currentUserUtil.user.last_name,
             sub_first_name: this.currentUserUtil.user.first_name,
             result_id: data.result_id,
-            title: data.title,
+            title: data.result_title,
             project_name: data.project_name,
             support_email: this.appConfig.ARI_SUPPORT_EMAIL,
             content_support_email: this.appConfig.ARI_CONTENT_SUPPORT_EMAIL,
             system_name: this.appConfig.ARI_MIS,
             rev_email:
-              data.contributor_id == this.currentUserUtil.user_id
-                ? data.contributor_email
-                : [
-                    data.contributor_email,
-                    this.currentUserUtil.user.email,
-                  ].join(', '),
+              data.owner_id == this.currentUserUtil.user_id
+                ? data.owner_email
+                : [data.owner_email, this.currentUserUtil.user.email].join(
+                    ', ',
+                  ),
             url: `${this.appConfig.ARI_CLIENT_HOST}/result/${data.result_id}/general-information`,
             indicator: data.indicator,
           };
@@ -635,7 +624,7 @@ export class GreenChecksService {
       {
         report_year_id: newReportYear,
         result_status_id: ResultStatusEnum.DRAFT,
-        ...this.currentUserUtil.audit(SetAutitEnum.UPDATE),
+        ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
       },
     );
 

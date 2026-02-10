@@ -32,7 +32,7 @@ import { MetadataResultDto } from './dto/metadata-result.dto';
 import { ResultPolicyChangeService } from '../result-policy-change/result-policy-change.service';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
@@ -308,7 +308,7 @@ export class ResultsService {
           is_snapshot: false,
           platform_code,
           result_status_id: config.result_status_id,
-          ...this.currentUser.audit(SetAutitEnum.NEW),
+          ...this.currentUser.audit(SetAuditEnum.NEW),
         })
         .then((result) => {
           this._alianceManagementApp.linkUserToContract(
@@ -503,7 +503,7 @@ export class ResultsService {
         title: generalInformation.title,
         description: generalInformation.description,
         report_year_id: generalInformation.year,
-        ...this.currentUser.audit(SetAutitEnum.UPDATE),
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
       });
 
       const keywordsToSave = this._resultKeywordsService.transformData(
@@ -583,7 +583,7 @@ export class ResultsService {
     return generalInformation;
   }
 
-  async findResultVersions(resultCode: number) {
+  async findResultVersions(resultCode: number, platformCode: string) {
     const select = {
       result_id: true,
       result_official_code: true,
@@ -593,6 +593,7 @@ export class ResultsService {
     const where = {
       result_official_code: resultCode,
       is_active: true,
+      platform_code: platformCode,
     };
     const versions = await this.mainRepo.find({
       select,
@@ -767,7 +768,11 @@ export class ResultsService {
         result_status_id: true,
         title: true,
         result_status: {
+          result_status_id: true,
           name: true,
+          description: true,
+          config: true as any,
+          editable_roles: true,
         },
         created_by: true,
       },
@@ -802,6 +807,7 @@ export class ResultsService {
       created_by: result?.created_by,
       report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
+      result_status: result?.result_status,
     };
   }
 
@@ -1096,7 +1102,7 @@ export class ResultsService {
     this.dataSource.getRepository(TempResultAi).save({
       processed_object: tmpNewData,
       raw_object: result,
-      ...this.currentUser.audit(SetAutitEnum.BOTH),
+      ...this.currentUser.audit(SetAuditEnum.BOTH),
     });
     return tmpNewData;
   }
@@ -1115,7 +1121,7 @@ export class ResultsService {
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
         comment_geo_scope: saveGeoLocationDto?.comment_geo_scope ?? null,
-        ...this.currentUser.audit(SetAutitEnum.UPDATE),
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
       });
 
       const tempData =

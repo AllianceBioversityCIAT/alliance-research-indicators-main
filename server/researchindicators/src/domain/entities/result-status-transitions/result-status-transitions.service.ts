@@ -23,9 +23,6 @@ export class ResultStatusTransitionsService extends ControlListBaseService<
         from_status_id: fromStatusId,
         is_active: true,
       },
-      relations: {
-        to_status: true,
-      },
     });
   }
 }
