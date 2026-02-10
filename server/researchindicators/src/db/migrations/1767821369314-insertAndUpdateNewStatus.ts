@@ -1,10 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class InsertAndUpdateNewStatus1767821369314
-  implements MigrationInterface
-{
+  implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // ========== ACTUALIZACIONES DE ESTADOS EXISTENTES ==========
 
     // Draft (ID: 4)
     await queryRunner.query(
