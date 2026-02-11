@@ -48,19 +48,19 @@ export class CurrentUserUtil {
     return (this.request['user'] as User)?.roles || [];
   }
 
-  public audit(set: SetAutitEnum = SetAutitEnum.NEW): Partial<AuditableEntity> {
+  public audit(set: SetAuditEnum = SetAuditEnum.NEW): Partial<AuditableEntity> {
     switch (set) {
-      case SetAutitEnum.NEW:
+      case SetAuditEnum.NEW:
         return { created_by: this?.user_id };
-      case SetAutitEnum.UPDATE:
+      case SetAuditEnum.UPDATE:
         return { updated_by: this?.user_id };
-      case SetAutitEnum.BOTH:
+      case SetAuditEnum.BOTH:
         return { created_by: this?.user_id, updated_by: this?.user_id };
     }
   }
 }
 
-export enum SetAutitEnum {
+export enum SetAuditEnum {
   NEW,
   UPDATE,
   BOTH,

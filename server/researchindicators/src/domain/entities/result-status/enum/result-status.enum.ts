@@ -18,6 +18,7 @@ export enum ResultStatusEnum {
   SCIENCE_EDITION = 12,
   KM_CURATION = 13,
   PUBLISHED = 14,
+  COMPLETED_IN_TIP = 20,
 }
 
 export const ResultStatusNameEnum = {
@@ -35,6 +36,7 @@ export const ResultStatusNameEnum = {
   12: 'Science Edition',
   13: 'KM Curation',
   14: 'Published',
+  20: 'Completed in TIP',
 };
 
 export const getTemplateByStatus = (

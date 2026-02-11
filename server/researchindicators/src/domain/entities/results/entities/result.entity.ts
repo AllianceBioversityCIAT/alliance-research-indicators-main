@@ -172,6 +172,12 @@ export class Result extends AuditableEntity {
   })
   external_link?: string;
 
+  @Column('text', {
+    name: 'public_link',
+    nullable: true,
+  })
+  public_link?: string;
+
   @ManyToOne(
     () => ReportingPlatform,
     (reportingPlatform) => reportingPlatform.results,

@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { CreateResultActorDto } from './dto/create-result-actor.dto';
 import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
@@ -109,7 +109,7 @@ export class ResultActorsService extends BaseServiceSimple<
           sex_age_disaggregation_not_apply:
             institution?.sex_age_disaggregation_not_apply,
           actor_role_id: ActorRolesEnum.INNOVATION_DEV,
-          ...this.currentUser.audit(SetAutitEnum.UPDATE),
+          ...this.currentUser.audit(SetAuditEnum.UPDATE),
         });
       } else {
         const where = this.constructWhereClause(institution, resultId);
@@ -133,7 +133,7 @@ export class ResultActorsService extends BaseServiceSimple<
             institution?.sex_age_disaggregation_not_apply,
           ),
           actor_role_id: ActorRolesEnum.INNOVATION_DEV,
-          ...this.currentUser.audit(SetAutitEnum.NEW),
+          ...this.currentUser.audit(SetAuditEnum.NEW),
         };
 
         if (existData) {

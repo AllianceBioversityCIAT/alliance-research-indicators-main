@@ -7,7 +7,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultInnovationDev } from './entities/result-innovation-dev.entity';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { selectManager } from '../../shared/utils/orm.util';
 import { ResultActorsService } from '../result-actors/result-actors.service';
@@ -190,7 +190,7 @@ export class ResultInnovationDevService {
 
     return entityManager.save({
       result_id: resultId,
-      ...this._currentUser.audit(SetAutitEnum.NEW),
+      ...this._currentUser.audit(SetAuditEnum.NEW),
     });
   }
 
@@ -241,7 +241,7 @@ export class ResultInnovationDevService {
               expected_outcome: null,
               intended_beneficiaries_description: null,
             }),
-        ...this._currentUser.audit(SetAutitEnum.UPDATE),
+        ...this._currentUser.audit(SetAuditEnum.UPDATE),
       });
 
       const filterIds = await this._clarisaActorTypesService.validateActorTypes(
@@ -416,7 +416,7 @@ export class ResultInnovationDevService {
       results_achieved_expected:
         knowledgeSharingData?.results_achieved_expected,
       tool_useful_context: knowledgeSharingData?.tool_useful_context,
-      ...this._currentUser.audit(SetAutitEnum.UPDATE),
+      ...this._currentUser.audit(SetAuditEnum.UPDATE),
     });
   }
 

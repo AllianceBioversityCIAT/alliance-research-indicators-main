@@ -87,3 +87,18 @@ export interface ValidationResult {
   isValid: boolean;
   invalidFields: string[];
 }
+
+export const cleanText = (text: string) => {
+  return text?.toLowerCase()?.trim();
+};
+
+export const cleanName = (name: string) => {
+  const names = name?.split(' ');
+  return names
+    ?.map((name) => {
+      const cleanName = cleanText(name);
+      const cleanFirstLetter = cleanName?.charAt(0)?.toUpperCase();
+      return cleanFirstLetter + cleanName?.slice(1);
+    })
+    ?.join(' ');
+};

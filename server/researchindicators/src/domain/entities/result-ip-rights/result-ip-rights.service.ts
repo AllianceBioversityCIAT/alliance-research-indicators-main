@@ -5,7 +5,7 @@ import { ResultIpRight } from './entities/result-ip-right.entity';
 import { selectManager } from '../../shared/utils/orm.util';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { ResultsUtil } from '../../shared/utils/results.util';
@@ -32,7 +32,7 @@ export class ResultIpRightsService {
 
     const response = await entityManager.save({
       result_ip_rights_id: resultId,
-      ...this.currentUser.audit(SetAutitEnum.NEW),
+      ...this.currentUser.audit(SetAuditEnum.NEW),
     });
 
     return response;
@@ -52,7 +52,7 @@ export class ResultIpRightsService {
       potential_asset_description: updateData.potential_asset_description,
       private_sector_engagement_id: null,
       formal_ip_rights_application_id: null,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
     };
 
     if (

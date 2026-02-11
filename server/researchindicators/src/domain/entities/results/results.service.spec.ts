@@ -31,7 +31,7 @@ import { AgressoContractService } from '../agresso-contract/agresso-contract.ser
 import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { CreateResultDto } from './dto/create-result.dto';
-import { SetAutitEnum } from '../../shared/utils/current-user.util';
+import { SetAuditEnum } from '../../shared/utils/current-user.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ContractRolesEnum } from '../result-contracts/enum/contract-roles.enum';
@@ -1468,7 +1468,7 @@ describe('ResultsService', () => {
         title: updateGeneralInfoDto.title,
         description: updateGeneralInfoDto.description,
         report_year_id: updateGeneralInfoDto.year,
-        ...mockCurrentUser.audit(SetAutitEnum.UPDATE),
+        ...mockCurrentUser.audit(SetAuditEnum.UPDATE),
       });
 
       expect(mockResultKeywordsService.transformData).toHaveBeenCalledWith(
@@ -1902,6 +1902,7 @@ describe('ResultsService', () => {
     it('should return result versions for a valid result code', async () => {
       // Arrange
       const resultCode = 12345;
+      const platformCode = 'STAR';
       const mockVersions = [
         { result_id: 1, title: 'Version 1', version: 1 },
         { result_id: 2, title: 'Version 2', version: 2 },
@@ -1913,7 +1914,7 @@ describe('ResultsService', () => {
         .mockResolvedValueOnce(mockLive as any); // Second call for live
 
       // Act
-      const result = await service.findResultVersions(resultCode);
+      const result = await service.findResultVersions(resultCode, platformCode);
 
       // Assert
       expect(result).toEqual({
@@ -1926,12 +1927,13 @@ describe('ResultsService', () => {
     it('should return empty arrays when no versions found', async () => {
       // Arrange
       const resultCode = 99999;
+      const platformCode = 'STAR';
       mockMainRepo.find
         .mockResolvedValueOnce([]) // First call for versions
         .mockResolvedValueOnce([]); // Second call for live
 
       // Act
-      const result = await service.findResultVersions(resultCode);
+      const result = await service.findResultVersions(resultCode, platformCode);
 
       // Assert
       expect(result).toEqual({
@@ -2047,6 +2049,7 @@ describe('ResultsService', () => {
         report_year: mockResult.report_year_id,
         is_principal_investigator: mockPrincipalData.is_principal === 1,
         result_contract_id: mockPrimaryContract.contract_id,
+        result_status: mockResult.result_status,
       });
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         select: {
@@ -2061,6 +2064,10 @@ describe('ResultsService', () => {
           title: true,
           result_status: {
             name: true,
+            description: true,
+            config: true as any,
+            editable_roles: true,
+            result_status_id: true,
           },
           created_by: true,
         },

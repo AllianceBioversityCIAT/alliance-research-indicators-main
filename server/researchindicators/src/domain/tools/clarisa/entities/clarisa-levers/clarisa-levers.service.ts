@@ -34,7 +34,7 @@ export class ClarisaLeversService extends ControlListBaseService<
     });
   }
 
-  homologatedData(data: string) {
+  homologatedData(data: string): string {
     const homologated = {
       L8: 'Lever 8',
       L7: 'Lever 7',

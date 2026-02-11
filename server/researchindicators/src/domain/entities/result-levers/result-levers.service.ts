@@ -6,7 +6,7 @@ import { selectManager } from '../../shared/utils/orm.util';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { updateArray } from '../../shared/utils/array.util';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
@@ -33,7 +33,7 @@ export class ResultLeversService extends BaseServiceSimple<
 
     const response = await entityManager.update(
       { result_id: result_id },
-      { is_active: false, ...this.currentUser.audit(SetAutitEnum.UPDATE) },
+      { is_active: false, ...this.currentUser.audit(SetAuditEnum.UPDATE) },
     );
 
     return response;

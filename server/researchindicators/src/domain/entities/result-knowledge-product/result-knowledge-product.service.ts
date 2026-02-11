@@ -4,7 +4,7 @@ import { ResultKnowledgeProduct } from './entities/result-knowledge-product.enti
 import { selectManager } from '../../shared/utils/orm.util';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 
 @Injectable()
@@ -26,7 +26,7 @@ export class ResultKnowledgeProductService {
 
     return entityManager.save({
       result_id: resultId,
-      ...this._currentUser.audit(SetAutitEnum.NEW),
+      ...this._currentUser.audit(SetAuditEnum.NEW),
     });
   }
 
@@ -36,8 +36,14 @@ export class ResultKnowledgeProductService {
       citation: data.citation,
       publication_date: data.publication_date,
       type: data.type,
-      ...this._currentUser.audit(SetAutitEnum.UPDATE),
+      ...this._currentUser.audit(SetAuditEnum.UPDATE),
     });
     return this.mainRepo.findOne({ where: { result_id: resultId } });
+  }
+
+  async activeKpByResultId(resultId: number) {
+    await this.mainRepo.update(resultId, {
+      is_active: true,
+    });
   }
 }

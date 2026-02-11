@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ResultStatus } from '../../result-status/entities/result-status.entity';
 
 export class MetadataResultDto {
   @ApiProperty({
@@ -77,4 +78,11 @@ export class MetadataResultDto {
     required: false,
   })
   result_contract_id: string;
+
+  @ApiProperty({
+    type: ResultStatus,
+    description: 'The result status',
+    required: false,
+  })
+  result_status: ResultStatus;
 }
