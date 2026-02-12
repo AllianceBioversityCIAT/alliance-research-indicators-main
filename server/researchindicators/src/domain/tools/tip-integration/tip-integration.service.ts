@@ -152,37 +152,43 @@ export class TipIntegrationService extends BaseApi {
         indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
         contract_id: projectId,
       };
-
+      let allianceUserStaff: AllianceUserStaff = null;
       if (!isEmpty(result?.submitter)) {
         const existsUser = await this.resultRepository.findUserByEmailOrCarnet(
           result.submitter?.idCard,
           result.submitter?.email,
         );
 
-        const allianceUserStaff = await this.dataSource
+        allianceUserStaff = await this.dataSource
           .getRepository(AllianceUserStaff)
           .findOne({
             where: {
               carnet: result.submitter?.idCard,
             },
           });
-        if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
-          resultMapped.userData =
-            await this.createUserProcess(allianceUserStaff);
-        } else {
-          await this.resultRepository.unpdateCarnetUser(
-            existsUser?.sec_user_id,
-            existsUser?.carnet,
-          );
-          resultMapped.userData = existsUser;
-          if (!isEmpty(existsUser)) {
-            resultMapped.userData.carnet = result.submitter?.idCard;
+        if (!isEmpty(allianceUserStaff)) {
+          if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
+            resultMapped.userData =
+              await this.createUserProcess(allianceUserStaff);
+          } else {
+            await this.resultRepository.unpdateCarnetUser(
+              existsUser?.sec_user_id,
+              existsUser?.carnet,
+            );
+            resultMapped.userData = existsUser;
+            if (!isEmpty(existsUser)) {
+              resultMapped.userData.carnet = result.submitter?.idCard;
+            }
           }
         }
       }
 
-      const carnet =
-        resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
+      let carnet = null;
+      if (!isEmpty(allianceUserStaff)) {
+        carnet = resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
+      } else {
+        this.logger.warn(`User ${result?.submitter?.idCard} not found in Alliance User Staff`);
+      }
 
       resultMapped.generalInformation = {
         title: result.name,
@@ -190,8 +196,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-              user_id: carnet,
-            } as ResultUser)
+            user_id: carnet,
+          } as ResultUser)
           : null,
       };
 
