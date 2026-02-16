@@ -27,7 +27,7 @@ import {
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
 export class TipIntegrationController {
-  constructor(private readonly tipIntegrationService: TipIntegrationService) {}
+  constructor(private readonly tipIntegrationService: TipIntegrationService) { }
 
   @MessagePattern('tip.get-ipr-data')
   async handleGetIprData(): Promise<TipIprDataDto[]> {
@@ -74,9 +74,9 @@ export class TipIntegrationController {
     type: Number,
   })
   @ApiOperation({ summary: 'Sync IPR data with TIP' })
-  async syncIprData(@Query('year') year?: number) {
+  async syncIprData(@Query('year') year?: string) {
     return this.tipIntegrationService
-      .getKnowledgeProductsByYear(year)
+      .getKnowledgeProductsByYear(Number(year))
       .then((data) =>
         ResponseUtils.format({
           description: 'IPR data synced successfully',
