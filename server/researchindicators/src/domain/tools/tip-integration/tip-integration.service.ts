@@ -93,7 +93,6 @@ export class TipIntegrationService extends BaseApi {
   }
 
   async getKnowledgeProductsByYear(year: number) {
-    console.log(typeof year, year);
     if (isEmpty(year) || ![2025, 2026].includes(year)) {
       throw new BadRequestException('Only year 2025 and 2026 are supported');
     }
