@@ -27,7 +27,7 @@ import {
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
 export class TipIntegrationController {
-  constructor(private readonly tipIntegrationService: TipIntegrationService) { }
+  constructor(private readonly tipIntegrationService: TipIntegrationService) {}
 
   @MessagePattern('tip.get-ipr-data')
   async handleGetIprData(): Promise<TipIprDataDto[]> {
