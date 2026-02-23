@@ -93,7 +93,6 @@ export class TipIntegrationService extends BaseApi {
   }
 
   async getKnowledgeProductsByYear(year: number) {
-    console.log(typeof year, year);
     if (isEmpty(year) || ![2025, 2026].includes(year)) {
       throw new BadRequestException('Only year 2025 and 2026 are supported');
     }
@@ -188,7 +187,9 @@ export class TipIntegrationService extends BaseApi {
       if (!isEmpty(allianceUserStaff)) {
         carnet = resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
       } else {
-        this.logger.warn(`User ${result?.submitter?.idCard} not found in Alliance User Staff`);
+        this.logger.warn(
+          `User ${result?.submitter?.idCard} not found in Alliance User Staff`,
+        );
       }
 
       resultMapped.generalInformation = {
@@ -197,8 +198,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-            user_id: carnet,
-          } as ResultUser)
+              user_id: carnet,
+            } as ResultUser)
           : null,
       };
 
