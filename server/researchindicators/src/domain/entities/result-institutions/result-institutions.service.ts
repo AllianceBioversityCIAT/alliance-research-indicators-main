@@ -1,12 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ResultInstitution } from './entities/result-institution.entity';
-import {
-  DataSource,
-  EntityManager,
-  FindOptionsWhere,
-  In,
-  Repository,
-} from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { CreateResultInstitutionDto } from './dto/create-result-institution.dto';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
@@ -14,7 +8,6 @@ import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { isEmpty } from '../../shared/utils/object.utils';
 import { SessionFormatEnum } from '../session-formats/enums/session-format.enum';
-import { ResultCapacitySharing } from '../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { Result } from '../results/entities/result.entity';
 import { AiRawInstitution } from '../results/dto/result-ai.dto';
 import { ResultInstitutionAi } from './entities/result-institution-ai.entity';
@@ -177,24 +170,9 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     resultId: number,
     institution_role_id?: InstitutionRolesEnum,
   ): Promise<CreateResultInstitutionDto> {
-    const where: FindOptionsWhere<ResultInstitution> = {};
-
-    if (
-      institution_role_id &&
-      institution_role_id == InstitutionRolesEnum.PARTNERS
-    ) {
-      where.institution_role_id = In([
-        InstitutionRolesEnum.PARTNERS,
-        InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE,
-        InstitutionRolesEnum.TRAINEE_AFFILIATION,
-      ]);
-    } else if (institution_role_id) {
-      where.institution_role_id = institution_role_id;
-    }
-
-    let institutio = await this.mainRepo.find({
+    const institutio = await this.mainRepo.find({
       where: {
-        ...where,
+        institution_role_id: institution_role_id,
         result_id: resultId,
         is_active: true,
       },
@@ -204,25 +182,6 @@ export class ResultInstitutionsService extends BaseServiceSimple<
         },
       },
     });
-
-    if (
-      institution_role_id &&
-      institution_role_id == InstitutionRolesEnum.PARTNERS
-    ) {
-      const capSharingType: SessionFormatEnum = await this.dataSource
-        .getRepository(ResultCapacitySharing)
-        .findOne({
-          where: {
-            result_id: resultId,
-            is_active: true,
-          },
-          select: {
-            session_format_id: true,
-          },
-        })
-        .then((result) => result?.session_format_id ?? null);
-      institutio = this.filterInstitutions(institutio, capSharingType);
-    }
 
     let is_partner_not_applicable = undefined;
     if (institution_role_id === InstitutionRolesEnum.PARTNERS) {

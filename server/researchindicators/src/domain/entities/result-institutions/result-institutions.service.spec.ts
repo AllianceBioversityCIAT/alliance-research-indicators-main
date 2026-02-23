@@ -177,7 +177,7 @@ describe('ResultInstitutionsService', () => {
       });
     });
 
-    it('should find all institutions for a result with PARTNERS role and filter them', async () => {
+    it('should find all institutions for a result with PARTNERS role', async () => {
       const resultId = 1;
       const mockInstitutions = [
         {
@@ -188,43 +188,30 @@ describe('ResultInstitutionsService', () => {
           is_active: true,
         } as ResultInstitution,
       ];
-      const mockCapacitySharing = {
-        session_format_id: SessionFormatEnum.GROUP,
-      };
 
       mockRepository.find.mockResolvedValue(mockInstitutions);
-
-      // Mock the capacity sharing repository call
-      const mockCapacitySharingRepo = {
-        ...mockRepository,
-        findOne: jest.fn().mockResolvedValue(mockCapacitySharing),
-      };
-      mockDataSource.getRepository.mockImplementation((entity) => {
-        if (entity === ResultCapacitySharing) {
-          return mockCapacitySharingRepo;
-        }
-        return mockRepository;
-      });
-
-      // Mock the filterInstitutions method
-      const filterInstitutionsSpy = jest.spyOn(
-        service as any,
-        'filterInstitutions',
-      );
-      filterInstitutionsSpy.mockReturnValue(mockInstitutions);
 
       const result = await service.findAll(
         resultId,
         InstitutionRolesEnum.PARTNERS,
       );
 
+      expect(mockRepository.find).toHaveBeenCalledWith({
+        where: {
+          institution_role_id: InstitutionRolesEnum.PARTNERS,
+          result_id: resultId,
+          is_active: true,
+        },
+        relations: {
+          institution: {
+            institution_type: true,
+          },
+        },
+      });
       expect(result).toEqual({
         institutions: mockInstitutions,
+        is_partner_not_applicable: undefined,
       });
-      expect(filterInstitutionsSpy).toHaveBeenCalledWith(
-        mockInstitutions,
-        SessionFormatEnum.GROUP,
-      );
     });
 
     it('should query and return is_partner_not_applicable when role is PARTNERS', async () => {
