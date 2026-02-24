@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { SelfApp } from '../broker/self.app';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 
@@ -14,7 +14,7 @@ export class TipCron {
     this.logger._verbose('TipCron initialized');
   }
 
-  @Cron(CronExpression.EVERY_WEEKEND)
+  @Cron('0 0 * * 0') // Every Sunday at midnight
   cloneNormalEntities(): void {
     this._selfApp.executeTipCloneKnowledgeProducts(TIP_SYNC_YEARS);
   }
