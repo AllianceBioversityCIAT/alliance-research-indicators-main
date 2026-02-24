@@ -14,7 +14,7 @@ export class TipCron {
     this.logger._verbose('TipCron initialized');
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_WEEKEND)
   cloneNormalEntities(): void {
     this._selfApp.executeTipCloneKnowledgeProducts(TIP_SYNC_YEARS);
   }
