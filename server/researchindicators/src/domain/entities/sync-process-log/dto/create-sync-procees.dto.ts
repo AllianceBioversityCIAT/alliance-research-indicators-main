@@ -28,6 +28,7 @@ export class CreateSyncProcessDto {
       total_records: entity?.totalRecords ?? 0,
       success_records: entity?.successRecords ?? 0,
       error_records: entity?.errorRecords ?? 0,
+      process_status: SyncProcessStatusEnum[entity.processStatus],
       ...currentUser.audit(SetAuditEnum.BOTH),
     };
   }
@@ -53,6 +54,14 @@ export class CreateSyncProcessDto {
       error_records: incrementCounter(
         syncProcessLog.error_records,
         entity?.errorRecords,
+      ),
+      total_records: incrementCounter(
+        syncProcessLog.total_records,
+        entity?.createdRecords + entity?.updatedRecords + entity?.errorRecords,
+      ),
+      success_records: incrementCounter(
+        syncProcessLog.success_records,
+        entity?.createdRecords + entity?.updatedRecords,
       ),
       ...currentUser.audit(SetAuditEnum.UPDATE),
     };

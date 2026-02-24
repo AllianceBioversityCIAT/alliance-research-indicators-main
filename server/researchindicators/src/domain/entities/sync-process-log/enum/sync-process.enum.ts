@@ -5,4 +5,5 @@ export enum SyncProcessEnum {
 export enum SyncProcessStatusEnum {
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
 }
