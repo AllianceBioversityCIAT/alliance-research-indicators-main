@@ -18,10 +18,10 @@ import { SyncProcessLogModule } from '../../entities/sync-process-log/sync-proce
     ClarisaCountriesModule,
     ClarisaLeversModule,
     ResultKnowledgeProductModule,
-    SyncProcessLogModule
+    SyncProcessLogModule,
   ],
   controllers: [TipIntegrationController],
   providers: [TipIntegrationService, TipIntegrationRepository],
   exports: [TipIntegrationRepository, TipIntegrationService],
 })
-export class TipIntegrationModule { }
+export class TipIntegrationModule {}

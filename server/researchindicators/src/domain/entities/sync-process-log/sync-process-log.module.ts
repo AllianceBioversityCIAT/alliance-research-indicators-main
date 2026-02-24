@@ -7,4 +7,4 @@ import { SyncProcessLogController } from './sync-process-log.controller';
   providers: [SyncProcessLogService],
   exports: [SyncProcessLogService],
 })
-export class SyncProcessLogModule { }
+export class SyncProcessLogModule {}

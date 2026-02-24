@@ -83,7 +83,7 @@ export class CounterResults {
     this.updatedRecords = 0;
     this.errorRecords = 0;
   }
-};
+}
 
 export enum CounterResultsEnum {
   CREATED = 'createdRecords',

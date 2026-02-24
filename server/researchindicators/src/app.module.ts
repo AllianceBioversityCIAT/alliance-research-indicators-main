@@ -45,7 +45,7 @@ import { CronModule } from './domain/tools/cron-jobs/cron.module';
     TipIntegrationModule,
     DynamoFeedbackModule,
     AdminModule,
-    CronModule
+    CronModule,
   ],
   controllers: [AppController],
   providers: [

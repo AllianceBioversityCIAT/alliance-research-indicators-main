@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { TipIntegrationModule } from '../tip-integration/tip-integration.module';
+import { GlobalUtilsModule } from '../../shared/utils/global-utils.module';
+import { SelfApp } from '../broker/self.app';
 import { TipCron } from './tip.cron';
 
 @Module({
   imports: [
-    TipIntegrationModule,
+    GlobalUtilsModule,
     ScheduleModule.forRoot({
       cronJobs: true,
     }),
   ],
-  providers: [TipCron],
+  providers: [SelfApp, TipCron],
 })
-export class CronModule { }
+export class CronModule {}

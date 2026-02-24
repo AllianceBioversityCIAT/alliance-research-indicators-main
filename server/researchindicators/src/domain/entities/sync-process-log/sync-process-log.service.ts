@@ -10,7 +10,10 @@ import {
   CurrentUserUtil,
   SetAuditEnum,
 } from '../../shared/utils/current-user.util';
-import { SyncProcessEnum, SyncProcessStatusEnum } from './enum/sync-process.enum';
+import {
+  SyncProcessEnum,
+  SyncProcessStatusEnum,
+} from './enum/sync-process.enum';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 
 @Injectable()
@@ -88,7 +91,9 @@ export class SyncProcessLogService {
         throw new BadRequestException(`Error updating sync process log`);
       });
     const syncProcessLogEnded = await this.mainRepo.findOne({ where: { id } });
-    this.logger.debug(`Sync process log ended:\n created: ${syncProcessLogEnded.created_records}\n updated: ${syncProcessLogEnded.updated_records}\n error: ${syncProcessLogEnded.error_records}\n total: ${syncProcessLogEnded.total_records}\n success: ${syncProcessLogEnded.success_records}`);
+    this.logger.debug(
+      `Sync process log ended:\n created: ${syncProcessLogEnded.created_records}\n updated: ${syncProcessLogEnded.updated_records}\n error: ${syncProcessLogEnded.error_records}\n total: ${syncProcessLogEnded.total_records}\n success: ${syncProcessLogEnded.success_records}`,
+    );
     return syncProcessLogEnded;
   }
 }

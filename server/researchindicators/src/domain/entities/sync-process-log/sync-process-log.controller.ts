@@ -3,6 +3,5 @@ import { SyncProcessLogService } from './sync-process-log.service';
 
 @Controller('sync-process-log')
 export class SyncProcessLogController {
-  constructor(private readonly syncProcessLogService: SyncProcessLogService) { }
-
+  constructor(private readonly syncProcessLogService: SyncProcessLogService) {}
 }
