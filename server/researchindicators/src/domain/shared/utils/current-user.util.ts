@@ -24,28 +24,28 @@ export class CurrentUserUtil {
     if (this.systemUser || this.forceSystemUser) {
       return this.systemUser;
     }
-    return this.request['user'];
+    return this.request?.['user'];
   }
 
   get user_id(): number {
     if (this.systemUser || this.forceSystemUser) {
       return this.systemUser?.sec_user_id;
     }
-    return (this.request['user'] as User)?.sec_user_id;
+    return (this.request?.['user'] as User)?.sec_user_id;
   }
 
   get email(): string {
     if (this.systemUser || this.forceSystemUser) {
       return this.systemUser?.email;
     }
-    return (this.request['user'] as User)?.email;
+    return (this.request?.['user'] as User)?.email;
   }
 
   get roles(): number[] {
     if (this.systemUser || this.forceSystemUser) {
       return this.systemUser?.roles;
     }
-    return (this.request['user'] as User)?.roles || [];
+    return (this.request?.['user'] as User)?.roles || [];
   }
 
   public audit(set: SetAuditEnum = SetAuditEnum.NEW): Partial<AuditableEntity> {

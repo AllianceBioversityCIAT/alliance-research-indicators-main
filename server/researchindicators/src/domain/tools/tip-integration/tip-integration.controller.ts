@@ -34,6 +34,18 @@ export class TipIntegrationController {
     return this.tipIntegrationService.getAllIprData();
   }
 
+  @MessagePattern('tip-clone-knowledge-products')
+  async handleTipCloneKnowledgeProducts(
+    payload: { years?: number[] } | string,
+  ): Promise<{ description: string; status: number }> {
+    const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+    const years = data?.years ?? [2025, 2026];
+    for (const year of years) {
+      await this.tipIntegrationService.getKnowledgeProductsByYear(year);
+    }
+    return { description: 'TIP clone knowledge products started', status: 200 };
+  }
+
   @ApiOperation({ summary: 'Get all IPR data for TIP integration' })
   @ApiQuery({
     name: 'year',

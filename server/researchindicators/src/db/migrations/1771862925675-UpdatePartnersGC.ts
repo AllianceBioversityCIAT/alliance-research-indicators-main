@@ -1,10 +1,9 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class UpdatePartnersGC1771862925675 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP FUNCTION IF EXISTS \`partners_validation\`;`);
-        await queryRunner.query(`CREATE FUNCTION \`partners_validation\`(result_code BIGINT) RETURNS tinyint(1)
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP FUNCTION IF EXISTS \`partners_validation\`;`);
+    await queryRunner.query(`CREATE FUNCTION \`partners_validation\`(result_code BIGINT) RETURNS tinyint(1)
     READS SQL DATA
 begin
             declare temp_institution boolean default null;
@@ -36,11 +35,11 @@ begin
             return temp_institution;
             
         end`);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP FUNCTION IF EXISTS \`partners_validation\`;`);
-        await queryRunner.query(`CREATE FUNCTION \`partners_validation\`(result_code BIGINT) RETURNS tinyint(1)
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP FUNCTION IF EXISTS \`partners_validation\`;`);
+    await queryRunner.query(`CREATE FUNCTION \`partners_validation\`(result_code BIGINT) RETURNS tinyint(1)
     READS SQL DATA
 begin
             declare temp_institution boolean default null;
@@ -72,6 +71,5 @@ begin
             return temp_institution;
             
         end`);
-    }
-
+  }
 }

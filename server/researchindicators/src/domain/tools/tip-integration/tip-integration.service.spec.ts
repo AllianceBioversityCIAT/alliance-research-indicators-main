@@ -13,6 +13,7 @@ import { ResultKnowledgeProductService } from '../../entities/result-knowledge-p
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import * as mapperModule from './mapper/tip-integration.mapper';
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
+import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
 
 describe('TipIntegrationService', () => {
   let service: TipIntegrationService;
@@ -41,6 +42,14 @@ describe('TipIntegrationService', () => {
           },
         },
         { provide: TipIntegrationRepository, useValue: {} },
+        {
+          provide: SyncProcessLogService,
+          useValue: {
+            initiateSync: jest.fn().mockResolvedValue({ id: 1 }),
+            update: jest.fn().mockResolvedValue(undefined),
+            endSync: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

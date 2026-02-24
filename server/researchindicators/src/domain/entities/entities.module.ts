@@ -90,6 +90,7 @@ import { ResultStatusTransitionsModule } from './result-status-transitions/resul
 import { PooledFundingContractsModule } from './pooled-funding-contracts/pooled-funding-contracts.module';
 import { ResultKnowledgeProductModule } from './result-knowledge-product/result-knowledge-product.module';
 import { ResultStatusWorkflowModule } from './result-status-workflow/result-status-workflow.module';
+import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module';
 
 @Module({
   imports: [
@@ -184,6 +185,7 @@ import { ResultStatusWorkflowModule } from './result-status-workflow/result-stat
     PooledFundingContractsModule,
     ResultKnowledgeProductModule,
     ResultStatusWorkflowModule,
+    SyncProcessLogModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
