@@ -1,13 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { TipIntegrationService } from '../tip-integration/tip-integration.service';
+import { Cron } from '@nestjs/schedule';
+import { SelfApp } from '../broker/self.app';
+import { LoggerUtil } from '../../shared/utils/logger.util';
+
+const TIP_SYNC_YEARS = [2025, 2026];
 
 @Injectable()
 export class TipCron {
-  constructor(private readonly _tipIntegrationService: TipIntegrationService) {}
+  private readonly logger: LoggerUtil = new LoggerUtil({
+    name: TipCron.name,
+  });
+  constructor(private readonly _selfApp: SelfApp) {
+    this.logger._verbose('TipCron initialized');
+  }
 
-  @Cron(CronExpression.EVERY_WEEKEND)
-  async cloneNormalEntities() {
-    this._tipIntegrationService.getKnowledgeProductsByYear(2025);
+  @Cron('0 0 * * 0') // Every Sunday at midnight
+  cloneNormalEntities(): void {
+    this._selfApp.executeTipCloneKnowledgeProducts(TIP_SYNC_YEARS);
   }
 }

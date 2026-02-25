@@ -12,4 +12,8 @@ export class SelfApp extends BrokerConnectionBase {
   executeCloneNormalEntities(): void {
     this.emitToPattern('clone-normal-entities', {});
   }
+
+  executeTipCloneKnowledgeProducts(years: number[]): void {
+    this.emitToPattern('tip-clone-knowledge-products', { years });
+  }
 }

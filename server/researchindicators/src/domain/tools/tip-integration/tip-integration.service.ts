@@ -8,6 +8,8 @@ import { HttpService } from '@nestjs/axios';
 import { isEmpty } from '../../shared/utils/object.utils';
 import { firstValueFrom } from 'rxjs';
 import {
+  CounterResults,
+  CounterResultsEnum,
   ResultsTipMapping,
   TipKnowledgeProductDto,
   TipKnowledgeProductsResponseDto,
@@ -43,6 +45,8 @@ import {
 } from '../../shared/utils/array.util';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
+import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
+import { SyncProcessEnum } from '../../entities/sync-process-log/enum/sync-process.enum';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -59,6 +63,7 @@ export class TipIntegrationService extends BaseApi {
     private readonly resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _currentUser: CurrentUserUtil,
     private readonly tipIntegrationRepository: TipIntegrationRepository,
+    private readonly syncProcessLogService: SyncProcessLogService,
   ) {
     super(
       httpService,
@@ -100,7 +105,11 @@ export class TipIntegrationService extends BaseApi {
     let offset = 0;
     let pendingData = true;
     const resultSaved: number[] = [];
+    const syncProcessLog = await this.syncProcessLogService.initiateSync(
+      SyncProcessEnum.TIP_INTEGRATION,
+    );
     while (pendingData) {
+      const counters: CounterResults = new CounterResults();
       const response = await firstValueFrom(
         this.getRequest<TipKnowledgeProductsResponseDto>(
           `/publications/year/${year}?limit=${limit}&offset=${offset}`,
@@ -121,14 +130,16 @@ export class TipIntegrationService extends BaseApi {
           );
         });
       const mappedData = await this.processing(response.data, year);
-      await this.createKpInStar(mappedData, resultSaved);
+      await this.createKpInStar(mappedData, resultSaved, counters);
       if (response.data_count < limit) {
         pendingData = false;
         await this.inactiveAllTipResults(resultSaved);
       } else {
         offset += limit;
       }
+      await this.syncProcessLogService.update(syncProcessLog.id, counters);
     }
+    await this.syncProcessLogService.endSync(syncProcessLog.id);
   }
 
   async processing(results: TipKnowledgeProductDto[], year: number) {
@@ -315,7 +326,17 @@ export class TipIntegrationService extends BaseApi {
     return this.resultRepository.createUserInSecUsers(newUser);
   }
 
-  async createKpInStar(results: ResultsTipMapping[], resultSaved: number[]) {
+  async createKpInStar(
+    results: ResultsTipMapping[],
+    resultSaved: number[],
+    counters: CounterResults = {
+      createdRecords: 0,
+      updatedRecords: 0,
+      errorRecords: 0,
+    },
+  ) {
+    let typeCounter: CounterResultsEnum = null;
+
     for (const result of results) {
       this.logger.debug(`Processing result ${result.official_code} from TIP.`);
       this._currentUser.setSystemUser(result.userData, true);
@@ -345,6 +366,7 @@ export class TipIntegrationService extends BaseApi {
           this.logger.debug(
             `Creating new result ${findResult.result_official_code} from TIP.`,
           );
+          typeCounter = CounterResultsEnum.CREATED;
         } else {
           await this.resultKnowledgeProductService.activeKpByResultId(
             findResult.result_id,
@@ -352,6 +374,7 @@ export class TipIntegrationService extends BaseApi {
           this.logger.debug(
             `Updating result ${findResult.result_official_code} from TIP.`,
           );
+          typeCounter = CounterResultsEnum.UPDATED;
         }
         await this.dataSource
           .getRepository(Result)
@@ -412,7 +435,9 @@ export class TipIntegrationService extends BaseApi {
           );
         }
         this.logger.error(`Error processing tip result: ${error.message}`);
+        typeCounter = CounterResultsEnum.ERROR;
       }
+      counters[typeCounter]++;
       this._currentUser.clearSystemUser();
       this.logger.debug(
         `Finished processing result ${result.official_code} from TIP.`,
