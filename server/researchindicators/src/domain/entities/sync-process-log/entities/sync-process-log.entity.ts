@@ -16,6 +16,7 @@ export class SyncProcessLog extends AuditableEntity {
   @Column({
     name: 'process_status',
     type: 'text',
+    nullable: true,
   })
   process_status!: SyncProcessStatusEnum;
 

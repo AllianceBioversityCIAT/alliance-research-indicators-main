@@ -113,4 +113,39 @@ export class GreenChecksController {
         }),
       );
   }
+
+  @Patch(
+    `change/status/date/${RESULT_CODE}/submission-history/:submissionHistoryId([0-9]+)`,
+  )
+  @ApiParam({
+    name: 'submissionHistoryId',
+    type: Number,
+    required: true,
+    description: 'The ID of the submission history',
+  })
+  @ApiQuery({
+    name: 'newDate',
+    type: Date,
+    required: true,
+    description: 'The new date',
+  })
+  @GetResultVersion(ParamOrQueryEnum.PARAM)
+  async changeStatusDate(
+    @Param('submissionHistoryId') submissionHistoryId: string,
+    @Query('newDate') newDate: string,
+  ) {
+    return this.greenChecksService
+      .updateChageStatusDate(
+        this._resultsUtil.resultId,
+        +submissionHistoryId,
+        new Date(newDate),
+      )
+      .then((result) =>
+        ResponseUtils.format({
+          data: result,
+          description: 'Status date changed',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 }
