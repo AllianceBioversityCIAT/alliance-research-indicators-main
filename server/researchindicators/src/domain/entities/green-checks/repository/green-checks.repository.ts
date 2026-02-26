@@ -17,7 +17,7 @@ export class GreenCheckRepository {
   constructor(
     private dataSource: DataSource,
     private readonly appConfig: AppConfig,
-  ) {}
+  ) { }
 
   generalInformationValidation(result_key: string) {
     return `general_information_validation(${result_key}) as general_information`;
@@ -131,6 +131,7 @@ export class GreenCheckRepository {
           sh.created_by,
           sh.created_at,
           sh.updated_at,
+          sh.custom_date,
           JSON_OBJECT(
           	'result_id',r.result_id,
           	'result_official_code', r.result_official_code,
