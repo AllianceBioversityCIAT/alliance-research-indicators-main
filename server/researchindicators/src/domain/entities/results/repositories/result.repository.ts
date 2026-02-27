@@ -16,7 +16,8 @@ import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-u
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
-  implements ElasticFindEntity<ResultOpensearchDto> {
+  implements ElasticFindEntity<ResultOpensearchDto>
+{
   constructor(
     private readonly appConfig: AppConfig,
     private readonly currentUserUtil: CurrentUserUtil,
@@ -207,10 +208,11 @@ export class ResultRepository
 											  'start_date', ac.start_date,
 											  'deleted_at', ac.deleted_at))`;
 
-      queryParts.contracts.select = `,${filters?.primary_contract
+      queryParts.contracts.select = `,${
+        filters?.primary_contract
           ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
           : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
-        } as result_contracts`;
+      } as result_contracts`;
 
       if (filters?.primary_contract) {
         queryParts.contracts.groupBy = `,rc.result_contract_id`;
