@@ -7,7 +7,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultInnovationDev } from './entities/result-innovation-dev.entity';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { selectManager } from '../../shared/utils/orm.util';
 import { ResultActorsService } from '../result-actors/result-actors.service';
@@ -95,10 +95,10 @@ export class ResultInnovationDevService {
         actor_type_id: actorTypeCode,
         actor_role_id: ActorRolesEnum.INNOVATION_DEV,
         actor_type_custom_name: isOther ? actor.other_actor_type : null,
-        men_not_youth: actor.gender_age.includes('Men: Non-youth'),
-        men_youth: actor.gender_age.includes('Men: Youth'),
-        women_not_youth: actor.gender_age.includes('Women: Non-youth'),
-        women_youth: actor.gender_age.includes('Women: Youth'),
+        men_not_youth: actor.gender_age?.includes('Men: Non-youth'),
+        men_youth: actor.gender_age?.includes('Men: Youth'),
+        women_not_youth: actor.gender_age?.includes('Women: Non-youth'),
+        women_youth: actor.gender_age?.includes('Women: Youth'),
       });
     }
     innovationDev.actors = newActors as CreateResultActorDto[];
@@ -128,8 +128,8 @@ export class ResultInnovationDevService {
     );
     const clarisaInstitutionsType = preProcessedTypes.length
       ? await this._clarisaInstitutionTypesService.findByLikeNames(
-          preProcessedTypes,
-        )
+        preProcessedTypes,
+      )
       : [];
     const newArray: string[] = Array.isArray(result?.organization_sub_type)
       ? result?.organization_sub_type
@@ -141,8 +141,8 @@ export class ResultInnovationDevService {
 
     const clarisaInstitutionsSubType = preProcessedSubTypes.length
       ? await this._clarisaInstitutionTypesService.findByLikeNames(
-          preProcessedSubTypes,
-        )
+        preProcessedSubTypes,
+      )
       : [];
 
     for (const institutionsType of clarisaInstitutionsType) {
@@ -190,7 +190,7 @@ export class ResultInnovationDevService {
 
     return entityManager.save({
       result_id: resultId,
-      ...this._currentUser.audit(SetAutitEnum.NEW),
+      ...this._currentUser.audit(SetAuditEnum.NEW),
     });
   }
 
@@ -233,15 +233,15 @@ export class ResultInnovationDevService {
           createResultInnovationDevDto?.anticipated_users_id,
         ...(adddExtraData
           ? {
-              expected_outcome: createResultInnovationDevDto?.expected_outcome,
-              intended_beneficiaries_description:
-                createResultInnovationDevDto?.intended_beneficiaries_description,
-            }
+            expected_outcome: createResultInnovationDevDto?.expected_outcome,
+            intended_beneficiaries_description:
+              createResultInnovationDevDto?.intended_beneficiaries_description,
+          }
           : {
-              expected_outcome: null,
-              intended_beneficiaries_description: null,
-            }),
-        ...this._currentUser.audit(SetAutitEnum.UPDATE),
+            expected_outcome: null,
+            intended_beneficiaries_description: null,
+          }),
+        ...this._currentUser.audit(SetAuditEnum.UPDATE),
       });
 
       const filterIds = await this._clarisaActorTypesService.validateActorTypes(
@@ -251,7 +251,7 @@ export class ResultInnovationDevService {
       );
 
       const saveActors = createResultInnovationDevDto?.actors.filter(
-        (actor) => !filterIds.includes(actor.actor_type_id),
+        (actor) => !filterIds?.includes(actor.actor_type_id),
       );
 
       await this._resultActorsService.customSaveInnovationDev(
@@ -264,8 +264,8 @@ export class ResultInnovationDevService {
         resultId,
         adddExtraData
           ? createResultInnovationDevDto?.institution_types?.filter((el) =>
-              Boolean(el?.institution_type_id || el?.institution_id),
-            )
+            Boolean(el?.institution_type_id || el?.institution_id),
+          )
           : [],
         manager,
       );
@@ -416,7 +416,7 @@ export class ResultInnovationDevService {
       results_achieved_expected:
         knowledgeSharingData?.results_achieved_expected,
       tool_useful_context: knowledgeSharingData?.tool_useful_context,
-      ...this._currentUser.audit(SetAutitEnum.UPDATE),
+      ...this._currentUser.audit(SetAuditEnum.UPDATE),
     });
   }
 

@@ -10,7 +10,7 @@ import { StepOneOicrDto } from './dto/step-one-oicr.dto';
 import { ResultTagsService } from '../result-tags/result-tags.service';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { ResultUsersService } from '../result-users/result-users.service';
 import { ResultUser } from '../result-users/entities/result-user.entity';
@@ -34,7 +34,7 @@ import { ResultOicrRepository } from './repositories/result-oicr.repository';
 import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
-import { isEmpty } from '../../shared/utils/object.utils';
+import { cleanName, isEmpty } from '../../shared/utils/object.utils';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import {
@@ -58,6 +58,8 @@ import { ResultQuantificationsService } from '../result-quantifications/result-q
 import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
 import { ResultImpactAreasService } from '../result-impact-areas/result-impact-areas.service';
 import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
+import { StatusWorkflowFunctionHandlerService } from '../result-status-workflow/function-handler.service';
+import { GeneralDataDto } from '../result-status-workflow/config/config-workflow';
 
 @Injectable()
 export class ResultOicrService {
@@ -80,6 +82,7 @@ export class ResultOicrService {
     private readonly resultQuantificationsService: ResultQuantificationsService,
     private readonly resultImpactAreasService: ResultImpactAreasService,
     private readonly resultImpactAreaGlobalTargetsService: ResultImpactAreaGlobalTargetsService,
+    private readonly resultStatusWorkflowHandler: StatusWorkflowFunctionHandlerService,
   ) {}
 
   async create(resultId: number, manager: EntityManager) {
@@ -90,7 +93,7 @@ export class ResultOicrService {
     );
     return entityManager.save({
       result_id: resultId,
-      ...this.currentUser.audit(SetAutitEnum.NEW),
+      ...this.currentUser.audit(SetAuditEnum.NEW),
     });
   }
 
@@ -137,13 +140,13 @@ export class ResultOicrService {
     await this.updateOicrSteps(result.result_id, data, manager, !resultId);
 
     if (!resultId) {
-      await this.sendMessageOicr(result.result_id);
+      await this.sendMessageOicr(result.result_id, result);
     }
 
     return result;
   }
 
-  async sendMessageOicr(resultId: number) {
+  async sendMessageOicr(resultId: number, result: Result) {
     const messageData = await this.mainRepo.getDataToNewOicrMessage(resultId);
     messageData.cration_date = new Date(messageData.cration_date)
       .toLocaleDateString('en-US', {
@@ -152,19 +155,34 @@ export class ResultOicrService {
         year: 'numeric',
       })
       .toLowerCase();
-
+    const generalData: GeneralDataDto = new GeneralDataDto();
+    generalData.result = result;
+    generalData.customData.action_executor.name =
+      cleanName(this.currentUser.user.first_name) +
+      ' ' +
+      cleanName(this.currentUser.user.last_name);
+    generalData.customData.action_executor.email = this.currentUser.user.email;
+    await this.resultStatusWorkflowHandler.findCustomDataForOicr(
+      generalData,
+      null,
+    );
+    await this.resultStatusWorkflowHandler.oicrRequestConfigEmail(
+      generalData,
+      null,
+    );
     const template = await this.templateService._getTemplate(
       TemplateEnum.OICR_NOTIFICATION_CREATED,
-      messageData,
+      generalData.customData,
     );
     if (template) {
       await this.messageMicroservice.sendEmail({
-        subject: `[STAR] - New OICR Request #${messageData.result_code}`,
-        to: this.appConfig.SPRM_EMAIL_SAFE(this.currentUser.email),
+        subject: generalData.configEmail.subject,
+        to: generalData.configEmail.to,
+        cc: generalData.configEmail.cc,
         message: {
           socketFile: Buffer.from(template),
         },
-        bcc: process.env.ARI_MAPPED_BCC_SUBM_OICR,
+        bcc: this.appConfig.INTERNAL_EMAIL_LIST_ARRAY,
       });
     }
   }
@@ -193,7 +211,7 @@ export class ResultOicrService {
       sharepoint_link: isEmpty(data?.sharepoint_link?.trim())
         ? null
         : data.sharepoint_link,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
 
     const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
@@ -465,7 +483,7 @@ export class ResultOicrService {
 
     await this.mainRepo.update(resultId, {
       outcome_impact_statement: data.outcome_impact_statement,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
   }
 
@@ -579,7 +597,7 @@ export class ResultOicrService {
       sharepoint_link: isEmpty(data?.sharepoint_link?.trim())
         ? null
         : data.sharepoint_link,
-      ...this.currentUser.audit(SetAutitEnum.UPDATE),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
   }
 

@@ -8,6 +8,8 @@ import { HttpService } from '@nestjs/axios';
 import { isEmpty } from '../../shared/utils/object.utils';
 import { firstValueFrom } from 'rxjs';
 import {
+  CounterResults,
+  CounterResultsEnum,
   ResultsTipMapping,
   TipKnowledgeProductDto,
   TipKnowledgeProductsResponseDto,
@@ -42,6 +44,9 @@ import {
   mergeArraysWithPriority,
 } from '../../shared/utils/array.util';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
+import { TipIntegrationRepository } from './repository/tip-integration.repository';
+import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
+import { SyncProcessEnum } from '../../entities/sync-process-log/enum/sync-process.enum';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -57,6 +62,8 @@ export class TipIntegrationService extends BaseApi {
     private readonly dataSource: DataSource,
     private readonly resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _currentUser: CurrentUserUtil,
+    private readonly tipIntegrationRepository: TipIntegrationRepository,
+    private readonly syncProcessLogService: SyncProcessLogService,
   ) {
     super(
       httpService,
@@ -82,14 +89,27 @@ export class TipIntegrationService extends BaseApi {
     );
   }
 
+  async inactiveAllTipResults(resultCodes: number[]): Promise<void> {
+    const tipResultIds =
+      await this.tipIntegrationRepository.allTipResultId(resultCodes);
+    for (const resultId of tipResultIds) {
+      await this.tipIntegrationRepository.inactiveAllTipResults(resultId);
+    }
+  }
+
   async getKnowledgeProductsByYear(year: number) {
-    if (isEmpty(year) || year != 2025) {
-      throw new BadRequestException('Only year 2025 is supported');
+    if (isEmpty(year) || ![2025, 2026].includes(year)) {
+      throw new BadRequestException('Only year 2025 and 2026 are supported');
     }
     const limit = 50;
     let offset = 0;
     let pendingData = true;
+    const resultSaved: number[] = [];
+    const syncProcessLog = await this.syncProcessLogService.initiateSync(
+      SyncProcessEnum.TIP_INTEGRATION,
+    );
     while (pendingData) {
+      const counters: CounterResults = new CounterResults();
       const response = await firstValueFrom(
         this.getRequest<TipKnowledgeProductsResponseDto>(
           `/publications/year/${year}?limit=${limit}&offset=${offset}`,
@@ -110,13 +130,16 @@ export class TipIntegrationService extends BaseApi {
           );
         });
       const mappedData = await this.processing(response.data, year);
-      await this.createKpInStar(mappedData);
+      await this.createKpInStar(mappedData, resultSaved, counters);
       if (response.data_count < limit) {
         pendingData = false;
+        await this.inactiveAllTipResults(resultSaved);
       } else {
         offset += limit;
       }
+      await this.syncProcessLogService.update(syncProcessLog.id, counters);
     }
+    await this.syncProcessLogService.endSync(syncProcessLog.id);
   }
 
   async processing(results: TipKnowledgeProductDto[], year: number) {
@@ -140,42 +163,55 @@ export class TipIntegrationService extends BaseApi {
         indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
         contract_id: projectId,
       };
-
+      let allianceUserStaff: AllianceUserStaff = null;
       if (!isEmpty(result?.submitter)) {
         const existsUser = await this.resultRepository.findUserByEmailOrCarnet(
           result.submitter?.idCard,
           result.submitter?.email,
         );
 
-        const allianceUserStaff = await this.dataSource
+        allianceUserStaff = await this.dataSource
           .getRepository(AllianceUserStaff)
           .findOne({
             where: {
               carnet: result.submitter?.idCard,
             },
           });
-        if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
-          resultMapped.userData =
-            await this.createUserProcess(allianceUserStaff);
-        } else {
-          await this.resultRepository.unpdateCarnetUser(
-            existsUser?.sec_user_id,
-            existsUser?.carnet,
-          );
-          resultMapped.userData = existsUser;
-          if (!isEmpty(existsUser)) {
-            resultMapped.userData.carnet = result.submitter?.idCard;
+        if (!isEmpty(allianceUserStaff)) {
+          if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
+            resultMapped.userData =
+              await this.createUserProcess(allianceUserStaff);
+          } else {
+            await this.resultRepository.unpdateCarnetUser(
+              existsUser?.sec_user_id,
+              existsUser?.carnet,
+            );
+            resultMapped.userData = existsUser;
+            if (!isEmpty(existsUser)) {
+              resultMapped.userData.carnet = result.submitter?.idCard;
+            }
           }
         }
+      }
+
+      let carnet = null;
+      if (!isEmpty(allianceUserStaff)) {
+        carnet = resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
+      } else {
+        this.logger.warn(
+          `User ${result?.submitter?.idCard} not found in Alliance User Staff`,
+        );
       }
 
       resultMapped.generalInformation = {
         title: result.name,
         year: year,
         description: result.abstract,
-        main_contact_person: {
-          user_id: resultMapped.userData?.carnet,
-        } as ResultUser,
+        main_contact_person: !isEmpty(carnet)
+          ? ({
+              user_id: carnet,
+            } as ResultUser)
+          : null,
       };
 
       const primaryLever = await this.mapLevers(result.levers);
@@ -281,13 +317,30 @@ export class TipIntegrationService extends BaseApi {
     newUser.last_name = user.last_name;
     newUser.email = user.email;
     newUser.carnet = user.carnet;
+    if (isEmpty(user.email)) {
+      this.logger.warn(
+        `User ${user.carnet} has no email, skipping user creation.`,
+      );
+      return null;
+    }
     return this.resultRepository.createUserInSecUsers(newUser);
   }
 
-  async createKpInStar(results: ResultsTipMapping[]) {
+  async createKpInStar(
+    results: ResultsTipMapping[],
+    resultSaved: number[],
+    counters: CounterResults = {
+      createdRecords: 0,
+      updatedRecords: 0,
+      errorRecords: 0,
+    },
+  ) {
+    let typeCounter: CounterResultsEnum = null;
+
     for (const result of results) {
       this.logger.debug(`Processing result ${result.official_code} from TIP.`);
       this._currentUser.setSystemUser(result.userData, true);
+      resultSaved.push(result.official_code);
       let createNewResult: Result = null;
       try {
         let findResult = await this.dataSource.getRepository(Result).findOne({
@@ -304,7 +357,7 @@ export class TipIntegrationService extends BaseApi {
             ReportingPlatformEnum.TIP,
             {
               notContract: true,
-              result_status_id: ResultStatusEnum.APPROVED,
+              result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
               validateTitle: false,
             },
             result.official_code,
@@ -313,10 +366,15 @@ export class TipIntegrationService extends BaseApi {
           this.logger.debug(
             `Creating new result ${findResult.result_official_code} from TIP.`,
           );
+          typeCounter = CounterResultsEnum.CREATED;
         } else {
+          await this.resultKnowledgeProductService.activeKpByResultId(
+            findResult.result_id,
+          );
           this.logger.debug(
             `Updating result ${findResult.result_official_code} from TIP.`,
           );
+          typeCounter = CounterResultsEnum.UPDATED;
         }
         await this.dataSource
           .getRepository(Result)
@@ -377,7 +435,9 @@ export class TipIntegrationService extends BaseApi {
           );
         }
         this.logger.error(`Error processing tip result: ${error.message}`);
+        typeCounter = CounterResultsEnum.ERROR;
       }
+      counters[typeCounter]++;
       this._currentUser.clearSystemUser();
       this.logger.debug(
         `Finished processing result ${result.official_code} from TIP.`,

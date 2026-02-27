@@ -19,3 +19,10 @@ export const cleanNumberForDB = (value: string | number) => {
   }
   return 0;
 };
+
+export const transactionManager = (
+  manager: EntityManager,
+  dataSourceManager: EntityManager,
+): EntityManager => {
+  return isEmpty(manager) ? dataSourceManager : manager;
+};

@@ -47,6 +47,7 @@ export class ResultsUtil {
           result_id: true,
           indicator_id: true,
           result_status_id: true,
+          platform_code: true,
         },
         where,
       })
@@ -66,6 +67,7 @@ export class ResultsUtil {
           result_id: true,
           indicator_id: true,
           result_status_id: true,
+          platform_code: true,
         },
         where: { result_id: resultId, is_active: true },
       })
@@ -83,6 +85,11 @@ export class ResultsUtil {
   get result(): Result {
     if (!this.currentResult) throw new BadRequestException('Result not found');
     return this.currentResult;
+  }
+
+  get platformCode(): string {
+    if (!this.currentResult) throw new BadRequestException('Result not found');
+    return this.currentResult.platform_code;
   }
 
   get resultId(): number {
@@ -123,6 +130,10 @@ export class ResultsUtil {
 
   get nullIndicatorId(): number {
     return this.currentResult?.indicator_id ?? null;
+  }
+
+  get nullPlatformCode(): string {
+    return this.currentResult?.platform_code ?? null;
   }
 }
 

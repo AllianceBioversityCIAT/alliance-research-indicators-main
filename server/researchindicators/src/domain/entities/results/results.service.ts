@@ -32,7 +32,7 @@ import { MetadataResultDto } from './dto/metadata-result.dto';
 import { ResultPolicyChangeService } from '../result-policy-change/result-policy-change.service';
 import {
   CurrentUserUtil,
-  SetAutitEnum,
+  SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
@@ -90,6 +90,7 @@ import { QueryService } from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
+import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 
 @Injectable()
 export class ResultsService {
@@ -307,7 +308,7 @@ export class ResultsService {
           is_snapshot: false,
           platform_code,
           result_status_id: config.result_status_id,
-          ...this.currentUser.audit(SetAutitEnum.NEW),
+          ...this.currentUser.audit(SetAuditEnum.NEW),
         })
         .then((result) => {
           this._alianceManagementApp.linkUserToContract(
@@ -327,7 +328,7 @@ export class ResultsService {
       const agressoContract =
         await this._agressoContractService.findOne(contract_id);
       const lever = this._clarisaLeversService.homologatedData(
-        agressoContract.departmentId,
+        agressoContract?.departmentId,
       );
       const clarisaLever = await this._clarisaLeversService.findByName(lever);
 
@@ -437,7 +438,7 @@ export class ResultsService {
       IndicatorsEnum.INNOVATION_DEV,
     ];
 
-    if (ipAvailables.includes(indicator)) {
+    if (ipAvailables?.includes(indicator)) {
       await this._resultIpRightsService.create(resultId, manager);
     }
   }
@@ -502,7 +503,7 @@ export class ResultsService {
         title: generalInformation.title,
         description: generalInformation.description,
         report_year_id: generalInformation.year,
-        ...this.currentUser.audit(SetAutitEnum.UPDATE),
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
       });
 
       const keywordsToSave = this._resultKeywordsService.transformData(
@@ -582,7 +583,7 @@ export class ResultsService {
     return generalInformation;
   }
 
-  async findResultVersions(resultCode: number) {
+  async findResultVersions(resultCode: number, platformCode: string) {
     const select = {
       result_id: true,
       result_official_code: true,
@@ -592,6 +593,7 @@ export class ResultsService {
     const where = {
       result_official_code: resultCode,
       is_active: true,
+      platform_code: platformCode,
     };
     const versions = await this.mainRepo.find({
       select,
@@ -766,7 +768,11 @@ export class ResultsService {
         result_status_id: true,
         title: true,
         result_status: {
+          result_status_id: true,
           name: true,
+          description: true,
+          config: true as any,
+          editable_roles: true,
         },
         created_by: true,
       },
@@ -801,6 +807,7 @@ export class ResultsService {
       created_by: result?.created_by,
       report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
+      result_status: result?.result_status,
     };
   }
 
@@ -834,7 +841,7 @@ export class ResultsService {
     return results.map((el) => el.result_id);
   }
 
-  async formalizeResult(result: ResultRawAi) {
+  async formalizeResult(result: ResultRawAi, isbulk: boolean = false) {
     let resultExists: Result = null;
     try {
       const processedResult = await this.createResultFromAiRoar(result);
@@ -903,12 +910,18 @@ export class ResultsService {
         });
 
       this._resultsUtil.clearManually();
+
+      if (!isbulk) {
+        throw error;
+      }
+
       return {
         ...result,
         result_official_code: tempExistsResult?.result_official_code,
         platform_code: tempExistsResult?.platform_code,
         error: true,
-        message_error: error?.name || error,
+        message_error:
+          typeof error.message == 'object' ? error.name : error.message,
       };
     }
   }
@@ -919,7 +932,7 @@ export class ResultsService {
       | { error?: boolean; message_error?: string }
     )[] = [];
     for (const result of results) {
-      const newResult = await this.formalizeResult(result);
+      const newResult = await this.formalizeResult(result, true);
       resultsCreated.push(newResult);
     }
     return {
@@ -950,6 +963,21 @@ export class ResultsService {
 
   async createResultFromAiRoar(result: ResultRawAi) {
     const tmpNewData: ResultAiDto = new ResultAiDto();
+    if (result?.contract_code) {
+      const agressoContract = await this.dataSource
+        .getRepository(AgressoContract)
+        .findOne({
+          where: {
+            agreement_id: result.contract_code,
+          },
+        });
+      if (!agressoContract) {
+        throw new NotFoundException(
+          `Agresso contract ${result.contract_code} not found`,
+        );
+      }
+    }
+
     {
       const newResult: CreateResultDto = new CreateResultDto();
       newResult.title = result.title;
@@ -1021,7 +1049,7 @@ export class ResultsService {
           existingCountries.map((el) => el.isoAlpha2),
         );
         const processCountries = result.countries.filter((el) =>
-          sharedCountries.includes(el.code),
+          sharedCountries?.includes(el.code),
         );
 
         for (const country of processCountries) {
@@ -1080,7 +1108,7 @@ export class ResultsService {
     this.dataSource.getRepository(TempResultAi).save({
       processed_object: tmpNewData,
       raw_object: result,
-      ...this.currentUser.audit(SetAutitEnum.BOTH),
+      ...this.currentUser.audit(SetAuditEnum.BOTH),
     });
     return tmpNewData;
   }
@@ -1099,7 +1127,7 @@ export class ResultsService {
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         geo_scope_id: geoScopeId,
         comment_geo_scope: saveGeoLocationDto?.comment_geo_scope ?? null,
-        ...this.currentUser.audit(SetAutitEnum.UPDATE),
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
       });
 
       const tempData =

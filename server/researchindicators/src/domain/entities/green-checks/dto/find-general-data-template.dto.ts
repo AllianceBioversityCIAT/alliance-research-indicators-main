@@ -11,15 +11,33 @@ export class FindGeneralDataTemplateDto {
   indicator: string;
 }
 
-export class FindDataForSubmissionDto {
-  contributor_id: number;
-  contributor_email: string;
-  pi_name: string;
-  pi_email: string;
+export class FindGeneralCustomDataDto {
+  owner_id: number;
+  owner_first_name: string;
+  owner_last_name: string;
+  owner_email: string;
+  principal_investigator_id: number;
+  principal_investigator_first_name: string;
+  principal_investigator_last_name: string;
+  principal_investigator_email: string;
+  result_official_code: string;
   result_id: number;
-  title: string;
+  result_title: string;
   project_name: string;
   indicator: string;
+  action_executor_id: number;
+  action_executor_first_name: string;
+  action_executor_last_name: string;
+  action_executor_email: string;
+  description: string;
+  oicr_internal_code: string;
+  project_code: string;
+  created_at: string;
+  mel_regional_expert_id: number;
+  mel_regional_expert_first_name: string;
+  mel_regional_expert_last_name: string;
+  mel_regional_expert_email: string;
+  sharepoint_link: string;
 }
 
 export class SubmissionEmailTemplateDataDto {

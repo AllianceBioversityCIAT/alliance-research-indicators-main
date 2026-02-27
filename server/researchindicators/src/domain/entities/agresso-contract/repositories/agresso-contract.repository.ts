@@ -290,6 +290,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       userId
         ? `
     LEFT JOIN result_contracts rc ON rc.contract_id = ac.agreement_id AND rc.is_active = 1
+        AND rc.is_primary = TRUE
     LEFT JOIN results r ON r.result_id = rc.result_id 
         AND r.is_active = 1 
         AND r.is_snapshot = FALSE 

@@ -313,6 +313,7 @@ describe('ResultsController', () => {
 
       expect(service.findResultVersions).toHaveBeenCalledWith(
         resultsUtil.resultCode,
+        resultsUtil.platformCode,
       );
       expect(result).toEqual(expectedResponse);
     });

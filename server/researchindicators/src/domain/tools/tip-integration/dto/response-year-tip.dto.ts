@@ -72,3 +72,21 @@ export class ResultsTipMapping {
   geoScope: SaveGeoLocationDto;
   alignments: ResultAlignmentDto;
 }
+
+export class CounterResults {
+  createdRecords: number;
+  updatedRecords: number;
+  errorRecords: number;
+
+  constructor() {
+    this.createdRecords = 0;
+    this.updatedRecords = 0;
+    this.errorRecords = 0;
+  }
+}
+
+export enum CounterResultsEnum {
+  CREATED = 'createdRecords',
+  UPDATED = 'updatedRecords',
+  ERROR = 'errorRecords',
+}

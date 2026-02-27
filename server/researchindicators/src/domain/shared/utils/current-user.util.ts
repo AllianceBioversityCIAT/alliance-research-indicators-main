@@ -24,43 +24,43 @@ export class CurrentUserUtil {
     if (this.systemUser || this.forceSystemUser) {
       return this.systemUser;
     }
-    return this.request['user'];
+    return this.request?.['user'];
   }
 
   get user_id(): number {
     if (this.systemUser || this.forceSystemUser) {
       return this.systemUser?.sec_user_id;
     }
-    return (this.request['user'] as User)?.sec_user_id;
+    return (this.request?.['user'] as User)?.sec_user_id;
   }
 
   get email(): string {
     if (this.systemUser || this.forceSystemUser) {
       return this.systemUser?.email;
     }
-    return (this.request['user'] as User)?.email;
+    return (this.request?.['user'] as User)?.email;
   }
 
   get roles(): number[] {
     if (this.systemUser || this.forceSystemUser) {
       return this.systemUser?.roles;
     }
-    return (this.request['user'] as User)?.roles || [];
+    return (this.request?.['user'] as User)?.roles || [];
   }
 
-  public audit(set: SetAutitEnum = SetAutitEnum.NEW): Partial<AuditableEntity> {
+  public audit(set: SetAuditEnum = SetAuditEnum.NEW): Partial<AuditableEntity> {
     switch (set) {
-      case SetAutitEnum.NEW:
+      case SetAuditEnum.NEW:
         return { created_by: this?.user_id };
-      case SetAutitEnum.UPDATE:
+      case SetAuditEnum.UPDATE:
         return { updated_by: this?.user_id };
-      case SetAutitEnum.BOTH:
+      case SetAuditEnum.BOTH:
         return { created_by: this?.user_id, updated_by: this?.user_id };
     }
   }
 }
 
-export enum SetAutitEnum {
+export enum SetAuditEnum {
   NEW,
   UPDATE,
   BOTH,

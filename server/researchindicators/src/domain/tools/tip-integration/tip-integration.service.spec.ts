@@ -12,6 +12,8 @@ import { DataSource } from 'typeorm';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import * as mapperModule from './mapper/tip-integration.mapper';
+import { TipIntegrationRepository } from './repository/tip-integration.repository';
+import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
 
 describe('TipIntegrationService', () => {
   let service: TipIntegrationService;
@@ -37,6 +39,15 @@ describe('TipIntegrationService', () => {
             ARI_CLIENT_HOST: 'http://client.example',
             TIP_API_URL: 'http://tip.example',
             TIP_TOKEN: 'test-token',
+          },
+        },
+        { provide: TipIntegrationRepository, useValue: {} },
+        {
+          provide: SyncProcessLogService,
+          useValue: {
+            initiateSync: jest.fn().mockResolvedValue({ id: 1 }),
+            update: jest.fn().mockResolvedValue(undefined),
+            endSync: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

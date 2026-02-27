@@ -28,6 +28,7 @@ import { DynamoFeedbackModule } from './domain/tools/dynamo-feedback/dynamo-feed
 import { AllianceStaffOpenSearchModule } from './domain/tools/open-search/alliance-staff/alliance-staff.opensearch.module';
 import { AdminModule } from './admin/admin.module';
 import { PrmsOpenSearchModule } from './domain/tools/open-search/prms/prms.opensearch.module';
+import { CronModule } from './domain/tools/cron-jobs/cron.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { PrmsOpenSearchModule } from './domain/tools/open-search/prms/prms.opens
     TipIntegrationModule,
     DynamoFeedbackModule,
     AdminModule,
+    CronModule,
   ],
   controllers: [AppController],
   providers: [
