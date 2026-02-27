@@ -915,7 +915,8 @@ export class ResultsService {
         result_official_code: tempExistsResult?.result_official_code,
         platform_code: tempExistsResult?.platform_code,
         error: true,
-        message_error: error?.message || error,
+        message_error:
+          typeof error.message == 'object' ? error.name : error.message,
       };
     }
   }
