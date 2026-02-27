@@ -438,7 +438,7 @@ export class ResultsService {
       IndicatorsEnum.INNOVATION_DEV,
     ];
 
-    if (ipAvailables.includes(indicator)) {
+    if (ipAvailables?.includes(indicator)) {
       await this._resultIpRightsService.create(resultId, manager);
     }
   }
@@ -841,7 +841,7 @@ export class ResultsService {
     return results.map((el) => el.result_id);
   }
 
-  async formalizeResult(result: ResultRawAi) {
+  async formalizeResult(result: ResultRawAi, isbulk: boolean = false) {
     let resultExists: Result = null;
     try {
       const processedResult = await this.createResultFromAiRoar(result);
@@ -910,6 +910,11 @@ export class ResultsService {
         });
 
       this._resultsUtil.clearManually();
+
+      if (!isbulk) {
+        throw error;
+      }
+
       return {
         ...result,
         result_official_code: tempExistsResult?.result_official_code,
@@ -927,7 +932,7 @@ export class ResultsService {
       | { error?: boolean; message_error?: string }
     )[] = [];
     for (const result of results) {
-      const newResult = await this.formalizeResult(result);
+      const newResult = await this.formalizeResult(result, true);
       resultsCreated.push(newResult);
     }
     return {
@@ -1044,7 +1049,7 @@ export class ResultsService {
           existingCountries.map((el) => el.isoAlpha2),
         );
         const processCountries = result.countries.filter((el) =>
-          sharedCountries.includes(el.code),
+          sharedCountries?.includes(el.code),
         );
 
         for (const country of processCountries) {
