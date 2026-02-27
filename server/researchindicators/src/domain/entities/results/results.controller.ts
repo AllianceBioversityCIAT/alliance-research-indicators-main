@@ -431,9 +431,9 @@ export class ResultsController {
       ResponseUtils.format({
         data: data,
         description: data.error
-          ? 'Error creating AI Result'
+          ? (data?.['message_error'] ?? 'Error creating AI Result')
           : 'AI Result created',
-        status: data.error ? HttpStatus.BAD_GATEWAY : HttpStatus.CREATED,
+        status: data.error ? HttpStatus.BAD_REQUEST : HttpStatus.CREATED,
       }),
     );
   }
