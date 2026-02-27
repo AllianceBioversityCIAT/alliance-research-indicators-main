@@ -329,6 +329,7 @@ export class ResultStatusWorkflowService {
       [ConfigWorkFlowTypeEnum.EMAIL]: async (
         action: DeepPartial<ConfigWorkflowAction>,
       ) => {
+        if (!generalData.configEmail.isAvailableToSend) return;
         const config = action.config as ConfigWorkflowActionEmail;
         generalData.configEmail.templateCode = config.template;
         generalData.configEmail.rawTemplate =

@@ -128,8 +128,8 @@ export class ResultInnovationDevService {
     );
     const clarisaInstitutionsType = preProcessedTypes.length
       ? await this._clarisaInstitutionTypesService.findByLikeNames(
-        preProcessedTypes,
-      )
+          preProcessedTypes,
+        )
       : [];
     const newArray: string[] = Array.isArray(result?.organization_sub_type)
       ? result?.organization_sub_type
@@ -141,8 +141,8 @@ export class ResultInnovationDevService {
 
     const clarisaInstitutionsSubType = preProcessedSubTypes.length
       ? await this._clarisaInstitutionTypesService.findByLikeNames(
-        preProcessedSubTypes,
-      )
+          preProcessedSubTypes,
+        )
       : [];
 
     for (const institutionsType of clarisaInstitutionsType) {
@@ -233,14 +233,14 @@ export class ResultInnovationDevService {
           createResultInnovationDevDto?.anticipated_users_id,
         ...(adddExtraData
           ? {
-            expected_outcome: createResultInnovationDevDto?.expected_outcome,
-            intended_beneficiaries_description:
-              createResultInnovationDevDto?.intended_beneficiaries_description,
-          }
+              expected_outcome: createResultInnovationDevDto?.expected_outcome,
+              intended_beneficiaries_description:
+                createResultInnovationDevDto?.intended_beneficiaries_description,
+            }
           : {
-            expected_outcome: null,
-            intended_beneficiaries_description: null,
-          }),
+              expected_outcome: null,
+              intended_beneficiaries_description: null,
+            }),
         ...this._currentUser.audit(SetAuditEnum.UPDATE),
       });
 
@@ -264,8 +264,8 @@ export class ResultInnovationDevService {
         resultId,
         adddExtraData
           ? createResultInnovationDevDto?.institution_types?.filter((el) =>
-            Boolean(el?.institution_type_id || el?.institution_id),
-          )
+              Boolean(el?.institution_type_id || el?.institution_id),
+            )
           : [],
         manager,
       );

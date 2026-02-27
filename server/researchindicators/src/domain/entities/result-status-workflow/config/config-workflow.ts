@@ -86,6 +86,7 @@ export class ConfigEmailDto {
   body: string = null;
   rawTemplate: string = null;
   templateCode: string = null;
+  isAvailableToSend: boolean = true;
 }
 
 export class ContractCustomDataDto {
@@ -122,6 +123,7 @@ export class CustomDataDto {
   indicator_id?: number = null;
   description?: string = null;
   oicr_internal_code: string = null;
+  innovation_readiness_level: number = null;
 }
 
 export class SimpleUserDto {

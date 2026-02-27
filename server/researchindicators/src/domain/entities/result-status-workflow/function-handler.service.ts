@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { DataSource, EntityManager, Not } from 'typeorm';
+import { DataSource, EntityManager, MoreThanOrEqual, Not } from 'typeorm';
 import { Template } from '../../shared/auxiliar/template/entities/template.entity';
 import { GeneralDataDto } from './config/config-workflow';
 import { ResultStatusWorkflowRepository } from './repositories/result-status-workflow.repository';
@@ -20,6 +20,7 @@ import {
 } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { ResultInnovationDev } from '../result-innovation-dev/entities/result-innovation-dev.entity';
 
 @Injectable()
 export class StatusWorkflowFunctionHandlerService {
@@ -61,6 +62,54 @@ export class StatusWorkflowFunctionHandlerService {
         socketFile: Buffer.from(generalData.configEmail.body),
       },
     });
+  }
+
+  async validateInnovationReadinessLevelSevenOrHigher(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    const entityManager = transactionManager(
+      _manager,
+      this.dataSource.createEntityManager(),
+    );
+
+    const innovationReadinessLevel = await entityManager
+      .getRepository(ResultInnovationDev)
+      .findOne({
+        where: {
+          result_id: generalData.result.result_id,
+          is_active: true,
+          innovation_readiness_id: MoreThanOrEqual(7),
+        },
+      });
+
+    if (isEmpty(innovationReadinessLevel)) {
+      generalData.configEmail.isAvailableToSend = false;
+    }
+  }
+
+  async findInnovationReadinessLevel(
+    generalData: GeneralDataDto,
+    manager: EntityManager,
+  ) {
+    const entityManager = transactionManager(
+      manager,
+      this.dataSource.createEntityManager(),
+    );
+
+    const innovationReadinessLevel = await entityManager
+      .getRepository(ResultInnovationDev)
+      .findOne({
+        where: {
+          result_id: generalData.result.result_id,
+          is_active: true,
+        },
+      });
+
+    if (!isEmpty(innovationReadinessLevel)) {
+      generalData.customData.innovation_readiness_level =
+        innovationReadinessLevel.innovation_readiness_id;
+    }
   }
 
   async createSnapshot(generalData: GeneralDataDto, manager: EntityManager) {
