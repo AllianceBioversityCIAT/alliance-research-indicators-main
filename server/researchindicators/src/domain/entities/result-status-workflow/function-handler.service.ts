@@ -104,11 +104,16 @@ export class StatusWorkflowFunctionHandlerService {
           result_id: generalData.result.result_id,
           is_active: true,
         },
+        relations: {
+          innovationReadiness: true,
+        },
       });
 
     if (!isEmpty(innovationReadinessLevel)) {
       generalData.customData.innovation_readiness_level =
-        innovationReadinessLevel.innovation_readiness_id;
+        innovationReadinessLevel?.innovationReadiness?.level;
+      generalData.customData.innovation_readiness_level_name =
+        innovationReadinessLevel?.innovationReadiness?.name;
     }
   }
 
@@ -373,6 +378,15 @@ export class StatusWorkflowFunctionHandlerService {
       .filter((email) => !generalData.configEmail.to.includes(email))
       .filter((email) => !isEmpty(email));
     generalData.configEmail.cc = ccEmails;
+  }
+
+  async innovationLevelSevenConfigEmail(
+    generalData: GeneralDataDto,
+    _manager: EntityManager,
+  ) {
+    generalData.configEmail.to = [this.appConfig.LEVEL_SEVEN_EMAIL];
+    generalData.configEmail.cc = [generalData.customData.action_executor.email];
+    generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - New Innovation Submitted in STAR – Readiness Level ${generalData.customData.innovation_readiness_level}`;
   }
 
   async oicrApprovalConfigEmail(
