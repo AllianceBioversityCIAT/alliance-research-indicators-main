@@ -29,7 +29,7 @@ export class InsertNewTemplateInnovationLevel1772481692172
       <li>Innovation Title: {{title}}</li>
       <li>Associated Project: {{contract.code}} - {{contract.title}}</li>
       <li>Principal Investigator: {{principal_investigator.name}}</li>
-      <li>Submission Date: {{decision_date}}</li>
+      <li>Submission Date: {{history.created_at}}</li>
     </ul>
     <p>
       You can access the full submission directly in STAR, including the
@@ -85,7 +85,7 @@ export class InsertNewTemplateInnovationLevel1772481692172
             },
           ],
         }),
-        25,
+        7,
       ],
     );
   }
@@ -115,7 +115,7 @@ export class InsertNewTemplateInnovationLevel1772481692172
             },
           ],
         }),
-        25,
+        7,
       ],
     );
   }
