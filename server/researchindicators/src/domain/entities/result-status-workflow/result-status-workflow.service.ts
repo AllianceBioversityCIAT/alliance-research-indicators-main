@@ -32,7 +32,6 @@ import { LoggerUtil } from '../../shared/utils/logger.util';
 @Injectable()
 export class ResultStatusWorkflowService {
   private _validateFunction(functionName: string) {
-    if (isEmpty(functionName)) return;
     if (isEmpty(this.handlerService?.[functionName]))
       throw new InternalServerErrorException(
         `The configuration of change status is not valid`,
@@ -48,7 +47,7 @@ export class ResultStatusWorkflowService {
     private readonly currentResult: ResultsUtil,
     private readonly currentUserUtil: CurrentUserUtil,
     private readonly handlerService: StatusWorkflowFunctionHandlerService,
-  ) {}
+  ) { }
 
   private async getStatusesByIds(statusIds: number[]) {
     return this.dataSource.getRepository(ResultStatus).find({
@@ -337,11 +336,13 @@ export class ResultStatusWorkflowService {
         action: DeepPartial<ConfigWorkflowAction>,
       ) => {
         const config = action.config as ConfigWorkflowActionEmail;
-        this._validateFunction(config?.condition_to_execute);
-        await this.handlerService?.[config?.condition_to_execute](
-          generalData,
-          manager,
-        );
+        if (!isEmpty(config?.condition_to_execute)) {
+          this._validateFunction(config?.condition_to_execute);
+          await this.handlerService?.[config?.condition_to_execute](
+            generalData,
+            manager,
+          );
+        }
         if (!generalData.configEmail.isAvailableToSend) {
           this.logger._log(
             `Email is not available to send for result ${generalData.result.result_id}`,
