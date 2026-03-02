@@ -28,6 +28,7 @@ import {
 } from './config/config-workflow';
 import Handlebars from 'handlebars';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { format } from 'date-fns';
 
 @Injectable()
 export class ResultStatusWorkflowService {
@@ -47,7 +48,7 @@ export class ResultStatusWorkflowService {
     private readonly currentResult: ResultsUtil,
     private readonly currentUserUtil: CurrentUserUtil,
     private readonly handlerService: StatusWorkflowFunctionHandlerService,
-  ) { }
+  ) {}
 
   private async getStatusesByIds(statusIds: number[]) {
     return this.dataSource.getRepository(ResultStatus).find({
@@ -265,11 +266,19 @@ export class ResultStatusWorkflowService {
               insertResponse.identifiers[0].submission_history_id,
           },
         });
-      generalData.history = historyResult;
+      generalData.history = { ...historyResult };
+      generalData.customData.history = {
+        ...historyResult,
+        created_at: format(
+          historyResult.created_at,
+          'dd/MM/yyyy',
+        ) as unknown as Date,
+      };
       await manager.getRepository(Result).update(resultId, {
         result_status_id: toStatusId,
         ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
       });
+      console.log(JSON.stringify(transitionStatus, null, 2));
       await this._executeConfigWorkflow(
         transitionStatus.config,
         manager,

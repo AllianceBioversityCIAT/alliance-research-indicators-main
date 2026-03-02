@@ -120,6 +120,7 @@ export class CustomDataDto {
   submitter: SimpleUserDto = new SimpleUserDto();
   result_owner: SimpleUserDto = new SimpleUserDto();
   regional_expert: SimpleUserDto = new SimpleUserDto();
+  history: SubmissionHistory = new SubmissionHistory();
   indicator_name?: string = null;
   indicator_id?: number = null;
   description?: string = null;
