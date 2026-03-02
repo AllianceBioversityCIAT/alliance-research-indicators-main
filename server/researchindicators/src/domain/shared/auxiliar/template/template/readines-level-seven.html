@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Innovation Readiness Level Seven</title>
+  </head>
+  <body>
+    <p>Dear Laura,</p>
+    <p>
+      An innovation has been submitted in STAR with a readiness level of
+      {{innovation_readiness_level}}.
+    </p>
+    <p>Details of the innovation:</p>
+    <ul>
+      <li>Innovation ID: {{result_code}}</li>
+      <li>Innovation Title: {{title}}</li>
+      <li>Associated Project: {{contract.code}} - {{contract.title}}</li>
+      <li>Principal Investigator: {{principal_investigator.name}}</li>
+      <li>Submission Date: {{decision_date}}</li>
+    </ul>
+    <p>
+      You can access the full submission directly in STAR, including the
+      Knowledge Sharing section, through the following link:
+    </p>
+    <p><a href="{{url}}">{{url}}</a></p>
+    <p>Kind Regards,<br /><b>{{platform_code}} System Notification</b></p>
+    <p>
+      <i
+        >Please do not reply to this email, as this mailbox is not monitored.</i
+      >
+    </p>
+  </body>
+</html>

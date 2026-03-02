@@ -35,6 +35,7 @@ export class ConfigWorkflowActionEmail {
   template: TemplateEnum;
   custom_data_resolver: string;
   custom_config_email: string;
+  condition_to_execute: string;
 
   constructor(data: ConfigWorkflowActionEmail) {
     this.template = data?.template;
@@ -86,6 +87,7 @@ export class ConfigEmailDto {
   body: string = null;
   rawTemplate: string = null;
   templateCode: string = null;
+  isAvailableToSend: boolean = true;
 }
 
 export class ContractCustomDataDto {
@@ -122,6 +124,8 @@ export class CustomDataDto {
   indicator_id?: number = null;
   description?: string = null;
   oicr_internal_code: string = null;
+  innovation_readiness_level: number = null;
+  innovation_readiness_level_name: string = null;
 }
 
 export class SimpleUserDto {
