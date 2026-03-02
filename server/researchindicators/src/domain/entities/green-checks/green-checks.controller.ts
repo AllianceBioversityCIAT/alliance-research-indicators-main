@@ -26,6 +26,7 @@ import {
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ReviewDto } from '../result-oicr/dto/review.dto';
 import { OptionalBody } from './dto/optional-body.dto';
+import { RequiredQueryPipe } from '../../shared/pipes/required-query.pipe';
 
 @ApiTags('Results')
 @ApiBearerAuth()
@@ -132,7 +133,7 @@ export class GreenChecksController {
   @GetResultVersion(ParamOrQueryEnum.PARAM)
   async changeStatusDate(
     @Param('submissionHistoryId') submissionHistoryId: string,
-    @Query('newDate') newDate: string,
+    @Query('newDate', new RequiredQueryPipe('newDate')) newDate: string,
   ) {
     return this.greenChecksService
       .updateChageStatusDate(
