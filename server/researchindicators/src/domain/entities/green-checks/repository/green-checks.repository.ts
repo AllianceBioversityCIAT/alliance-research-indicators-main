@@ -132,6 +132,7 @@ export class GreenCheckRepository {
           sh.created_at,
           sh.updated_at,
           sh.custom_date,
+          rsw.is_editable_date,
           JSON_OBJECT(
           	'result_id',r.result_id,
           	'result_official_code', r.result_official_code,
@@ -167,6 +168,10 @@ export class GreenCheckRepository {
           INNER JOIN result_status rs1 on rs1.result_status_id = sh.from_status_id
           INNER JOIN result_status rs2 on rs2.result_status_id = sh.to_status_id 
           INNER JOIN ${this.appConfig.ARI_MYSQL_NAME}.sec_users su1 on su1.sec_user_id = sh.created_by 
+          LEFT JOIN result_status_workflow rsw ON rsw.indicator_id = r.indicator_id  
+          										AND rsw.from_status_id = sh.from_status_id 
+          										AND rsw.to_status_id = sh.to_status_id 
+          										AND rsw.is_active = TRUE
           WHERE r.is_active = TRUE
           	AND r.result_id = ?
           ORDER BY sh.submission_history_id DESC;`;
