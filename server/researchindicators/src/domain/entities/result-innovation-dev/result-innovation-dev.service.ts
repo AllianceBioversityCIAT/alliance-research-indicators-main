@@ -95,10 +95,10 @@ export class ResultInnovationDevService {
         actor_type_id: actorTypeCode,
         actor_role_id: ActorRolesEnum.INNOVATION_DEV,
         actor_type_custom_name: isOther ? actor.other_actor_type : null,
-        men_not_youth: actor.gender_age.includes('Men: Non-youth'),
-        men_youth: actor.gender_age.includes('Men: Youth'),
-        women_not_youth: actor.gender_age.includes('Women: Non-youth'),
-        women_youth: actor.gender_age.includes('Women: Youth'),
+        men_not_youth: actor.gender_age?.includes('Men: Non-youth'),
+        men_youth: actor.gender_age?.includes('Men: Youth'),
+        women_not_youth: actor.gender_age?.includes('Women: Non-youth'),
+        women_youth: actor.gender_age?.includes('Women: Youth'),
       });
     }
     innovationDev.actors = newActors as CreateResultActorDto[];
@@ -137,7 +137,9 @@ export class ResultInnovationDevService {
         ? [result?.organization_sub_type]
         : [];
 
-    const preProcessedSubTypes = this.processDataArrayString(newArray);
+    const preProcessedSubTypes = this.processDataArrayString(
+      newArray?.filter(Boolean),
+    );
 
     const clarisaInstitutionsSubType = preProcessedSubTypes.length
       ? await this._clarisaInstitutionTypesService.findByLikeNames(
@@ -251,7 +253,7 @@ export class ResultInnovationDevService {
       );
 
       const saveActors = createResultInnovationDevDto?.actors.filter(
-        (actor) => !filterIds.includes(actor.actor_type_id),
+        (actor) => !filterIds?.includes(actor.actor_type_id),
       );
 
       await this._resultActorsService.customSaveInnovationDev(
