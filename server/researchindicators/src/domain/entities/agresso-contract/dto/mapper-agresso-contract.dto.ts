@@ -1,3 +1,4 @@
+import { isEmpty } from '../../../shared/utils/object.utils';
 import { LeverIcon } from '../../../tools/clarisa/entities/clarisa-levers/enum/LeversIcons.enum';
 import { Indicator } from '../../indicators/entities/indicator.entity';
 
@@ -100,20 +101,27 @@ export class MappedContractsDto {
     this.is_science_program = Boolean(rawData.is_science_program);
     this.funding_type = rawData.funding_type;
     this.ubwClientDescription = rawData.ubwClientDescription;
-    this.indicators = indicators.map(
-      (indicator) => new AgressoContractIndicatorObjectDto(indicator, 0),
-    );
+    if (!isEmpty(indicators)) {
+      this.indicators = indicators.map(
+        (indicator) => new AgressoContractIndicatorObjectDto(indicator, 0),
+      );
+    } else {
+      this.indicators = undefined;
+    }
+
     this.levers = rawData?.lever_id
       ? new AgressoContractLeverDto(rawData)
       : null;
   }
 
   public setIndicatorCount(indicatorId: number, count: number) {
-    const indicator = this.indicators.find(
-      (ind) => ind.indicator.indicator_id === indicatorId,
-    );
-    if (indicator) {
-      indicator.count_results = count;
+    if (!isEmpty(this.indicators)) {
+      const indicator = this.indicators.find(
+        (ind) => ind.indicator.indicator_id === indicatorId,
+      );
+      if (indicator) {
+        indicator.count_results = count;
+      }
     }
   }
 }
