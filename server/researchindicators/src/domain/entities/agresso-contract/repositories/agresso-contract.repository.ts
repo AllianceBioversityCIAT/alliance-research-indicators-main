@@ -412,7 +412,10 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     rawResults.forEach((rawData) => {
       const contractId = rawData.agreement_id;
       if (!mapContracts.has(contractId)) {
-        const mappedContract = new MappedContractsDto(rawData, indicators);
+        const mappedContract = new MappedContractsDto(
+          rawData,
+          filter?.with_indicators ? indicators : null,
+        );
         mappedContract.setIndicatorCount(
           rawData.indicator_id,
           rawData.count_results,
