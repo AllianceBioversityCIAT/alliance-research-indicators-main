@@ -137,7 +137,9 @@ export class ResultInnovationDevService {
         ? [result?.organization_sub_type]
         : [];
 
-    const preProcessedSubTypes = this.processDataArrayString(newArray);
+    const preProcessedSubTypes = this.processDataArrayString(
+      newArray?.filter(Boolean),
+    );
 
     const clarisaInstitutionsSubType = preProcessedSubTypes.length
       ? await this._clarisaInstitutionTypesService.findByLikeNames(
