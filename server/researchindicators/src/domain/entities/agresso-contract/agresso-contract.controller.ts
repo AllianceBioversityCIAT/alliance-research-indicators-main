@@ -23,7 +23,7 @@ import { isEmpty } from '../../shared/utils/object.utils';
 export class AgressoContractController {
   constructor(
     private readonly agressoContractService: AgressoContractService,
-  ) { }
+  ) {}
 
   @Get()
   @ApiQuery({ name: 'project', required: false, description: 'Project ID' })
@@ -237,9 +237,10 @@ export class AgressoContractController {
     @Query('query') query: string,
     @Query('direction') direction: 'ASC' | 'DESC' = 'ASC',
     @Query('exclude-pooled-funding') excludePooledFunding: TrueFalseEnum,
-    @Query('with-indicators') withIndicators: TrueFalseEnum = TrueFalseEnum.TRUE,
+    @Query('with-indicators')
+    withIndicators: TrueFalseEnum = TrueFalseEnum.TRUE,
   ) {
-    if (isEmpty(withIndicators)) withIndicators = TrueFalseEnum.TRUE;//TODO: Remove this once a pipe is implemented in the query parameter
+    if (isEmpty(withIndicators)) withIndicators = TrueFalseEnum.TRUE; //TODO: Remove this once a pipe is implemented in the query parameter
     return this.agressoContractService
       .findAgressoContracts(
         currentUser,
