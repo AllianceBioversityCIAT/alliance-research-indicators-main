@@ -42,15 +42,14 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
-          .map(([key, value]) => `ac.${key} like '%${value}%'`)
-          .join(' AND ')}`
+        .map(([key, value]) => `ac.${key} like '%${value}%'`)
+        .join(' AND ')}`
       : '';
     const query = `
     select ac.*,
     ifnull(cl.full_name, 'Not available' ) as lever,
     cl.id as lever_id
-    ${
-      relations?.countries
+    ${relations?.countries
         ? `,JSON_ARRAYAGG(
             JSON_OBJECT(
                 'agreement_id', acc.agreement_id,
@@ -59,7 +58,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             )
         ) AS countries`
         : ''
-    }
+      }
     from agresso_contracts ac 
     LEFT JOIN 
         agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
@@ -412,7 +411,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     rawResults.forEach((rawData) => {
       const contractId = rawData.agreement_id;
       if (!mapContracts.has(contractId)) {
-        const mappedContract = new MappedContractsDto(rawData, indicators);
+        const mappedContract = new MappedContractsDto(rawData, filter?.with_indicators ? indicators : null);
         mappedContract.setIndicatorCount(
           rawData.indicator_id,
           rawData.count_results,

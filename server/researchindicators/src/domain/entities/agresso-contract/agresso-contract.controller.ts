@@ -15,6 +15,7 @@ import { AgressoContract } from './entities/agresso-contract.entity';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
+import { isEmpty } from '../../shared/utils/object.utils';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -22,7 +23,7 @@ import { OrderFieldsEnum } from './enum/order-fields.enum';
 export class AgressoContractController {
   constructor(
     private readonly agressoContractService: AgressoContractService,
-  ) {}
+  ) { }
 
   @Get()
   @ApiQuery({ name: 'project', required: false, description: 'Project ID' })
@@ -137,6 +138,13 @@ export class AgressoContractController {
     enum: TrueFalseEnum,
   })
   @ApiQuery({
+    name: 'with-indicators',
+    required: false,
+    description: 'Filter by indicators',
+    enum: TrueFalseEnum,
+    default: TrueFalseEnum.TRUE,
+  })
+  @ApiQuery({
     name: 'contract-code',
     required: false,
     type: String,
@@ -229,11 +237,14 @@ export class AgressoContractController {
     @Query('query') query: string,
     @Query('direction') direction: 'ASC' | 'DESC' = 'ASC',
     @Query('exclude-pooled-funding') excludePooledFunding: TrueFalseEnum,
+    @Query('with-indicators') withIndicators: TrueFalseEnum = TrueFalseEnum.TRUE,
   ) {
+    if (isEmpty(withIndicators)) withIndicators = TrueFalseEnum.TRUE;//TODO: Remove this once a pipe is implemented in the query parameter
     return this.agressoContractService
       .findAgressoContracts(
         currentUser,
         {
+          with_indicators: withIndicators == TrueFalseEnum.TRUE,
           contract_code: contractCode,
           project_name: projectName,
           principal_investigator: principalInvestigator,
