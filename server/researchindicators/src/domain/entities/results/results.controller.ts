@@ -182,6 +182,12 @@ export class ResultsController {
     type: String,
     description: 'filter by primary contract',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'search by title or description',
+  })
   @ApiOperation({ summary: 'Find all results' })
   @Get()
   async find(

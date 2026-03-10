@@ -336,7 +336,9 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return query;
   }
 
-  async findResultsFilters(filters?: Partial<ResultFiltersInterface>) {
+  async findResultsFilters(
+    filters?: Partial<ResultFiltersInterface>,
+  ): Promise<FindResultsFiltersResult> {
     const queryParts: DeepPartial<CreateResultQueryInterface> = {
       contracts: {
         select: '',
@@ -389,24 +391,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       sort_order = filters.sort_order.toUpperCase();
     }
 
-    const mainQuery = `
-	SELECT 
-  ${resultDefaultParametersSQL('r')},
-		r.title,
-		r.description,
-		r.indicator_id,
-		r.geo_scope_id,
-		r.result_status_id,
-		r.report_year_id,
-    r.external_link,
-    r.public_link,
-		COALESCE(r2.snapshot_years, JSON_ARRAY()) as snapshot_years,
-		r.is_active
-		${queryParts.result_audit_data?.select}
-		${queryParts.result_status?.select}
-		${queryParts.indicators?.select}
-		${queryParts.levers?.select}
-		${queryParts.contracts?.select}
+    const fromJoinWhere = `
 	FROM results r
 		LEFT JOIN (SELECT temp.result_official_code,
                                         IF(
@@ -435,14 +420,49 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 		${haveYears ? `AND r.report_year_id IN (${formatArrayToQuery<string>(filters.years)})` : ''}
 		${haveUsersCodes ? `AND r.created_by IN (${formatArrayToQuery<string>(filters.user_codes)})` : ''}
     ${havePlatformCodes ? `AND r.platform_code IN (${formatArrayToQuery<string>(filters.platform_code)})` : ''}
+	`;
+
+    const mainQuery = `
+	SELECT 
+  ${resultDefaultParametersSQL('r')},
+		r.title,
+		r.description,
+		r.indicator_id,
+		r.geo_scope_id,
+		r.result_status_id,
+		r.report_year_id,
+    r.external_link,
+    r.public_link,
+		COALESCE(r2.snapshot_years, JSON_ARRAY()) as snapshot_years,
+		r.is_active
+		${queryParts.result_audit_data?.select}
+		${queryParts.result_status?.select}
+		${queryParts.indicators?.select}
+		${queryParts.levers?.select}
+		${queryParts.contracts?.select}
+	${fromJoinWhere}
 	GROUP BY r.result_id
 		${queryParts.result_audit_data?.groupBy}
 		${queryParts.contracts?.groupBy}
 		ORDER BY r.result_official_code ${sort_order}
 		${limit}
 	`;
-
-    return this.query(mainQuery);
+    const countQuery = `SELECT COUNT(DISTINCT r.result_id) as total ${fromJoinWhere}`;
+    const countResult = await this.query(countQuery);
+    const total = parseInt(countResult[0]?.total ?? '0', 10);
+    const data = await this.query(mainQuery);
+    const totalPages = Math.ceil(total / filters.limit);
+    return {
+      data,
+      pagination: {
+        total,
+        page: filters?.page || 1,
+        limit: filters?.limit || total,
+        totalPages: totalPages || 1,
+        hasNextPage: filters?.page ? filters.page < totalPages : false,
+        hasPreviousPage: filters?.page ? filters.page > 1 : false,
+      },
+    };
   }
 
   async deleteResult(result_id: number) {
@@ -536,6 +556,24 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     await this.query(query, [carnet, userId]);
   }
 }
+
+export interface ResultFiltersPaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface FindResultsFiltersPaginatedResponse {
+  data: any[];
+  pagination: ResultFiltersPaginationMeta;
+}
+
+export type FindResultsFiltersResult =
+  | any[]
+  | FindResultsFiltersPaginatedResponse;
 
 export interface ResultFiltersInterface {
   limit?: number;
