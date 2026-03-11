@@ -166,8 +166,8 @@ export class ResultCapacitySharingService {
 
     tempCapSharing.nationality = clean_nationality
       ? ({
-          isoAlpha2: clean_nationality.isoAlpha2,
-        } as ResultCountry)
+        isoAlpha2: clean_nationality.isoAlpha2,
+      } as ResultCountry)
       : null;
 
     const clean_gender = await nextToProcessAiRaw(
@@ -243,6 +243,18 @@ export class ResultCapacitySharingService {
         'string',
       )
     );
+
+    tempCapSharing.is_attending_organization = rawData?.trainees
+      ? rawData?.trainees === 'Yes'
+      : null;
+
+    const institutions =
+      await this._resultInstitutionService.filterInstitutionsAi(
+        rawData?.trainees_description,
+        InstitutionRolesEnum.TRAINEE_AFFILIATION,
+      );
+
+    tempCapSharing.trainee_organization_representative = institutions.acept as ResultInstitution[];
 
     return tempCapSharing;
   }
