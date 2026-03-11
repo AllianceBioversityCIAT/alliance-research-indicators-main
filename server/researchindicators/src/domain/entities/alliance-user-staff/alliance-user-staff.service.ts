@@ -23,12 +23,27 @@ export class AllianceUserStaffService extends ControlListBaseService<
     );
   }
 
-  findUserByFirstAndLastName(first_name: string, last_name: string) {
+  async findUserByFirstAndLastName(first_name: string, last_name: string) {
     return this.mainRepo
       .createQueryBuilder('user')
       .where('user.first_name = :first_name', { first_name })
       .andWhere('user.last_name = :last_name', { last_name })
       .getOne();
+  }
+
+  async findBySearch(search?: string) {
+    const searchQuery = this.mainRepo
+      .createQueryBuilder('user')
+      .andWhere('user.is_active = :isActive', { isActive: true });
+
+    if (!isEmpty(search)) {
+      searchQuery.andWhere(
+        'user.first_name LIKE :search OR user.last_name LIKE :search or user.email LIKE :search',
+        { search: `%${search}%` },
+      );
+    }
+
+    return searchQuery.getMany();
   }
 
   async findWithFilters(pagination: PaginationDto, name?: string) {
