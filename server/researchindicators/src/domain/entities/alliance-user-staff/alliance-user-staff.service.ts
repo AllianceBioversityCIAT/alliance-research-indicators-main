@@ -34,10 +34,13 @@ export class AllianceUserStaffService extends ControlListBaseService<
   async findBySearch(search?: string) {
     const searchQuery = this.mainRepo
       .createQueryBuilder('user')
-      .andWhere('user.is_active = :isActive', { isActive: true })
+      .andWhere('user.is_active = :isActive', { isActive: true });
 
     if (!isEmpty(search)) {
-      searchQuery.andWhere('user.first_name LIKE :search OR user.last_name LIKE :search or user.email LIKE :search', { search: `%${search}%` });
+      searchQuery.andWhere(
+        'user.first_name LIKE :search OR user.last_name LIKE :search or user.email LIKE :search',
+        { search: `%${search}%` },
+      );
     }
 
     return searchQuery.getMany();

@@ -15,7 +15,7 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 export class AllianceUserStaffController {
   constructor(
     private readonly allianceUserStaffService: AllianceUserStaffService,
-  ) { }
+  ) {}
 
   @ApiOperation({
     summary: 'Find all alliance user staff',
