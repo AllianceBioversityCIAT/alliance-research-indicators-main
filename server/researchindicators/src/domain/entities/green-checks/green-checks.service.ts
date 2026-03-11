@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { GreenCheckRepository } from './repository/green-checks.repository';
 import { FindGreenChecksDto } from './dto/find-green-checks.dto';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Result } from '../results/entities/result.entity';
 import {
   getTemplateByStatus,
@@ -30,9 +30,13 @@ import { OptionalBody } from './dto/optional-body.dto';
 import { MessageOicrDto } from './dto/message-oicr.dto';
 import { validateRoles } from '../../shared/utils/roles.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { SubmissionHistoryLog } from './entities/submission-history-log.entity';
 
 @Injectable()
 export class GreenChecksService {
+  private readonly submissionHistoryLogRepository: Repository<SubmissionHistoryLog>;
+  private readonly submissionHistoryRepository: Repository<SubmissionHistory>;
+
   constructor(
     private readonly greenCheckRepository: GreenCheckRepository,
     private readonly dataSource: DataSource,
@@ -42,7 +46,12 @@ export class GreenChecksService {
     private readonly appConfig: AppConfig,
     private readonly _resultsUtil: ResultsUtil,
     private readonly resultOicrService: ResultOicrService,
-  ) {}
+  ) {
+    this.submissionHistoryLogRepository =
+      this.dataSource.getRepository(SubmissionHistoryLog);
+    this.submissionHistoryRepository =
+      this.dataSource.getRepository(SubmissionHistory);
+  }
 
   async findByResultId(resultId: number) {
     const greenChecks: FindGreenChecksDto =
@@ -633,5 +642,66 @@ export class GreenChecksService {
       report_year_id: newReportYear,
       result_status_id: ResultStatusEnum.DRAFT,
     };
+  }
+
+  async updateChageStatusDate(
+    resultId: number,
+    submissionHistoryId: number,
+    newDate: Date,
+  ) {
+    const submissionHistory = await this.submissionHistoryRepository.findOne({
+      where: {
+        submission_history_id: submissionHistoryId,
+        result_id: resultId,
+        is_active: true,
+      },
+    });
+
+    if (!submissionHistory) {
+      throw new BadRequestException('Submission history not found');
+    }
+    const oldDate = submissionHistory.custom_date;
+
+    await this.submissionHistoryRepository
+      .update(submissionHistoryId, {
+        custom_date: newDate,
+        ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
+      })
+      .catch(() => {
+        throw new ConflictException('Failed to update change status date');
+      });
+
+    await this.saveSubmissionHistoryLog(submissionHistoryId, newDate, oldDate);
+  }
+
+  async saveSubmissionHistoryLog(
+    submissionHistoryId: number,
+    newDate: Date,
+    oldDate: Date,
+  ) {
+    const submissionHistory = await this.submissionHistoryRepository.findOne({
+      where: {
+        submission_history_id: submissionHistoryId,
+        is_active: true,
+      },
+    });
+    if (!submissionHistory) {
+      throw new BadRequestException('Submission history not found');
+    }
+
+    const submissionHistoryLog = new SubmissionHistoryLog();
+    submissionHistoryLog.submission_history_id =
+      submissionHistory.submission_history_id;
+    submissionHistoryLog.new_date = newDate;
+    submissionHistoryLog.old_date = oldDate;
+
+    await this.submissionHistoryLogRepository
+      .save({
+        ...submissionHistoryLog,
+        ...this.currentUserUtil.audit(SetAuditEnum.NEW),
+      })
+      .catch(() => {
+        throw new ConflictException('Failed to save submission history log');
+      });
   }
 }

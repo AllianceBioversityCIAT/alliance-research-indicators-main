@@ -33,9 +33,9 @@ import { ClarisaLanguagesModule } from '../../tools/clarisa/entities/clarisa-lan
     ClarisaCountriesModule,
     GendersModule,
     AllianceUserStaffModule,
-    ClarisaLanguagesModule,
+    ClarisaLanguagesModule
   ],
   providers: [ResultCapacitySharingService, AiRoarMiningApp],
   exports: [ResultCapacitySharingService],
 })
-export class ResultCapacitySharingModule {}
+export class ResultCapacitySharingModule { }

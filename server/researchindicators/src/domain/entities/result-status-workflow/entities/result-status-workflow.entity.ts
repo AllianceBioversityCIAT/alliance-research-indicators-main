@@ -47,6 +47,14 @@ export class ResultStatusWorkflow extends AuditableEntity {
   })
   config!: DeepPartial<ConfigWorkflowDto>;
 
+  @Column({
+    type: 'boolean',
+    name: 'is_editable_date',
+    nullable: false,
+    default: false,
+  })
+  is_editable_date!: boolean;
+
   @ManyToOne(() => Indicator, (indicator) => indicator.result_status_workflows)
   @JoinColumn({ name: 'indicator_id' })
   indicator!: Indicator;
