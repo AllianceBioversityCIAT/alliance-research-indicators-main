@@ -248,13 +248,13 @@ export class ResultCapacitySharingService {
       ? rawData?.trainees === 'Yes'
       : null;
 
-    const institutions =
-      await this._resultInstitutionService.filterInstitutionsAi(
-        rawData?.trainees_description,
-        InstitutionRolesEnum.TRAINEE_AFFILIATION,
-      );
+    const institutions = this._resultInstitutionService.filterInstitutionsAi(
+      rawData?.trainees_description,
+      InstitutionRolesEnum.TRAINEE_AFFILIATION,
+    );
 
-    tempCapSharing.trainee_organization_representative = institutions.acept as ResultInstitution[];
+    tempCapSharing.trainee_organization_representative =
+      institutions.acept as ResultInstitution[];
 
     return tempCapSharing;
   }
