@@ -18,7 +18,7 @@ import { SyncProcessLogModule } from '../../../entities/sync-process-log/sync-pr
     ResultKnowledgeProductModule,
     PooledFundingContractsModule,
     ClarisaLeversModule,
-    SyncProcessLogModule
+    SyncProcessLogModule,
   ],
 })
-export class PrmsOpenSearchModule { }
+export class PrmsOpenSearchModule {}

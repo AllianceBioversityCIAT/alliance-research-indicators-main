@@ -18,7 +18,6 @@ import {
 import { ClarisaRegionsService } from '../clarisa/entities/clarisa-regions/clarisa-regions.service';
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
 import { ResultRepository } from '../../entities/results/repositories/result.repository';
-import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../../entities/result-users/entities/result-user.entity';
 import { ClarisaLeversService } from '../clarisa/entities/clarisa-levers/clarisa-levers.service';
@@ -209,8 +208,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-            user_id: carnet,
-          } as ResultUser)
+              user_id: carnet,
+            } as ResultUser)
           : null,
       };
 

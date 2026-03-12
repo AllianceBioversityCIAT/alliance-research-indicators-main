@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { BaseExternalOpenSearchApi } from '../core/external-base-open-search-api';
 import {
-  ContributingCenterMapper,
   PrmsKnowledgeProductDto,
-  PrmsResponseDto,
   ResultResponseMapper,
   SearcherResponseDto,
 } from './dto/prms-response.dto';
@@ -14,7 +11,6 @@ import {
   ExternalMappersInterface,
 } from '../../../shared/global-dto/external-mappers.dto';
 import { IndicatorHomologation } from './homologation/indicator.homologation';
-import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { isEmpty } from '../../../shared/utils/object.utils';
@@ -42,7 +38,7 @@ import {
 import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
-import { firstValueFrom, map } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import {
   CounterResults,
   CounterResultsEnum,
@@ -52,7 +48,8 @@ import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-pr
 
 @Injectable()
 export class PrmsOpenSearchService
-  implements ExternalMappersInterface<ExternalMappersDto> {
+  implements ExternalMappersInterface<ExternalMappersDto>
+{
   private readonly logger = new LoggerUtil({
     name: PrmsOpenSearchService.name,
   });
@@ -68,7 +65,7 @@ export class PrmsOpenSearchService
     private readonly pooledFundingContractsService: PooledFundingContractsService,
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly syncProcessLogService: SyncProcessLogService,
-  ) { }
+  ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
     for (const result of res) {
@@ -184,15 +181,15 @@ export class PrmsOpenSearchService
       const counters: CounterResults = new CounterResults();
       const centerAcronym = ['ABC', 'ABC RH'];
       const prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}&year=${year}`;
-      console.log(prmsUrl);
       const response = await firstValueFrom(
         this.httpService.get<SearcherResponseDto>(prmsUrl),
       ).then((response) => response.data);
       const dataProcessed = await this.processData(response.data);
-      //await this.createResultInStar(dataProcessed, resultSaved, counters);
-      if (response.totalPages < page) {
+      await this.createResultInStar(dataProcessed, resultSaved, counters);
+      if (response.totalPages <= page) {
         keepGoing = false;
       }
+
       page++;
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
     }
@@ -325,15 +322,17 @@ export class PrmsOpenSearchService
       const clarisaLever =
         await this.clarisaLeversService.findByShortName(lever);
 
-      const savedPrimaryContract = [...contributingContracts
-        .map(
-          (contract) =>
-            ({
-              contract_id: contract?.agreement_id,
-              is_primary: false,
-            }) as ResultContract,
-        )
-        .filter((contract) => !isEmpty(contract?.contract_id))]
+      const savedPrimaryContract = [
+        ...contributingContracts
+          .map(
+            (contract) =>
+              ({
+                contract_id: contract?.agreement_id,
+                is_primary: false,
+              }) as ResultContract,
+          )
+          .filter((contract) => !isEmpty(contract?.contract_id)),
+      ];
 
       if (!isEmpty(primaryContract?.agreement_id)) {
         savedPrimaryContract.push({
@@ -341,7 +340,6 @@ export class PrmsOpenSearchService
           is_primary: true,
         } as ResultContract);
       }
-
 
       result.alignments = {
         primary_levers: [
@@ -380,7 +378,7 @@ export class PrmsOpenSearchService
     let typeCounter: CounterResultsEnum = null;
 
     for (const result of results) {
-      this.logger.debug(`Processing result ${result.official_code} from TIP.`);
+      this.logger.debug(`Processing result ${result.official_code} from PRMS.`);
       this._currentUser.setSystemUser(result.userData, true);
       resultSaved.push(result.official_code);
       let createNewResult: Result = null;
@@ -392,11 +390,10 @@ export class PrmsOpenSearchService
             report_year_id: result.createResult.year,
           },
         });
-
         if (!findResult) {
           createNewResult = await this.resultsService.createResult(
             result.createResult,
-            ReportingPlatformEnum.TIP,
+            ReportingPlatformEnum.PRMS,
             {
               notContract: true,
               result_status_id: result.status_id,
@@ -406,7 +403,7 @@ export class PrmsOpenSearchService
           );
           findResult = createNewResult;
           this.logger.debug(
-            `Creating new result ${findResult.result_official_code} from TIP.`,
+            `Creating new result ${findResult.result_official_code} from PRMS.`,
           );
           typeCounter = CounterResultsEnum.CREATED;
         } else {
@@ -414,7 +411,7 @@ export class PrmsOpenSearchService
             findResult.result_id,
           );
           this.logger.debug(
-            `Updating result ${findResult.result_official_code} from TIP.`,
+            `Updating result ${findResult.result_official_code} from PRMS.`,
           );
           typeCounter = CounterResultsEnum.UPDATED;
         }

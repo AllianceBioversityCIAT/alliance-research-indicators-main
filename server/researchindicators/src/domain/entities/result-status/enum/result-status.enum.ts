@@ -57,7 +57,7 @@ export const getTemplateByStatus = (
     typeof otherData?.oicr_number == 'string' ? otherData.oicr_number : '';
   status =
     result.indicatorId === IndicatorsEnum.OICR &&
-      status === ResultStatusEnum.DRAFT
+    status === ResultStatusEnum.DRAFT
       ? ResultStatusEnum.OICR_APPROVED
       : status;
   if (

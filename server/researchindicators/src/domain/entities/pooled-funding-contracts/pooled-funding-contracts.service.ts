@@ -6,23 +6,23 @@ import { AgressoContract } from '../agresso-contract/entities/agresso-contract.e
 
 @Injectable()
 export class PooledFundingContractsService {
-    private readonly mainRepo: Repository<PooledFundingContract>;
-    constructor(
-        private readonly dataSource: DataSource,
-    ) {
-        this.mainRepo = this.dataSource.getRepository(PooledFundingContract);
-    }
+  private readonly mainRepo: Repository<PooledFundingContract>;
+  constructor(private readonly dataSource: DataSource) {
+    this.mainRepo = this.dataSource.getRepository(PooledFundingContract);
+  }
 
-    async findMappingPooledFundingContracts(pooledFundingOfficialCode: string): Promise<AgressoContract[]> {
-        const pooledFundingContracts = await this.mainRepo.find({
-            where: {
-                cgiar_entity_code: pooledFundingOfficialCode,
-            },
-            relations: {
-                agresso_contract: true,
-            },
-        });
+  async findMappingPooledFundingContracts(
+    pooledFundingOfficialCode: string,
+  ): Promise<AgressoContract[]> {
+    const pooledFundingContracts = await this.mainRepo.find({
+      where: {
+        cgiar_entity_code: pooledFundingOfficialCode,
+      },
+      relations: {
+        agresso_contract: true,
+      },
+    });
 
-        return pooledFundingContracts.map(contract => contract.agresso_contract);
-    }
+    return pooledFundingContracts.map((contract) => contract.agresso_contract);
+  }
 }

@@ -7,4 +7,4 @@ import { PooledFundingContractsController } from './pooled-funding-contracts.con
   providers: [PooledFundingContractsService],
   exports: [PooledFundingContractsService],
 })
-export class PooledFundingContractsModule { }
+export class PooledFundingContractsModule {}

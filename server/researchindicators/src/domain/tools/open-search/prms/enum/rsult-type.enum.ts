@@ -1,4 +1,4 @@
-import { ResultStatusEnum } from "../../../../entities/result-status/enum/result-status.enum"
+import { ResultStatusEnum } from '../../../../entities/result-status/enum/result-status.enum';
 
 export enum ResultTypeEnum {
   POLICY_CHANGE = 1,
@@ -24,6 +24,4 @@ export const ResultPrmsStatusMapper = {
   2: ResultStatusEnum.QAED_IN_PRMS,
   3: ResultStatusEnum.SUBMITTED_IN_PRMS,
   4: ResultStatusEnum.DISCONTINUED_IN_PRMS,
-
-
-}
+};

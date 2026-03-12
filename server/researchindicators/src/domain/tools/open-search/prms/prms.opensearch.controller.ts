@@ -6,7 +6,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 @Controller()
 @ApiBearerAuth()
 export class PrmsOpenSearchController {
-  constructor(private readonly prmsService: PrmsOpenSearchService) { }
+  constructor(private readonly prmsService: PrmsOpenSearchService) {}
 
   @Get('fetch-prms-data')
   @ApiQuery({
