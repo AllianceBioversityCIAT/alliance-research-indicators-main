@@ -153,6 +153,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        undefined,
       );
 
       expect(service.findResults).toHaveBeenCalledWith({
@@ -176,6 +177,7 @@ describe('ResultsController', () => {
         resultCodes: [],
         platform_code: [],
         filter_primary_contract: [],
+        search: undefined,
       });
       expect(result).toEqual(expectedResponse);
     });
@@ -206,6 +208,7 @@ describe('ResultsController', () => {
         ['RES1'],
         [],
         [],
+        undefined,
       );
 
       expect(service.findResults).toHaveBeenCalledWith({
@@ -229,6 +232,7 @@ describe('ResultsController', () => {
         resultCodes: ['RES1'],
         platform_code: [],
         filter_primary_contract: [],
+        search: undefined,
       });
     });
 
@@ -258,6 +262,7 @@ describe('ResultsController', () => {
           [],
           [],
           [],
+          undefined,
         ),
       ).rejects.toThrow('Database error');
     });
@@ -291,6 +296,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        undefined,
       );
 
       expect(result.data).toEqual([]);
@@ -685,6 +691,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        undefined,
       );
 
       expect(mockResponseUtils.format).toHaveBeenCalledWith({
@@ -735,6 +742,7 @@ describe('ResultsController', () => {
           [],
           [],
           [],
+          undefined,
         ),
       ).rejects.toThrow('Service unavailable');
     });
@@ -775,6 +783,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        undefined,
       );
 
       expect(service.findResults).toHaveBeenCalledWith(
@@ -810,6 +819,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        undefined,
       );
 
       expect(service.findResults).toHaveBeenCalledWith(
@@ -854,6 +864,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        undefined,
       );
       const findGeneralPromise = controller.findGeneralInformation();
 
@@ -889,6 +900,7 @@ describe('ResultsController', () => {
         [],
         [],
         [],
+        undefined,
       );
 
       expect(result.data).toHaveLength(1000);

@@ -303,11 +303,6 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 		  r.updated_at,
 		  r.updated_by`;
 
-      queryParts.result_audit_data.groupBy = `,r.created_at,
-		  r.created_by,
-		  r.updated_at,
-		  r.updated_by`;
-
       if (filters.result_audit_data_objects) {
         queryParts.result_audit_data.select += `,IF(su1.sec_user_id IS NOT NULL, JSON_OBJECT('user_id', su1.sec_user_id, 
 					  'first_name', su1.first_name, 
@@ -318,8 +313,6 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 					  'last_name', su2.last_name, 
 					  'is_active', su2.is_active), NULL) as updated_by_user
 		  `;
-        queryParts.result_audit_data.join = `LEFT JOIN ${this.appConfig.ARI_MYSQL_NAME}.sec_users su1 ON su1.sec_user_id = r.created_by 
-		  LEFT JOIN ${this.appConfig.ARI_MYSQL_NAME}.sec_users su2 ON su2.sec_user_id = r.updated_by `;
       }
     }
   }
@@ -404,7 +397,8 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
                                         AND temp.is_snapshot = TRUE
                                         GROUP BY result_official_code) r2 ON r.result_official_code = r2.result_official_code
     ${this.filterByPrimaryContract(filters?.filter_primary_contract)}
-		${queryParts.result_audit_data?.join}
+		LEFT JOIN ${this.appConfig.ARI_MYSQL_NAME}.sec_users su1 ON su1.sec_user_id = r.created_by 
+		LEFT JOIN ${this.appConfig.ARI_MYSQL_NAME}.sec_users su2 ON su2.sec_user_id = r.updated_by 
 		${queryParts.result_status?.join}
 		${queryParts.indicators?.join}
 		${queryParts.contracts?.join}
@@ -412,6 +406,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 		WHERE 1 = 1
 		AND r.is_active = TRUE
 		AND r.is_snapshot = FALSE
+    ${this.searchFilters(filters?.search)}
     ${haveResultCodes ? `AND r.result_official_code IN (${formatArrayToQuery<string>(filters.resultCodes)})` : ''}
 		${haveContractsCodes ? `AND ac.agreement_id IN (${formatArrayToQuery<string>(filters.contract_codes)})` : ''}
 		${haveLeversCodes ? `AND cl.id IN (${formatArrayToQuery<string>(filters.lever_codes)})` : ``}
@@ -441,7 +436,11 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 		${queryParts.levers?.select}
 		${queryParts.contracts?.select}
 	${fromJoinWhere}
-	GROUP BY r.result_id
+	GROUP BY r.result_id,
+      r.created_at,
+		  r.created_by,
+		  r.updated_at,
+		  r.updated_by
 		${queryParts.result_audit_data?.groupBy}
 		${queryParts.contracts?.groupBy}
 		ORDER BY r.result_official_code ${sort_order}
@@ -501,6 +500,14 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return this.query(query, [email]).then((res: SecUser[]) =>
       res?.length ? res[0] : null,
     );
+  }
+
+  searchFilters(search?: string) {
+    if (isEmpty(search)) return '';
+    return `AND (r.title LIKE '%${search}%' 
+        OR r.result_official_code LIKE '%${search}%'
+        OR su1.first_name LIKE '%${search}%'
+        OR su1.last_name LIKE '%${search}%')`;
   }
 
   async findUserByEmailOrCarnet(
@@ -596,6 +603,7 @@ export interface ResultFiltersInterface {
   resultCodes: string[];
   platform_code?: string[];
   filter_primary_contract?: string[];
+  search?: string;
 }
 
 export interface CreateResultQueryInterface {

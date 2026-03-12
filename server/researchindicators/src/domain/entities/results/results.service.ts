@@ -155,6 +155,7 @@ export class ResultsService {
       resultCodes: filters?.resultCodes,
       platform_code: filters?.platform_code,
       filter_primary_contract: filters?.filter_primary_contract,
+      search: filters?.search,
     });
   }
 
