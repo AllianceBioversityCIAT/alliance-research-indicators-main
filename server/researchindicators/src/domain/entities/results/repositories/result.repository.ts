@@ -504,10 +504,14 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 
   searchFilters(search?: string) {
     if (isEmpty(search)) return '';
-    return `AND (r.title LIKE '%${search}%' 
-        OR r.result_official_code LIKE '%${search}%'
-        OR su1.first_name LIKE '%${search}%'
-        OR su1.last_name LIKE '%${search}%')`;
+    const splitSearch = search.split(' ');
+    const fieldToSearch = [
+      'r.title',
+      'r.result_official_code',
+      'su1.first_name',
+      'su1.last_name',
+    ];
+    return `AND (${fieldToSearch.map((field) => splitSearch.map((search) => `${field} LIKE '%${search}%'`).join(' OR ')).join(' OR ')})`;
   }
 
   async findUserByEmailOrCarnet(
