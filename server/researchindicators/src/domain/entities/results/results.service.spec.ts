@@ -587,9 +587,14 @@ describe('ResultsService', () => {
           { result_id: 1, title: 'Result 1', status: 'active' },
           { result_id: 2, title: 'Result 2', status: 'draft' },
         ],
-        total: 50,
-        currentPage: 2,
-        totalPages: 3,
+        pagination: {
+          total: 50,
+          page: 2,
+          limit: 20,
+          totalPages: 3,
+          hasNextPage: true,
+          hasPreviousPage: true,
+        },
       };
 
       mockMainRepo.findResultsFilters.mockResolvedValue(repositoryResult);
