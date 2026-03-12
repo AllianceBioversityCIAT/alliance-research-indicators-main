@@ -446,12 +446,13 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 		ORDER BY r.result_official_code ${sort_order}
 		${limit}
 	`;
-    const countQuery = `SELECT COUNT(DISTINCT r.result_id) as total ${fromJoinWhere}`;
-    const countResult = await this.query(countQuery);
-    const total = parseInt(countResult[0]?.total ?? '0', 10);
+    //const countQuery = `SELECT COUNT(DISTINCT r.result_id) as total ${fromJoinWhere}`;
+    //const countResult = await this.query(countQuery);
+    //const total = parseInt(countResult[0]?.total ?? '0', 10);
     const data = await this.query(mainQuery);
-    const totalPages = Math.ceil(total / filters.limit);
-    return {
+    //const totalPages = Math.ceil(total / filters.limit);
+    return data;
+    /*return {
       data,
       pagination: {
         total,
@@ -461,7 +462,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
         hasNextPage: filters?.page ? filters.page < totalPages : false,
         hasPreviousPage: filters?.page ? filters.page > 1 : false,
       },
-    };
+    };*/
   }
 
   async deleteResult(result_id: number) {
