@@ -92,3 +92,113 @@ export class PrmsInitiativeDto {
   cgiar_entity_type_id: string;
 }
 
+// new dto for the result response
+export class ResultLevelMapper {
+  public code: string;
+  public name: string;
+  public description: string;
+}
+
+export class IndicatorCategoryMapper {
+  public code: string;
+  public name: string;
+}
+
+export class GeographicFocusMapper {
+  public code: string;
+  public description: string;
+}
+
+export class RegionMapper {
+  public code: string;
+  public name: string;
+}
+
+export class CountryMapper {
+  public code: string;
+  public name: string;
+}
+
+export class ContributingCenterMapper {
+  public code: string;
+  public name: string;
+  public acronym: string;
+  public is_lead: boolean;
+}
+
+export class ContributingPartnerMapper {
+  public code: string;
+  public name: string;
+  public acronym: string;
+}
+
+export class EvidencesMapper {
+  public link: string;
+  public description: string;
+}
+
+export class PrimaryEntityMapper {
+  public official_code: string;
+  public name: string;
+}
+
+export class EntityMapper {
+  public official_code: string;
+  public name: string;
+}
+
+export class SubEntityMapper {
+  public official_code: string;
+  public description: string;
+}
+
+export class TocResultMapper {
+  public level: string;
+  public sub_entity: SubEntityMapper;
+  public result_name: string;
+}
+
+export class TocMapper {
+  public entity: EntityMapper;
+  public initiative_role: string;
+  public toc_results: TocResultMapper[];
+}
+
+export class SearcherResponseDto {
+  public total: number;
+  public page: number;
+  public size: number;
+  public totalPages: number;
+  public data: ResultResponseMapper[];
+}
+
+export class CreatedByMapper {
+  public first_name: string;
+  public last_name: string;
+  public email: string;
+}
+
+export class ResultResponseMapper {
+  public created_date: Date;
+  public last_updated_date: Date;
+  public result_code: string;
+  public status_id: string;
+  public year: string;
+  public pdf_link: string;
+  public prms_link: string;
+  public last_update_at: string;
+  public is_active: boolean;
+  public result_title: string;
+  public description: string;
+  public result_level: ResultLevelMapper;
+  public indicator_category: IndicatorCategoryMapper;
+  public toc_alignment: TocMapper[];
+  public geographic_focus: GeographicFocusMapper;
+  public regions: RegionMapper[];
+  public countries: CountryMapper[];
+  public contributing_centers: ContributingCenterMapper[];
+  public contributing_partners: ContributingPartnerMapper[];
+  public evidences: EvidencesMapper[];
+  public primary_entity: PrimaryEntityMapper;
+  public created_by: CreatedByMapper;
+}

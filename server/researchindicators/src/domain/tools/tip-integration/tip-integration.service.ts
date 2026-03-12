@@ -180,7 +180,7 @@ export class TipIntegrationService extends BaseApi {
         if (!isEmpty(allianceUserStaff)) {
           if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
             resultMapped.userData =
-              await this.createUserProcess(allianceUserStaff);
+              await this.resultsService.createUserProcess(allianceUserStaff);
           } else {
             await this.resultRepository.unpdateCarnetUser(
               existsUser?.sec_user_id,
@@ -209,8 +209,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-              user_id: carnet,
-            } as ResultUser)
+            user_id: carnet,
+          } as ResultUser)
           : null,
       };
 
@@ -309,21 +309,6 @@ export class TipIntegrationService extends BaseApi {
       }
     }
     return this.clarisaLeversService.findByNames(clarisaLevers);
-  }
-
-  private createUserProcess(user: AllianceUserStaff): Promise<SecUser> {
-    const newUser: SecUser = new SecUser();
-    newUser.first_name = user.first_name;
-    newUser.last_name = user.last_name;
-    newUser.email = user.email;
-    newUser.carnet = user.carnet;
-    if (isEmpty(user.email)) {
-      this.logger.warn(
-        `User ${user.carnet} has no email, skipping user creation.`,
-      );
-      return null;
-    }
-    return this.resultRepository.createUserInSecUsers(newUser);
   }
 
   async createKpInStar(

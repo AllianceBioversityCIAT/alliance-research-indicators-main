@@ -328,6 +328,10 @@ export class AppConfig {
     return process.env.ARI_PI_EMAIL.split(',');
   }
 
+  get SEARCH_PRMS_URL(): string {
+    return process.env.ARI_SEARCH_PRMS_URL;
+  }
+
   SPRM_EMAIL_SAFE(currentUserEmail: string): string {
     return this.ARI_IS_PRODUCTION ? this.SPRM_EMAIL : currentUserEmail;
   }

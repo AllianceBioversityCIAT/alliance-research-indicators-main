@@ -5,5 +5,6 @@ import { PooledFundingContractsController } from './pooled-funding-contracts.con
 @Module({
   controllers: [PooledFundingContractsController],
   providers: [PooledFundingContractsService],
+  exports: [PooledFundingContractsService],
 })
-export class PooledFundingContractsModule {}
+export class PooledFundingContractsModule { }

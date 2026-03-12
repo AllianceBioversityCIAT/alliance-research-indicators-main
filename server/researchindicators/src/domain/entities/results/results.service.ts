@@ -91,6 +91,8 @@ import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-ou
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
+import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 
 @Injectable()
 export class ResultsService {
@@ -129,7 +131,7 @@ export class ResultsService {
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -408,6 +410,21 @@ export class ResultsService {
     return lastCode;
   }
 
+  async createUserProcess(user: AllianceUserStaff): Promise<SecUser> {
+    const newUser: SecUser = new SecUser();
+    newUser.first_name = user.first_name;
+    newUser.last_name = user.last_name;
+    newUser.email = user.email;
+    newUser.carnet = user.carnet;
+    if (isEmpty(user.email)) {
+      this.logger.warn(
+        `User ${user.carnet} has no email, skipping user creation.`,
+      );
+      return null;
+    }
+    return this.mainRepo.createUserInSecUsers(newUser);
+  }
+
   private async createResultType(
     resultId: number,
     indicator: IndicatorsEnum,
@@ -639,19 +656,19 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -1140,8 +1157,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },

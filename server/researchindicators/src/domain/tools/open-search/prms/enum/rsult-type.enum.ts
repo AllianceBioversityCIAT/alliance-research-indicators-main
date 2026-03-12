@@ -1,3 +1,5 @@
+import { ResultStatusEnum } from "../../../../entities/result-status/enum/result-status.enum"
+
 export enum ResultTypeEnum {
   POLICY_CHANGE = 1,
   INNOVATION_USE = 2,
@@ -10,4 +12,18 @@ export enum ResultTypeEnum {
   IMPACT_CONTRIBUTION = 9,
   INNOVATION_USE_IPSR = 10,
   COMPLIMENTARY_INNOVATION = 11,
+}
+
+export enum AcronymExContractEnum {
+  'ABC RH' = 'EXCIAT',
+  'ABC' = 'EXBIO',
+}
+
+export const ResultPrmsStatusMapper = {
+  1: ResultStatusEnum.EDITING_IN_PRMS,
+  2: ResultStatusEnum.QAED_IN_PRMS,
+  3: ResultStatusEnum.SUBMITTED_IN_PRMS,
+  4: ResultStatusEnum.DISCONTINUED_IN_PRMS,
+
+
 }

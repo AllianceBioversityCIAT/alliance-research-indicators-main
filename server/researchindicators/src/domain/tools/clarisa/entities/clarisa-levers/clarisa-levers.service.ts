@@ -34,6 +34,14 @@ export class ClarisaLeversService extends ControlListBaseService<
     });
   }
 
+  async findByShortName(shortName: string): Promise<ClarisaLever> {
+    return this.mainRepo.findOne({
+      where: {
+        short_name: shortName,
+      },
+    });
+  }
+
   homologatedData(data: string): string {
     const homologated = {
       L8: 'Lever 8',
