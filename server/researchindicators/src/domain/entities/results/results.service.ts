@@ -129,7 +129,7 @@ export class ResultsService {
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -153,6 +153,7 @@ export class ResultsService {
       resultCodes: filters?.resultCodes,
       platform_code: filters?.platform_code,
       filter_primary_contract: filters?.filter_primary_contract,
+      search: filters?.search,
     });
   }
 
@@ -639,19 +640,19 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -1140,8 +1141,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },

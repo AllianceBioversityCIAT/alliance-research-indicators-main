@@ -45,7 +45,7 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   @ApiQuery({
     name: 'page',
@@ -212,6 +212,7 @@ export class ResultsController {
     @Query('platform-code', ListParseToArrayPipe) platform_code: string[],
     @Query('filter-primary-contract', ListParseToArrayPipe)
     filterPrimaryContract: string[],
+    @Query('search') search: string,
   ) {
     return this.resultsService
       .findResults({
@@ -235,6 +236,7 @@ export class ResultsController {
         resultCodes: resultCodes,
         platform_code: platform_code,
         filter_primary_contract: filterPrimaryContract,
+        search: search,
       })
       .then((el) =>
         ResponseUtils.format({
