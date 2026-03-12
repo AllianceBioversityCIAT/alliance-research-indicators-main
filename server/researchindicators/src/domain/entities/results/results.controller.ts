@@ -45,7 +45,7 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
-  ) { }
+  ) {}
 
   @ApiQuery({
     name: 'page',
