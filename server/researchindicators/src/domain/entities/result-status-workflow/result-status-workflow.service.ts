@@ -18,6 +18,7 @@ import {
 import { AditionalDataChangeStatusDto } from './dto/aditional-data.dto';
 import { StatusTransitionTree } from './satus-graph';
 import {
+  ConfigEmailDto,
   ConfigWorkflowAction,
   ConfigWorkflowActionEmail,
   ConfigWorkflowActionFunction,
@@ -26,6 +27,8 @@ import {
   GeneralDataDto,
 } from './config/config-workflow';
 import Handlebars from 'handlebars';
+import { LoggerUtil } from '../../shared/utils/logger.util';
+import { format } from 'date-fns';
 
 @Injectable()
 export class ResultStatusWorkflowService {
@@ -35,6 +38,10 @@ export class ResultStatusWorkflowService {
         `The configuration of change status is not valid`,
       );
   }
+
+  private readonly logger: LoggerUtil = new LoggerUtil({
+    name: ResultStatusWorkflowService.name,
+  });
 
   constructor(
     private readonly dataSource: DataSource,
@@ -259,11 +266,19 @@ export class ResultStatusWorkflowService {
               insertResponse.identifiers[0].submission_history_id,
           },
         });
-      generalData.history = historyResult;
+      generalData.history = { ...historyResult };
+      generalData.customData.history = {
+        ...historyResult,
+        created_at: format(
+          historyResult.created_at,
+          'dd/MM/yyyy',
+        ) as unknown as Date,
+      };
       await manager.getRepository(Result).update(resultId, {
         result_status_id: toStatusId,
         ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
       });
+      console.log(JSON.stringify(transitionStatus, null, 2));
       await this._executeConfigWorkflow(
         transitionStatus.config,
         manager,
@@ -330,6 +345,20 @@ export class ResultStatusWorkflowService {
         action: DeepPartial<ConfigWorkflowAction>,
       ) => {
         const config = action.config as ConfigWorkflowActionEmail;
+        if (!isEmpty(config?.condition_to_execute)) {
+          this._validateFunction(config?.condition_to_execute);
+          await this.handlerService?.[config?.condition_to_execute](
+            generalData,
+            manager,
+          );
+        }
+        if (!generalData.configEmail.isAvailableToSend) {
+          this.logger._log(
+            `Email is not available to send for result ${generalData.result.result_id}`,
+          );
+          generalData.configEmail = new ConfigEmailDto();
+          return;
+        }
         generalData.configEmail.templateCode = config.template;
         generalData.configEmail.rawTemplate =
           await this.handlerService.getTemplate(generalData, manager);
@@ -349,6 +378,7 @@ export class ResultStatusWorkflowService {
           generalData.configEmail.rawTemplate,
         )(generalData.customData);
         await this.handlerService.sendEmail(generalData, manager);
+        generalData.configEmail = new ConfigEmailDto();
       },
     };
     if (!isEmpty(config?.actions)) {
