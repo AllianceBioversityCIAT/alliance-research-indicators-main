@@ -20,9 +20,14 @@ export class AllianceUserStaffController {
   @ApiOperation({
     summary: 'Find all alliance user staff',
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by name or email',
+  })
   @Get()
-  async find() {
-    return this.allianceUserStaffService.findAll().then((result) =>
+  async find(@Query('search') search?: string) {
+    return this.allianceUserStaffService.findBySearch(search).then((result) =>
       ResponseUtils.format({
         description: 'Alliance user staff found',
         status: HttpStatus.OK,
