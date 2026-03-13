@@ -48,8 +48,7 @@ import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-pr
 
 @Injectable()
 export class PrmsOpenSearchService
-  implements ExternalMappersInterface<ExternalMappersDto>
-{
+  implements ExternalMappersInterface<ExternalMappersDto> {
   private readonly logger = new LoggerUtil({
     name: PrmsOpenSearchService.name,
   });
@@ -65,7 +64,7 @@ export class PrmsOpenSearchService
     private readonly pooledFundingContractsService: PooledFundingContractsService,
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly syncProcessLogService: SyncProcessLogService,
-  ) {}
+  ) { }
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
     for (const result of res) {
@@ -247,6 +246,7 @@ export class PrmsOpenSearchService
     for (const item of data) {
       const indicator = IndicatorHomologation[item.indicator_category.code];
       if (!indicator) {
+        this.logger.warn(`Skipping result ${item.result_code} because indicator ${item.indicator_category.code} is not homologated.`);
         continue;
       }
       const result = new ExternalMappersDto();

@@ -1,12 +1,15 @@
-import { Controller, Get, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { PrmsOpenSearchService } from './prms.opensearch.service';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { RolesGuard } from '../../../shared/guards/roles.guard';
+import { Roles } from '../../../shared/decorators/roles.decorator';
+import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 
 @ApiTags('OpenSearch')
 @Controller()
 @ApiBearerAuth()
 export class PrmsOpenSearchController {
-  constructor(private readonly prmsService: PrmsOpenSearchService) {}
+  constructor(private readonly prmsService: PrmsOpenSearchService) { }
 
   @Get('fetch-prms-data')
   @ApiQuery({
@@ -14,6 +17,8 @@ export class PrmsOpenSearchController {
     required: true,
     type: Number,
   })
+  @UseGuards(RolesGuard)
+  @Roles(SecRolesEnum.DEVELOPER)
   async fetchPrmsData(@Query('year', ParseIntPipe) year: number) {
     return this.prmsService.getData(year);
   }
