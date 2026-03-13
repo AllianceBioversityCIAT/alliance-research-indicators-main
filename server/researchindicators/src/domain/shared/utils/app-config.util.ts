@@ -328,6 +328,10 @@ export class AppConfig {
     return process.env.ARI_PI_EMAIL.split(',');
   }
 
+  get LEVEL_SEVEN_EMAIL(): string {
+    return process.env.ARI_LEVEL_SEVEN_EMAIL;
+  }
+
   SPRM_EMAIL_SAFE(currentUserEmail: string): string {
     return this.ARI_IS_PRODUCTION ? this.SPRM_EMAIL : currentUserEmail;
   }
