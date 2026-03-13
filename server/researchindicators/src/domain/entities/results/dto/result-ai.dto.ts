@@ -18,6 +18,7 @@ import {
   Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { UpdateIpRightDto } from '../../result-ip-rights/dto/update-ip-right.dto';
 
 export class ResultAiDto {
   result: CreateResultDto;
@@ -29,6 +30,7 @@ export class ResultAiDto {
   partners?: CreateResultInstitutionDto;
   evidences?: CreateResultEvidenceDto;
   sdgs?: ResultSdg[];
+  ipRights?: UpdateIpRightDto;
 }
 
 export class CountryAreas {
@@ -648,6 +650,112 @@ export class ResultRawAi {
   @IsArray()
   @IsString({ each: true })
   other_organization_type: string[];
+
+  @ApiProperty({
+    type: Number,
+    description: 'Asset IP Owner ID',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  asset_ip_owner_id?: number;
+
+  @ApiProperty({
+    type: String,
+    description: 'Asset IP Owner Description',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  asset_ip_owner_description: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Publicity Restriction',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^(Yes|No)$/, {
+    message: 'The value must be "Yes" or "No"',
+  })
+  publicity_restriction: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Publicity Restriction Description',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  publicity_restriction_description: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Potential Asset',
+    required: false,
+  })
+  @IsOptional()
+  @IsOptional()
+  @IsString()
+  @Matches(/^(Yes|No)$/, {
+    message: 'The value must be "Yes" or "No"',
+  })
+  potential_asset: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Potential Asset Description',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  potential_asset_description: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Requires Further Development',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^(Yes|No)$/, {
+    message: 'The value must be "Yes" or "No"',
+  })
+  requires_further_development: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Requires Further Development Description',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  requires_further_development_description: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Trainees',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^(Yes|No)$/, {
+    message: 'The value must be "Yes" or "No"',
+  })
+  trainees: string;
+
+  @ApiProperty({
+    type: AiRawInstitution,
+    isArray: true,
+    description: 'Trainees Description',
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AiRawInstitution)
+  trainees_description: AiRawInstitution[];
 }
 
 export class RootAi {

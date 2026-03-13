@@ -45,6 +45,14 @@ export class SubmissionHistory extends AuditableEntity {
   })
   public submission_comment: string;
 
+  @Column({
+    type: 'timestamp',
+    name: 'custom_date',
+    nullable: true,
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  public custom_date?: Date;
+
   @ManyToOne(() => Result, (result) => result.submission_histories)
   @JoinColumn({ name: 'result_id' })
   public result: Result;
