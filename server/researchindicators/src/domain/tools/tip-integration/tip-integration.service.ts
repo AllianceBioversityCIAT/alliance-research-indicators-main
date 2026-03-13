@@ -18,7 +18,6 @@ import {
 import { ClarisaRegionsService } from '../clarisa/entities/clarisa-regions/clarisa-regions.service';
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
 import { ResultRepository } from '../../entities/results/repositories/result.repository';
-import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../../entities/result-users/entities/result-user.entity';
 import { ClarisaLeversService } from '../clarisa/entities/clarisa-levers/clarisa-levers.service';
@@ -180,7 +179,7 @@ export class TipIntegrationService extends BaseApi {
         if (!isEmpty(allianceUserStaff)) {
           if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
             resultMapped.userData =
-              await this.createUserProcess(allianceUserStaff);
+              await this.resultsService.createUserProcess(allianceUserStaff);
           } else {
             await this.resultRepository.unpdateCarnetUser(
               existsUser?.sec_user_id,
@@ -309,21 +308,6 @@ export class TipIntegrationService extends BaseApi {
       }
     }
     return this.clarisaLeversService.findByNames(clarisaLevers);
-  }
-
-  private createUserProcess(user: AllianceUserStaff): Promise<SecUser> {
-    const newUser: SecUser = new SecUser();
-    newUser.first_name = user.first_name;
-    newUser.last_name = user.last_name;
-    newUser.email = user.email;
-    newUser.carnet = user.carnet;
-    if (isEmpty(user.email)) {
-      this.logger.warn(
-        `User ${user.carnet} has no email, skipping user creation.`,
-      );
-      return null;
-    }
-    return this.resultRepository.createUserInSecUsers(newUser);
   }
 
   async createKpInStar(

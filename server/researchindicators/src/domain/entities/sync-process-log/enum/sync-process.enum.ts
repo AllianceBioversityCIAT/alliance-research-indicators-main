@@ -1,5 +1,6 @@
 export enum SyncProcessEnum {
   TIP_INTEGRATION = 'TIP_INTEGRATION',
+  PRMS_INTEGRATION = 'PRMS_INTEGRATION',
 }
 
 export enum SyncProcessStatusEnum {

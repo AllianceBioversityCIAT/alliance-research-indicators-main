@@ -91,6 +91,8 @@ import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-ou
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
+import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
 import { IntellectualPropertyOwner } from '../intellectual-property-owners/entities/intellectual-property-owner.entity';
 
@@ -416,6 +418,21 @@ export class ResultsService {
       });
 
     return lastCode;
+  }
+
+  async createUserProcess(user: AllianceUserStaff): Promise<SecUser> {
+    const newUser: SecUser = new SecUser();
+    newUser.first_name = user.first_name;
+    newUser.last_name = user.last_name;
+    newUser.email = user.email;
+    newUser.carnet = user.carnet;
+    if (isEmpty(user.email)) {
+      this.logger.warn(
+        `User ${user.carnet} has no email, skipping user creation.`,
+      );
+      return null;
+    }
+    return this.mainRepo.createUserInSecUsers(newUser);
   }
 
   private async createResultType(
