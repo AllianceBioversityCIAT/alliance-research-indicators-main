@@ -556,6 +556,11 @@ describe('ResultsService', () => {
         validateTitle: true,
         isSnapshot: false,
       });
+
+      // Ensure OpenSearch upload returns a Promise (service chains `.catch(...)`)
+      mockOpenSearchResultApi.uploadSingleToOpenSearch.mockResolvedValue(
+        undefined,
+      );
     });
 
     it('should throw BadRequestException when required fields are missing', async () => {
