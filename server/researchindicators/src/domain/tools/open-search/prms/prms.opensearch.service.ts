@@ -48,7 +48,8 @@ import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-pr
 
 @Injectable()
 export class PrmsOpenSearchService
-  implements ExternalMappersInterface<ExternalMappersDto> {
+  implements ExternalMappersInterface<ExternalMappersDto>
+{
   private readonly logger = new LoggerUtil({
     name: PrmsOpenSearchService.name,
   });
@@ -64,7 +65,7 @@ export class PrmsOpenSearchService
     private readonly pooledFundingContractsService: PooledFundingContractsService,
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly syncProcessLogService: SyncProcessLogService,
-  ) { }
+  ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
     for (const result of res) {
@@ -172,6 +173,7 @@ export class PrmsOpenSearchService
     const size = 50;
     let page = 1;
     let keepGoing = true;
+    const currentCode: number = null;
     const resultSaved: number[] = [];
     const syncProcessLog = await this.syncProcessLogService.initiateSync(
       SyncProcessEnum.PRMS_INTEGRATION,
@@ -179,12 +181,20 @@ export class PrmsOpenSearchService
     while (keepGoing) {
       const counters: CounterResults = new CounterResults();
       const centerAcronym = ['ABC', 'ABC RH'];
-      const prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}&year=${year}`;
+      let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
+      if (!isEmpty(year)) {
+        prmsUrl += `&year=${year}`;
+      }
       const response = await firstValueFrom(
         this.httpService.get<SearcherResponseDto>(prmsUrl),
       ).then((response) => response.data);
       const dataProcessed = await this.processData(response.data);
-      await this.createResultInStar(dataProcessed, resultSaved, counters);
+      await this.createResultInStar(
+        dataProcessed,
+        resultSaved,
+        currentCode,
+        counters,
+      );
       if (response.totalPages <= page) {
         keepGoing = false;
       }
@@ -246,7 +256,9 @@ export class PrmsOpenSearchService
     for (const item of data) {
       const indicator = IndicatorHomologation[item.indicator_category.code];
       if (!indicator) {
-        this.logger.warn(`Skipping result ${item.result_code} because indicator ${item.indicator_category.code} is not homologated.`);
+        this.logger.warn(
+          `Skipping result ${item.result_code} because indicator ${item.indicator_category.code} is not homologated.`,
+        );
         continue;
       }
       const result = new ExternalMappersDto();
@@ -369,6 +381,7 @@ export class PrmsOpenSearchService
   async createResultInStar(
     results: ExternalMappersDto[],
     resultSaved: number[],
+    currentCode: number,
     counters: CounterResults = {
       createdRecords: 0,
       updatedRecords: 0,
@@ -378,6 +391,12 @@ export class PrmsOpenSearchService
     let typeCounter: CounterResultsEnum = null;
 
     for (const result of results) {
+      let isNewCode = false;
+      if (result.official_code != currentCode) {
+        currentCode = result.official_code;
+        isNewCode = true;
+      }
+
       this.logger.debug(`Processing result ${result.official_code} from PRMS.`);
       this._currentUser.setSystemUser(result.userData, true);
       resultSaved.push(result.official_code);
@@ -390,6 +409,10 @@ export class PrmsOpenSearchService
             report_year_id: result.createResult.year,
           },
         });
+        const snapshotMessage =
+          (isNewCode ? 'is a live version' : 'is a snapshot') +
+          ' from year ' +
+          result.createResult.year;
         if (!findResult) {
           createNewResult = await this.resultsService.createResult(
             result.createResult,
@@ -398,20 +421,22 @@ export class PrmsOpenSearchService
               notContract: true,
               result_status_id: result.status_id,
               validateTitle: false,
+              isSnapshot: !isNewCode,
             },
             result.official_code,
           );
           findResult = createNewResult;
           this.logger.debug(
-            `Creating new result ${findResult.result_official_code} from PRMS.`,
+            `Creating new result ${findResult.result_official_code} from PRMS, ${snapshotMessage}`,
           );
           typeCounter = CounterResultsEnum.CREATED;
         } else {
-          await this.resultKnowledgeProductService.activeKpByResultId(
+          await this.resultsService.updateInactiveResult(
             findResult.result_id,
+            !isNewCode,
           );
           this.logger.debug(
-            `Updating result ${findResult.result_official_code} from PRMS.`,
+            `Updating result ${findResult.result_official_code} from PRMS, ${snapshotMessage}`,
           );
           typeCounter = CounterResultsEnum.UPDATED;
         }
