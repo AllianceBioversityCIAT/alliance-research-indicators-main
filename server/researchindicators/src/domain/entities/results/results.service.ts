@@ -133,7 +133,7 @@ export class ResultsService {
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
-  ) { }
+  ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -258,7 +258,16 @@ export class ResultsService {
       configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
     newConfig.notContract = configuration?.notContract ?? false;
     newConfig.validateTitle = configuration?.validateTitle ?? true;
+    newConfig.isSnapshot = configuration?.isSnapshot ?? false;
     return newConfig;
+  }
+
+  async updateInactiveResult(resultId: number, isSnapshot: boolean) {
+    await this.mainRepo.update(resultId, {
+      is_active: true,
+      is_snapshot: isSnapshot,
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    });
   }
 
   async createResult(
@@ -317,7 +326,7 @@ export class ResultsService {
           is_ai: createResult.is_ai ?? false,
           result_official_code: officialCode ?? newOfficialCode,
           report_year_id: year,
-          is_snapshot: false,
+          is_snapshot: config.isSnapshot,
           platform_code,
           result_status_id: config.result_status_id,
           ...this.currentUser.audit(SetAuditEnum.NEW),
@@ -393,7 +402,7 @@ export class ResultsService {
       return result;
     });
 
-    this._openSearchResultApi.uploadSingleToOpenSearch(
+    await this._openSearchResultApi.uploadSingleToOpenSearch(
       result.result_id,
       ElasticOperationEnum.PATCH,
     );
@@ -562,7 +571,7 @@ export class ResultsService {
         );
       }
 
-      this._openSearchResultApi.uploadSingleToOpenSearch(
+      await this._openSearchResultApi.uploadSingleToOpenSearch(
         {
           result_id,
           title: generalInformation.title,
@@ -666,19 +675,19 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: true,
-            result_lever_strategic_outcomes:
-              el?.result_lever_strategic_outcomes,
-          }))
+              lever_id: el.lever_id,
+              is_primary: true,
+              result_lever_strategic_outcomes:
+                el?.result_lever_strategic_outcomes,
+            }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: false,
-          }))
+              lever_id: el.lever_id,
+              is_primary: false,
+            }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -1026,9 +1035,10 @@ export class ResultsService {
       : null;
     tempIpRights.potential_asset_description =
       result?.potential_asset_description;
-    tempIpRights.requires_futher_development = result?.requires_further_development
-      ? result?.requires_further_development === 'Yes'
-      : null;
+    tempIpRights.requires_futher_development =
+      result?.requires_further_development
+        ? result?.requires_further_development === 'Yes'
+        : null;
     tempIpRights.requires_futher_development_description =
       result?.requires_further_development_description;
     return tempIpRights;
@@ -1219,8 +1229,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-              (el) => el.isoAlpha2 === country.isoAlpha2,
-            )?.result_countries_sub_nationals
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
             : [];
           return country;
         },
