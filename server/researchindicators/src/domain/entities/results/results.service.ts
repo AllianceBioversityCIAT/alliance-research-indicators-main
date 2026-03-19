@@ -133,7 +133,7 @@ export class ResultsService {
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
-  ) { }
+  ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -394,12 +394,10 @@ export class ResultsService {
       return result;
     });
 
-    await this._openSearchResultApi.uploadSingleToOpenSearch(
+    this._openSearchResultApi.uploadSingleToOpenSearch(
       result.result_id,
       ElasticOperationEnum.PATCH,
-    ).catch((error) => {
-      this.logger.error(`Error uploading result ${result.result_official_code} to OpenSearch: ${error}`);
-    });
+    );
 
     return result;
   }
@@ -498,12 +496,10 @@ export class ResultsService {
       });
 
     await this.mainRepo.deleteResult(result.result_id);
-    await this._openSearchResultApi.uploadSingleToOpenSearch(
+    this._openSearchResultApi.uploadSingleToOpenSearch(
       { result_id: result.result_id },
       ElasticOperationEnum.DELETE,
-    ).catch((error) => {
-      this.logger.error(`Error uploading result ${result.result_official_code} to OpenSearch: ${error}`);
-    });
+    );
     return result;
   }
 
@@ -567,7 +563,7 @@ export class ResultsService {
         );
       }
 
-      await this._openSearchResultApi.uploadSingleToOpenSearch(
+      this._openSearchResultApi.uploadSingleToOpenSearch(
         {
           result_id,
           title: generalInformation.title,
@@ -575,9 +571,7 @@ export class ResultsService {
           keywords: keywords.map((el) => el.keyword),
         },
         ElasticOperationEnum.PUT,
-      ).catch((error) => {
-        this.logger.error(`Error uploading result ${result_id} to OpenSearch: ${error}`);
-      });
+      );
 
       if (returnData === TrueFalseEnum.TRUE) {
         return this.findGeneralInfo(result_id);
@@ -673,19 +667,19 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: true,
-            result_lever_strategic_outcomes:
-              el?.result_lever_strategic_outcomes,
-          }))
+              lever_id: el.lever_id,
+              is_primary: true,
+              result_lever_strategic_outcomes:
+                el?.result_lever_strategic_outcomes,
+            }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: false,
-          }))
+              lever_id: el.lever_id,
+              is_primary: false,
+            }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -1227,8 +1221,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-              (el) => el.isoAlpha2 === country.isoAlpha2,
-            )?.result_countries_sub_nationals
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
             : [];
           return country;
         },
