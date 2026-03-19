@@ -69,6 +69,7 @@ export class ResultInnovationDevService {
   async processedCenters(
     centers: OrganizationDetailed[],
   ): Promise<CreateResultInstitutionTypeDto[]> {
+    if (isEmpty(centers)) return [];
     const newInstitutionTypes: CreateResultInstitutionTypeDto[] = [];
     for (const center of centers) {
       const isInstitutionValid = validObject(center, [
@@ -265,14 +266,14 @@ export class ResultInnovationDevService {
           createResultInnovationDevDto?.anticipated_users_id,
         ...(adddExtraData
           ? {
-              expected_outcome: createResultInnovationDevDto?.expected_outcome,
-              intended_beneficiaries_description:
-                createResultInnovationDevDto?.intended_beneficiaries_description,
-            }
+            expected_outcome: createResultInnovationDevDto?.expected_outcome,
+            intended_beneficiaries_description:
+              createResultInnovationDevDto?.intended_beneficiaries_description,
+          }
           : {
-              expected_outcome: null,
-              intended_beneficiaries_description: null,
-            }),
+            expected_outcome: null,
+            intended_beneficiaries_description: null,
+          }),
         ...this._currentUser.audit(SetAuditEnum.UPDATE),
       });
 
@@ -296,8 +297,8 @@ export class ResultInnovationDevService {
         resultId,
         adddExtraData
           ? createResultInnovationDevDto?.institution_types?.filter((el) =>
-              Boolean(el?.institution_type_id || el?.institution_id),
-            )
+            Boolean(el?.institution_type_id || el?.institution_id),
+          )
           : [],
         manager,
       );
