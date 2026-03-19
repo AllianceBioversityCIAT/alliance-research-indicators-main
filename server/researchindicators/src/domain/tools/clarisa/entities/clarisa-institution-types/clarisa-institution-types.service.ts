@@ -25,6 +25,19 @@ export class ClarisaInstitutionTypesService extends ControlListBaseService<
     return this.mainRepo.findActiveWithNoChildren();
   }
 
+  async findByName(name: string): Promise<ClarisaInstitutionType> {
+    const where: FindOptionsWhere<ClarisaInstitutionType> = {
+      is_active: true,
+      name: Like(`%${name}%`),
+    } as FindOptionsWhere<ClarisaInstitutionType>;
+    return this.mainRepo.findOne({
+      where: where,
+      relations: {
+        parent: true,
+      },
+    });
+  }
+
   async getChildlessInstitutionTypes() {
     const institutionsType = await this.mainRepo.find({
       where: { is_active: true },
