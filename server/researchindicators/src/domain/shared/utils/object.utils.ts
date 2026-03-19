@@ -39,6 +39,35 @@ export const validObject = <T>(
   };
 };
 
+export const validObjectAnyOf = <T>(
+  obj: Partial<T>,
+  valid: (keyof T)[],
+): ValidationResult => {
+  const invalidFields: string[] = [];
+
+  if (!valid?.length) {
+    return {
+      isValid: false,
+      invalidFields,
+    };
+  }
+
+  for (const key of valid) {
+    if (!isEmpty(obj[key])) {
+      return {
+        isValid: true,
+        invalidFields: [],
+      };
+    }
+    invalidFields.push(key as string);
+  }
+
+  return {
+    isValid: false,
+    invalidFields,
+  };
+};
+
 export const isEmpty = <T>(attr: T) => {
   return (
     attr === null ||
