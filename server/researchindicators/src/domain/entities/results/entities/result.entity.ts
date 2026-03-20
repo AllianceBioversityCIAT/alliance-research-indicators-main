@@ -1,6 +1,7 @@
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -45,6 +46,16 @@ import { ResultImpactArea } from '../../result-impact-areas/entities/result-impa
 import { ResultKnowledgeProduct } from '../../result-knowledge-product/entities/result-knowledge-product.entity';
 
 @Entity('results')
+@Index('idx_results_snapshot_active_report_year', [
+  'is_snapshot',
+  'is_active',
+  'report_year_id',
+])
+@Index('idx_results_official_code_snapshot_report_year', [
+  'result_official_code',
+  'is_snapshot',
+  'report_year_id',
+])
 export class Result extends AuditableEntity {
   @PrimaryGeneratedColumn({
     name: 'result_id',
