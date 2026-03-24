@@ -22,6 +22,7 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ResultInnovationDev } from '../result-innovation-dev/entities/result-innovation-dev.entity';
 import { EnvAppConfigUtil } from '../../shared/utils/env-app-config.util';
+import { DisseminationQualificationsEnum } from '../dissemination-qualifications/enum/dissemination-qualifications.enum';
 
 @Injectable()
 export class StatusWorkflowFunctionHandlerService {
@@ -78,9 +79,15 @@ export class StatusWorkflowFunctionHandlerService {
     const innovationReadinessLevel = await entityManager
       .getRepository(ResultInnovationDev)
       .findOne({
+        select: {
+          result_id: true,
+        },
         where: {
           result_id: generalData.result.result_id,
           is_active: true,
+          is_knowledge_sharing: true,
+          dissemination_qualification_id:
+            DisseminationQualificationsEnum.PROCEED,
           innovation_readiness_id: MoreThanOrEqual(7),
         },
       });
@@ -88,6 +95,31 @@ export class StatusWorkflowFunctionHandlerService {
     if (isEmpty(innovationReadinessLevel)) {
       generalData.configEmail.isAvailableToSend = false;
     }
+  }
+
+  async findInnovationDevData(
+    generalData: GeneralDataDto,
+    manager: EntityManager,
+  ) {
+    const entityManager = transactionManager(
+      manager,
+      this.dataSource.createEntityManager(),
+    );
+
+    const innovationDev = await entityManager
+      .getRepository(ResultInnovationDev)
+      .findOne({
+        where: {
+          result_id: generalData.result.result_id,
+          is_active: true,
+        },
+      });
+
+    if (!isEmpty(innovationDev)) {
+      generalData.customData.innovation_dev = innovationDev;
+    }
+
+    await this.findInnovationReadinessLevel(generalData, manager);
   }
 
   async findInnovationReadinessLevel(
@@ -231,6 +263,15 @@ export class StatusWorkflowFunctionHandlerService {
       generalData,
       entityManager,
     );
+    return { ...generalData };
+  }
+
+  async findCustomDataForInnovationReadinessLevelSeven(
+    generalData: GeneralDataDto,
+    manager: EntityManager,
+  ): Promise<GeneralDataDto> {
+    await this.findCustomDataSubmitted(generalData, manager);
+    await this.findInnovationDevData(generalData, manager);
     return { ...generalData };
   }
 
