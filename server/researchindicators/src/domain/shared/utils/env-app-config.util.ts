@@ -26,9 +26,13 @@ export class EnvAppConfigUtil {
         if (configWhere?.key) {
             where.key = configWhere.key;
         }
-        if (configWhere?.category && configWhere?.subcategory) {
+        if (configWhere?.category) {
             where.category = configWhere.category;
+        }
+        if (configWhere?.subcategory) {
             where.subcategory = configWhere.subcategory;
+        }
+        if (configWhere?.field) {
             where.field = configWhere.field;
         }
 
