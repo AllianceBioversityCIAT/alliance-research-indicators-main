@@ -4,6 +4,7 @@ import { DeepPartial } from 'typeorm';
 import { Result } from '../../results/entities/result.entity';
 import { AditionalDataChangeStatusDto } from '../dto/aditional-data.dto';
 import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
+import { ResultInnovationDev } from '../../result-innovation-dev/entities/result-innovation-dev.entity';
 
 export interface ConfigWorkflow {
   actions: ConfigWorkflowAction[];
@@ -121,6 +122,7 @@ export class CustomDataDto {
   result_owner: SimpleUserDto = new SimpleUserDto();
   regional_expert: SimpleUserDto = new SimpleUserDto();
   history: SubmissionHistory = new SubmissionHistory();
+  innovation_dev: ResultInnovationDev = new ResultInnovationDev();
   indicator_name?: string = null;
   indicator_id?: number = null;
   description?: string = null;
