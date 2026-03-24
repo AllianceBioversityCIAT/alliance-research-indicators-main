@@ -21,6 +21,7 @@ import {
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ResultInnovationDev } from '../result-innovation-dev/entities/result-innovation-dev.entity';
+import { EnvAppConfigUtil } from '../../shared/utils/env-app-config.util';
 
 @Injectable()
 export class StatusWorkflowFunctionHandlerService {
@@ -33,6 +34,7 @@ export class StatusWorkflowFunctionHandlerService {
     private readonly greenCheckRepository: GreenCheckRepository,
     private readonly currentUser: CurrentUserUtil,
     private readonly updateDataUtil: UpdateDataUtil,
+    private readonly dbEnv: EnvAppConfigUtil,
   ) {
     this.mainRepo = resultStatusWorkflowRepository;
   }
@@ -384,7 +386,10 @@ export class StatusWorkflowFunctionHandlerService {
     generalData: GeneralDataDto,
     _manager: EntityManager,
   ) {
-    generalData.configEmail.to = [this.appConfig.LEVEL_SEVEN_EMAIL];
+    const to = await this.dbEnv
+      .EMAIL_READINESS_LEVEL_7_TO<string>()
+      .then((to) => to.split(','));
+    generalData.configEmail.to = to;
     generalData.configEmail.cc = [generalData.customData.action_executor.email];
     generalData.configEmail.subject = `[${this.appConfig.ARI_MIS}] - New Innovation Submitted in STAR – Readiness Level ${generalData.customData.innovation_readiness_level}`;
   }

@@ -331,9 +331,6 @@ export class AppConfig {
   get SEARCH_PRMS_URL(): string {
     return process.env.ARI_SEARCH_PRMS_URL;
   }
-  get LEVEL_SEVEN_EMAIL(): string {
-    return process.env.ARI_LEVEL_SEVEN_EMAIL;
-  }
 
   SPRM_EMAIL_SAFE(currentUserEmail: string): string {
     return this.ARI_IS_PRODUCTION ? this.SPRM_EMAIL : currentUserEmail;
