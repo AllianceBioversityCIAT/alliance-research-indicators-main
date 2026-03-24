@@ -166,8 +166,8 @@ export class ResultCapacitySharingService {
 
     tempCapSharing.nationality = clean_nationality
       ? ({
-        isoAlpha2: clean_nationality.isoAlpha2,
-      } as ResultCountry)
+          isoAlpha2: clean_nationality.isoAlpha2,
+        } as ResultCountry)
       : null;
 
     const clean_gender = await nextToProcessAiRaw(
