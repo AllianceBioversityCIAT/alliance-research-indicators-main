@@ -278,7 +278,6 @@ export class ResultStatusWorkflowService {
         result_status_id: toStatusId,
         ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
       });
-      console.log(JSON.stringify(transitionStatus, null, 2));
       await this._executeConfigWorkflow(
         transitionStatus.config,
         manager,
