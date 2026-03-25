@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { UpdateResultCapacitySharingDto } from '../../result-capacity-sharing/dto/update-result-capacity-sharing.dto';
 import { CreateResultPolicyChangeDto } from '../../result-policy-change/dto/create-result-policy-change.dto';
 import { CreateResultDto } from './create-result.dto';
@@ -218,6 +218,32 @@ export class AiRawLanguage {
   @IsString()
   @IsNotEmpty()
   code: string;
+}
+
+export class OrganizationDetailed extends PartialType(AiRawInstitution) {
+  @ApiProperty({
+    type: String,
+    description: 'Type of the organization',
+  })
+  @IsString()
+  @IsOptional()
+  type?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Sub type of the organization',
+  })
+  @IsString()
+  @IsOptional()
+  sub_type?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Other type of the organization',
+  })
+  @IsString()
+  @IsOptional()
+  other_type?: string;
 }
 
 export class ResultRawAi {
@@ -613,43 +639,16 @@ export class ResultRawAi {
   innovation_actors_detailed: ResultInnovationActorDetailedDto[];
 
   @ApiProperty({
-    type: String,
+    type: OrganizationDetailed,
     isArray: true,
-    description: 'Organizations involved in the result',
+    description: 'Detailed information about the organizations',
     required: false,
   })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  organizations: string[];
-
-  @ApiProperty({
-    type: [String],
-    description: 'Organization type of the result',
-    required: false,
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  organization_type: string[];
-
-  @ApiProperty({
-    type: [String],
-    description: 'Sub-type of the organization if applicable',
-    required: false,
-  })
-  @IsOptional()
-  organization_sub_type: string | string[];
-
-  @ApiProperty({
-    type: [String],
-    description: 'Other organization type if applicable',
-    required: false,
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  other_organization_type: string[];
+  @ValidateNested({ each: true })
+  @Type(() => OrganizationDetailed)
+  organizations_detailed: OrganizationDetailed[];
 
   @ApiProperty({
     type: Number,
