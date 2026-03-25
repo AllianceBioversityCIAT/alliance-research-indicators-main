@@ -18,13 +18,18 @@ import { ClarisaActorTypesService } from '../../tools/clarisa/entities/clarisa-a
 import {
   isEmpty,
   setDefaultValueInObject,
+  validObject,
+  validObjectAnyOf,
 } from '../../shared/utils/object.utils';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { LinkResult } from '../link-results/entities/link-result.entity';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { ClarisaInnovationReadinessLevel } from '../../tools/clarisa/entities/clarisa-innovation-readiness-levels/entities/clarisa-innovation-readiness-level.entity';
-import { ResultRawAi } from '../results/dto/result-ai.dto';
+import {
+  OrganizationDetailed,
+  ResultRawAi,
+} from '../results/dto/result-ai.dto';
 import { ClarisaInnovationCharacteristicsService } from '../../tools/clarisa/entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.service';
 import { ClarisaInnovationTypesService } from '../../tools/clarisa/entities/clarisa-innovation-types/clarisa-innovation-types.service';
 import { ClarisaInnovationReadinessLevelsService } from '../../tools/clarisa/entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.service';
@@ -32,14 +37,16 @@ import { InnovationDevAnticipatedUsersService } from '../innovation-dev-anticipa
 import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
 import { CreateResultActorDto } from '../result-actors/dto/create-result-actor.dto';
 import { ClarisaInstitutionsService } from '../../tools/clarisa/entities/clarisa-institutions/clarisa-institutions.service';
-import { ClarisaInstitution } from '../../tools/clarisa/entities/clarisa-institutions/entities/clarisa-institution.entity';
 import { CreateResultInstitutionTypeDto } from '../result-institution-types/dto/create-result-institution-type.dto';
 import { ClarisaInstitutionTypesService } from '../../tools/clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
 import { ResultInnovationToolFunction } from '../result-innovation-tool-function/entities/result-innovation-tool-function.entity';
 import { ResultInnovationToolFunctionService } from '../result-innovation-tool-function/result-innovation-tool-function.service';
+import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
+import { ClarisaInstitutionTypeEnum } from '../../tools/clarisa/entities/clarisa-institution-types/enum/clarisa-institution-type.enum';
 @Injectable()
 export class ResultInnovationDevService {
   private readonly mainRepo: Repository<ResultInnovationDev>;
+  private readonly logger = new CgiarLogger(ResultInnovationDevService.name);
   constructor(
     private readonly dataSource: DataSource,
     private readonly _currentUser: CurrentUserUtil,
@@ -57,6 +64,89 @@ export class ResultInnovationDevService {
     private readonly _resultInnovationToolFunctionService: ResultInnovationToolFunctionService,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultInnovationDev);
+  }
+
+  async processedCenters(
+    centers: OrganizationDetailed[],
+  ): Promise<CreateResultInstitutionTypeDto[]> {
+    if (isEmpty(centers)) return [];
+    const newInstitutionTypes: CreateResultInstitutionTypeDto[] = [];
+    for (const center of centers) {
+      const isInstitutionValid = validObject(center, [
+        'institution_id',
+        'similarity_score',
+      ]).isValid;
+      const isCenterValid = validObjectAnyOf(center, [
+        'type',
+        'sub_type',
+        'other_type',
+      ]).isValid;
+      const anyValid = isInstitutionValid || isCenterValid;
+      if (anyValid) {
+        const newInstitutionType = new CreateResultInstitutionTypeDto();
+        if (isInstitutionValid) {
+          const institution = await this._clarisaInstitutionsService.findOne(
+            center.institution_id,
+          );
+          if (isEmpty(institution)) {
+            this.logger.warn(
+              `Institution with ID ${center.institution_id}: ${center?.institution_name} not found`,
+            );
+            continue;
+          }
+          newInstitutionType.institution_id = institution.code;
+          newInstitutionType.is_organization_known = true;
+          newInstitutionTypes.push(newInstitutionType);
+        } else if (isCenterValid) {
+          const institutionType = await this.processedInstitutionTypes(center);
+          if (isEmpty(institutionType)) {
+            this.logger.warn(
+              `Institution type with name ${center.type} not found`,
+            );
+            continue;
+          }
+          newInstitutionTypes.push(institutionType);
+        }
+      }
+    }
+    return newInstitutionTypes;
+  }
+
+  async processedInstitutionTypes(
+    institutionTypes: OrganizationDetailed,
+  ): Promise<CreateResultInstitutionTypeDto> {
+    let newInstitutionTypes = new CreateResultInstitutionTypeDto();
+    newInstitutionTypes.is_organization_known = false;
+    if (!isEmpty(institutionTypes?.other_type)) {
+      newInstitutionTypes.institution_type_id =
+        ClarisaInstitutionTypeEnum.OTHER;
+      newInstitutionTypes.institution_type_custom_name =
+        institutionTypes.other_type;
+    } else if (!isEmpty(institutionTypes?.sub_type)) {
+      const subType = await this._clarisaInstitutionTypesService.findByName(
+        institutionTypes.sub_type,
+      );
+      if (subType) {
+        newInstitutionTypes.institution_type_id = subType.parent?.code;
+        newInstitutionTypes.sub_institution_type_id = subType.code;
+      } else {
+        this.logger.warn(
+          `Sub type with name ${institutionTypes.sub_type} not found`,
+        );
+        newInstitutionTypes = null;
+      }
+    } else {
+      const type = await this._clarisaInstitutionTypesService.findByName(
+        institutionTypes.type,
+      );
+      if (type) {
+        newInstitutionTypes.institution_type_id = type.code;
+      } else {
+        this.logger.warn(`Type with name ${institutionTypes.type} not found`);
+        newInstitutionTypes = null;
+      }
+    }
+    return newInstitutionTypes;
   }
 
   async processedAiInfo(
@@ -103,69 +193,10 @@ export class ResultInnovationDevService {
     }
     innovationDev.actors = newActors as CreateResultActorDto[];
 
-    const organizationsNames = result.organizations;
-    let clarisaInstitutions: ClarisaInstitution[] = [];
-    if (Array.isArray(organizationsNames) && organizationsNames.length > 0) {
-      clarisaInstitutions =
-        await this._clarisaInstitutionsService.findByLikeNames(
-          organizationsNames,
-        );
-    }
+    const organizationsDetailed = result.organizations_detailed;
     const newInstitutionTypes: Partial<CreateResultInstitutionTypeDto>[] = [];
-
-    for (const institution of clarisaInstitutions) {
-      newInstitutionTypes.push({
-        institution_type_id: null,
-        sub_institution_type_id: null,
-        institution_type_custom_name: null,
-        is_organization_known: true,
-        institution_id: institution.code,
-      });
-    }
-
-    const preProcessedTypes = this.processDataArrayString(
-      result?.organization_type,
-    );
-    const clarisaInstitutionsType = preProcessedTypes.length
-      ? await this._clarisaInstitutionTypesService.findByLikeNames(
-          preProcessedTypes,
-        )
-      : [];
-    const newArray: string[] = Array.isArray(result?.organization_sub_type)
-      ? result?.organization_sub_type
-      : result?.organization_sub_type !== 'Not collected'
-        ? [result?.organization_sub_type]
-        : [];
-
-    const preProcessedSubTypes = this.processDataArrayString(
-      newArray?.filter(Boolean),
-    );
-
-    const clarisaInstitutionsSubType = preProcessedSubTypes.length
-      ? await this._clarisaInstitutionTypesService.findByLikeNames(
-          preProcessedSubTypes,
-        )
-      : [];
-
-    for (const institutionsType of clarisaInstitutionsType) {
-      newInstitutionTypes.push({
-        institution_type_id: institutionsType.code,
-        sub_institution_type_id: null,
-        institution_type_custom_name: null,
-        is_organization_known: false,
-        institution_id: null,
-      });
-    }
-
-    for (const institutionsSubType of clarisaInstitutionsSubType) {
-      newInstitutionTypes.push({
-        institution_type_id: institutionsSubType?.parent?.code,
-        sub_institution_type_id: institutionsSubType.code,
-        institution_type_custom_name: null,
-        is_organization_known: false,
-        institution_id: null,
-      });
-    }
+    const centers = await this.processedCenters(organizationsDetailed);
+    newInstitutionTypes.push(...centers);
 
     innovationDev.institution_types =
       newInstitutionTypes as CreateResultInstitutionTypeDto[];
@@ -235,14 +266,14 @@ export class ResultInnovationDevService {
           createResultInnovationDevDto?.anticipated_users_id,
         ...(adddExtraData
           ? {
-              expected_outcome: createResultInnovationDevDto?.expected_outcome,
-              intended_beneficiaries_description:
-                createResultInnovationDevDto?.intended_beneficiaries_description,
-            }
+            expected_outcome: createResultInnovationDevDto?.expected_outcome,
+            intended_beneficiaries_description:
+              createResultInnovationDevDto?.intended_beneficiaries_description,
+          }
           : {
-              expected_outcome: null,
-              intended_beneficiaries_description: null,
-            }),
+            expected_outcome: null,
+            intended_beneficiaries_description: null,
+          }),
         ...this._currentUser.audit(SetAuditEnum.UPDATE),
       });
 
@@ -266,8 +297,8 @@ export class ResultInnovationDevService {
         resultId,
         adddExtraData
           ? createResultInnovationDevDto?.institution_types?.filter((el) =>
-              Boolean(el?.institution_type_id || el?.institution_id),
-            )
+            Boolean(el?.institution_type_id || el?.institution_id),
+          )
           : [],
         manager,
       );
