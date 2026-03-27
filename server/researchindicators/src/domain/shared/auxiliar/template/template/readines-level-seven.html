@@ -13,12 +13,16 @@
     </p>
     <p>Details of the innovation:</p>
     <ul>
-      <li>Innovation ID: {{result_code}}</li>
-      <li>Innovation Title: {{title}}</li>
-      <li>Associated Project: {{contract.code}} - {{contract.title}}</li>
-      <li>Principal Investigator: {{principal_investigator.name}}</li>
-      <li>Submission Date: {{history.created_at}}</li>
+      <li><b>Innovation ID:</b> {{result_code}}</li>
+      <li><b>Innovation Title:</b> {{title}}</li>
+      <li><b>Associated Project:</b> {{contract.code}} - {{contract.title}}</li>
+      <li><b>Principal Investigator:</b> {{principal_investigator.name}}</li>
+      <li><b>Submission Date:</b> {{history.created_at}}</li>
     </ul>
+    <p>
+      <b>In what context is this tool useful?</b><br />
+      "{{innovation_dev.tool_useful_context}}"
+    </p>
     <p>
       You can access the full submission directly in STAR, including the
       Knowledge Sharing section, through the following link:

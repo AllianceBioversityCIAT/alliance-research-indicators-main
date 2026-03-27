@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('app_config')
 export class AppConfig extends AuditableEntity {
-  @PrimaryColumn({ type: 'varchar', length: 100 })
+  @PrimaryColumn({ type: 'varchar', length: 255 })
   key: string;
 
   @ApiProperty()
@@ -14,6 +14,30 @@ export class AppConfig extends AuditableEntity {
     name: 'description',
   })
   description: string;
+
+  @ApiProperty()
+  @Column({
+    type: 'text',
+    nullable: true,
+    name: 'category',
+  })
+  category: string;
+
+  @ApiProperty()
+  @Column({
+    type: 'text',
+    nullable: true,
+    name: 'subcategory',
+  })
+  subcategory: string;
+
+  @ApiProperty()
+  @Column({
+    type: 'text',
+    nullable: true,
+    name: 'field',
+  })
+  field: string;
 
   @ApiProperty()
   @Column({
