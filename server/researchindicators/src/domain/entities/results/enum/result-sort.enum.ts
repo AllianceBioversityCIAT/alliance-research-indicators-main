@@ -12,7 +12,7 @@ export const ResultSortFields = (field: ResultSortEnum, order: 'ASC' | 'DESC') =
         'result-title': 'r.title',
     }
 
-    return fieldMap[field] ?? 'r.result_official_code';
+    return fieldMap?.[field] ?? 'r.result_official_code';
 }
 
 export enum ResultSortEnum {

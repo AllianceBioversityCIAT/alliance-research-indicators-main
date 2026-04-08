@@ -164,7 +164,7 @@ export class ResultsService {
     pagination?: { page?: number; limit?: number },
     sorting?: { field?: ResultSortEnum; order?: 'ASC' | 'DESC' },
   ) {
-    return this.mainRepo.findResultsV2(search, pagination);
+    return this.mainRepo.findResultsV2(search, pagination, sorting);
   }
 
   async findOne(options: FindOneOptions<Result>) {

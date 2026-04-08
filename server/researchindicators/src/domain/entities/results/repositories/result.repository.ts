@@ -209,8 +209,8 @@ export class ResultRepository
 											  'deleted_at', ac.deleted_at))`;
 
       queryParts.contracts.select = `,${filters?.primary_contract
-          ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
-          : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
+        ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
+        : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
         } as result_contracts`;
 
       if (filters?.primary_contract) {
@@ -543,7 +543,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 
   private sortOrderV2(field: ResultSortEnum, order: 'ASC' | 'DESC') {
     const fieldMap = ResultSortFields(field, order);
-    const direction = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const direction = order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     return `ORDER BY ${fieldMap} ${direction}`;
   }
 

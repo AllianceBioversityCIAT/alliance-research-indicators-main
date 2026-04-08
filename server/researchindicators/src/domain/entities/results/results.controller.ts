@@ -283,10 +283,11 @@ export class ResultsController {
     @Query('search') search: string,
     @Query('page') page: string,
     @Query('limit') limit: string,
-    @Query('sort-order', new DefaultValuePipe('DESC')) sortOrder: string,
+    @Query('sort-order', new DefaultValuePipe('DESC')) sortOrder: 'ASC' | 'DESC',
+    @Query('sort-field', new DefaultValuePipe(ResultSortEnum.CODE)) sortField: ResultSortEnum,
   ) {
     return this.resultsService
-      .findResultv2(search, { page: +page, limit: +limit })
+      .findResultv2(search, { page: +page, limit: +limit }, { field: sortField, order: sortOrder })
       .then((el) =>
         ResponseUtils.format({
           description: 'Results found',
