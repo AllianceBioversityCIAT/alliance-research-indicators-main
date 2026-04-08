@@ -41,6 +41,7 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ResultSortEnum } from './enum/result-sort.enum';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 @ApiTags('Results')
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
@@ -50,7 +51,7 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   @ApiQuery({
     name: 'page',
@@ -304,6 +305,19 @@ export class ResultsController {
     type: String,
     description: 'filter by platform code',
   })
+  @ApiQuery({
+    name: 'indicators',
+    required: false,
+    type: String,
+    description: 'filter by indicators',
+  })
+  @ApiQuery({
+    name: 'only-own-results',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description: 'filter by only own results',
+  })
   async findResultv2(
     @Query('search') search: string,
     @Query('page') page: string,
@@ -318,6 +332,9 @@ export class ResultsController {
     @Query('years', ListParseToArrayPipe) years: string[],
     @Query('platform-code', ListParseToArrayPipe)
     platformCode: ReportingPlatformEnum[],
+    @Query('indicators', ListParseToArrayPipe)
+    indicators: IndicatorsEnum[],
+    @Query('only-own-results', QueryParseBool) onlyOwnResults: boolean,
   ) {
     return this.resultsService
       .findResultv2(
@@ -329,6 +346,8 @@ export class ResultsController {
           contracts: contractCodes,
           years: years,
           sources: platformCode,
+          indicators: indicators,
+          onlyOwnResults: onlyOwnResults,
         },
       )
       .then((el) =>

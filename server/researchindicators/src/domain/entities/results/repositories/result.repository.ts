@@ -15,6 +15,7 @@ import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-u
 import { ResultSortEnum, ResultSortFields } from '../enum/result-sort.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
+import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 
 @Injectable()
 export class ResultRepository
@@ -211,8 +212,8 @@ export class ResultRepository
 											  'deleted_at', ac.deleted_at))`;
 
       queryParts.contracts.select = `,${filters?.primary_contract
-          ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
-          : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
+        ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
+        : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
         } as result_contracts`;
 
       if (filters?.primary_contract) {
@@ -593,6 +594,11 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     contracts: string[];
     years: string[];
     sources: ReportingPlatformEnum[];
+    indicators: IndicatorsEnum[];
+    currentUser: {
+      onlyOwnResults: boolean;
+      userId: number;
+    }
   }) {
     let query = '';
     if (filters.status.length > 0) {
@@ -607,6 +613,13 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     if (filters.sources.length > 0) {
       query += `AND r.platform_code IN (${formatArrayToQuery<string>(filters.sources)})`;
     }
+    if (filters.indicators.length > 0) {
+      query += `AND r.indicator_id IN (${formatArrayToQuery<number>(filters.indicators)})`;
+    }
+    if (filters.currentUser.onlyOwnResults) {
+      query += `AND r.created_by = ${filters.currentUser.userId}`;
+    }
+
     return query;
   }
 
@@ -619,6 +632,11 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       contracts: string[];
       years: string[];
       sources: ReportingPlatformEnum[];
+      indicators: IndicatorsEnum[];
+      currentUser: {
+        onlyOwnResults: boolean;
+        userId: number;
+      }
     },
   ) {
     const page = !pagination?.page || pagination.page < 1 ? 1 : pagination.page;
