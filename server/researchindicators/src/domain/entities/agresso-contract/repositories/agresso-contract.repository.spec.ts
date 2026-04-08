@@ -571,6 +571,42 @@ describe('AgressoContractRepository', () => {
         expect.not.stringContaining('AND r.created_by'),
       );
     });
+
+    it('should order by query relevance when query parameter is set', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.getContracts(
+        {},
+        null,
+        undefined,
+        undefined,
+        undefined,
+        'climate research',
+      );
+
+      const mainSql = (repository.query as jest.Mock).mock.calls.find(
+        (call) =>
+          typeof call[0] === 'string' &&
+          call[0].includes('paginated_contracts'),
+      )?.[0] as string;
+
+      expect(mainSql).toContain('_query_relevance');
+      expect(mainSql).toMatch(/ORDER BY _query_relevance DESC/);
+    });
+
+    it('should not add query relevance column when query is omitted', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.getContracts();
+
+      const mainSql = (repository.query as jest.Mock).mock.calls.find(
+        (call) =>
+          typeof call[0] === 'string' &&
+          call[0].includes('paginated_contracts'),
+      )?.[0] as string;
+
+      expect(mainSql).not.toContain('_query_relevance');
+    });
   });
 
   describe('buildStatusFilterClause', () => {

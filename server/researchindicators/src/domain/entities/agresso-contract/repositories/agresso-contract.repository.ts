@@ -218,6 +218,38 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ).then((response) => (response.length > 0 ? response[0] : null));
   }
 
+  /**
+   * Score used only for ORDER BY when searching by `query`. Same columns as `querySearch`
+   * in getContracts; higher = closer match. Not exposed in the outer SELECT.
+   */
+  private buildQueryRelevanceScoreSql(
+    escapedFullQuery: string,
+    escapedTokens: string[],
+  ): string {
+    const tokens = escapedTokens.filter((t) => !isEmpty(t));
+    const parts: string[] = [
+      `(CASE WHEN LOWER(TRIM(ac.agreement_id)) = LOWER('${escapedFullQuery}') THEN 2000 ELSE 0 END)`,
+      `(CASE WHEN ac.agreement_id LIKE '${escapedFullQuery}%' THEN 800 ELSE 0 END)`,
+      `(CASE WHEN ac.description LIKE '%${escapedFullQuery}%' THEN 400 ELSE 0 END)`,
+      `(CASE WHEN ac.project_lead_description LIKE '%${escapedFullQuery}%' THEN 400 ELSE 0 END)`,
+    ];
+    for (const token of tokens) {
+      parts.push(
+        `(CASE WHEN ac.agreement_id LIKE '${token}%' THEN 300 ELSE 0 END)`,
+      );
+      parts.push(
+        `(CASE WHEN ac.agreement_id LIKE '%${token}%' THEN 150 ELSE 0 END)`,
+      );
+      parts.push(
+        `(CASE WHEN ac.description LIKE '%${token}%' THEN 80 ELSE 0 END)`,
+      );
+      parts.push(
+        `(CASE WHEN ac.project_lead_description LIKE '%${token}%' THEN 80 ELSE 0 END)`,
+      );
+    }
+    return parts.join(' + ');
+  }
+
   orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): string {
     if (isEmpty(field)) return '';
 
@@ -245,12 +277,13 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     query?: string,
   ) {
     let queryConditions = '';
+    let queryRelevanceSelectSql = '';
+    let queryRelevanceOrderPrefix = '';
     if (!isEmpty(query) && !isValidText(query)) {
       throw new BadRequestException('Invalid characters in query parameter');
     } else if (!isEmpty(query)) {
-      const sanitizedQuery = !isEmpty(query)
-        ? escapeLikeString(query).split(' ')
-        : [];
+      const escapedFullQuery = escapeLikeString(query);
+      const sanitizedQuery = escapedFullQuery.split(' ');
 
       const querySearch: (keyof AgressoContract)[] = [
         'description',
@@ -265,6 +298,13 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             .join(' OR ');
         })
         .join(' OR ');
+
+      const tokensForScore = sanitizedQuery.filter((t) => !isEmpty(t));
+      queryRelevanceSelectSql = `, (${this.buildQueryRelevanceScoreSql(
+        escapedFullQuery,
+        tokensForScore,
+      )}) AS _query_relevance`;
+      queryRelevanceOrderPrefix = '_query_relevance DESC, ';
     }
 
     const validFilter = (attr: string, filter: string) => {
@@ -277,7 +317,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     const operationOrder = isEmpty(orderFields)
       ? `FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')`
       : this.orderBy(orderFields, direction);
-    const orderBy = `ORDER BY ${operationOrder}`;
+    const orderBy = `ORDER BY ${queryRelevanceOrderPrefix}${operationOrder}`;
 
     let offset: number = null;
     if (!isEmpty(pagination?.limit)) {
@@ -371,6 +411,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
                 WHEN ac.ubwClientDescription = 'ExBIO' THEN 'Bioversity International'
                 ELSE ac.ubwClientDescription
             END AS ubwClientDescription
+            ${queryRelevanceSelectSql}
         FROM agresso_contracts ac
         LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))

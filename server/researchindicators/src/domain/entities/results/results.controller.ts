@@ -38,7 +38,6 @@ import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
-import { OrderFieldsEnum } from '../agresso-contract/enum/order-fields.enum';
 import { ResultSortEnum } from './enum/result-sort.enum';
 @ApiTags('Results')
 @ApiBearerAuth()
@@ -49,7 +48,7 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
-  ) { }
+  ) {}
 
   @ApiQuery({
     name: 'page',
@@ -283,11 +282,17 @@ export class ResultsController {
     @Query('search') search: string,
     @Query('page') page: string,
     @Query('limit') limit: string,
-    @Query('sort-order', new DefaultValuePipe('DESC')) sortOrder: 'ASC' | 'DESC',
-    @Query('sort-field', new DefaultValuePipe(ResultSortEnum.CODE)) sortField: ResultSortEnum,
+    @Query('sort-order', new DefaultValuePipe('DESC'))
+    sortOrder: 'ASC' | 'DESC',
+    @Query('sort-field', new DefaultValuePipe(ResultSortEnum.CODE))
+    sortField: ResultSortEnum,
   ) {
     return this.resultsService
-      .findResultv2(search, { page: +page, limit: +limit }, { field: sortField, order: sortOrder })
+      .findResultv2(
+        search,
+        { page: +page, limit: +limit },
+        { field: sortField, order: sortOrder },
+      )
       .then((el) =>
         ResponseUtils.format({
           description: 'Results found',
