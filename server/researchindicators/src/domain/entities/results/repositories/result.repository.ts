@@ -19,8 +19,7 @@ import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
-  implements ElasticFindEntity<ResultOpensearchDto>
-{
+  implements ElasticFindEntity<ResultOpensearchDto> {
   constructor(
     private readonly appConfig: AppConfig,
     private readonly currentUserUtil: CurrentUserUtil,
@@ -211,11 +210,10 @@ export class ResultRepository
 											  'start_date', ac.start_date,
 											  'deleted_at', ac.deleted_at))`;
 
-      queryParts.contracts.select = `,${
-        filters?.primary_contract
+      queryParts.contracts.select = `,${filters?.primary_contract
           ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
           : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
-      } as result_contracts`;
+        } as result_contracts`;
 
       if (filters?.primary_contract) {
         queryParts.contracts.groupBy = `,rc.result_contract_id`;
@@ -647,9 +645,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       OR su.last_name LIKE CONCAT('%',?, '%'))`;
 
     const countParameters = (searchConditions.match(/\?/g) || []).length;
-    const searchWhereParams = search
-      ? Array(countParameters).fill(search)
-      : [];
+    const searchWhereParams = search ? Array(countParameters).fill(search) : [];
 
     const relevanceFragment = search
       ? this.buildFindResultsV2SearchRelevanceSelectFragment()
@@ -676,14 +672,14 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id`;
 
     const countQuery = `
-    SELECT COUNT(DISTINCT r.result_id) AS total
+    SELECT COUNT(tmp.total) AS total FROM (SELECT COUNT(DISTINCT r.result_id) AS total
     ${fromAndJoins}
     WHERE r.is_snapshot = FALSE
       AND r.is_active = TRUE
+      ${this.buildFilteringV2(filters)}
       ${search ? searchConditions : ''}
     GROUP BY r.result_id
-    ORDER BY r.result_official_code ASC
-    LIMIT ? OFFSET ?`;
+    ORDER BY r.result_official_code ASC) tmp`;
 
     const mainQuery = `
     SELECT
@@ -702,7 +698,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       r.result_status_id AS status_id,
       rs.name AS status_name,
       rs.config as status_config,
-      GROUP_CONCAT(r2.report_year_id ORDER BY r2.report_year_id DESC) AS snapshot_years,
+      GROUP_CONCAT(DISTINCT r2.report_year_id ORDER BY r2.report_year_id DESC) AS snapshot_years,
       rc.contract_id,
       cl.short_name as lever_name,
       su.sec_user_id as create_user_id,
@@ -735,9 +731,9 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     const rawData = await this.query(mainQuery, mainQueryParams);
     const data = search
       ? rawData.map((row: Record<string, unknown>) => {
-          const { _search_relevance: _r, ...rest } = row;
-          return rest;
-        })
+        const { _search_relevance: _r, ...rest } = row;
+        return rest;
+      })
       : rawData;
 
     return {
@@ -746,6 +742,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
         total,
         page,
         limit,
+        pageSize: data.length,
         totalPages,
         hasNextPage: page < totalPages,
         hasPreviousPage: page > 1,
