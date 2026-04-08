@@ -4,7 +4,7 @@ export const ResultSortFields = (
 ) => {
   const fieldMap = {
     code: 'r.result_official_code',
-    creator: 'su.first_name, su.last_name',
+    creator: 'CONCAT_WS(" ", su.first_name, su.last_name)',
     'creation-date': 'r.created_at',
     'snapshot-version': `${order === 'ASC' ? 'MIN' : 'MAX'}(r2.report_year_id)`,
     'live-version': 'r.report_year_id',
