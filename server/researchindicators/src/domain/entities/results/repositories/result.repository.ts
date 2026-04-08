@@ -13,6 +13,8 @@ import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultSortEnum, ResultSortFields } from '../enum/result-sort.enum';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
+import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
 
 @Injectable()
 export class ResultRepository
@@ -549,10 +551,38 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return `ORDER BY ${fieldMap} ${direction}`;
   }
 
+  private buildFilteringV2(filters: {
+    status: ResultStatusEnum[];
+    contracts: string[];
+    years: string[];
+    sources: ReportingPlatformEnum[];
+  }) {
+    let query = '';
+    if (filters.status.length > 0) {
+      query += `AND r.result_status_id IN (${formatArrayToQuery<number>(filters.status)})`;
+    }
+    if (filters.contracts.length > 0) {
+      query += `AND rc.contract_id IN (${formatArrayToQuery<string>(filters.contracts)})`;
+    }
+    if (filters.years.length > 0) {
+      query += `AND r.report_year_id IN (${formatArrayToQuery<string>(filters.years)})`;
+    }
+    if (filters.sources.length > 0) {
+      query += `AND r.platform_code IN (${formatArrayToQuery<string>(filters.sources)})`;
+    }
+    return query;
+  }
+
   async findResultsV2(
     search: string,
     pagination?: { page?: number; limit?: number },
     sorting?: { field?: ResultSortEnum; order?: 'ASC' | 'DESC' },
+    filters?: {
+      status: ResultStatusEnum[];
+      contracts: string[];
+      years: string[];
+      sources: ReportingPlatformEnum[];
+    },
   ) {
     const page = !pagination?.page || pagination.page < 1 ? 1 : pagination.page;
     const limit = !pagination?.limit ? 100 : pagination.limit;
@@ -569,13 +599,13 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
             )
           )
       OR r.result_official_code = ?
-      OR r.title like '%?%'
-      OR i.name like '%?%'
-      OR rs.name LIKE '%?%'
+      OR r.title like CONCAT('%',?, '%')
+      OR i.name like CONCAT('%',?, '%')
+      OR rs.name LIKE CONCAT('%',?, '%')
       OR rc.contract_id = ?
-      OR cl.short_name LIKE '%?%'
-      OR su.first_name LIKE '%?%'
-      OR su.last_name LIKE '%?%')`;
+      OR cl.short_name LIKE CONCAT('%',?, '%')
+      OR su.first_name LIKE CONCAT('%',?, '%')
+      OR su.last_name LIKE CONCAT('%',?, '%'))`;
 
     const countParameters = searchConditions.match(new RegExp(/\?/g)).length;
     const params = Array(countParameters).fill(search);
@@ -590,7 +620,11 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     LEFT JOIN result_contracts rc on rc.result_id = r.result_id 
       AND rc.is_active 
       AND rc.is_primary 
-    LEFT JOIN sec_users su ON su.sec_user_id = r.created_by`;
+    LEFT JOIN result_levers rl ON rl.result_id = r.result_id
+      AND rl.is_active = TRUE
+      AND rl.is_primary = TRUE
+    LEFT JOIN sec_users su ON su.sec_user_id = r.created_by
+    LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id`;
 
     const countQuery = `
     SELECT COUNT(DISTINCT r.result_id) AS total
@@ -621,6 +655,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       rs.config as status_config,
       GROUP_CONCAT(r2.report_year_id ORDER BY r2.report_year_id DESC) AS snapshot_years,
       rc.contract_id,
+      cl.short_name as lever_name,
       su.sec_user_id as create_user_id,
       su.first_name as create_user_first_name,
       su.last_name as create_user_last_name,
@@ -628,6 +663,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       ${fromAndJoins}
     WHERE r.is_snapshot = FALSE
       AND r.is_active = TRUE
+      ${this.buildFilteringV2(filters)}
       ${search ? searchConditions : ''}
     GROUP BY r.result_id
     ${this.sortOrderV2(sorting?.field, sorting?.order)}

@@ -163,8 +163,14 @@ export class ResultsService {
     search: string,
     pagination?: { page?: number; limit?: number },
     sorting?: { field?: ResultSortEnum; order?: 'ASC' | 'DESC' },
+    filters?: {
+      status: ResultStatusEnum[];
+      contracts: string[];
+      years: string[];
+      sources: ReportingPlatformEnum[];
+    },
   ) {
-    return this.mainRepo.findResultsV2(search, pagination, sorting);
+    return this.mainRepo.findResultsV2(search, pagination, sorting, filters);
   }
 
   async findOne(options: FindOneOptions<Result>) {
