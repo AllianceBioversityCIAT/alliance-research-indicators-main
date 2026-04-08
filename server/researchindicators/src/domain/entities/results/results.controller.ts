@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   HttpStatus,
@@ -11,6 +12,7 @@ import {
   UseInterceptors,
   UsePipes,
   ValidationPipe,
+  Version,
 } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import {
@@ -36,6 +38,8 @@ import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { OrderFieldsEnum } from '../agresso-contract/enum/order-fields.enum';
+import { ResultSortEnum } from './enum/result-sort.enum';
 @ApiTags('Results')
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
@@ -45,7 +49,7 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   @ApiQuery({
     name: 'page',
@@ -230,6 +234,59 @@ export class ResultsController {
         platform_code: platform_code,
         filter_primary_contract: filterPrimaryContract,
       })
+      .then((el) =>
+        ResponseUtils.format({
+          description: 'Results found',
+          status: HttpStatus.OK,
+          data: el,
+        }),
+      );
+  }
+
+  @Get()
+  @Version('2')
+  @ApiOperation({ summary: 'Find all results v2' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Is a reference to the search',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Is a reference to the page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Is a reference to the limit of items per page',
+  })
+  @ApiQuery({
+    name: 'sort-order',
+    required: false,
+    type: String,
+    enum: ['DESC', 'ASC'],
+    default: 'DESC',
+    description: 'Is a reference to the sort order',
+  })
+  @ApiQuery({
+    name: 'sort-field',
+    required: false,
+    type: String,
+    enum: ResultSortEnum,
+    description: 'Is a reference to the sort field',
+  })
+  async findResultv2(
+    @Query('search') search: string,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Query('sort-order', new DefaultValuePipe('DESC')) sortOrder: string,
+  ) {
+    return this.resultsService
+      .findResultv2(search, { page: +page, limit: +limit })
       .then((el) =>
         ResponseUtils.format({
           description: 'Results found',

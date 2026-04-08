@@ -12,6 +12,7 @@ import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
+import { ResultSortEnum, ResultSortFields } from '../enum/result-sort.enum';
 
 @Injectable()
 export class ResultRepository
@@ -208,8 +209,8 @@ export class ResultRepository
 											  'deleted_at', ac.deleted_at))`;
 
       queryParts.contracts.select = `,${filters?.primary_contract
-        ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
-        : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
+          ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
+          : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
         } as result_contracts`;
 
       if (filters?.primary_contract) {
@@ -335,10 +336,10 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
   }
 
   /**
-   * 
+   *
    * @deprecated Use findResults instead
-   * @param filters 
-   * @returns 
+   * @param filters
+   * @returns
    */
   async findResultsFilters(filters?: Partial<ResultFiltersInterface>) {
     const queryParts: DeepPartial<CreateResultQueryInterface> = {
@@ -540,7 +541,17 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     await this.query(query, [carnet, userId]);
   }
 
-  async findResults(search: string, pagination?: { page?: number; limit?: number }) {
+  private sortOrderV2(field: ResultSortEnum, order: 'ASC' | 'DESC') {
+    const fieldMap = ResultSortFields(field, order);
+    const direction = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    return `ORDER BY ${fieldMap} ${direction}`;
+  }
+
+  async findResultsV2(
+    search: string,
+    pagination?: { page?: number; limit?: number },
+    sorting?: { field?: ResultSortEnum; order?: 'ASC' | 'DESC' },
+  ) {
     const page = !pagination?.page || pagination.page < 1 ? 1 : pagination.page;
     const limit = !pagination?.limit ? 100 : pagination.limit;
     const offset = (page - 1) * limit;
@@ -564,7 +575,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       OR su.first_name LIKE '%?%'
       OR su.last_name LIKE '%?%')`;
 
-    const countParameters = searchConditions.match(new RegExp(/\?/g)).length
+    const countParameters = searchConditions.match(new RegExp(/\?/g)).length;
     const params = Array(countParameters).fill(search);
 
     const fromAndJoins = `
@@ -617,14 +628,19 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       AND r.is_active = TRUE
       ${search ? searchConditions : ''}
     GROUP BY r.result_id
-    ORDER BY r.result_official_code ASC
+    ${this.sortOrderV2(sorting?.field, sorting?.order)}
     LIMIT ? OFFSET ?`;
 
-    const totalResult = await this.query(countQuery, [...params, limit, offset]);
+    const queryParams = [];
+    if (search) {
+      queryParams.push(...params);
+    }
+    queryParams.push(limit, offset);
+    const totalResult = await this.query(countQuery, queryParams);
     const total = Number(totalResult?.[0]?.total ?? 0);
     const totalPages = Math.ceil(total / limit);
 
-    const data = await this.query(mainQuery, [...params, limit, offset]);
+    const data = await this.query(mainQuery, queryParams);
 
     return {
       data,
@@ -637,7 +653,6 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
         hasPreviousPage: page > 1,
       },
     };
-
   }
 }
 

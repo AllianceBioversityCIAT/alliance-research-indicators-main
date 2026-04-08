@@ -369,9 +369,4 @@ const children: Routes = [
   },
 ];
 
-export const route: Routes = [
-  {
-    path: 'api',
-    children: children,
-  },
-];
+export const route: Routes = children;
