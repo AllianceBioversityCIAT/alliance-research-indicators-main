@@ -12,12 +12,12 @@ import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
+import { ResultSortEnum, ResultSortFields } from '../enum/result-sort.enum';
 
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
-  implements ElasticFindEntity<ResultOpensearchDto>
-{
+  implements ElasticFindEntity<ResultOpensearchDto> {
   constructor(
     private readonly appConfig: AppConfig,
     private readonly currentUserUtil: CurrentUserUtil,
@@ -208,11 +208,10 @@ export class ResultRepository
 											  'start_date', ac.start_date,
 											  'deleted_at', ac.deleted_at))`;
 
-      queryParts.contracts.select = `,${
-        filters?.primary_contract
+      queryParts.contracts.select = `,${filters?.primary_contract
           ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
           : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
-      } as result_contracts`;
+        } as result_contracts`;
 
       if (filters?.primary_contract) {
         queryParts.contracts.groupBy = `,rc.result_contract_id`;
@@ -329,9 +328,13 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return query;
   }
 
-  async findResultsFilters(
-    filters?: Partial<ResultFiltersInterface>,
-  ): Promise<FindResultsFiltersResult> {
+  /**
+   *
+   * @deprecated Use findResults instead
+   * @param filters
+   * @returns
+   */
+  async findResultsFilters(filters?: Partial<ResultFiltersInterface>) {
     const queryParts: DeepPartial<CreateResultQueryInterface> = {
       contracts: {
         select: '',
@@ -566,6 +569,120 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
   async unpdateCarnetUser(userId: number, carnet: string) {
     const query = `UPDATE sec_users SET carnet = ? WHERE sec_user_id = ?`;
     await this.query(query, [carnet, userId]);
+  }
+
+  private sortOrderV2(field: ResultSortEnum, order: 'ASC' | 'DESC') {
+    const fieldMap = ResultSortFields(field, order);
+    const direction = order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    return `ORDER BY ${fieldMap} ${direction}`;
+  }
+
+  async findResultsV2(
+    search: string,
+    pagination?: { page?: number; limit?: number },
+    sorting?: { field?: ResultSortEnum; order?: 'ASC' | 'DESC' },
+  ) {
+    const page = !pagination?.page || pagination.page < 1 ? 1 : pagination.page;
+    const limit = !pagination?.limit ? 100 : pagination.limit;
+    const offset = (page - 1) * limit;
+    const searchConditions = `
+    AND ((
+            r.report_year_id IN (?)
+        OR EXISTS (
+              SELECT 1
+              FROM results s
+              WHERE s.result_official_code = r.result_official_code
+                AND s.is_snapshot = TRUE
+                AND s.report_year_id IN (?)
+            )
+          )
+      OR r.result_official_code = ?
+      OR r.title like '%?%'
+      OR i.name like '%?%'
+      OR rs.name LIKE '%?%'
+      OR rc.contract_id = ?
+      OR cl.short_name LIKE '%?%'
+      OR su.first_name LIKE '%?%'
+      OR su.last_name LIKE '%?%')`;
+
+    const countParameters = searchConditions.match(new RegExp(/\?/g)).length;
+    const params = Array(countParameters).fill(search);
+
+    const fromAndJoins = `
+    FROM results r
+    INNER JOIN indicators i ON i.indicator_id = r.indicator_id
+    INNER JOIN result_status rs ON rs.result_status_id = r.result_status_id
+    LEFT JOIN results r2
+      ON r2.result_official_code = r.result_official_code
+      AND r2.is_snapshot = TRUE
+    LEFT JOIN result_contracts rc on rc.result_id = r.result_id 
+      AND rc.is_active 
+      AND rc.is_primary 
+    LEFT JOIN sec_users su ON su.sec_user_id = r.created_by`;
+
+    const countQuery = `
+    SELECT COUNT(DISTINCT r.result_id) AS total
+    ${fromAndJoins}
+    WHERE r.is_snapshot = FALSE
+      AND r.is_active = TRUE
+      ${search ? searchConditions : ''}
+    GROUP BY r.result_id
+    ORDER BY r.result_official_code ASC
+    LIMIT ? OFFSET ?`;
+
+    const mainQuery = `
+    SELECT
+      r.created_at,
+      r.updated_at,
+      r.created_by,
+      r.updated_by,
+      r.is_active,
+      r.result_id,
+      r.result_official_code,
+      r.platform_code,
+      r.report_year_id,
+      r.title,
+      r.indicator_id,
+      i.name AS indicator_name,
+      r.result_status_id AS status_id,
+      rs.name AS status_name,
+      rs.config as status_config,
+      GROUP_CONCAT(r2.report_year_id ORDER BY r2.report_year_id DESC) AS snapshot_years,
+      rc.contract_id,
+      su.sec_user_id as create_user_id,
+      su.first_name as create_user_first_name,
+      su.last_name as create_user_last_name,
+      rs.description as status_description
+      ${fromAndJoins}
+    WHERE r.is_snapshot = FALSE
+      AND r.is_active = TRUE
+      ${search ? searchConditions : ''}
+    GROUP BY r.result_id
+    ${this.sortOrderV2(sorting?.field, sorting?.order)}
+    LIMIT ? OFFSET ?`;
+
+    const queryParams = [];
+    if (search) {
+      queryParams.push(...params);
+    }
+    queryParams.push(limit, offset);
+    const totalResult = await this.query(countQuery, queryParams);
+    const total = Number(totalResult?.[0]?.total ?? 0);
+    const totalPages = Math.ceil(total / limit);
+
+    const data = await this.query(mainQuery, queryParams);
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 }
 

@@ -95,6 +95,7 @@ import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-use
 import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
 import { IntellectualPropertyOwner } from '../intellectual-property-owners/entities/intellectual-property-owner.entity';
+import { ResultSortEnum } from './enum/result-sort.enum';
 
 @Injectable()
 export class ResultsService {
@@ -159,6 +160,14 @@ export class ResultsService {
       filter_primary_contract: filters?.filter_primary_contract,
       search: filters?.search,
     });
+  }
+
+  async findResultv2(
+    search: string,
+    pagination?: { page?: number; limit?: number },
+    sorting?: { field?: ResultSortEnum; order?: 'ASC' | 'DESC' },
+  ) {
+    return this.mainRepo.findResultsV2(search, pagination, sorting);
   }
 
   async findOne(options: FindOneOptions<Result>) {
