@@ -34,7 +34,10 @@ export class LinkResultsService extends BaseServiceSimple<
     const results = await this.mainRepo.find({
       where: { result_id, link_result_role_id: role_id, is_active: true },
       relations: {
-        other_result: true,
+        other_result: {
+          indicator: true,
+          result_status: true,
+        },
       },
     });
     const otherResults =
