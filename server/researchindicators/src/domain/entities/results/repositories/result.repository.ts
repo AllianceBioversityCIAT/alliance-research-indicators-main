@@ -551,6 +551,45 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return `ORDER BY ${fieldMap} ${direction}`;
   }
 
+  /**
+   * Relevance for findResultsV2 text search only (same dimensions as searchConditions).
+   * Uses bound parameters only; not returned to the client (ordering only).
+   */
+  private buildFindResultsV2SearchRelevanceSelectFragment(): string {
+    return `, (
+      (CASE WHEN r.report_year_id IN (?) THEN 150 ELSE 0 END) +
+      (CASE WHEN EXISTS (
+            SELECT 1
+            FROM results s
+            WHERE s.result_official_code = r.result_official_code
+              AND s.is_snapshot = TRUE
+              AND s.report_year_id IN (?)
+          ) THEN 130 ELSE 0 END) +
+      (CASE WHEN r.result_official_code = ? THEN 2000 ELSE 0 END) +
+      (CASE WHEN r.result_official_code LIKE CONCAT(?, '%') THEN 900 ELSE 0 END) +
+      (CASE WHEN r.title LIKE CONCAT('%', ?, '%') THEN 550 ELSE 0 END) +
+      (CASE WHEN i.name LIKE CONCAT('%', ?, '%') THEN 450 ELSE 0 END) +
+      (CASE WHEN rs.name LIKE CONCAT('%', ?, '%') THEN 380 ELSE 0 END) +
+      (CASE WHEN rc.contract_id = ? THEN 750 ELSE 0 END) +
+      (CASE WHEN cl.short_name LIKE CONCAT('%', ?, '%') THEN 320 ELSE 0 END) +
+      (CASE WHEN su.first_name LIKE CONCAT('%', ?, '%') THEN 220 ELSE 0 END) +
+      (CASE WHEN su.last_name LIKE CONCAT('%', ?, '%') THEN 220 ELSE 0 END)
+    ) AS _search_relevance`;
+  }
+
+  private sortOrderV2WithSearchRelevance(
+    hasSearch: boolean,
+    field?: ResultSortEnum,
+    order?: 'ASC' | 'DESC',
+  ) {
+    const fieldMap = ResultSortFields(field, order);
+    const direction = order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    if (hasSearch) {
+      return `ORDER BY _search_relevance DESC, ${fieldMap} ${direction}`;
+    }
+    return `ORDER BY ${fieldMap} ${direction}`;
+  }
+
   private buildFilteringV2(filters: {
     status: ResultStatusEnum[];
     contracts: string[];
@@ -607,8 +646,18 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       OR su.first_name LIKE CONCAT('%',?, '%')
       OR su.last_name LIKE CONCAT('%',?, '%'))`;
 
-    const countParameters = searchConditions.match(new RegExp(/\?/g)).length;
-    const params = Array(countParameters).fill(search);
+    const countParameters = (searchConditions.match(/\?/g) || []).length;
+    const searchWhereParams = search
+      ? Array(countParameters).fill(search)
+      : [];
+
+    const relevanceFragment = search
+      ? this.buildFindResultsV2SearchRelevanceSelectFragment()
+      : '';
+    const relevanceParamCount = (relevanceFragment.match(/\?/g) || []).length;
+    const relevanceParams = search
+      ? Array(relevanceParamCount).fill(search)
+      : [];
 
     const fromAndJoins = `
     FROM results r
@@ -660,25 +709,36 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       su.first_name as create_user_first_name,
       su.last_name as create_user_last_name,
       rs.description as status_description
+      ${relevanceFragment}
       ${fromAndJoins}
     WHERE r.is_snapshot = FALSE
       AND r.is_active = TRUE
       ${this.buildFilteringV2(filters)}
       ${search ? searchConditions : ''}
     GROUP BY r.result_id
-    ${this.sortOrderV2(sorting?.field, sorting?.order)}
+    ${this.sortOrderV2WithSearchRelevance(!!search, sorting?.field, sorting?.order)}
     LIMIT ? OFFSET ?`;
 
-    const queryParams = [];
-    if (search) {
-      queryParams.push(...params);
-    }
-    queryParams.push(limit, offset);
-    const totalResult = await this.query(countQuery, queryParams);
+    const countQueryParams = [...searchWhereParams, limit, offset];
+    // Placeholders are bound in textual order: SELECT relevance, then WHERE search, then LIMIT/OFFSET
+    const mainQueryParams = [
+      ...relevanceParams,
+      ...searchWhereParams,
+      limit,
+      offset,
+    ];
+
+    const totalResult = await this.query(countQuery, countQueryParams);
     const total = Number(totalResult?.[0]?.total ?? 0);
     const totalPages = Math.ceil(total / limit);
 
-    const data = await this.query(mainQuery, queryParams);
+    const rawData = await this.query(mainQuery, mainQueryParams);
+    const data = search
+      ? rawData.map((row: Record<string, unknown>) => {
+          const { _search_relevance: _r, ...rest } = row;
+          return rest;
+        })
+      : rawData;
 
     return {
       data,
