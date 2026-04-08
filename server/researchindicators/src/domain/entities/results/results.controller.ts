@@ -39,6 +39,8 @@ import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ResultSortEnum } from './enum/result-sort.enum';
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 @ApiTags('Results')
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
@@ -286,6 +288,30 @@ export class ResultsController {
     enum: ResultSortEnum,
     description: 'Is a reference to the sort field',
   })
+  @ApiQuery({
+    name: 'status-codes',
+    required: false,
+    type: String,
+    description: 'filter by status codes',
+  })
+  @ApiQuery({
+    name: 'contract-codes',
+    required: false,
+    type: String,
+    description: 'filter by contract codes',
+  })
+  @ApiQuery({
+    name: 'years',
+    required: false,
+    type: String,
+    description: 'filter by years',
+  })
+  @ApiQuery({
+    name: 'platform-code',
+    required: false,
+    type: String,
+    description: 'filter by platform code',
+  })
   async findResultv2(
     @Query('search') search: string,
     @Query('page') page: string,
@@ -294,12 +320,24 @@ export class ResultsController {
     sortOrder: 'ASC' | 'DESC',
     @Query('sort-field', new DefaultValuePipe(ResultSortEnum.CODE))
     sortField: ResultSortEnum,
+    @Query('status-codes', ListParseToArrayPipe)
+    statusCodes: ResultStatusEnum[],
+    @Query('contract-codes', ListParseToArrayPipe) contractCodes: string[],
+    @Query('years', ListParseToArrayPipe) years: string[],
+    @Query('platform-code', ListParseToArrayPipe)
+    platformCode: ReportingPlatformEnum[],
   ) {
     return this.resultsService
       .findResultv2(
         search,
         { page: +page, limit: +limit },
         { field: sortField, order: sortOrder },
+        {
+          status: statusCodes,
+          contracts: contractCodes,
+          years: years,
+          sources: platformCode,
+        },
       )
       .then((el) =>
         ResponseUtils.format({
