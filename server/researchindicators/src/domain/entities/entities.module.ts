@@ -86,6 +86,7 @@ import { PooledFundingContractsModule } from './pooled-funding-contracts/pooled-
 import { ResultKnowledgeProductModule } from './result-knowledge-product/result-knowledge-product.module';
 import { ResultStatusWorkflowModule } from './result-status-workflow/result-status-workflow.module';
 import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module';
+import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.module';
 
 @Module({
   imports: [
@@ -176,6 +177,7 @@ import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module
     ResultKnowledgeProductModule,
     ResultStatusWorkflowModule,
     SyncProcessLogModule,
+    LeverSdgTargetsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
