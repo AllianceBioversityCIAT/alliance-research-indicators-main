@@ -36,6 +36,7 @@ import { ResultInstitutionsModule } from '../result-institutions/result-institut
 import { ResultEvidencesModule } from '../result-evidences/result-evidences.module';
 import { ResultLeverStrategicOutcomeModule } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.module';
 import { ResultKnowledgeProductModule } from '../result-knowledge-product/result-knowledge-product.module';
+import { ResultLeverSdgTargetsModule } from '../result-lever-sdg-targets/result-lever-sdg-targets.module';
 
 @Module({
   controllers: [ResultsController],
@@ -73,6 +74,7 @@ import { ResultKnowledgeProductModule } from '../result-knowledge-product/result
     ResultEvidencesModule,
     ResultLeverStrategicOutcomeModule,
     ResultKnowledgeProductModule,
+    ResultLeverSdgTargetsModule,
   ],
   providers: [
     ResultsService,

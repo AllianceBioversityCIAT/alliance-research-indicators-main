@@ -93,6 +93,7 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
 import { IntellectualPropertyOwner } from '../intellectual-property-owners/entities/intellectual-property-owner.entity';
+import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
 
 @Injectable()
 export class ResultsService {
@@ -129,6 +130,7 @@ export class ResultsService {
     private readonly _resultEvidencesService: ResultEvidencesService,
     private readonly _queryService: QueryService,
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
+    private readonly _resultLeverSdgTargetsService: ResultLeverSdgTargetsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
   ) {}
@@ -645,6 +647,7 @@ export class ResultsService {
               is_primary: true,
               result_lever_strategic_outcomes:
                 el?.result_lever_strategic_outcomes,
+              result_lever_sdg_targets: el?.result_lever_sdg_targets,
             }))
           : [];
 
@@ -697,6 +700,16 @@ export class ResultsService {
         );
       }
 
+      for (const lever of emergedLever) {
+        await this._resultLeverSdgTargetsService.create(
+          lever.result_lever_id,
+          lever?.result_lever_sdg_targets ?? [],
+          'sdg_target_id',
+          undefined,
+          manager,
+        );
+      }
+
       await this._resultSdgsService.create(
         resultId,
         alignmentData.result_sdgs,
@@ -731,6 +744,17 @@ export class ResultsService {
       resultId,
       LeverRolesEnum.ALIGNMENT,
     );
+
+    const sdgTargets =
+      await this._resultLeverSdgTargetsService.findByMultiplesResultLeverIds(
+        levers.map((el) => el.result_lever_id),
+      );
+
+    levers.forEach((lever) => {
+      lever.result_lever_sdg_targets = sdgTargets.filter(
+        (sdgTarget) => sdgTarget.result_lever_id === lever.result_lever_id,
+      );
+    });
 
     const primaryLevers = levers.filter((el) => el.is_primary);
 

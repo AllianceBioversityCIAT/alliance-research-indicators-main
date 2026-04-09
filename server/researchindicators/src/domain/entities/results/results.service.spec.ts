@@ -47,6 +47,7 @@ import { ResultEvidencesService } from '../result-evidences/result-evidences.ser
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
+import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 
@@ -82,6 +83,7 @@ describe('ResultsService', () => {
   let mockResultEvidencesService: jest.Mocked<ResultEvidencesService>;
   let mockQueryService: jest.Mocked<QueryService>;
   let mockResultLeverStrategicOutcomeService: jest.Mocked<ResultLeverStrategicOutcomeService>;
+  let mockResultLeverSdgTargetsService: jest.Mocked<ResultLeverSdgTargetsService>;
   let mockResultKnowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
   let mockResultsUtil: jest.Mocked<ResultsUtil>;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -239,6 +241,11 @@ describe('ResultsService', () => {
       create: jest.fn(),
     } as any;
 
+    mockResultLeverSdgTargetsService = {
+      create: jest.fn(),
+      findByMultiplesResultLeverIds: jest.fn(),
+    } as any;
+
     mockResultKnowledgeProductService = {
       create: jest.fn(),
     } as any;
@@ -338,6 +345,10 @@ describe('ResultsService', () => {
         {
           provide: ResultLeverStrategicOutcomeService,
           useValue: mockResultLeverStrategicOutcomeService,
+        },
+        {
+          provide: ResultLeverSdgTargetsService,
+          useValue: mockResultLeverSdgTargetsService,
         },
         {
           provide: ResultKnowledgeProductService,
