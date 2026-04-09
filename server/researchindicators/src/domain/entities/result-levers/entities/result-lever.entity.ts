@@ -12,6 +12,7 @@ import { Result } from '../../results/entities/result.entity';
 import { ClarisaLever } from '../../../tools/clarisa/entities/clarisa-levers/entities/clarisa-lever.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResultLeverStrategicOutcome } from '../../result-lever-strategic-outcome/entities/result-lever-strategic-outcome.entity';
+import { ResultLeverSdgTarget } from '../../result-lever-sdg-targets/entities/result-lever-sdg-target.entity';
 
 @Entity('result_levers')
 export class ResultLever extends AuditableEntity {
@@ -78,10 +79,24 @@ export class ResultLever extends AuditableEntity {
   @JoinColumn({ name: 'lever_id' })
   lever!: ClarisaLever;
 
+  @ApiProperty({
+    type: [ResultLeverStrategicOutcome],
+    name: 'result_lever_strategic_outcomes',
+  })
   @OneToMany(
     () => ResultLeverStrategicOutcome,
     (result_lever_strategic_outcome) =>
       result_lever_strategic_outcome.result_lever,
   )
   result_lever_strategic_outcomes: ResultLeverStrategicOutcome[];
+
+  @ApiProperty({
+    type: [ResultLeverSdgTarget],
+    name: 'result_lever_sdg_targets',
+  })
+  @OneToMany(
+    () => ResultLeverSdgTarget,
+    (resultLeverSdgTarget) => resultLeverSdgTarget.result_lever,
+  )
+  result_lever_sdg_targets: ResultLeverSdgTarget[];
 }

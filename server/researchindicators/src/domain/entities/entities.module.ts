@@ -92,6 +92,7 @@ import { ResultKnowledgeProductModule } from './result-knowledge-product/result-
 import { ResultStatusWorkflowModule } from './result-status-workflow/result-status-workflow.module';
 import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module';
 import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.module';
+import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
 
 @Module({
   imports: [
@@ -188,6 +189,7 @@ import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.mod
     ResultStatusWorkflowModule,
     SyncProcessLogModule,
     LeverSdgTargetsModule,
+    ResultLeverSdgTargetsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule],
 })
