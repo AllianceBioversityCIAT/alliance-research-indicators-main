@@ -64,6 +64,7 @@ import { ImpactAreaScoreModule } from '../entities/impact-area-score/impact-area
 import { LinkResultsModule } from '../entities/link-results/link-results.module';
 import { ResultStatusTransitionsModule } from '../entities/result-status-transitions/result-status-transitions.module';
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
+import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 
 const capSharingChildren: Routes = [
   {
@@ -305,6 +306,10 @@ const children: Routes = [
   {
     path: 'lever-strategic-outcome',
     module: LeverStrategicOutcomeModule,
+  },
+  {
+    path: 'lever-sdg-targets',
+    module: LeverSdgTargetsModule,
   },
   {
     path: 'tags',

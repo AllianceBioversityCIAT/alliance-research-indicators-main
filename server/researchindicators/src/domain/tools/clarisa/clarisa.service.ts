@@ -32,6 +32,11 @@ import { ClarisaSdg } from './entities/clarisa-sdgs/entities/clarisa-sdg.entity'
 import { ResClarisaValidateConectioDto } from './dto/clarisa-create-conection.dto';
 import { ClarisaImpactArea } from './entities/clarisa-impact-areas/entities/clarisa-impact-area.entity';
 import { ClarisaGlobalTarget } from './entities/clarisa-global-targets/entities/clarisa-global-target.entity';
+import {
+  ClarisaSdgTargetsMapper,
+  ClarisaSdgTargetsRawDto,
+} from './mappers/clarisa-sdg-targets.mapper';
+import { ClarisaSdgTarget } from './entities/clarisa-sdg-targets/entities/clarisa-sdg-target.entity';
 
 @Injectable()
 export class ClarisaService extends BaseControlListSave<Clarisa> {
@@ -150,6 +155,13 @@ export class ClarisaService extends BaseControlListSave<Clarisa> {
       ClarisaPathEnum.GEO_SCOPES,
       ClarisaGeoScope,
     );
+
+    await this.base<ClarisaSdgTargetsRawDto, ClarisaSdgTarget>(
+      ClarisaPathEnum.SDG_TARGETS,
+      ClarisaSdgTarget,
+      (data) => new ClarisaSdgTargetsMapper(data),
+    );
+
     this._logger.debug('All entities cloned');
   }
 
