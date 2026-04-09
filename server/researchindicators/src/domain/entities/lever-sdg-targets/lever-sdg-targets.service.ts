@@ -141,7 +141,6 @@ export class LeverSdgTargetsService extends BaseServiceSimple<
       })
       .then((res) => {
         if (onlySdgTargets) {
-          console.log('entro aqui', onlySdgTargets);
           return res.map((el) => el.sdg_target);
         }
         return res;
