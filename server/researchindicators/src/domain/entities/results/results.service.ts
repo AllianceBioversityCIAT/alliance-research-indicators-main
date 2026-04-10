@@ -718,6 +718,7 @@ export class ResultsService {
           ? contributor_levers.map((el) => ({
             lever_id: el.lever_id,
             is_primary: false,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
           }))
           : [];
 
@@ -747,7 +748,7 @@ export class ResultsService {
       const emergedLever =
         await this._resultLeversService.comparerClientToServer(
           resultId,
-          primaryLevers,
+          fullLevers,
           LeverRolesEnum.ALIGNMENT,
           activeLevers,
         );
