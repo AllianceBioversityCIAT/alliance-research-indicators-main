@@ -742,6 +742,8 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       r.report_year_id,
       r.title,
       r.indicator_id,
+      r.external_link,
+      r.public_link,
       i.name AS indicator_name,
       r.result_status_id AS status_id,
       rs.name AS status_name,
