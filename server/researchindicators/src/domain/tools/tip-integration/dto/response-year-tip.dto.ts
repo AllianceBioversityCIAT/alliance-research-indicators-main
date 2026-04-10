@@ -63,6 +63,7 @@ export class ResultsTipMapping {
   official_code: number;
   resultOfficialCode: number;
   external_link: string;
+  public_link: string;
   created_at: Date;
   userData: SecUser;
   createResult: CreateResultDto;
