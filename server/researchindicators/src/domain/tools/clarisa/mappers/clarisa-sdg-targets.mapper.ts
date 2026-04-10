@@ -3,9 +3,10 @@ import { ClarisaSdgTarget } from '../entities/clarisa-sdg-targets/entities/clari
 export class ClarisaSdgTargetsMapper extends ClarisaSdgTarget {
   constructor(rawData: ClarisaSdgTargetsRawDto) {
     super();
-    this.id = rawData.id;
-    this.sdg_target = rawData.sdgTarget;
-    this.sdg_target_code = rawData.sdgTargetCode;
+    this.id = rawData?.id;
+    this.sdg_target = rawData?.sdgTarget;
+    this.sdg_target_code = rawData?.sdgTargetCode;
+    this.clarisa_sdg_id = rawData?.sdg?.usndCode;
   }
 }
 
