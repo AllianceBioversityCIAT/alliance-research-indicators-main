@@ -20,7 +20,8 @@ import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
-  implements ElasticFindEntity<ResultOpensearchDto> {
+  implements ElasticFindEntity<ResultOpensearchDto>
+{
   constructor(
     private readonly appConfig: AppConfig,
     private readonly currentUserUtil: CurrentUserUtil,
@@ -211,10 +212,11 @@ export class ResultRepository
 											  'start_date', ac.start_date,
 											  'deleted_at', ac.deleted_at))`;
 
-      queryParts.contracts.select = `,${filters?.primary_contract
-        ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
-        : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
-        } as result_contracts`;
+      queryParts.contracts.select = `,${
+        filters?.primary_contract
+          ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
+          : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
+      } as result_contracts`;
 
       if (filters?.primary_contract) {
         queryParts.contracts.groupBy = `,rc.result_contract_id`;
@@ -580,11 +582,68 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return `ORDER BY ${fieldMap} ${direction}`;
   }
 
+  /** Tokens for creator name matching: each token must match first_name or last_name (AND across tokens). */
+  private splitFindResultsV2CreatorNameTokens(search: string): string[] {
+    const tokens = search
+      .trim()
+      .split(/\s+/)
+      .filter((t) => t.length > 0);
+    return tokens.length > 0 ? tokens : [search];
+  }
+
+  private static readonly FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT = 8;
+
+  /** Placeholders in buildFindResultsV2SearchRelevanceSelectFragment before creator-name CASEs. */
+  private static readonly FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT = 9;
+
+  private buildFindResultsV2SearchStaticWhereFragment(): string {
+    return `
+    AND ((
+            r.report_year_id IN (?)
+        OR EXISTS (
+              SELECT 1
+              FROM results s
+              WHERE s.result_official_code = r.result_official_code
+                AND s.is_snapshot = TRUE
+                AND s.report_year_id IN (?)
+            )
+          )
+      OR r.result_official_code = ?
+      OR r.title like CONCAT('%',?, '%')
+      OR i.name like CONCAT('%',?, '%')
+      OR rs.name LIKE CONCAT('%',?, '%')
+      OR rc.contract_id = ?
+      OR cl.short_name LIKE CONCAT('%',?, '%')`;
+  }
+
   /**
-   * Relevance for findResultsV2 text search only (same dimensions as searchConditions).
-   * Uses bound parameters only; not returned to the client (ordering only).
+   * OR branch: creator matches when every whitespace-separated token appears in first_name or last_name.
+   * (e.g. "david casanas" matches first_name "David Felipe" + last_name "Casanas".)
    */
-  private buildFindResultsV2SearchRelevanceSelectFragment(): string {
+  private buildFindResultsV2CreatorNameWhereFragment(
+    nameTokens: string[],
+  ): string {
+    const perToken = nameTokens.map(
+      () =>
+        `(su.first_name LIKE CONCAT('%', ?, '%') OR su.last_name LIKE CONCAT('%', ?, '%'))`,
+    ).join(`
+        AND `);
+    return `
+      OR (su.sec_user_id IS NOT NULL AND ${perToken}))`;
+  }
+
+  /**
+   * Relevance for findResultsV2 text search only (aligned with search WHERE).
+   * Non-name clauses use the full search string; creator name uses the same token rules as WHERE.
+   */
+  private buildFindResultsV2SearchRelevanceSelectFragment(
+    creatorNameTokens: string[],
+  ): string {
+    const nameRelevanceCases = creatorNameTokens.map(
+      () =>
+        `(CASE WHEN (su.first_name LIKE CONCAT('%', ?, '%') OR su.last_name LIKE CONCAT('%', ?, '%')) THEN 220 ELSE 0 END)`,
+    ).join(`
+      + `);
     return `, (
       (CASE WHEN r.report_year_id IN (?) THEN 150 ELSE 0 END) +
       (CASE WHEN EXISTS (
@@ -601,8 +660,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       (CASE WHEN rs.name LIKE CONCAT('%', ?, '%') THEN 380 ELSE 0 END) +
       (CASE WHEN rc.contract_id = ? THEN 750 ELSE 0 END) +
       (CASE WHEN cl.short_name LIKE CONCAT('%', ?, '%') THEN 320 ELSE 0 END) +
-      (CASE WHEN su.first_name LIKE CONCAT('%', ?, '%') THEN 220 ELSE 0 END) +
-      (CASE WHEN su.last_name LIKE CONCAT('%', ?, '%') THEN 220 ELSE 0 END)
+      ${nameRelevanceCases}
     ) AS _search_relevance`;
   }
 
@@ -628,7 +686,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     currentUser: {
       onlyOwnResults: boolean;
       userId: number;
-    }
+    };
   }) {
     let query = '';
     if (filters.status.length > 0) {
@@ -666,41 +724,40 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       currentUser: {
         onlyOwnResults: boolean;
         userId: number;
-      }
+      };
     },
   ) {
     const page = !pagination?.page || pagination.page < 1 ? 1 : pagination.page;
     const limit = !pagination?.limit ? 100 : pagination.limit;
     const offset = (page - 1) * limit;
-    const searchConditions = `
-    AND ((
-            r.report_year_id IN (?)
-        OR EXISTS (
-              SELECT 1
-              FROM results s
-              WHERE s.result_official_code = r.result_official_code
-                AND s.is_snapshot = TRUE
-                AND s.report_year_id IN (?)
-            )
-          )
-      OR r.result_official_code = ?
-      OR r.title like CONCAT('%',?, '%')
-      OR i.name like CONCAT('%',?, '%')
-      OR rs.name LIKE CONCAT('%',?, '%')
-      OR rc.contract_id = ?
-      OR cl.short_name LIKE CONCAT('%',?, '%')
-      OR su.first_name LIKE CONCAT('%',?, '%')
-      OR su.last_name LIKE CONCAT('%',?, '%'))`;
 
-    const countParameters = (searchConditions.match(/\?/g) || []).length;
-    const searchWhereParams = search ? Array(countParameters).fill(search) : [];
+    const creatorNameTokens = search
+      ? this.splitFindResultsV2CreatorNameTokens(search)
+      : [];
+    const searchConditions = search
+      ? `${this.buildFindResultsV2SearchStaticWhereFragment()}${this.buildFindResultsV2CreatorNameWhereFragment(creatorNameTokens)}`
+      : '';
+
+    const staticWhereParams = search
+      ? Array(
+          ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT,
+        ).fill(search)
+      : [];
+    const creatorNameWhereParams = creatorNameTokens.flatMap((t) => [t, t]);
+    const searchWhereParams = search
+      ? [...staticWhereParams, ...creatorNameWhereParams]
+      : [];
 
     const relevanceFragment = search
-      ? this.buildFindResultsV2SearchRelevanceSelectFragment()
+      ? this.buildFindResultsV2SearchRelevanceSelectFragment(creatorNameTokens)
       : '';
-    const relevanceParamCount = (relevanceFragment.match(/\?/g) || []).length;
     const relevanceParams = search
-      ? Array(relevanceParamCount).fill(search)
+      ? [
+          ...Array(
+            ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT,
+          ).fill(search),
+          ...creatorNameTokens.flatMap((t) => [t, t]),
+        ]
       : [];
 
     const fromAndJoins = `
@@ -765,7 +822,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     ${this.sortOrderV2WithSearchRelevance(!!search, sorting?.field, sorting?.order)}
     LIMIT ? OFFSET ?`;
 
-    const countQueryParams = [...searchWhereParams, limit, offset];
+    const countQueryParams = [...searchWhereParams];
     // Placeholders are bound in textual order: SELECT relevance, then WHERE search, then LIMIT/OFFSET
     const mainQueryParams = [
       ...relevanceParams,
@@ -781,9 +838,9 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     const rawData = await this.query(mainQuery, mainQueryParams);
     const data = search
       ? rawData.map((row: Record<string, unknown>) => {
-        const { _search_relevance: _r, ...rest } = row;
-        return rest;
-      })
+          const { _search_relevance: _r, ...rest } = row;
+          return rest;
+        })
       : rawData;
 
     return {

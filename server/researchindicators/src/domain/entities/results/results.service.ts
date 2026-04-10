@@ -188,7 +188,12 @@ export class ResultsService {
         userId: this.currentUser.user_id,
       },
     };
-    return this.mainRepo.findResultsV2(search, pagination, sorting, filtersData);
+    return this.mainRepo.findResultsV2(
+      search,
+      pagination,
+      sorting,
+      filtersData,
+    );
   }
 
   async findOne(options: FindOneOptions<Result>) {
