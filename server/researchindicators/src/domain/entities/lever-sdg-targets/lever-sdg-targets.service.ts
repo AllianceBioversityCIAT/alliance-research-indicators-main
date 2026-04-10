@@ -124,6 +124,14 @@ export class LeverSdgTargetsService extends BaseServiceSimple<
             id: true,
             sdg_target_code: true,
             sdg_target: true,
+            clarisa_sdg: {
+              id: true,
+              short_name: true,
+              full_name: true,
+              icon: true,
+              color: true,
+              description: true,
+            },
           },
           lever: {
             id: true,
@@ -135,7 +143,9 @@ export class LeverSdgTargetsService extends BaseServiceSimple<
           lever_id: leverId,
         },
         relations: {
-          sdg_target: true,
+          sdg_target: {
+            clarisa_sdg: true,
+          },
           ...(onlySdgTargets ? {} : { lever: true }),
         },
       })

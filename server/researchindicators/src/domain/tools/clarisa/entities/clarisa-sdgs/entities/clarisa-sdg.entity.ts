@@ -1,6 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
 import { ResultSdg } from '../../../../../entities/result-sdgs/entities/result-sdg.entity';
+import { ClarisaSdgTarget } from '../../clarisa-sdg-targets/entities/clarisa-sdg-target.entity';
 
 @Entity('clarisa_sdgs')
 export class ClarisaSdg extends AuditableEntity {
@@ -58,6 +59,12 @@ export class ClarisaSdg extends AuditableEntity {
     nullable: true,
   })
   description: string;
+
+  @OneToMany(
+    () => ClarisaSdgTarget,
+    (clarisaSdgTarget) => clarisaSdgTarget.clarisa_sdg,
+  )
+  clarisa_sdg_targets: ClarisaSdgTarget[];
 
   @OneToMany(() => ResultSdg, (resultSdg) => resultSdg.clarisa_sdg)
   result_sdgs!: ResultSdg[];
