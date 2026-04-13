@@ -1,6 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { ResultLever } from '../../../../../entities/result-levers/entities/result-lever.entity';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
+import { LeverSdgTarget } from '../../../../../entities/lever-sdg-targets/entities/lever-sdg-target.entity';
 
 @Entity('clarisa_levers')
 export class ClarisaLever extends AuditableEntity {
@@ -30,4 +31,7 @@ export class ClarisaLever extends AuditableEntity {
 
   @OneToMany(() => ResultLever, (resultLever) => resultLever.lever)
   result_levers!: ResultLever[];
+
+  @OneToMany(() => LeverSdgTarget, (leverSdgTarget) => leverSdgTarget.lever)
+  lever_sdg_targets: LeverSdgTarget[];
 }
