@@ -666,12 +666,7 @@ export class ResultsService {
         'is_primary',
       );
 
-      const activeLevers = await this._resultLeversService.find(
-        resultId,
-        LeverRolesEnum.ALIGNMENT,
-      );
-
-      await this._resultLeversService.create<LeverRolesEnum>(
+      const newLevers = await this._resultLeversService.create<LeverRolesEnum>(
         resultId,
         fullLevers,
         'lever_id',
@@ -688,7 +683,7 @@ export class ResultsService {
           resultId,
           fullLevers,
           LeverRolesEnum.ALIGNMENT,
-          activeLevers,
+          newLevers,
         );
 
       for (const lever of emergedLever) {
