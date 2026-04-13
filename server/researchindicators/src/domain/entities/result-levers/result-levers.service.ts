@@ -52,7 +52,7 @@ export class ResultLeversService extends BaseServiceSimple<
     role: LeverRolesEnum,
     serverResultLevers?: Partial<ResultLever>[],
   ) {
-    if (!isEmpty(serverResultLevers)) {
+    if (isEmpty(serverResultLevers)) {
       serverResultLevers = await this.mainRepo.find({
         where: {
           result_id: resultId,
@@ -61,7 +61,6 @@ export class ResultLeversService extends BaseServiceSimple<
         },
       });
     }
-
     return updateArray(
       clientResultLevers,
       serverResultLevers,
