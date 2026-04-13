@@ -2151,4 +2151,73 @@ describe('ResultOicrService', () => {
       ).toBe(true);
     });
   });
+
+  // [CLAUDE/DONE] 87
+  describe('validateOicrInternalCode', () => {
+    it('should throw BadRequestException when oicr_internal_code already exists for another result', async () => {
+      mockResultOicrRepository.findOne.mockResolvedValue({ result_id: 99 } as any);
+
+      await expect(
+        service.validateOicrInternalCode(10, 'OICR-001'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should not throw when code does not exist for other results', async () => {
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.validateOicrInternalCode(10, 'OICR-001'),
+      ).resolves.not.toThrow();
+    });
+  });
+
+  // [CLAUDE/DONE] 88
+  describe('review', () => {
+    it('should throw BadRequestException when oicr_internal_code already exists for another result', async () => {
+      mockResultOicrRepository.findOne.mockResolvedValue({ result_id: 99 } as any);
+      mockCurrentUser.audit.mockReturnValue({ updated_by: 1 });
+
+      await expect(
+        service.review(10, {
+          oicr_internal_code: 'OICR-001',
+          mel_regional_expert: '5',
+          sharepoint_link: 'http://sharepoint.com',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update oicr record when code does not conflict', async () => {
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] } as any);
+      mockCurrentUser.audit.mockReturnValue({ updated_by: 1 });
+
+      await service.review(10, {
+        oicr_internal_code: 'OICR-NEW',
+        mel_regional_expert: '5',
+        sharepoint_link: ' http://sharepoint.com ',
+      });
+
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({ oicr_internal_code: 'OICR-NEW' }),
+      );
+    });
+
+    it('should set sharepoint_link to null when empty', async () => {
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] } as any);
+      mockCurrentUser.audit.mockReturnValue({ updated_by: 1 });
+
+      await service.review(10, {
+        oicr_internal_code: 'OICR-NEW',
+        mel_regional_expert: '5',
+        sharepoint_link: '   ',
+      });
+
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({ sharepoint_link: null }),
+      );
+    });
+  });
 });
