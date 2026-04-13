@@ -311,7 +311,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter.contract_code}'`)}
     ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter.project_name}%'`)}
     ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'`)}
-    ${validFilter(filter?.lever, `AND cl.id in (${filter.lever.join(',')})`)}
+    ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
     ${dateFilterClause}
     ${validFilter(filter?.status, this.buildStatusFilterClause(filter.status))}
   `;
