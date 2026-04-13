@@ -60,6 +60,7 @@ import { ResultImpactAreasService } from '../result-impact-areas/result-impact-a
 import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
 import { StatusWorkflowFunctionHandlerService } from '../result-status-workflow/function-handler.service';
 import { GeneralDataDto } from '../result-status-workflow/config/config-workflow';
+import { ResultImpactAreaGlobalTarget } from '../result-impact-area-global-targets/entities/result-impact-area-global-target.entity';
 
 @Injectable()
 export class ResultOicrService {
@@ -83,7 +84,7 @@ export class ResultOicrService {
     private readonly resultImpactAreasService: ResultImpactAreasService,
     private readonly resultImpactAreaGlobalTargetsService: ResultImpactAreaGlobalTargetsService,
     private readonly resultStatusWorkflowHandler: StatusWorkflowFunctionHandlerService,
-  ) {}
+  ) { }
 
   async create(resultId: number, manager: EntityManager) {
     const entityManager: Repository<ResultOicr> = selectManager(
@@ -264,8 +265,9 @@ export class ResultOicrService {
         (ia) => ia.impact_area_id === impactArea.impact_area_id,
       );
       impactArea.result_impact_area_global_targets =
-        tempImpactArea?.result_impact_area_global_targets;
-      impactArea.global_target_id = tempImpactArea?.global_target_id;
+        tempImpactArea?.result_impact_area_global_targets
+          ?.map((gt) => ({ global_target_id: gt.global_target_id }))
+          .filter((gt) => gt.global_target_id !== null) as ResultImpactAreaGlobalTarget[];
     });
 
     await this.resultImpactAreaGlobalTargetsService.disableAllByResultId(
@@ -273,11 +275,10 @@ export class ResultOicrService {
     );
 
     for (const impactArea of savedImpactAreas) {
+
       await this.resultImpactAreaGlobalTargetsService.create(
         impactArea.id,
-        impactArea?.global_target_id
-          ? [{ global_target_id: impactArea.global_target_id }]
-          : [],
+        impactArea?.result_impact_area_global_targets,
         'global_target_id',
       );
     }
@@ -320,10 +321,6 @@ export class ResultOicrService {
         (gt) => gt.result_impact_area_id === ria.id,
       );
       ria.result_impact_area_global_targets = globalTargetsForRia;
-      ria.global_target_id =
-        globalTargetsForRia.length > 0
-          ? globalTargetsForRia[0].global_target_id
-          : null;
     });
 
     return {
@@ -452,10 +449,10 @@ export class ResultOicrService {
 
     const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
       ? [
-          {
-            tag_id: data?.tagging?.tag_id,
-          },
-        ]
+        {
+          tag_id: data?.tagging?.tag_id,
+        },
+      ]
       : [];
 
     const createdTags = await this.resultTagsService.create(
