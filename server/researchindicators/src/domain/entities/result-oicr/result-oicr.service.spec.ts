@@ -1885,12 +1885,12 @@ describe('ResultOicrService', () => {
         ['impact_area_score_id'],
       );
 
-      // Assert that global targets are created for each impact area
+      // Assert that global targets are created for each impact area (full list per area)
       expect(
         mockResultImpactAreaGlobalTargetsService.create,
       ).toHaveBeenCalledWith(
         mockImpactAreaId,
-        [{ global_target_id: 1 }],
+        [{ global_target_id: 1 }, { global_target_id: 3 }],
         'global_target_id',
       );
 
