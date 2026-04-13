@@ -84,7 +84,7 @@ export class ResultOicrService {
     private readonly resultImpactAreasService: ResultImpactAreasService,
     private readonly resultImpactAreaGlobalTargetsService: ResultImpactAreaGlobalTargetsService,
     private readonly resultStatusWorkflowHandler: StatusWorkflowFunctionHandlerService,
-  ) { }
+  ) {}
 
   async create(resultId: number, manager: EntityManager) {
     const entityManager: Repository<ResultOicr> = selectManager(
@@ -267,7 +267,9 @@ export class ResultOicrService {
       impactArea.result_impact_area_global_targets =
         tempImpactArea?.result_impact_area_global_targets
           ?.map((gt) => ({ global_target_id: gt.global_target_id }))
-          .filter((gt) => gt.global_target_id !== null) as ResultImpactAreaGlobalTarget[];
+          .filter(
+            (gt) => gt.global_target_id !== null,
+          ) as ResultImpactAreaGlobalTarget[];
     });
 
     await this.resultImpactAreaGlobalTargetsService.disableAllByResultId(
@@ -275,7 +277,6 @@ export class ResultOicrService {
     );
 
     for (const impactArea of savedImpactAreas) {
-
       await this.resultImpactAreaGlobalTargetsService.create(
         impactArea.id,
         impactArea?.result_impact_area_global_targets,
@@ -449,10 +450,10 @@ export class ResultOicrService {
 
     const saveTags: Partial<ResultTag>[] = !isEmpty(data?.tagging)
       ? [
-        {
-          tag_id: data?.tagging?.tag_id,
-        },
-      ]
+          {
+            tag_id: data?.tagging?.tag_id,
+          },
+        ]
       : [];
 
     const createdTags = await this.resultTagsService.create(
