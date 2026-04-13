@@ -8,9 +8,7 @@ describe('ResultNotableReferencesController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultNotableReferencesController],
-      providers: [
-        { provide: ResultNotableReferencesService, useValue: {} },
-      ],
+      providers: [{ provide: ResultNotableReferencesService, useValue: {} }],
     }).compile();
     controller = module.get(ResultNotableReferencesController);
   });

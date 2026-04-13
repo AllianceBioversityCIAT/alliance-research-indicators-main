@@ -78,8 +78,20 @@ describe('ResultStatusWorkflowService', () => {
   describe('getAllStatusesByindicatorId', () => {
     it('should return workflow statuses without config field', async () => {
       const mockStatuses = [
-        { indicator_id: 1, is_active: true, config: { actions: [] }, from_status: {}, to_status: {} },
-        { indicator_id: 1, is_active: true, config: { actions: [] }, from_status: {}, to_status: {} },
+        {
+          indicator_id: 1,
+          is_active: true,
+          config: { actions: [] },
+          from_status: {},
+          to_status: {},
+        },
+        {
+          indicator_id: 1,
+          is_active: true,
+          config: { actions: [] },
+          from_status: {},
+          to_status: {},
+        },
       ];
       mockWorkflowFind.mockResolvedValue(mockStatuses);
 
@@ -122,8 +134,11 @@ describe('ResultStatusWorkflowService', () => {
       const mockStatuses = [{ to_status_id: 2, indicator_id: 1 }];
       mockWorkflowFind.mockResolvedValue(mockStatuses);
 
-      const result =
-        await service.getConfigWorkflowByIndicatorAndFromStatus(1, 1, true);
+      const result = await service.getConfigWorkflowByIndicatorAndFromStatus(
+        1,
+        1,
+        true,
+      );
 
       expect(result).toEqual(mockStatuses);
     });
@@ -136,8 +151,10 @@ describe('ResultStatusWorkflowService', () => {
         { result_status_id: 2, is_active: true },
       ]);
 
-      const result =
-        await service.getConfigWorkflowByIndicatorAndFromStatus(1, 1);
+      const result = await service.getConfigWorkflowByIndicatorAndFromStatus(
+        1,
+        1,
+      );
 
       expect(Array.isArray(result)).toBe(true);
     });
@@ -148,8 +165,10 @@ describe('ResultStatusWorkflowService', () => {
         .mockResolvedValueOnce([]);
       mockStatusFind.mockResolvedValue([]);
 
-      const result =
-        await service.getConfigWorkflowByIndicatorAndFromStatus(1, 1);
+      const result = await service.getConfigWorkflowByIndicatorAndFromStatus(
+        1,
+        1,
+      );
 
       expect(result).toEqual([]);
     });
@@ -189,7 +208,11 @@ describe('ResultStatusWorkflowService', () => {
     });
 
     it('should throw NotFoundException when transition is not valid', async () => {
-      mockResultFindOne.mockResolvedValue({ result_id: 1, indicator_id: 1, result_status_id: 1 });
+      mockResultFindOne.mockResolvedValue({
+        result_id: 1,
+        indicator_id: 1,
+        result_status_id: 1,
+      });
       mockWorkflowFindOne.mockResolvedValue(null);
 
       await expect(
@@ -214,14 +237,19 @@ describe('ResultStatusWorkflowService', () => {
       mockWorkflowFindOne.mockResolvedValue(mockTransition);
 
       const mockInsertResult = { identifiers: [{ submission_history_id: 10 }] };
-      const mockHistoryEntry = { submission_history_id: 10, created_at: new Date() };
+      const mockHistoryEntry = {
+        submission_history_id: 10,
+        created_at: new Date(),
+      };
       const mockManagerRepo = {
         insert: jest.fn().mockResolvedValue(mockInsertResult),
         findOne: jest.fn().mockResolvedValue(mockHistoryEntry),
         update: jest.fn().mockResolvedValue(undefined),
       };
       mockTransaction.mockImplementation(async (cb) => {
-        return cb({ getRepository: jest.fn().mockReturnValue(mockManagerRepo) });
+        return cb({
+          getRepository: jest.fn().mockReturnValue(mockManagerRepo),
+        });
       });
 
       await expect(

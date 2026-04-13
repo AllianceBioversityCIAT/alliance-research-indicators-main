@@ -569,18 +569,32 @@ describe('ResultInstitutionsService', () => {
   // [CLAUDE/DONE] 72
   describe('filterInstitutionsAi', () => {
     it('should return empty acept and pending when institutions list is empty', () => {
-      const result = service.filterInstitutionsAi([], InstitutionRolesEnum.PARTNERS);
+      const result = service.filterInstitutionsAi(
+        [],
+        InstitutionRolesEnum.PARTNERS,
+      );
 
       expect(result).toEqual({ acept: [], pending: [] });
     });
 
     it('should classify institutions with score >= 70 and institution_id as accepted', () => {
       const institutions = [
-        { institution_id: '10', institution_name: 'CIAT', similarity_score: '85' },
-        { institution_id: null, institution_name: 'Unknown', similarity_score: '90' },
+        {
+          institution_id: '10',
+          institution_name: 'CIAT',
+          similarity_score: '85',
+        },
+        {
+          institution_id: null,
+          institution_name: 'Unknown',
+          similarity_score: '90',
+        },
       ] as any[];
 
-      const { acept, pending } = service.filterInstitutionsAi(institutions, InstitutionRolesEnum.PARTNERS);
+      const { acept, pending } = service.filterInstitutionsAi(
+        institutions,
+        InstitutionRolesEnum.PARTNERS,
+      );
 
       expect(acept).toHaveLength(1);
       expect(acept[0].institution_id).toBe(10);
@@ -590,35 +604,64 @@ describe('ResultInstitutionsService', () => {
 
     it('should classify institutions with score < 70 as pending', () => {
       const institutions = [
-        { institution_id: '5', institution_name: 'Alliance', similarity_score: '60' },
+        {
+          institution_id: '5',
+          institution_name: 'Alliance',
+          similarity_score: '60',
+        },
       ] as any[];
 
-      const { acept, pending } = service.filterInstitutionsAi(institutions, InstitutionRolesEnum.PARTNERS);
+      const { acept, pending } = service.filterInstitutionsAi(
+        institutions,
+        InstitutionRolesEnum.PARTNERS,
+      );
 
       expect(acept).toHaveLength(0);
       expect(pending).toHaveLength(1);
-      expect(pending[0].institution_role_id).toBe(InstitutionRolesEnum.PARTNERS);
+      expect(pending[0].institution_role_id).toBe(
+        InstitutionRolesEnum.PARTNERS,
+      );
     });
   });
 
   // [CLAUDE/DONE] 73
   describe('insertInstitutionsAi', () => {
     it('should return null when institutions list is empty', async () => {
-      const result = await service.insertInstitutionsAi(1, [], InstitutionRolesEnum.PARTNERS);
+      const result = await service.insertInstitutionsAi(
+        1,
+        [],
+        InstitutionRolesEnum.PARTNERS,
+      );
 
       expect(result).toBeNull();
     });
 
     it('should save institutions filtered by non-empty institution_id', async () => {
       const institutions = [
-        { institution_id: 5, institution_name: 'CIAT', score: 85, institution_role_id: InstitutionRolesEnum.PARTNERS },
-        { institution_id: null, institution_name: 'Unknown', score: 60, institution_role_id: InstitutionRolesEnum.PARTNERS },
+        {
+          institution_id: 5,
+          institution_name: 'CIAT',
+          score: 85,
+          institution_role_id: InstitutionRolesEnum.PARTNERS,
+        },
+        {
+          institution_id: null,
+          institution_name: 'Unknown',
+          score: 60,
+          institution_role_id: InstitutionRolesEnum.PARTNERS,
+        },
       ] as any[];
 
-      mockRepository.save.mockResolvedValue([{ result_id: 10, institution_id: 5 }]);
+      mockRepository.save.mockResolvedValue([
+        { result_id: 10, institution_id: 5 },
+      ]);
       mockDataSource.getRepository.mockReturnValue(mockRepository);
 
-      const result = await service.insertInstitutionsAi(10, institutions, InstitutionRolesEnum.PARTNERS);
+      const result = await service.insertInstitutionsAi(
+        10,
+        institutions,
+        InstitutionRolesEnum.PARTNERS,
+      );
 
       expect(mockRepository.save).toHaveBeenCalledWith(
         expect.arrayContaining([

@@ -4,7 +4,9 @@ import { LoggerUtil } from '../utils/logger.util';
 
 describe('GlobalExceptions', () => {
   beforeAll(() => {
-    jest.spyOn(LoggerUtil.prototype, '_error').mockImplementation(() => undefined);
+    jest
+      .spyOn(LoggerUtil.prototype, '_error')
+      .mockImplementation(() => undefined);
   });
 
   afterAll(() => {

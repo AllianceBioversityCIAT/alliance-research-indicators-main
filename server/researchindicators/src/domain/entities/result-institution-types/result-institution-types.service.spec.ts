@@ -21,7 +21,9 @@ describe('ResultInstitutionTypesService', () => {
     findOne: mockFindOne,
     save: mockSave,
     update: mockUpdate,
-    metadata: { primaryColumns: [{ propertyName: 'result_institution_type_id' }] },
+    metadata: {
+      primaryColumns: [{ propertyName: 'result_institution_type_id' }],
+    },
   };
 
   beforeEach(async () => {
@@ -38,7 +40,9 @@ describe('ResultInstitutionTypesService', () => {
       ],
     }).compile();
 
-    service = module.get<ResultInstitutionTypesService>(ResultInstitutionTypesService);
+    service = module.get<ResultInstitutionTypesService>(
+      ResultInstitutionTypesService,
+    );
   });
 
   afterEach(() => {
@@ -48,9 +52,9 @@ describe('ResultInstitutionTypesService', () => {
   // [CLAUDE/DONE] 70
   describe('saveInnovationDev', () => {
     it('should call create for OTHER type institutions', async () => {
-      const createSpy = jest.spyOn(service as any, 'create').mockResolvedValue([
-        { result_institution_type_id: 1 },
-      ]);
+      const createSpy = jest
+        .spyOn(service as any, 'create')
+        .mockResolvedValue([{ result_institution_type_id: 1 }]);
       const mockManager = { getRepository: jest.fn() } as any;
 
       await service.saveInnovationDev(
@@ -75,9 +79,9 @@ describe('ResultInstitutionTypesService', () => {
     });
 
     it('should call create for regular type institutions (non-OTHER, no sub_type)', async () => {
-      const createSpy = jest.spyOn(service as any, 'create').mockResolvedValue([
-        { result_institution_type_id: 2 },
-      ]);
+      const createSpy = jest
+        .spyOn(service as any, 'create')
+        .mockResolvedValue([{ result_institution_type_id: 2 }]);
       const mockManager = { getRepository: jest.fn() } as any;
 
       await service.saveInnovationDev(
@@ -104,7 +108,9 @@ describe('ResultInstitutionTypesService', () => {
     });
 
     it('should not call create when data is empty', async () => {
-      const createSpy = jest.spyOn(service as any, 'create').mockResolvedValue([]);
+      const createSpy = jest
+        .spyOn(service as any, 'create')
+        .mockResolvedValue([]);
       const mockManager = { getRepository: jest.fn() } as any;
 
       await service.saveInnovationDev(10, [], mockManager);
@@ -126,10 +132,18 @@ describe('ResultInstitutionTypesService', () => {
       } as any;
 
       const data = [
-        { institution_type_id: 5, sub_institution_type_id: null, is_organization_known: false } as any,
+        {
+          institution_type_id: 5,
+          sub_institution_type_id: null,
+          is_organization_known: false,
+        } as any,
       ];
 
-      const result = await service.customSaveInnovationDev(10, data, mockManager);
+      const result = await service.customSaveInnovationDev(
+        10,
+        data,
+        mockManager,
+      );
 
       expect(mockTempRepo.update).toHaveBeenCalledWith(
         expect.objectContaining({ result_id: 10, is_active: true }),
@@ -150,8 +164,16 @@ describe('ResultInstitutionTypesService', () => {
       } as any;
 
       const data = [
-        { institution_type_id: 5, sub_institution_type_id: null, is_organization_known: false } as any,
-        { institution_type_id: 5, sub_institution_type_id: null, is_organization_known: false } as any,
+        {
+          institution_type_id: 5,
+          sub_institution_type_id: null,
+          is_organization_known: false,
+        } as any,
+        {
+          institution_type_id: 5,
+          sub_institution_type_id: null,
+          is_organization_known: false,
+        } as any,
       ];
 
       await service.customSaveInnovationDev(10, data, mockManager);

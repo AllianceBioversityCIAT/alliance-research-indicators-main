@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 import { ResultPolicyChangeService } from './result-policy-change.service';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
-import { CurrentUserUtil, SetAuditEnum } from '../../shared/utils/current-user.util';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { PolicyStagesService } from '../policy-stages/policy-stages.service';
 import { PolicyTypesService } from '../policy-types/policy-types.service';
@@ -60,7 +60,10 @@ describe('ResultPolicyChangeService', () => {
           },
         },
         { provide: LinkResultsService, useValue: mockLinkResultsService },
-        { provide: ResultInstitutionsService, useValue: mockResultInstitutionsService },
+        {
+          provide: ResultInstitutionsService,
+          useValue: mockResultInstitutionsService,
+        },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
         { provide: UpdateDataUtil, useValue: mockUpdateDataUtil },
         { provide: PolicyStagesService, useValue: mockPolicyStagesService },
@@ -98,8 +101,12 @@ describe('ResultPolicyChangeService', () => {
   // [CLAUDE/DONE] 90
   describe('processedAiInfo', () => {
     it('should map raw AI data to CreateResultPolicyChangeDto', async () => {
-      mockPolicyStagesService.findByName.mockResolvedValue({ policy_stage_id: 1 });
-      mockPolicyTypesService.findByName.mockResolvedValue({ policy_type_id: 2 });
+      mockPolicyStagesService.findByName.mockResolvedValue({
+        policy_stage_id: 1,
+      });
+      mockPolicyTypesService.findByName.mockResolvedValue({
+        policy_type_id: 2,
+      });
 
       const result = await service.processedAiInfo({
         evidence_for_stage: 'evidence',
@@ -163,7 +170,9 @@ describe('ResultPolicyChangeService', () => {
         policy_stage_id: 2,
         evidence_stage: 'stage',
       });
-      mockResultInstitutionsService.findInstitutionsByRoleResult.mockResolvedValue([]);
+      mockResultInstitutionsService.findInstitutionsByRoleResult.mockResolvedValue(
+        [],
+      );
       mockLinkResultsService.findAndDetails.mockResolvedValue([
         {
           other_result_id: 5,
@@ -184,7 +193,9 @@ describe('ResultPolicyChangeService', () => {
 
     it('should return undefined innovation links when no link results match', async () => {
       mockFindOne.mockResolvedValue(null);
-      mockResultInstitutionsService.findInstitutionsByRoleResult.mockResolvedValue([]);
+      mockResultInstitutionsService.findInstitutionsByRoleResult.mockResolvedValue(
+        [],
+      );
       mockLinkResultsService.findAndDetails.mockResolvedValue([]);
 
       const result = await service.findPolicyChange(99);

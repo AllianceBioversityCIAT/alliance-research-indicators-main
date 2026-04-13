@@ -8,9 +8,7 @@ describe('ResultKeywordsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultKeywordsController],
-      providers: [
-        { provide: ResultKeywordsService, useValue: {} },
-      ],
+      providers: [{ provide: ResultKeywordsService, useValue: {} }],
     }).compile();
     controller = module.get(ResultKeywordsController);
   });

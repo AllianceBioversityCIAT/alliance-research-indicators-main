@@ -44,7 +44,9 @@ describe('ResultSdgsService', () => {
       const existingSdgs = [{ result_id: 10, clarisa_sdg_id: 1 }];
       mockFind.mockResolvedValue(existingSdgs);
 
-      const createSpy = jest.spyOn(service as any, 'create').mockResolvedValue([]);
+      const createSpy = jest
+        .spyOn(service as any, 'create')
+        .mockResolvedValue([]);
 
       const newSdgs = [{ clarisa_sdg_id: 2 }] as any;
 
@@ -67,7 +69,9 @@ describe('ResultSdgsService', () => {
 
     it('should filter out sdgs without clarisa_sdg_id', async () => {
       mockFind.mockResolvedValue([]);
-      const createSpy = jest.spyOn(service as any, 'create').mockResolvedValue([]);
+      const createSpy = jest
+        .spyOn(service as any, 'create')
+        .mockResolvedValue([]);
 
       const newSdgs = [{ clarisa_sdg_id: null }, { clarisa_sdg_id: 3 }] as any;
 

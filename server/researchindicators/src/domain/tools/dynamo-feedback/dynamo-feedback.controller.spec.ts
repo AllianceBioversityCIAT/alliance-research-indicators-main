@@ -19,9 +19,7 @@ describe('DynamoFeedbackController', () => {
     (ResponseUtils.format as jest.Mock) = mockFormat;
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DynamoFeedbackController],
-      providers: [
-        { provide: DynamoFeedbackService, useValue: mockService },
-      ],
+      providers: [{ provide: DynamoFeedbackService, useValue: mockService }],
     }).compile();
     controller = module.get(DynamoFeedbackController);
   });

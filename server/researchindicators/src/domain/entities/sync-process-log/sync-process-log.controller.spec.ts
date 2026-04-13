@@ -8,9 +8,7 @@ describe('SyncProcessLogController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SyncProcessLogController],
-      providers: [
-        { provide: SyncProcessLogService, useValue: {} },
-      ],
+      providers: [{ provide: SyncProcessLogService, useValue: {} }],
     }).compile();
     controller = module.get(SyncProcessLogController);
   });

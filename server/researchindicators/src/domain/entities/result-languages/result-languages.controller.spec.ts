@@ -8,9 +8,7 @@ describe('ResultLanguagesController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultLanguagesController],
-      providers: [
-        { provide: ResultLanguagesService, useValue: {} },
-      ],
+      providers: [{ provide: ResultLanguagesService, useValue: {} }],
     }).compile();
     controller = module.get(ResultLanguagesController);
   });

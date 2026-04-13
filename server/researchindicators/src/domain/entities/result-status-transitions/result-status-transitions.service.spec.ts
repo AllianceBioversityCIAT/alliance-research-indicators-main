@@ -28,7 +28,9 @@ describe('ResultStatusTransitionsService', () => {
       ],
     }).compile();
 
-    service = module.get<ResultStatusTransitionsService>(ResultStatusTransitionsService);
+    service = module.get<ResultStatusTransitionsService>(
+      ResultStatusTransitionsService,
+    );
   });
 
   afterEach(() => {

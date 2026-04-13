@@ -1,7 +1,4 @@
-import {
-  AgressoContractMapper,
-  mapCountries,
-} from './agresso-contract.mapper';
+import { AgressoContractMapper, mapCountries } from './agresso-contract.mapper';
 import { ClarisaSdg } from '../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 
 describe('AgressoContractMapper', () => {

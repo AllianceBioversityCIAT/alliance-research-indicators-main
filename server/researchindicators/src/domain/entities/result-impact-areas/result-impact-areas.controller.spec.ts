@@ -8,9 +8,7 @@ describe('ResultImpactAreasController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultImpactAreasController],
-      providers: [
-        { provide: ResultImpactAreasService, useValue: {} },
-      ],
+      providers: [{ provide: ResultImpactAreasService, useValue: {} }],
     }).compile();
     controller = module.get(ResultImpactAreasController);
   });

@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { TempExternalOicrsService } from './temp_external_oicrs.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
-import { TempResultExternalOicr } from './entities/temp_result_external_oicr.entity';
 import { TempExternalOicr } from './entities/temp_external_oicr.entity';
 
 describe('TempExternalOicrsService', () => {
@@ -95,9 +94,7 @@ describe('TempExternalOicrsService', () => {
       expect(result.step_one.main_contact_person).toEqual({
         user_id: 'user123',
       });
-      expect(result.step_one.outcome_impact_statement).toBe(
-        'Impact narrative',
-      );
+      expect(result.step_one.outcome_impact_statement).toBe('Impact narrative');
       expect(result.step_two.contributor_lever).toHaveLength(2);
       expect(result.step_three.countries).toHaveLength(2);
       expect(result.step_three.geo_scope_id).toBe(3);

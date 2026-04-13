@@ -3,10 +3,7 @@ import { ReportingFeedbackService } from './reporting-feedback.service';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { TemplateService } from '../../shared/auxiliar/template/template.service';
-import {
-  AskForHelp,
-  AskForHelpTypeEnum,
-} from './dto/reporting-feedback.dto';
+import { AskForHelp, AskForHelpTypeEnum } from './dto/reporting-feedback.dto';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
 
 describe('ReportingFeedbackService', () => {

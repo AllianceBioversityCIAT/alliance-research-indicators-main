@@ -104,7 +104,9 @@ describe('LinkResultsService', () => {
     it('should filter indicators and persist via create', async () => {
       filterResultByIndicators.mockResolvedValue([10, 20]);
       const saved = [{ link_result_id: 1 } as LinkResult];
-      const createSpy = jest.spyOn(service, 'create').mockResolvedValue(saved as any);
+      const createSpy = jest
+        .spyOn(service, 'create')
+        .mockResolvedValue(saved as any);
 
       const body = {
         link_results: [

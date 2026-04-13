@@ -25,7 +25,9 @@ describe('ResultLeverSdgTargetsService', () => {
       ],
     }).compile();
 
-    service = module.get<ResultLeverSdgTargetsService>(ResultLeverSdgTargetsService);
+    service = module.get<ResultLeverSdgTargetsService>(
+      ResultLeverSdgTargetsService,
+    );
   });
 
   afterEach(() => {
@@ -35,7 +37,10 @@ describe('ResultLeverSdgTargetsService', () => {
   // [CLAUDE/DONE] 83
   describe('findByMultiplesResultLeverIds', () => {
     it('should return active records matching the provided lever ids', async () => {
-      const mockRecords = [{ id: 1, result_lever_id: 10 }, { id: 2, result_lever_id: 20 }];
+      const mockRecords = [
+        { id: 1, result_lever_id: 10 },
+        { id: 2, result_lever_id: 20 },
+      ];
       mockFind.mockResolvedValue(mockRecords);
 
       const result = await service.findByMultiplesResultLeverIds([10, 20]);

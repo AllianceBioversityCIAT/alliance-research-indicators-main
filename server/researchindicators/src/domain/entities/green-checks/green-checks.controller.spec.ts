@@ -61,12 +61,7 @@ describe('GreenChecksController', () => {
     mockFormat.mockReturnValue({});
     const body = {} as any;
     await controller.submitResult('c', '4', body);
-    expect(mockService.statusManagement).toHaveBeenCalledWith(
-      10,
-      4,
-      'c',
-      body,
-    );
+    expect(mockService.statusManagement).toHaveBeenCalledWith(10, 4, 'c', body);
     expect(ResponseUtils.format).toHaveBeenCalledWith({
       description: 'Status changed to ' + ResultStatusEnum[4],
       status: HttpStatus.OK,

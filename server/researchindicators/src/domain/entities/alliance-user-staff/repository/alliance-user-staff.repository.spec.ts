@@ -32,10 +32,7 @@ describe('AllianceUserStaffRepository', () => {
   });
 
   it('findDataForOpenSearch adds carnet In(ids)', async () => {
-    await repository.findDataForOpenSearch(FindAllOptions.SHOW_ALL, [
-      'A',
-      'B',
-    ]);
+    await repository.findDataForOpenSearch(FindAllOptions.SHOW_ALL, ['A', 'B']);
     expect(findSpy).toHaveBeenCalledWith({
       where: { carnet: expect.anything() },
     });

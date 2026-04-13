@@ -1,23 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { DataSource } from 'typeorm';
-import {
-  ClarisaService,
-  ResponseClarisaDtio,
-} from './clarisa.service';
+import { ClarisaService, ResponseClarisaDtio } from './clarisa.service';
 import { ClarisaInstitutionsService } from './entities/clarisa-institutions/clarisa-institutions.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { AppConfig } from '../../shared/utils/app-config.util';
-import {
-  ClarisaPathEnum,
-  SearchToOpenSearchEnum,
-} from './anum/path.enum';
+import { ClarisaPathEnum, SearchToOpenSearchEnum } from './anum/path.enum';
 import { PartnerRequestCliDataDto } from '../dto/partner-request-cli-data.dto';
 
 describe('ClarisaService', () => {
   let service: ClarisaService;
   let mockConnection: { get: jest.Mock; post: jest.Mock };
-  let currentUser: jest.Mocked<CurrentUserUtil>;
+  let _currentUser: jest.Mocked<CurrentUserUtil>;
   let ciService: jest.Mocked<ClarisaInstitutionsService>;
 
   const mockDataSource = {
@@ -58,7 +52,7 @@ describe('ClarisaService', () => {
     }).compile();
 
     service = module.get<ClarisaService>(ClarisaService);
-    currentUser = module.get(CurrentUserUtil);
+    _currentUser = module.get(CurrentUserUtil);
     ciService = module.get(ClarisaInstitutionsService);
 
     // Replace internal connection with controlled mock
@@ -74,7 +68,11 @@ describe('ClarisaService', () => {
     it('should call connection.get with country path when target is COUNTRY', async () => {
       mockConnection.get.mockResolvedValue([]);
 
-      await service.searchToOS('Colombia', 'CO', SearchToOpenSearchEnum.COUNTRY);
+      await service.searchToOS(
+        'Colombia',
+        'CO',
+        SearchToOpenSearchEnum.COUNTRY,
+      );
 
       expect(mockConnection.get).toHaveBeenCalledWith(
         `${ClarisaPathEnum.OS_COUNTRIES}?query=Colombia&country=CO`,
@@ -84,7 +82,11 @@ describe('ClarisaService', () => {
     it('should call connection.get with institution path when target is INSTITUTION', async () => {
       mockConnection.get.mockResolvedValue([]);
 
-      await service.searchToOS('Alliance', '', SearchToOpenSearchEnum.INSTITUTION);
+      await service.searchToOS(
+        'Alliance',
+        '',
+        SearchToOpenSearchEnum.INSTITUTION,
+      );
 
       expect(mockConnection.get).toHaveBeenCalledWith(
         `${ClarisaPathEnum.OS_INSTITUTIONS}?query=Alliance&country=`,
@@ -94,7 +96,11 @@ describe('ClarisaService', () => {
     it('should call connection.get with subnational path when target is SUBNATIONAL', async () => {
       mockConnection.get.mockResolvedValue([]);
 
-      await service.searchToOS('Antioquia', 'CO', SearchToOpenSearchEnum.SUBNATIONAL);
+      await service.searchToOS(
+        'Antioquia',
+        'CO',
+        SearchToOpenSearchEnum.SUBNATIONAL,
+      );
 
       expect(mockConnection.get).toHaveBeenCalledWith(
         `${ClarisaPathEnum.OS_SUBNATIONAL}?query=Antioquia&country=CO`,
@@ -135,16 +141,12 @@ describe('ClarisaService', () => {
   // [CLAUDE/DONE] 164
   describe('cloneAllClarisaEntities', () => {
     it('should call base and baseBatches for all entity types', async () => {
-      const baseSpy = jest
-        .spyOn(service as any, 'base')
-        .mockResolvedValue([]);
+      const baseSpy = jest.spyOn(service as any, 'base').mockResolvedValue([]);
       const baseBatchesSpy = jest
         .spyOn(service as any, 'baseBatches')
         .mockResolvedValue([]);
       ciService.clonePath.mockResolvedValue('api/institutions?show=all');
-      mockDataSource
-        .getRepository()
-        .save.mockResolvedValue([]);
+      mockDataSource.getRepository().save.mockResolvedValue([]);
 
       await service.cloneAllClarisaEntities();
 
@@ -219,7 +221,10 @@ describe('ClarisaService', () => {
     it('should post to CREATE_SECRET with receiver and sender mis data', async () => {
       mockConnection.post.mockResolvedValue({ id: 1 });
 
-      await service.createPermission({ acronym: 'TIP', environment: 'production' });
+      await service.createPermission({
+        acronym: 'TIP',
+        environment: 'production',
+      });
 
       expect(mockConnection.post).toHaveBeenCalledWith(
         ClarisaPathEnum.CREATE_SECRET,

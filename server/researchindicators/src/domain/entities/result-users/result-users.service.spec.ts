@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { ResultUsersService } from './result-users.service';
 import { UserService } from '../../complementary-entities/secondary/user/user.service';
-import { CurrentUserUtil, SetAuditEnum } from '../../shared/utils/current-user.util';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { InformativeRolesEnum } from '../informative-roles/enum/informative-roles.enum';
 import { ResultUser } from './entities/result-user.entity';
@@ -119,7 +119,10 @@ describe('ResultUsersService', () => {
     });
 
     it('should create a new role when no existing roles are found and role is AUTHOR', async () => {
-      const newRole = { result_user_id: 1, informative_role_id: InformativeRolesEnum.AUTHOR };
+      const newRole = {
+        result_user_id: 1,
+        informative_role_id: InformativeRolesEnum.AUTHOR,
+      };
       const mockRepo = {
         find: jest.fn().mockResolvedValue([]),
         findOne: jest.fn().mockResolvedValue(null),
@@ -144,7 +147,10 @@ describe('ResultUsersService', () => {
   // [CLAUDE/DONE] 134
   describe('filterInstitutionsAi', () => {
     it('should return empty acept and pending when users is empty', () => {
-      const result = service.filterInstitutionsAi([], UserRolesEnum.MAIN_CONTACT);
+      const result = service.filterInstitutionsAi(
+        [],
+        UserRolesEnum.MAIN_CONTACT,
+      );
 
       expect(result).toEqual({ acept: [], pending: [] });
     });
@@ -181,9 +187,14 @@ describe('ResultUsersService', () => {
     });
 
     it('should set user_role_id in pending users', () => {
-      const users = [{ code: null, name: 'X', similarity_score: '30' }] as any[];
+      const users = [
+        { code: null, name: 'X', similarity_score: '30' },
+      ] as any[];
 
-      const { pending } = service.filterInstitutionsAi(users, UserRolesEnum.MAIN_CONTACT);
+      const { pending } = service.filterInstitutionsAi(
+        users,
+        UserRolesEnum.MAIN_CONTACT,
+      );
 
       expect(pending[0].user_role_id).toBe(UserRolesEnum.MAIN_CONTACT);
     });
@@ -192,18 +203,24 @@ describe('ResultUsersService', () => {
   // [CLAUDE/DONE] 135
   describe('insertUserAi', () => {
     it('should return null when users list is empty', async () => {
-      const result = await service.insertUserAi(1, [], UserRolesEnum.MAIN_CONTACT);
+      const result = await service.insertUserAi(
+        1,
+        [],
+        UserRolesEnum.MAIN_CONTACT,
+      );
 
       expect(result).toBeNull();
     });
 
     it('should save users with the given resultId and role', async () => {
-      const users: any[] = [
-        { user_code: 'C1', user_name: 'Alice', score: 90 },
-      ];
+      const users: any[] = [{ user_code: 'C1', user_name: 'Alice', score: 90 }];
       mockSave.mockResolvedValue(users);
 
-      const result = await service.insertUserAi(5, users, UserRolesEnum.MAIN_CONTACT);
+      const result = await service.insertUserAi(
+        5,
+        users,
+        UserRolesEnum.MAIN_CONTACT,
+      );
 
       expect(mockSave).toHaveBeenCalledWith([
         expect.objectContaining({
@@ -220,11 +237,18 @@ describe('ResultUsersService', () => {
   describe('findUsersByRoleResult', () => {
     it('should return active users with user relation for the given role and resultId', async () => {
       const mockUsers: Partial<ResultUser>[] = [
-        { result_user_id: 1, user_role_id: UserRolesEnum.MAIN_CONTACT, result_id: 10 },
+        {
+          result_user_id: 1,
+          user_role_id: UserRolesEnum.MAIN_CONTACT,
+          result_id: 10,
+        },
       ];
       mockFind.mockResolvedValue(mockUsers);
 
-      const result = await service.findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, 10);
+      const result = await service.findUsersByRoleResult(
+        UserRolesEnum.MAIN_CONTACT,
+        10,
+      );
 
       expect(mockFind).toHaveBeenCalledWith({
         where: {
@@ -240,7 +264,10 @@ describe('ResultUsersService', () => {
     it('should return empty array when no users match', async () => {
       mockFind.mockResolvedValue([]);
 
-      const result = await service.findUsersByRoleResult(UserRolesEnum.MAIN_CONTACT, 99);
+      const result = await service.findUsersByRoleResult(
+        UserRolesEnum.MAIN_CONTACT,
+        99,
+      );
 
       expect(result).toEqual([]);
     });

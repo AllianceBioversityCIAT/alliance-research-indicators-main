@@ -37,7 +37,9 @@ describe('ClarisaInstitutionsService', () => {
       ],
     }).compile();
 
-    service = module.get<ClarisaInstitutionsService>(ClarisaInstitutionsService);
+    service = module.get<ClarisaInstitutionsService>(
+      ClarisaInstitutionsService,
+    );
   });
 
   afterEach(() => {

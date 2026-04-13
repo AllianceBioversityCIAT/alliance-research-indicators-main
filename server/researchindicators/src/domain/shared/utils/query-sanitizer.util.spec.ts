@@ -34,7 +34,7 @@ describe('query-sanitizer.util', () => {
 
   describe('escapeLikeString', () => {
     it('should escape like wildcards', () => {
-      expect(escapeLikeString("100%_")).toBe('100\\%\\_');
+      expect(escapeLikeString('100%_')).toBe('100\\%\\_');
     });
   });
 });

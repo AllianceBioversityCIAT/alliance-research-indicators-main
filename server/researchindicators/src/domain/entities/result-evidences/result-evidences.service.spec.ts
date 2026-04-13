@@ -74,10 +74,12 @@ describe('ResultEvidencesService', () => {
   describe('updateResultEvidences', () => {
     it('should run transaction, create evidences and touch last updated', async () => {
       const saved = [{ result_evidence_id: 1 } as ResultEvidence];
-      const createSpy = jest.spyOn(service, 'create').mockResolvedValue(saved as any);
+      const createSpy = jest
+        .spyOn(service, 'create')
+        .mockResolvedValue(saved as any);
 
-      transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) =>
-        cb({}),
+      transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) => cb({}),
       );
 
       const body: CreateResultEvidenceDto = {
@@ -109,13 +111,15 @@ describe('ResultEvidencesService', () => {
     it('should upsert notable references for OICR indicator', async () => {
       resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
       jest.spyOn(service, 'create').mockResolvedValue([] as any);
-      transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) =>
-        cb({}),
+      transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) => cb({}),
       );
 
       const body: CreateResultEvidenceDto = {
         evidence: [{ evidence_url: 'u' } as any],
-        notable_references: [{ link: 'l', notable_reference_type_id: 1 } as any],
+        notable_references: [
+          { link: 'l', notable_reference_type_id: 1 } as any,
+        ],
       };
 
       await service.updateResultEvidences(2, body);

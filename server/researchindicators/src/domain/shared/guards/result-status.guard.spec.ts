@@ -18,9 +18,7 @@ describe('ResultStatusGuard', () => {
 
   it('should allow editable statuses', async () => {
     const { guard } = setup(ResultStatusEnum.DRAFT);
-    await expect(
-      guard.canActivate({} as ExecutionContext),
-    ).resolves.toBe(true);
+    await expect(guard.canActivate({} as ExecutionContext)).resolves.toBe(true);
   });
 
   it('should reject non-editable status', async () => {

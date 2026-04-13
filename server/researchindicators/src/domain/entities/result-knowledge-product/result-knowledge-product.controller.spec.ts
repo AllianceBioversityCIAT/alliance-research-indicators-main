@@ -8,9 +8,7 @@ describe('ResultKnowledgeProductController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultKnowledgeProductController],
-      providers: [
-        { provide: ResultKnowledgeProductService, useValue: {} },
-      ],
+      providers: [{ provide: ResultKnowledgeProductService, useValue: {} }],
     }).compile();
     controller = module.get(ResultKnowledgeProductController);
   });

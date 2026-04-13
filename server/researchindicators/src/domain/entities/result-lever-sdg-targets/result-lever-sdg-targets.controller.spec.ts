@@ -8,9 +8,7 @@ describe('ResultLeverSdgTargetsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultLeverSdgTargetsController],
-      providers: [
-        { provide: ResultLeverSdgTargetsService, useValue: {} },
-      ],
+      providers: [{ provide: ResultLeverSdgTargetsService, useValue: {} }],
     }).compile();
     controller = module.get(ResultLeverSdgTargetsController);
   });

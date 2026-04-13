@@ -2434,7 +2434,9 @@ describe('ResultsService', () => {
 
       const result = await service.findOne({ where: { result_id: 1 } } as any);
 
-      expect(mockMainRepo.findOne).toHaveBeenCalledWith({ where: { result_id: 1 } });
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+        where: { result_id: 1 },
+      });
       expect(result).toEqual(mockResult);
     });
   });
@@ -2451,12 +2453,16 @@ describe('ResultsService', () => {
         setParameters: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(mockResults),
       };
-      mockMainRepo.createQueryBuilder = jest.fn().mockReturnValue(mockQb) as any;
+      mockMainRepo.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(mockQb) as any;
 
       const result = await service.findResultTIPData({ year: 2024 });
 
       expect(mockMainRepo.createQueryBuilder).toHaveBeenCalledWith('r');
-      expect(mockQb.andWhere).toHaveBeenCalledWith('report_year_id = :year', { year: 2024 });
+      expect(mockQb.andWhere).toHaveBeenCalledWith('report_year_id = :year', {
+        year: 2024,
+      });
       expect(result).toEqual(mockResults);
     });
 
@@ -2470,11 +2476,16 @@ describe('ResultsService', () => {
         setParameters: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(mockResults),
       };
-      mockMainRepo.createQueryBuilder = jest.fn().mockReturnValue(mockQb) as any;
+      mockMainRepo.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(mockQb) as any;
 
       const result = await service.findResultTIPData({ productType: 3 });
 
-      expect(mockQb.andWhere).toHaveBeenCalledWith('r.indicator_id = :productType', { productType: 3 });
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'r.indicator_id = :productType',
+        { productType: 3 },
+      );
       expect(result).toEqual(mockResults);
     });
   });
@@ -2499,6 +2510,13 @@ describe('ResultsService', () => {
       expect(result.title).toBe('My Result');
       expect(result.year).toBe(2024);
     });
+
+    it('should throw when result row is missing', async () => {
+      mockResultContractsService.find.mockResolvedValue([] as any);
+      mockMainRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.findBaseInfo(99)).rejects.toThrow();
+    });
   });
 
   // [CLAUDE/DONE] 140
@@ -2512,7 +2530,10 @@ describe('ResultsService', () => {
     });
 
     it('should return false when a result exists with the given title', async () => {
-      mockMainRepo.findOne.mockResolvedValue({ result_id: 1, title: 'New Title' } as any);
+      mockMainRepo.findOne.mockResolvedValue({
+        result_id: 1,
+        title: 'New Title',
+      } as any);
 
       const result = await service.validateResultTitle('New Title');
 
@@ -2535,7 +2556,10 @@ describe('ResultsService', () => {
         { result_id: 3 },
       ] as any);
 
-      const result = await service.filterResultByIndicators([1, 2, 3], [1 as any]);
+      const result = await service.filterResultByIndicators(
+        [1, 2, 3],
+        [1 as any],
+      );
 
       expect(result).toEqual([1, 3]);
     });
@@ -2546,9 +2570,14 @@ describe('ResultsService', () => {
     it('should return result with error=true and call deleteFullResultById on exception in bulk mode', async () => {
       const rawResult = { title: 'Test', indicator: 'Policy Change' } as any;
 
-      jest.spyOn(service, 'createResultFromAiRoar').mockRejectedValue(new Error('AI error'));
+      jest
+        .spyOn(service, 'createResultFromAiRoar')
+        .mockRejectedValue(new Error('AI error'));
       mockDataSource.getRepository.mockReturnValue({
-        findOne: jest.fn().mockResolvedValue({ result_official_code: 'STAR-001', platform_code: 'STAR' }),
+        findOne: jest.fn().mockResolvedValue({
+          result_official_code: 'STAR-001',
+          platform_code: 'STAR',
+        }),
       } as any);
 
       const result = await service.formalizeResult(rawResult, true);
@@ -2559,27 +2588,32 @@ describe('ResultsService', () => {
     it('should throw error when not in bulk mode', async () => {
       const rawResult = { title: 'Test' } as any;
 
-      jest.spyOn(service, 'createResultFromAiRoar').mockRejectedValue(new Error('AI error'));
+      jest
+        .spyOn(service, 'createResultFromAiRoar')
+        .mockRejectedValue(new Error('AI error'));
       mockDataSource.getRepository.mockReturnValue({
         findOne: jest.fn().mockResolvedValue(null),
       } as any);
 
-      await expect(service.formalizeResult(rawResult, false)).rejects.toThrow('AI error');
+      await expect(service.formalizeResult(rawResult, false)).rejects.toThrow(
+        'AI error',
+      );
     });
   });
 
   // [CLAUDE/DONE] 143
   describe('createResultFromAiBulk', () => {
     it('should process all results and return errors/created partitioned', async () => {
-      const results = [
-        { title: 'R1' } as any,
-        { title: 'R2' } as any,
-      ];
+      const results = [{ title: 'R1' } as any, { title: 'R2' } as any];
 
       jest
         .spyOn(service, 'formalizeResult')
         .mockResolvedValueOnce({ result_id: 1, error: false } as any)
-        .mockResolvedValueOnce({ title: 'R2', error: true, message_error: 'fail' } as any);
+        .mockResolvedValueOnce({
+          title: 'R2',
+          error: true,
+          message_error: 'fail',
+        } as any);
 
       const output = await service.createResultFromAiBulk(results);
 
@@ -2591,16 +2625,18 @@ describe('ResultsService', () => {
   // [CLAUDE/DONE] 144
   describe('validateAiRawCountries', () => {
     it('should return a ResultCountry with isoAlpha2 set', async () => {
-      const result = await service.validateAiRawCountries({ code: 'CO', areas: [] });
+      const result = await service.validateAiRawCountries({
+        code: 'CO',
+        areas: [],
+      });
 
       expect(result.isoAlpha2).toBe('CO');
     });
 
     it('should populate sub_nationals when areas are provided', async () => {
-      mockClarisaSubNationalsService.findByCodes = jest.fn().mockResolvedValue([
-        { id: 10 },
-        { id: 20 },
-      ]);
+      mockClarisaSubNationalsService.findByCodes = jest
+        .fn()
+        .mockResolvedValue([{ id: 10 }, { id: 20 }]);
 
       const result = await service.validateAiRawCountries({
         code: 'CO',
@@ -2675,9 +2711,15 @@ describe('ResultsService', () => {
           find: jest.fn().mockResolvedValue([]),
         } as any;
       });
-      mockIndicatorsService.findByName.mockResolvedValue({ indicator_id: 1 } as any);
-      mockResultUsersService.filterInstitutionsAi = jest.fn().mockReturnValue({ acept: [], pending: [] });
-      mockResultInstitutionsService.filterInstitutionsAi = jest.fn().mockReturnValue({ acept: [], pending: [] });
+      mockIndicatorsService.findByName.mockResolvedValue({
+        indicator_id: 1,
+      } as any);
+      mockResultUsersService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockResultInstitutionsService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
       mockClarisaGeoScopeService.findByName.mockResolvedValue(null);
       mockClarisaCountriesService.findByIso2 = jest.fn().mockResolvedValue([]);
 
@@ -2697,7 +2739,9 @@ describe('ResultsService', () => {
   describe('generalReport', () => {
     it('should delegate to mainRepo.generalReport', async () => {
       const mockReport = [{ result_id: 1 }];
-      mockMainRepo.generalReport = jest.fn().mockResolvedValue(mockReport) as any;
+      mockMainRepo.generalReport = jest
+        .fn()
+        .mockResolvedValue(mockReport) as any;
 
       const result = await service.generalReport();
 

@@ -101,16 +101,18 @@ describe('GreenChecksService', () => {
       submission_history_id: 77,
       result_id: 1,
     });
-    transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => {
-      const manager = {
-        getRepository: (entity: unknown) => {
-          if (entity === Result) return { update: resultRepo.update };
-          if (entity === SubmissionHistory) return submissionHistoryRepo;
-          return {};
-        },
-      };
-      return cb(manager);
-    });
+    transaction.mockImplementation(
+      async (cb: (m: unknown) => Promise<unknown>) => {
+        const manager = {
+          getRepository: (entity: unknown) => {
+            if (entity === Result) return { update: resultRepo.update };
+            if (entity === SubmissionHistory) return submissionHistoryRepo;
+            return {};
+          },
+        };
+        return cb(manager);
+      },
+    );
   };
 
   beforeEach(async () => {

@@ -8,9 +8,7 @@ describe('ClarisaSdgTargetsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ClarisaSdgTargetsController],
-      providers: [
-        { provide: ClarisaSdgTargetsService, useValue: {} },
-      ],
+      providers: [{ provide: ClarisaSdgTargetsService, useValue: {} }],
     }).compile();
     controller = module.get(ClarisaSdgTargetsController);
   });

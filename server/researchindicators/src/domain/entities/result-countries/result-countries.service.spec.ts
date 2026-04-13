@@ -70,7 +70,10 @@ describe('ResultCountriesService', () => {
       ] as ResultCountry[];
       find.mockResolvedValue(server);
 
-      const client = [{ isoAlpha2: 'CO' }, { isoAlpha2: 'EC' }] as ResultCountry[];
+      const client = [
+        { isoAlpha2: 'CO' },
+        { isoAlpha2: 'EC' },
+      ] as ResultCountry[];
 
       const out = await service.comparerClientToServerCountry(7, client);
 

@@ -178,11 +178,7 @@ describe('AgressoContractRepository', () => {
 
     it('should normalize page to 1 when page is below 1', async () => {
       (repository.query as jest.Mock).mockResolvedValue([]);
-      await repository.findAllContracts(
-        { page: 0, limit: 5 },
-        {},
-        {},
-      );
+      await repository.findAllContracts({ page: 0, limit: 5 }, {}, {});
       expect(repository.query).toHaveBeenCalledWith(
         expect.stringContaining('LIMIT 5 OFFSET 0'),
       );
@@ -681,9 +677,9 @@ describe('AgressoContractRepository', () => {
       );
 
       expect(repository.query).toHaveBeenCalledTimes(2);
-      expect((repository.query as jest.Mock).mock.calls[0][0] as string).toContain(
-        'COUNT(DISTINCT ac.agreement_id)',
-      );
+      expect(
+        (repository.query as jest.Mock).mock.calls[0][0] as string,
+      ).toContain('COUNT(DISTINCT ac.agreement_id)');
       expect(out.metadata).toMatchObject({
         total: 12,
         page: 2,
@@ -743,9 +739,9 @@ describe('AgressoContractRepository', () => {
         with_indicators: true,
       } as any);
 
-      expect((repository.query as jest.Mock).mock.calls[0][0] as string).toContain(
-        'AND pfc.id IS NULL',
-      );
+      expect(
+        (repository.query as jest.Mock).mock.calls[0][0] as string,
+      ).toContain('AND pfc.id IS NULL');
       expect(out.data).toHaveLength(1);
     });
   });
@@ -753,9 +749,7 @@ describe('AgressoContractRepository', () => {
   describe('buildStatusFilterClause', () => {
     it('should return empty string for null, non-array or empty list', () => {
       expect(repository['buildStatusFilterClause'](null as any)).toBe('');
-      expect(repository['buildStatusFilterClause'](undefined as any)).toBe(
-        '',
-      );
+      expect(repository['buildStatusFilterClause'](undefined as any)).toBe('');
       expect(repository['buildStatusFilterClause']([])).toBe('');
     });
 

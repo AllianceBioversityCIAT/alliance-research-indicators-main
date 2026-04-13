@@ -44,9 +44,7 @@ describe('ResultStatusService', () => {
 
       const result = await service.findAmountOfResultsByStatusCurrentUser();
 
-      expect(
-        mockFindAmountOfResultsByStatusCurrentUser,
-      ).toHaveBeenCalled();
+      expect(mockFindAmountOfResultsByStatusCurrentUser).toHaveBeenCalled();
       expect(result).toEqual(mockData);
     });
   });

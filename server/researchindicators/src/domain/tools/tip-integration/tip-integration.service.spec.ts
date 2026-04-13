@@ -186,10 +186,18 @@ describe('TipIntegrationService', () => {
       expect(tipIntegrationRepository.allTipResultId).toHaveBeenCalledWith(
         resultCodes,
       );
-      expect(tipIntegrationRepository.inactiveAllTipResults).toHaveBeenCalledTimes(3);
-      expect(tipIntegrationRepository.inactiveAllTipResults).toHaveBeenCalledWith(1);
-      expect(tipIntegrationRepository.inactiveAllTipResults).toHaveBeenCalledWith(2);
-      expect(tipIntegrationRepository.inactiveAllTipResults).toHaveBeenCalledWith(3);
+      expect(
+        tipIntegrationRepository.inactiveAllTipResults,
+      ).toHaveBeenCalledTimes(3);
+      expect(
+        tipIntegrationRepository.inactiveAllTipResults,
+      ).toHaveBeenCalledWith(1);
+      expect(
+        tipIntegrationRepository.inactiveAllTipResults,
+      ).toHaveBeenCalledWith(2);
+      expect(
+        tipIntegrationRepository.inactiveAllTipResults,
+      ).toHaveBeenCalledWith(3);
     });
 
     it('should not call inactiveAllTipResults when there are no tip result ids', async () => {
@@ -197,7 +205,9 @@ describe('TipIntegrationService', () => {
 
       await service.inactiveAllTipResults([]);
 
-      expect(tipIntegrationRepository.inactiveAllTipResults).not.toHaveBeenCalled();
+      expect(
+        tipIntegrationRepository.inactiveAllTipResults,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -323,13 +333,18 @@ describe('TipIntegrationService', () => {
   // [CLAUDE/DONE] 194
   describe('mapRegions', () => {
     it('should extract un_codes and delegate to clarisaRegionsService', async () => {
-      const mockRegions = [{ name: 'LAC', un_code: 419 }, { name: 'AF', un_code: 2 }] as any;
+      const mockRegions = [
+        { name: 'LAC', un_code: 419 },
+        { name: 'AF', un_code: 2 },
+      ] as any;
       const mockResult = [{ um49Code: 419 }] as any;
       clarisaRegionsService.findByUm49Codes.mockResolvedValue(mockResult);
 
       const result = await service.mapRegions(mockRegions);
 
-      expect(clarisaRegionsService.findByUm49Codes).toHaveBeenCalledWith([419, 2]);
+      expect(clarisaRegionsService.findByUm49Codes).toHaveBeenCalledWith([
+        419, 2,
+      ]);
       expect(result).toEqual(mockResult);
     });
 
@@ -346,13 +361,18 @@ describe('TipIntegrationService', () => {
   // [CLAUDE/DONE] 195
   describe('mapCountries', () => {
     it('should extract un_codes and delegate to clarisaCountriesService', async () => {
-      const mockCountries = [{ name: 'Colombia', un_code: 170 }, { name: 'Ecuador', un_code: 218 }] as any;
+      const mockCountries = [
+        { name: 'Colombia', un_code: 170 },
+        { name: 'Ecuador', un_code: 218 },
+      ] as any;
       const mockResult = [{ isoAlpha2: 'CO' }, { isoAlpha2: 'EC' }] as any;
       clarisaCountriesService.findByUm49Codes.mockResolvedValue(mockResult);
 
       const result = await service.mapCountries(mockCountries);
 
-      expect(clarisaCountriesService.findByUm49Codes).toHaveBeenCalledWith([170, 218]);
+      expect(clarisaCountriesService.findByUm49Codes).toHaveBeenCalledWith([
+        170, 218,
+      ]);
       expect(result).toEqual(mockResult);
     });
 
@@ -462,7 +482,9 @@ describe('TipIntegrationService', () => {
       await service.createKpInStar([baseMapping], [], counters);
 
       expect(resultsService.createResult).not.toHaveBeenCalled();
-      expect(resultKnowledgeProductService.activeKpByResultId).toHaveBeenCalledWith(10);
+      expect(
+        resultKnowledgeProductService.activeKpByResultId,
+      ).toHaveBeenCalledWith(10);
       expect(counters.updatedRecords).toBe(1);
     });
 

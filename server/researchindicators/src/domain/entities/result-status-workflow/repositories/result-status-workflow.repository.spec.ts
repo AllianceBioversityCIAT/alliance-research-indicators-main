@@ -2,9 +2,7 @@ import { Logger } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ResultStatusWorkflowRepository } from './result-status-workflow.repository';
 import { AppConfig } from '../../../shared/utils/app-config.util';
-import {
-  GeneralDataDto,
-} from '../config/config-workflow';
+import { GeneralDataDto } from '../config/config-workflow';
 import { Result } from '../../results/entities/result.entity';
 
 describe('ResultStatusWorkflowRepository', () => {
@@ -60,7 +58,10 @@ describe('ResultStatusWorkflowRepository', () => {
 
   it('setCustomGeneralData fills customData fields', () => {
     const generalData = new GeneralDataDto();
-    generalData.result = { result_official_code: 55, report_year_id: 1 } as Result;
+    generalData.result = {
+      result_official_code: 55,
+      report_year_id: 1,
+    } as Result;
     const custom: any = {
       owner_id: 1,
       owner_first_name: 'A',

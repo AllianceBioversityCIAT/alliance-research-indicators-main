@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResultLeversService } from './result-levers.service';
 import { ResultLeversRepository } from './repositories/result-levers.repository';
-import { CurrentUserUtil, SetAuditEnum } from '../../shared/utils/current-user.util';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 
 describe('ResultLeversService', () => {
@@ -56,7 +56,9 @@ describe('ResultLeversService', () => {
   // [CLAUDE/DONE] 86
   describe('comparerClientToServer', () => {
     it('should fetch server levers and return updateArray result when serverResultLevers not provided', async () => {
-      const serverLevers = [{ result_lever_id: 1, lever_id: 'L1', result_id: 10 }];
+      const serverLevers = [
+        { result_lever_id: 1, lever_id: 'L1', result_id: 10 },
+      ];
       const clientLevers = [{ lever_id: 'L1' }, { lever_id: 'L2' }];
       mockFind.mockResolvedValue(serverLevers);
 
@@ -77,7 +79,9 @@ describe('ResultLeversService', () => {
     });
 
     it('should use provided serverResultLevers without querying', async () => {
-      const serverLevers = [{ result_lever_id: 1, lever_id: 'L1', result_id: 10 }];
+      const serverLevers = [
+        { result_lever_id: 1, lever_id: 'L1', result_id: 10 },
+      ];
       const clientLevers = [{ lever_id: 'L1' }];
 
       const result = await service.comparerClientToServer(

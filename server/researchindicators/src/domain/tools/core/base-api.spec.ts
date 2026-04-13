@@ -31,7 +31,13 @@ class TestApi extends BaseApi {
 }
 
 describe('BaseApi', () => {
-  let httpService: { get: jest.Mock; post: jest.Mock; put: jest.Mock; patch: jest.Mock; delete: jest.Mock };
+  let httpService: {
+    get: jest.Mock;
+    post: jest.Mock;
+    put: jest.Mock;
+    patch: jest.Mock;
+    delete: jest.Mock;
+  };
   let api: TestApi;
 
   const ok = <T>(data: T): AxiosResponse<T> =>

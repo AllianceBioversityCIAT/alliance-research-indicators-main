@@ -16,7 +16,14 @@ describe('CgiarLogger', () => {
 
   it('formats string messages for all public log levels', () => {
     const logger = new CgiarLogger('Svc');
-    const levels = ['debug', 'error', 'warn', 'verbose', 'log', 'fatal'] as const;
+    const levels = [
+      'debug',
+      'error',
+      'warn',
+      'verbose',
+      'log',
+      'fatal',
+    ] as const;
 
     for (const level of levels) {
       const spy = jest
@@ -29,19 +36,24 @@ describe('CgiarLogger', () => {
 
   it('stringifies object messages and appends stack when provided', () => {
     const logger = new CgiarLogger('Svc');
-    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined as any);
+    jest
+      .spyOn(Logger.prototype, 'debug')
+      .mockImplementation(() => undefined as any);
 
     logger.debug({ a: 1 }, { stack: 'Error\n    at X.y (z)' });
 
     expect(Logger.prototype.debug).toHaveBeenCalled();
-    const arg = (Logger.prototype.debug as jest.Mock).mock.calls[0][0] as string;
+    const arg = (Logger.prototype.debug as jest.Mock).mock
+      .calls[0][0] as string;
     expect(arg).toContain('{"a":1}');
     expect(arg).toContain('Stack:');
   });
 
   it('uses stringify fallback when JSON.stringify fails', () => {
     const logger = new CgiarLogger('Svc');
-    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined as any);
+    jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined as any);
 
     logger.warn({ n: BigInt(1) } as any);
 
@@ -51,7 +63,9 @@ describe('CgiarLogger', () => {
 
   it('parses project stack lines for class and method', () => {
     const logger = new CgiarLogger('OrderService');
-    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined as any);
+    jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined as any);
 
     const stack = `Error
     at OrderService.place (alliance-research-indicators-main/server/researchindicators/src/order/order.service.ts:10:1)`;
@@ -64,14 +78,17 @@ describe('CgiarLogger', () => {
 
   it('falls back to generic class/method when stack has no project path', () => {
     const logger = new CgiarLogger('Other');
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined as any);
+    jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined as any);
 
     const stack = `Error
     at Foo.bar (/tmp/file.js:1:1)`;
 
     logger.error('e', { stack });
 
-    const arg = (Logger.prototype.error as jest.Mock).mock.calls[0][0] as string;
+    const arg = (Logger.prototype.error as jest.Mock).mock
+      .calls[0][0] as string;
     expect(arg).toContain('Foo');
   });
 
@@ -86,7 +103,9 @@ describe('CgiarLogger', () => {
     } as unknown as ExecutionContext;
 
     const logger = new CgiarLogger('Svc');
-    jest.spyOn(Logger.prototype, 'verbose').mockImplementation(() => undefined as any);
+    jest
+      .spyOn(Logger.prototype, 'verbose')
+      .mockImplementation(() => undefined as any);
 
     logger.verbose('v', {
       context,
@@ -95,7 +114,8 @@ describe('CgiarLogger', () => {
       url: '/x',
     });
 
-    const arg = (Logger.prototype.verbose as jest.Mock).mock.calls[0][0] as string;
+    const arg = (Logger.prototype.verbose as jest.Mock).mock
+      .calls[0][0] as string;
     expect(arg).toContain('USER_ID:42');
     expect(arg).toContain('GET');
     expect(arg).toContain('/x');

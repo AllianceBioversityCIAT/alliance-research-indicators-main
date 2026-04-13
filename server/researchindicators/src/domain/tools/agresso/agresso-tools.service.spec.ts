@@ -38,9 +38,7 @@ describe('AgressoToolsService', () => {
       const mockSdgs = [{ id: 1, name: 'No Poverty' }];
       mockSdgFind.mockResolvedValue(mockSdgs);
 
-      const baseSpy = jest
-        .spyOn(service as any, 'base')
-        .mockResolvedValue([]);
+      const baseSpy = jest.spyOn(service as any, 'base').mockResolvedValue([]);
 
       await service.cloneAllAgressoEntities();
 
@@ -57,12 +55,14 @@ describe('AgressoToolsService', () => {
       mockSdgFind.mockResolvedValue([]);
 
       let capturedIterator: ((data: any[]) => any[]) | null = null;
-      jest.spyOn(service as any, 'base').mockImplementation(
-        (_path, _entity, _mapper, iterator: (data: any[]) => any[]) => {
-          capturedIterator = iterator;
-          return Promise.resolve([]);
-        },
-      );
+      jest
+        .spyOn(service as any, 'base')
+        .mockImplementation(
+          (_path, _entity, _mapper, iterator: (data: any[]) => any[]) => {
+            capturedIterator = iterator;
+            return Promise.resolve([]);
+          },
+        );
 
       await service.cloneAllAgressoEntities();
 

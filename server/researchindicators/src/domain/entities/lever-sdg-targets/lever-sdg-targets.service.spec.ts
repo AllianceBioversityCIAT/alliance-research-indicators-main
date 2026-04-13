@@ -54,10 +54,12 @@ describe('LeverSdgTargetsService', () => {
 
   describe('createDataTransaction', () => {
     it('should group sdg targets by lever_id and call create per lever', async () => {
-      transaction.mockImplementation(async (cb: (m: unknown) => Promise<void>) =>
-        cb({}),
+      transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<void>) => cb({}),
       );
-      const createSpy = jest.spyOn(service, 'create').mockResolvedValue([] as any);
+      const createSpy = jest
+        .spyOn(service, 'create')
+        .mockResolvedValue([] as any);
 
       await service.createDataTransaction({
         leverSdgTargetList: [
@@ -119,7 +121,9 @@ describe('LeverSdgTargetsService', () => {
     it('should wrap zero affected (inner NotFound) as BadRequestException in catch', async () => {
       update.mockResolvedValue({ affected: 0 });
 
-      await expect(service.softDelete(999)).rejects.toThrow(BadRequestException);
+      await expect(service.softDelete(999)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

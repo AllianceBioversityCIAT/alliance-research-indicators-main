@@ -8,9 +8,7 @@ describe('PooledFundingContractsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PooledFundingContractsController],
-      providers: [
-        { provide: PooledFundingContractsService, useValue: {} },
-      ],
+      providers: [{ provide: PooledFundingContractsService, useValue: {} }],
     }).compile();
     controller = module.get(PooledFundingContractsController);
   });

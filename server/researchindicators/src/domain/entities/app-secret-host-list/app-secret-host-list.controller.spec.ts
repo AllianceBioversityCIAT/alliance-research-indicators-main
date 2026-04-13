@@ -8,9 +8,7 @@ describe('AppSecretHostListController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AppSecretHostListController],
-      providers: [
-        { provide: AppSecretHostListService, useValue: {} },
-      ],
+      providers: [{ provide: AppSecretHostListService, useValue: {} }],
     }).compile();
     controller = module.get(AppSecretHostListController);
   });

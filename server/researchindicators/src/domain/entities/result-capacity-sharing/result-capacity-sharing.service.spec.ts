@@ -134,14 +134,16 @@ describe('ResultCapacitySharingService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    transaction.mockImplementation(async (cb: (m: unknown) => Promise<void>) => {
-      const manager = {
-        getRepository: jest.fn().mockReturnValue({
-          update: repoUpdateInTx,
-        }),
-      };
-      await cb(manager);
-    });
+    transaction.mockImplementation(
+      async (cb: (m: unknown) => Promise<void>) => {
+        const manager = {
+          getRepository: jest.fn().mockReturnValue({
+            update: repoUpdateInTx,
+          }),
+        };
+        await cb(manager);
+      },
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -253,7 +255,9 @@ describe('ResultCapacitySharingService', () => {
     it('should throw when result is not capacity-sharing indicator', async () => {
       resultFindOne.mockResolvedValue(null);
 
-      await expect(service.findByResultId(1)).rejects.toThrow(ConflictException);
+      await expect(service.findByResultId(1)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should build group payload when session is GROUP', async () => {

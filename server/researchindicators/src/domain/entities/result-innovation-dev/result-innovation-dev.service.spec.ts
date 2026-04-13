@@ -172,7 +172,9 @@ describe('ResultInnovationDevService', () => {
       ],
     }).compile();
 
-    service = module.get<ResultInnovationDevService>(ResultInnovationDevService);
+    service = module.get<ResultInnovationDevService>(
+      ResultInnovationDevService,
+    );
   });
 
   it('should be defined', () => {

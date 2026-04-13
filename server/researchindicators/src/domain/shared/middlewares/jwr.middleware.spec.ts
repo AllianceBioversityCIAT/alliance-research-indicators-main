@@ -1,13 +1,8 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtMiddleware } from './jwr.middleware';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
-import { RoarManagementService } from '../../tools/roar-management/roar-management.service';
 import { ResultsUtil } from '../utils/results.util';
-import { AppSecretsService } from '../../entities/app-secrets/app-secrets.service';
-import {
-  JsonWebTokenError,
-  TokenExpiredError,
-} from 'jsonwebtoken';
+import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 
 describe('JwtMiddleware', () => {
   const next = jest.fn();

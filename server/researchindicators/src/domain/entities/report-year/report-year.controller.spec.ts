@@ -21,7 +21,10 @@ describe('ReportYearController', () => {
       providers: [
         { provide: ReportYearService, useValue: mockService },
         SetUpInterceptor,
-        { provide: ResultsUtil, useValue: { setup: jest.fn().mockResolvedValue(undefined) } },
+        {
+          provide: ResultsUtil,
+          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
     controller = module.get(ReportYearController);

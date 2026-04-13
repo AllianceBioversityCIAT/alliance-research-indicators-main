@@ -2155,7 +2155,9 @@ describe('ResultOicrService', () => {
   // [CLAUDE/DONE] 87
   describe('validateOicrInternalCode', () => {
     it('should throw BadRequestException when oicr_internal_code already exists for another result', async () => {
-      mockResultOicrRepository.findOne.mockResolvedValue({ result_id: 99 } as any);
+      mockResultOicrRepository.findOne.mockResolvedValue({
+        result_id: 99,
+      } as any);
 
       await expect(
         service.validateOicrInternalCode(10, 'OICR-001'),
@@ -2174,7 +2176,9 @@ describe('ResultOicrService', () => {
   // [CLAUDE/DONE] 88
   describe('review', () => {
     it('should throw BadRequestException when oicr_internal_code already exists for another result', async () => {
-      mockResultOicrRepository.findOne.mockResolvedValue({ result_id: 99 } as any);
+      mockResultOicrRepository.findOne.mockResolvedValue({
+        result_id: 99,
+      } as any);
       mockCurrentUser.audit.mockReturnValue({ updated_by: 1 });
 
       await expect(
@@ -2188,7 +2192,11 @@ describe('ResultOicrService', () => {
 
     it('should update oicr record when code does not conflict', async () => {
       mockResultOicrRepository.findOne.mockResolvedValue(null);
-      mockResultOicrRepository.update.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] } as any);
+      mockResultOicrRepository.update.mockResolvedValue({
+        affected: 1,
+        raw: [],
+        generatedMaps: [],
+      } as any);
       mockCurrentUser.audit.mockReturnValue({ updated_by: 1 });
 
       await service.review(10, {
@@ -2205,7 +2213,11 @@ describe('ResultOicrService', () => {
 
     it('should set sharepoint_link to null when empty', async () => {
       mockResultOicrRepository.findOne.mockResolvedValue(null);
-      mockResultOicrRepository.update.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] } as any);
+      mockResultOicrRepository.update.mockResolvedValue({
+        affected: 1,
+        raw: [],
+        generatedMaps: [],
+      } as any);
       mockCurrentUser.audit.mockReturnValue({ updated_by: 1 });
 
       await service.review(10, {

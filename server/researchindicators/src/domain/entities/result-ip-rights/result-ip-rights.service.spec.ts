@@ -88,9 +88,12 @@ describe('ResultIpRightsService', () => {
 
       const result = await service.update(10, updateDto);
 
-      expect(mockUpdate).toHaveBeenCalledWith(10, expect.objectContaining({
-        asset_ip_owner_description: 'desc',
-      }));
+      expect(mockUpdate).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          asset_ip_owner_description: 'desc',
+        }),
+      );
       expect(mockUpdateDataUtil.updateLastUpdatedDate).toHaveBeenCalledWith(10);
       expect(result).toEqual(updateDto);
     });
@@ -115,10 +118,13 @@ describe('ResultIpRightsService', () => {
 
       await service.update(10, updateDto);
 
-      expect(mockUpdate).toHaveBeenCalledWith(10, expect.objectContaining({
-        private_sector_engagement_id: 3,
-        formal_ip_rights_application_id: 4,
-      }));
+      expect(mockUpdate).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          private_sector_engagement_id: 3,
+          formal_ip_rights_application_id: 4,
+        }),
+      );
     });
   });
 

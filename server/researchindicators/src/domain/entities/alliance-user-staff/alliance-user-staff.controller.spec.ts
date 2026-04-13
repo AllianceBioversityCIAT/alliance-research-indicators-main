@@ -20,9 +20,7 @@ describe('AllianceUserStaffController', () => {
     (ResponseUtils.format as jest.Mock) = mockFormat;
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AllianceUserStaffController],
-      providers: [
-        { provide: AllianceUserStaffService, useValue: mockService },
-      ],
+      providers: [{ provide: AllianceUserStaffService, useValue: mockService }],
     }).compile();
     controller = module.get(AllianceUserStaffController);
   });

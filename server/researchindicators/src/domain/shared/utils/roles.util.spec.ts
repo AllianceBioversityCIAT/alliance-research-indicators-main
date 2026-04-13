@@ -1,7 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { validateRoles } from './roles.util';
 import { SecRolesEnum } from '../enum/sec_role.enum';
 

@@ -17,9 +17,15 @@ describe('ResponseInterceptor', () => {
   };
 
   beforeAll(() => {
-    jest.spyOn(LoggerUtil.prototype, '_verbose').mockImplementation(() => undefined);
-    jest.spyOn(LoggerUtil.prototype, '_warn').mockImplementation(() => undefined);
-    jest.spyOn(LoggerUtil.prototype, '_error').mockImplementation(() => undefined);
+    jest
+      .spyOn(LoggerUtil.prototype, '_verbose')
+      .mockImplementation(() => undefined);
+    jest
+      .spyOn(LoggerUtil.prototype, '_warn')
+      .mockImplementation(() => undefined);
+    jest
+      .spyOn(LoggerUtil.prototype, '_error')
+      .mockImplementation(() => undefined);
   });
 
   afterAll(() => {

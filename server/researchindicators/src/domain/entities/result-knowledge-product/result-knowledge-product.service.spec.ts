@@ -32,7 +32,9 @@ describe('ResultKnowledgeProductService', () => {
       ],
     }).compile();
 
-    service = module.get<ResultKnowledgeProductService>(ResultKnowledgeProductService);
+    service = module.get<ResultKnowledgeProductService>(
+      ResultKnowledgeProductService,
+    );
   });
 
   afterEach(() => {

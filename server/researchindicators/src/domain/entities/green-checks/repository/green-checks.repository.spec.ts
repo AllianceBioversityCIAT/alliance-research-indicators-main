@@ -33,11 +33,21 @@ describe('GreenCheckRepository', () => {
     expect(repository.generalInformationValidation('r.x')).toContain(
       'general_information_validation',
     );
-    expect(repository.alignmentValidation('r.x')).toContain('alignment_validation');
-    expect(repository.geoLocationValidation('r.x')).toContain('geo_location_validation');
-    expect(repository.partnersValidation('r.x')).toContain('partners_validation');
-    expect(repository.evidencesValidation('r.x')).toContain('evidences_validation');
-    expect(repository.capSharingValidation('r.x')).toContain('cap_sharing_validation');
+    expect(repository.alignmentValidation('r.x')).toContain(
+      'alignment_validation',
+    );
+    expect(repository.geoLocationValidation('r.x')).toContain(
+      'geo_location_validation',
+    );
+    expect(repository.partnersValidation('r.x')).toContain(
+      'partners_validation',
+    );
+    expect(repository.evidencesValidation('r.x')).toContain(
+      'evidences_validation',
+    );
+    expect(repository.capSharingValidation('r.x')).toContain(
+      'cap_sharing_validation',
+    );
     expect(repository.capSharingIpValidation('r.x')).toContain(
       'intellectual_property_validation',
     );
@@ -54,7 +64,9 @@ describe('GreenCheckRepository', () => {
   });
 
   it('calculateGreenChecks includes policy_change for POLICY_CHANGE', async () => {
-    findOneMock.mockResolvedValue({ indicator_id: IndicatorsEnum.POLICY_CHANGE });
+    findOneMock.mockResolvedValue({
+      indicator_id: IndicatorsEnum.POLICY_CHANGE,
+    });
     queryMock.mockResolvedValueOnce([{ general_information: 1 }]);
     const out = await repository.calculateGreenChecks(1);
     expect(queryMock.mock.calls[0][0] as string).toContain(
@@ -84,7 +96,9 @@ describe('GreenCheckRepository', () => {
   });
 
   it('calculateGreenChecks adds innovation and IP for INNOVATION_DEV', async () => {
-    findOneMock.mockResolvedValue({ indicator_id: IndicatorsEnum.INNOVATION_DEV });
+    findOneMock.mockResolvedValue({
+      indicator_id: IndicatorsEnum.INNOVATION_DEV,
+    });
     queryMock.mockResolvedValueOnce([{}]);
     await repository.calculateGreenChecks(3);
     const sql = queryMock.mock.calls[0][0] as string;
@@ -93,7 +107,9 @@ describe('GreenCheckRepository', () => {
   });
 
   it('calculateGreenChecks returns null when query empty', async () => {
-    findOneMock.mockResolvedValue({ indicator_id: IndicatorsEnum.INNOVATION_USE });
+    findOneMock.mockResolvedValue({
+      indicator_id: IndicatorsEnum.INNOVATION_USE,
+    });
     queryMock.mockResolvedValueOnce([]);
     await expect(repository.calculateGreenChecks(9)).resolves.toBeNull();
   });
@@ -202,9 +218,7 @@ describe('GreenCheckRepository', () => {
 
   it('getDataForReviseResult merges history rows', async () => {
     queryMock
-      .mockResolvedValueOnce([
-        { result_id: 10, title: 'T', indicator: 'I' },
-      ])
+      .mockResolvedValueOnce([{ result_id: 10, title: 'T', indicator: 'I' }])
       .mockResolvedValueOnce([
         {
           to_status_id: ResultStatusEnum.REVISED,

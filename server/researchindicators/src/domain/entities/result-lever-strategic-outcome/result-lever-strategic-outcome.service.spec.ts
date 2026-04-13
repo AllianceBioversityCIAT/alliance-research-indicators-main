@@ -25,7 +25,9 @@ describe('ResultLeverStrategicOutcomeService', () => {
       ],
     }).compile();
 
-    service = module.get<ResultLeverStrategicOutcomeService>(ResultLeverStrategicOutcomeService);
+    service = module.get<ResultLeverStrategicOutcomeService>(
+      ResultLeverStrategicOutcomeService,
+    );
   });
 
   afterEach(() => {

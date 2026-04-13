@@ -88,15 +88,37 @@ describe('StatusWorkflowFunctionHandlerService', () => {
     mockCurrentUser.roles = [];
   });
 
-  function makeGeneralData(overrides: Partial<GeneralDataDto> = {}): GeneralDataDto {
+  function makeGeneralData(
+    overrides: Partial<GeneralDataDto> = {},
+  ): GeneralDataDto {
     const data = new GeneralDataDto();
     data.result = { result_id: 10 } as any;
     data.customData.result_code = 'R-001';
-    data.customData.principal_investigator = { email: 'pi@test.com', name: 'PI', id: 1 };
-    data.customData.submitter = { email: 'submitter@test.com', name: 'Sub', id: 2 };
-    data.customData.result_owner = { email: 'owner@test.com', name: 'Owner', id: 3 };
-    data.customData.action_executor = { email: 'exec@test.com', name: 'Exec', id: 4 };
-    data.customData.regional_expert = { email: 'regional@test.com', name: 'RE', id: 5 };
+    data.customData.principal_investigator = {
+      email: 'pi@test.com',
+      name: 'PI',
+      id: 1,
+    };
+    data.customData.submitter = {
+      email: 'submitter@test.com',
+      name: 'Sub',
+      id: 2,
+    };
+    data.customData.result_owner = {
+      email: 'owner@test.com',
+      name: 'Owner',
+      id: 3,
+    };
+    data.customData.action_executor = {
+      email: 'exec@test.com',
+      name: 'Exec',
+      id: 4,
+    };
+    data.customData.regional_expert = {
+      email: 'regional@test.com',
+      name: 'RE',
+      id: 5,
+    };
     return Object.assign(data, overrides);
   }
 
@@ -110,7 +132,10 @@ describe('StatusWorkflowFunctionHandlerService', () => {
       const generalData = makeGeneralData();
       generalData.configEmail.templateCode = 'SUBMISSION';
 
-      const result = await service.getTemplate(generalData, mockEntityManager as any);
+      const result = await service.getTemplate(
+        generalData,
+        mockEntityManager as any,
+      );
 
       expect(mockTemplateRepo.findOne).toHaveBeenCalledWith({
         where: { name: 'SUBMISSION', is_active: true },
@@ -179,7 +204,10 @@ describe('StatusWorkflowFunctionHandlerService', () => {
       mockEntityManager.getRepository.mockReturnValue(mockRepo);
       const generalData = makeGeneralData();
 
-      await service.findInnovationDevData(generalData, mockEntityManager as any);
+      await service.findInnovationDevData(
+        generalData,
+        mockEntityManager as any,
+      );
 
       expect(generalData.customData.innovation_dev).toEqual(mockInnovation);
     });
@@ -189,7 +217,10 @@ describe('StatusWorkflowFunctionHandlerService', () => {
       mockEntityManager.getRepository.mockReturnValue(mockRepo);
       const generalData = makeGeneralData();
 
-      await service.findInnovationDevData(generalData, mockEntityManager as any);
+      await service.findInnovationDevData(
+        generalData,
+        mockEntityManager as any,
+      );
 
       // innovation_dev stays at the default (new ResultInnovationDev())
       expect(generalData.customData.innovation_dev).toBeDefined();
@@ -207,10 +238,15 @@ describe('StatusWorkflowFunctionHandlerService', () => {
       mockEntityManager.getRepository.mockReturnValue(mockRepo);
       const generalData = makeGeneralData();
 
-      await service.findInnovationReadinessLevel(generalData, mockEntityManager as any);
+      await service.findInnovationReadinessLevel(
+        generalData,
+        mockEntityManager as any,
+      );
 
       expect(generalData.customData.innovation_readiness_level).toBe(7);
-      expect(generalData.customData.innovation_readiness_level_name).toBe('Level 7');
+      expect(generalData.customData.innovation_readiness_level_name).toBe(
+        'Level 7',
+      );
     });
 
     it('should not set innovation_readiness_level when not found', async () => {
@@ -218,7 +254,10 @@ describe('StatusWorkflowFunctionHandlerService', () => {
       mockEntityManager.getRepository.mockReturnValue(mockRepo);
       const generalData = makeGeneralData();
 
-      await service.findInnovationReadinessLevel(generalData, mockEntityManager as any);
+      await service.findInnovationReadinessLevel(
+        generalData,
+        mockEntityManager as any,
+      );
 
       expect(generalData.customData.innovation_readiness_level).toBeNull();
     });

@@ -23,9 +23,7 @@ describe('IndicatorRepository', () => {
 
   it('findAmountResultsByIndicatorCurrentUser filters by created_by', async () => {
     await repository.findAmountResultsByIndicatorCurrentUser();
-    expect(querySpy.mock.calls[0][0] as string).toContain(
-      'r.created_by = 7',
-    );
+    expect(querySpy.mock.calls[0][0] as string).toContain('r.created_by = 7');
   });
 
   it('findIndicatorByAmmountResults runs inner join query', async () => {

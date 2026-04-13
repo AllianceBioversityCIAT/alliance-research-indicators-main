@@ -15,7 +15,14 @@ describe('DynamoFeedbackService', () => {
   let ddbSendMock: jest.Mock;
 
   const baseDto = {
-    user: { sec_user_id: 1, first_name: 'Ana', last_name: 'Test', email: 'a@b.com', user_role_list: [], roleName: 'Admin' },
+    user: {
+      sec_user_id: 1,
+      first_name: 'Ana',
+      last_name: 'Test',
+      email: 'a@b.com',
+      user_role_list: [],
+      roleName: 'Admin',
+    },
     description: 'Some issue',
     issueType: ['1', '2'],
     feedbackType: 'bad',
@@ -23,7 +30,7 @@ describe('DynamoFeedbackService', () => {
   };
 
   beforeEach(async () => {
-    ddbSendMock = (dynamoConf.ddbClient.send as jest.Mock);
+    ddbSendMock = dynamoConf.ddbClient.send as jest.Mock;
     ddbSendMock.mockReset();
 
     issueCategoryRepository = { find: jest.fn() };
@@ -129,9 +136,7 @@ describe('DynamoFeedbackService', () => {
 
     it('should handle items with missing optional fields gracefully', async () => {
       ddbSendMock.mockResolvedValue({
-        Items: [
-          { id: { S: 'uuid-2' } },
-        ],
+        Items: [{ id: { S: 'uuid-2' } }],
       });
 
       const result = await service.getAllFeedback();

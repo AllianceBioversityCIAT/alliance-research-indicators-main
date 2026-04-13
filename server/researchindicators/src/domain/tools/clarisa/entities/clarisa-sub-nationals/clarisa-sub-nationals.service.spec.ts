@@ -30,7 +30,9 @@ describe('ClarisaSubNationalsService', () => {
       ],
     }).compile();
 
-    service = module.get<ClarisaSubNationalsService>(ClarisaSubNationalsService);
+    service = module.get<ClarisaSubNationalsService>(
+      ClarisaSubNationalsService,
+    );
   });
 
   afterEach(() => {

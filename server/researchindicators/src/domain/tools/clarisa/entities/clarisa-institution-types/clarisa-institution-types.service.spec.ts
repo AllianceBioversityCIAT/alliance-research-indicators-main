@@ -113,9 +113,7 @@ describe('ClarisaInstitutionTypesService', () => {
     });
 
     it('should return empty array when all types have children', async () => {
-      mockFind.mockResolvedValue([
-        { code: 1, children: [{ code: 2 }] },
-      ]);
+      mockFind.mockResolvedValue([{ code: 1, children: [{ code: 2 }] }]);
 
       const result = await service.getChildlessInstitutionTypes();
 

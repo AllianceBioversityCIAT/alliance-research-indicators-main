@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { SyncProcessLogService } from './sync-process-log.service';
-import { CurrentUserUtil, SetAuditEnum } from '../../shared/utils/current-user.util';
-import { SyncProcessEnum, SyncProcessStatusEnum } from './enum/sync-process.enum';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import {
+  SyncProcessEnum,
+  SyncProcessStatusEnum,
+} from './enum/sync-process.enum';
 import { SyncProcessLog } from './entities/sync-process-log.entity';
 
 describe('SyncProcessLogService', () => {
@@ -113,7 +113,12 @@ describe('SyncProcessLogService', () => {
     });
 
     it('should throw BadRequestException when update query fails', async () => {
-      mockFindOne.mockResolvedValue({ id: 3, created_records: 0, updated_records: 0, error_records: 0 });
+      mockFindOne.mockResolvedValue({
+        id: 3,
+        created_records: 0,
+        updated_records: 0,
+        error_records: 0,
+      });
       mockUpdate.mockRejectedValue(new Error('DB error'));
 
       await expect(service.update(3, {})).rejects.toThrow(BadRequestException);
@@ -138,9 +143,7 @@ describe('SyncProcessLogService', () => {
         process_status: SyncProcessStatusEnum.COMPLETED,
       };
 
-      mockFindOne
-        .mockResolvedValueOnce(existing)
-        .mockResolvedValueOnce(ended);
+      mockFindOne.mockResolvedValueOnce(existing).mockResolvedValueOnce(ended);
       mockUpdate.mockResolvedValue(undefined);
       mockCurrentUser.audit.mockReturnValue({ updated_by: 1 });
 

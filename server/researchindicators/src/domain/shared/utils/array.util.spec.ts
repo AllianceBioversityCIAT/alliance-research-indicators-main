@@ -56,12 +56,7 @@ describe('array.util', () => {
     });
 
     it('should coerce null clientArray to empty', () => {
-      const out = updateArray(
-        null as any,
-        [],
-        'id',
-        { key: 'r', value: 1 },
-      );
+      const out = updateArray(null as any, [], 'id', { key: 'r', value: 1 });
       expect(Array.isArray(out)).toBe(true);
     });
   });
@@ -115,9 +110,9 @@ describe('array.util', () => {
     });
 
     it('should fail when one element fails', () => {
-      expect(isArrayOfType([1, 'a'], (x): x is number => typeof x === 'number')).toBe(
-        false,
-      );
+      expect(
+        isArrayOfType([1, 'a'], (x): x is number => typeof x === 'number'),
+      ).toBe(false);
     });
   });
 
@@ -131,15 +126,16 @@ describe('array.util', () => {
     it('should append items from B not in A by key', () => {
       const a = [{ id: 1 }] as any[];
       const b = [{ id: 1 }, { id: 2 }] as any[];
-      expect(mergeArraysWithPriority(a, b, 'id')).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(mergeArraysWithPriority(a, b, 'id')).toEqual([
+        { id: 1 },
+        { id: 2 },
+      ]);
     });
   });
 
   describe('getItemsAtLevel', () => {
     type N = { id: number; children?: N[] };
-    const tree: N[] = [
-      { id: 1, children: [{ id: 2, children: [{ id: 3 }] }] },
-    ];
+    const tree: N[] = [{ id: 1, children: [{ id: 2, children: [{ id: 3 }] }] }];
 
     it('should return empty when level < 1', () => {
       expect(getItemsAtLevel(tree, 0)).toEqual([]);
@@ -182,9 +178,13 @@ describe('array.util', () => {
 
     it('should treat empty values as same composite key', () => {
       expect(
-        removeDuplicatesByKeys([{ a: null, b: 1 }, { a: undefined, b: 2 }], [
-          'a',
-        ]),
+        removeDuplicatesByKeys(
+          [
+            { a: null, b: 1 },
+            { a: undefined, b: 2 },
+          ],
+          ['a'],
+        ),
       ).toHaveLength(1);
     });
   });

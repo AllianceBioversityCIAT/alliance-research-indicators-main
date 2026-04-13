@@ -18,7 +18,9 @@ describe('ResultLanguagesService', () => {
             getRepository: jest.fn().mockReturnValue({
               find: mockFind,
               save: jest.fn(),
-              metadata: { primaryColumns: [{ propertyName: 'result_language_id' }] },
+              metadata: {
+                primaryColumns: [{ propertyName: 'result_language_id' }],
+              },
             }),
           },
         },
@@ -37,11 +39,18 @@ describe('ResultLanguagesService', () => {
   describe('findLanguageByRoleResult', () => {
     it('should return active languages with language relation for the given role and resultId', async () => {
       const mockLanguages = [
-        { result_language_id: 1, language_role_id: LanguageRolesEnum.TRAINING_SUPERVISOR, result_id: 10 },
+        {
+          result_language_id: 1,
+          language_role_id: LanguageRolesEnum.TRAINING_SUPERVISOR,
+          result_id: 10,
+        },
       ];
       mockFind.mockResolvedValue(mockLanguages);
 
-      const result = await service.findLanguageByRoleResult(LanguageRolesEnum.TRAINING_SUPERVISOR, 10);
+      const result = await service.findLanguageByRoleResult(
+        LanguageRolesEnum.TRAINING_SUPERVISOR,
+        10,
+      );
 
       expect(mockFind).toHaveBeenCalledWith({
         where: {
@@ -57,7 +66,10 @@ describe('ResultLanguagesService', () => {
     it('should return empty array when no languages match', async () => {
       mockFind.mockResolvedValue([]);
 
-      const result = await service.findLanguageByRoleResult(LanguageRolesEnum.TRAINING_SUPERVISOR, 99);
+      const result = await service.findLanguageByRoleResult(
+        LanguageRolesEnum.TRAINING_SUPERVISOR,
+        99,
+      );
 
       expect(result).toEqual([]);
     });

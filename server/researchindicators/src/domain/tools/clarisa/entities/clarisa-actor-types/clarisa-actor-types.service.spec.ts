@@ -39,10 +39,7 @@ describe('ClarisaActorTypesService', () => {
   // [CLAUDE/DONE] 167
   describe('validateActorTypes', () => {
     it('should return ids that do not exist in the repository', async () => {
-      mockFind.mockResolvedValue([
-        { code: 1 },
-        { code: 2 },
-      ]);
+      mockFind.mockResolvedValue([{ code: 1 }, { code: 2 }]);
 
       const result = await service.validateActorTypes([1, 2, 3, 4]);
 

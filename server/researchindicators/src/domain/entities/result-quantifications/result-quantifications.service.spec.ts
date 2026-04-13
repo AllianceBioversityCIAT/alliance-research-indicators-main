@@ -29,7 +29,9 @@ describe('ResultQuantificationsService', () => {
       ],
     }).compile();
 
-    service = module.get<ResultQuantificationsService>(ResultQuantificationsService);
+    service = module.get<ResultQuantificationsService>(
+      ResultQuantificationsService,
+    );
   });
 
   afterEach(() => {

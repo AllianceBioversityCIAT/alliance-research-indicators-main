@@ -17,7 +17,9 @@ describe('ResultKeywordsService', () => {
             getRepository: jest.fn().mockReturnValue({
               find: mockFind,
               save: jest.fn(),
-              metadata: { primaryColumns: [{ propertyName: 'result_keyword_id' }] },
+              metadata: {
+                primaryColumns: [{ propertyName: 'result_keyword_id' }],
+              },
             }),
           },
         },
@@ -60,7 +62,9 @@ describe('ResultKeywordsService', () => {
   // [CLAUDE/DONE] 78
   describe('findKeywordsByResultId', () => {
     it('should return active keywords for the given resultId', async () => {
-      const mockKeywords = [{ result_keyword_id: 1, keyword: 'AI', result_id: 10 }];
+      const mockKeywords = [
+        { result_keyword_id: 1, keyword: 'AI', result_id: 10 },
+      ];
       mockFind.mockResolvedValue(mockKeywords);
 
       const result = await service.findKeywordsByResultId(10);

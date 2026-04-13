@@ -8,9 +8,7 @@ describe('QuantificationRolesController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [QuantificationRolesController],
-      providers: [
-        { provide: QuantificationRolesService, useValue: {} },
-      ],
+      providers: [{ provide: QuantificationRolesService, useValue: {} }],
     }).compile();
     controller = module.get(QuantificationRolesController);
   });

@@ -8,9 +8,7 @@ describe('ResultInitiativesController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultInitiativesController],
-      providers: [
-        { provide: ResultInitiativesService, useValue: {} },
-      ],
+      providers: [{ provide: ResultInitiativesService, useValue: {} }],
     }).compile();
     controller = module.get(ResultInitiativesController);
   });

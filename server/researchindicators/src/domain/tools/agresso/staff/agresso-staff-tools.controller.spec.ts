@@ -16,9 +16,7 @@ describe('AgressoStaffToolsController', () => {
     (ResponseUtils.format as jest.Mock) = mockFormat;
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AgressoStaffToolsController],
-      providers: [
-        { provide: AgressoStaffToolsService, useValue: mockService },
-      ],
+      providers: [{ provide: AgressoStaffToolsService, useValue: mockService }],
     }).compile();
     controller = module.get(AgressoStaffToolsController);
   });

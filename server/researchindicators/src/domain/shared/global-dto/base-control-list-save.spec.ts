@@ -12,13 +12,16 @@ class TestSave extends BaseControlListSave<ConnectionInterface> {
     return this.base<{ id: number }, RowEntity>(
       '/items',
       RowEntity,
-      (row) => ({ id: row.id } as any),
+      (row) => ({ id: row.id }) as any,
     );
   }
 
   runBaseIterator() {
-    return this.base<{ id: number }, RowEntity>('/items', RowEntity, undefined, (rows) =>
-      rows.map((r) => ({ id: r.id + 10 } as any)),
+    return this.base<{ id: number }, RowEntity>(
+      '/items',
+      RowEntity,
+      undefined,
+      (rows) => rows.map((r) => ({ id: r.id + 10 }) as any),
     );
   }
 
@@ -35,7 +38,7 @@ class TestSave extends BaseControlListSave<ConnectionInterface> {
       '/many',
       RowEntity,
       batchSize,
-      (x) => ({ v: x.v } as any),
+      (x) => ({ v: x.v }) as any,
     );
   }
 }
@@ -65,7 +68,11 @@ describe('BaseControlListSave', () => {
     connection.get.mockResolvedValue([{ id: 1 }, { id: 2 }]);
     save.mockResolvedValue([{ id: 1 }, { id: 2 }]);
 
-    const svc = new TestSave(dataSource as unknown as DataSource, connection, logger);
+    const svc = new TestSave(
+      dataSource as unknown as DataSource,
+      connection,
+      logger,
+    );
     const out = await svc.runBaseMap();
 
     expect(connection.get).toHaveBeenCalledWith('/items');
@@ -77,7 +84,11 @@ describe('BaseControlListSave', () => {
     connection.get.mockResolvedValue([{ id: 1 }]);
     save.mockResolvedValue([{ id: 11 }]);
 
-    const svc = new TestSave(dataSource as unknown as DataSource, connection, logger);
+    const svc = new TestSave(
+      dataSource as unknown as DataSource,
+      connection,
+      logger,
+    );
     await svc.runBaseIterator();
 
     expect(save).toHaveBeenCalledWith([{ id: 11 }]);
@@ -88,7 +99,11 @@ describe('BaseControlListSave', () => {
     connection.get.mockResolvedValue(raw);
     save.mockResolvedValue(raw);
 
-    const svc = new TestSave(dataSource as unknown as DataSource, connection, logger);
+    const svc = new TestSave(
+      dataSource as unknown as DataSource,
+      connection,
+      logger,
+    );
     await svc.runBaseRaw();
 
     expect(save).toHaveBeenCalledWith(raw);
@@ -97,7 +112,11 @@ describe('BaseControlListSave', () => {
   it('base swallows fetch errors and saves empty list', async () => {
     connection.get.mockRejectedValue(new Error('network'));
 
-    const svc = new TestSave(dataSource as unknown as DataSource, connection, logger);
+    const svc = new TestSave(
+      dataSource as unknown as DataSource,
+      connection,
+      logger,
+    );
     save.mockResolvedValue([]);
 
     await svc.runBaseFetchError();
@@ -111,7 +130,11 @@ describe('BaseControlListSave', () => {
       .mockResolvedValueOnce([{ v: 1 }, { v: 2 }])
       .mockResolvedValueOnce([{ v: 3 }]);
 
-    const svc = new TestSave(dataSource as unknown as DataSource, connection, logger);
+    const svc = new TestSave(
+      dataSource as unknown as DataSource,
+      connection,
+      logger,
+    );
     const out = await svc.runBatches(2);
 
     expect(save).toHaveBeenCalledTimes(2);

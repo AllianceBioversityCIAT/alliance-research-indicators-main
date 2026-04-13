@@ -40,8 +40,7 @@ describe('AllianceUserStaffGroupsController', () => {
       expect(mockService.findAllMap).toHaveBeenCalledWith(undefined);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
         data: map,
-        description:
-          'Alliance User Staff Groups mapped by Alliance User Staff',
+        description: 'Alliance User Staff Groups mapped by Alliance User Staff',
         status: HttpStatus.OK,
       });
     });

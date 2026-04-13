@@ -102,10 +102,7 @@ describe('UserAgressoContractsService', () => {
         first_name: 'Ana',
         last_name: 'Garcia',
       } as any;
-      const contracts = [
-        { agreement_id: 'C001' },
-        { agreement_id: 'C002' },
-      ];
+      const contracts = [{ agreement_id: 'C001' }, { agreement_id: 'C002' }];
       const savedLinks = [
         { user_id: 5, agreement_id: 'C001' },
         { user_id: 5, agreement_id: 'C002' },
@@ -125,7 +122,11 @@ describe('UserAgressoContractsService', () => {
     });
 
     it('should save empty array when user has no matching contracts', async () => {
-      const user = { sec_user_id: 3, first_name: 'John', last_name: 'Doe' } as any;
+      const user = {
+        sec_user_id: 3,
+        first_name: 'John',
+        last_name: 'Doe',
+      } as any;
       mockAgressoFindByName.mockResolvedValue([]);
       mockSave.mockResolvedValue([]);
 

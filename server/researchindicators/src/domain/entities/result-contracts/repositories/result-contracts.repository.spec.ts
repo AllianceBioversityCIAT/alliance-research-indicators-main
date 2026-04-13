@@ -42,16 +42,12 @@ describe('ResultContractsRepository', () => {
   it('findAllResultsByContractId uses secondary DB for sec_users', async () => {
     await repository.findAllResultsByContractId('AGR-1');
     expect(querySpy).toHaveBeenCalledWith(expect.any(String), ['AGR-1']);
-    expect(querySpy.mock.calls[0][0] as string).toContain(
-      'sec_db.sec_users',
-    );
+    expect(querySpy.mock.calls[0][0] as string).toContain('sec_db.sec_users');
   });
 
   it('findContractsLeverByResultId returns lever id or null', async () => {
     querySpy.mockResolvedValueOnce([{ id: 9 }]);
-    await expect(
-      repository.findContractsLeverByResultId(3),
-    ).resolves.toBe(9);
+    await expect(repository.findContractsLeverByResultId(3)).resolves.toBe(9);
     querySpy.mockResolvedValueOnce([]);
     await expect(
       repository.findContractsLeverByResultId(3),

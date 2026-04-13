@@ -20,7 +20,9 @@ describe('ClarisaController', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     (ResponseUtils.format as jest.Mock) = mockFormat;
-    jest.spyOn(LoggerUtil.prototype, '_log').mockImplementation(() => undefined);
+    jest
+      .spyOn(LoggerUtil.prototype, '_log')
+      .mockImplementation(() => undefined);
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ClarisaController],
       providers: [{ provide: ClarisaService, useValue: mockService }],
@@ -55,7 +57,11 @@ describe('ClarisaController', () => {
 
   it('openSearch requires query', async () => {
     mockFormat.mockReturnValue({});
-    await controller.openSearch(undefined as any, 'CO', SearchToOpenSearchEnum.COUNTRY);
+    await controller.openSearch(
+      undefined as any,
+      'CO',
+      SearchToOpenSearchEnum.COUNTRY,
+    );
     expect(ResponseUtils.format).toHaveBeenCalledWith({
       description: 'Query is required',
       status: HttpStatus.BAD_REQUEST,
@@ -67,7 +73,11 @@ describe('ClarisaController', () => {
     const countries = [{ id: 1 }];
     mockService.searchToOS.mockResolvedValue(countries);
     mockFormat.mockReturnValue({});
-    await controller.openSearch('Colombia', 'CO', SearchToOpenSearchEnum.COUNTRY);
+    await controller.openSearch(
+      'Colombia',
+      'CO',
+      SearchToOpenSearchEnum.COUNTRY,
+    );
     expect(mockService.searchToOS).toHaveBeenCalledWith(
       'Colombia',
       'CO',

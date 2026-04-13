@@ -16,9 +16,7 @@ describe('ClarisaLanguagesController', () => {
     (ResponseUtils.format as jest.Mock) = mockFormat;
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ClarisaLanguagesController],
-      providers: [
-        { provide: ClarisaLanguagesService, useValue: mockService },
-      ],
+      providers: [{ provide: ClarisaLanguagesService, useValue: mockService }],
     }).compile();
     controller = module.get(ClarisaLanguagesController);
   });

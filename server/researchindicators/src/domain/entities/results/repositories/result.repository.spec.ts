@@ -50,7 +50,10 @@ describe('ResultRepository', () => {
     });
 
     it('adds result_id IN clause when ids provided', async () => {
-      await repository.findDataForOpenSearch(FindAllOptions.SHOW_ALL, [1, 2, 3]);
+      await repository.findDataForOpenSearch(
+        FindAllOptions.SHOW_ALL,
+        [1, 2, 3],
+      );
       const sql = querySpy.mock.calls[0][0] as string;
       expect(sql).toContain('and r.result_id in (1,2,3)');
     });
@@ -89,7 +92,9 @@ describe('ResultRepository', () => {
     });
 
     it('defaults sort to ASC and accepts DESC', async () => {
-      await repository.findResultsFilters({} as Partial<ResultFiltersInterface>);
+      await repository.findResultsFilters(
+        {} as Partial<ResultFiltersInterface>,
+      );
       expect(querySpy.mock.calls[0][0] as string).toContain(
         'ORDER BY r.result_official_code ASC',
       );
@@ -196,7 +201,9 @@ describe('ResultRepository', () => {
   describe('findUserByCarnetId', () => {
     it('returns null for empty carnet', async () => {
       await expect(repository.findUserByCarnetId('')).resolves.toBeNull();
-      await expect(repository.findUserByCarnetId(null as any)).resolves.toBeNull();
+      await expect(
+        repository.findUserByCarnetId(null as any),
+      ).resolves.toBeNull();
       expect(querySpy).not.toHaveBeenCalled();
     });
 
@@ -236,10 +243,15 @@ describe('ResultRepository', () => {
     });
 
     it('falls back to email when carnet not found', async () => {
-      querySpy.mockResolvedValueOnce([]).mockResolvedValueOnce([
-        { sec_user_id: 2, email: 'e@mail.com' } as SecUser,
-      ]);
-      const out = await repository.findUserByEmailOrCarnet('missing', 'e@mail.com');
+      querySpy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { sec_user_id: 2, email: 'e@mail.com' } as SecUser,
+        ]);
+      const out = await repository.findUserByEmailOrCarnet(
+        'missing',
+        'e@mail.com',
+      );
       expect(out?.sec_user_id).toBe(2);
     });
 
@@ -288,8 +300,14 @@ describe('ResultRepository', () => {
       const findOne = jest.fn().mockResolvedValue({ id: 1 });
       (dataSource.getRepository as jest.Mock).mockReturnValue({ findOne });
 
-      const created = { sec_user_id: 11, email: 'x@y.z', carnet: 'Z9' } as SecUser;
-      querySpy.mockResolvedValueOnce(undefined).mockResolvedValueOnce([created]);
+      const created = {
+        sec_user_id: 11,
+        email: 'x@y.z',
+        carnet: 'Z9',
+      } as SecUser;
+      querySpy
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce([created]);
 
       await repository.createUserInSecUsers({
         first_name: 'A',
@@ -298,11 +316,13 @@ describe('ResultRepository', () => {
         carnet: 'Z9',
       } as SecUser);
 
-      expect(querySpy).toHaveBeenNthCalledWith(
+      expect(querySpy).toHaveBeenNthCalledWith(1, expect.any(String), [
+        'A',
+        'B',
+        'x@y.z',
+        'Z9',
         1,
-        expect.any(String),
-        ['A', 'B', 'x@y.z', 'Z9', 1],
-      );
+      ]);
     });
   });
 

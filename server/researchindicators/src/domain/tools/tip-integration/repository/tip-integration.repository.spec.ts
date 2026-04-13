@@ -37,16 +37,12 @@ describe('TipIntegrationRepository', () => {
 
   it('inactiveAllTipResults resolves on success', async () => {
     queryMock.mockResolvedValueOnce(undefined);
-    await expect(
-      repository.inactiveAllTipResults(5),
-    ).resolves.toBeUndefined();
+    await expect(repository.inactiveAllTipResults(5)).resolves.toBeUndefined();
     expect(queryMock).toHaveBeenCalledWith('SELECT delete_result(?)', [5]);
   });
 
   it('inactiveAllTipResults swallows rejection after logging', async () => {
     queryMock.mockRejectedValueOnce(new Error('db'));
-    await expect(
-      repository.inactiveAllTipResults(5),
-    ).resolves.toBeUndefined();
+    await expect(repository.inactiveAllTipResults(5)).resolves.toBeUndefined();
   });
 });

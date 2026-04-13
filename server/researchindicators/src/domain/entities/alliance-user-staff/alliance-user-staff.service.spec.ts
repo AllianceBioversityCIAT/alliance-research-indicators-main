@@ -60,7 +60,10 @@ describe('AllianceUserStaffService', () => {
       const user = { id: 1 } as unknown as AllianceUserStaff;
       queryBuilder.getOne.mockResolvedValue(user);
 
-      const result = await service.findUserByFirstAndLastName('Ada', 'Lovelace');
+      const result = await service.findUserByFirstAndLastName(
+        'Ada',
+        'Lovelace',
+      );
 
       expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith('user');
       expect(queryBuilder.where).toHaveBeenCalledWith(
@@ -89,8 +92,7 @@ describe('AllianceUserStaffService', () => {
       expect(queryBuilder.getMany).toHaveBeenCalled();
       expect(
         queryBuilder.andWhere.mock.calls.some(
-          (c) =>
-            typeof c[0] === 'string' && c[0].includes('LIKE :search'),
+          (c) => typeof c[0] === 'string' && c[0].includes('LIKE :search'),
         ),
       ).toBe(false);
     });

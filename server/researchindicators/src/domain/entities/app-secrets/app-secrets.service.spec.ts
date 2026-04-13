@@ -108,9 +108,9 @@ describe('AppSecretsService', () => {
       expect(result.app_secret_description).toBe('App');
       expect(typeof result.app_secret_key).toBe('string');
       const created = create.mock.calls[0][0];
-      expect(bcrypt.compareSync(result.app_secret_key, created.app_secret_key)).toBe(
-        true,
-      );
+      expect(
+        bcrypt.compareSync(result.app_secret_key, created.app_secret_key),
+      ).toBe(true);
     });
 
     it('should save whitelist hosts when provided', async () => {

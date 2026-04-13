@@ -1,5 +1,9 @@
 import { EntityManager, Repository } from 'typeorm';
-import { cleanNumberForDB, selectManager, transactionManager } from './orm.util';
+import {
+  cleanNumberForDB,
+  selectManager,
+  transactionManager,
+} from './orm.util';
 
 class Dummy {}
 

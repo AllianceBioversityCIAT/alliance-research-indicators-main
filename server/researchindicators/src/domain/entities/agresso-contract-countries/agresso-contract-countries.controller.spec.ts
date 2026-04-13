@@ -8,9 +8,7 @@ describe('AgressoContractCountriesController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AgressoContractCountriesController],
-      providers: [
-        { provide: AgressoContractCountriesService, useValue: {} },
-      ],
+      providers: [{ provide: AgressoContractCountriesService, useValue: {} }],
     }).compile();
     controller = module.get(AgressoContractCountriesController);
   });

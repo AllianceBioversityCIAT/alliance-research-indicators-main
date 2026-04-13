@@ -77,7 +77,10 @@ describe('UserSettingsService', () => {
       });
 
       expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ specific_component: 'pageSize', value: '50' }),
+        expect.objectContaining({
+          specific_component: 'pageSize',
+          value: '50',
+        }),
       );
       expect(result).toEqual({ pageSize: '50' });
     });
@@ -103,10 +106,7 @@ describe('UserSettingsService', () => {
       ];
       mockFind.mockResolvedValue(mockSettings);
 
-      const result = await service.findByUserIdAndComponent(
-        'results',
-        'table',
-      );
+      const result = await service.findByUserIdAndComponent('results', 'table');
 
       expect(result).toEqual({ pageSize: '10', theme: 'dark' });
     });

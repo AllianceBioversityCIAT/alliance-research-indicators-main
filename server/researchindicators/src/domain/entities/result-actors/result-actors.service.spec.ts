@@ -2,7 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, EntityManager } from 'typeorm';
 import { ResultActorsService } from './result-actors.service';
 import { ResultActor } from './entities/result-actor.entity';
-import { CurrentUserUtil, SetAuditEnum } from '../../shared/utils/current-user.util';
+import {
+  CurrentUserUtil,
+  SetAuditEnum,
+} from '../../shared/utils/current-user.util';
 import { CreateResultActorDto } from './dto/create-result-actor.dto';
 import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
 import { ActorRolesEnum } from '../actor-roles/enum/actor-roles.enum';
@@ -28,9 +31,7 @@ describe('ResultActorsService', () => {
   const mockCurrentUser = {
     user_id: 1,
     audit: jest.fn((set: SetAuditEnum) =>
-      set === SetAuditEnum.NEW
-        ? { created_by: 1 }
-        : { updated_by: 1 },
+      set === SetAuditEnum.NEW ? { created_by: 1 } : { updated_by: 1 },
     ),
   };
 
@@ -55,9 +56,13 @@ describe('ResultActorsService', () => {
   describe('saveInnovationDev', () => {
     it('should call create once for non-OTHER actors only', async () => {
       const manager = {} as EntityManager;
-      const createSpy = jest.spyOn(service, 'create').mockResolvedValue([] as any);
+      const createSpy = jest
+        .spyOn(service, 'create')
+        .mockResolvedValue([] as any);
 
-      const data = [{ actor_type_id: 1, men_youth: false }] as CreateResultActorDto[];
+      const data = [
+        { actor_type_id: 1, men_youth: false },
+      ] as CreateResultActorDto[];
 
       await service.saveInnovationDev(10, data, manager);
 

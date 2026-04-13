@@ -35,9 +35,7 @@ describe('AgressoStaffToolsService', () => {
   describe('cloneAllAgressoStaff', () => {
     it('should call base once per page when totalElements fits exactly in 1000-item pages', async () => {
       mockConnection.getRaw.mockResolvedValue({ totalElements: 2000 });
-      const baseSpy = jest
-        .spyOn(service as any, 'base')
-        .mockResolvedValue([]);
+      const baseSpy = jest.spyOn(service as any, 'base').mockResolvedValue([]);
 
       await service.cloneAllAgressoStaff();
 
@@ -46,9 +44,7 @@ describe('AgressoStaffToolsService', () => {
 
     it('should compute pages with round + remainder (1500 -> 3 calls)', async () => {
       mockConnection.getRaw.mockResolvedValue({ totalElements: 1500 });
-      const baseSpy = jest
-        .spyOn(service as any, 'base')
-        .mockResolvedValue([]);
+      const baseSpy = jest.spyOn(service as any, 'base').mockResolvedValue([]);
 
       await service.cloneAllAgressoStaff();
 
@@ -57,9 +53,7 @@ describe('AgressoStaffToolsService', () => {
 
     it('should call base with the correct query for each page', async () => {
       mockConnection.getRaw.mockResolvedValue({ totalElements: 1000 });
-      const baseSpy = jest
-        .spyOn(service as any, 'base')
-        .mockResolvedValue([]);
+      const baseSpy = jest.spyOn(service as any, 'base').mockResolvedValue([]);
 
       await service.cloneAllAgressoStaff();
 
@@ -72,9 +66,7 @@ describe('AgressoStaffToolsService', () => {
 
     it('should not call base when totalElements is 0', async () => {
       mockConnection.getRaw.mockResolvedValue({ totalElements: 0 });
-      const baseSpy = jest
-        .spyOn(service as any, 'base')
-        .mockResolvedValue([]);
+      const baseSpy = jest.spyOn(service as any, 'base').mockResolvedValue([]);
 
       await service.cloneAllAgressoStaff();
 
