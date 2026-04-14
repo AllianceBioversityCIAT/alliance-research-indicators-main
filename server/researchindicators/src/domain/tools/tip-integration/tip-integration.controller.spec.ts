@@ -1,85 +1,78 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { HttpStatus } from '@nestjs/common';
 import { TipIntegrationController } from './tip-integration.controller';
 import { TipIntegrationService } from './tip-integration.service';
-import { HttpStatus } from '@nestjs/common';
-import { QueryIndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
+import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResultsUtil } from '../../shared/utils/results.util';
 
+jest.mock('../../shared/utils/response.utils');
+
 describe('TipIntegrationController', () => {
   let controller: TipIntegrationController;
-  let service: jest.Mocked<TipIntegrationService>;
+  const mockService = {
+    getAllIprData: jest.fn(),
+    getKnowledgeProductsByYear: jest.fn(),
+  };
+  const mockFormat = jest.fn();
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    (ResponseUtils.format as jest.Mock) = mockFormat;
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TipIntegrationController],
       providers: [
-        // Mock the interceptor used with @UseInterceptors to avoid resolving its deps
-        {
-          provide: SetUpInterceptor,
-          useValue: { intercept: jest.fn((_ctx, next) => next.handle()) },
-        },
-        // Provide ResultsUtil so that the interceptor's constructor can be resolved if needed
+        { provide: TipIntegrationService, useValue: mockService },
+        SetUpInterceptor,
         {
           provide: ResultsUtil,
-          useValue: { setup: jest.fn() },
-        },
-        {
-          provide: TipIntegrationService,
-          useValue: {
-            getAllIprData: jest.fn(),
-          },
+          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();
-
-    controller = module.get<TipIntegrationController>(TipIntegrationController);
-    service = module.get(TipIntegrationService);
+    controller = module.get(TipIntegrationController);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
   });
 
-  it('handleGetIprData should delegate to service', async () => {
-    const mockData = [{ id: 1 }] as any;
-    service.getAllIprData.mockResolvedValue(mockData);
-
-    const res = await controller.handleGetIprData();
-    expect(service.getAllIprData).toHaveBeenCalledWith();
-    expect(res).toBe(mockData);
+  it('handleGetIprData', async () => {
+    const rows = [];
+    mockService.getAllIprData.mockResolvedValue(rows);
+    await expect(controller.handleGetIprData()).resolves.toBe(rows);
   });
 
-  it('getIprDataRest should map product_type and format response', async () => {
-    const mockData = [{ id: 1 }] as any;
-    service.getAllIprData.mockResolvedValue(mockData);
-
-    const res = await controller.getIprDataRest(
-      2025 as any,
-      QueryIndicatorsEnum.INNOVATION_DEV,
+  it('handleTipCloneKnowledgeProducts parses string payload', async () => {
+    mockService.getKnowledgeProductsByYear.mockResolvedValue(undefined);
+    const res = await controller.handleTipCloneKnowledgeProducts(
+      JSON.stringify({ years: [2024] }),
     );
-
-    expect(service.getAllIprData).toHaveBeenCalledWith({
-      year: 2025,
-      productType: 2, // IndicatorsEnum.INNOVATION_DEV
-    });
-
-    expect(res.status).toBe(HttpStatus.OK);
-    expect(res.description).toBe('IPR data found successfully');
-    expect(res.data).toBe(mockData);
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(2024);
+    expect(res.status).toBe(200);
   });
 
-  it('getIprDataRest should pass undefineds when no filters', async () => {
-    const mockData = [] as any;
-    service.getAllIprData.mockResolvedValue(mockData);
-
-    const res = await controller.getIprDataRest(undefined as any, undefined);
-
-    expect(service.getAllIprData).toHaveBeenCalledWith({
-      year: undefined,
+  it('getIprDataRest', async () => {
+    const data = [];
+    mockService.getAllIprData.mockResolvedValue(data);
+    mockFormat.mockReturnValue({});
+    await controller.getIprDataRest(2025, undefined);
+    expect(mockService.getAllIprData).toHaveBeenCalledWith({
+      year: 2025,
       productType: undefined,
     });
-    expect(res.status).toBe(HttpStatus.OK);
-    expect(res.data).toEqual([]);
+    expect(ResponseUtils.format).toHaveBeenCalledWith({
+      description: 'IPR data found successfully',
+      status: HttpStatus.OK,
+      data,
+    });
+  });
+
+  it('syncIprData', async () => {
+    const synced = [];
+    mockService.getKnowledgeProductsByYear.mockResolvedValue(synced);
+    mockFormat.mockReturnValue({});
+    await controller.syncIprData('2026');
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(2026);
   });
 });

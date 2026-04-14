@@ -50,6 +50,7 @@ import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-ou
 import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
+import { TempResultAi } from './entities/temp-result-ai.entity';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -2520,6 +2521,330 @@ describe('ResultsService', () => {
 
       // Assert
       expect(result).toEqual(mockResults);
+    });
+  });
+
+  // [CLAUDE/DONE] 137
+  describe('findOne', () => {
+    it('should delegate to mainRepo.findOne with the provided options', async () => {
+      const mockResult = { result_id: 1, title: 'Test' };
+      mockMainRepo.findOne.mockResolvedValue(mockResult as any);
+
+      const result = await service.findOne({ where: { result_id: 1 } } as any);
+
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith({
+        where: { result_id: 1 },
+      });
+      expect(result).toEqual(mockResult);
+    });
+  });
+
+  // [CLAUDE/DONE] 138
+  describe('findResultTIPData', () => {
+    it('should call createQueryBuilder and return results', async () => {
+      const mockResults = [{ result_id: 1 }];
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockResults),
+      };
+      mockMainRepo.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(mockQb) as any;
+
+      const result = await service.findResultTIPData({ year: 2024 });
+
+      expect(mockMainRepo.createQueryBuilder).toHaveBeenCalledWith('r');
+      expect(mockQb.andWhere).toHaveBeenCalledWith('report_year_id = :year', {
+        year: 2024,
+      });
+      expect(result).toEqual(mockResults);
+    });
+
+    it('should filter by productType when provided', async () => {
+      const mockResults = [{ result_id: 2 }];
+      const mockQb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        setParameters: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockResults),
+      };
+      mockMainRepo.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(mockQb) as any;
+
+      const result = await service.findResultTIPData({ productType: 3 });
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'r.indicator_id = :productType',
+        { productType: 3 },
+      );
+      expect(result).toEqual(mockResults);
+    });
+  });
+
+  // [CLAUDE/DONE] 139
+  describe('findBaseInfo', () => {
+    it('should return base info combining contract and result data', async () => {
+      mockResultContractsService.find.mockResolvedValue([
+        { contract_id: 'AGR-001' } as any,
+      ]);
+      mockMainRepo.findOne.mockResolvedValue({
+        title: 'My Result',
+        description: 'Desc',
+        indicator_id: 1,
+        report_year_id: 2024,
+        is_ai: false,
+      } as any);
+
+      const result = await service.findBaseInfo(10);
+
+      expect(result.contract_id).toBe('AGR-001');
+      expect(result.title).toBe('My Result');
+      expect(result.year).toBe(2024);
+    });
+
+    it('should throw when result row is missing', async () => {
+      mockResultContractsService.find.mockResolvedValue([] as any);
+      mockMainRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.findBaseInfo(99)).rejects.toThrow();
+    });
+  });
+
+  // [CLAUDE/DONE] 140
+  describe('validateResultTitle', () => {
+    it('should return true when no result exists with the given title', async () => {
+      mockMainRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.validateResultTitle('New Title');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when a result exists with the given title', async () => {
+      mockMainRepo.findOne.mockResolvedValue({
+        result_id: 1,
+        title: 'New Title',
+      } as any);
+
+      const result = await service.validateResultTitle('New Title');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  // [CLAUDE/DONE] 141
+  describe('filterResultByIndicators', () => {
+    it('should return all resultIds unchanged when indicators is empty', async () => {
+      const result = await service.filterResultByIndicators([1, 2, 3], []);
+
+      expect(result).toEqual([1, 2, 3]);
+      expect(mockMainRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('should filter result ids by matching indicators', async () => {
+      mockMainRepo.find.mockResolvedValue([
+        { result_id: 1 },
+        { result_id: 3 },
+      ] as any);
+
+      const result = await service.filterResultByIndicators(
+        [1, 2, 3],
+        [1 as any],
+      );
+
+      expect(result).toEqual([1, 3]);
+    });
+  });
+
+  // [CLAUDE/DONE] 142
+  describe('formalizeResult', () => {
+    it('should return result with error=true and call deleteFullResultById on exception in bulk mode', async () => {
+      const rawResult = { title: 'Test', indicator: 'Policy Change' } as any;
+
+      jest
+        .spyOn(service, 'createResultFromAiRoar')
+        .mockRejectedValue(new Error('AI error'));
+      mockDataSource.getRepository.mockReturnValue({
+        findOne: jest.fn().mockResolvedValue({
+          result_official_code: 'STAR-001',
+          platform_code: 'STAR',
+        }),
+      } as any);
+
+      const result = await service.formalizeResult(rawResult, true);
+
+      expect((result as any).error).toBe(true);
+    });
+
+    it('should throw error when not in bulk mode', async () => {
+      const rawResult = { title: 'Test' } as any;
+
+      jest
+        .spyOn(service, 'createResultFromAiRoar')
+        .mockRejectedValue(new Error('AI error'));
+      mockDataSource.getRepository.mockReturnValue({
+        findOne: jest.fn().mockResolvedValue(null),
+      } as any);
+
+      await expect(service.formalizeResult(rawResult, false)).rejects.toThrow(
+        'AI error',
+      );
+    });
+  });
+
+  // [CLAUDE/DONE] 143
+  describe('createResultFromAiBulk', () => {
+    it('should process all results and return errors/created partitioned', async () => {
+      const results = [{ title: 'R1' } as any, { title: 'R2' } as any];
+
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any)
+        .mockResolvedValueOnce({
+          title: 'R2',
+          error: true,
+          message_error: 'fail',
+        } as any);
+
+      const output = await service.createResultFromAiBulk(results);
+
+      expect(output.results_created).toHaveLength(1);
+      expect(output.results_errors).toHaveLength(1);
+    });
+  });
+
+  // [CLAUDE/DONE] 144
+  describe('validateAiRawCountries', () => {
+    it('should return a ResultCountry with isoAlpha2 set', async () => {
+      const result = await service.validateAiRawCountries({
+        code: 'CO',
+        areas: [],
+      });
+
+      expect(result.isoAlpha2).toBe('CO');
+    });
+
+    it('should populate sub_nationals when areas are provided', async () => {
+      mockClarisaSubNationalsService.findByCodes = jest
+        .fn()
+        .mockResolvedValue([{ id: 10 }, { id: 20 }]);
+
+      const result = await service.validateAiRawCountries({
+        code: 'CO',
+        areas: ['ANT', 'BOG'],
+      });
+
+      expect(result.result_countries_sub_nationals).toHaveLength(2);
+    });
+  });
+
+  // [CLAUDE/DONE] 145
+  describe('createMappingIpRights', () => {
+    it('should return dto with null boolean fields when yes/no strings are absent', async () => {
+      const result = await service.createMappingIpRights({
+        asset_ip_owner_id: null,
+        publicity_restriction: null,
+        potential_asset: null,
+        requires_further_development: null,
+      } as any);
+
+      expect(result.publicity_restriction).toBeNull();
+      expect(result.potential_asset).toBeNull();
+      expect(result.requires_futher_development).toBeNull();
+    });
+
+    it('should map Yes/No strings to boolean values', async () => {
+      const result = await service.createMappingIpRights({
+        asset_ip_owner_id: null,
+        publicity_restriction: 'Yes',
+        potential_asset: 'No',
+        requires_further_development: 'Yes',
+      } as any);
+
+      expect(result.publicity_restriction).toBe(true);
+      expect(result.potential_asset).toBe(false);
+      expect(result.requires_futher_development).toBe(true);
+    });
+
+    it('should throw NotFoundException when asset_ip_owner_id is provided but not found', async () => {
+      mockDataSource.getRepository.mockReturnValue({
+        findOne: jest.fn().mockResolvedValue(null),
+      } as any);
+
+      await expect(
+        service.createMappingIpRights({
+          asset_ip_owner_id: 999,
+        } as any),
+      ).rejects.toThrow();
+    });
+  });
+
+  // [CLAUDE/DONE] 146
+  describe('createResultFromAiRoar', () => {
+    it('should throw NotFoundException when contract_code does not exist', async () => {
+      mockDataSource.getRepository.mockReturnValue({
+        findOne: jest.fn().mockResolvedValue(null),
+        find: jest.fn().mockResolvedValue([]),
+      } as any);
+
+      await expect(
+        service.createResultFromAiRoar({ contract_code: 'FAKE-001' } as any),
+      ).rejects.toThrow();
+    });
+
+    it('should build a ResultAiDto when contract exists', async () => {
+      mockDataSource.getRepository.mockImplementation((entity: unknown) => {
+        if (entity === TempResultAi) {
+          return { save: jest.fn().mockResolvedValue({}) } as any;
+        }
+        return {
+          findOne: jest.fn().mockResolvedValue({ agreement_id: 'AGR-001' }),
+          find: jest.fn().mockResolvedValue([]),
+        } as any;
+      });
+      mockIndicatorsService.findByName.mockResolvedValue({
+        indicator_id: 1,
+      } as any);
+      mockResultUsersService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockResultInstitutionsService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockClarisaGeoScopeService.findByName.mockResolvedValue(null);
+      mockClarisaCountriesService.findByIso2 = jest.fn().mockResolvedValue([]);
+
+      const result = await service.createResultFromAiRoar({
+        contract_code: 'AGR-001',
+        title: 'Test',
+        description: 'Desc',
+        indicator: 'Policy Change',
+      } as any);
+
+      expect(result.result).toBeDefined();
+      expect(result.result.title).toBe('Test');
+    });
+  });
+
+  // [CLAUDE/DONE] 147
+  describe('generalReport', () => {
+    it('should delegate to mainRepo.generalReport', async () => {
+      const mockReport = [{ result_id: 1 }];
+      mockMainRepo.generalReport = jest
+        .fn()
+        .mockResolvedValue(mockReport) as any;
+
+      const result = await service.generalReport();
+
+      expect(mockMainRepo.generalReport).toHaveBeenCalled();
+      expect(result).toEqual(mockReport);
     });
   });
 });

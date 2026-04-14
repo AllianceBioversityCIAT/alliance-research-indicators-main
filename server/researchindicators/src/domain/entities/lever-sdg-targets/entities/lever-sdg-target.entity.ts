@@ -4,11 +4,11 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  Entity,
 } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ClarisaLever } from '../../../tools/clarisa/entities/clarisa-levers/entities/clarisa-lever.entity';
 import { ClarisaSdgTarget } from '../../../tools/clarisa/entities/clarisa-sdg-targets/entities/clarisa-sdg-target.entity';
-import { Entity } from 'typeorm';
 
 @Entity('lever_sdg_targets')
 @Index('lever_id_sdg_target_id_index', ['lever_id', 'sdg_target_id'])
