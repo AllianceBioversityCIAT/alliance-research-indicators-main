@@ -118,7 +118,7 @@ function rel(p: string): string {
 function main(): void {
   const serviceFiles: string[] = [];
   walkTsFiles(SRC, serviceFiles);
-  serviceFiles.sort();
+  serviceFiles.sort((a, b) => a.localeCompare(b));
 
   let withSpec = 0;
   let withoutSpec = 0;
