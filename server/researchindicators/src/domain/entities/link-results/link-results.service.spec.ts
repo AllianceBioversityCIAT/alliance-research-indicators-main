@@ -88,7 +88,12 @@ describe('LinkResultsService', () => {
           link_result_role_id: LinkResultRolesEnum.POLICY_CHANGE,
           is_active: true,
         },
-        relations: { other_result: true },
+        relations: {
+          other_result: {
+            indicator: true,
+            result_status: true,
+          },
+        },
       });
       expect(getPrincipalContractByResultsIds).toHaveBeenCalledWith([100, 200]);
       expect((result[0].other_result as any).result_contracts).toEqual([

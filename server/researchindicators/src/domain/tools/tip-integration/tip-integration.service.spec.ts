@@ -425,6 +425,7 @@ describe('TipIntegrationService', () => {
       official_code: 42,
       resultOfficialCode: 42,
       external_link: 'http://link',
+      public_link: 'http://public',
       created_at: new Date(),
       userData: null,
       createResult: {
