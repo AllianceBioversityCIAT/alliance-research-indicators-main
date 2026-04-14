@@ -45,9 +45,7 @@ export class LeverSdgTargetsService extends BaseServiceSimple<
           lever_id,
           sdg_target_id,
         } of createLeverSdgTargetDto.leverSdgTargetList) {
-          if (byLever[lever_id] === undefined) {
-            byLever[lever_id] = [];
-          }
+          byLever[lever_id] ??= [];
           byLever[lever_id].push(sdg_target_id);
         }
         for (const [lever_id, sdg_target_ids] of Object.entries(byLever)) {

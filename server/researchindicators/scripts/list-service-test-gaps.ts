@@ -31,7 +31,10 @@ function loadSpecText(specPath: string): string | null {
   return fs.readFileSync(specPath, 'utf8');
 }
 
-function methodLikelyTestedInSpec(specText: string, methodName: string): boolean {
+function methodLikelyTestedInSpec(
+  specText: string,
+  methodName: string,
+): boolean {
   if (methodName.length === 0) return false;
   const escaped = methodName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const patterns = [
@@ -40,6 +43,55 @@ function methodLikelyTestedInSpec(specText: string, methodName: string): boolean
     new RegExp(`spyOn\\s*\\([^,]+,\\s*['"]${escaped}['"]`),
   ];
   return patterns.some((re) => re.test(specText));
+}
+
+function isPrivateOrProtected(mods: ts.ModifierFlags): boolean {
+  return (
+    (mods & ts.ModifierFlags.Private) !== 0 ||
+    (mods & ts.ModifierFlags.Protected) !== 0
+  );
+}
+
+function isFunctionLikeInitializer(
+  init: ts.Expression | undefined,
+): init is ts.ArrowFunction | ts.FunctionExpression {
+  return (
+    init !== undefined &&
+    (ts.isArrowFunction(init) || ts.isFunctionExpression(init))
+  );
+}
+
+function appendPublicMethodIfApplicable(
+  member: ts.MethodDeclaration,
+  push: (name: string, kind: 'method' | 'property-fn') => void,
+): void {
+  if (!member.name || !ts.isIdentifier(member.name)) return;
+  if (isPrivateOrProtected(ts.getCombinedModifierFlags(member))) return;
+  push(member.name.text, 'method');
+}
+
+function appendPropertyFunctionIfApplicable(
+  member: ts.PropertyDeclaration,
+  push: (name: string, kind: 'method' | 'property-fn') => void,
+): void {
+  if (!member.name || !ts.isIdentifier(member.name)) return;
+  if (isPrivateOrProtected(ts.getCombinedModifierFlags(member))) return;
+  if (!isFunctionLikeInitializer(member.initializer)) return;
+  push(member.name.text, 'property-fn');
+}
+
+function appendPublicServiceMember(
+  member: ts.ClassElement,
+  push: (name: string, kind: 'method' | 'property-fn') => void,
+): void {
+  if (ts.isConstructorDeclaration(member)) return;
+  if (ts.isMethodDeclaration(member)) {
+    appendPublicMethodIfApplicable(member, push);
+    return;
+  }
+  if (ts.isPropertyDeclaration(member)) {
+    appendPropertyFunctionIfApplicable(member, push);
+  }
 }
 
 function collectPublicMethods(
@@ -55,28 +107,7 @@ function collectPublicMethods(
   };
 
   for (const member of classNode.members) {
-    if (ts.isConstructorDeclaration(member)) continue;
-
-    if (ts.isMethodDeclaration(member) && member.name && ts.isIdentifier(member.name)) {
-      const mods = ts.getCombinedModifierFlags(member);
-      if (mods & ts.ModifierFlags.Private) continue;
-      if (mods & ts.ModifierFlags.Protected) continue;
-      push(member.name.text, 'method');
-      continue;
-    }
-
-    if (ts.isPropertyDeclaration(member) && member.name && ts.isIdentifier(member.name)) {
-      const mods = ts.getCombinedModifierFlags(member);
-      if (mods & ts.ModifierFlags.Private) continue;
-      if (mods & ts.ModifierFlags.Protected) continue;
-      const init = member.initializer;
-      if (
-        init &&
-        (ts.isArrowFunction(init) || ts.isFunctionExpression(init))
-      ) {
-        push(member.name.text, 'property-fn');
-      }
-    }
+    appendPublicServiceMember(member, push);
   }
 
   return out;
@@ -133,7 +164,9 @@ function main(): void {
 
     const serviceBlocks = parseServiceFile(filePath);
     if (serviceBlocks.length === 0) {
-      sections.push(`## (sin clase *Service en AST)\n\n- Archivo: \`${rel(filePath)}\`\n`);
+      sections.push(
+        `## (sin clase *Service en AST)\n\n- Archivo: \`${rel(filePath)}\`\n`,
+      );
       continue;
     }
 
@@ -147,9 +180,9 @@ function main(): void {
       lines.push(`## ${block.className}`);
       lines.push('');
       lines.push(`- Archivo: \`${rel(filePath)}\``);
-      lines.push(
-        `- Spec: ${specText !== null ? `\`${rel(specPath)}\`` : '_ninguno_'}`,
-      );
+      const specDisplay =
+        specText !== null ? '`' + rel(specPath) + '`' : '_ninguno_';
+      lines.push(`- Spec: ${specDisplay}`);
       lines.push('');
 
       if (block.methods.length === 0) {
@@ -210,7 +243,7 @@ Generado por \`npm run docs:service-test-gaps\` (no editar a mano; volver a gene
   const body = sections.join('\n');
   fs.mkdirSync(path.dirname(OUT_MD), { recursive: true });
   fs.writeFileSync(OUT_MD, header + body, 'utf8');
-  // eslint-disable-next-line no-console
+
   console.log(`Wrote ${rel(OUT_MD)} (${totalGaps} gap entries).`);
 }
 
