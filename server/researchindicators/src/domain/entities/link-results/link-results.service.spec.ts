@@ -89,10 +89,7 @@ describe('LinkResultsService', () => {
           is_active: true,
         },
         relations: {
-          other_result: {
-            indicator: true,
-            result_status: true,
-          },
+          other_result: { indicator: true, result_status: true },
         },
       });
       expect(getPrincipalContractByResultsIds).toHaveBeenCalledWith([100, 200]);
