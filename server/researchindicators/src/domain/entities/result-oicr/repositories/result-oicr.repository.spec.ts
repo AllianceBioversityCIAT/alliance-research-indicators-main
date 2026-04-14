@@ -266,4 +266,19 @@ describe('ResultOicrRepository', () => {
       );
     });
   });
+
+  describe('getResultOicrDetailsByOfficialCode', () => {
+    it('runs detail query with result id param', async () => {
+      const rows = [{ result_id: 1, result_code: 99 }];
+      jest.spyOn(repository, 'query').mockResolvedValue(rows as any);
+
+      const out = await repository.getResultOicrDetailsByOfficialCode(42);
+
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('FROM results r'),
+        [42],
+      );
+      expect(out).toBe(rows);
+    });
+  });
 });

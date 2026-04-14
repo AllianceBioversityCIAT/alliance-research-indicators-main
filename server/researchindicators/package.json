@@ -22,6 +22,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "docs:service-test-gaps": "ts-node scripts/list-service-test-gaps.ts",
     "compose:up:dev": "docker-compose up dev -d",
     "compose:up:prod": "docker-compose up prod -d",
     "typeorm": "ts-node ./node_modules/typeorm/cli.js",
@@ -124,7 +125,9 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.spec.ts",
+      "!**/*.entity.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
