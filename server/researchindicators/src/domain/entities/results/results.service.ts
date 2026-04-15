@@ -93,6 +93,8 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
 import { IntellectualPropertyOwner } from '../intellectual-property-owners/entities/intellectual-property-owner.entity';
+import { ResultSortEnum } from './enum/result-sort.enum';
+import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
 
 @Injectable()
 export class ResultsService {
@@ -129,9 +131,10 @@ export class ResultsService {
     private readonly _resultEvidencesService: ResultEvidencesService,
     private readonly _queryService: QueryService,
     private readonly _resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
+    private readonly _resultLeverSdgTargetsService: ResultLeverSdgTargetsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -156,6 +159,38 @@ export class ResultsService {
       platform_code: filters?.platform_code,
       filter_primary_contract: filters?.filter_primary_contract,
     });
+  }
+
+  async findResultv2(
+    search: string,
+    pagination?: { page?: number; limit?: number },
+    sorting?: { field?: ResultSortEnum; order?: 'ASC' | 'DESC' },
+    filters?: {
+      status: ResultStatusEnum[];
+      contracts: string[];
+      years: string[];
+      sources: ReportingPlatformEnum[];
+      indicators: IndicatorsEnum[];
+      onlyOwnResults: boolean;
+    },
+  ) {
+    const filtersData = {
+      status: filters.status,
+      contracts: filters.contracts,
+      years: filters.years,
+      sources: filters.sources,
+      indicators: filters.indicators,
+      currentUser: {
+        onlyOwnResults: filters.onlyOwnResults,
+        userId: this.currentUser.user_id,
+      },
+    };
+    return this.mainRepo.findResultsV2(
+      search,
+      pagination,
+      sorting,
+      filtersData,
+    );
   }
 
   async findOne(options: FindOneOptions<Result>) {
@@ -641,19 +676,21 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -662,12 +699,7 @@ export class ResultsService {
         'is_primary',
       );
 
-      const activeLevers = await this._resultLeversService.find(
-        resultId,
-        LeverRolesEnum.ALIGNMENT,
-      );
-
-      await this._resultLeversService.create<LeverRolesEnum>(
+      const newLevers = await this._resultLeversService.create<LeverRolesEnum>(
         resultId,
         fullLevers,
         'lever_id',
@@ -682,9 +714,9 @@ export class ResultsService {
       const emergedLever =
         await this._resultLeversService.comparerClientToServer(
           resultId,
-          primaryLevers,
+          fullLevers,
           LeverRolesEnum.ALIGNMENT,
-          activeLevers,
+          newLevers,
         );
 
       for (const lever of emergedLever) {
@@ -692,6 +724,16 @@ export class ResultsService {
           lever.result_lever_id,
           lever?.result_lever_strategic_outcomes ?? [],
           'lever_strategic_outcome_id',
+          undefined,
+          manager,
+        );
+      }
+
+      for (const lever of emergedLever) {
+        await this._resultLeverSdgTargetsService.create(
+          lever.result_lever_id,
+          lever?.result_lever_sdg_targets ?? [],
+          'sdg_target_id',
           undefined,
           manager,
         );
@@ -731,6 +773,17 @@ export class ResultsService {
       resultId,
       LeverRolesEnum.ALIGNMENT,
     );
+
+    const sdgTargets =
+      await this._resultLeverSdgTargetsService.findByMultiplesResultLeverIds(
+        levers.map((el) => el.result_lever_id),
+      );
+
+    levers.forEach((lever) => {
+      lever.result_lever_sdg_targets = sdgTargets.filter(
+        (sdgTarget) => sdgTarget.result_lever_id === lever.result_lever_id,
+      );
+    });
 
     const primaryLevers = levers.filter((el) => el.is_primary);
 
@@ -1195,8 +1248,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },

@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { AgressoContractRepository } from './agresso-contract.repository';
@@ -6,12 +7,21 @@ import { AlianceManagementApp } from '../../../tools/broker/aliance-management.a
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
 import { AgressoContractStatus } from '../../../shared/enum/agresso-contract.enum';
+import {
+  isValidText,
+  escapeLikeString,
+} from '../../../shared/utils/query-sanitizer.util';
 
 // Mock the utility functions
 jest.mock('../../../shared/utils/object.utils', () => ({
   isEmpty: jest.fn(
     (value) => value === undefined || value === null || value === '',
   ),
+}));
+
+jest.mock('../../../shared/utils/query-sanitizer.util', () => ({
+  isValidText: jest.fn(() => true),
+  escapeLikeString: jest.fn((s: string) => s),
 }));
 
 describe('AgressoContractRepository', () => {
@@ -53,6 +63,8 @@ describe('AgressoContractRepository', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    (isValidText as jest.Mock).mockReturnValue(true);
+    (escapeLikeString as jest.Mock).mockImplementation((s: string) => s);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -162,6 +174,26 @@ describe('AgressoContractRepository', () => {
       );
       expect(result).toHaveLength(1);
       expect(result[0].leverUrl).toBe('Not available');
+    });
+
+    it('should normalize page to 1 when page is below 1', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+      await repository.findAllContracts({ page: 0, limit: 5 }, {}, {});
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('LIMIT 5 OFFSET 0'),
+      );
+    });
+
+    it('should default page to 1 when page is empty', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+      await repository.findAllContracts(
+        { page: undefined as any, limit: 10 },
+        {},
+        {},
+      );
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('LIMIT 10 OFFSET 0'),
+      );
     });
 
     it('should include countries when relations specify countries', async () => {
@@ -442,6 +474,14 @@ describe('AgressoContractRepository', () => {
           field: OrderFieldsEnum.STATUS,
           expected: 'ac.contract_status ASC ',
         },
+        {
+          field: OrderFieldsEnum.LEAD_CENTER,
+          expected: 'ac.ubwClientDescription ASC ',
+        },
+        {
+          field: OrderFieldsEnum.LEVER,
+          expected: 'cl.id ASC ',
+        },
       ];
       testCases.forEach(({ field, expected }) => {
         const direction = expected.includes('DESC') ? 'DESC' : 'ASC';
@@ -571,9 +611,148 @@ describe('AgressoContractRepository', () => {
         expect.not.stringContaining('AND r.created_by'),
       );
     });
+
+    it('should throw when search query has invalid characters', async () => {
+      (isValidText as jest.Mock).mockReturnValueOnce(false);
+      await expect(
+        repository.getContracts(
+          {},
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'bad<>',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should build LIKE conditions from search query tokens', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+      await repository.getContracts(
+        {},
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'alpha beta',
+      );
+      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      expect(escapeLikeString).toHaveBeenCalled();
+      expect(sql).toContain("ac.description LIKE '%alpha%'");
+      expect(sql).toContain("ac.agreement_id LIKE '%beta%'");
+    });
+
+    it('should run count query and set metadata when paginated', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ total: '12' }])
+        .mockResolvedValueOnce([
+          {
+            agreement_id: 'C1',
+            indicator_id: 1,
+            count_results: 2,
+            projectDescription: 'P',
+            project_lead_description: 'PI',
+            description: 'D',
+            start_date: 'a',
+            end_date: 'b',
+            endDateGlobal: 'c',
+            endDatefinance: 'd',
+            contract_status: 'ongoing',
+            lever_id: 1,
+            lever_short_name: 's',
+            lever_full_name: 'f',
+            lever_other_names: 'o',
+            is_science_program: 0,
+            funding_type: 'x',
+            ubwClientDescription: 'CIAT',
+          },
+        ]);
+
+      const out = await repository.getContracts(
+        {},
+        undefined,
+        OrderFieldsEnum.CONTRACT_CODE,
+        'ASC',
+        { page: 2, limit: 5 },
+      );
+
+      expect(repository.query).toHaveBeenCalledTimes(2);
+      expect(
+        (repository.query as jest.Mock).mock.calls[0][0] as string,
+      ).toContain('COUNT(DISTINCT ac.agreement_id)');
+      expect(out.metadata).toMatchObject({
+        total: 12,
+        page: 2,
+        limit: 5,
+        totalPages: 3,
+        hasNextPage: true,
+        hasPreviousPage: true,
+      });
+    });
+
+    it('should add exclude_pooled_funding and merge rows per contract', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([
+        {
+          agreement_id: 'SAME',
+          indicator_id: 1,
+          count_results: 1,
+          projectDescription: 'P',
+          project_lead_description: 'PI',
+          description: 'D',
+          start_date: 'a',
+          end_date: 'b',
+          endDateGlobal: 'c',
+          endDatefinance: 'd',
+          contract_status: 'ongoing',
+          lever_id: 1,
+          lever_short_name: 's',
+          lever_full_name: 'f',
+          lever_other_names: 'o',
+          is_science_program: 0,
+          funding_type: 'x',
+          ubwClientDescription: 'CIAT',
+        },
+        {
+          agreement_id: 'SAME',
+          indicator_id: 2,
+          count_results: 4,
+          projectDescription: 'P',
+          project_lead_description: 'PI',
+          description: 'D',
+          start_date: 'a',
+          end_date: 'b',
+          endDateGlobal: 'c',
+          endDatefinance: 'd',
+          contract_status: 'ongoing',
+          lever_id: 1,
+          lever_short_name: 's',
+          lever_full_name: 'f',
+          lever_other_names: 'o',
+          is_science_program: 0,
+          funding_type: 'x',
+          ubwClientDescription: 'CIAT',
+        },
+      ]);
+
+      const out = await repository.getContracts({
+        exclude_pooled_funding: true,
+        with_indicators: true,
+      } as any);
+
+      expect(
+        (repository.query as jest.Mock).mock.calls[0][0] as string,
+      ).toContain('AND pfc.id IS NULL');
+      expect(out.data).toHaveLength(1);
+    });
   });
 
   describe('buildStatusFilterClause', () => {
+    it('should return empty string for null, non-array or empty list', () => {
+      expect(repository['buildStatusFilterClause'](null as any)).toBe('');
+      expect(repository['buildStatusFilterClause'](undefined as any)).toBe('');
+      expect(repository['buildStatusFilterClause']([])).toBe('');
+    });
+
     it('should build correct status filter clause', () => {
       const statuses = ['ONGOING', 'COMPLETED'];
       const result = repository['buildStatusFilterClause'](statuses);

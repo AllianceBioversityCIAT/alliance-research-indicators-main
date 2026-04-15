@@ -10,6 +10,7 @@ import { LoggerUtil } from './domain/shared/utils/logger.util';
 import helmet from 'helmet';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { VersioningType } from '@nestjs/common';
 const logger: LoggerUtil = new LoggerUtil({
   name: 'bootstrap',
 });
@@ -48,6 +49,11 @@ async function httpservice() {
   );
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
+
+  app.setGlobalPrefix('api');
+  app.enableVersioning({
+    type: VersioningType.URI,
+  });
 
   // Serve static files for admin panel (React build files)
   app.useStaticAssets(join(__dirname, 'admin', 'public'), {

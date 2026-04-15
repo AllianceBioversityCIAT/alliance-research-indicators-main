@@ -16,6 +16,7 @@ export enum ClarisaPathEnum {
   SDG = 'api/sdgs',
   IMPACT_AREAS = 'api/impact-areas',
   GLOBAL_TARGETS = 'api/global-targets',
+  SDG_TARGETS = 'api/sdg-targets',
 }
 
 export enum SearchToOpenSearchEnum {

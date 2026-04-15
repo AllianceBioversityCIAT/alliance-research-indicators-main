@@ -263,7 +263,7 @@ export class TipIntegrationService extends BaseApi {
         notable_references: [],
       };
 
-      resultMapped.external_link = result.link;
+      resultMapped.public_link = result.link;
       resultMapped.created_at = result.created_at;
 
       resultMapped.knowledgeProduct = {
@@ -379,7 +379,7 @@ export class TipIntegrationService extends BaseApi {
         await this.dataSource
           .getRepository(Result)
           .update(findResult.result_id, {
-            external_link: result.external_link,
+            public_link: result.public_link,
             created_at: result.created_at,
           });
 
