@@ -568,7 +568,7 @@ export class ResultsController {
 
   @ApiOperation({ summary: 'Create results from AI bulk' })
   @Post('ai/formalize/bulk')
-  @Roles(SecRolesEnum.DEVELOPER)
+  @Roles(SecRolesEnum.DEVELOPER, SecRolesEnum.CENTER_ADMIN)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
