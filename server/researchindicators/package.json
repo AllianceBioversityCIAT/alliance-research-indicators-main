@@ -59,6 +59,7 @@
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
     "express-rate-limit": "^8.0.1",
     "fast-xml-parser": "^4.5.1",
     "handlebars": "^4.7.8",
@@ -126,7 +127,9 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s",
       "!**/*.spec.ts",
-      "!**/*.entity.ts"
+      "!**/*.entity.ts",
+      "!**/db/migrations/**",
+      "!**/*.enum.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"

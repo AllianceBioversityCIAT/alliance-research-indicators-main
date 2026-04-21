@@ -93,6 +93,7 @@ import { ResultStatusWorkflowModule } from './result-status-workflow/result-stat
 import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module';
 import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.module';
 import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -190,7 +191,8 @@ import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-l
     SyncProcessLogModule,
     LeverSdgTargetsModule,
     ResultLeverSdgTargetsModule,
+    ReportsModule,
   ],
-  exports: [AgressoContractModule, AppSecretsModule],
+  exports: [AgressoContractModule, AppSecretsModule, ReportsModule],
 })
 export class EntitiesModule {}

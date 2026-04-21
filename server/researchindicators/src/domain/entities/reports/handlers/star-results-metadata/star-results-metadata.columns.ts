@@ -1,0 +1,111 @@
+import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
+
+/**
+ * Raw data sheet columns A–AG (reference workbook "Raw data" header row).
+ */
+export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
+  { key: 'result_code', header: 'Result Code', width: 14 },
+  { key: 'platform_code', header: 'Source Platform', width: 16 },
+  {
+    key: 'public_link',
+    header: 'Public link',
+    width: 40,
+    hyperlink: {
+      urlField: 'public_link',
+      displayField: 'public_link',
+      emptyDisplay: 'Not available',
+    },
+  },
+  {
+    key: 'platform_link',
+    header: 'Link to platform',
+    width: 36,
+    hyperlink: {
+      urlField: 'platform_link',
+      displayField: 'platform_link_display',
+      emptyDisplay: 'Not available',
+    },
+  },
+  { key: 'indicator', header: 'Indicator', width: 36 },
+  { key: 'status', header: 'Status', width: 18 },
+  { key: 'result_title', header: 'Title', width: 48 },
+  { key: 'result_description', header: 'Description', width: 60 },
+  { key: 'reporting_year', header: 'Reporting year', width: 16 },
+  { key: 'approved_versions', header: 'Approved versions', width: 22 },
+  { key: 'keywords', header: 'Keywords', width: 36 },
+  { key: 'creator', header: 'Creator', width: 28 },
+  { key: 'creation_date', header: 'Creation date', width: 16 },
+  { key: 'main_contact_person', header: 'Main contact person', width: 36 },
+  { key: 'primary_project', header: 'Primary project', width: 56 },
+  {
+    key: 'primary_project_principal_investigator',
+    header: 'Primary project: principal investigator',
+    width: 40,
+  },
+  {
+    key: 'primary_project_start_date',
+    header: 'Primary project: Start date',
+    width: 22,
+  },
+  {
+    key: 'primary_project_end_date',
+    header: 'Primary project: End date',
+    width: 22,
+  },
+  { key: 'contributing_projects', header: 'Contributing projects', width: 48 },
+  { key: 'primary_lever', header: 'Primary lever(s)', width: 28 },
+  { key: 'contributor_lever', header: 'Contributing lever(s)', width: 28 },
+  {
+    key: 'sdg_targets',
+    header: 'Contibution to SDG targets',
+    width: 72,
+  },
+  { key: 'partners', header: 'Partners involved', width: 56 },
+  { key: 'geo_scope_name', header: 'Geographic scope', width: 24 },
+  { key: 'countries', header: 'Countries specified', width: 36 },
+  { key: 'regions', header: 'Regions specified', width: 28 },
+  {
+    key: 'sub_nationals',
+    header: 'Geographic scope comments',
+    width: 48,
+  },
+  { key: 'evidences', header: 'Evidences', width: 72 },
+  { key: 'who_owns_ip_rights', header: 'Who owns IP rights?', width: 28 },
+  { key: 'third_party', header: 'Third party', width: 32 },
+  {
+    key: 'legal_restrictions_publication',
+    header: 'Legal restrictions on publication?',
+    width: 40,
+  },
+  {
+    key: 'commercialization_potential_asset',
+    header: 'Commercialization potential for asset?',
+    width: 42,
+  },
+  {
+    key: 'asset_need_refinement',
+    header: 'Does asset need refinement?',
+    width: 36,
+  },
+];
+
+export const STAR_RESULTS_METADATA_DICTIONARY_COLUMNS: ExcelColumnSpec[] = [
+  {
+    key: 'section',
+    header: 'Section',
+    width: 28,
+    headerFillArgb: 'FF455A64',
+  },
+  {
+    key: 'field_label',
+    header: 'Field',
+    width: 56,
+    headerFillArgb: 'FF455A64',
+  },
+  {
+    key: 'explanation',
+    header: 'Explanation',
+    width: 72,
+    headerFillArgb: 'FF455A64',
+  },
+];
