@@ -62,6 +62,7 @@ import { LinkResultsModule } from '../entities/link-results/link-results.module'
 import { ResultStatusTransitionsModule } from '../entities/result-status-transitions/result-status-transitions.module';
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
+import { ReportsModule } from '../entities/reports/reports.module';
 
 const capSharingChildren: Routes = [
   {
@@ -371,6 +372,10 @@ const children: Routes = [
   {
     path: 'link-results',
     module: LinkResultsModule,
+  },
+  {
+    path: 'reports',
+    module: ReportsModule,
   },
 ];
 
