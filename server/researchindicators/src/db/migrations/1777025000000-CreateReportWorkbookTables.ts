@@ -1,7 +1,9 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { STAR_RESULTS_METADATA_DICTIONARY_SEED } from './seed-data/star-results-metadata-dictionary.seed';
 
-export class CreateReportWorkbookTables1777025000000 implements MigrationInterface {
+export class CreateReportWorkbookTables1777025000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE \`report_workbook_sheet\` (

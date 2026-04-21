@@ -17,7 +17,9 @@ export class ReportHandlerRegistry {
   getHandler(workbookKey: string): ReportWorkbookHandler {
     const handler = this.handlers.get(workbookKey);
     if (!handler) {
-      throw new NotFoundException(`Unknown report workbook_key: ${workbookKey}`);
+      throw new NotFoundException(
+        `Unknown report workbook_key: ${workbookKey}`,
+      );
     }
     return handler;
   }

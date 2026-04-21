@@ -1,20 +1,21 @@
 import {
   BadRequestException,
-  Body,
   Controller,
   DefaultValuePipe,
   Get,
-  Param,
   Query,
   StreamableFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { RolesGuard } from '../../shared/guards/roles.guard';
-import { Roles } from '../../shared/decorators/roles.decorator';
-import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { ReportsGenerationService } from './reports-generation.service';
 import { ResultSortEnum } from '../results/enum/result-sort.enum';
 import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
@@ -37,7 +38,7 @@ export class ReportsController {
   constructor(
     private readonly reportsGeneration: ReportsGenerationService,
     private readonly currentUser: CurrentUserUtil,
-  ) { }
+  ) {}
 
   @Get('resultCenter/xlsx')
   @ApiOperation({
@@ -142,7 +143,7 @@ export class ReportsController {
 
     const buffer = await this.reportsGeneration.buildWorkbookXlsxBuffer(
       workbookKey,
-      filters
+      filters,
     );
     const date = new Date().toISOString().split('T')[0];
     const filename = `${workbookKey}_${date}.xlsx`;

@@ -11,11 +11,16 @@ export class ReportsGenerationService {
   constructor(
     private readonly registry: ReportHandlerRegistry,
     private readonly workbookBuilder: ExcelWorkbookBuilder,
-  ) { }
+  ) {}
 
-  async buildWorkbookXlsxBuffer(workbookKey: string, filters: FullFiltersReportDto): Promise<Buffer> {
+  async buildWorkbookXlsxBuffer(
+    workbookKey: string,
+    filters: FullFiltersReportDto,
+  ): Promise<Buffer> {
     const handler = this.registry.getHandler(workbookKey);
-    const spec = await handler.buildWorkbookSpec(mergeFullFiltersReportDto(filters));
+    const spec = await handler.buildWorkbookSpec(
+      mergeFullFiltersReportDto(filters),
+    );
     return this.workbookBuilder.toBuffer(spec);
   }
 }

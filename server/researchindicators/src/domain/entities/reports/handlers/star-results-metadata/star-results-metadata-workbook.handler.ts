@@ -39,7 +39,9 @@ const HEADER_LOGO_CANDIDATE = join(
 const DICTIONARY_ROW_FILL = '_rowFillArgb';
 
 @Injectable()
-export class StarResultsMetadataWorkbookHandler implements ReportWorkbookHandler {
+export class StarResultsMetadataWorkbookHandler
+  implements ReportWorkbookHandler
+{
   readonly workbookKey = STAR_RESULTS_METADATA_WORKBOOK_KEY;
   readonly sheetOrderEnvVarName = STAR_RESULTS_METADATA_SHEET_ORDER_ENV;
 
@@ -47,9 +49,11 @@ export class StarResultsMetadataWorkbookHandler implements ReportWorkbookHandler
     private readonly layoutRepository: ReportLayoutRepository,
     private readonly starExportRepository: StarResultsExportRepository,
     private readonly sheetOrderResolver: WorkbookSheetOrderResolver,
-  ) { }
+  ) {}
 
-  async buildWorkbookSpec(filters: FullFiltersReportDto): Promise<ExcelWorkbookSpec> {
+  async buildWorkbookSpec(
+    filters: FullFiltersReportDto,
+  ): Promise<ExcelWorkbookSpec> {
     const sheetRows = await this.layoutRepository.findActiveSheets(
       this.workbookKey,
     );
@@ -61,9 +65,11 @@ export class StarResultsMetadataWorkbookHandler implements ReportWorkbookHandler
       csvOverride,
     );
 
-    const dictionaryRows =
-      await this.layoutRepository.findDataDictionaryRows(this.workbookKey);
-    const rawRows = await this.starExportRepository.findStarResultsMetadataRows(filters);
+    const dictionaryRows = await this.layoutRepository.findDataDictionaryRows(
+      this.workbookKey,
+    );
+    const rawRows =
+      await this.starExportRepository.findStarResultsMetadataRows(filters);
 
     const columnGroups = await this.resolveRawColumnGroups();
     const rawColumns = this.withHeaderFills(
@@ -88,13 +94,7 @@ export class StarResultsMetadataWorkbookHandler implements ReportWorkbookHandler
       presentation: {
         ...STAR_RAW_SHEET_PREAMBLE_BASE,
         columnGroups,
-        ...(headerLogo
-          ? { logoImage: headerLogo }
-          : {
-            logoPath: existsSync(HEADER_LOGO_CANDIDATE)
-              ? HEADER_LOGO_CANDIDATE
-              : undefined,
-          }),
+        ...(headerLogo ? { logoImage: headerLogo } : { logoPath: undefined }),
       },
     };
 
@@ -181,9 +181,7 @@ export class StarResultsMetadataWorkbookHandler implements ReportWorkbookHandler
     const fallback = groups[0]?.fillArgb ?? 'FF1565C0';
     return columns.map((col, idx) => {
       const colNum = idx + 1;
-      const g = groups.find(
-        (x) => colNum >= x.fromCol && colNum <= x.toCol,
-      );
+      const g = groups.find((x) => colNum >= x.fromCol && colNum <= x.toCol);
       return { ...col, headerFillArgb: g?.fillArgb ?? fallback };
     });
   }

@@ -1,4 +1,4 @@
-import { FullFiltersReportDto } from "../dto/filters-report.dto";
+import { FullFiltersReportDto } from '../dto/filters-report.dto';
 
 export type ExcelHyperlinkColumnSpec = {
   urlField: string;

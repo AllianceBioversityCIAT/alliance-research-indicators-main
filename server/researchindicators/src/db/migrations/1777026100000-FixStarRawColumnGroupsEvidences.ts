@@ -5,7 +5,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Safe if 177702600 already inserted the older 5-group layout.
  */
 export class FixStarRawColumnGroupsEvidences1777026100000
-  implements MigrationInterface {
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       DELETE FROM \`report_workbook_column_group\`

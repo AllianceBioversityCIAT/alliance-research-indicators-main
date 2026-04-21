@@ -20,7 +20,12 @@ export class ReportDataDictionary {
   @Column({ name: 'explanation', type: 'text', nullable: true })
   explanation!: string | null;
 
-  @Column({ name: 'section_fill_argb', type: 'varchar', length: 9, nullable: true })
+  @Column({
+    name: 'section_fill_argb',
+    type: 'varchar',
+    length: 9,
+    nullable: true,
+  })
   section_fill_argb!: string | null;
 
   @Column({ name: 'sort_order', type: 'int' })

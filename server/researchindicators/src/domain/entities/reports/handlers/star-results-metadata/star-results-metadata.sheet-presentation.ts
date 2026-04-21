@@ -29,16 +29,19 @@ export const STAR_RAW_COLUMN_GROUP_FALLBACK: Array<{
   label: string;
   fillArgb: string;
 }> = [
-    { fromCol: 1, toCol: 14, label: 'GENERAL INFORMATION', fillArgb: 'FF203C61' },
-    { fromCol: 15, toCol: 22, label: 'ALLIANCE ALIGNMENT', fillArgb: 'FF2A4783' },
-    { fromCol: 23, toCol: 23, label: 'PARTNERS', fillArgb: 'FF325B94' },
-    { fromCol: 24, toCol: 27, label: 'GEOGRAPHIC SCOPE', fillArgb: 'FF5A91D3' },
-    { fromCol: 28, toCol: 28, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
-    { fromCol: 29, toCol: 33, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
-  ];
+  { fromCol: 1, toCol: 14, label: 'GENERAL INFORMATION', fillArgb: 'FF203C61' },
+  { fromCol: 15, toCol: 22, label: 'ALLIANCE ALIGNMENT', fillArgb: 'FF2A4783' },
+  { fromCol: 23, toCol: 23, label: 'PARTNERS', fillArgb: 'FF325B94' },
+  { fromCol: 24, toCol: 27, label: 'GEOGRAPHIC SCOPE', fillArgb: 'FF5A91D3' },
+  { fromCol: 28, toCol: 28, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
+  { fromCol: 29, toCol: 33, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
+];
 
 /** Preamble without column groups (groups come from DB or fallback in the handler). */
-export const STAR_RAW_SHEET_PREAMBLE_BASE: Omit<ExcelSheetPreamble, 'columnGroups'> = {
+export const STAR_RAW_SHEET_PREAMBLE_BASE: Omit<
+  ExcelSheetPreamble,
+  'columnGroups'
+> = {
   bannerTitle: 'ALLIANCE RESULTS',
   bannerTitleHorizontalAlign: 'left',
   bannerTitleFillArgb: STAR_RAW_BANNER_TITLE_FILL_ARGB,

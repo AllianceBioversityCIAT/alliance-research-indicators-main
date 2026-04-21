@@ -1,7 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class ReportSectionColorsAndColumnGroups1777026000000
-  implements MigrationInterface {
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE \`report_workbook_column_group\` (
@@ -68,6 +69,8 @@ export class ReportSectionColorsAndColumnGroups1777026000000
     await queryRunner.query(
       `ALTER TABLE \`report_data_dictionary\` DROP COLUMN \`section_fill_argb\``,
     );
-    await queryRunner.query(`DROP TABLE IF EXISTS \`report_workbook_column_group\``);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS \`report_workbook_column_group\``,
+    );
   }
 }

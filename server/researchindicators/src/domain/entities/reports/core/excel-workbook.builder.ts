@@ -59,9 +59,7 @@ export class ExcelWorkbookBuilder {
           const raw = dataRow[fillField];
           if (typeof raw === 'string' && /^[0-9A-Fa-f]{8}$/.test(raw)) {
             cell.fill = this.solidFill(raw.toUpperCase());
-            const fontArgb = this.isDarkArgb(raw)
-              ? 'FFFFFFFF'
-              : 'FF000000';
+            const fontArgb = this.isDarkArgb(raw) ? 'FFFFFFFF' : 'FF000000';
             cell.font = { color: { argb: fontArgb } };
           }
         }
@@ -83,9 +81,13 @@ export class ExcelWorkbookBuilder {
     const fillArgb = pre.headerFillArgb ?? 'FF1F4E79';
     const fontArgb = pre.headerFontArgb ?? 'FFFFFFFF';
     const titleFillArgb =
-      pre.bannerTitleFillArgb !== undefined ? pre.bannerTitleFillArgb : fillArgb;
+      pre.bannerTitleFillArgb !== undefined
+        ? pre.bannerTitleFillArgb
+        : fillArgb;
     const titleFontArgb =
-      pre.bannerTitleFontArgb !== undefined ? pre.bannerTitleFontArgb : fontArgb;
+      pre.bannerTitleFontArgb !== undefined
+        ? pre.bannerTitleFontArgb
+        : fontArgb;
 
     ws.getRow(1).height = 54;
     ws.getRow(2).height = 28;
@@ -115,33 +117,31 @@ export class ExcelWorkbookBuilder {
         base64: Buffer.from(buf).toString('base64'),
         extension: bufExt,
       });
-      ws.addImage(
-        imageId,
-        {
-          tl: logoTl,
-          ext: logoDisplayExt,
-          editAs: logoEditAs,
-        } as unknown as Parameters<ExcelJS.Worksheet['addImage']>[1],
-      );
+      ws.addImage(imageId, {
+        tl: logoTl,
+        ext: logoDisplayExt,
+        editAs: logoEditAs,
+      } as unknown as Parameters<ExcelJS.Worksheet['addImage']>[1]);
     } else if (pre.logoPath && existsSync(pre.logoPath)) {
       ws.mergeCells(
         `${this.excelColumnLetter(fromC)}1:${this.excelColumnLetter(toC)}${toR}`,
       );
       const ext = extname(pre.logoPath).toLowerCase();
       const extension =
-        ext === '.jpg' || ext === '.jpeg' ? 'jpeg' : ext === '.gif' ? 'gif' : 'png';
+        ext === '.jpg' || ext === '.jpeg'
+          ? 'jpeg'
+          : ext === '.gif'
+            ? 'gif'
+            : 'png';
       const imageId = workbook.addImage({
         filename: pre.logoPath,
         extension,
       });
-      ws.addImage(
-        imageId,
-        {
-          tl: logoTl,
-          ext: logoDisplayExt,
-          editAs: logoEditAs,
-        } as unknown as Parameters<ExcelJS.Worksheet['addImage']>[1],
-      );
+      ws.addImage(imageId, {
+        tl: logoTl,
+        ext: logoDisplayExt,
+        editAs: logoEditAs,
+      } as unknown as Parameters<ExcelJS.Worksheet['addImage']>[1]);
     }
 
     const tFrom = pre.bannerTitleMergeFromCol;
@@ -167,7 +167,11 @@ export class ExcelWorkbookBuilder {
       const sub = ws.getCell('A2');
       sub.value = pre.bannerSubtitle;
       sub.font = { size: 11, color: { argb: 'FF000000' } };
-      sub.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+      sub.alignment = {
+        vertical: 'middle',
+        horizontal: 'left',
+        wrapText: true,
+      };
     }
 
     for (const g of pre.columnGroups) {
@@ -199,10 +203,13 @@ export class ExcelWorkbookBuilder {
     bold: boolean,
   ): void {
     cell.fill = this.solidFill(fillArgb);
-    cell.font = { bold, color: { argb: fontArgb }, size: bold ? 11 : 11 };
+    cell.font = { bold, color: { argb: fontArgb }, size: 11 };
   }
 
-  private applyColumnWidths(ws: ExcelJS.Worksheet, columns: ExcelColumnSpec[]): void {
+  private applyColumnWidths(
+    ws: ExcelJS.Worksheet,
+    columns: ExcelColumnSpec[],
+  ): void {
     columns.forEach((col, idx) => {
       const column = ws.getColumn(idx + 1);
       if (col.width) {

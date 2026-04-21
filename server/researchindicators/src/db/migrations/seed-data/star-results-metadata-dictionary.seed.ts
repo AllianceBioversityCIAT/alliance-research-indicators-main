@@ -1,638 +1,642 @@
 export const STAR_RESULTS_METADATA_DICTIONARY_SEED = [
   {
-    "sortOrder": 0,
-    "section": "Section",
-    "fieldLabel": "Field",
-    "explanation": "Explanation"
+    sortOrder: 0,
+    section: 'Section',
+    fieldLabel: 'Field',
+    explanation: 'Explanation',
   },
   {
-    "sortOrder": 1,
-    "section": "General Information",
-    "fieldLabel": "Result Code",
-    "explanation": ""
+    sortOrder: 1,
+    section: 'General Information',
+    fieldLabel: 'Result Code',
+    explanation: '',
   },
   {
-    "sortOrder": 2,
-    "section": "",
-    "fieldLabel": "Platform",
-    "explanation": ""
+    sortOrder: 2,
+    section: '',
+    fieldLabel: 'Platform',
+    explanation: '',
   },
   {
-    "sortOrder": 3,
-    "section": "",
-    "fieldLabel": "Link to pdf",
-    "explanation": ""
+    sortOrder: 3,
+    section: '',
+    fieldLabel: 'Link to pdf',
+    explanation: '',
   },
   {
-    "sortOrder": 4,
-    "section": "",
-    "fieldLabel": "Link to platform",
-    "explanation": ""
+    sortOrder: 4,
+    section: '',
+    fieldLabel: 'Link to platform',
+    explanation: '',
   },
   {
-    "sortOrder": 5,
-    "section": "",
-    "fieldLabel": "Indicator",
-    "explanation": ""
+    sortOrder: 5,
+    section: '',
+    fieldLabel: 'Indicator',
+    explanation: '',
   },
   {
-    "sortOrder": 6,
-    "section": "",
-    "fieldLabel": "Title",
-    "explanation": ""
+    sortOrder: 6,
+    section: '',
+    fieldLabel: 'Title',
+    explanation: '',
   },
   {
-    "sortOrder": 7,
-    "section": "",
-    "fieldLabel": "Description",
-    "explanation": ""
+    sortOrder: 7,
+    section: '',
+    fieldLabel: 'Description',
+    explanation: '',
   },
   {
-    "sortOrder": 8,
-    "section": "",
-    "fieldLabel": "Reporting year",
-    "explanation": ""
+    sortOrder: 8,
+    section: '',
+    fieldLabel: 'Reporting year',
+    explanation: '',
   },
   {
-    "sortOrder": 9,
-    "section": "",
-    "fieldLabel": "Approved versions",
-    "explanation": ""
+    sortOrder: 9,
+    section: '',
+    fieldLabel: 'Approved versions',
+    explanation: '',
   },
   {
-    "sortOrder": 10,
-    "section": "",
-    "fieldLabel": "Keywords",
-    "explanation": ""
+    sortOrder: 10,
+    section: '',
+    fieldLabel: 'Keywords',
+    explanation: '',
   },
   {
-    "sortOrder": 11,
-    "section": "",
-    "fieldLabel": "Creator",
-    "explanation": ""
+    sortOrder: 11,
+    section: '',
+    fieldLabel: 'Creator',
+    explanation: '',
   },
   {
-    "sortOrder": 12,
-    "section": "",
-    "fieldLabel": "Main contact person",
-    "explanation": ""
+    sortOrder: 12,
+    section: '',
+    fieldLabel: 'Main contact person',
+    explanation: '',
   },
   {
-    "sortOrder": 13,
-    "section": "",
-    "fieldLabel": "Creation date",
-    "explanation": ""
+    sortOrder: 13,
+    section: '',
+    fieldLabel: 'Creation date',
+    explanation: '',
   },
   {
-    "sortOrder": 14,
-    "section": "Alliance Alignment",
-    "fieldLabel": "Primary project",
-    "explanation": ""
+    sortOrder: 14,
+    section: 'Alliance Alignment',
+    fieldLabel: 'Primary project',
+    explanation: '',
   },
   {
-    "sortOrder": 15,
-    "section": "",
-    "fieldLabel": "Primary project - principal investigator",
-    "explanation": ""
+    sortOrder: 15,
+    section: '',
+    fieldLabel: 'Primary project - principal investigator',
+    explanation: '',
   },
   {
-    "sortOrder": 16,
-    "section": "",
-    "fieldLabel": "Contributing projects",
-    "explanation": ""
+    sortOrder: 16,
+    section: '',
+    fieldLabel: 'Contributing projects',
+    explanation: '',
   },
   {
-    "sortOrder": 17,
-    "section": "",
-    "fieldLabel": "Primary lever",
-    "explanation": ""
+    sortOrder: 17,
+    section: '',
+    fieldLabel: 'Primary lever',
+    explanation: '',
   },
   {
-    "sortOrder": 18,
-    "section": "",
-    "fieldLabel": "Contributing lever",
-    "explanation": ""
+    sortOrder: 18,
+    section: '',
+    fieldLabel: 'Contributing lever',
+    explanation: '',
   },
   {
-    "sortOrder": 19,
-    "section": "",
-    "fieldLabel": "Contibution to SDG targets",
-    "explanation": ""
+    sortOrder: 19,
+    section: '',
+    fieldLabel: 'Contibution to SDG targets',
+    explanation: '',
   },
   {
-    "sortOrder": 20,
-    "section": "Partners",
-    "fieldLabel": "Partners involved",
-    "explanation": ""
+    sortOrder: 20,
+    section: 'Partners',
+    fieldLabel: 'Partners involved',
+    explanation: '',
   },
   {
-    "sortOrder": 21,
-    "section": "Geographic scope",
-    "fieldLabel": "Geographic scope",
-    "explanation": ""
+    sortOrder: 21,
+    section: 'Geographic scope',
+    fieldLabel: 'Geographic scope',
+    explanation: '',
   },
   {
-    "sortOrder": 22,
-    "section": "",
-    "fieldLabel": "Countries specified",
-    "explanation": ""
+    sortOrder: 22,
+    section: '',
+    fieldLabel: 'Countries specified',
+    explanation: '',
   },
   {
-    "sortOrder": 23,
-    "section": "",
-    "fieldLabel": "Regions specified",
-    "explanation": ""
+    sortOrder: 23,
+    section: '',
+    fieldLabel: 'Regions specified',
+    explanation: '',
   },
   {
-    "sortOrder": 24,
-    "section": "",
-    "fieldLabel": "Geographic scope comments",
-    "explanation": ""
+    sortOrder: 24,
+    section: '',
+    fieldLabel: 'Geographic scope comments',
+    explanation: '',
   },
   {
-    "sortOrder": 25,
-    "section": "Evidences",
-    "fieldLabel": "Evidences",
-    "explanation": ""
+    sortOrder: 25,
+    section: 'Evidences',
+    fieldLabel: 'Evidences',
+    explanation: '',
   },
   {
-    "sortOrder": 26,
-    "section": "IP rights",
-    "fieldLabel": "Who owns IP rights?",
-    "explanation": ""
+    sortOrder: 26,
+    section: 'IP rights',
+    fieldLabel: 'Who owns IP rights?',
+    explanation: '',
   },
   {
-    "sortOrder": 27,
-    "section": "",
-    "fieldLabel": "Third party",
-    "explanation": ""
+    sortOrder: 27,
+    section: '',
+    fieldLabel: 'Third party',
+    explanation: '',
   },
   {
-    "sortOrder": 28,
-    "section": "",
-    "fieldLabel": "Legal restrictions on publication?",
-    "explanation": ""
+    sortOrder: 28,
+    section: '',
+    fieldLabel: 'Legal restrictions on publication?',
+    explanation: '',
   },
   {
-    "sortOrder": 29,
-    "section": "",
-    "fieldLabel": "Commercialization potential for asset?",
-    "explanation": ""
+    sortOrder: 29,
+    section: '',
+    fieldLabel: 'Commercialization potential for asset?',
+    explanation: '',
   },
   {
-    "sortOrder": 30,
-    "section": "",
-    "fieldLabel": "Does asset need refinement?",
-    "explanation": ""
+    sortOrder: 30,
+    section: '',
+    fieldLabel: 'Does asset need refinement?',
+    explanation: '',
   },
   {
-    "sortOrder": 31,
-    "section": "CapSharing details",
-    "fieldLabel": "Training type",
-    "explanation": ""
+    sortOrder: 31,
+    section: 'CapSharing details',
+    fieldLabel: 'Training type',
+    explanation: '',
   },
   {
-    "sortOrder": 32,
-    "section": "",
-    "fieldLabel": "Training or engagement?",
-    "explanation": ""
+    sortOrder: 32,
+    section: '',
+    fieldLabel: 'Training or engagement?',
+    explanation: '',
   },
   {
-    "sortOrder": 33,
-    "section": "",
-    "fieldLabel": "Length training",
-    "explanation": ""
+    sortOrder: 33,
+    section: '',
+    fieldLabel: 'Length training',
+    explanation: '',
   },
   {
-    "sortOrder": 34,
-    "section": "",
-    "fieldLabel": "Degree",
-    "explanation": ""
+    sortOrder: 34,
+    section: '',
+    fieldLabel: 'Degree',
+    explanation: '',
   },
   {
-    "sortOrder": 35,
-    "section": "",
-    "fieldLabel": "Total participants ",
-    "explanation": ""
+    sortOrder: 35,
+    section: '',
+    fieldLabel: 'Total participants ',
+    explanation: '',
   },
   {
-    "sortOrder": 36,
-    "section": "",
-    "fieldLabel": "Number people trained TOTAL",
-    "explanation": ""
+    sortOrder: 36,
+    section: '',
+    fieldLabel: 'Number people trained TOTAL',
+    explanation: '',
   },
   {
-    "sortOrder": 37,
-    "section": "",
-    "fieldLabel": "Number people trained FEMALE",
-    "explanation": ""
+    sortOrder: 37,
+    section: '',
+    fieldLabel: 'Number people trained FEMALE',
+    explanation: '',
   },
   {
-    "sortOrder": 38,
-    "section": "",
-    "fieldLabel": "Number people trained MALE",
-    "explanation": ""
+    sortOrder: 38,
+    section: '',
+    fieldLabel: 'Number people trained MALE',
+    explanation: '',
   },
   {
-    "sortOrder": 39,
-    "section": "",
-    "fieldLabel": "Number people trained NON BINARY",
-    "explanation": ""
+    sortOrder: 39,
+    section: '',
+    fieldLabel: 'Number people trained NON BINARY',
+    explanation: '',
   },
   {
-    "sortOrder": 40,
-    "section": "",
-    "fieldLabel": "What was the purpose of this training/engagement?*",
-    "explanation": ""
+    sortOrder: 40,
+    section: '',
+    fieldLabel: 'What was the purpose of this training/engagement?*',
+    explanation: '',
   },
   {
-    "sortOrder": 41,
-    "section": "",
-    "fieldLabel": "Were the trainees attending on behalf of an organization?*",
-    "explanation": ""
+    sortOrder: 41,
+    section: '',
+    fieldLabel: 'Were the trainees attending on behalf of an organization?*',
+    explanation: '',
   },
   {
-    "sortOrder": 42,
-    "section": "",
-    "fieldLabel": "Organizations on behalf",
-    "explanation": ""
+    sortOrder: 42,
+    section: '',
+    fieldLabel: 'Organizations on behalf',
+    explanation: '',
   },
   {
-    "sortOrder": 43,
-    "section": "",
-    "fieldLabel": "Trainee affiliation",
-    "explanation": ""
+    sortOrder: 43,
+    section: '',
+    fieldLabel: 'Trainee affiliation',
+    explanation: '',
   },
   {
-    "sortOrder": 44,
-    "section": "",
-    "fieldLabel": "Trainee name",
-    "explanation": ""
+    sortOrder: 44,
+    section: '',
+    fieldLabel: 'Trainee name',
+    explanation: '',
   },
   {
-    "sortOrder": 45,
-    "section": "",
-    "fieldLabel": "Trainee nationality",
-    "explanation": ""
+    sortOrder: 45,
+    section: '',
+    fieldLabel: 'Trainee nationality',
+    explanation: '',
   },
   {
-    "sortOrder": 46,
-    "section": "",
-    "fieldLabel": "Trainee Gender",
-    "explanation": ""
+    sortOrder: 46,
+    section: '',
+    fieldLabel: 'Trainee Gender',
+    explanation: '',
   },
   {
-    "sortOrder": 47,
-    "section": "",
-    "fieldLabel": "Training / Engagement supervisor",
-    "explanation": ""
+    sortOrder: 47,
+    section: '',
+    fieldLabel: 'Training / Engagement supervisor',
+    explanation: '',
   },
   {
-    "sortOrder": 48,
-    "section": "",
-    "fieldLabel": "Language",
-    "explanation": ""
+    sortOrder: 48,
+    section: '',
+    fieldLabel: 'Language',
+    explanation: '',
   },
   {
-    "sortOrder": 49,
-    "section": "",
-    "fieldLabel": "Start date",
-    "explanation": ""
+    sortOrder: 49,
+    section: '',
+    fieldLabel: 'Start date',
+    explanation: '',
   },
   {
-    "sortOrder": 50,
-    "section": "",
-    "fieldLabel": "End date",
-    "explanation": ""
+    sortOrder: 50,
+    section: '',
+    fieldLabel: 'End date',
+    explanation: '',
   },
   {
-    "sortOrder": 51,
-    "section": "",
-    "fieldLabel": "Delivery modality",
-    "explanation": ""
+    sortOrder: 51,
+    section: '',
+    fieldLabel: 'Delivery modality',
+    explanation: '',
   },
   {
-    "sortOrder": 52,
-    "section": "Policy Change",
-    "fieldLabel": "Policy type",
-    "explanation": ""
+    sortOrder: 52,
+    section: 'Policy Change',
+    fieldLabel: 'Policy type',
+    explanation: '',
   },
   {
-    "sortOrder": 53,
-    "section": "",
-    "fieldLabel": "Policy stage",
-    "explanation": ""
+    sortOrder: 53,
+    section: '',
+    fieldLabel: 'Policy stage',
+    explanation: '',
   },
   {
-    "sortOrder": 54,
-    "section": "",
-    "fieldLabel": "Evidence for stage",
-    "explanation": ""
+    sortOrder: 54,
+    section: '',
+    fieldLabel: 'Evidence for stage',
+    explanation: '',
   },
   {
-    "sortOrder": 55,
-    "section": "",
-    "fieldLabel": "Implementing organizations",
-    "explanation": ""
+    sortOrder: 55,
+    section: '',
+    fieldLabel: 'Implementing organizations',
+    explanation: '',
   },
   {
-    "sortOrder": 56,
-    "section": "",
-    "fieldLabel": "Link to Innovation Dev",
-    "explanation": ""
+    sortOrder: 56,
+    section: '',
+    fieldLabel: 'Link to Innovation Dev',
+    explanation: '',
   },
   {
-    "sortOrder": 57,
-    "section": "",
-    "fieldLabel": "Link to Innovation Use",
-    "explanation": ""
+    sortOrder: 57,
+    section: '',
+    fieldLabel: 'Link to Innovation Use',
+    explanation: '',
   },
   {
-    "sortOrder": 58,
-    "section": "Innovation details",
-    "fieldLabel": "Short title",
-    "explanation": ""
+    sortOrder: 58,
+    section: 'Innovation details',
+    fieldLabel: 'Short title',
+    explanation: '',
   },
   {
-    "sortOrder": 59,
-    "section": "",
-    "fieldLabel": "Innovation nature",
-    "explanation": ""
+    sortOrder: 59,
+    section: '',
+    fieldLabel: 'Innovation nature',
+    explanation: '',
   },
   {
-    "sortOrder": 60,
-    "section": "",
-    "fieldLabel": "Innovation type",
-    "explanation": ""
+    sortOrder: 60,
+    section: '',
+    fieldLabel: 'Innovation type',
+    explanation: '',
   },
   {
-    "sortOrder": 61,
-    "section": "",
-    "fieldLabel": "Innovation readiness level",
-    "explanation": ""
+    sortOrder: 61,
+    section: '',
+    fieldLabel: 'Innovation readiness level',
+    explanation: '',
   },
   {
-    "sortOrder": 62,
-    "section": "",
-    "fieldLabel": "Readiness explanation ",
-    "explanation": ""
+    sortOrder: 62,
+    section: '',
+    fieldLabel: 'Readiness explanation ',
+    explanation: '',
   },
   {
-    "sortOrder": 63,
-    "section": "",
-    "fieldLabel": "Actors",
-    "explanation": ""
+    sortOrder: 63,
+    section: '',
+    fieldLabel: 'Actors',
+    explanation: '',
   },
   {
-    "sortOrder": 64,
-    "section": "",
-    "fieldLabel": "Organizations",
-    "explanation": ""
+    sortOrder: 64,
+    section: '',
+    fieldLabel: 'Organizations',
+    explanation: '',
   },
   {
-    "sortOrder": 65,
-    "section": "",
-    "fieldLabel": "Intended beneficiaries/users elaborated\n",
-    "explanation": ""
+    sortOrder: 65,
+    section: '',
+    fieldLabel: 'Intended beneficiaries/users elaborated\n',
+    explanation: '',
   },
   {
-    "sortOrder": 66,
-    "section": "",
-    "fieldLabel": "Expected outcomes ",
-    "explanation": ""
+    sortOrder: 66,
+    section: '',
+    fieldLabel: 'Expected outcomes ',
+    explanation: '',
   },
   {
-    "sortOrder": 67,
-    "section": "",
-    "fieldLabel": "Potential for researchers/policymakers adaptation",
-    "explanation": ""
+    sortOrder: 67,
+    section: '',
+    fieldLabel: 'Potential for researchers/policymakers adaptation',
+    explanation: '',
   },
   {
-    "sortOrder": 68,
-    "section": "",
-    "fieldLabel": "Method/tool qualifies for dissemination\n",
-    "explanation": ""
+    sortOrder: 68,
+    section: '',
+    fieldLabel: 'Method/tool qualifies for dissemination\n',
+    explanation: '',
   },
   {
-    "sortOrder": 69,
-    "section": "",
-    "fieldLabel": "Context for tool usefulness",
-    "explanation": ""
+    sortOrder: 69,
+    section: '',
+    fieldLabel: 'Context for tool usefulness',
+    explanation: '',
   },
   {
-    "sortOrder": 70,
-    "section": "",
-    "fieldLabel": "Results detailed with examples",
-    "explanation": ""
+    sortOrder: 70,
+    section: '',
+    fieldLabel: 'Results detailed with examples',
+    explanation: '',
   },
   {
-    "sortOrder": 71,
-    "section": "",
-    "fieldLabel": "Tool function",
-    "explanation": ""
+    sortOrder: 71,
+    section: '',
+    fieldLabel: 'Tool function',
+    explanation: '',
   },
   {
-    "sortOrder": 72,
-    "section": "",
-    "fieldLabel": "Innovation used beyond original context",
-    "explanation": ""
+    sortOrder: 72,
+    section: '',
+    fieldLabel: 'Innovation used beyond original context',
+    explanation: '',
   },
   {
-    "sortOrder": 73,
-    "section": "",
-    "fieldLabel": "Adopted and adapted in other contexts",
-    "explanation": ""
+    sortOrder: 73,
+    section: '',
+    fieldLabel: 'Adopted and adapted in other contexts',
+    explanation: '',
   },
   {
-    "sortOrder": 74,
-    "section": "",
-    "fieldLabel": "Tools often used together",
-    "explanation": ""
+    sortOrder: 74,
+    section: '',
+    fieldLabel: 'Tools often used together',
+    explanation: '',
   },
   {
-    "sortOrder": 75,
-    "section": "",
-    "fieldLabel": "Other tools",
-    "explanation": ""
+    sortOrder: 75,
+    section: '',
+    fieldLabel: 'Other tools',
+    explanation: '',
   },
   {
-    "sortOrder": 76,
-    "section": "",
-    "fieldLabel": "Other tools' usage with this one description",
-    "explanation": ""
+    sortOrder: 76,
+    section: '',
+    fieldLabel: "Other tools' usage with this one description",
+    explanation: '',
   },
   {
-    "sortOrder": 77,
-    "section": "",
-    "fieldLabel": "Formulation:\nIs it cheaper compared to alternatives?",
-    "explanation": ""
+    sortOrder: 77,
+    section: '',
+    fieldLabel: 'Formulation:\nIs it cheaper compared to alternatives?',
+    explanation: '',
   },
   {
-    "sortOrder": 78,
-    "section": "",
-    "fieldLabel": "Formulation: Is it simpler to use?",
-    "explanation": ""
+    sortOrder: 78,
+    section: '',
+    fieldLabel: 'Formulation: Is it simpler to use?',
+    explanation: '',
   },
   {
-    "sortOrder": 79,
-    "section": "",
-    "fieldLabel": "Formulation: Does it perform better?",
-    "explanation": ""
+    sortOrder: 79,
+    section: '',
+    fieldLabel: 'Formulation: Does it perform better?',
+    explanation: '',
   },
   {
-    "sortOrder": 80,
-    "section": "",
-    "fieldLabel": "Demand and Investment: \nIs the innovation desirable to intended\nusers?",
-    "explanation": ""
+    sortOrder: 80,
+    section: '',
+    fieldLabel:
+      'Demand and Investment: \nIs the innovation desirable to intended\nusers?',
+    explanation: '',
   },
   {
-    "sortOrder": 81,
-    "section": "",
-    "fieldLabel": "Demand and Investment: Is the innovation commercially viable/is there\ninvestment potential?",
-    "explanation": ""
+    sortOrder: 81,
+    section: '',
+    fieldLabel:
+      'Demand and Investment: Is the innovation commercially viable/is there\ninvestment potential?',
+    explanation: '',
   },
   {
-    "sortOrder": 82,
-    "section": "",
-    "fieldLabel": "Sustained use: Is the innovation supported by a suitable enabling\nenvironment?",
-    "explanation": ""
+    sortOrder: 82,
+    section: '',
+    fieldLabel:
+      'Sustained use: Is the innovation supported by a suitable enabling\nenvironment?',
+    explanation: '',
   },
   {
-    "sortOrder": 83,
-    "section": "",
-    "fieldLabel": "Sustained use: Is there already evidence of\nuptake? ",
-    "explanation": ""
+    sortOrder: 83,
+    section: '',
+    fieldLabel: 'Sustained use: Is there already evidence of\nuptake? ',
+    explanation: '',
   },
   {
-    "sortOrder": 84,
-    "section": "",
-    "fieldLabel": "Sustained use: Is there potential for actor in new contexts and for new purposes? ",
-    "explanation": ""
+    sortOrder: 84,
+    section: '',
+    fieldLabel:
+      'Sustained use: Is there potential for actor in new contexts and for new purposes? ',
+    explanation: '',
   },
   {
-    "sortOrder": 85,
-    "section": "OICRS",
-    "fieldLabel": "Strategic outcomes",
-    "explanation": ""
+    sortOrder: 85,
+    section: 'OICRS',
+    fieldLabel: 'Strategic outcomes',
+    explanation: '',
   },
   {
-    "sortOrder": 86,
-    "section": "",
-    "fieldLabel": "MEL Regional Expert",
-    "explanation": ""
+    sortOrder: 86,
+    section: '',
+    fieldLabel: 'MEL Regional Expert',
+    explanation: '',
   },
   {
-    "sortOrder": 87,
-    "section": "",
-    "fieldLabel": "SharePoint Folder Link",
-    "explanation": ""
+    sortOrder: 87,
+    section: '',
+    fieldLabel: 'SharePoint Folder Link',
+    explanation: '',
   },
   {
-    "sortOrder": 88,
-    "section": "",
-    "fieldLabel": "OICR No ",
-    "explanation": ""
+    sortOrder: 88,
+    section: '',
+    fieldLabel: 'OICR No ',
+    explanation: '',
   },
   {
-    "sortOrder": 89,
-    "section": "",
-    "fieldLabel": "Tagging ",
-    "explanation": ""
+    sortOrder: 89,
+    section: '',
+    fieldLabel: 'Tagging ',
+    explanation: '',
   },
   {
-    "sortOrder": 90,
-    "section": "",
-    "fieldLabel": "Maturity of change ",
-    "explanation": ""
+    sortOrder: 90,
+    section: '',
+    fieldLabel: 'Maturity of change ',
+    explanation: '',
   },
   {
-    "sortOrder": 91,
-    "section": "",
-    "fieldLabel": "Elaboration of outcome/impact statement",
-    "explanation": ""
+    sortOrder: 91,
+    section: '',
+    fieldLabel: 'Elaboration of outcome/impact statement',
+    explanation: '',
   },
   {
-    "sortOrder": 92,
-    "section": "",
-    "fieldLabel": "Short Outcome/Impact Statement ",
-    "explanation": ""
+    sortOrder: 92,
+    section: '',
+    fieldLabel: 'Short Outcome/Impact Statement ',
+    explanation: '',
   },
   {
-    "sortOrder": 93,
-    "section": "",
-    "fieldLabel": "Quantification",
-    "explanation": ""
+    sortOrder: 93,
+    section: '',
+    fieldLabel: 'Quantification',
+    explanation: '',
   },
   {
-    "sortOrder": 94,
-    "section": "",
-    "fieldLabel": "Authors and Contact Persons",
-    "explanation": ""
+    sortOrder: 94,
+    section: '',
+    fieldLabel: 'Authors and Contact Persons',
+    explanation: '',
   },
   {
-    "sortOrder": 95,
-    "section": "",
-    "fieldLabel": "Further communication opportunities",
-    "explanation": ""
+    sortOrder: 95,
+    section: '',
+    fieldLabel: 'Further communication opportunities',
+    explanation: '',
   },
   {
-    "sortOrder": 96,
-    "section": "",
-    "fieldLabel": "Nutrition, Health and Food Security score",
-    "explanation": ""
+    sortOrder: 96,
+    section: '',
+    fieldLabel: 'Nutrition, Health and Food Security score',
+    explanation: '',
   },
   {
-    "sortOrder": 97,
-    "section": "",
-    "fieldLabel": "Nutrition, Health and Food Security global target",
-    "explanation": ""
+    sortOrder: 97,
+    section: '',
+    fieldLabel: 'Nutrition, Health and Food Security global target',
+    explanation: '',
   },
   {
-    "sortOrder": 98,
-    "section": "",
-    "fieldLabel": "Poverty Reduction, Livelihoods and Jobs score",
-    "explanation": ""
+    sortOrder: 98,
+    section: '',
+    fieldLabel: 'Poverty Reduction, Livelihoods and Jobs score',
+    explanation: '',
   },
   {
-    "sortOrder": 99,
-    "section": "",
-    "fieldLabel": "Poverty Reduction, Livelihoods and Jobs global target",
-    "explanation": ""
+    sortOrder: 99,
+    section: '',
+    fieldLabel: 'Poverty Reduction, Livelihoods and Jobs global target',
+    explanation: '',
   },
   {
-    "sortOrder": 100,
-    "section": "",
-    "fieldLabel": "Gender Equality, Youth and Social Inclusion scroe",
-    "explanation": ""
+    sortOrder: 100,
+    section: '',
+    fieldLabel: 'Gender Equality, Youth and Social Inclusion scroe',
+    explanation: '',
   },
   {
-    "sortOrder": 101,
-    "section": "",
-    "fieldLabel": "Gender Equality, Youth and Social Inclusion global target",
-    "explanation": ""
+    sortOrder: 101,
+    section: '',
+    fieldLabel: 'Gender Equality, Youth and Social Inclusion global target',
+    explanation: '',
   },
   {
-    "sortOrder": 102,
-    "section": "",
-    "fieldLabel": "Climate Adaptation and Mitigation score",
-    "explanation": ""
+    sortOrder: 102,
+    section: '',
+    fieldLabel: 'Climate Adaptation and Mitigation score',
+    explanation: '',
   },
   {
-    "sortOrder": 103,
-    "section": "",
-    "fieldLabel": "Climate Adaptation and Mitigation global target",
-    "explanation": ""
+    sortOrder: 103,
+    section: '',
+    fieldLabel: 'Climate Adaptation and Mitigation global target',
+    explanation: '',
   },
   {
-    "sortOrder": 104,
-    "section": "",
-    "fieldLabel": "Environmental Health and Biodiversity score",
-    "explanation": ""
+    sortOrder: 104,
+    section: '',
+    fieldLabel: 'Environmental Health and Biodiversity score',
+    explanation: '',
   },
   {
-    "sortOrder": 105,
-    "section": "",
-    "fieldLabel": "Environmental Health and Biodiversity global target",
-    "explanation": ""
-  }
+    sortOrder: 105,
+    section: '',
+    fieldLabel: 'Environmental Health and Biodiversity global target',
+    explanation: '',
+  },
 ] as const;
