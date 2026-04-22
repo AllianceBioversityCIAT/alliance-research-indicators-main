@@ -1,7 +1,9 @@
 import * as fs from 'fs';
+import { PayloadTooLargeException } from '@nestjs/common';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { ExcelWorkbookBuilder } from './excel-workbook.builder';
+import { maxDataRowsForExcelSheet } from './excel-workbook.row-limit';
 import type {
   ExcelColumnSpec,
   ExcelSheetPreamble,
@@ -709,5 +711,48 @@ describe('ExcelWorkbookBuilder', () => {
         },
       ],
     });
+  });
+
+  it('toBuffer throws PayloadTooLargeException when data rows exceed Excel cap (with presentation)', async () => {
+    const max = maxDataRowsForExcelSheet(true);
+    const rows: Record<string, unknown>[] = [];
+    rows.length = max + 1;
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [
+        { fromCol: 1, toCol: 5, label: 'G', fillArgb: 'FF203C61' },
+      ],
+    };
+    await expect(
+      builder.toBuffer({
+        sheets: [
+          {
+            sheetKey: 'raw',
+            name: 'Raw data',
+            columns: preambleSheetColumns,
+            rows,
+            presentation,
+          },
+        ],
+      }),
+    ).rejects.toThrow(PayloadTooLargeException);
+  });
+
+  it('toBuffer throws PayloadTooLargeException when data rows exceed Excel cap (no presentation)', async () => {
+    const max = maxDataRowsForExcelSheet(false);
+    const rows: Record<string, unknown>[] = [];
+    rows.length = max + 1;
+    await expect(
+      builder.toBuffer({
+        sheets: [
+          {
+            sheetKey: 's',
+            name: 'Flat',
+            columns: [{ key: 'a', header: 'A' }],
+            rows,
+          },
+        ],
+      }),
+    ).rejects.toThrow(PayloadTooLargeException);
   });
 });

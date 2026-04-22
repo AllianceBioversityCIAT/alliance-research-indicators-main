@@ -13,6 +13,11 @@ export class FiltersReportDto {
   onlyOwnResults: boolean;
   /** Injected server-side for `onlyOwnResults` (same as Result Center). */
   currentUserId?: number;
+  /**
+   * Full name (or email fallback) of the current user; used in export banner when
+   * `onlyOwnResults` is true.
+   */
+  currentUserDisplayName?: string;
 }
 
 export class SortingReportDto {
@@ -37,6 +42,7 @@ export function emptyFullFiltersReportDto(): FullFiltersReportDto {
       indicators: [],
       onlyOwnResults: false,
       currentUserId: undefined,
+      currentUserDisplayName: undefined,
     },
     sorting: { sortOrder: 'DESC', sortField: ResultSortEnum.CODE },
   };

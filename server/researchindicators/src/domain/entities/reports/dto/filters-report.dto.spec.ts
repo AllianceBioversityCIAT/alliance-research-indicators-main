@@ -13,6 +13,7 @@ describe('filters-report.dto', () => {
       expect(dto.filters.statusCodes).toEqual([]);
       expect(dto.filters.onlyOwnResults).toBe(false);
       expect(dto.filters.currentUserId).toBeUndefined();
+      expect(dto.filters.currentUserDisplayName).toBeUndefined();
       expect(dto.sorting.sortOrder).toBe('DESC');
       expect(dto.sorting.sortField).toBe(ResultSortEnum.CODE);
     });

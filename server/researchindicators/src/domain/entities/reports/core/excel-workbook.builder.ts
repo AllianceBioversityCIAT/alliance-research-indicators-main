@@ -9,10 +9,12 @@ import type {
   ExcelSheetSpec,
   ExcelWorkbookSpec,
 } from './excel-workbook.types';
+import { validateExcelWorkbookRowLimits } from './excel-workbook.row-limit';
 
 @Injectable()
 export class ExcelWorkbookBuilder {
   async toBuffer(spec: ExcelWorkbookSpec): Promise<Buffer> {
+    validateExcelWorkbookRowLimits(spec);
     const workbook = new ExcelJS.Workbook();
     for (const sheet of spec.sheets) {
       this.addSheet(workbook, sheet);
@@ -69,6 +71,7 @@ export class ExcelWorkbookBuilder {
 
   /**
    * Renders banner (rows 1–2), column-group row (row 3). Returns row index for column headers (4).
+   * Keep in sync with {@link EXCEL_RESERVED_ROWS_WITH_PRESENTATION} in `./excel-workbook.row-limit`.
    */
   private renderPreamble(
     workbook: ExcelJS.Workbook,
