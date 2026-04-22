@@ -55,8 +55,6 @@ export const STAR_RAW_SHEET_PREAMBLE_BASE: Omit<
   logoExtPx: STAR_RAW_LOGO_EXT_PX,
   logoTlEmu: { nativeColOff: 0, nativeRowOff: STAR_RAW_LOGO_ROW_OFF_EMU },
   logoEditAs: 'absolute',
-  bannerSubtitle:
-    'This file contains the results generated from the selected filters in STAR: Indicator - Capacity Sharing for Development | Year - 2024, 2025',
   headerFillArgb: STAR_RAW_SHEET_HEADER_FILL_ARGB,
   headerFontArgb: STAR_RAW_SHEET_HEADER_FONT_ARGB,
 };

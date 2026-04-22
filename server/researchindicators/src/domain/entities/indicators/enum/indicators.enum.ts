@@ -7,6 +7,21 @@ export enum IndicatorsEnum {
   INNOVATION_USE = 6,
 }
 
+/** Human-readable labels for exports and UI copy (aligned with STAR naming). */
+export const INDICATORS_ENUM_DISPLAY_NAME: Record<IndicatorsEnum, string> = {
+  [IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT]:
+    'Capacity Sharing for Development',
+  [IndicatorsEnum.INNOVATION_DEV]: 'Innovation Development',
+  [IndicatorsEnum.KNOWLEDGE_PRODUCT]: 'Knowledge Product',
+  [IndicatorsEnum.POLICY_CHANGE]: 'Policy Change',
+  [IndicatorsEnum.OICR]: 'OICR',
+  [IndicatorsEnum.INNOVATION_USE]: 'Innovation Use',
+};
+
+export function indicatorsEnumDisplayName(value: IndicatorsEnum): string {
+  return INDICATORS_ENUM_DISPLAY_NAME[value] ?? `Indicator ${value}`;
+}
+
 export enum QueryIndicatorsEnum {
   CAPACITY_SHARING_FOR_DEVELOPMENT = 'capacity-sharing-for-development',
   INNOVATION_DEV = 'innovation-dev',

@@ -124,6 +124,14 @@ export class ReportsController {
         `Unsupported workbook_key: ${workbookKey}. Allowed: ${[...this.allowedWorkbookKeys].join(', ')}`,
       );
     }
+    const u = this.currentUser.user;
+    const nameFromProfile = [u?.first_name, u?.last_name]
+      .map((x) => (typeof x === 'string' ? x.trim() : ''))
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const displayForBanner = nameFromProfile || u?.email?.trim() || '';
+
     const filters: FullFiltersReportDto = {
       filters: {
         search: search,
@@ -134,6 +142,7 @@ export class ReportsController {
         indicators: indicators,
         onlyOwnResults: onlyOwnResults,
         currentUserId: this.currentUser.user_id,
+        currentUserDisplayName: onlyOwnResults ? displayForBanner : undefined,
       },
       sorting: {
         sortOrder: sortOrder,

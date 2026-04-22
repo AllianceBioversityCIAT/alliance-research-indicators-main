@@ -20,7 +20,19 @@ describe('ReportsController', () => {
           provide: ReportsGenerationService,
           useValue: { buildWorkbookXlsxBuffer },
         },
-        { provide: CurrentUserUtil, useValue: { user_id: 99 } },
+        {
+          provide: CurrentUserUtil,
+          useValue: {
+            user_id: 99,
+            user: {
+              sec_user_id: 99,
+              first_name: 'Jane',
+              last_name: 'Tester',
+              email: 'jane@example.org',
+              roles: [],
+            },
+          },
+        },
         {
           provide: ResultsUtil,
           useValue: { setup: jest.fn().mockResolvedValue(undefined) },
@@ -53,6 +65,30 @@ describe('ReportsController', () => {
           onlyOwnResults: false,
         }),
         sorting: { sortOrder: 'DESC', sortField: ResultSortEnum.CODE },
+      }),
+    );
+  });
+
+  it('passes currentUserDisplayName when only own results is enabled', async () => {
+    buildWorkbookXlsxBuffer.mockResolvedValue(Buffer.from('blob'));
+    await controller.downloadWorkbook(
+      '',
+      'DESC',
+      ResultSortEnum.CODE,
+      [],
+      [],
+      [],
+      [],
+      [],
+      true,
+    );
+    expect(buildWorkbookXlsxBuffer).toHaveBeenCalledWith(
+      'star_results_metadata',
+      expect.objectContaining({
+        filters: expect.objectContaining({
+          onlyOwnResults: true,
+          currentUserDisplayName: 'Jane Tester',
+        }),
       }),
     );
   });

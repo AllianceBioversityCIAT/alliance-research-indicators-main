@@ -126,6 +126,9 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       extension: 'png',
     });
     expect(findStarResultsMetadataRows).toHaveBeenCalledWith(baseFilters);
+    expect(raw?.presentation?.bannerSubtitle).toBe(
+      'This file contains the results generated from the selected filters in STAR.',
+    );
   });
 
   it('uses gif extension from content-type', async () => {
