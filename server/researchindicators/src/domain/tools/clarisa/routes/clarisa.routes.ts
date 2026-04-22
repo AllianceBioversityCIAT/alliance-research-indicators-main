@@ -16,8 +16,13 @@ import { ClarisaSdgsModule } from '../entities/clarisa-sdgs/clarisa-sdgs.module'
 import { ClarisaInitiativesModule } from '../entities/clarisa-initiatives/clarisa-initiatives.module';
 import { ClarisaImpactAreasModule } from '../entities/clarisa-impact-areas/clarisa-impact-areas.module';
 import { ClarisaGlobalTargetsModule } from '../entities/clarisa-global-targets/clarisa-global-targets.module';
+import { ClarisaSdgTargetsModule } from '../entities/clarisa-sdg-targets/clarisa-sdg-targets.module';
 
 export const clarisaRoutes: Routes = [
+  {
+    path: 'sdg-targets',
+    module: ClarisaSdgTargetsModule,
+  },
   {
     path: 'initiatives',
     module: ClarisaInitiativesModule,
