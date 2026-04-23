@@ -8,4 +8,5 @@ export enum SecRolesEnum {
   DEVELOPER = 7,
   TESTER = 8,
   GENERAL_ADMIN = 9,
+  CENTER_ADMIN = 10,
 }

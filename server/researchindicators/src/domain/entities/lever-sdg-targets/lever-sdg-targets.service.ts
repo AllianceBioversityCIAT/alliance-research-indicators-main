@@ -106,9 +106,20 @@ export class LeverSdgTargetsService extends BaseServiceSimple<
           sdg_target: true,
         },
       },
+      where: {
+        is_active: true,
+      },
       relations: {
         lever: true,
         sdg_target: true,
+      },
+      order: {
+        lever: {
+          id: 'ASC',
+        },
+        sdg_target: {
+          sdg_target_code: 'ASC',
+        },
       },
     });
   }
@@ -139,6 +150,7 @@ export class LeverSdgTargetsService extends BaseServiceSimple<
         },
         where: {
           lever_id: leverId,
+          is_active: true,
         },
         relations: {
           sdg_target: {

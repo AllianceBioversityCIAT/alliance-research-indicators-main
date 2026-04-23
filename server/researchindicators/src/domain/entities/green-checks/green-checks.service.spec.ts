@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { GreenChecksService } from './green-checks.service';
 import { GreenCheckRepository } from './repository/green-checks.repository';
@@ -19,6 +23,8 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { TemplateEnum } from '../../shared/auxiliar/template/enum/template.enum';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { OptionalBody } from './dto/optional-body.dto';
 
 describe('GreenChecksService', () => {
   let service: GreenChecksService;
@@ -65,6 +71,7 @@ describe('GreenChecksService', () => {
 
   const mockCurrentUser = {
     user_id: 1,
+    roles: [SecRolesEnum.SUP_ADMIN],
     user: {
       sec_user_id: 1,
       first_name: 'Ada',
@@ -84,13 +91,29 @@ describe('GreenChecksService', () => {
     INTERNAL_EMAIL_LIST: 'internal@test.com',
   };
 
-  /** Misma referencia en todo el ciclo de vida del módulo Nest (mutar por test). */
   const resultsUtilStub = {
     statusId: ResultStatusEnum.SUBMITTED,
     indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
     resultCode: 1001,
     nullReportYearId: 2024,
     resultId: 50,
+  };
+
+  const stubNonOicrEmailData = () => {
+    getDataForReviseResult.mockResolvedValue({
+      sub_email: 'sub@test.com',
+      rev_email: 'rev@test.com',
+    });
+    getTemplate.mockResolvedValue(Buffer.from('<email/>'));
+  };
+
+  const stubOicrEmailData = () => {
+    oircData.mockResolvedValue({
+      requester_by_email: 'req@test.com',
+      reviewed_by_email: 'rev@test.com',
+      mel_expert_email: 'mel@test.com',
+    });
+    getTemplate.mockResolvedValue(Buffer.from('<email/>'));
   };
 
   const setupTransactionForSaveHistory = () => {
@@ -117,6 +140,9 @@ describe('GreenChecksService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    Object.assign(mockCurrentUser, {
+      roles: [SecRolesEnum.SUP_ADMIN],
+    });
     Object.assign(resultsUtilStub, {
       statusId: ResultStatusEnum.SUBMITTED,
       indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
@@ -249,6 +275,280 @@ describe('GreenChecksService', () => {
       expect(res).toMatchObject({ submission_history_id: 77 });
       expect(sendEmail).not.toHaveBeenCalled();
     });
+
+    it('should return snapshot when transitioning to APPROVED', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.APPROVED,
+      });
+      resultsUtilStub.statusId = ResultStatusEnum.SUBMITTED;
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      setupTransactionForSaveHistory();
+      stubNonOicrEmailData();
+      const snapshot = {
+        result_id: 99,
+        result_status_id: ResultStatusEnum.APPROVED,
+      } as Result;
+      createSnapshot.mockResolvedValue(snapshot);
+
+      const res = await service.statusManagement(
+        99,
+        ResultStatusEnum.APPROVED,
+        'ok',
+      );
+
+      expect(createSnapshot).toHaveBeenCalledWith(1001, 2024);
+      expect(res).toEqual(snapshot);
+    });
+
+    it('should call validateOicrInternalCode when OICR moves from REQUESTED to DRAFT', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.DRAFT,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.REQUESTED;
+      resultsUtilStub.resultId = 50;
+      setupTransactionForSaveHistory();
+      stubOicrEmailData();
+      const body = {
+        mel_regional_expert: '1',
+        oicr_internal_code: 'OICR-1',
+        sharepoint_link: 'https://share.example/doc',
+      };
+
+      await service.statusManagement(50, ResultStatusEnum.DRAFT, 'c', body);
+
+      expect(validateOicrInternalCode).toHaveBeenCalledWith(50, 'OICR-1');
+    });
+
+    it('should call review when OICR moves from POSTPONE to DRAFT', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.DRAFT,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.POSTPONE;
+      setupTransactionForSaveHistory();
+      stubOicrEmailData();
+      const body = {
+        mel_regional_expert: '1',
+        oicr_internal_code: 'X',
+        sharepoint_link: 'https://share.example/doc',
+      };
+
+      await service.statusManagement(2, ResultStatusEnum.DRAFT, 'c', body);
+
+      expect(review).toHaveBeenCalledWith(50, body);
+    });
+
+    it('should reject OICR REQUESTED to DRAFT when required body fields are missing', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.DRAFT,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.REQUESTED;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(
+          2,
+          ResultStatusEnum.DRAFT,
+          'c',
+          {} as unknown as OptionalBody,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should allow OICR REQUESTED to DRAFT with required body fields', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.DRAFT,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.REQUESTED;
+      setupTransactionForSaveHistory();
+      stubOicrEmailData();
+
+      await service.statusManagement(2, ResultStatusEnum.DRAFT, 'c', {
+        mel_regional_expert: '1',
+        oicr_internal_code: 'OK',
+        sharepoint_link: 'https://share.example/doc',
+      });
+
+      expect(submissionHistoryRepo.insert).toHaveBeenCalled();
+    });
+
+    it('should reject REVISED without comment (non-OICR)', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.REVISED,
+      });
+      resultsUtilStub.statusId = ResultStatusEnum.SUBMITTED;
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(1, ResultStatusEnum.REVISED, ''),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should transition non-OICR SUBMITTED to REVISED with comment', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.REVISED,
+      });
+      resultsUtilStub.statusId = ResultStatusEnum.SUBMITTED;
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      setupTransactionForSaveHistory();
+      stubNonOicrEmailData();
+
+      const res = await service.statusManagement(
+        1,
+        ResultStatusEnum.REVISED,
+        'please fix',
+      );
+
+      expect(res).toMatchObject({ submission_history_id: 77 });
+    });
+
+    it('should reject unsupported target status (default branch)', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.EDITING,
+      });
+      resultsUtilStub.statusId = ResultStatusEnum.SUBMITTED;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(1, ResultStatusEnum.EDITING, 'x'),
+      ).rejects.toThrow('Invalid status');
+    });
+
+    it('should reject OICR_APPROVED when current status is not REQUESTED', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.OICR_APPROVED,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.DRAFT;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(1, ResultStatusEnum.OICR_APPROVED, 'x'),
+      ).rejects.toThrow('Only OIRC in requested status');
+    });
+
+    it('should allow OICR_APPROVED from REQUESTED', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.OICR_APPROVED,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.REQUESTED;
+      setupTransactionForSaveHistory();
+      stubOicrEmailData();
+
+      const res = await service.statusManagement(
+        1,
+        ResultStatusEnum.OICR_APPROVED,
+        'ok',
+      );
+
+      expect(res).toMatchObject({ submission_history_id: 77 });
+    });
+
+    it('should reject OICR transition to SCIENCE_EDITION from invalid prior status', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.SCIENCE_EDITION,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.SUBMITTED;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(1, ResultStatusEnum.SCIENCE_EDITION, 'x'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should allow OICR transition to SCIENCE_EDITION from DRAFT', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.SCIENCE_EDITION,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.DRAFT;
+      setupTransactionForSaveHistory();
+
+      const res = await service.statusManagement(
+        1,
+        ResultStatusEnum.SCIENCE_EDITION,
+        'x',
+      );
+
+      expect(res).toMatchObject({ submission_history_id: 77 });
+    });
+
+    it('should reject change when current is APPROVED and target is REVISED', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.REVISED,
+      });
+      resultsUtilStub.statusId = ResultStatusEnum.APPROVED;
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(1, ResultStatusEnum.REVISED, 'c'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should reject SUBMITTED to DRAFT without comment', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.DRAFT,
+      });
+      resultsUtilStub.statusId = ResultStatusEnum.SUBMITTED;
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(1, ResultStatusEnum.DRAFT),
+      ).rejects.toThrow('comment is required when changing from submitted');
+    });
+
+    it('should throw ForbiddenException when OICR POSTPONE lacks admin role', async () => {
+      mockCurrentUser.roles = [SecRolesEnum.CONTRIBUTOR];
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.POSTPONE,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.REQUESTED;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(1, ResultStatusEnum.POSTPONE, 'p'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow OICR REQUESTED to POSTPONE when user is admin', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.POSTPONE,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.REQUESTED;
+      setupTransactionForSaveHistory();
+      stubOicrEmailData();
+
+      const res = await service.statusManagement(
+        1,
+        ResultStatusEnum.POSTPONE,
+        'postpone reason',
+      );
+
+      expect(res).toMatchObject({ submission_history_id: 77 });
+    });
+
+    it('should reject OICR POSTPONE when current status is not in allowed list', async () => {
+      resultStatusRepo.findOne.mockResolvedValue({
+        result_status_id: ResultStatusEnum.POSTPONE,
+      });
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      resultsUtilStub.statusId = ResultStatusEnum.KM_CURATION;
+      setupTransactionForSaveHistory();
+
+      await expect(
+        service.statusManagement(1, ResultStatusEnum.POSTPONE, 'p'),
+      ).rejects.toThrow(/OIRC in requested status can be/);
+    });
   });
 
   describe('saveHistory', () => {
@@ -353,6 +653,32 @@ describe('GreenChecksService', () => {
         ResultStatusEnum.SUBMITTED,
       );
     });
+
+    it('should join owner and submitter emails when owner is not current user', async () => {
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      getDataForSubmissionResult.mockResolvedValue({
+        principal_investigator_first_name: 'P',
+        principal_investigator_last_name: 'I',
+        result_id: 20,
+        result_title: 'T',
+        project_name: 'Pr',
+        owner_id: 99,
+        owner_email: 'owner@test.com',
+        indicator: 'KP',
+      });
+      getTemplate.mockResolvedValue(Buffer.from('sub'));
+
+      const prepared = await service.prepareDataToEmail(
+        20,
+        ResultStatusEnum.SUBMITTED,
+        ResultStatusEnum.DRAFT,
+        TemplateEnum.SUBMITTED_RESULT,
+      );
+
+      expect(prepared.data).toMatchObject({
+        rev_email: 'owner@test.com, ada@test.com',
+      });
+    });
   });
 
   describe('prepareEmail', () => {
@@ -361,6 +687,26 @@ describe('GreenChecksService', () => {
         1,
         ResultStatusEnum.SCIENCE_EDITION,
         ResultStatusEnum.DRAFT,
+      );
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('should skip when getTemplateByStatus returns null', async () => {
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      await service.prepareEmail(
+        5,
+        ResultStatusEnum.DRAFT,
+        ResultStatusEnum.SUBMITTED,
+      );
+      expect(sendEmail).not.toHaveBeenCalled();
+      expect(getDataForReviseResult).not.toHaveBeenCalled();
+    });
+
+    it('should exit early for DRAFT from SCIENCE_EDITION', async () => {
+      await service.prepareEmail(
+        1,
+        ResultStatusEnum.DRAFT,
+        ResultStatusEnum.SCIENCE_EDITION,
       );
       expect(sendEmail).not.toHaveBeenCalled();
     });
@@ -383,6 +729,84 @@ describe('GreenChecksService', () => {
         expect.objectContaining({
           to: 'sub@test.com',
           subject: expect.stringContaining('approved'),
+        }),
+      );
+    });
+
+    it('should send OICR email with MEL expert on cc when OICR_APPROVED', async () => {
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      oircData.mockResolvedValue({
+        requester_by_email: 'req@test.com',
+        reviewed_by_email: 'rev@test.com',
+        mel_expert_email: 'mel@test.com',
+      });
+      getTemplate.mockResolvedValue(Buffer.from('<oicr/>'));
+
+      await service.prepareEmail(
+        3,
+        ResultStatusEnum.OICR_APPROVED,
+        ResultStatusEnum.REQUESTED,
+        {
+          oicr_internal_code: 'N-1',
+          mel_regional_expert: '1',
+          sharepoint_link: 'https://share.example/doc',
+        },
+      );
+
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'req@test.com',
+          cc: 'rev@test.com,mel@test.com',
+        }),
+      );
+    });
+
+    it('should send OICR email without MEL on cc when not OICR_APPROVED', async () => {
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      oircData.mockResolvedValue({
+        requester_by_email: 'req@test.com',
+        reviewed_by_email: 'rev@test.com',
+        mel_expert_email: 'mel@test.com',
+      });
+      getTemplate.mockResolvedValue(Buffer.from('<oicr/>'));
+
+      await service.prepareEmail(
+        3,
+        ResultStatusEnum.REJECTED,
+        ResultStatusEnum.REQUESTED,
+      );
+
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'req@test.com',
+          cc: 'rev@test.com',
+        }),
+      );
+    });
+
+    it('should send SUBMITTED email to current user when non-OICR', async () => {
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      getDataForSubmissionResult.mockResolvedValue({
+        principal_investigator_first_name: 'P',
+        principal_investigator_last_name: 'I',
+        result_id: 20,
+        result_title: 'T',
+        project_name: 'Pr',
+        owner_id: 1,
+        owner_email: 'owner@test.com',
+        indicator: 'KP',
+      });
+      getTemplate.mockResolvedValue(Buffer.from('<sub/>'));
+
+      await service.prepareEmail(
+        20,
+        ResultStatusEnum.SUBMITTED,
+        ResultStatusEnum.DRAFT,
+      );
+
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'ada@test.com',
         }),
       );
     });
@@ -458,6 +882,19 @@ describe('GreenChecksService', () => {
       );
       expect(submissionHistoryLogRepo.save).toHaveBeenCalled();
     });
+
+    it('should throw ConflictException when update fails', async () => {
+      submissionHistoryRepo.findOne.mockResolvedValue({
+        submission_history_id: 5,
+        result_id: 1,
+        custom_date: new Date('2020-01-01'),
+      });
+      submissionHistoryRepo.update.mockRejectedValueOnce(new Error('db'));
+
+      await expect(
+        service.updateChageStatusDate(1, 5, new Date('2025-06-01')),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 
   describe('saveSubmissionHistoryLog', () => {
@@ -489,6 +926,21 @@ describe('GreenChecksService', () => {
           created_by: 1,
         }),
       );
+    });
+
+    it('should throw ConflictException when save fails', async () => {
+      submissionHistoryRepo.findOne.mockResolvedValue({
+        submission_history_id: 3,
+      });
+      submissionHistoryLogRepo.save.mockRejectedValueOnce(new Error('db'));
+
+      await expect(
+        service.saveSubmissionHistoryLog(
+          3,
+          new Date('2025-01-02'),
+          new Date('2025-01-01'),
+        ),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });
