@@ -344,6 +344,13 @@ export class ResultStatusWorkflowService {
         action: DeepPartial<ConfigWorkflowAction>,
       ) => {
         const config = action.config as ConfigWorkflowActionEmail;
+
+        this._validateFunction(config?.custom_data_resolver);
+        await this.handlerService?.[config?.custom_data_resolver](
+          generalData,
+          manager,
+        );
+
         if (!isEmpty(config?.condition_to_execute)) {
           this._validateFunction(config?.condition_to_execute);
           await this.handlerService?.[config?.condition_to_execute](
@@ -361,12 +368,6 @@ export class ResultStatusWorkflowService {
         generalData.configEmail.templateCode = config.template;
         generalData.configEmail.rawTemplate =
           await this.handlerService.getTemplate(generalData, manager);
-
-        this._validateFunction(config?.custom_data_resolver);
-        await this.handlerService?.[config?.custom_data_resolver](
-          generalData,
-          manager,
-        );
 
         this._validateFunction(config?.custom_config_email);
         await this.handlerService?.[config?.custom_config_email](

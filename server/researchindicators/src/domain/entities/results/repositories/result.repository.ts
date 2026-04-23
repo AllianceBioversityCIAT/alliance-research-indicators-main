@@ -12,6 +12,10 @@ import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
+import { ResultSortEnum, ResultSortFields } from '../enum/result-sort.enum';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
+import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
+import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 
 @Injectable()
 export class ResultRepository
@@ -336,6 +340,12 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return query;
   }
 
+  /**
+   *
+   * @deprecated Use findResults instead
+   * @param filters
+   * @returns
+   */
   async findResultsFilters(filters?: Partial<ResultFiltersInterface>) {
     const queryParts: DeepPartial<CreateResultQueryInterface> = {
       contracts: {
@@ -534,6 +544,287 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
   async unpdateCarnetUser(userId: number, carnet: string) {
     const query = `UPDATE sec_users SET carnet = ? WHERE sec_user_id = ?`;
     await this.query(query, [carnet, userId]);
+  }
+
+  private sortOrderV2(field: ResultSortEnum, order: 'ASC' | 'DESC') {
+    const fieldMap = ResultSortFields(field, order);
+    const direction = order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    return `ORDER BY ${fieldMap} ${direction}`;
+  }
+
+  /** Tokens for creator name matching: each token must match first_name or last_name (AND across tokens). */
+  private splitFindResultsV2CreatorNameTokens(search: string): string[] {
+    const tokens = search
+      .trim()
+      .split(/\s+/)
+      .filter((t) => t.length > 0);
+    return tokens.length > 0 ? tokens : [search];
+  }
+
+  private static readonly FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT = 8;
+
+  /** Placeholders in buildFindResultsV2SearchRelevanceSelectFragment before creator-name CASEs. */
+  private static readonly FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT = 9;
+
+  private buildFindResultsV2SearchStaticWhereFragment(): string {
+    return `
+    AND ((
+            r.report_year_id IN (?)
+        OR EXISTS (
+              SELECT 1
+              FROM results s
+              WHERE s.result_official_code = r.result_official_code
+                AND s.is_snapshot = TRUE
+                AND s.report_year_id IN (?)
+            )
+          )
+      OR r.result_official_code = ?
+      OR r.title like CONCAT('%',?, '%')
+      OR i.name like CONCAT('%',?, '%')
+      OR rs.name LIKE CONCAT('%',?, '%')
+      OR rc.contract_id = ?
+      OR cl.short_name LIKE CONCAT('%',?, '%')`;
+  }
+
+  /**
+   * OR branch: creator matches when every whitespace-separated token appears in first_name or last_name.
+   * (e.g. "david casanas" matches first_name "David Felipe" + last_name "Casanas".)
+   */
+  private buildFindResultsV2CreatorNameWhereFragment(
+    nameTokens: string[],
+  ): string {
+    const perToken = nameTokens.map(
+      () =>
+        `(su.first_name LIKE CONCAT('%', ?, '%') OR su.last_name LIKE CONCAT('%', ?, '%'))`,
+    ).join(`
+        AND `);
+    return `
+      OR (su.sec_user_id IS NOT NULL AND ${perToken}))`;
+  }
+
+  /**
+   * Relevance for findResultsV2 text search only (aligned with search WHERE).
+   * Non-name clauses use the full search string; creator name uses the same token rules as WHERE.
+   */
+  private buildFindResultsV2SearchRelevanceSelectFragment(
+    creatorNameTokens: string[],
+  ): string {
+    const nameRelevanceCases = creatorNameTokens.map(
+      () =>
+        `(CASE WHEN (su.first_name LIKE CONCAT('%', ?, '%') OR su.last_name LIKE CONCAT('%', ?, '%')) THEN 220 ELSE 0 END)`,
+    ).join(`
+      + `);
+    return `, (
+      (CASE WHEN r.report_year_id IN (?) THEN 150 ELSE 0 END) +
+      (CASE WHEN EXISTS (
+            SELECT 1
+            FROM results s
+            WHERE s.result_official_code = r.result_official_code
+              AND s.is_snapshot = TRUE
+              AND s.report_year_id IN (?)
+          ) THEN 130 ELSE 0 END) +
+      (CASE WHEN r.result_official_code = ? THEN 2000 ELSE 0 END) +
+      (CASE WHEN r.result_official_code LIKE CONCAT(?, '%') THEN 900 ELSE 0 END) +
+      (CASE WHEN r.title LIKE CONCAT('%', ?, '%') THEN 550 ELSE 0 END) +
+      (CASE WHEN i.name LIKE CONCAT('%', ?, '%') THEN 450 ELSE 0 END) +
+      (CASE WHEN rs.name LIKE CONCAT('%', ?, '%') THEN 380 ELSE 0 END) +
+      (CASE WHEN rc.contract_id = ? THEN 750 ELSE 0 END) +
+      (CASE WHEN cl.short_name LIKE CONCAT('%', ?, '%') THEN 320 ELSE 0 END) +
+      ${nameRelevanceCases}
+    ) AS _search_relevance`;
+  }
+
+  private sortOrderV2WithSearchRelevance(
+    hasSearch: boolean,
+    field?: ResultSortEnum,
+    order?: 'ASC' | 'DESC',
+  ) {
+    const fieldMap = ResultSortFields(field, order);
+    const direction = order?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    if (hasSearch) {
+      return `ORDER BY _search_relevance DESC, ${fieldMap} ${direction}`;
+    }
+    return `ORDER BY ${fieldMap} ${direction}`;
+  }
+
+  private buildFilteringV2(filters: {
+    status: ResultStatusEnum[];
+    contracts: string[];
+    years: string[];
+    sources: ReportingPlatformEnum[];
+    indicators: IndicatorsEnum[];
+    currentUser: {
+      onlyOwnResults: boolean;
+      userId: number;
+    };
+  }) {
+    let query = '';
+    if (filters.status.length > 0) {
+      query += `AND r.result_status_id IN (${formatArrayToQuery<number>(filters.status)})`;
+    }
+    if (filters.contracts.length > 0) {
+      query += `AND rc.contract_id IN (${formatArrayToQuery<string>(filters.contracts)})`;
+    }
+    if (filters.years.length > 0) {
+      query += `AND r.report_year_id IN (${formatArrayToQuery<string>(filters.years)})`;
+    }
+    if (filters.sources.length > 0) {
+      query += `AND r.platform_code IN (${formatArrayToQuery<string>(filters.sources)})`;
+    }
+    if (filters.indicators.length > 0) {
+      query += `AND r.indicator_id IN (${formatArrayToQuery<number>(filters.indicators)})`;
+    }
+    if (filters.currentUser.onlyOwnResults) {
+      query += `AND r.created_by = ${filters.currentUser.userId}`;
+    }
+
+    return query;
+  }
+
+  async findResultsV2(
+    search: string,
+    pagination?: { page?: number; limit?: number },
+    sorting?: { field?: ResultSortEnum; order?: 'ASC' | 'DESC' },
+    filters?: {
+      status: ResultStatusEnum[];
+      contracts: string[];
+      years: string[];
+      sources: ReportingPlatformEnum[];
+      indicators: IndicatorsEnum[];
+      currentUser: {
+        onlyOwnResults: boolean;
+        userId: number;
+      };
+    },
+  ) {
+    const page = !pagination?.page || pagination.page < 1 ? 1 : pagination.page;
+    const limit = !pagination?.limit ? 100 : pagination.limit;
+    const offset = (page - 1) * limit;
+
+    const creatorNameTokens = search
+      ? this.splitFindResultsV2CreatorNameTokens(search)
+      : [];
+    const searchConditions = search
+      ? `${this.buildFindResultsV2SearchStaticWhereFragment()}${this.buildFindResultsV2CreatorNameWhereFragment(creatorNameTokens)}`
+      : '';
+
+    const staticWhereParams = search
+      ? Array(
+          ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT,
+        ).fill(search)
+      : [];
+    const creatorNameWhereParams = creatorNameTokens.flatMap((t) => [t, t]);
+    const searchWhereParams = search
+      ? [...staticWhereParams, ...creatorNameWhereParams]
+      : [];
+
+    const relevanceFragment = search
+      ? this.buildFindResultsV2SearchRelevanceSelectFragment(creatorNameTokens)
+      : '';
+    const relevanceParams = search
+      ? [
+          ...Array(
+            ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT,
+          ).fill(search),
+          ...creatorNameTokens.flatMap((t) => [t, t]),
+        ]
+      : [];
+
+    const fromAndJoins = `
+    FROM results r
+    INNER JOIN indicators i ON i.indicator_id = r.indicator_id
+    INNER JOIN result_status rs ON rs.result_status_id = r.result_status_id
+    LEFT JOIN results r2
+      ON r2.result_official_code = r.result_official_code
+      AND r2.is_snapshot = TRUE
+    LEFT JOIN result_contracts rc on rc.result_id = r.result_id 
+      AND rc.is_active 
+      AND rc.is_primary 
+    LEFT JOIN result_levers rl ON rl.result_id = r.result_id
+      AND rl.is_active = TRUE
+      AND rl.is_primary = TRUE
+    LEFT JOIN sec_users su ON su.sec_user_id = r.created_by
+    LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id`;
+
+    const countQuery = `
+    SELECT COUNT(tmp.total) AS total FROM (SELECT COUNT(DISTINCT r.result_id) AS total
+    ${fromAndJoins}
+    WHERE r.is_snapshot = FALSE
+      AND r.is_active = TRUE
+      ${this.buildFilteringV2(filters)}
+      ${search ? searchConditions : ''}
+    GROUP BY r.result_id
+    ORDER BY r.result_official_code ASC) tmp`;
+
+    const mainQuery = `
+    SELECT
+      r.created_at,
+      r.updated_at,
+      r.created_by,
+      r.updated_by,
+      r.is_active,
+      r.result_id,
+      r.result_official_code,
+      r.platform_code,
+      r.report_year_id,
+      r.title,
+      r.indicator_id,
+      r.external_link,
+      r.public_link,
+      i.name AS indicator_name,
+      r.result_status_id AS status_id,
+      rs.name AS status_name,
+      rs.config as status_config,
+      GROUP_CONCAT(DISTINCT r2.report_year_id ORDER BY r2.report_year_id DESC) AS snapshot_years,
+      rc.contract_id,
+      cl.short_name as lever_name,
+      su.sec_user_id as create_user_id,
+      su.first_name as create_user_first_name,
+      su.last_name as create_user_last_name,
+      rs.description as status_description
+      ${relevanceFragment}
+      ${fromAndJoins}
+    WHERE r.is_snapshot = FALSE
+      AND r.is_active = TRUE
+      ${this.buildFilteringV2(filters)}
+      ${search ? searchConditions : ''}
+    GROUP BY r.result_id
+    ${this.sortOrderV2WithSearchRelevance(!!search, sorting?.field, sorting?.order)}
+    LIMIT ? OFFSET ?`;
+
+    const countQueryParams = [...searchWhereParams];
+    // Placeholders are bound in textual order: SELECT relevance, then WHERE search, then LIMIT/OFFSET
+    const mainQueryParams = [
+      ...relevanceParams,
+      ...searchWhereParams,
+      limit,
+      offset,
+    ];
+
+    const totalResult = await this.query(countQuery, countQueryParams);
+    const total = Number(totalResult?.[0]?.total ?? 0);
+    const totalPages = Math.ceil(total / limit);
+
+    const rawData = await this.query(mainQuery, mainQueryParams);
+    const data = search
+      ? rawData.map((row: Record<string, unknown>) => {
+          const { _search_relevance: _r, ...rest } = row;
+          return rest;
+        })
+      : rawData;
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        pageSize: data.length,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 }
 
