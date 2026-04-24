@@ -4,6 +4,7 @@ import type { CellValue } from 'exceljs';
 import { existsSync } from 'fs';
 import { extname } from 'path';
 import type {
+  ExcelCellFontStyle,
   ExcelColumnSpec,
   ExcelSheetPreamble,
   ExcelSheetSpec,
@@ -58,17 +59,21 @@ export class ExcelWorkbookBuilder {
         const cell = excelRow.getCell(colIdx + 1);
         if (col.hyperlink) {
           cell.value = this.buildCellValue(dataRow, col);
+          this.applyHyperlinkCellStyle(cell, col);
         } else {
           const raw = dataRow[col.key];
           cell.value = this.coerceCellValue(raw, col);
           this.applyColumnNumberFormat(cell, col);
+          if (col.cellFont) {
+            this.applyCellFontStyle(cell, col.cellFont);
+          }
         }
         if (fillField) {
           const raw = dataRow[fillField];
           if (typeof raw === 'string' && /^[0-9A-Fa-f]{8}$/.test(raw)) {
             cell.fill = this.solidFill(raw.toUpperCase());
             const fontArgb = this.isDarkArgb(raw) ? 'FFFFFFFF' : 'FF000000';
-            cell.font = { color: { argb: fontArgb } };
+            cell.font = { ...(cell.font ?? {}), color: { argb: fontArgb } };
           }
         }
       });
@@ -353,6 +358,78 @@ export class ExcelWorkbookBuilder {
       return 'yyyy-mm-dd';
     }
     return undefined;
+  }
+
+  /** Default http(s) hyperlink text look (Office-style blue + underline). */
+  private static readonly defaultHyperlinkColorArgb = 'FF0563C1';
+
+  private applyCellFontStyle(
+    cell: ExcelJS.Cell,
+    style: ExcelCellFontStyle,
+  ): void {
+    const prev = { ...(cell.font ?? {}) } as Partial<ExcelJS.Font>;
+    if (style.bold !== undefined) {
+      prev.bold = style.bold;
+    }
+    if (style.italic !== undefined) {
+      prev.italic = style.italic;
+    }
+    if (style.underline !== undefined) {
+      prev.underline = style.underline;
+    }
+    if (style.size !== undefined) {
+      prev.size = style.size;
+    }
+    if (style.colorArgb !== undefined) {
+      prev.color = { argb: style.colorArgb };
+    }
+    cell.font = prev;
+  }
+
+  private applyHyperlinkCellStyle(
+    cell: ExcelJS.Cell,
+    col: ExcelColumnSpec,
+  ): void {
+    const h = col.hyperlink;
+    if (!h) {
+      return;
+    }
+    const v = cell.value;
+    const linkTarget =
+      v !== null &&
+      typeof v === 'object' &&
+      'hyperlink' in v &&
+      typeof (v as { hyperlink: unknown }).hyperlink === 'string'
+        ? (v as { hyperlink: string }).hyperlink
+        : '';
+    const isLiveLink = this.isHttpUrl(linkTarget);
+    if (!isLiveLink) {
+      if (col.cellFont) {
+        this.applyCellFontStyle(cell, col.cellFont);
+      }
+      return;
+    }
+    const la = h.linkAppearance;
+    if (la?.enabled === false) {
+      if (col.cellFont) {
+        this.applyCellFontStyle(cell, col.cellFont);
+      }
+      return;
+    }
+    const underline =
+      la?.underline === undefined ? true : Boolean(la.underline);
+    const colorArgb =
+      la?.colorArgb ?? ExcelWorkbookBuilder.defaultHyperlinkColorArgb;
+    this.applyCellFontStyle(cell, {
+      colorArgb,
+      underline,
+      ...(la?.bold !== undefined ? { bold: la.bold } : {}),
+      ...(la?.italic !== undefined ? { italic: la.italic } : {}),
+      ...(la?.size !== undefined ? { size: la.size } : {}),
+    });
+    if (col.cellFont) {
+      this.applyCellFontStyle(cell, col.cellFont);
+    }
   }
 
   private buildCellValue(

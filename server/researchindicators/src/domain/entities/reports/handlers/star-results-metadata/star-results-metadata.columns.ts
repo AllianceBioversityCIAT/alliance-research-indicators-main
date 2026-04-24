@@ -14,6 +14,10 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
       urlField: 'public_link',
       displayField: 'public_link',
       emptyDisplay: 'Not available',
+      linkAppearance: {
+        colorArgb: 'FF0563C1',
+        underline: true,
+      },
     },
   },
   {
@@ -24,6 +28,10 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
       urlField: 'platform_link',
       displayField: 'platform_link_display',
       emptyDisplay: 'Not available',
+      linkAppearance: {
+        colorArgb: 'FF0563C1',
+        underline: true,
+      },
     },
   },
   { key: 'indicator', header: 'Indicator', width: 36 },

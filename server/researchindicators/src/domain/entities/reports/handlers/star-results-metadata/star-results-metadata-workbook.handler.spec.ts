@@ -189,6 +189,54 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(d.getUTCDate()).toBe(15);
   });
 
+  it('includes linkAppearance on public_link and platform_link columns', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    const spec = await handler.buildWorkbookSpec(baseFilters);
+    const raw = spec.sheets.find(
+      (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
+    );
+    const publicLink = raw?.columns.find((c) => c.key === 'public_link');
+    const platformLink = raw?.columns.find((c) => c.key === 'platform_link');
+    expect(publicLink?.hyperlink?.linkAppearance?.colorArgb).toBe('FF0563C1');
+    expect(publicLink?.hyperlink?.linkAppearance?.underline).toBe(true);
+    expect(platformLink?.hyperlink?.linkAppearance?.colorArgb).toBe('FF0563C1');
+    expect(platformLink?.hyperlink?.linkAppearance?.underline).toBe(true);
+  });
+
+  it('exports xlsx with blue underlined public_link cell', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    findStarResultsMetadataRows.mockResolvedValue([
+      {
+        result_code: 'R1',
+        public_link: 'https://example.org/star-result',
+      },
+    ]);
+    const spec = await handler.buildWorkbookSpec(baseFilters);
+    const raw = spec.sheets.find(
+      (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
+    )!;
+    const buf = await new ExcelWorkbookBuilder().toBuffer(spec);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as never);
+    const col = raw.columns.findIndex((c) => c.key === 'public_link') + 1;
+    const cell = wb.getWorksheet('Raw')!.getRow(5).getCell(col);
+    expect(cell.value).toEqual(
+      expect.objectContaining({
+        hyperlink: 'https://example.org/star-result',
+      }),
+    );
+    expect(cell.font?.underline).toBeTruthy();
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF0563C1');
+  });
+
   it('uses gif extension from content-type', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
