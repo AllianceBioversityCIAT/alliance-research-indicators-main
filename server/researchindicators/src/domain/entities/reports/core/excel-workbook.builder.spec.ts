@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import { PayloadTooLargeException } from '@nestjs/common';
+import ExcelJS from 'exceljs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { ExcelWorkbookBuilder } from './excel-workbook.builder';
@@ -62,6 +63,13 @@ describe('ExcelWorkbookBuilder', () => {
     return buf;
   }
 
+  /** ExcelJS `xlsx.load` typings expect a narrower `Buffer` than Node’s generic `Buffer`. */
+  async function loadWorkbook(buf: Buffer): Promise<ExcelJS.Workbook> {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as never);
+    return wb;
+  }
+
   it('writes a minimal workbook without presentation', async () => {
     await bufferFrom({
       sheets: [
@@ -73,6 +81,94 @@ describe('ExcelWorkbookBuilder', () => {
         },
       ],
     });
+  });
+
+  it('coerces values and sets numFmt from cellDataType', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Typed',
+          columns: [
+            { key: 'n', header: 'N', cellDataType: 'number' },
+            { key: 'i', header: 'I', cellDataType: 'integer' },
+            { key: 'd', header: 'D', cellDataType: 'date' },
+          ],
+          rows: [{ n: '1.25', i: '2024', d: '2024-06-15' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const ws = wb.getWorksheet('Typed');
+    expect(ws).toBeDefined();
+    const row = ws!.getRow(2);
+    expect(row.getCell(1).value).toBe(1.25);
+    expect(row.getCell(1).numFmt).toBe('#,##0.##');
+    expect(row.getCell(2).value).toBe(2024);
+    expect(row.getCell(2).numFmt).toBe('0');
+    expect(row.getCell(3).value).toEqual(expect.any(Date));
+    expect(row.getCell(3).numFmt).toBe('yyyy-mm-dd');
+  });
+
+  it('prefers excelNumFmt over the default for cellDataType', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Fmt',
+          columns: [
+            {
+              key: 'd',
+              header: 'D',
+              cellDataType: 'date',
+              excelNumFmt: 'dd/mm/yyyy',
+            },
+          ],
+          rows: [{ d: '2024-01-02' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const row = wb.getWorksheet('Fmt')!.getRow(2);
+    expect(row.getCell(1).numFmt).toBe('dd/mm/yyyy');
+  });
+
+  it('applies excelNumFmt without cellDataType (no coercion)', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Mask',
+          columns: [{ key: 'c', header: 'C', excelNumFmt: '@' }],
+          rows: [{ c: '00123' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const cell = wb.getWorksheet('Mask')!.getRow(2).getCell(1);
+    expect(cell.value).toBe('00123');
+    expect(cell.numFmt).toBe('@');
+  });
+
+  it('writes empty cell when date or number value is not parseable', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Bad',
+          columns: [
+            { key: 'd', header: 'D', cellDataType: 'date' },
+            { key: 'n', header: 'N', cellDataType: 'number' },
+          ],
+          rows: [{ d: 'not-a-date', n: 'x' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const row = wb.getWorksheet('Bad')!.getRow(2);
+    const empty = (v: unknown) => v === '' || v === null || v === undefined;
+    expect(empty(row.getCell(1).value)).toBe(true);
+    expect(empty(row.getCell(2).value)).toBe(true);
   });
 
   it('omits column width when not specified', async () => {
@@ -96,7 +192,7 @@ describe('ExcelWorkbookBuilder', () => {
         hyperlink: { urlField: 'u', displayField: 'label' },
       },
     ];
-    await bufferFrom({
+    const buf = await bufferFrom({
       sheets: [
         {
           sheetKey: 's',
@@ -106,6 +202,241 @@ describe('ExcelWorkbookBuilder', () => {
         },
       ],
     });
+    const wb = await loadWorkbook(buf);
+    const cell = wb.getWorksheet('S')!.getRow(2).getCell(1);
+    expect(cell.font?.underline).toBeTruthy();
+    const argb = cell.font?.color?.argb?.toUpperCase?.();
+    expect(argb).toBe('FF0563C1');
+  });
+
+  it('skips default hyperlink font when linkAppearance.enabled is false', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Plain',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: {
+                urlField: 'u',
+                linkAppearance: { enabled: false },
+              },
+            },
+          ],
+          rows: [{ u: 'https://a.test' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('Plain')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.color?.argb).toBeUndefined();
+    expect(cell.font?.underline).toBeFalsy();
+  });
+
+  it('applies cellFont bold and italic to data cells', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'F',
+          columns: [
+            {
+              key: 't',
+              header: 'T',
+              cellFont: { bold: true, italic: true, colorArgb: 'FF424242' },
+            },
+          ],
+          rows: [{ t: 'x' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('F')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.bold).toBe(true);
+    expect(cell.font?.italic).toBe(true);
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF424242');
+  });
+
+  it('merges cellFont on top of default hyperlink styling', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'HlFont',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: { urlField: 'u' },
+              cellFont: { bold: true },
+            },
+          ],
+          rows: [{ u: 'https://merge.test' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('HlFont')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.bold).toBe(true);
+    expect(cell.font?.underline).toBeTruthy();
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF0563C1');
+  });
+
+  it('honors linkAppearance colorArgb override for hyperlinks', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'GreenLink',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: {
+                urlField: 'u',
+                linkAppearance: { colorArgb: 'FF008000' },
+              },
+            },
+          ],
+          rows: [{ u: 'https://green.test' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('GreenLink')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF008000');
+    expect(cell.font?.underline).toBeTruthy();
+  });
+
+  it('allows linkAppearance underline false while keeping link color', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'NoUl',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: {
+                urlField: 'u',
+                linkAppearance: { underline: false, colorArgb: 'FF0563C1' },
+              },
+            },
+          ],
+          rows: [{ u: 'https://nou.test' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('NoUl')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.underline).toBeFalsy();
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF0563C1');
+  });
+
+  it('preserves hyperlink underline when row fill overrides font color', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'RowHl',
+          columns: [{ key: 'u', header: 'L', hyperlink: { urlField: 'u' } }],
+          rows: [{ u: 'https://row.test', _f: 'FF000000' }],
+          rowFillArgbField: '_f',
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('RowHl')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.underline).toBeTruthy();
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FFFFFFFF');
+  });
+
+  it('applies cellFont together with cellDataType number', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'NumFont',
+          columns: [
+            {
+              key: 'n',
+              header: 'N',
+              cellDataType: 'number',
+              cellFont: { italic: true, bold: true },
+            },
+          ],
+          rows: [{ n: 99 }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('NumFont')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.value).toBe(99);
+    expect(cell.font?.italic).toBe(true);
+    expect(cell.font?.bold).toBe(true);
+  });
+
+  it('applies cellFont for invalid URL hyperlink cells', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'BadHl',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: { urlField: 'u', emptyDisplay: 'N/A' },
+              cellFont: { italic: true, colorArgb: 'FF808080' },
+            },
+          ],
+          rows: [{ u: 'not-a-url' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('BadHl')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.value).toBe('N/A');
+    expect(cell.font?.italic).toBe(true);
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF808080');
+  });
+
+  it('coerces bigint to integer for cellDataType integer', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'BigI',
+          columns: [{ key: 'i', header: 'I', cellDataType: 'integer' }],
+          rows: [{ i: BigInt(2025) }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('BigI')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.value).toBe(2025);
+    expect(cell.numFmt).toBe('0');
   });
 
   it('uses URL as hyperlink text when displayField is omitted', async () => {

@@ -1,9 +1,8 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateSectionViews1776874787128 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_general_information AS
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_general_information AS
 SELECT
 	root.result_id,
 	root.result_official_code AS result_code,
@@ -50,7 +49,7 @@ WHERE root.is_active = TRUE
 	AND root.is_snapshot = FALSE
 ORDER BY root.result_id ASC`);
 
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_alliance_alignment AS
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_alliance_alignment AS
     SELECT 
         root.result_id,
         report_field(pp.project, TRUE, NULL) AS primary_project,
@@ -124,8 +123,7 @@ ORDER BY root.result_id ASC`);
         AND root.is_snapshot = FALSE
     ORDER BY root.result_id ASC`);
 
-
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_partners AS
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_partners AS
     SELECT 
         root.result_id,
         report_field(pr.partners, TRUE, NOT root.is_partner_not_applicable ) AS partners
@@ -144,7 +142,7 @@ ORDER BY root.result_id ASC`);
         AND root.is_snapshot = FALSE
     ORDER BY root.result_id ASC`);
 
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_geo_location AS
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_geo_location AS
     SELECT 
         root.result_id,
         report_field(cgs.name, TRUE, NULL) AS geo_scope_name,
@@ -180,7 +178,7 @@ ORDER BY root.result_id ASC`);
         AND root.is_snapshot = FALSE
     ORDER BY root.result_id ASC`);
 
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_evidences AS
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_evidences AS
     SELECT 
         root.result_id,
         report_field(re.evidences, TRUE, NULL) AS evidences
@@ -195,7 +193,7 @@ ORDER BY root.result_id ASC`);
         AND root.is_snapshot = FALSE
     ORDER BY root.result_id ASC`);
 
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_ip_rights AS
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_ip_rights AS
     SELECT 
         root.result_id,
         report_field(rir.who_owns_ip_rights, TRUE, NULL) AS who_owns_ip_rights,
@@ -217,18 +215,15 @@ ORDER BY root.result_id ASC`);
                     ORDER BY rir.result_ip_rights_id ASC) AS rir ON rir.result_id = root.result_id 
     WHERE root.is_active = TRUE
         AND root.is_snapshot = FALSE
-    ORDER BY root.result_id ASC`)
-    }
+    ORDER BY root.result_id ASC`);
+  }
 
-
-
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP VIEW IF EXISTS report_general_information`);
-        await queryRunner.query(`DROP VIEW IF EXISTS report_alliance_alignment`);
-        await queryRunner.query(`DROP VIEW IF EXISTS report_partners`);
-        await queryRunner.query(`DROP VIEW IF EXISTS report_geo_location`);
-        await queryRunner.query(`DROP VIEW IF EXISTS report_evidences`);
-        await queryRunner.query(`DROP VIEW IF EXISTS report_ip_rights`);
-    }
-
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP VIEW IF EXISTS report_general_information`);
+    await queryRunner.query(`DROP VIEW IF EXISTS report_alliance_alignment`);
+    await queryRunner.query(`DROP VIEW IF EXISTS report_partners`);
+    await queryRunner.query(`DROP VIEW IF EXISTS report_geo_location`);
+    await queryRunner.query(`DROP VIEW IF EXISTS report_evidences`);
+    await queryRunner.query(`DROP VIEW IF EXISTS report_ip_rights`);
+  }
 }

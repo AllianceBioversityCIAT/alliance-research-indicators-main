@@ -4,6 +4,7 @@ import type { CellValue } from 'exceljs';
 import { existsSync } from 'fs';
 import { extname } from 'path';
 import type {
+  ExcelCellFontStyle,
   ExcelColumnSpec,
   ExcelSheetPreamble,
   ExcelSheetSpec,
@@ -56,13 +57,23 @@ export class ExcelWorkbookBuilder {
       const excelRow = ws.addRow([]);
       sheet.columns.forEach((col, colIdx) => {
         const cell = excelRow.getCell(colIdx + 1);
-        cell.value = this.buildCellValue(dataRow, col);
+        if (col.hyperlink) {
+          cell.value = this.buildCellValue(dataRow, col);
+          this.applyHyperlinkCellStyle(cell, col);
+        } else {
+          const raw = dataRow[col.key];
+          cell.value = this.coerceCellValue(raw, col);
+          this.applyColumnNumberFormat(cell, col);
+          if (col.cellFont) {
+            this.applyCellFontStyle(cell, col.cellFont);
+          }
+        }
         if (fillField) {
           const raw = dataRow[fillField];
           if (typeof raw === 'string' && /^[0-9A-Fa-f]{8}$/.test(raw)) {
             cell.fill = this.solidFill(raw.toUpperCase());
             const fontArgb = this.isDarkArgb(raw) ? 'FFFFFFFF' : 'FF000000';
-            cell.font = { color: { argb: fontArgb } };
+            cell.font = { ...(cell.font ?? {}), color: { argb: fontArgb } };
           }
         }
       });
@@ -254,35 +265,199 @@ export class ExcelWorkbookBuilder {
     return s;
   }
 
+  private coerceCellValue(
+    raw: unknown,
+    col: ExcelColumnSpec,
+  ): string | number | Date | CellValue {
+    const kind = col.cellDataType ?? 'text';
+    if (kind === 'text') {
+      if (raw === null || raw === undefined) {
+        return '';
+      }
+      return raw as CellValue;
+    }
+    if (raw === null || raw === undefined || raw === '') {
+      return '';
+    }
+    if (kind === 'number') {
+      const n = this.parseNumber(raw);
+      return n === null ? '' : n;
+    }
+    if (kind === 'integer') {
+      const n = this.parseNumber(raw);
+      if (n === null) {
+        return '';
+      }
+      return Math.trunc(n);
+    }
+    if (kind === 'date') {
+      const d = this.parseDate(raw);
+      return d === null ? '' : d;
+    }
+    return '';
+  }
+
+  private parseNumber(raw: unknown): number | null {
+    if (typeof raw === 'number' && !Number.isNaN(raw)) {
+      return raw;
+    }
+    if (typeof raw === 'bigint') {
+      return Number(raw);
+    }
+    if (typeof raw === 'string') {
+      const t = raw.trim();
+      if (t === '') {
+        return null;
+      }
+      const n = Number(t);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  }
+
+  private parseDate(raw: unknown): Date | null {
+    if (raw instanceof Date) {
+      return Number.isNaN(raw.getTime()) ? null : raw;
+    }
+    if (typeof raw === 'string') {
+      const t = raw.trim();
+      if (t === '') {
+        return null;
+      }
+      const d = new Date(t);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  }
+
+  private applyColumnNumberFormat(
+    cell: ExcelJS.Cell,
+    col: ExcelColumnSpec,
+  ): void {
+    const fmt =
+      col.excelNumFmt ?? this.defaultNumFmtForCellDataType(col.cellDataType);
+    if (fmt) {
+      cell.numFmt = fmt;
+    }
+  }
+
+  private defaultNumFmtForCellDataType(
+    kind: ExcelColumnSpec['cellDataType'],
+  ): string | undefined {
+    if (kind === 'number') {
+      return '#,##0.##';
+    }
+    if (kind === 'integer') {
+      return '0';
+    }
+    if (kind === 'date') {
+      return 'yyyy-mm-dd';
+    }
+    return undefined;
+  }
+
+  /** Default http(s) hyperlink text look (Office-style blue + underline). */
+  private static readonly defaultHyperlinkColorArgb = 'FF0563C1';
+
+  private applyCellFontStyle(
+    cell: ExcelJS.Cell,
+    style: ExcelCellFontStyle,
+  ): void {
+    const prev = { ...(cell.font ?? {}) } as Partial<ExcelJS.Font>;
+    if (style.bold !== undefined) {
+      prev.bold = style.bold;
+    }
+    if (style.italic !== undefined) {
+      prev.italic = style.italic;
+    }
+    if (style.underline !== undefined) {
+      prev.underline = style.underline;
+    }
+    if (style.size !== undefined) {
+      prev.size = style.size;
+    }
+    if (style.colorArgb !== undefined) {
+      prev.color = { argb: style.colorArgb };
+    }
+    cell.font = prev;
+  }
+
+  private applyHyperlinkCellStyle(
+    cell: ExcelJS.Cell,
+    col: ExcelColumnSpec,
+  ): void {
+    const h = col.hyperlink;
+    if (!h) {
+      return;
+    }
+    const v = cell.value;
+    const linkTarget =
+      v !== null &&
+      typeof v === 'object' &&
+      'hyperlink' in v &&
+      typeof (v as { hyperlink: unknown }).hyperlink === 'string'
+        ? (v as { hyperlink: string }).hyperlink
+        : '';
+    const isLiveLink = this.isHttpUrl(linkTarget);
+    if (!isLiveLink) {
+      if (col.cellFont) {
+        this.applyCellFontStyle(cell, col.cellFont);
+      }
+      return;
+    }
+    const la = h.linkAppearance;
+    if (la?.enabled === false) {
+      if (col.cellFont) {
+        this.applyCellFontStyle(cell, col.cellFont);
+      }
+      return;
+    }
+    const underline =
+      la?.underline === undefined ? true : Boolean(la.underline);
+    const colorArgb =
+      la?.colorArgb ?? ExcelWorkbookBuilder.defaultHyperlinkColorArgb;
+    this.applyCellFontStyle(cell, {
+      colorArgb,
+      underline,
+      ...(la?.bold !== undefined ? { bold: la.bold } : {}),
+      ...(la?.italic !== undefined ? { italic: la.italic } : {}),
+      ...(la?.size !== undefined ? { size: la.size } : {}),
+    });
+    if (col.cellFont) {
+      this.applyCellFontStyle(cell, col.cellFont);
+    }
+  }
+
   private buildCellValue(
     row: Record<string, unknown>,
     col: ExcelColumnSpec,
   ): CellValue {
-    if (!col.hyperlink) {
+    const h = col.hyperlink;
+    if (!h) {
       const v = row[col.key];
       if (v === null || v === undefined) {
         return '';
       }
       return v as CellValue;
     }
-    const url = row[col.hyperlink.urlField];
+    const url = row[h.urlField];
     const urlStr = typeof url === 'string' ? url.trim() : '';
     if (this.isHttpUrl(urlStr)) {
-      const displaySource = col.hyperlink.displayField
-        ? row[col.hyperlink.displayField]
-        : url;
+      const displaySource = h.displayField ? row[h.displayField] : url;
       const text =
         displaySource !== null && displaySource !== undefined
           ? String(displaySource)
           : urlStr;
       return { text, hyperlink: urlStr };
     }
-    if (col.hyperlink.emptyDisplay !== undefined) {
-      return col.hyperlink.emptyDisplay;
+    if (h.emptyDisplay !== undefined) {
+      return h.emptyDisplay;
     }
-    const displaySource = col.hyperlink.displayField
-      ? row[col.hyperlink.displayField]
-      : row[col.key];
+    const displaySource = h.displayField ? row[h.displayField] : row[col.key];
     if (displaySource === null || displaySource === undefined) {
       return '';
     }
