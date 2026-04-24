@@ -8,6 +8,12 @@ export type ExcelHyperlinkColumnSpec = {
   emptyDisplay?: string;
 };
 
+/**
+ * How values are coerced and which default Excel `numFmt` the builder applies.
+ * Ignored when `hyperlink` is set (hyperlink cells keep text/hyperlink semantics).
+ */
+export type ExcelColumnCellDataType = 'text' | 'number' | 'integer' | 'date';
+
 export type ExcelColumnSpec = {
   key: string;
   header: string;
@@ -15,6 +21,15 @@ export type ExcelColumnSpec = {
   /** When set, used for the main header row background (e.g. per raw-data section). */
   headerFillArgb?: string;
   hyperlink?: ExcelHyperlinkColumnSpec;
+  /**
+   * Excel cell semantics: numbers/dates sort and filter correctly; dates need a JS `Date` (or coercible string).
+   * Default / omitted: pass through like today (general/text).
+   */
+  cellDataType?: ExcelColumnCellDataType;
+  /**
+   * Excel number format string (e.g. `yyyy-mm-dd`, `#,##0.00`). Overrides the default for `cellDataType`.
+   */
+  excelNumFmt?: string;
 };
 
 /** Optional merged banner / subtitle / column-group row before the main header row. */

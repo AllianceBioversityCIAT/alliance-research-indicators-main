@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import { Test, TestingModule } from '@nestjs/testing';
+import ExcelJS from 'exceljs';
+import { ExcelWorkbookBuilder } from '../../core/excel-workbook.builder';
 import { WorkbookSheetOrderResolver } from '../../core/workbook-sheet-order.resolver';
 import { ReportLayoutRepository } from '../../repositories/report-layout.repository';
 import { StarResultsExportRepository } from '../../repositories/star-results-export.repository';
@@ -129,6 +131,62 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(raw?.presentation?.bannerSubtitle).toBe(
       'This file contains the results generated from the selected filters in STAR.',
     );
+  });
+
+  it('includes cellDataType on raw sheet columns for year and date fields', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    const spec = await handler.buildWorkbookSpec(baseFilters);
+    const raw = spec.sheets.find(
+      (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
+    );
+    const byKey = new Map(raw!.columns.map((c) => [c.key, c] as const));
+    expect(byKey.get('reporting_year')?.cellDataType).toBe('integer');
+    expect(byKey.get('creation_date')?.cellDataType).toBe('date');
+    expect(byKey.get('primary_project_start_date')?.cellDataType).toBe('date');
+    expect(byKey.get('primary_project_end_date')?.cellDataType).toBe('date');
+    expect(byKey.get('result_code')?.cellDataType).toBeUndefined();
+  });
+
+  it('renders typed reporting_year and creation_date cells in exported xlsx', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    findStarResultsMetadataRows.mockResolvedValue([
+      {
+        result_code: 'RC',
+        reporting_year: '2024',
+        creation_date: '2024-03-15',
+      },
+    ]);
+    const spec = await handler.buildWorkbookSpec(baseFilters);
+    const raw = spec.sheets.find(
+      (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
+    )!;
+    const buf = await new ExcelWorkbookBuilder().toBuffer(spec);
+    const wb = new ExcelJS.Workbook();
+    // ExcelJS `load` typings are narrower than Node `Buffer` (ArrayBufferLike).
+    await wb.xlsx.load(buf as never);
+    const ws = wb.getWorksheet('Raw');
+    expect(ws).toBeDefined();
+    const yearCol =
+      raw.columns.findIndex((c) => c.key === 'reporting_year') + 1;
+    const dateCol = raw.columns.findIndex((c) => c.key === 'creation_date') + 1;
+    const dataRow = ws!.getRow(5);
+    expect(dataRow.getCell(yearCol).value).toBe(2024);
+    expect(dataRow.getCell(yearCol).numFmt).toBe('0');
+    const dateCell = dataRow.getCell(dateCol);
+    expect(dateCell.value).toEqual(expect.any(Date));
+    expect(dateCell.numFmt).toBe('yyyy-mm-dd');
+    const d = dateCell.value as Date;
+    expect(d.getUTCFullYear()).toBe(2024);
+    expect(d.getUTCMonth()).toBe(2);
+    expect(d.getUTCDate()).toBe(15);
   });
 
   it('uses gif extension from content-type', async () => {

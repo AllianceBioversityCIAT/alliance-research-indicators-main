@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import { PayloadTooLargeException } from '@nestjs/common';
+import ExcelJS from 'exceljs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { ExcelWorkbookBuilder } from './excel-workbook.builder';
@@ -62,6 +63,13 @@ describe('ExcelWorkbookBuilder', () => {
     return buf;
   }
 
+  /** ExcelJS `xlsx.load` typings expect a narrower `Buffer` than Node’s generic `Buffer`. */
+  async function loadWorkbook(buf: Buffer): Promise<ExcelJS.Workbook> {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as never);
+    return wb;
+  }
+
   it('writes a minimal workbook without presentation', async () => {
     await bufferFrom({
       sheets: [
@@ -73,6 +81,94 @@ describe('ExcelWorkbookBuilder', () => {
         },
       ],
     });
+  });
+
+  it('coerces values and sets numFmt from cellDataType', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Typed',
+          columns: [
+            { key: 'n', header: 'N', cellDataType: 'number' },
+            { key: 'i', header: 'I', cellDataType: 'integer' },
+            { key: 'd', header: 'D', cellDataType: 'date' },
+          ],
+          rows: [{ n: '1.25', i: '2024', d: '2024-06-15' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const ws = wb.getWorksheet('Typed');
+    expect(ws).toBeDefined();
+    const row = ws!.getRow(2);
+    expect(row.getCell(1).value).toBe(1.25);
+    expect(row.getCell(1).numFmt).toBe('#,##0.##');
+    expect(row.getCell(2).value).toBe(2024);
+    expect(row.getCell(2).numFmt).toBe('0');
+    expect(row.getCell(3).value).toEqual(expect.any(Date));
+    expect(row.getCell(3).numFmt).toBe('yyyy-mm-dd');
+  });
+
+  it('prefers excelNumFmt over the default for cellDataType', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Fmt',
+          columns: [
+            {
+              key: 'd',
+              header: 'D',
+              cellDataType: 'date',
+              excelNumFmt: 'dd/mm/yyyy',
+            },
+          ],
+          rows: [{ d: '2024-01-02' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const row = wb.getWorksheet('Fmt')!.getRow(2);
+    expect(row.getCell(1).numFmt).toBe('dd/mm/yyyy');
+  });
+
+  it('applies excelNumFmt without cellDataType (no coercion)', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Mask',
+          columns: [{ key: 'c', header: 'C', excelNumFmt: '@' }],
+          rows: [{ c: '00123' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const cell = wb.getWorksheet('Mask')!.getRow(2).getCell(1);
+    expect(cell.value).toBe('00123');
+    expect(cell.numFmt).toBe('@');
+  });
+
+  it('writes empty cell when date or number value is not parseable', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Bad',
+          columns: [
+            { key: 'd', header: 'D', cellDataType: 'date' },
+            { key: 'n', header: 'N', cellDataType: 'number' },
+          ],
+          rows: [{ d: 'not-a-date', n: 'x' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const row = wb.getWorksheet('Bad')!.getRow(2);
+    const empty = (v: unknown) => v === '' || v === null || v === undefined;
+    expect(empty(row.getCell(1).value)).toBe(true);
+    expect(empty(row.getCell(2).value)).toBe(true);
   });
 
   it('omits column width when not specified', async () => {
