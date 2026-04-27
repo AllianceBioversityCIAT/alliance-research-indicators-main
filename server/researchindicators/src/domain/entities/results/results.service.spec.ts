@@ -51,6 +51,7 @@ import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { TempResultAi } from './entities/temp-result-ai.entity';
+import { GreenChecksService } from '../green-checks/green-checks.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -87,6 +88,7 @@ describe('ResultsService', () => {
   let mockResultLeverSdgTargetsService: jest.Mocked<ResultLeverSdgTargetsService>;
   let mockResultKnowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
   let mockResultsUtil: jest.Mocked<ResultsUtil>;
+  let mockGreenChecksService: { findByResultId: jest.Mock };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -256,6 +258,10 @@ describe('ResultsService', () => {
       clearManually: jest.fn(),
     } as any;
 
+    mockGreenChecksService = {
+      findByResultId: jest.fn().mockResolvedValue({}),
+    };
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -358,6 +364,10 @@ describe('ResultsService', () => {
         {
           provide: ResultsUtil,
           useValue: mockResultsUtil,
+        },
+        {
+          provide: GreenChecksService,
+          useValue: mockGreenChecksService,
         },
       ],
     }).compile();

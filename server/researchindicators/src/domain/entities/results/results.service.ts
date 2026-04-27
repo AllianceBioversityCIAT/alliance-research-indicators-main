@@ -48,7 +48,10 @@ import { ResultCountriesSubNational } from '../result-countries-sub-nationals/en
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
-import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import {
+  ResultStatusEnum,
+  ResultStatusNameEnum,
+} from '../result-status/enum/result-status.enum';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
@@ -95,6 +98,7 @@ import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
 import { IntellectualPropertyOwner } from '../intellectual-property-owners/entities/intellectual-property-owner.entity';
 import { ResultSortEnum } from './enum/result-sort.enum';
 import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
+import { GreenChecksService } from '../green-checks/green-checks.service';
 
 @Injectable()
 export class ResultsService {
@@ -134,6 +138,7 @@ export class ResultsService {
     private readonly _resultLeverSdgTargetsService: ResultLeverSdgTargetsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
+    private readonly _greenChecksService: GreenChecksService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -950,6 +955,8 @@ export class ResultsService {
           break;
       }
 
+      await this.customStatus(result.status, newResult.result_id);
+
       return { ...newResult, error: false };
     } catch (error) {
       if (resultExists) {
@@ -983,6 +990,26 @@ export class ResultsService {
         message_error:
           typeof error.message == 'object' ? error.name : error.message,
       };
+    }
+  }
+
+  async customStatus(
+    status: ResultStatusEnum,
+    resultId: number,
+  ): Promise<void> {
+    if (isEmpty(status) || !ResultStatusNameEnum?.[status]) return;
+
+    const greenChecks = await this._greenChecksService.findByResultId(resultId);
+    if (
+      [ResultStatusEnum.SUBMITTED, ResultStatusEnum.APPROVED].includes(
+        status,
+      ) &&
+      greenChecks?.completness
+    ) {
+      await this.dataSource.getRepository(Result).update(resultId, {
+        result_status_id: status,
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
+      });
     }
   }
 
