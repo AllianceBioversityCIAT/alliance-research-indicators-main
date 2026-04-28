@@ -16,9 +16,11 @@ import {
   ValidateNested,
   IsNotEmpty,
   Matches,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UpdateIpRightDto } from '../../result-ip-rights/dto/update-ip-right.dto';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 
 export class ResultAiDto {
   result: CreateResultDto;
@@ -254,6 +256,14 @@ export class ResultRawAi {
   @IsNotEmpty()
   @IsString()
   contract_code: string;
+
+  @ApiProperty({
+    type: Number,
+    description: 'The status id of the result',
+  })
+  @IsOptional()
+  @IsEnum(ResultStatusEnum)
+  status: ResultStatusEnum;
 
   @ApiProperty({
     type: Number,

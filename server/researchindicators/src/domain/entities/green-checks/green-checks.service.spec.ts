@@ -91,7 +91,6 @@ describe('GreenChecksService', () => {
     INTERNAL_EMAIL_LIST: 'internal@test.com',
   };
 
-  /** Misma referencia en todo el ciclo de vida del módulo Nest (mutar por test). */
   const resultsUtilStub = {
     statusId: ResultStatusEnum.SUBMITTED,
     indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
@@ -100,7 +99,6 @@ describe('GreenChecksService', () => {
     resultId: 50,
   };
 
-  /** prepareEmail → prepareDataToEmail exige promesas en repositorio / plantilla. */
   const stubNonOicrEmailData = () => {
     getDataForReviseResult.mockResolvedValue({
       sub_email: 'sub@test.com',
