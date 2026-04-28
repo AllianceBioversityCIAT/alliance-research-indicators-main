@@ -83,6 +83,22 @@ describe('ExcelWorkbookBuilder', () => {
     });
   });
 
+  it('strips XML 1.0–illegal characters from text cells so xlsx is not “corrupt” in Excel', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'BadChar',
+          columns: [{ key: 't', header: 'T', cellDataType: 'text' }],
+          rows: [{ t: `before\uFFFEafter` }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const ws = wb.getWorksheet('BadChar');
+    expect(ws!.getRow(2).getCell(1).value).toBe('beforeafter');
+  });
+
   it('coerces values and sets numFmt from cellDataType', async () => {
     const buf = await bufferFrom({
       sheets: [
