@@ -99,6 +99,7 @@ import { IntellectualPropertyOwner } from '../intellectual-property-owners/entit
 import { ResultSortEnum } from './enum/result-sort.enum';
 import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
 import { GreenChecksService } from '../green-checks/green-checks.service';
+import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 
 @Injectable()
 export class ResultsService {
@@ -139,7 +140,8 @@ export class ResultsService {
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
     private readonly _greenChecksService: GreenChecksService,
-  ) {}
+    private readonly _greenCheckRepository: GreenCheckRepository,
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -681,21 +683,21 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -955,7 +957,7 @@ export class ResultsService {
           break;
       }
 
-      await this.customStatus(result.status, newResult.result_id);
+      await this.customStatus(result.status, newResult.result_id, processedResult?.result?.year);
 
       return { ...newResult, error: false };
     } catch (error) {
@@ -996,6 +998,7 @@ export class ResultsService {
   async customStatus(
     status: ResultStatusEnum,
     resultId: number,
+    reportYear: number,
   ): Promise<void> {
     if (isEmpty(status) || !ResultStatusNameEnum?.[status]) return;
 
@@ -1010,6 +1013,17 @@ export class ResultsService {
         result_status_id: status,
         ...this.currentUser.audit(SetAuditEnum.UPDATE),
       });
+
+      if (status === ResultStatusEnum.APPROVED) {
+        const resultrCode = await this.dataSource.getRepository(Result).findOne({
+          where: {
+            result_id: resultId,
+            is_active: true,
+          },
+        }).then((result) => result.result_official_code);
+
+        await this._greenCheckRepository.createSnapshot(resultrCode, reportYear)
+      }
     }
   }
 
@@ -1275,8 +1289,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },
