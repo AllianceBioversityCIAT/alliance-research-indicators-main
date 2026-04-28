@@ -11,6 +11,7 @@ import type {
   ExcelWorkbookSpec,
 } from './excel-workbook.types';
 import { validateExcelWorkbookRowLimits } from './excel-workbook.row-limit';
+import { sanitizeXml1Text } from '../../../shared/utils/xml1-text-sanitize.util';
 
 @Injectable()
 export class ExcelWorkbookBuilder {
@@ -274,7 +275,16 @@ export class ExcelWorkbookBuilder {
       if (raw === null || raw === undefined) {
         return '';
       }
-      return raw as CellValue;
+      if (typeof raw === 'string') {
+        return sanitizeXml1Text(raw);
+      }
+      if (typeof raw === 'number' || typeof raw === 'bigint') {
+        return raw as CellValue;
+      }
+      if (raw instanceof Date) {
+        return raw;
+      }
+      return sanitizeXml1Text(String(raw));
     }
     if (raw === null || raw === undefined || raw === '') {
       return '';
@@ -442,6 +452,9 @@ export class ExcelWorkbookBuilder {
       if (v === null || v === undefined) {
         return '';
       }
+      if (typeof v === 'string') {
+        return sanitizeXml1Text(v);
+      }
       return v as CellValue;
     }
     const url = row[h.urlField];
@@ -450,7 +463,7 @@ export class ExcelWorkbookBuilder {
       const displaySource = h.displayField ? row[h.displayField] : url;
       const text =
         displaySource !== null && displaySource !== undefined
-          ? String(displaySource)
+          ? sanitizeXml1Text(String(displaySource))
           : urlStr;
       return { text, hyperlink: urlStr };
     }
@@ -461,7 +474,7 @@ export class ExcelWorkbookBuilder {
     if (displaySource === null || displaySource === undefined) {
       return '';
     }
-    return String(displaySource);
+    return sanitizeXml1Text(String(displaySource));
   }
 
   private isHttpUrl(value: string): boolean {
