@@ -134,7 +134,7 @@ export class ResultsService {
     private readonly _resultLeverSdgTargetsService: ResultLeverSdgTargetsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -676,21 +676,21 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -838,6 +838,11 @@ export class ResultsService {
       },
     });
 
+    const isMainContactPerson = await this.mainRepo.isMainContactPerson(
+      result_id,
+      this.currentUser.user_id,
+    );
+
     const primaryContract =
       await this._resultContractsService.getPrimaryContract(result_id);
 
@@ -851,6 +856,7 @@ export class ResultsService {
     }
 
     return {
+      is_main_contact_person: isMainContactPerson,
       result_contract_id: primaryContract?.contract_id,
       indicator_id: result?.indicator?.indicator_id,
       indicator_name: result?.indicator?.name,
@@ -1248,8 +1254,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },

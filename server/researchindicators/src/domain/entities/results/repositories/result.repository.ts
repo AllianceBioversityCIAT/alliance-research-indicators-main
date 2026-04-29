@@ -467,6 +467,24 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     );
   }
 
+  async isMainContactPerson(resultId: number, userId: number) {
+    const query = `SELECT 
+                    COUNT(ru.result_user_id) > 0 AS is_main_contact
+                  FROM result_users ru 
+                    INNER JOIN alliance_user_staff aus ON aus.carnet = ru.user_id 
+                    INNER JOIN sec_users su ON TRIM(LOWER(su.email)) = TRIM(LOWER(aus.email)) 
+                                AND su.sec_user_id = ?
+                  WHERE ru.user_role_id = 1
+                    AND ru.is_active = TRUE
+                    AND ru.result_id = ?`;
+
+    const isMainContact = await this.query(query, [userId, resultId]).then(
+      (res: { is_main_contact: number }[]) =>
+        res?.length ? res[0] : { is_main_contact: 0 },
+    );
+    return isMainContact?.is_main_contact === 1;
+  }
+
   async findUserByCarnetId(carnetId: string): Promise<SecUser> {
     if (isEmpty(carnetId)) return null;
     const query = `SELECT su.*

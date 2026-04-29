@@ -98,6 +98,7 @@ describe('ResultsService', () => {
       find: jest.fn(),
       deleteResult: jest.fn(),
       metadataPrincipalInvestigator: jest.fn(),
+      isMainContactPerson: jest.fn(),
       target: {} as any,
       save: jest.fn(),
     } as any;
@@ -2038,6 +2039,7 @@ describe('ResultsService', () => {
       const mockPrimaryContract = { contract_id: 'CONTRACT-001' };
 
       mockMainRepo.findOne.mockResolvedValue(mockResult as any);
+      mockMainRepo.isMainContactPerson.mockResolvedValue(true);
       mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
         mockPrincipalData as any,
       );
@@ -2059,10 +2061,15 @@ describe('ResultsService', () => {
         result_title: mockResult.title,
         created_by: mockResult.created_by,
         report_year: mockResult.report_year_id,
+        is_main_contact_person: true,
         is_principal_investigator: mockPrincipalData.is_principal === 1,
         result_contract_id: mockPrimaryContract.contract_id,
         result_status: mockResult.result_status,
       });
+      expect(mockMainRepo.isMainContactPerson).toHaveBeenCalledWith(
+        resultId,
+        123,
+      );
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         select: {
           indicator: {
@@ -2101,6 +2108,7 @@ describe('ResultsService', () => {
       const mockPrincipalData = { is_principal: 0 };
 
       mockMainRepo.findOne.mockResolvedValue(null);
+      mockMainRepo.isMainContactPerson.mockResolvedValue(false);
       mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
         mockPrincipalData as any,
       );
@@ -2109,6 +2117,10 @@ describe('ResultsService', () => {
       // Act & Assert
       await expect(service.findMetadataResult(resultId)).rejects.toThrow(
         NotFoundException,
+      );
+      expect(mockMainRepo.isMainContactPerson).toHaveBeenCalledWith(
+        resultId,
+        123,
       );
       expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
         resultId,
