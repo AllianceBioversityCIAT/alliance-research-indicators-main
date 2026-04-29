@@ -10,7 +10,7 @@ export class InsertNewRoles1776433682077 implements MigrationInterface {
 
     await queryRunner.query(`INSERT INTO sec_roles 
                                  (created_at,created_by,updated_at,updated_by,is_active,justification_update,sec_role_id,name,focus_id,deleted_at) VALUES
-                                 ('2026-04-15 15:40:46.297915',NULL,'2026-04-15 15:40:46.297915',NULL,1,NULL,${SecRolesEnum.CENTER_ADMIN},'Center Admin',1,NULL)`);
+                                 ('2026-04-15 15:40:46.297915',NULL,'2026-04-15 15:40:46.297915',NULL,1,NULL,${SecRolesEnum.MEL_REGIONAL_EXPERT},'Center Admin',1,NULL)`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -18,7 +18,7 @@ export class InsertNewRoles1776433682077 implements MigrationInterface {
       `DELETE FROM app_config WHERE \`key\` = 'BULK_UPLOAD.EMBED_INFO.URL'`,
     );
     await queryRunner.query(
-      `DELETE FROM sec_roles WHERE sec_role_id = ${SecRolesEnum.CENTER_ADMIN}`,
+      `DELETE FROM sec_roles WHERE sec_role_id = ${SecRolesEnum.MEL_REGIONAL_EXPERT}`,
     );
   }
 }
