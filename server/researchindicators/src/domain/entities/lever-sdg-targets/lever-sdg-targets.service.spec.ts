@@ -134,21 +134,27 @@ describe('LeverSdgTargetsService', () => {
 
       const result = await service.findAll();
 
-      expect(find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          select: expect.objectContaining({
+      expect(find).toHaveBeenCalledWith({
+        select: {
+          id: true,
+          lever: {
             id: true,
-            lever: expect.any(Object),
-            sdg_target: expect.any(Object),
-          }),
-          relations: { lever: true, sdg_target: true },
-          where: { is_active: true },
-          order: {
-            lever: { id: 'ASC' },
-            sdg_target: { sdg_target_code: 'ASC' },
+            short_name: true,
+            full_name: true,
           },
-        }),
-      );
+          sdg_target: {
+            id: true,
+            sdg_target_code: true,
+            sdg_target: true,
+          },
+        },
+        where: { is_active: true },
+        relations: { lever: true, sdg_target: true },
+        order: {
+          lever: { id: 'ASC' },
+          sdg_target: { sdg_target_code: 'ASC' },
+        },
+      });
       expect(result).toBe(rows);
     });
   });
@@ -175,8 +181,24 @@ describe('LeverSdgTargetsService', () => {
           }),
           select: expect.objectContaining({
             id: true,
-            lever: expect.any(Object),
-            sdg_target: expect.any(Object),
+            lever: {
+              id: true,
+              short_name: true,
+              full_name: true,
+            },
+            sdg_target: expect.objectContaining({
+              id: true,
+              sdg_target_code: true,
+              sdg_target: true,
+              clarisa_sdg: {
+                id: true,
+                short_name: true,
+                full_name: true,
+                icon: true,
+                color: true,
+                description: true,
+              },
+            }),
           }),
         }),
       );
