@@ -12,7 +12,7 @@ export const validateRoles = (
     );
   }
 
-  if (user.roles?.includes(SecRolesEnum.SUP_ADMIN)) {
+  if (user.roles?.includes(SecRolesEnum.SYSTEM_ADMIN)) {
     return true;
   }
 

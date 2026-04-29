@@ -26,7 +26,7 @@ export class RolesGuard implements CanActivate {
     }
 
     // If user is GENERAL_ADMIN, allow access automatically
-    if (user.roles?.includes(SecRolesEnum.GENERAL_ADMIN)) {
+    if (user.roles?.includes(SecRolesEnum.CENTER_ADMIN)) {
       return true;
     }
 

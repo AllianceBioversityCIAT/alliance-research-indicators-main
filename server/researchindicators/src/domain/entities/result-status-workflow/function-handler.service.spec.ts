@@ -338,7 +338,7 @@ describe('StatusWorkflowFunctionHandlerService', () => {
   // [CLAUDE/DONE] 107
   describe('isPiValidation', () => {
     it('should throw ForbiddenException when user is not PI and not admin', async () => {
-      mockCurrentUser.roles = [SecRolesEnum.GENERAL_ADMIN];
+      mockCurrentUser.roles = [SecRolesEnum.CENTER_ADMIN];
       mockMainRepo.isPi.mockResolvedValue(false);
       const generalData = makeGeneralData();
 
@@ -348,7 +348,7 @@ describe('StatusWorkflowFunctionHandlerService', () => {
     });
 
     it('should not throw when user has SUP_ADMIN role', async () => {
-      mockCurrentUser.roles = [SecRolesEnum.SUP_ADMIN];
+      mockCurrentUser.roles = [SecRolesEnum.SYSTEM_ADMIN];
       const generalData = makeGeneralData();
 
       await expect(
@@ -543,7 +543,7 @@ describe('StatusWorkflowFunctionHandlerService', () => {
     });
 
     it('should not throw when user has GENERAL_ADMIN role', async () => {
-      mockCurrentUser.roles = [SecRolesEnum.GENERAL_ADMIN];
+      mockCurrentUser.roles = [SecRolesEnum.CENTER_ADMIN];
 
       await expect(
         service.oicrRoleChangeStatusValidation(makeGeneralData(), null as any),
@@ -551,7 +551,7 @@ describe('StatusWorkflowFunctionHandlerService', () => {
     });
 
     it('should not throw when user has SUP_ADMIN role', async () => {
-      mockCurrentUser.roles = [SecRolesEnum.SUP_ADMIN];
+      mockCurrentUser.roles = [SecRolesEnum.SYSTEM_ADMIN];
 
       await expect(
         service.oicrRoleChangeStatusValidation(makeGeneralData(), null as any),

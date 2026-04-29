@@ -55,7 +55,7 @@ describe('RolesGuard', () => {
       // Arrange
       reflector.getAllAndOverride.mockReturnValue([SecRolesEnum.CONTRIBUTOR]);
       const context = createExecutionContext({
-        roles: [SecRolesEnum.GENERAL_ADMIN],
+        roles: [SecRolesEnum.CENTER_ADMIN],
       });
 
       // Act
@@ -128,7 +128,7 @@ describe('RolesGuard', () => {
       // Arrange
       reflector.getAllAndOverride.mockReturnValue([SecRolesEnum.CONTRIBUTOR]);
       const context = createExecutionContext({
-        roles: [SecRolesEnum.GENERAL_ADMIN, SecRolesEnum.IT_SUPPORT],
+        roles: [SecRolesEnum.CENTER_ADMIN, SecRolesEnum.IT_SUPPORT],
       });
 
       // Act
@@ -142,7 +142,7 @@ describe('RolesGuard', () => {
       // Arrange
       reflector.getAllAndOverride.mockReturnValue([SecRolesEnum.CONTRIBUTOR]);
       const context = createExecutionContext({
-        roles: [SecRolesEnum.IT_SUPPORT, SecRolesEnum.DEVELOPER],
+        roles: [SecRolesEnum.IT_SUPPORT, SecRolesEnum.TECHNICAL_SUPPORT],
       });
 
       // Act

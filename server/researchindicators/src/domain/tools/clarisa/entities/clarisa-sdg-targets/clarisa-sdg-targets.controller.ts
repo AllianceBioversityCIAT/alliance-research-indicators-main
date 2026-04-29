@@ -7,7 +7,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 @Controller()
 @ApiBearerAuth()
 export class ClarisaSdgTargetsController {
-  constructor(private readonly sdgTargetsService: ClarisaSdgTargetsService) { }
+  constructor(private readonly sdgTargetsService: ClarisaSdgTargetsService) {}
 
   @Get()
   async findAll() {
