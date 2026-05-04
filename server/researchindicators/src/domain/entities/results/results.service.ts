@@ -91,6 +91,8 @@ import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-ou
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
+import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { AllianceUserStaff } from '../alliance-user-staff/entities/alliance-user-staff.entity';
 import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
 import { IntellectualPropertyOwner } from '../intellectual-property-owners/entities/intellectual-property-owner.entity';
 import { ResultSortEnum } from './enum/result-sort.enum';
@@ -283,7 +285,16 @@ export class ResultsService {
       configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
     newConfig.notContract = configuration?.notContract ?? false;
     newConfig.validateTitle = configuration?.validateTitle ?? true;
+    newConfig.isSnapshot = configuration?.isSnapshot ?? false;
     return newConfig;
+  }
+
+  async updateInactiveResult(resultId: number, isSnapshot: boolean) {
+    await this.mainRepo.update(resultId, {
+      is_active: true,
+      is_snapshot: isSnapshot,
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    });
   }
 
   async createResult(
@@ -342,7 +353,7 @@ export class ResultsService {
           is_ai: createResult.is_ai ?? false,
           result_official_code: officialCode ?? newOfficialCode,
           report_year_id: year,
-          is_snapshot: false,
+          is_snapshot: config.isSnapshot,
           platform_code,
           result_status_id: config.result_status_id,
           ...this.currentUser.audit(SetAuditEnum.NEW),
@@ -445,6 +456,21 @@ export class ResultsService {
     return lastCode;
   }
 
+  async createUserProcess(user: AllianceUserStaff): Promise<SecUser> {
+    const newUser: SecUser = new SecUser();
+    newUser.first_name = user.first_name;
+    newUser.last_name = user.last_name;
+    newUser.email = user.email;
+    newUser.carnet = user.carnet;
+    if (isEmpty(user.email)) {
+      this.logger.warn(
+        `User ${user.carnet} has no email, skipping user creation.`,
+      );
+      return null;
+    }
+    return this.mainRepo.createUserInSecUsers(newUser);
+  }
+
   private async createResultType(
     resultId: number,
     indicator: IndicatorsEnum,
@@ -505,7 +531,7 @@ export class ResultsService {
       });
 
     await this.mainRepo.deleteResult(result.result_id);
-    await this._openSearchResultApi.uploadSingleToOpenSearch(
+    this._openSearchResultApi.uploadSingleToOpenSearch(
       { result_id: result.result_id },
       ElasticOperationEnum.DELETE,
     );
