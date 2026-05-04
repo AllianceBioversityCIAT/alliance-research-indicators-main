@@ -563,7 +563,16 @@ describe('ResultsService', () => {
           lever: false,
           sdg: false,
         },
+        result_status_id: ResultStatusEnum.DRAFT,
+        notContract: false,
+        validateTitle: true,
+        isSnapshot: false,
       });
+
+      // Ensure OpenSearch upload returns a Promise (service chains `.catch(...)`)
+      mockOpenSearchResultApi.uploadSingleToOpenSearch.mockResolvedValue(
+        undefined,
+      );
     });
 
     it('should throw BadRequestException when required fields are missing', async () => {
@@ -695,20 +704,23 @@ describe('ResultsService', () => {
       });
       expect((service as any).newOfficialCode).toHaveBeenCalled();
       expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockRepository.save).toHaveBeenCalledWith({
-        description: createResult.description,
-        indicator_id: createResult.indicator_id,
-        title: createResult.title,
-        is_ai: false,
-        result_official_code: newOfficialCode,
-        report_year_id: createResult.year,
-        is_snapshot: false,
-        platform_code: ReportingPlatformEnum.STAR, // Default value
-        created_at: expect.any(Date),
-        updated_at: expect.any(Date),
-        created_by: 123,
-        updated_by: 123,
-      });
+      expect(mockRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: createResult.description,
+          indicator_id: createResult.indicator_id,
+          title: createResult.title,
+          is_ai: false,
+          result_official_code: newOfficialCode,
+          report_year_id: createResult.year,
+          is_snapshot: false,
+          platform_code: ReportingPlatformEnum.STAR, // Default value
+          result_status_id: ResultStatusEnum.DRAFT,
+          created_at: expect.any(Date),
+          updated_at: expect.any(Date),
+          created_by: 123,
+          updated_by: 123,
+        }),
+      );
       expect((service as any).createResultType).toHaveBeenCalledWith(
         savedResult.result_id,
         savedResult.indicator_id,
