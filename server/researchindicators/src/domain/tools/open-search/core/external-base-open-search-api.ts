@@ -45,7 +45,7 @@ export abstract class BaseExternalOpenSearchApi<
         'Content-Type': 'application/x-ndjson',
       },
     };
-    this._primaryKey = customPrimaryKey as keyof OpenSearchEntity;
+    this._primaryKey = customPrimaryKey;
 
     this._index = indexListName.map((name) => name.trim()).join(',');
   }
@@ -122,24 +122,24 @@ export abstract class BaseExternalOpenSearchApi<
       query: isEmpty(fieldsToSearchOn)
         ? { match_all: {} }
         : {
-            bool: {
-              must: [
-                {
-                  bool: {
-                    should: [
-                      {
-                        multi_match: {
-                          query: toFind,
-                          fields: fieldsToSearchOn as (keyof T)[],
-                          operator: 'and',
-                        },
+          bool: {
+            must: [
+              {
+                bool: {
+                  should: [
+                    {
+                      multi_match: {
+                        query: toFind,
+                        fields: fieldsToSearchOn as (keyof T)[],
+                        operator: 'and',
                       },
-                    ],
-                  },
+                    },
+                  ],
                 },
-              ],
-            },
+              },
+            ],
           },
+        },
       sort: [{ [this._primaryKey]: { order: 'desc' } } as OpenSearchSort<T>],
     };
 
