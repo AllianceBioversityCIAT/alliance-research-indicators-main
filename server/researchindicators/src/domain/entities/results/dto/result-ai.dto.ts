@@ -17,6 +17,7 @@ import {
   IsNotEmpty,
   Matches,
   IsEnum,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UpdateIpRightDto } from '../../result-ip-rights/dto/update-ip-right.dto';
@@ -433,6 +434,15 @@ export class ResultRawAi {
   @ValidateNested({ each: true })
   @Type(() => AiRawInstitution)
   partners?: AiRawInstitution[];
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Indicates if partner is not applicable',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  is_partner_not_applicable?: boolean;
 
   @ApiProperty({
     type: AiRawEvidence,
