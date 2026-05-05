@@ -1259,6 +1259,7 @@ export class ResultsService {
         );
       tempCountries.institutions = acept as ResultInstitution[];
       tempCountries.institutions_ai = pending as ResultInstitutionAi[];
+      tempCountries.is_partner_not_applicable = result?.is_partner_not_applicable;
       tmpNewData.partners = tempCountries;
     }
 
