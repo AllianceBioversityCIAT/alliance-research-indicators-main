@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { AppConfig as AppConfigEntity } from '../../entities/app-config/entities/app-config.entity';
 
 /**
  * Class to get all application configurations from environment variables or .env file
@@ -7,6 +9,7 @@ import { Injectable } from '@nestjs/common';
  */
 @Injectable()
 export class AppConfig {
+  constructor(private readonly dataSource: DataSource) { }
   //RabbitMQ host
   get ARI_MQ_HOST(): string {
     return process.env.ARI_MQ_HOST;
@@ -379,5 +382,14 @@ export class AppConfig {
 
   get TIP_TOKEN(): string {
     return process.env.ARI_TIP_TOKEN;
+  }
+
+  async DB_SUPPORT_EMAIL(): Promise<string> {
+    const appConfig = await this.dataSource.getRepository(AppConfigEntity).findOne({
+      where: {
+        key: 'ARI_SUPPORT_EMAIL',
+      },
+    });
+    return appConfig?.simple_value;
   }
 }
