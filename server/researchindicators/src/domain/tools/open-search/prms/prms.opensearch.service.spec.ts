@@ -262,7 +262,7 @@ describe('PrmsOpenSearchService', () => {
       );
     });
 
-    it('should create user from alliance staff when sec user is missing', async () => {
+    it('should create user from alliance staff when STAR user is missing and creator email is empty', async () => {
       resultRepository.findUserByEmailOrCarnet.mockResolvedValue(null as any);
       allianceStaffRepoHandle.findOne.mockResolvedValue({
         email: 'staff@alliance.org',
@@ -277,17 +277,23 @@ describe('PrmsOpenSearchService', () => {
           created_by: {
             first_name: 'A',
             last_name: 'B',
-            email: 'Staff@Alliance.org ',
+            email: '',
           },
         }),
       ]);
 
       expect(Like).toHaveBeenCalled();
-      expect(resultsService.createUserProcess).toHaveBeenCalled();
+      expect(allianceStaffRepoHandle.findOne).toHaveBeenCalled();
+      expect(resultsService.createUserProcess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'staff@alliance.org',
+          center: 'ABC',
+        }),
+      );
       expect(out[0].userData).toEqual({ sec_user_id: 1 });
     });
 
-    it('should reuse sec user and refresh carnet when staff exists', async () => {
+    it('should reuse sec user and refresh carnet from alliance staff when creator email is empty', async () => {
       resultRepository.findUserByEmailOrCarnet.mockResolvedValue({
         sec_user_id: 5,
         carnet: 'OLD',
@@ -302,12 +308,13 @@ describe('PrmsOpenSearchService', () => {
           created_by: {
             first_name: 'A',
             last_name: 'B',
-            email: 'staff@alliance.org',
+            email: '',
           },
         }),
       ]);
 
       expect(resultRepository.unpdateCarnetUser).toHaveBeenCalledWith(5, 'OLD');
+      expect(allianceStaffRepoHandle.findOne).toHaveBeenCalled();
       expect(out[0].userData.carnet).toBe('NEWCENTER');
     });
 
