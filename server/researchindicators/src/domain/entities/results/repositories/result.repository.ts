@@ -540,6 +540,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
   }
 
   async unpdateCarnetUser(userId: number, carnet: string) {
+    if (isEmpty(carnet) || isEmpty(userId)) return;
     const query = `UPDATE sec_users SET carnet = ? WHERE sec_user_id = ?`;
     await this.query(query, [carnet, userId]);
   }
