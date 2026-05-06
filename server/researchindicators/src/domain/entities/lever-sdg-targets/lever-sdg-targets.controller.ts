@@ -50,7 +50,7 @@ export class LeverSdgTargetsController {
       transform: true,
     }),
   )
-  @Roles(SecRolesEnum.DEVELOPER)
+  @Roles(SecRolesEnum.TECHNICAL_SUPPORT)
   @UseGuards(RolesGuard)
   create(@Body() createLeverSdgTargetDto: CreateLeverSdgTargetDto) {
     return this.leverSdgTargetsService
@@ -71,7 +71,7 @@ export class LeverSdgTargetsController {
     description: 'ID of the Lever Sdg Target',
     example: 1,
   })
-  @Roles(SecRolesEnum.DEVELOPER)
+  @Roles(SecRolesEnum.TECHNICAL_SUPPORT)
   @UseGuards(RolesGuard)
   async delete(@Param('id') id: number) {
     return this.leverSdgTargetsService.softDelete(id).then((data) =>

@@ -1,7 +1,9 @@
+import { DataSource } from 'typeorm';
 import { AppConfig } from './app-config.util';
 
 describe('AppConfig', () => {
   const prev = { ...process.env };
+  const dataSource = {} as DataSource;
 
   afterEach(() => {
     process.env = { ...prev };
@@ -11,7 +13,7 @@ describe('AppConfig', () => {
     process.env.ARI_PORT = '3000';
     process.env.ARI_IS_PRODUCTION = 'true';
     process.env.ARI_SEE_ALL_LOGS = 'false';
-    const cfg = new AppConfig();
+    const cfg = new AppConfig(dataSource);
     expect(cfg.ARI_PORT).toBe(3000);
     expect(cfg.ARI_IS_PRODUCTION).toBe(true);
     expect(cfg.ARI_SEE_ALL_LOGS).toBe(false);
@@ -20,7 +22,7 @@ describe('AppConfig', () => {
   it('exposes raw string env values', () => {
     process.env.ARI_MQ_HOST = 'amqp://local';
     process.env.ARI_JWT_ACCESS_EXPIRES_IN = '1h';
-    const cfg = new AppConfig();
+    const cfg = new AppConfig(dataSource);
     expect(cfg.ARI_MQ_HOST).toBe('amqp://local');
     expect(cfg.ARI_JWT_ACCESS_EXPIRES_IN).toBe('1h');
   });
@@ -77,7 +79,7 @@ describe('AppConfig', () => {
     process.env.ARI_TIP_API_URL = 'tip';
     process.env.ARI_TIP_TOKEN = 'tok';
 
-    const cfg = new AppConfig();
+    const cfg = new AppConfig(dataSource);
 
     expect(cfg.ARI_MQ_HOST).toBe('mq-host');
     expect(cfg.ARI_MQ_USER).toBe('mq-user');
@@ -140,8 +142,29 @@ describe('AppConfig', () => {
   it('SPRM_EMAIL_SAFE and SET_SAFE_EMAIL use production env when ARI_IS_PRODUCTION is true', () => {
     process.env.ARI_IS_PRODUCTION = 'true';
     process.env.ARI_SPRM_EMAIL = 'prod@x';
-    const cfg = new AppConfig();
+    const cfg = new AppConfig(dataSource);
     expect(cfg.SPRM_EMAIL_SAFE('user@x')).toBe('prod@x');
     expect(cfg.SET_SAFE_EMAIL('real@x', 'alt@x')).toBe('real@x');
+  });
+
+  it('DB_SUPPORT_EMAIL returns simple_value from app_config for ARI_SUPPORT_EMAIL key', async () => {
+    const findOne = jest.fn().mockResolvedValue({ simple_value: 'db-support@example.com' });
+    const ds = {
+      getRepository: jest.fn().mockReturnValue({ findOne }),
+    } as unknown as DataSource;
+    const cfg = new AppConfig(ds);
+    await expect(cfg.DB_SUPPORT_EMAIL()).resolves.toBe('db-support@example.com');
+    expect(findOne).toHaveBeenCalledWith({
+      where: { key: 'ARI_SUPPORT_EMAIL' },
+    });
+  });
+
+  it('DB_SUPPORT_EMAIL resolves to undefined when no matching app_config row', async () => {
+    const findOne = jest.fn().mockResolvedValue(null);
+    const ds = {
+      getRepository: jest.fn().mockReturnValue({ findOne }),
+    } as unknown as DataSource;
+    const cfg = new AppConfig(ds);
+    await expect(cfg.DB_SUPPORT_EMAIL()).resolves.toBeUndefined();
   });
 });

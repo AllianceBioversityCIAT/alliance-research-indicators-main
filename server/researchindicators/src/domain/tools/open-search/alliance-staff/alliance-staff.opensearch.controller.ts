@@ -23,7 +23,7 @@ export class AllianceStaffOpenSearchController {
   constructor(private readonly api: OpenSearchAllianceStaffApi) {}
 
   @Post('reset')
-  @Roles(SecRolesEnum.DEVELOPER)
+  @Roles(SecRolesEnum.TECHNICAL_SUPPORT)
   async resetOpenSearch() {
     return this.api.resetElasticData().then((response) =>
       ResponseUtils.format({

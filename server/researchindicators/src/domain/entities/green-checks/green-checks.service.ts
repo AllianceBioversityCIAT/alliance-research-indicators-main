@@ -245,7 +245,7 @@ export class GreenChecksService {
         ResultStatusEnum.REJECTED,
       ].includes(status)
     ) {
-      validateRoles(this.currentUserUtil, SecRolesEnum.GENERAL_ADMIN);
+      validateRoles(this.currentUserUtil, SecRolesEnum.CENTER_ADMIN);
     }
   }
 

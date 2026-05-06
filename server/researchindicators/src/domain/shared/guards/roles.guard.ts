@@ -6,7 +6,7 @@ export const ROLES_KEY = 'roles';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<SecRolesEnum[]>(
@@ -26,7 +26,7 @@ export class RolesGuard implements CanActivate {
     }
 
     // If user is GENERAL_ADMIN, allow access automatically
-    if (user.roles?.includes(SecRolesEnum.GENERAL_ADMIN)) {
+    if (user.roles?.includes(SecRolesEnum.SYSTEM_ADMIN)) {
       return true;
     }
 
