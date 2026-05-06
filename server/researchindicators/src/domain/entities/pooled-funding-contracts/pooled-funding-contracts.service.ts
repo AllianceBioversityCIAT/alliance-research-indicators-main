@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { DataSource } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { PooledFundingContract } from './entities/pooled-funding-contract.entity';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 

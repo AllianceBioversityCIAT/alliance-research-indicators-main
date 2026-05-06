@@ -20,8 +20,7 @@ import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
-  implements ElasticFindEntity<ResultOpensearchDto>
-{
+  implements ElasticFindEntity<ResultOpensearchDto> {
   constructor(
     private readonly appConfig: AppConfig,
     private readonly currentUserUtil: CurrentUserUtil,
@@ -212,11 +211,10 @@ export class ResultRepository
 											  'start_date', ac.start_date,
 											  'deleted_at', ac.deleted_at))`;
 
-      queryParts.contracts.select = `,${
-        filters?.primary_contract
-          ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
-          : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
-      } as result_contracts`;
+      queryParts.contracts.select = `,${filters?.primary_contract
+        ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
+        : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
+        } as result_contracts`;
 
       if (filters?.primary_contract) {
         queryParts.contracts.groupBy = `,rc.result_contract_id`;
@@ -520,7 +518,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     if (isEmpty(email)) return null;
     const query = `SELECT su.*
     FROM sec_users su
-    WHERE su.email = ?
+    WHERE su.email like CONCAT('%', ?, '%')
       AND su.is_active = TRUE
     LIMIT 1;`;
 
@@ -763,8 +761,8 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 
     const staticWhereParams = search
       ? Array(
-          ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT,
-        ).fill(search)
+        ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT,
+      ).fill(search)
       : [];
     const creatorNameWhereParams = creatorNameTokens.flatMap((t) => [t, t]);
     const searchWhereParams = search
@@ -776,11 +774,11 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       : '';
     const relevanceParams = search
       ? [
-          ...Array(
-            ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT,
-          ).fill(search),
-          ...creatorNameTokens.flatMap((t) => [t, t]),
-        ]
+        ...Array(
+          ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT,
+        ).fill(search),
+        ...creatorNameTokens.flatMap((t) => [t, t]),
+      ]
       : [];
 
     const fromAndJoins = `
@@ -861,9 +859,9 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     const rawData = await this.query(mainQuery, mainQueryParams);
     const data = search
       ? rawData.map((row: Record<string, unknown>) => {
-          const { _search_relevance: _r, ...rest } = row;
-          return rest;
-        })
+        const { _search_relevance: _r, ...rest } = row;
+        return rest;
+      })
       : rawData;
 
     return {

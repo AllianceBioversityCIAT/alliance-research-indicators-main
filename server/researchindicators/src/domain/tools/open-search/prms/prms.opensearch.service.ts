@@ -375,7 +375,7 @@ export class PrmsOpenSearchService
 
       results.push(result);
     }
-    return results ?? [];
+    return results;
   }
 
   async createResultInStar(
