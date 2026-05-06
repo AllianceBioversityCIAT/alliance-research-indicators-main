@@ -31,7 +31,7 @@ import { ClarisaRegion } from '../clarisa/entities/clarisa-regions/entities/clar
 import { ClarisaCountry } from '../clarisa/entities/clarisa-countries/entities/clarisa-country.entity';
 import { ResultEvidence } from '../../entities/result-evidences/entities/result-evidence.entity';
 import { ResultKnowledgeProduct } from '../../entities/result-knowledge-product/entities/result-knowledge-product.entity';
-import { DataSource } from 'typeorm';
+import { DataSource, Like } from 'typeorm';
 import { Result } from '../../entities/results/entities/result.entity';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
@@ -169,13 +169,19 @@ export class TipIntegrationService extends BaseApi {
           result.submitter?.email,
         );
 
-        allianceUserStaff = await this.dataSource
-          .getRepository(AllianceUserStaff)
-          .findOne({
-            where: {
-              carnet: result.submitter?.idCard,
-            },
-          });
+        const dataToSearch = result.submitter?.idCard ?? result.submitter?.email;
+        if (isEmpty(dataToSearch)) {
+          allianceUserStaff = await this.dataSource
+            .getRepository(AllianceUserStaff)
+            .findOne({
+              where: [{
+                carnet: dataToSearch,
+              }, {
+                email: Like(`%${dataToSearch?.trim()?.toLowerCase()}%`),
+              }],
+            });
+        }
+
         if (!isEmpty(allianceUserStaff)) {
           if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
             resultMapped.userData =
@@ -208,8 +214,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-              user_id: carnet,
-            } as ResultUser)
+            user_id: carnet,
+          } as ResultUser)
           : null,
       };
 
