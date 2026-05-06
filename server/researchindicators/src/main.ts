@@ -116,7 +116,7 @@ async function microservice() {
 }
 
 async function bootstrap() {
-  await httpservice();
   await microservice();
+  await httpservice();
 }
 bootstrap();

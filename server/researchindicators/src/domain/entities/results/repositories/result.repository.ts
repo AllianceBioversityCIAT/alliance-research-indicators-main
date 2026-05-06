@@ -680,6 +680,11 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return query;
   }
 
+  /**
+   * Result Center (paginated list). The STAR export reuses this same query for filters,
+   * search, relevance, and sort order; it does not duplicate `buildFilteringV2` / search fragments in the views.
+   * @see StarResultsExportRepository.collectOrderedResultIdsViaFindResultsV2
+   */
   async findResultsV2(
     search: string,
     pagination?: { page?: number; limit?: number },

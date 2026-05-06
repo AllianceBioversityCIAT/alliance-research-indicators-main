@@ -93,9 +93,12 @@ export class Result extends AuditableEntity {
   })
   title?: string;
 
-  @Column('text', {
+  @Column({
+    type: 'text',
     name: 'description',
     nullable: true,
+    charset: 'utf8mb4',
+    collation: 'utf8mb4_unicode_ci',
   })
   @OpenSearchProperty({
     type: 'text',

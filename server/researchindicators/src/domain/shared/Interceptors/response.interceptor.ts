@@ -4,6 +4,7 @@ import {
   HttpStatus,
   InternalServerErrorException,
   NestInterceptor,
+  StreamableFile,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Observable, map } from 'rxjs';
@@ -35,6 +36,9 @@ export class ResponseInterceptor implements NestInterceptor {
             method: 'socket',
             url: pattern,
           });
+          return res;
+        }
+        if (res instanceof StreamableFile) {
           return res;
         }
         let modifiedData: ServerResponseDto<unknown> = {
