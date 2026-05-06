@@ -9,7 +9,7 @@ import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 @Controller()
 @ApiBearerAuth()
 export class PrmsOpenSearchController {
-  constructor(private readonly prmsService: PrmsOpenSearchService) {}
+  constructor(private readonly prmsService: PrmsOpenSearchService) { }
 
   @Get('fetch-prms-data')
   @ApiQuery({
@@ -18,7 +18,7 @@ export class PrmsOpenSearchController {
     type: Number,
   })
   @UseGuards(RolesGuard)
-  @Roles(SecRolesEnum.DEVELOPER)
+  @Roles(SecRolesEnum.TECHNICAL_SUPPORT)
   async fetchPrmsData(@Query('year') year: string) {
     return this.prmsService.getData(+year);
   }
