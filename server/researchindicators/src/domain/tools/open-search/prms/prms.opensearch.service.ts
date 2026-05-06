@@ -48,8 +48,7 @@ import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-pr
 
 @Injectable()
 export class PrmsOpenSearchService
-  implements ExternalMappersInterface<ExternalMappersDto>
-{
+  implements ExternalMappersInterface<ExternalMappersDto> {
   private readonly logger = new LoggerUtil({
     name: PrmsOpenSearchService.name,
   });
@@ -65,7 +64,7 @@ export class PrmsOpenSearchService
     private readonly pooledFundingContractsService: PooledFundingContractsService,
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly syncProcessLogService: SyncProcessLogService,
-  ) {}
+  ) { }
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
     for (const result of res) {
@@ -294,14 +293,16 @@ export class PrmsOpenSearchService
           null,
           item.created_by?.email,
         );
-
-        const allianceUserStaff = await this.dataSource
-          .getRepository(AllianceUserStaff)
-          .findOne({
-            where: {
-              email: Like(`%${item.created_by?.email?.trim()?.toLowerCase()}%`),
-            },
-          });
+        let allianceUserStaff: AllianceUserStaff = null;
+        if (isEmpty(item.created_by?.email)) {
+          allianceUserStaff = await this.dataSource
+            .getRepository(AllianceUserStaff)
+            .findOne({
+              where: {
+                email: Like(`%${item.created_by?.email?.trim()?.toLowerCase()}%`),
+              },
+            });
+        }
         if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
           result.userData =
             await this.resultsService.createUserProcess(allianceUserStaff);

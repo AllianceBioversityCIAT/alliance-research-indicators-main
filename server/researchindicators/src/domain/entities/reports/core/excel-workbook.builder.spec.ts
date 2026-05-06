@@ -1,0 +1,1105 @@
+import * as fs from 'fs';
+import { PayloadTooLargeException } from '@nestjs/common';
+import ExcelJS from 'exceljs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { ExcelWorkbookBuilder } from './excel-workbook.builder';
+import { maxDataRowsForExcelSheet } from './excel-workbook.row-limit';
+import type {
+  ExcelColumnSpec,
+  ExcelSheetPreamble,
+  ExcelWorkbookSpec,
+} from './excel-workbook.types';
+
+jest.mock('fs', () => ({
+  ...jest.requireActual<typeof import('fs')>('fs'),
+  existsSync: jest.fn(),
+}));
+
+const existsSync = fs.existsSync as jest.MockedFunction<typeof fs.existsSync>;
+
+/** Logo merges cols 1–2; title must start at col ≥3 to avoid ExcelJS merge overlap. */
+const preambleSheetColumns: ExcelColumnSpec[] = [
+  { key: 'c1', header: 'C1', width: 10 },
+  { key: 'c2', header: 'C2' },
+  { key: 'c3', header: 'C3', width: 11 },
+  { key: 'c4', header: 'C4' },
+  { key: 'c5', header: 'C5', width: 12 },
+];
+
+const preambleBase = (): Pick<
+  ExcelSheetPreamble,
+  | 'bannerTitle'
+  | 'bannerTitleMergeFromCol'
+  | 'bannerTitleMergeToCol'
+  | 'logoMergeFromCol'
+  | 'logoMergeToCol'
+  | 'logoMergeToRow'
+  | 'headerFillArgb'
+  | 'headerFontArgb'
+> => ({
+  bannerTitle: 'T',
+  bannerTitleMergeFromCol: 3,
+  bannerTitleMergeToCol: 5,
+  logoMergeFromCol: 1,
+  logoMergeToCol: 2,
+  logoMergeToRow: 1,
+  headerFillArgb: 'FF1F4E79',
+  headerFontArgb: 'FFFFFFFF',
+});
+
+describe('ExcelWorkbookBuilder', () => {
+  let builder: ExcelWorkbookBuilder;
+
+  beforeEach(() => {
+    builder = new ExcelWorkbookBuilder();
+    existsSync.mockReturnValue(false);
+  });
+
+  async function bufferFrom(spec: ExcelWorkbookSpec): Promise<Buffer> {
+    const buf = await builder.toBuffer(spec);
+    expect(Buffer.isBuffer(buf)).toBe(true);
+    expect(buf.length).toBeGreaterThan(0);
+    return buf;
+  }
+
+  /** ExcelJS `xlsx.load` typings expect a narrower `Buffer` than Node’s generic `Buffer`. */
+  async function loadWorkbook(buf: Buffer): Promise<ExcelJS.Workbook> {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as never);
+    return wb;
+  }
+
+  it('writes a minimal workbook without presentation', async () => {
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Sheet1',
+          columns: [{ key: 'a', header: 'A' }],
+          rows: [{ a: '1' }],
+        },
+      ],
+    });
+  });
+
+  it('strips XML 1.0–illegal characters from text cells so xlsx is not “corrupt” in Excel', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'BadChar',
+          columns: [{ key: 't', header: 'T', cellDataType: 'text' }],
+          rows: [{ t: `before\uFFFEafter` }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const ws = wb.getWorksheet('BadChar');
+    expect(ws!.getRow(2).getCell(1).value).toBe('beforeafter');
+  });
+
+  it('coerces values and sets numFmt from cellDataType', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Typed',
+          columns: [
+            { key: 'n', header: 'N', cellDataType: 'number' },
+            { key: 'i', header: 'I', cellDataType: 'integer' },
+            { key: 'd', header: 'D', cellDataType: 'date' },
+          ],
+          rows: [{ n: '1.25', i: '2024', d: '2024-06-15' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const ws = wb.getWorksheet('Typed');
+    expect(ws).toBeDefined();
+    const row = ws!.getRow(2);
+    expect(row.getCell(1).value).toBe(1.25);
+    expect(row.getCell(1).numFmt).toBe('#,##0.##');
+    expect(row.getCell(2).value).toBe(2024);
+    expect(row.getCell(2).numFmt).toBe('0');
+    expect(row.getCell(3).value).toEqual(expect.any(Date));
+    expect(row.getCell(3).numFmt).toBe('yyyy-mm-dd');
+  });
+
+  it('prefers excelNumFmt over the default for cellDataType', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Fmt',
+          columns: [
+            {
+              key: 'd',
+              header: 'D',
+              cellDataType: 'date',
+              excelNumFmt: 'dd/mm/yyyy',
+            },
+          ],
+          rows: [{ d: '2024-01-02' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const row = wb.getWorksheet('Fmt')!.getRow(2);
+    expect(row.getCell(1).numFmt).toBe('dd/mm/yyyy');
+  });
+
+  it('applies excelNumFmt without cellDataType (no coercion)', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Mask',
+          columns: [{ key: 'c', header: 'C', excelNumFmt: '@' }],
+          rows: [{ c: '00123' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const cell = wb.getWorksheet('Mask')!.getRow(2).getCell(1);
+    expect(cell.value).toBe('00123');
+    expect(cell.numFmt).toBe('@');
+  });
+
+  it('writes empty cell when date or number value is not parseable', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Bad',
+          columns: [
+            { key: 'd', header: 'D', cellDataType: 'date' },
+            { key: 'n', header: 'N', cellDataType: 'number' },
+          ],
+          rows: [{ d: 'not-a-date', n: 'x' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const row = wb.getWorksheet('Bad')!.getRow(2);
+    const empty = (v: unknown) => v === '' || v === null || v === undefined;
+    expect(empty(row.getCell(1).value)).toBe(true);
+    expect(empty(row.getCell(2).value)).toBe(true);
+  });
+
+  it('omits column width when not specified', async () => {
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: [{ key: 'k', header: 'H' }],
+          rows: [],
+        },
+      ],
+    });
+  });
+
+  it('renders hyperlinks for valid http(s) URLs', async () => {
+    const columns: ExcelColumnSpec[] = [
+      {
+        key: 'u',
+        header: 'Link',
+        hyperlink: { urlField: 'u', displayField: 'label' },
+      },
+    ];
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns,
+          rows: [{ u: 'https://a.test', label: 'Text' }],
+        },
+      ],
+    });
+    const wb = await loadWorkbook(buf);
+    const cell = wb.getWorksheet('S')!.getRow(2).getCell(1);
+    expect(cell.font?.underline).toBeTruthy();
+    const argb = cell.font?.color?.argb?.toUpperCase?.();
+    expect(argb).toBe('FF0563C1');
+  });
+
+  it('skips default hyperlink font when linkAppearance.enabled is false', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'Plain',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: {
+                urlField: 'u',
+                linkAppearance: { enabled: false },
+              },
+            },
+          ],
+          rows: [{ u: 'https://a.test' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('Plain')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.color?.argb).toBeUndefined();
+    expect(cell.font?.underline).toBeFalsy();
+  });
+
+  it('applies cellFont bold and italic to data cells', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'F',
+          columns: [
+            {
+              key: 't',
+              header: 'T',
+              cellFont: { bold: true, italic: true, colorArgb: 'FF424242' },
+            },
+          ],
+          rows: [{ t: 'x' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('F')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.bold).toBe(true);
+    expect(cell.font?.italic).toBe(true);
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF424242');
+  });
+
+  it('merges cellFont on top of default hyperlink styling', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'HlFont',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: { urlField: 'u' },
+              cellFont: { bold: true },
+            },
+          ],
+          rows: [{ u: 'https://merge.test' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('HlFont')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.bold).toBe(true);
+    expect(cell.font?.underline).toBeTruthy();
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF0563C1');
+  });
+
+  it('honors linkAppearance colorArgb override for hyperlinks', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'GreenLink',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: {
+                urlField: 'u',
+                linkAppearance: { colorArgb: 'FF008000' },
+              },
+            },
+          ],
+          rows: [{ u: 'https://green.test' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('GreenLink')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF008000');
+    expect(cell.font?.underline).toBeTruthy();
+  });
+
+  it('allows linkAppearance underline false while keeping link color', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'NoUl',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: {
+                urlField: 'u',
+                linkAppearance: { underline: false, colorArgb: 'FF0563C1' },
+              },
+            },
+          ],
+          rows: [{ u: 'https://nou.test' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('NoUl')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.underline).toBeFalsy();
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF0563C1');
+  });
+
+  it('preserves hyperlink underline when row fill overrides font color', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'RowHl',
+          columns: [{ key: 'u', header: 'L', hyperlink: { urlField: 'u' } }],
+          rows: [{ u: 'https://row.test', _f: 'FF000000' }],
+          rowFillArgbField: '_f',
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('RowHl')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.font?.underline).toBeTruthy();
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FFFFFFFF');
+  });
+
+  it('applies cellFont together with cellDataType number', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'NumFont',
+          columns: [
+            {
+              key: 'n',
+              header: 'N',
+              cellDataType: 'number',
+              cellFont: { italic: true, bold: true },
+            },
+          ],
+          rows: [{ n: 99 }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('NumFont')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.value).toBe(99);
+    expect(cell.font?.italic).toBe(true);
+    expect(cell.font?.bold).toBe(true);
+  });
+
+  it('applies cellFont for invalid URL hyperlink cells', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'BadHl',
+          columns: [
+            {
+              key: 'u',
+              header: 'L',
+              hyperlink: { urlField: 'u', emptyDisplay: 'N/A' },
+              cellFont: { italic: true, colorArgb: 'FF808080' },
+            },
+          ],
+          rows: [{ u: 'not-a-url' }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('BadHl')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.value).toBe('N/A');
+    expect(cell.font?.italic).toBe(true);
+    expect(cell.font?.color?.argb?.toUpperCase()).toBe('FF808080');
+  });
+
+  it('coerces bigint to integer for cellDataType integer', async () => {
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'BigI',
+          columns: [{ key: 'i', header: 'I', cellDataType: 'integer' }],
+          rows: [{ i: BigInt(2025) }],
+        },
+      ],
+    });
+    const cell = (await loadWorkbook(buf))
+      .getWorksheet('BigI')!
+      .getRow(2)
+      .getCell(1);
+    expect(cell.value).toBe(2025);
+    expect(cell.numFmt).toBe('0');
+  });
+
+  it('uses URL as hyperlink text when displayField is omitted', async () => {
+    const columns: ExcelColumnSpec[] = [
+      { key: 'u', header: 'Link', hyperlink: { urlField: 'u' } },
+    ];
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns,
+          rows: [{ u: 'https://example.test/path' }],
+        },
+      ],
+    });
+  });
+
+  it('falls back to URL string when displayField is set but missing on row', async () => {
+    const columns: ExcelColumnSpec[] = [
+      {
+        key: 'u',
+        header: 'Link',
+        hyperlink: { urlField: 'u', displayField: 'label' },
+      },
+    ];
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns,
+          rows: [{ u: 'https://example.test/x' }],
+        },
+      ],
+    });
+  });
+
+  it('treats non-string hyperlink URL field as empty string', async () => {
+    const columns: ExcelColumnSpec[] = [
+      {
+        key: 'u',
+        header: 'Link',
+        hyperlink: { urlField: 'u', emptyDisplay: '—' },
+      },
+    ];
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns,
+          rows: [{ u: 404 as unknown as string }],
+        },
+      ],
+    });
+  });
+
+  it('uses emptyDisplay when URL is invalid', async () => {
+    const columns: ExcelColumnSpec[] = [
+      {
+        key: 'u',
+        header: 'Link',
+        hyperlink: {
+          urlField: 'u',
+          displayField: 'label',
+          emptyDisplay: 'N/A',
+        },
+      },
+    ];
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns,
+          rows: [{ u: 'not-a-url', label: 'ignored' }],
+        },
+      ],
+    });
+  });
+
+  it('falls back to displayField text when URL invalid and no emptyDisplay', async () => {
+    const columns: ExcelColumnSpec[] = [
+      {
+        key: 'u',
+        header: 'Link',
+        hyperlink: { urlField: 'u', displayField: 'label' },
+      },
+    ];
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns,
+          rows: [{ u: '', label: 'Shown' }],
+        },
+      ],
+    });
+  });
+
+  it('returns empty string for non-hyperlink cell when value is null', async () => {
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: [{ key: 'z', header: 'Z' }],
+          rows: [{ z: null }],
+        },
+      ],
+    });
+  });
+
+  it('returns empty string for invalid URL when displayField is missing on row', async () => {
+    const columns: ExcelColumnSpec[] = [
+      {
+        key: 'u',
+        header: 'Link',
+        hyperlink: { urlField: 'u', displayField: 'missing' },
+      },
+    ];
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns,
+          rows: [{ u: 'not-url' }],
+        },
+      ],
+    });
+  });
+
+  it('returns empty string for invalid URL without displayField when display is null', async () => {
+    const columns: ExcelColumnSpec[] = [
+      {
+        key: 'u',
+        header: 'Link',
+        hyperlink: { urlField: 'u' },
+      },
+    ];
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns,
+          rows: [{ u: 'bad' }],
+        },
+      ],
+    });
+  });
+
+  it('applies row fill and dark font for dark ARGB fills', async () => {
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: [{ key: 'x', header: 'X' }],
+          rows: [{ x: 'v', _f: 'FF000000' }],
+          rowFillArgbField: '_f',
+        },
+      ],
+    });
+  });
+
+  it('applies row fill and light font for light ARGB fills', async () => {
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: [{ key: 'x', header: 'X' }],
+          rows: [{ x: 'v', _f: 'FFFFFFFF' }],
+          rowFillArgbField: '_f',
+        },
+      ],
+    });
+  });
+
+  it('skips row fill when value is not a valid 8-hex ARGB string', async () => {
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: [{ key: 'x', header: 'X' }],
+          rows: [
+            { x: 'v', _f: 'ZZZZZZZZ' },
+            { x: '2', _f: 'nothex' },
+          ],
+          rowFillArgbField: '_f',
+        },
+      ],
+    });
+  });
+
+  it('skips row fill when value is not a string', async () => {
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: [{ key: 'x', header: 'X' }],
+          rows: [{ x: 'v', _f: 123 as unknown as string }],
+          rowFillArgbField: '_f',
+        },
+      ],
+    });
+  });
+
+  it('treats non-FF-prefixed 8-hex row fill as non-dark via isDarkArgb guard', async () => {
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: [{ key: 'x', header: 'X' }],
+          rows: [{ x: 'v', _f: '12345678' }],
+          rowFillArgbField: '_f',
+        },
+      ],
+    });
+  });
+
+  it('renders preamble with logo image buffer', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [
+        { fromCol: 1, toCol: 1, label: 'G', fillArgb: 'FF203C61' },
+      ],
+      logoImage: {
+        buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+        extension: 'png',
+      },
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('renders preamble with logo from path when file exists', async () => {
+    const logoPath = join(tmpdir(), `excel-logo-${Date.now()}.jpeg`);
+    fs.writeFileSync(
+      logoPath,
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46]),
+    );
+    existsSync.mockImplementation((p) =>
+      typeof p === 'string' && p === logoPath
+        ? true
+        : (jest.requireActual('fs') as typeof fs).existsSync(p as string),
+    );
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+      logoPath,
+    };
+    try {
+      await bufferFrom({
+        sheets: [
+          {
+            sheetKey: 's',
+            name: 'S',
+            columns: preambleSheetColumns,
+            rows: [],
+            presentation,
+          },
+        ],
+      });
+    } finally {
+      try {
+        fs.unlinkSync(logoPath);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  it('uses jpeg extension for .jpg logo path', async () => {
+    const logoPath = join(tmpdir(), `excel-logo-${Date.now()}.jpg`);
+    fs.writeFileSync(logoPath, Buffer.from([0xff, 0xd8, 0xff]));
+    existsSync.mockImplementation((p) =>
+      typeof p === 'string' && p === logoPath
+        ? true
+        : (jest.requireActual('fs') as typeof fs).existsSync(p as string),
+    );
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+      logoPath,
+    };
+    try {
+      await bufferFrom({
+        sheets: [
+          {
+            sheetKey: 's',
+            name: 'S',
+            columns: preambleSheetColumns,
+            rows: [],
+            presentation,
+          },
+        ],
+      });
+    } finally {
+      try {
+        fs.unlinkSync(logoPath);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  it('uses gif extension for .gif logo path', async () => {
+    const logoPath = join(tmpdir(), `excel-logo-${Date.now()}.gif`);
+    fs.writeFileSync(
+      logoPath,
+      Buffer.from(
+        'GIF89a\x01\x00\x01\x00\x00\x00\x00!\xf9\x04\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02',
+      ),
+    );
+    existsSync.mockImplementation((p) =>
+      typeof p === 'string' && p === logoPath
+        ? true
+        : (jest.requireActual('fs') as typeof fs).existsSync(p as string),
+    );
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+      logoPath,
+    };
+    try {
+      await bufferFrom({
+        sheets: [
+          {
+            sheetKey: 's',
+            name: 'S',
+            columns: preambleSheetColumns,
+            rows: [],
+            presentation,
+          },
+        ],
+      });
+    } finally {
+      try {
+        fs.unlinkSync(logoPath);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  it('uses png extension for unknown logo path extension', async () => {
+    const logoPath = join(tmpdir(), `excel-logo-${Date.now()}.bin`);
+    fs.writeFileSync(
+      logoPath,
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+    existsSync.mockImplementation((p) =>
+      typeof p === 'string' && p === logoPath
+        ? true
+        : (jest.requireActual('fs') as typeof fs).existsSync(p as string),
+    );
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+      logoPath,
+    };
+    try {
+      await bufferFrom({
+        sheets: [
+          {
+            sheetKey: 's',
+            name: 'S',
+            columns: preambleSheetColumns,
+            rows: [],
+            presentation,
+          },
+        ],
+      });
+    } finally {
+      try {
+        fs.unlinkSync(logoPath);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  it('skips logo image when buffer is empty', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+      logoImage: { buffer: Buffer.alloc(0), extension: 'png' },
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('skips embedded logo when extension is missing', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+      logoImage: {
+        buffer: Buffer.from([1, 2, 3]),
+      } as ExcelSheetPreamble['logoImage'],
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('uses default header colors when preamble omits headerFillArgb and headerFontArgb', async () => {
+    const base = preambleBase();
+    const presentation: ExcelSheetPreamble = {
+      ...base,
+      headerFillArgb: undefined as unknown as string,
+      headerFontArgb: undefined as unknown as string,
+      columnGroups: [],
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('omits banner subtitle row when not provided', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('uses explicit banner title colors when provided', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+      bannerTitleFillArgb: 'FF00FF00',
+      bannerTitleFontArgb: 'FF0000FF',
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('defaults banner title horizontal alignment to right when omitted', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [],
+      bannerSubtitle: 'Sub',
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('skips invalid column group merge when from > to', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [
+        { fromCol: 5, toCol: 2, label: 'bad', fillArgb: 'FF000000' },
+      ],
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('uses group header fill fallback when group fillArgb is omitted', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [
+        { fromCol: 1, toCol: 1, label: 'G', fillArgb: undefined },
+      ] as ExcelSheetPreamble['columnGroups'],
+      headerFillArgb: 'FF112233',
+      headerFontArgb: 'FFFFFFFF',
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('does not set autoFilter when presentation exists but there are no columns', async () => {
+    const presentation: ExcelSheetPreamble = {
+      bannerTitle: 'T',
+      bannerTitleMergeFromCol: 1,
+      bannerTitleMergeToCol: 1,
+      columnGroups: [],
+      headerFillArgb: 'FF1F4E79',
+      headerFontArgb: 'FFFFFFFF',
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: [],
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('uses default logo merge columns and oneCell editAs when omitted', async () => {
+    const presentation: ExcelSheetPreamble = {
+      bannerTitle: 'T',
+      bannerTitleMergeFromCol: 3,
+      bannerTitleMergeToCol: 5,
+      columnGroups: [],
+      headerFillArgb: 'FF1F4E79',
+      headerFontArgb: 'FFFFFFFF',
+      logoImage: {
+        buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+        extension: 'png',
+      },
+    };
+    await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+  });
+
+  it('toBuffer throws PayloadTooLargeException when data rows exceed Excel cap (with presentation)', async () => {
+    const max = maxDataRowsForExcelSheet(true);
+    const rows: Record<string, unknown>[] = [];
+    rows.length = max + 1;
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      columnGroups: [
+        { fromCol: 1, toCol: 5, label: 'G', fillArgb: 'FF203C61' },
+      ],
+    };
+    await expect(
+      builder.toBuffer({
+        sheets: [
+          {
+            sheetKey: 'raw',
+            name: 'Raw data',
+            columns: preambleSheetColumns,
+            rows,
+            presentation,
+          },
+        ],
+      }),
+    ).rejects.toThrow(PayloadTooLargeException);
+  });
+
+  it('toBuffer throws PayloadTooLargeException when data rows exceed Excel cap (no presentation)', async () => {
+    const max = maxDataRowsForExcelSheet(false);
+    const rows: Record<string, unknown>[] = [];
+    rows.length = max + 1;
+    await expect(
+      builder.toBuffer({
+        sheets: [
+          {
+            sheetKey: 's',
+            name: 'Flat',
+            columns: [{ key: 'a', header: 'A' }],
+            rows,
+          },
+        ],
+      }),
+    ).rejects.toThrow(PayloadTooLargeException);
+  });
+});

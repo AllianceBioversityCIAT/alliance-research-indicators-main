@@ -540,6 +540,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
   }
 
   async unpdateCarnetUser(userId: number, carnet: string) {
+    if (isEmpty(carnet) || isEmpty(userId)) return;
     const query = `UPDATE sec_users SET carnet = ? WHERE sec_user_id = ?`;
     await this.query(query, [carnet, userId]);
   }
@@ -679,6 +680,11 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return query;
   }
 
+  /**
+   * Result Center (paginated list). The STAR export reuses this same query for filters,
+   * search, relevance, and sort order; it does not duplicate `buildFilteringV2` / search fragments in the views.
+   * @see StarResultsExportRepository.collectOrderedResultIdsViaFindResultsV2
+   */
   async findResultsV2(
     search: string,
     pagination?: { page?: number; limit?: number },
