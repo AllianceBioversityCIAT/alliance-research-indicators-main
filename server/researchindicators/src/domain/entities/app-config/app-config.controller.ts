@@ -48,7 +48,7 @@ export class AppConfigController {
     description: 'The key of the configuration to update',
     type: String,
   })
-  @Roles(SecRolesEnum.DEVELOPER)
+  @Roles(SecRolesEnum.TECHNICAL_SUPPORT)
   async updateConfig(
     @Param('key') key: string,
     @Body() updateData: Partial<AppConfig>,

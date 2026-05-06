@@ -17,7 +17,10 @@ describe('ClarisaSdgTargetsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ClarisaSdgTargetsController],
       providers: [
-        { provide: ClarisaSdgTargetsService, useValue: { findAll: mockFindAll } },
+        {
+          provide: ClarisaSdgTargetsService,
+          useValue: { findAll: mockFindAll },
+        },
       ],
     }).compile();
     controller = module.get(ClarisaSdgTargetsController);

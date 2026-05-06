@@ -71,7 +71,7 @@ describe('GreenChecksService', () => {
 
   const mockCurrentUser = {
     user_id: 1,
-    roles: [SecRolesEnum.SUP_ADMIN],
+    roles: [SecRolesEnum.SYSTEM_ADMIN],
     user: {
       sec_user_id: 1,
       first_name: 'Ada',
@@ -141,7 +141,7 @@ describe('GreenChecksService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     Object.assign(mockCurrentUser, {
-      roles: [SecRolesEnum.SUP_ADMIN],
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
     });
     Object.assign(resultsUtilStub, {
       statusId: ResultStatusEnum.SUBMITTED,
