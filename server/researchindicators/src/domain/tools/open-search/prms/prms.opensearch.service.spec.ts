@@ -166,6 +166,7 @@ describe('PrmsOpenSearchService', () => {
         {
           provide: ClarisaLeversService,
           useValue: {
+            findOne: jest.fn().mockResolvedValue({ id: 88 }),
             homologatedData: jest.fn().mockResolvedValue('LEVER'),
             findByShortName: jest.fn().mockResolvedValue({ id: 77 }),
           },
@@ -253,13 +254,22 @@ describe('PrmsOpenSearchService', () => {
     });
 
     it('should map a valid row without created_by', async () => {
-      const out = await service.processData([buildResultMapper()]);
+      const row = buildResultMapper({ result_level: { code: 'L9', name: '', description: '' } });
+      const out = await service.processData([row]);
       expect(out).toHaveLength(1);
       expect(out[0].createResult.indicator_id).toBeDefined();
       expect(out[0].alignments.contracts.length).toBeGreaterThan(0);
+      expect(clarisaLeversService.findOne).toHaveBeenCalledWith('L9');
       expect(pooledFundingContractsService.findMappingPooledFundingContracts).toHaveBeenCalledWith(
         'PFUND',
       );
+    });
+
+    it('should prefer PRMS lever id over Clarisa when both are present', async () => {
+      clarisaLeversService.findOne.mockResolvedValueOnce({ id: 999 } as any);
+      clarisaLeversService.findByShortName.mockResolvedValueOnce({ id: 1 } as any);
+      const out = await service.processData([buildResultMapper()]);
+      expect(out[0].alignments.primary_levers[0].lever_id).toBe(999);
     });
 
     it('should create user from alliance staff when STAR user is missing and creator email is empty', async () => {
@@ -373,9 +383,31 @@ describe('PrmsOpenSearchService', () => {
     });
 
     it('should tolerate missing clarisa lever id', async () => {
+      clarisaLeversService.findOne.mockResolvedValueOnce(null as any);
       clarisaLeversService.findByShortName.mockResolvedValueOnce(null as any);
       const out = await service.processData([buildResultMapper()]);
       expect(out[0].alignments.primary_levers[0].lever_id).toBeUndefined();
+    });
+
+    it('should fall back to Clarisa lever when PRMS lever is missing', async () => {
+      clarisaLeversService.findOne.mockResolvedValueOnce(null as any);
+      clarisaLeversService.findByShortName.mockResolvedValueOnce({ id: 42 } as any);
+      const out = await service.processData([buildResultMapper()]);
+      expect(out[0].alignments.primary_levers[0].lever_id).toBe(42);
+    });
+
+    it('should not push primary contract when agreement_id is empty', async () => {
+      pooledFundingContractsService.findMappingPooledFundingContracts.mockResolvedValueOnce([
+        {
+          agreement_id: '',
+          ubwClientDescription: 'exbio',
+          departmentId: 10,
+        },
+      ] as any);
+
+      const out = await service.processData([buildResultMapper()]);
+      expect(out[0].alignments.contracts).toEqual([]);
+      expect(out[0].createResult.contract_id).toBe('');
     });
   });
 
