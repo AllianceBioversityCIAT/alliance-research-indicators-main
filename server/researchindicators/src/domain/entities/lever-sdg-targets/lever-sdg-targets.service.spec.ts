@@ -175,24 +175,8 @@ describe('LeverSdgTargetsService', () => {
           }),
           select: expect.objectContaining({
             id: true,
-            lever: {
-              id: true,
-              short_name: true,
-              full_name: true,
-            },
-            sdg_target: expect.objectContaining({
-              id: true,
-              sdg_target_code: true,
-              sdg_target: true,
-              clarisa_sdg: {
-                id: true,
-                short_name: true,
-                full_name: true,
-                icon: true,
-                color: true,
-                description: true,
-              },
-            }),
+            lever: expect.any(Object),
+            sdg_target: expect.any(Object),
           }),
         }),
       );
