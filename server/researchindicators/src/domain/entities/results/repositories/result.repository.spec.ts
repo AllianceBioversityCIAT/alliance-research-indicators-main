@@ -198,6 +198,33 @@ describe('ResultRepository', () => {
     });
   });
 
+  describe('isMainContactPerson', () => {
+    it('returns false when query is empty', async () => {
+      querySpy.mockResolvedValueOnce([]);
+      await expect(repository.isMainContactPerson(9, 3)).resolves.toBe(false);
+      expect(querySpy.mock.calls[0][1]).toEqual([3, 9]);
+    });
+
+    it('returns false when is_main_contact is not 1', async () => {
+      querySpy.mockResolvedValueOnce([{ is_main_contact: 0 }]);
+      await expect(repository.isMainContactPerson(9, 3)).resolves.toBe(false);
+    });
+
+    it('returns true when is_main_contact is 1', async () => {
+      querySpy.mockResolvedValueOnce([{ is_main_contact: 1 }]);
+      await expect(repository.isMainContactPerson(9, 3)).resolves.toBe(true);
+    });
+
+    it('runs SQL joining result_users to sec_users by email', async () => {
+      querySpy.mockResolvedValueOnce([{ is_main_contact: 0 }]);
+      await repository.isMainContactPerson(12, 5);
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toContain('FROM result_users ru');
+      expect(sql).toContain('ru.user_role_id = 1');
+      expect(sql).toContain('ru.result_id = ?');
+    });
+  });
+
   describe('findUserByCarnetId', () => {
     it('returns null for empty carnet', async () => {
       await expect(repository.findUserByCarnetId('')).resolves.toBeNull();

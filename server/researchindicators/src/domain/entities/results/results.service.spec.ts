@@ -51,6 +51,8 @@ import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { TempResultAi } from './entities/temp-result-ai.entity';
+import { GreenChecksService } from '../green-checks/green-checks.service';
+import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -87,6 +89,8 @@ describe('ResultsService', () => {
   let mockResultLeverSdgTargetsService: jest.Mocked<ResultLeverSdgTargetsService>;
   let mockResultKnowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
   let mockResultsUtil: jest.Mocked<ResultsUtil>;
+  let mockGreenChecksService: { findByResultId: jest.Mock };
+  let mockGreenCheckRepository: { createSnapshot: jest.Mock };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -98,6 +102,7 @@ describe('ResultsService', () => {
       find: jest.fn(),
       deleteResult: jest.fn(),
       metadataPrincipalInvestigator: jest.fn(),
+      isMainContactPerson: jest.fn(),
       target: {} as any,
       save: jest.fn(),
     } as any;
@@ -256,6 +261,13 @@ describe('ResultsService', () => {
       clearManually: jest.fn(),
     } as any;
 
+    mockGreenChecksService = {
+      findByResultId: jest.fn().mockResolvedValue({}),
+    };
+    mockGreenCheckRepository = {
+      createSnapshot: jest.fn().mockResolvedValue(undefined),
+    };
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -358,6 +370,14 @@ describe('ResultsService', () => {
         {
           provide: ResultsUtil,
           useValue: mockResultsUtil,
+        },
+        {
+          provide: GreenChecksService,
+          useValue: mockGreenChecksService,
+        },
+        {
+          provide: GreenCheckRepository,
+          useValue: mockGreenCheckRepository,
         },
       ],
     }).compile();
@@ -1885,6 +1905,79 @@ describe('ResultsService', () => {
     });
   });
 
+  describe('customStatus', () => {
+    it('should skip updates when status is empty', async () => {
+      await service.customStatus(null as unknown as ResultStatusEnum, 7, 2025);
+
+      expect(mockGreenChecksService.findByResultId).not.toHaveBeenCalled();
+      expect(mockDataSource.getRepository).not.toHaveBeenCalled();
+      expect(mockGreenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('should update result status when SUBMITTED and completness is true', async () => {
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      mockDataSource.getRepository.mockReturnValue({ update } as any);
+      mockGreenChecksService.findByResultId.mockResolvedValue({
+        completness: true,
+      });
+
+      await service.customStatus(ResultStatusEnum.SUBMITTED, 10, 2026);
+
+      expect(mockGreenChecksService.findByResultId).toHaveBeenCalledWith(10);
+      expect(update).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          result_status_id: ResultStatusEnum.SUBMITTED,
+        }),
+      );
+      expect(mockGreenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('should update and create snapshot when APPROVED and completness is true', async () => {
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const findOne = jest
+        .fn()
+        .mockResolvedValue({ result_official_code: 'R123' });
+      mockDataSource.getRepository.mockReturnValue({ update, findOne } as any);
+      mockGreenChecksService.findByResultId.mockResolvedValue({
+        completness: true,
+      });
+
+      await service.customStatus(ResultStatusEnum.APPROVED, 11, 2027);
+
+      expect(update).toHaveBeenCalledWith(
+        11,
+        expect.objectContaining({
+          result_status_id: ResultStatusEnum.APPROVED,
+        }),
+      );
+      expect(findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { result_id: 11, is_active: true },
+        }),
+      );
+      expect(mockGreenCheckRepository.createSnapshot).toHaveBeenCalledWith(
+        'R123',
+        2027,
+      );
+    });
+
+    it('should not update or snapshot when completness is false', async () => {
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const findOne = jest.fn();
+      mockDataSource.getRepository.mockReturnValue({ update, findOne } as any);
+      mockGreenChecksService.findByResultId.mockResolvedValue({
+        completness: false,
+      });
+
+      await service.customStatus(ResultStatusEnum.APPROVED, 12, 2028);
+
+      expect(update).not.toHaveBeenCalled();
+      expect(findOne).not.toHaveBeenCalled();
+      expect(mockGreenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findGeneralInfo', () => {
     it('should call mainRepo.findOne and return result', async () => {
       // Arrange
@@ -2050,6 +2143,7 @@ describe('ResultsService', () => {
       const mockPrimaryContract = { contract_id: 'CONTRACT-001' };
 
       mockMainRepo.findOne.mockResolvedValue(mockResult as any);
+      mockMainRepo.isMainContactPerson.mockResolvedValue(true);
       mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
         mockPrincipalData as any,
       );
@@ -2071,10 +2165,15 @@ describe('ResultsService', () => {
         result_title: mockResult.title,
         created_by: mockResult.created_by,
         report_year: mockResult.report_year_id,
+        is_main_contact_person: true,
         is_principal_investigator: mockPrincipalData.is_principal === 1,
         result_contract_id: mockPrimaryContract.contract_id,
         result_status: mockResult.result_status,
       });
+      expect(mockMainRepo.isMainContactPerson).toHaveBeenCalledWith(
+        resultId,
+        123,
+      );
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
         select: {
           indicator: {
@@ -2113,6 +2212,7 @@ describe('ResultsService', () => {
       const mockPrincipalData = { is_principal: 0 };
 
       mockMainRepo.findOne.mockResolvedValue(null);
+      mockMainRepo.isMainContactPerson.mockResolvedValue(false);
       mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
         mockPrincipalData as any,
       );
@@ -2121,6 +2221,10 @@ describe('ResultsService', () => {
       // Act & Assert
       await expect(service.findMetadataResult(resultId)).rejects.toThrow(
         NotFoundException,
+      );
+      expect(mockMainRepo.isMainContactPerson).toHaveBeenCalledWith(
+        resultId,
+        123,
       );
       expect(mockMainRepo.metadataPrincipalInvestigator).toHaveBeenCalledWith(
         resultId,

@@ -48,7 +48,10 @@ import { ResultCountriesSubNational } from '../result-countries-sub-nationals/en
 import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
-import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import {
+  ResultStatusEnum,
+  ResultStatusNameEnum,
+} from '../result-status/enum/result-status.enum';
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
@@ -97,6 +100,8 @@ import { UpdateIpRightDto } from '../result-ip-rights/dto/update-ip-right.dto';
 import { IntellectualPropertyOwner } from '../intellectual-property-owners/entities/intellectual-property-owner.entity';
 import { ResultSortEnum } from './enum/result-sort.enum';
 import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
+import { GreenChecksService } from '../green-checks/green-checks.service';
+import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 
 @Injectable()
 export class ResultsService {
@@ -136,7 +141,9 @@ export class ResultsService {
     private readonly _resultLeverSdgTargetsService: ResultLeverSdgTargetsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+    private readonly _greenChecksService: GreenChecksService,
+    private readonly _greenCheckRepository: GreenCheckRepository,
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -702,21 +709,21 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -864,6 +871,11 @@ export class ResultsService {
       },
     });
 
+    const isMainContactPerson = await this.mainRepo.isMainContactPerson(
+      result_id,
+      this.currentUser.user_id,
+    );
+
     const primaryContract =
       await this._resultContractsService.getPrimaryContract(result_id);
 
@@ -877,6 +889,7 @@ export class ResultsService {
     }
 
     return {
+      is_main_contact_person: isMainContactPerson,
       result_contract_id: primaryContract?.contract_id,
       indicator_id: result?.indicator?.indicator_id,
       indicator_name: result?.indicator?.name,
@@ -976,6 +989,8 @@ export class ResultsService {
           break;
       }
 
+      await this.customStatus(result.status, newResult.result_id, processedResult?.result?.year);
+
       return { ...newResult, error: false };
     } catch (error) {
       if (resultExists) {
@@ -1009,6 +1024,38 @@ export class ResultsService {
         message_error:
           typeof error.message == 'object' ? error.name : error.message,
       };
+    }
+  }
+
+  async customStatus(
+    status: ResultStatusEnum,
+    resultId: number,
+    reportYear: number,
+  ): Promise<void> {
+    if (isEmpty(status) || !ResultStatusNameEnum?.[status]) return;
+
+    const greenChecks = await this._greenChecksService.findByResultId(resultId);
+    if (
+      [ResultStatusEnum.SUBMITTED, ResultStatusEnum.APPROVED].includes(
+        status,
+      ) &&
+      greenChecks?.completness
+    ) {
+      await this.dataSource.getRepository(Result).update(resultId, {
+        result_status_id: status,
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
+      });
+
+      if (status === ResultStatusEnum.APPROVED) {
+        const resultrCode = await this.dataSource.getRepository(Result).findOne({
+          where: {
+            result_id: resultId,
+            is_active: true,
+          },
+        }).then((result) => result.result_official_code);
+
+        await this._greenCheckRepository.createSnapshot(resultrCode, reportYear)
+      }
     }
   }
 
@@ -1204,6 +1251,7 @@ export class ResultsService {
         );
       tempCountries.institutions = acept as ResultInstitution[];
       tempCountries.institutions_ai = pending as ResultInstitutionAi[];
+      tempCountries.is_partner_not_applicable = result?.is_partner_not_applicable;
       tmpNewData.partners = tempCountries;
     }
 
@@ -1274,8 +1322,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },

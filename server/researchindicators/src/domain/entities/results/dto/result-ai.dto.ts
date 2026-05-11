@@ -16,9 +16,12 @@ import {
   ValidateNested,
   IsNotEmpty,
   Matches,
+  IsEnum,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UpdateIpRightDto } from '../../result-ip-rights/dto/update-ip-right.dto';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 
 export class ResultAiDto {
   result: CreateResultDto;
@@ -257,6 +260,14 @@ export class ResultRawAi {
 
   @ApiProperty({
     type: Number,
+    description: 'The status id of the result',
+  })
+  @IsOptional()
+  @IsEnum(ResultStatusEnum)
+  status: ResultStatusEnum;
+
+  @ApiProperty({
+    type: Number,
     description: 'The year of the result',
   })
   @IsOptional()
@@ -423,6 +434,15 @@ export class ResultRawAi {
   @ValidateNested({ each: true })
   @Type(() => AiRawInstitution)
   partners?: AiRawInstitution[];
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Indicates if partner is not applicable',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  is_partner_not_applicable?: boolean;
 
   @ApiProperty({
     type: AiRawEvidence,

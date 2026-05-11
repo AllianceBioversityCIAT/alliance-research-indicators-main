@@ -85,4 +85,11 @@ export class MetadataResultDto {
     required: false,
   })
   result_status: ResultStatus;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Is main contact person',
+    required: true,
+  })
+  is_main_contact_person: boolean;
 }
