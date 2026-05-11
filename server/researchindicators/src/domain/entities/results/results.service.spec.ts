@@ -51,6 +51,8 @@ import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { TempResultAi } from './entities/temp-result-ai.entity';
+import { GreenChecksService } from '../green-checks/green-checks.service';
+import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -87,6 +89,8 @@ describe('ResultsService', () => {
   let mockResultLeverSdgTargetsService: jest.Mocked<ResultLeverSdgTargetsService>;
   let mockResultKnowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
   let mockResultsUtil: jest.Mocked<ResultsUtil>;
+  let mockGreenChecksService: { findByResultId: jest.Mock };
+  let mockGreenCheckRepository: { createSnapshot: jest.Mock };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -257,6 +261,13 @@ describe('ResultsService', () => {
       clearManually: jest.fn(),
     } as any;
 
+    mockGreenChecksService = {
+      findByResultId: jest.fn().mockResolvedValue({}),
+    };
+    mockGreenCheckRepository = {
+      createSnapshot: jest.fn().mockResolvedValue(undefined),
+    };
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -359,6 +370,14 @@ describe('ResultsService', () => {
         {
           provide: ResultsUtil,
           useValue: mockResultsUtil,
+        },
+        {
+          provide: GreenChecksService,
+          useValue: mockGreenChecksService,
+        },
+        {
+          provide: GreenCheckRepository,
+          useValue: mockGreenCheckRepository,
         },
       ],
     }).compile();
@@ -564,7 +583,16 @@ describe('ResultsService', () => {
           lever: false,
           sdg: false,
         },
+        result_status_id: ResultStatusEnum.DRAFT,
+        notContract: false,
+        validateTitle: true,
+        isSnapshot: false,
       });
+
+      // Ensure OpenSearch upload returns a Promise (service chains `.catch(...)`)
+      mockOpenSearchResultApi.uploadSingleToOpenSearch.mockResolvedValue(
+        undefined,
+      );
     });
 
     it('should throw BadRequestException when required fields are missing', async () => {
@@ -696,20 +724,23 @@ describe('ResultsService', () => {
       });
       expect((service as any).newOfficialCode).toHaveBeenCalled();
       expect(mockDataSource.transaction).toHaveBeenCalled();
-      expect(mockRepository.save).toHaveBeenCalledWith({
-        description: createResult.description,
-        indicator_id: createResult.indicator_id,
-        title: createResult.title,
-        is_ai: false,
-        result_official_code: newOfficialCode,
-        report_year_id: createResult.year,
-        is_snapshot: false,
-        platform_code: ReportingPlatformEnum.STAR, // Default value
-        created_at: expect.any(Date),
-        updated_at: expect.any(Date),
-        created_by: 123,
-        updated_by: 123,
-      });
+      expect(mockRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: createResult.description,
+          indicator_id: createResult.indicator_id,
+          title: createResult.title,
+          is_ai: false,
+          result_official_code: newOfficialCode,
+          report_year_id: createResult.year,
+          is_snapshot: false,
+          platform_code: ReportingPlatformEnum.STAR, // Default value
+          result_status_id: ResultStatusEnum.DRAFT,
+          created_at: expect.any(Date),
+          updated_at: expect.any(Date),
+          created_by: 123,
+          updated_by: 123,
+        }),
+      );
       expect((service as any).createResultType).toHaveBeenCalledWith(
         savedResult.result_id,
         savedResult.indicator_id,
@@ -1871,6 +1902,79 @@ describe('ResultsService', () => {
         mockEntityManager,
       );
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe('customStatus', () => {
+    it('should skip updates when status is empty', async () => {
+      await service.customStatus(null as unknown as ResultStatusEnum, 7, 2025);
+
+      expect(mockGreenChecksService.findByResultId).not.toHaveBeenCalled();
+      expect(mockDataSource.getRepository).not.toHaveBeenCalled();
+      expect(mockGreenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('should update result status when SUBMITTED and completness is true', async () => {
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      mockDataSource.getRepository.mockReturnValue({ update } as any);
+      mockGreenChecksService.findByResultId.mockResolvedValue({
+        completness: true,
+      });
+
+      await service.customStatus(ResultStatusEnum.SUBMITTED, 10, 2026);
+
+      expect(mockGreenChecksService.findByResultId).toHaveBeenCalledWith(10);
+      expect(update).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          result_status_id: ResultStatusEnum.SUBMITTED,
+        }),
+      );
+      expect(mockGreenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('should update and create snapshot when APPROVED and completness is true', async () => {
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const findOne = jest
+        .fn()
+        .mockResolvedValue({ result_official_code: 'R123' });
+      mockDataSource.getRepository.mockReturnValue({ update, findOne } as any);
+      mockGreenChecksService.findByResultId.mockResolvedValue({
+        completness: true,
+      });
+
+      await service.customStatus(ResultStatusEnum.APPROVED, 11, 2027);
+
+      expect(update).toHaveBeenCalledWith(
+        11,
+        expect.objectContaining({
+          result_status_id: ResultStatusEnum.APPROVED,
+        }),
+      );
+      expect(findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { result_id: 11, is_active: true },
+        }),
+      );
+      expect(mockGreenCheckRepository.createSnapshot).toHaveBeenCalledWith(
+        'R123',
+        2027,
+      );
+    });
+
+    it('should not update or snapshot when completness is false', async () => {
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const findOne = jest.fn();
+      mockDataSource.getRepository.mockReturnValue({ update, findOne } as any);
+      mockGreenChecksService.findByResultId.mockResolvedValue({
+        completness: false,
+      });
+
+      await service.customStatus(ResultStatusEnum.APPROVED, 12, 2028);
+
+      expect(update).not.toHaveBeenCalled();
+      expect(findOne).not.toHaveBeenCalled();
+      expect(mockGreenCheckRepository.createSnapshot).not.toHaveBeenCalled();
     });
   });
 

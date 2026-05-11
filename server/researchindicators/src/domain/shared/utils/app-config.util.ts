@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { AppConfig as AppConfigEntity } from '../../entities/app-config/entities/app-config.entity';
 
 /**
  * Class to get all application configurations from environment variables or .env file
@@ -7,6 +9,7 @@ import { Injectable } from '@nestjs/common';
  */
 @Injectable()
 export class AppConfig {
+  constructor(private readonly dataSource: DataSource) { }
   //RabbitMQ host
   get ARI_MQ_HOST(): string {
     return process.env.ARI_MQ_HOST;
@@ -328,6 +331,13 @@ export class AppConfig {
     return process.env.ARI_PI_EMAIL.split(',');
   }
 
+  get SEARCH_PRMS_URL(): string {
+    return process.env.ARI_SEARCH_PRMS_URL;
+  }
+  get LEVEL_SEVEN_EMAIL(): string {
+    return process.env.ARI_LEVEL_SEVEN_EMAIL;
+  }
+
   SPRM_EMAIL_SAFE(currentUserEmail: string): string {
     return this.ARI_IS_PRODUCTION ? this.SPRM_EMAIL : currentUserEmail;
   }
@@ -336,11 +346,50 @@ export class AppConfig {
     return this.ARI_IS_PRODUCTION ? email : alternativeEmail;
   }
 
+  /**
+   * Get the OpenSearch PRMS host
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_PRMS_HOST(): string {
+    return process.env.ARI_OPEN_SEARCH_PRMS_HOST;
+  }
+
+  /**
+   * Get the OpenSearch PRMS user
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_PRMS_USER(): string {
+    return process.env.ARI_OPEN_SEARCH_PRMS_USER;
+  }
+
+  /**
+   * Get the OpenSearch PRMS password
+   * @readonly
+   * @type {string}
+   * @memberof AppConfig
+   */
+  get OPEN_SEARCH_PRMS_PASS(): string {
+    return process.env.ARI_OPEN_SEARCH_PRMS_PASS;
+  }
+
   get TIP_API_URL(): string {
     return process.env.ARI_TIP_API_URL;
   }
 
   get TIP_TOKEN(): string {
     return process.env.ARI_TIP_TOKEN;
+  }
+
+  async DB_SUPPORT_EMAIL(): Promise<string> {
+    const appConfig = await this.dataSource.getRepository(AppConfigEntity).findOne({
+      where: {
+        key: 'ARI_SUPPORT_EMAIL',
+      },
+    });
+    return appConfig?.simple_value;
   }
 }

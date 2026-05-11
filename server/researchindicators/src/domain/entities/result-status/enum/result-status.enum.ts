@@ -19,6 +19,10 @@ export enum ResultStatusEnum {
   KM_CURATION = 13,
   PUBLISHED = 14,
   COMPLETED_IN_TIP = 20,
+  EDITING_IN_PRMS = 16,
+  SUBMITTED_IN_PRMS = 17,
+  QAED_IN_PRMS = 18,
+  DISCONTINUED_IN_PRMS = 19,
 }
 
 export const ResultStatusNameEnum = {
@@ -37,6 +41,10 @@ export const ResultStatusNameEnum = {
   13: 'KM Curation',
   14: 'Published',
   20: 'Completed in TIP',
+  16: 'Editing in PRMS',
+  17: 'Submitted in PRMS',
+  18: 'QAed in PRMS',
+  19: 'Discontinued in PRMS',
 };
 
 export const getTemplateByStatus = (

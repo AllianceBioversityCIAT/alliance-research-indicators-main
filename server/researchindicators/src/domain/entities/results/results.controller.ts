@@ -51,7 +51,7 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   @ApiQuery({
     name: 'page',
@@ -561,9 +561,9 @@ export class ResultsController {
   @ApiOperation({ summary: 'Create results from AI bulk' })
   @Post('ai/formalize/bulk')
   @Roles(
-    SecRolesEnum.DEVELOPER,
-    SecRolesEnum.GENERAL_ADMIN,
+    SecRolesEnum.TECHNICAL_SUPPORT,
     SecRolesEnum.CENTER_ADMIN,
+    SecRolesEnum.MEL_REGIONAL_EXPERT,
   )
   @UsePipes(
     new ValidationPipe({

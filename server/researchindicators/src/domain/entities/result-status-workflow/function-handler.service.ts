@@ -371,14 +371,14 @@ export class StatusWorkflowFunctionHandlerService {
     const { roles } = this.currentUser;
     if (this.roleGenericValidation(roles)) return;
 
-    if (!roles.includes(SecRolesEnum.GENERAL_ADMIN))
+    if (!roles.includes(SecRolesEnum.CENTER_ADMIN))
       throw new ForbiddenException(
         'You are not authorized to perform this action',
       );
   }
 
   private roleGenericValidation(roles: SecRolesEnum[]) {
-    if (roles.includes(SecRolesEnum.SUP_ADMIN)) return true;
+    if (roles.includes(SecRolesEnum.SYSTEM_ADMIN)) return true;
     return false;
   }
 

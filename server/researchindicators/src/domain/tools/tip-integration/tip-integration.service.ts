@@ -18,7 +18,6 @@ import {
 import { ClarisaRegionsService } from '../clarisa/entities/clarisa-regions/clarisa-regions.service';
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
 import { ResultRepository } from '../../entities/results/repositories/result.repository';
-import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultUser } from '../../entities/result-users/entities/result-user.entity';
 import { ClarisaLeversService } from '../clarisa/entities/clarisa-levers/clarisa-levers.service';
@@ -32,7 +31,7 @@ import { ClarisaRegion } from '../clarisa/entities/clarisa-regions/entities/clar
 import { ClarisaCountry } from '../clarisa/entities/clarisa-countries/entities/clarisa-country.entity';
 import { ResultEvidence } from '../../entities/result-evidences/entities/result-evidence.entity';
 import { ResultKnowledgeProduct } from '../../entities/result-knowledge-product/entities/result-knowledge-product.entity';
-import { DataSource } from 'typeorm';
+import { DataSource, Like } from 'typeorm';
 import { Result } from '../../entities/results/entities/result.entity';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
@@ -170,17 +169,23 @@ export class TipIntegrationService extends BaseApi {
           result.submitter?.email,
         );
 
-        allianceUserStaff = await this.dataSource
-          .getRepository(AllianceUserStaff)
-          .findOne({
-            where: {
-              carnet: result.submitter?.idCard,
-            },
-          });
+        const dataToSearch = result.submitter?.idCard ?? result.submitter?.email;
+        if (isEmpty(dataToSearch)) {
+          allianceUserStaff = await this.dataSource
+            .getRepository(AllianceUserStaff)
+            .findOne({
+              where: [{
+                carnet: dataToSearch,
+              }, {
+                email: Like(`%${dataToSearch?.trim()?.toLowerCase()}%`),
+              }],
+            });
+        }
+
         if (!isEmpty(allianceUserStaff)) {
           if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
             resultMapped.userData =
-              await this.createUserProcess(allianceUserStaff);
+              await this.resultsService.createUserProcess(allianceUserStaff);
           } else {
             await this.resultRepository.unpdateCarnetUser(
               existsUser?.sec_user_id,
@@ -209,8 +214,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-              user_id: carnet,
-            } as ResultUser)
+            user_id: carnet,
+          } as ResultUser)
           : null,
       };
 
@@ -309,21 +314,6 @@ export class TipIntegrationService extends BaseApi {
       }
     }
     return this.clarisaLeversService.findByNames(clarisaLevers);
-  }
-
-  private createUserProcess(user: AllianceUserStaff): Promise<SecUser> {
-    const newUser: SecUser = new SecUser();
-    newUser.first_name = user.first_name;
-    newUser.last_name = user.last_name;
-    newUser.email = user.email;
-    newUser.carnet = user.carnet;
-    if (isEmpty(user.email)) {
-      this.logger.warn(
-        `User ${user.carnet} has no email, skipping user creation.`,
-      );
-      return null;
-    }
-    return this.resultRepository.createUserInSecUsers(newUser);
   }
 
   async createKpInStar(

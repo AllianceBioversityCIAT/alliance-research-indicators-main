@@ -10,4 +10,5 @@ export class CreateResultConfigDto {
   };
   notContract?: boolean;
   validateTitle?: boolean;
+  isSnapshot?: boolean;
 }

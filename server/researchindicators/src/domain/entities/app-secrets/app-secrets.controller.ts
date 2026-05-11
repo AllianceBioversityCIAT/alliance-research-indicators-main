@@ -26,7 +26,7 @@ export class AppSecretsController {
     type: CreateAppSecretDto,
     description: 'Create a new app secret',
   })
-  @Roles(SecRolesEnum.DEVELOPER)
+  @Roles(SecRolesEnum.TECHNICAL_SUPPORT)
   @Post()
   async createAppSecret(@Body() data: CreateAppSecretDto) {
     return this.appSecretsService.createCredentials(data).then((result) =>
