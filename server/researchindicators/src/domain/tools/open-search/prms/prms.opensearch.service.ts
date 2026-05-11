@@ -180,7 +180,7 @@ export class PrmsOpenSearchService
     while (keepGoing) {
       const counters: CounterResults = new CounterResults();
       const centerAcronym = ['ABC', 'ABC RH'];
-      let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
+      let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&fundingType=Result&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
       if (!isEmpty(year)) {
         prmsUrl += `&year=${year}`;
       }
@@ -329,6 +329,8 @@ export class PrmsOpenSearchService
         contract_id: primaryContract?.agreement_id,
       };
 
+      const prmsLever = await this.clarisaLeversService.findOne(item?.result_level?.code);
+
       const lever = await this.clarisaLeversService.homologatedData(
         primaryContract?.departmentId,
       );
@@ -357,7 +359,7 @@ export class PrmsOpenSearchService
       result.alignments = {
         primary_levers: [
           {
-            lever_id: clarisaLever?.id,
+            lever_id: prmsLever?.id ?? clarisaLever?.id,
           } as unknown as ResultLever,
         ],
         contracts: savedPrimaryContract,

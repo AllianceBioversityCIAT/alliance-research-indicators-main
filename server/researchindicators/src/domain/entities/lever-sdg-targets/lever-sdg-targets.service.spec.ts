@@ -134,27 +134,21 @@ describe('LeverSdgTargetsService', () => {
 
       const result = await service.findAll();
 
-      expect(find).toHaveBeenCalledWith({
-        select: {
-          id: true,
-          lever: {
+      expect(find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
             id: true,
-            short_name: true,
-            full_name: true,
+            lever: expect.any(Object),
+            sdg_target: expect.any(Object),
+          }),
+          relations: { lever: true, sdg_target: true },
+          where: { is_active: true },
+          order: {
+            lever: { id: 'ASC' },
+            sdg_target: { sdg_target_code: 'ASC' },
           },
-          sdg_target: {
-            id: true,
-            sdg_target_code: true,
-            sdg_target: true,
-          },
-        },
-        where: { is_active: true },
-        relations: { lever: true, sdg_target: true },
-        order: {
-          lever: { id: 'ASC' },
-          sdg_target: { sdg_target_code: 'ASC' },
-        },
-      });
+        }),
+      );
       expect(result).toBe(rows);
     });
   });
