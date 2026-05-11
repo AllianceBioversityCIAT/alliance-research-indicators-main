@@ -180,7 +180,7 @@ export class PrmsOpenSearchService
     while (keepGoing) {
       const counters: CounterResults = new CounterResults();
       const centerAcronym = ['ABC', 'ABC RH'];
-      let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
+      let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&fundingType=Result&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
       if (!isEmpty(year)) {
         prmsUrl += `&year=${year}`;
       }
