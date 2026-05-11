@@ -329,6 +329,8 @@ export class PrmsOpenSearchService
         contract_id: primaryContract?.agreement_id,
       };
 
+      const prmsLever = await this.clarisaLeversService.findOne(item?.result_level?.code);
+
       const lever = await this.clarisaLeversService.homologatedData(
         primaryContract?.departmentId,
       );
@@ -357,7 +359,7 @@ export class PrmsOpenSearchService
       result.alignments = {
         primary_levers: [
           {
-            lever_id: clarisaLever?.id,
+            lever_id: prmsLever?.id ?? clarisaLever?.id,
           } as unknown as ResultLever,
         ],
         contracts: savedPrimaryContract,
