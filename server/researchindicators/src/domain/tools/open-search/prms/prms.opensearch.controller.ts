@@ -1,9 +1,10 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Query, UseGuards } from '@nestjs/common';
 import { PrmsOpenSearchService } from './prms.opensearch.service';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { RolesGuard } from '../../../shared/guards/roles.guard';
 import { Roles } from '../../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
+import { ResponseUtils } from '../../../shared/utils/response.utils';
 
 @ApiTags('OpenSearch')
 @Controller()
@@ -20,6 +21,12 @@ export class PrmsOpenSearchController {
   @UseGuards(RolesGuard)
   @Roles(SecRolesEnum.TECHNICAL_SUPPORT)
   async fetchPrmsData(@Query('year') year: string) {
-    return this.prmsService.getData(+year);
+    return this.prmsService.getData(+year).then((response) => {
+      return ResponseUtils.format({
+        data: response,
+        description: 'Prms data fetched',
+        status: HttpStatus.OK,
+      });
+    });
   }
 }
