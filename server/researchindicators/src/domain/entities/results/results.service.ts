@@ -1497,6 +1497,7 @@ export class ResultsService {
           'indicator',
           'result_status_id',
           'result_status',
+          'platform_code'
         ],
         where: {
           created_by: this.currentUser.user_id,
