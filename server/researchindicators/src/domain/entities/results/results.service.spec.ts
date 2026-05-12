@@ -5,7 +5,9 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, Not } from 'typeorm';
+import { DataSource, EntityManager, In, Not } from 'typeorm';
+import { ResultContract } from '../result-contracts/entities/result-contract.entity';
+import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ResultsService } from './results.service';
 import { ResultRepository } from './repositories/result.repository';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
@@ -2607,24 +2609,153 @@ describe('ResultsService', () => {
   });
 
   describe('findLastUpdatedResultByCurrentUser', () => {
-    it('should call mainRepo.find and return results', async () => {
-      // Arrange
+    it('should load primary contracts and levers and merge them per result', async () => {
       const take = 5;
       const mockResults = [
-        { result_id: 1, title: 'Result 1', updated_at: new Date() },
-        { result_id: 2, title: 'Result 2', updated_at: new Date() },
+        {
+          result_id: 1,
+          title: 'R1',
+          updated_at: new Date(),
+          public_link: 'https://a',
+          report_year_id: 2024,
+        },
+        {
+          result_id: 2,
+          title: 'R2',
+          updated_at: new Date(),
+          public_link: null,
+          report_year_id: 2025,
+        },
       ];
+      const contractFor1 = {
+        result_id: 1,
+        is_primary: true,
+        is_active: true,
+        agresso_contract: { id: 10 },
+      };
+      const leverFor1a = {
+        result_id: 1,
+        is_primary: true,
+        is_active: true,
+        lever: { lever_id: 100 },
+      };
+      const leverFor1b = {
+        result_id: 1,
+        is_primary: true,
+        is_active: true,
+        lever: { lever_id: 101 },
+      };
+      const leverFor2 = {
+        result_id: 2,
+        is_primary: true,
+        is_active: true,
+        lever: { lever_id: 200 },
+      };
 
-      // Mock the method directly
-      jest
-        .spyOn(service, 'findLastUpdatedResultByCurrentUser')
-        .mockResolvedValue(mockResults as any);
+      mockMainRepo.find.mockResolvedValue(mockResults as any);
 
-      // Act
+      const mockContractFind = jest.fn().mockResolvedValue([contractFor1]);
+      const mockLeverFind = jest
+        .fn()
+        .mockResolvedValue([leverFor1a, leverFor1b, leverFor2]);
+
+      mockDataSource.getRepository.mockImplementation((entity: unknown) => {
+        if (entity === ResultContract) {
+          return { find: mockContractFind } as any;
+        }
+        if (entity === ResultLever) {
+          return { find: mockLeverFind } as any;
+        }
+        return { find: jest.fn() } as any;
+      });
+
       const result = await service.findLastUpdatedResultByCurrentUser(take);
 
-      // Assert
-      expect(result).toEqual(mockResults);
+      expect(mockMainRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.arrayContaining([
+            'public_link',
+            'report_year_id',
+            'platform_code',
+          ]),
+          where: {
+            created_by: mockCurrentUser.user_id,
+            is_active: true,
+            is_snapshot: false,
+          },
+          relations: {
+            indicator: true,
+            result_status: true,
+          },
+          order: { updated_at: 'DESC' },
+          take,
+        }),
+      );
+
+      expect(mockContractFind).toHaveBeenCalledWith({
+        where: {
+          result_id: In([1, 2]),
+          is_primary: true,
+          is_active: true,
+        },
+        relations: { agresso_contract: true },
+      });
+      expect(mockLeverFind).toHaveBeenCalledWith({
+        where: {
+          result_id: In([1, 2]),
+          is_primary: true,
+          is_active: true,
+        },
+        relations: { lever: true },
+      });
+
+      expect(result).toEqual([
+        {
+          ...mockResults[0],
+          result_contracts: contractFor1,
+          result_levers: [leverFor1a, leverFor1b],
+        },
+        {
+          ...mockResults[1],
+          result_contracts: null,
+          result_levers: [leverFor2],
+        },
+      ]);
+    });
+
+    it('should return empty array when the user has no recent results', async () => {
+      mockMainRepo.find.mockResolvedValue([] as any);
+      const mockContractFind = jest.fn().mockResolvedValue([]);
+      const mockLeverFind = jest.fn().mockResolvedValue([]);
+      mockDataSource.getRepository.mockImplementation((entity: unknown) => {
+        if (entity === ResultContract) {
+          return { find: mockContractFind } as any;
+        }
+        if (entity === ResultLever) {
+          return { find: mockLeverFind } as any;
+        }
+        return { find: jest.fn() } as any;
+      });
+
+      const result = await service.findLastUpdatedResultByCurrentUser(10);
+
+      expect(result).toEqual([]);
+      expect(mockContractFind).toHaveBeenCalledWith({
+        where: {
+          result_id: In([]),
+          is_primary: true,
+          is_active: true,
+        },
+        relations: { agresso_contract: true },
+      });
+      expect(mockLeverFind).toHaveBeenCalledWith({
+        where: {
+          result_id: In([]),
+          is_primary: true,
+          is_active: true,
+        },
+        relations: { lever: true },
+      });
     });
   });
 
