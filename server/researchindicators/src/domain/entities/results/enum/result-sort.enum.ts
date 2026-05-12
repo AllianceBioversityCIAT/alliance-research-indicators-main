@@ -13,6 +13,7 @@ export const ResultSortFields = (
     status: 'rs.name',
     indicator: 'i.name',
     'result-title': 'r.title',
+    'last-updated': 'r.updated_at',
   };
 
   return fieldMap?.[field] ?? 'r.result_official_code';
@@ -29,4 +30,5 @@ export enum ResultSortEnum {
   STATUS = 'status',
   INDICATOR = 'indicator',
   RESULT_TITLE = 'result-title',
+  LAST_UPDATED = 'last-updated',
 }
