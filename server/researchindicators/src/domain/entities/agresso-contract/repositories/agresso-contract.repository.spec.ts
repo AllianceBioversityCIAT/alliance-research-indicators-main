@@ -484,7 +484,7 @@ describe('AgressoContractRepository', () => {
         },
         {
           field: OrderFieldsEnum.COUNT_RESULTS,
-          expected: '_order_result_count ASC ',
+          expected: 'contract_total_results ASC ',
         },
       ];
       testCases.forEach(({ field, expected }) => {

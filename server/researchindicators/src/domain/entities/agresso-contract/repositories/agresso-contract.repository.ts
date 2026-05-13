@@ -250,7 +250,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
   }
 
   /**
-   * Active distinct results per contract; matches the result_counts join logic in getContracts.
+   * Distinct active results per contract; used for contract-level count_results and count-results sort.
    */
   private buildContractTotalResultsCountSql(user?: User): string {
     const userFilter = user?.sec_user_id
@@ -280,7 +280,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       [OrderFieldsEnum.STATUS]: 'ac.contract_status',
       [OrderFieldsEnum.LEAD_CENTER]: 'ac.ubwClientDescription',
       [OrderFieldsEnum.LEVER]: 'cl.id',
-      [OrderFieldsEnum.COUNT_RESULTS]: '_order_result_count',
+      [OrderFieldsEnum.COUNT_RESULTS]: 'contract_total_results',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
@@ -331,10 +331,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
 
     const dateFilterClause = this.buildDateFilterClause(filter);
     const indicators = await this.dataSource.getRepository(Indicator).find();
-    const orderByResultCountSelectSql =
-      orderFields === OrderFieldsEnum.COUNT_RESULTS
-        ? `, (${this.buildContractTotalResultsCountSql(user)}) AS _order_result_count`
-        : '';
+    const contractTotalResultsSelectSql = `, (${this.buildContractTotalResultsCountSql(user)}) AS contract_total_results`;
 
     const operationOrder = isEmpty(orderFields)
       ? `FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')`
@@ -402,6 +399,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         paginated_contracts.endDateGlobal,
         paginated_contracts.endDatefinance,
         paginated_contracts.contract_status,
+        paginated_contracts.contract_total_results,
         result_counts.indicator_id,
         COALESCE(result_counts.total_results, 0) as count_results,
         paginated_contracts.lever_id,
@@ -434,7 +432,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
                 ELSE ac.ubwClientDescription
             END AS ubwClientDescription
             ${queryRelevanceSelectSql}
-            ${orderByResultCountSelectSql}
+            ${contractTotalResultsSelectSql}
         FROM agresso_contracts ac
         LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
