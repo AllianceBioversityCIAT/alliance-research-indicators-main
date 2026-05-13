@@ -190,7 +190,8 @@ export class AgressoContractController {
     name: 'order-field',
     required: false,
     enum: OrderFieldsEnum,
-    description: 'Field to order by',
+    description:
+      'Field to order by (count-results = total active results per contract)',
   })
   @ApiQuery({
     name: 'direction',

@@ -9,4 +9,5 @@ export enum OrderFieldsEnum {
   STATUS = 'status',
   LEAD_CENTER = 'lead-center',
   LEVER = 'lever',
+  COUNT_RESULTS = 'count-results',
 }
