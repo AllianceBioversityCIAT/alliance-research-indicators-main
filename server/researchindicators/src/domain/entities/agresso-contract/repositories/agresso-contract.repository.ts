@@ -263,6 +263,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
           AND r_ord.is_active = 1
           AND r_ord.is_snapshot = FALSE
           AND rc_ord.is_active = 1
+          AND rc_ord.is_primary = TRUE
           ${userFilter})`;
   }
 
