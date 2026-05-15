@@ -462,6 +462,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         WHERE r.is_active = 1 
           AND r.is_snapshot = FALSE 
           AND rc.is_active = 1
+          AND rc.is_primary = TRUE
           ${user?.sec_user_id ? `AND r.created_by = ${user?.sec_user_id}` : ''}
         GROUP BY rc.contract_id, r.indicator_id
         HAVING COUNT(r.result_id) > 0 
