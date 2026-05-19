@@ -12,6 +12,8 @@ export class RawgressoContractDto {
   public endDateGlobal: Date;
   public endDatefinance: Date;
   public contract_status: string;
+  /** Distinct active results for the contract (same basis as count-results sort). */
+  public contract_total_results?: number | string;
   public count_results: number;
   public indicator_id: number;
   public lever_id: string;
@@ -99,7 +101,11 @@ export class MappedContractsDto {
     this.endDateGlobal = rawData.endDateGlobal;
     this.endDatefinance = rawData.endDatefinance;
     this.contract_status = rawData.contract_status;
-    this.count_results = rawData.count_results;
+    this.count_results =
+      rawData.contract_total_results != null &&
+      rawData.contract_total_results !== ''
+        ? Number(rawData.contract_total_results)
+        : Number(rawData.count_results) || 0;
     this.is_science_program = Boolean(rawData.is_science_program);
     this.is_pool_funding_contributor = Boolean(
       rawData.is_pool_funding_contributor,

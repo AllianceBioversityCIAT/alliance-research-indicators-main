@@ -805,6 +805,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     LEFT JOIN result_contracts rc on rc.result_id = r.result_id 
       AND rc.is_active 
       AND rc.is_primary 
+    LEFT JOIN agresso_contracts ac ON ac.agreement_id = rc.contract_id
     LEFT JOIN result_levers rl ON rl.result_id = r.result_id
       AND rl.is_active = TRUE
       AND rl.is_primary = TRUE
@@ -842,6 +843,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       rs.config as status_config,
       GROUP_CONCAT(DISTINCT r2.report_year_id ORDER BY r2.report_year_id DESC) AS snapshot_years,
       rc.contract_id,
+      ac.description as contract_description,
       cl.short_name as lever_name,
       su.sec_user_id as create_user_id,
       su.first_name as create_user_first_name,

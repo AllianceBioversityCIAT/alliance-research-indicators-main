@@ -544,6 +544,10 @@ describe('AgressoContractRepository', () => {
           field: OrderFieldsEnum.LEVER,
           expected: 'cl.id ASC ',
         },
+        {
+          field: OrderFieldsEnum.COUNT_RESULTS,
+          expected: 'contract_total_results ASC ',
+        },
       ];
       testCases.forEach(({ field, expected }) => {
         const direction = expected.includes('DESC') ? 'DESC' : 'ASC';
