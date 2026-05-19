@@ -45,6 +45,7 @@ import {
 } from '../../tip-integration/dto/response-year-tip.dto';
 import { SyncProcessLogService } from '../../../entities/sync-process-log/sync-process-log.service';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
+import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -64,6 +65,7 @@ export class PrmsOpenSearchService
     private readonly pooledFundingContractsService: PooledFundingContractsService,
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly syncProcessLogService: SyncProcessLogService,
+    private readonly saveResultService: SaveResultService,
   ) { }
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
@@ -188,13 +190,15 @@ export class PrmsOpenSearchService
         this.httpService.get<SearcherResponseDto>(prmsUrl),
       ).then((response) => response.data);
       const dataProcessed = await this.processData(response.data);
-      await this.createResultInStar(
-        dataProcessed,
+      await this.saveResultService.bulkSaveAllSections(dataProcessed, {
+        platformCode: ReportingPlatformEnum.PRMS,
         resultSaved,
         currentCode,
         counters,
-      );
-      if (response.totalPages <= page) {
+        appliedVersion: true,
+      });
+
+      if (page >= response.totalPages) {
         keepGoing = false;
       }
 
@@ -379,113 +383,5 @@ export class PrmsOpenSearchService
       results.push(result);
     }
     return results;
-  }
-
-  async createResultInStar(
-    results: ExternalMappersDto[],
-    resultSaved: number[],
-    currentCode: number,
-    counters: CounterResults = {
-      createdRecords: 0,
-      updatedRecords: 0,
-      errorRecords: 0,
-    },
-  ) {
-    let typeCounter: CounterResultsEnum = null;
-
-    for (const result of results) {
-      let isNewCode = false;
-      if (result.official_code != currentCode) {
-        currentCode = result.official_code;
-        isNewCode = true;
-      }
-
-      this.logger.debug(`Processing result ${result.official_code} from PRMS.`);
-      this._currentUser.setSystemUser(result.userData, true);
-      resultSaved.push(result.official_code);
-      let createNewResult: Result = null;
-      try {
-        let findResult = await this.dataSource.getRepository(Result).findOne({
-          where: {
-            result_official_code: result.official_code,
-            platform_code: ReportingPlatformEnum.PRMS,
-            report_year_id: result.createResult.year,
-          },
-        });
-        const snapshotMessage =
-          (isNewCode ? 'is a live version' : 'is a snapshot') +
-          ' from year ' +
-          result.createResult.year;
-        if (!findResult) {
-          createNewResult = await this.resultsService.createResult(
-            result.createResult,
-            ReportingPlatformEnum.PRMS,
-            {
-              notContract: true,
-              result_status_id: result.status_id,
-              validateTitle: false,
-              isSnapshot: !isNewCode,
-            },
-            result.official_code,
-          );
-          findResult = createNewResult;
-          this.logger.debug(
-            `Creating new result ${findResult.result_official_code} from PRMS, ${snapshotMessage}`,
-          );
-          typeCounter = CounterResultsEnum.CREATED;
-        } else {
-          await this.resultsService.updateInactiveResult(
-            findResult.result_id,
-            !isNewCode,
-          );
-          this.logger.debug(
-            `Updating result ${findResult.result_official_code} from PRMS, ${snapshotMessage}`,
-          );
-          typeCounter = CounterResultsEnum.UPDATED;
-        }
-
-        await this.dataSource
-          .getRepository(Result)
-          .update(findResult.result_id, {
-            external_link: result.external_link,
-            created_at: result.created_at,
-          });
-
-        await this.resultsService.updateGeneralInfo(
-          findResult.result_id,
-          result.generalInformation,
-          TrueFalseEnum.FALSE,
-          false,
-          false,
-        );
-
-        await this.resultsService.updateResultAlignment(
-          findResult.result_id,
-          result.alignments,
-        );
-        this.logger.log(
-          `Processed result ${findResult.result_official_code} from PRMS.`,
-        );
-        this.logger.log(
-          `Successfully processed result ${findResult.result_official_code} from PRMS.`,
-        );
-      } catch (error) {
-        if (createNewResult) {
-          this.logger.error(
-            `Error processing result ${createNewResult.result_id}, rolling back. Error: ${error.message}`,
-          );
-          await this._queryService.deleteFullResultById(
-            createNewResult.result_id,
-          );
-        }
-        this.logger.error(`Error processing tip result: ${error.message}`);
-        typeCounter = CounterResultsEnum.ERROR;
-      }
-      counters[typeCounter]++;
-      this._currentUser.clearSystemUser();
-      this.logger.debug(
-        `Finished processing result ${result.official_code} from PRMS.`,
-      );
-    }
   }
 }
