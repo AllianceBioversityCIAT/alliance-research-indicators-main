@@ -42,15 +42,14 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
-          .map(([key, value]) => `ac.${key} like '%${value}%'`)
-          .join(' AND ')}`
+        .map(([key, value]) => `ac.${key} like '%${value}%'`)
+        .join(' AND ')}`
       : '';
     const query = `
     select ac.*,
     ifnull(cl.full_name, 'Not available' ) as lever,
     cl.id as lever_id
-    ${
-      relations?.countries
+    ${relations?.countries
         ? `,JSON_ARRAYAGG(
             JSON_OBJECT(
                 'agreement_id', acc.agreement_id,
@@ -59,7 +58,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             )
         ) AS countries`
         : ''
-    }
+      }
     from agresso_contracts ac 
     LEFT JOIN 
         agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
@@ -250,6 +249,24 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     return parts.join(' + ');
   }
 
+  /**
+   * Distinct active results per contract; used for contract-level count_results and count-results sort.
+   */
+  private buildContractTotalResultsCountSql(user?: User): string {
+    const userFilter = user?.sec_user_id
+      ? `AND r_ord.created_by = ${user.sec_user_id}`
+      : '';
+    return `(SELECT COUNT(DISTINCT r_ord.result_id)
+        FROM results r_ord
+        INNER JOIN result_contracts rc_ord ON rc_ord.result_id = r_ord.result_id
+        WHERE rc_ord.contract_id = ac.agreement_id
+          AND r_ord.is_active = 1
+          AND r_ord.is_snapshot = FALSE
+          AND rc_ord.is_active = 1
+          AND rc_ord.is_primary = TRUE
+          ${userFilter})`;
+  }
+
   orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): string {
     if (isEmpty(field)) return '';
 
@@ -264,6 +281,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       [OrderFieldsEnum.STATUS]: 'ac.contract_status',
       [OrderFieldsEnum.LEAD_CENTER]: 'ac.ubwClientDescription',
       [OrderFieldsEnum.LEVER]: 'cl.id',
+      [OrderFieldsEnum.COUNT_RESULTS]: 'contract_total_results',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
@@ -314,6 +332,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
 
     const dateFilterClause = this.buildDateFilterClause(filter);
     const indicators = await this.dataSource.getRepository(Indicator).find();
+    const contractTotalResultsSelectSql = `, (${this.buildContractTotalResultsCountSql(user)}) AS contract_total_results`;
+
     const operationOrder = isEmpty(orderFields)
       ? `FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')`
       : this.orderBy(orderFields, direction);
@@ -380,8 +400,9 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         paginated_contracts.endDateGlobal,
         paginated_contracts.endDatefinance,
         paginated_contracts.contract_status,
+        paginated_contracts.contract_total_results,
         result_counts.indicator_id,
-        result_counts.total_results as count_results,
+        COALESCE(result_counts.total_results, 0) as count_results,
         paginated_contracts.lever_id,
         paginated_contracts.lever_short_name,
         paginated_contracts.lever_full_name,
@@ -412,6 +433,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
                 ELSE ac.ubwClientDescription
             END AS ubwClientDescription
             ${queryRelevanceSelectSql}
+            ${contractTotalResultsSelectSql}
         FROM agresso_contracts ac
         LEFT JOIN clarisa_levers cl ON cl.short_name = CONCAT('Lever ', 
             IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
@@ -441,6 +463,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         WHERE r.is_active = 1 
           AND r.is_snapshot = FALSE 
           AND rc.is_active = 1
+          AND rc.is_primary = TRUE
           ${user?.sec_user_id ? `AND r.created_by = ${user?.sec_user_id}` : ''}
         GROUP BY rc.contract_id, r.indicator_id
         HAVING COUNT(r.result_id) > 0 

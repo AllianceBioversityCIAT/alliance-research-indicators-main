@@ -1489,7 +1489,10 @@ export class ResultsService {
           'indicator',
           'result_status_id',
           'result_status',
-          'platform_code'
+          'platform_code',
+          'public_link',
+          'public_link',
+          'report_year_id'
         ],
         where: {
           created_by: this.currentUser.user_id,
@@ -1506,11 +1509,12 @@ export class ResultsService {
         take: take,
       })
       .then(async (results) => {
+        const resultIds = results.map((el) => el.result_id);
         const results_contract = await this.dataSource
           .getRepository(ResultContract)
           .find({
             where: {
-              result_id: In(results.map((el) => el.result_id)),
+              result_id: In(resultIds),
               is_primary: true,
               is_active: true,
             },
@@ -1519,13 +1523,30 @@ export class ResultsService {
             },
           });
 
+        const results_levers = await this.dataSource
+          .getRepository(ResultLever)
+          .find({
+            where: {
+              result_id: In(resultIds),
+              is_primary: true,
+              is_active: true,
+            },
+            relations: {
+              lever: true,
+            }
+          });
+
         return results.map((result) => {
           const contract = results_contract.find(
+            (el) => el.result_id === result.result_id,
+          );
+          const levers = results_levers.filter(
             (el) => el.result_id === result.result_id,
           );
           return {
             ...result,
             result_contracts: contract ?? null,
+            result_levers: levers ?? [],
           };
         });
       });
