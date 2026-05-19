@@ -89,6 +89,8 @@ import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module
 import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.module';
 import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { ReportsModule } from './reports/reports.module';
+import { BilateralModule } from './bilateral/bilateral.module';
+import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 
 @Module({
   imports: [
@@ -182,7 +184,15 @@ import { ReportsModule } from './reports/reports.module';
     LeverSdgTargetsModule,
     ResultLeverSdgTargetsModule,
     ReportsModule,
+    BilateralModule,
+    ResultReviewHistoryModule,
   ],
-  exports: [AgressoContractModule, AppSecretsModule, ReportsModule],
+  exports: [
+    AgressoContractModule,
+    AppSecretsModule,
+    ReportsModule,
+    BilateralModule,
+    ResultReviewHistoryModule,
+  ],
 })
 export class EntitiesModule {}

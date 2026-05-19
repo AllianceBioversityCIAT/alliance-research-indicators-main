@@ -8,6 +8,8 @@ import { StatusWorkflowFunctionHandlerService } from './function-handler.service
 import { ResultStatusWorkflow } from './entities/result-status-workflow.entity';
 import { ResultStatus } from '../result-status/entities/result-status.entity';
 import { Result } from '../results/entities/result.entity';
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 
 describe('ResultStatusWorkflowService', () => {
   let service: ResultStatusWorkflowService;
@@ -218,6 +220,30 @@ describe('ResultStatusWorkflowService', () => {
       await expect(
         service.changeStatus(1, 2, { submission_comment: 'test' } as any),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject direct bilateral approval when transition is not listed', async () => {
+      mockResultFindOne.mockResolvedValue({
+        result_id: 1,
+        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        result_status_id: ResultStatusEnum.DRAFT,
+      });
+      mockWorkflowFindOne.mockResolvedValue(null);
+
+      await expect(
+        service.changeStatus(1, ResultStatusEnum.BILATERAL_APPROVED, {
+          submission_comment: 'approve directly',
+        } as any),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockWorkflowFindOne).toHaveBeenCalledWith({
+        where: {
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          from_status_id: ResultStatusEnum.DRAFT,
+          to_status_id: ResultStatusEnum.BILATERAL_APPROVED,
+          is_active: true,
+        },
+      });
     });
 
     it('should execute transaction when result and transition are valid', async () => {

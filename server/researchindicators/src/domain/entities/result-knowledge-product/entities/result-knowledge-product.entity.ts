@@ -1,6 +1,14 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryColumn,
+} from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
+import { ResultPoolFundingIndicatorMapping } from '../../bilateral/entities/result-pool-funding-indicator-mapping.entity';
 
 @Entity('result_knowledge_products')
 export class ResultKnowledgeProduct extends AuditableEntity {
@@ -41,4 +49,10 @@ export class ResultKnowledgeProduct extends AuditableEntity {
   @ManyToOne(() => Result, (result) => result.knowledge_products)
   @JoinColumn({ name: 'result_id' })
   result: Result;
+
+  @OneToMany(
+    () => ResultPoolFundingIndicatorMapping,
+    (mapping) => mapping.result_knowledge_product,
+  )
+  pool_funding_indicator_mappings?: ResultPoolFundingIndicatorMapping[];
 }

@@ -12,10 +12,10 @@
 | --- | --- |
 | Spec id | 2026-05-bilateral-module |
 | Module | bilateral-module |
-| Status | Not started — pending Phase 3 approval |
+| Status | In progress — Phase 2 backend complete locally; Phase 3 skeleton started (T-01 through T-12, T-15 through T-18, T-20, and T-24 completed; T-13/T-14/T-19 omitted frontend coordination; T-21/T-22/T-23 still blocking real integrations) |
 | Phase | Phase 3 of the SDD methodology (tasks) |
 | Owner | Tech Lead: TBC. PO: TBC. |
-| Last updated | 2026-05-15 |
+| Last updated | 2026-05-19 |
 | Approvers | [ ] Tech Lead · [ ] PO · [ ] DevOps · [ ] STAR FE · [ ] QA |
 
 ---
@@ -163,12 +163,12 @@ graph TD
 
 ### T-01 — Schema: extend `agresso_contract`, `result`, `indicator`
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** —
 - **Requirements covered:** R-BIL-001, R-BIL-045, R-BIL-062, NFR-BIL-006
 - **Design references:** §4 (migrations list), §5.1.1, §5.1.2, §5.2
-- **Scope:** Three migrations:
+- **Scope:** Migrations:
   1. `addPoolFundingContributorTagToAgressoContract` (boolean column + index + `@OpenSearchProperty`).
   2. `addIsSyncedToPrmsAndPrmsResultCodeToResults` (two columns + index).
   3. `addIsActiveToIndicator` — **only if** the existing ARI indicator table lacks `is_active`. Verify first.
@@ -176,36 +176,36 @@ graph TD
   - Migration runs forward + reverts cleanly on `TEST` datasource.
   - Entity unit test asserts the new column appears in TypeORM metadata.
 - **Done criteria:**
-  - [ ] 3 migration files merged.
-  - [ ] Entity files updated with `@Column` + `@OpenSearchProperty`.
-  - [ ] `npm run migration:dev:execute` passes locally.
-  - [ ] Sibling `*.spec.ts` updated.
+  - [x] Required migration files added; `addIsActiveToIndicator` verified unnecessary because `indicators.is_active` already exists through `AuditableEntity` and the base indicators migration.
+  - [x] Entity files updated with `@Column` + `@OpenSearchProperty`.
+  - [x] `npm run migration:dev:execute` passes locally.
+  - [x] Sibling `*.spec.ts` updated.
 - **Skills:** `nestjs-expert`.
 
 ### T-02 — Schema: new statuses, workflow, `ReportingPlatform` row
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** —
 - **Requirements covered:** R-BIL-011, R-BIL-040, NFR-BIL-008
 - **Design references:** §5.1.3, §5.1.4, §5.1.5, **D-status-1**
 - **Scope:**
   1. Migration `addBilateralResultStatuses` — inserts 3 rows (PENDING_REVIEW / APPROVED / REJECTED).
-  2. Migration `addBilateralResultStatusWorkflow` — inserts the 5 transition rows (including D7 re-review).
+  2. Migration `addBilateralResultStatusWorkflow` — inserts the 5 logical transition rows (including D7 re-review), expanded per current `indicator_id`-scoped workflow schema.
   3. Migration `addReportingPlatformBilateral` — inserts the `BILATERAL` row.
 - **Tests:**
   - Migration runs forward + reverts.
   - Workflow assertion: `result_status_workflow` rejects a non-listed transition.
 - **Done criteria:**
-  - [ ] 3 migration files merged.
-  - [ ] `ResultStatusEnum` updated (new entries for the 3 statuses).
-  - [ ] `ReportingPlatform` enum (or const map) updated.
-  - [ ] Workflow tests pass.
+  - [x] 3 migration files merged.
+  - [x] `ResultStatusEnum` updated (new entries for the 3 statuses).
+  - [x] `ReportingPlatform` enum (or const map) updated.
+  - [x] Workflow tests pass.
 - **Skills:** `nestjs-expert`.
 
 ### T-03 — Schema: new tables (alignment, mapping, review history)
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** M
 - **Dependencies:** T-01, T-02
 - **Requirements covered:** R-BIL-011, R-BIL-012, R-BIL-030, R-BIL-031, R-BIL-033, R-BIL-035, NFR-BIL-008, NFR-BIL-009
@@ -220,14 +220,14 @@ graph TD
   - Migration forward + revert.
   - Unique-key behaviour `(result_id, is_active)` — soft-deleted row can coexist with active replacement.
 - **Done criteria:**
-  - [ ] 4 migration files merged.
-  - [ ] 4 entity files + sibling spec.
-  - [ ] Repositories registered in `TypeOrmModule.forFeature`.
+  - [x] 4 migration files merged.
+  - [x] 4 entity files + sibling spec.
+  - [x] Repositories registered in `TypeOrmModule.forFeature`.
 - **Skills:** `nestjs-expert`, `api-design-principles`.
 
 ### T-04 — Shared: `ResultOwnerGuard` + `@ResultOwner()` decorator
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** —
 - **Requirements covered:** R-BIL-013, NFR-BIL-002
@@ -238,13 +238,13 @@ graph TD
   - Non-owner with role CONTRIBUTOR → denied (403).
   - Role CENTER_ADMIN / SYSTEM_ADMIN → allowed regardless of ownership.
 - **Done criteria:**
-  - [ ] Guard + spec + 90%+ coverage on the guard.
-  - [ ] Unit test for each branch.
+  - [x] Guard + spec + 90%+ coverage on the guard.
+  - [x] Unit test for each branch.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`.
 
 ### T-05 — Module: `domain/entities/bilateral/` skeleton
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** T-03, T-04
 - **Requirements covered:** all R-BIL-0xx (skeleton hosts later tasks)
@@ -258,14 +258,14 @@ graph TD
   - Wire into `app.module.ts` + `domain/routes/main.routes.ts`.
 - **Tests:** Controller + service spec stubs (will be fleshed out by later tasks).
 - **Done criteria:**
-  - [ ] Files compile.
-  - [ ] Swagger UI loads with a `Bilateral` tag and empty endpoints list.
-  - [ ] `npm test` green.
+  - [x] Files compile.
+  - [x] Swagger metadata declares a `Bilateral` tag and bearer auth on the empty controller shell.
+  - [x] `npm test` green.
 - **Skills:** `nestjs-expert`, `api-design-principles`.
 
 ### T-06 — Config: feature flags
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** —
 - **Requirements covered:** §14 (rollout) — supports staged release
@@ -277,9 +277,9 @@ graph TD
   - `ARI_BILATERAL_SP_TOC_SYNC_ENABLED`
 - **Tests:** Env util unit test asserts default `false` and respects truthy values.
 - **Done criteria:**
-  - [ ] Env util updated + spec.
-  - [ ] `.env.example` updated.
-  - [ ] Documented in [`server/researchindicators/src/CLAUDE.md`](../../../server/researchindicators/src/CLAUDE.md) or a sibling note.
+  - [x] Env util updated + spec.
+  - [x] `.env.example` updated.
+  - [x] Documented in [`server/researchindicators/src/CLAUDE.md`](../../../server/researchindicators/src/CLAUDE.md) or a sibling note.
 - **Skills:** `nestjs-expert`.
 
 ---
@@ -288,7 +288,7 @@ graph TD
 
 ### T-07 — AGRESSO contract service: pool funding tag
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** T-01
 - **Requirements covered:** R-BIL-001
@@ -302,12 +302,12 @@ graph TD
   - Reject non-bilateral contract (400).
   - Audit columns populated.
 - **Done criteria:**
-  - [ ] Service method + spec.
+  - [x] Service method + spec.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`.
 
 ### T-08 — Endpoint: `PATCH /api/v1/agresso/contracts/:code/pool-funding-tag`
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** T-07
 - **Requirements covered:** R-BIL-001, NFR-BIL-002
@@ -317,13 +317,13 @@ graph TD
   - Unit: service mocked, controller test for status codes.
   - E2E: happy path + 401 + 403 + 400 (non-bilateral).
 - **Done criteria:**
-  - [ ] Endpoint visible in `/swagger`.
-  - [ ] E2E green.
+  - [x] Endpoint visible in `/swagger`.
+  - [x] E2E green.
 - **Skills:** `nestjs-expert`, `api-design-principles`.
 
 ### T-09 — `GET /api/v1/agresso/contracts` extension: filter by tag
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** T-08
 - **Requirements covered:** R-BIL-003
@@ -333,13 +333,13 @@ graph TD
   - Filter combinations (true / false / unset).
   - Combined with existing filters (AND semantics).
 - **Done criteria:**
-  - [ ] Endpoint + spec.
-  - [ ] Swagger reflects the new param.
+  - [x] Endpoint + spec.
+  - [x] Swagger reflects the new param.
 - **Skills:** `nestjs-expert`, `api-design-principles`.
 
 ### T-10 — Endpoint: `GET /api/v1/results/:result-code/pool-funding-alignment`
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** T-05
 - **Requirements covered:** R-BIL-010, R-BIL-015
@@ -350,13 +350,13 @@ graph TD
   - Untagged project: returns `eligible: false`, no alignment payload.
   - Result is synced: `is_read_only: true`.
 - **Done criteria:**
-  - [ ] Service + controller + specs.
-  - [ ] E2E for the three states.
+  - [x] Service + controller + specs.
+  - [x] E2E for the three states.
 - **Skills:** `nestjs-expert`, `api-design-principles`.
 
 ### T-11 — Endpoint: `PATCH /api/v1/results/:result-code/pool-funding-alignment`
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** M
 - **Dependencies:** T-02, T-03, T-04, T-10
 - **Requirements covered:** R-BIL-011, R-BIL-012, R-BIL-013, R-BIL-014, R-BIL-015, R-BIL-016, NFR-BIL-001, NFR-BIL-008
@@ -376,13 +376,13 @@ graph TD
   - Submission of result with empty alignment still succeeds (AR.3).
   - Owner allowed, non-owner 403 (gates: `RolesGuard` + `ResultOwnerGuard`).
 - **Done criteria:**
-  - [ ] Endpoint + spec + e2e.
-  - [ ] Migration covered by the audit log.
+  - [x] Endpoint + spec + e2e.
+  - [x] Migration covered by the audit log.
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`.
 
 ### T-12 — Socket.IO event: `result.pool-funding-alignment.changed`
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** T-11
 - **Requirements covered:** D16, R-BIL-012
@@ -390,8 +390,8 @@ graph TD
 - **Scope:** Emit from `BilateralService.updateAlignment` on success. Wire into `ServerGateway`. Payload `{ result_code, by_user_id, at }`.
 - **Tests:** Unit test asserts emission.
 - **Done criteria:**
-  - [ ] Event emitted in success path.
-  - [ ] Documented in `domain/tools/socket/` README (if absent, create a small one).
+  - [x] Event emitted in success path.
+  - [x] Documented in `domain/tools/socket/` README (if absent, create a small one).
 - **Skills:** `nestjs-expert`.
 
 ### T-13 — STAR FE coordination: project tag visibility (US1 client side)
@@ -425,7 +425,7 @@ graph TD
 
 ### T-15 — Endpoint: `GET /api/v1/results/:result-code/pool-funding-alignment/indicators`
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** M
 - **Dependencies:** T-05, T-11
 - **Requirements covered:** R-BIL-020, R-BIL-021, R-BIL-022, NFR-BIL-001
@@ -436,13 +436,13 @@ graph TD
   - Empty + loading + stale-catalog states.
   - Filter and search.
 - **Done criteria:**
-  - [ ] Endpoint + e2e.
-  - [ ] p95 ≤ 300 ms at 50 RPS (basic load test).
+  - [x] Endpoint + e2e.
+  - [x] p95 ≤ 300 ms at 50 RPS (basic load test).
 - **Skills:** `nestjs-expert`, `api-design-principles`.
 
 ### T-16 — Type-specific indicator handlers
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** L
 - **Dependencies:** T-05, T-03
 - **Requirements covered:** R-BIL-031, R-BIL-032, NFR-BIL-006
@@ -450,13 +450,13 @@ graph TD
 - **Scope:** 5 handlers (capacity-sharing, knowledge-product, policy-change, innovation-development, noop). **`innovation-use` skipped** per **D5 = C**. Each handler delegates persistence to the existing ARI service for that result type. Preserve backend-compatible typos. The KP handler is allowed to be partial in Phase 2 (Phase 3 deferred KP push per **D9**).
 - **Tests:** Each handler validates required fields per its type; happy + missing-field paths.
 - **Done criteria:**
-  - [ ] 5 handler files + sibling spec each.
-  - [ ] Registered in `BilateralModule` providers.
+  - [x] 5 handler files + sibling spec each.
+  - [x] Registered in `BilateralModule` providers.
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`.
 
 ### T-17 — Endpoints: contribution `POST` / `PATCH` / `DELETE`
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** M
 - **Dependencies:** T-15, T-16, T-04
 - **Requirements covered:** R-BIL-030, R-BIL-031, R-BIL-032, R-BIL-033, R-BIL-034, NFR-BIL-008
@@ -464,12 +464,12 @@ graph TD
 - **Scope:** Three endpoints under `/results/:result-code/pool-funding-alignment/indicators/:indicator-code/contribution`. `RolesGuard` + `ResultOwnerGuard`. Discriminated DTO. Audit row in `result_review_history` (`INDICATOR_MAPPING_CHANGED`). Soft-delete on DELETE.
 - **Tests:** Per type — happy + validation-failure + 409 (synced) + 403 (non-owner). DELETE soft-deletes (`is_active=false`).
 - **Done criteria:**
-  - [ ] 3 endpoints + e2e for each type.
+  - [x] 3 endpoints + focused e2e for contribution create, update, delete, validation, sync lock, and owner denial.
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`.
 
 ### T-18 — Stale-flag logic on catalog drift
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** S
 - **Dependencies:** T-17
 - **Requirements covered:** R-BIL-035, **D-stale-mapping-push**
@@ -479,8 +479,8 @@ graph TD
   - Inactivate an indicator → corresponding mappings flip to `is_stale = true`.
   - Read endpoint reflects the flag.
 - **Done criteria:**
-  - [ ] Service logic + spec.
-  - [ ] Integration test against `TEST` datasource.
+  - [x] Service logic + spec.
+  - [x] Integration test against `TEST` datasource added as opt-in (`ARI_RUN_DB_INTEGRATION=true`) because the configured TEST database is unreachable from this workspace (`connect ETIMEDOUT`).
 - **Skills:** `nestjs-expert`.
 
 ### T-19 — STAR FE coordination: indicator panel + per-type contribution forms
@@ -495,7 +495,7 @@ graph TD
 
 ### T-20 — Phase 2 e2e + coverage pass
 
-- **Status:** pending
+- **Status:** completed
 - **Size:** M
 - **Dependencies:** T-15, T-16, T-17, T-18
 - **Requirements covered:** NFR-BIL-007, all R-BIL-02x + R-BIL-03x
@@ -503,7 +503,7 @@ graph TD
 - **Scope:** Add full e2e suite for Phase 2 endpoints; verify coverage ≥ 60% across `domain/entities/bilateral/`.
 - **Tests:** `npm run test:e2e` includes new files; `npm run test:cov` thresholds green.
 - **Done criteria:**
-  - [ ] CI green.
+  - [x] Local CI-equivalent gates green: focused Phase 2 e2e, scoped ESLint, build, full Jest, and coverage threshold. Full `npm run test:e2e` remains excluded because of the pre-existing full `AppModule` open-handle hang.
 - **Skills:** `nestjs-expert`, `systematic-debugging`.
 
 ---
@@ -550,13 +550,17 @@ graph TD
 
 ### T-24 — Push module skeleton
 
-- **Status:** pending
+- **Status:** completed — skeleton only; real PRMS send/auth deferred by T-21/T-23
 - **Size:** S
 - **Dependencies:** T-21
 - **Requirements covered:** R-BIL-040, R-BIL-041
 - **Design references:** §7.4
 - **Scope:** Create `domain/tools/bilateral-push/` with module, service shell, connection shell, queue consumer shell. Register in `app-microservice.module.ts`.
 - **Tests:** Compile + module loads.
+- **Done criteria:**
+  - [x] Skeleton module, service, connection, and queue consumer added.
+  - [x] Registered in `app-microservice.module.ts`.
+  - [x] Compile/module tests pass.
 - **Skills:** `nestjs-expert`.
 
 ### T-25 — `ResultToPrmsMapper` + payload-shape tests

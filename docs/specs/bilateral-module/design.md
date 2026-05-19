@@ -160,9 +160,11 @@ server/researchindicators/src/
 │   │   │   └── agresso-contract.service.ts                 (✎)
 │   │   ├── result-review-history/                         ✚ NEW
 │   │   │   ├── result-review-history.module.ts
-│   │   │   ├── result-review-history.service.ts
-│   │   │   ├── result-review-history.service.spec.ts
-│   │   │   └── entities/result-review-history.entity.ts
+│   │   │   ├── entities/result-review-history.entity.ts
+│   │   │   └── repositories/result-review-history.repository.ts
+│   │   │   # Note: no dedicated service.ts — BilateralService writes via the
+│   │   │   # repository directly. Add a service file if a second module needs
+│   │   │   # to mutate review history.
 │   │   └── results/                                       (✎ minor service additions for re-review transitions)
 │   │
 │   ├── tools/

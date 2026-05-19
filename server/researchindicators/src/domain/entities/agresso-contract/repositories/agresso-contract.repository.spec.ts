@@ -11,6 +11,7 @@ import {
   isValidText,
   escapeLikeString,
 } from '../../../shared/utils/query-sanitizer.util';
+import { FindAllOptions } from '../../../shared/enum/find-all-options';
 
 // Mock the utility functions
 jest.mock('../../../shared/utils/object.utils', () => ({
@@ -94,6 +95,7 @@ describe('AgressoContractRepository', () => {
 
     // Setup repository methods
     repository.query = jest.fn();
+    repository.find = jest.fn();
     repository.createQueryBuilder = jest.fn().mockReturnValue(mockQueryBuilder);
     repository['sortResultsWithLodash'] = jest
       .fn()
@@ -106,10 +108,53 @@ describe('AgressoContractRepository', () => {
     expect(repository).toBeDefined();
   });
 
+  describe('findDataForOpenSearch', () => {
+    it('should map active contracts for OpenSearch', async () => {
+      (repository.find as jest.Mock).mockResolvedValue([
+        {
+          agreement_id: 'BIL-001',
+          projectDescription: 'Bilateral project',
+          project_lead_description: 'PI Name',
+          description: 'Project description',
+          funding_type: 'BILATERAL',
+          contract_status: 'ongoing',
+          is_pool_funding_contributor: true,
+        },
+      ]);
+
+      const result = await repository.findDataForOpenSearch(
+        FindAllOptions.SHOW_ONLY_ACTIVE,
+        ['BIL-001'],
+      );
+
+      expect(repository.find).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          agreement_id: expect.any(Object),
+          is_active: true,
+        }),
+      });
+      expect(result).toEqual([
+        {
+          agreement_id: 'BIL-001',
+          projectDescription: 'Bilateral project',
+          project_lead_description: 'PI Name',
+          description: 'Project description',
+          funding_type: 'BILATERAL',
+          contract_status: 'ongoing',
+          is_pool_funding_contributor: true,
+        },
+      ]);
+    });
+  });
+
   describe('findAllContracts', () => {
     it('should find all contracts with pagination and where clause', async () => {
       const pagination = { page: 2, limit: 10 };
-      const where = { agreement_id: 'TEST001', funding_type: 'BILATERAL' };
+      const where = {
+        agreement_id: 'TEST001',
+        funding_type: 'BILATERAL',
+        is_pool_funding_contributor: true,
+      };
       const relations = { countries: 'true' };
 
       const expectedContracts = [
@@ -144,8 +189,25 @@ describe('AgressoContractRepository', () => {
       expect(repository.query).toHaveBeenCalledWith(
         expect.stringContaining('LIMIT 10 OFFSET 10'),
       );
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('ac.is_pool_funding_contributor = 1'),
+      );
       expect(result).toHaveLength(1);
       expect(result[0]).toHaveProperty('leverUrl');
+    });
+
+    it('should filter by pool funding contributor false', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.findAllContracts(
+        undefined,
+        { is_pool_funding_contributor: false },
+        {},
+      );
+
+      expect((repository.query as jest.Mock).mock.calls[0][0]).toContain(
+        'ac.is_pool_funding_contributor = 0',
+      );
     });
 
     it('should find all contracts without pagination', async () => {
@@ -743,6 +805,39 @@ describe('AgressoContractRepository', () => {
         (repository.query as jest.Mock).mock.calls[0][0] as string,
       ).toContain('AND pfc.id IS NULL');
       expect(out.data).toHaveLength(1);
+    });
+
+    it('should filter contracts by pool funding contributor true', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.getContracts({ is_pool_funding_contributor: true });
+
+      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('AND ac.is_pool_funding_contributor = 1');
+    });
+
+    it('should filter contracts by pool funding contributor false', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.getContracts({ is_pool_funding_contributor: false });
+
+      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain('AND ac.is_pool_funding_contributor = 0');
+    });
+
+    it('should combine pool funding contributor with existing filters', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.getContracts({
+        project_name: 'Rice',
+        status: [AgressoContractStatus.ONGOING],
+        is_pool_funding_contributor: true,
+      });
+
+      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      expect(sql).toContain("AND ac.projectDescription LIKE '%Rice%'");
+      expect(sql).toContain("AND LOWER(ac.contract_status) in ('ongoing')");
+      expect(sql).toContain('AND ac.is_pool_funding_contributor = 1');
     });
   });
 

@@ -14,6 +14,12 @@ import { selectManager } from '../../shared/utils/orm.util';
 import { AiRawUser } from '../results/dto/result-ai.dto';
 import { SaveAuthorContcatDto } from './dto/save-author-contact.dto';
 import { InformativeRolesEnum } from '../informative-roles/enum/informative-roles.enum';
+import { Result } from '../results/entities/result.entity';
+import { queryPrincipalInvestigator } from '../../shared/const/gloabl-queries.const';
+import {
+  DEFAULT_RESULT_OWNER_TYPES,
+  ResultOwnerType,
+} from '../../shared/decorators/result-owner.decorator';
 @Injectable()
 export class ResultUsersService extends BaseServiceSimple<
   ResultUser,
@@ -347,5 +353,96 @@ export class ResultUsersService extends BaseServiceSimple<
     });
 
     return resultUsers;
+  }
+
+  async isUserOnResult(
+    resultId: number,
+    userId: number,
+    ownerTypes: ResultOwnerType[] = DEFAULT_RESULT_OWNER_TYPES,
+  ): Promise<boolean> {
+    if (!resultId || !userId || ownerTypes.length === 0) return false;
+
+    if (
+      ownerTypes.includes(ResultOwnerType.CREATOR) &&
+      (await this.isResultCreator(resultId, userId))
+    ) {
+      return true;
+    }
+
+    if (
+      ownerTypes.includes(ResultOwnerType.CONTACT) &&
+      (await this.isResultMainContact(resultId, userId))
+    ) {
+      return true;
+    }
+
+    if (
+      ownerTypes.includes(ResultOwnerType.PI) &&
+      (await this.isResultPrincipalInvestigator(resultId, userId))
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private async isResultCreator(
+    resultId: number,
+    userId: number,
+  ): Promise<boolean> {
+    const result = await this.dataSource.getRepository(Result).findOne({
+      select: {
+        result_id: true,
+        created_by: true,
+      },
+      where: {
+        result_id: resultId,
+        is_active: true,
+      },
+    });
+
+    return this.equalIds(result?.created_by, userId);
+  }
+
+  private async isResultMainContact(
+    resultId: number,
+    userId: number,
+  ): Promise<boolean> {
+    const query = `SELECT
+                    COUNT(ru.result_user_id) > 0 AS is_main_contact
+                  FROM result_users ru
+                    INNER JOIN alliance_user_staff aus ON aus.carnet = ru.user_id
+                    INNER JOIN sec_users su ON TRIM(LOWER(su.email)) = TRIM(LOWER(aus.email))
+                                AND su.sec_user_id = ?
+                  WHERE ru.user_role_id = ?
+                    AND ru.is_active = TRUE
+                    AND ru.result_id = ?`;
+
+    const result = await this.dataSource
+      .query(query, [userId, UserRolesEnum.MAIN_CONTACT, resultId])
+      .then((res: { is_main_contact: number | string | boolean }[]) =>
+        res?.length ? res[0] : { is_main_contact: 0 },
+      );
+
+    return Number(result.is_main_contact) === 1;
+  }
+
+  private async isResultPrincipalInvestigator(
+    resultId: number,
+    userId: number,
+  ): Promise<boolean> {
+    const result = await this.dataSource
+      .query(queryPrincipalInvestigator(), [userId, resultId])
+      .then((res: { is_principal: number | string | boolean }[]) =>
+        res?.length ? res[0] : { is_principal: 0 },
+      );
+
+    return Number(result.is_principal) === 1;
+  }
+
+  private equalIds(left: unknown, right: unknown): boolean {
+    return (
+      left !== null && left !== undefined && String(left) === String(right)
+    );
   }
 }

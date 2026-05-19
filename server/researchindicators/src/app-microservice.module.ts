@@ -14,6 +14,7 @@ import { AlianceManagementApp } from './domain/tools/broker/aliance-management.a
 import { AgressoToolsModule } from './domain/tools/agresso/agresso-tools.module';
 import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
 import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integration.module';
+import { BilateralPushModule } from './domain/tools/bilateral-push/bilateral-push.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integra
     ),
     GlobalUtilsModule,
     TipIntegrationModule,
+    BilateralPushModule,
   ],
   providers: [
     AlianceManagementApp,

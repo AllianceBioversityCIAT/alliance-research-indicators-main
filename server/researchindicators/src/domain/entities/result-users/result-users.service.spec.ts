@@ -6,6 +6,7 @@ import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
 import { InformativeRolesEnum } from '../informative-roles/enum/informative-roles.enum';
 import { ResultUser } from './entities/result-user.entity';
+import { ResultOwnerType } from '../../shared/decorators/result-owner.decorator';
 
 describe('ResultUsersService', () => {
   let service: ResultUsersService;
@@ -15,6 +16,7 @@ describe('ResultUsersService', () => {
   const mockCreate = jest.fn();
   const mockSave = jest.fn();
   const mockTransaction = jest.fn();
+  const mockQuery = jest.fn();
 
   const mockCurrentUser = {
     audit: jest.fn().mockReturnValue({ updated_by: 1 }),
@@ -37,6 +39,7 @@ describe('ResultUsersService', () => {
                 primaryColumns: [{ propertyName: 'result_user_id' }],
               },
             }),
+            query: mockQuery,
             transaction: mockTransaction,
           },
         },
@@ -270,6 +273,72 @@ describe('ResultUsersService', () => {
       );
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('isUserOnResult', () => {
+    it('should return true when the user created the result', async () => {
+      mockFindOne.mockResolvedValue({ created_by: '10' });
+
+      const result = await service.isUserOnResult(1, 10, [
+        ResultOwnerType.CREATOR,
+      ]);
+
+      expect(result).toBe(true);
+      expect(mockFindOne).toHaveBeenCalledWith({
+        select: {
+          result_id: true,
+          created_by: true,
+        },
+        where: {
+          result_id: 1,
+          is_active: true,
+        },
+      });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it('should return true when the user is the main contact', async () => {
+      mockQuery.mockResolvedValueOnce([{ is_main_contact: 1 }]);
+
+      const result = await service.isUserOnResult(1, 10, [
+        ResultOwnerType.CONTACT,
+      ]);
+
+      expect(result).toBe(true);
+      expect(mockQuery).toHaveBeenCalledWith(expect.any(String), [
+        10,
+        UserRolesEnum.MAIN_CONTACT,
+        1,
+      ]);
+    });
+
+    it('should return true when the user is the principal investigator', async () => {
+      mockQuery.mockResolvedValueOnce([{ is_principal: 1 }]);
+
+      const result = await service.isUserOnResult(1, 10, [ResultOwnerType.PI]);
+
+      expect(result).toBe(true);
+      expect(mockQuery).toHaveBeenCalledWith(expect.any(String), [10, 1]);
+    });
+
+    it('should return false when no ownership source matches', async () => {
+      mockFindOne.mockResolvedValue({ created_by: 11 });
+      mockQuery
+        .mockResolvedValueOnce([{ is_main_contact: 0 }])
+        .mockResolvedValueOnce([{ is_principal: 0 }]);
+
+      const result = await service.isUserOnResult(1, 10);
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when no owner types are requested', async () => {
+      const result = await service.isUserOnResult(1, 10, []);
+
+      expect(result).toBe(false);
+      expect(mockFindOne).not.toHaveBeenCalled();
+      expect(mockQuery).not.toHaveBeenCalled();
     });
   });
 });

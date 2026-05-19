@@ -156,6 +156,17 @@ Socket.IO event names + payload shapes are **not yet documented**; capture any n
 
 ---
 
+## 8.1 Bilateral Feature Flags
+
+Bilateral rollout toggles live in `domain/shared/utils/env.utils.ts` and default to `false` unless the env string is exactly `true`:
+
+- `ARI_BILATERAL_MODULE_ENABLED`
+- `ARI_BILATERAL_PUSH_ENABLED`
+- `ARI_BILATERAL_W3_SYNC_ENABLED`
+- `ARI_BILATERAL_SP_TOC_SYNC_ENABLED`
+
+---
+
 ## 9. Tests
 
 - Framework: Jest 29 + ts-jest. Sibling `*.spec.ts` per controller / service / guard / interceptor / middleware.
