@@ -68,6 +68,54 @@ describe('ResultRepository', () => {
     });
   });
 
+  describe('findPoolFundingAlignmentContext', () => {
+    it('returns first result context row', async () => {
+      querySpy.mockResolvedValueOnce([
+        {
+          result_id: 77,
+          result_official_code: 123,
+          result_status_id: 24,
+          version_id: 2,
+          report_year_id: 2026,
+          is_synced_to_prms: 0,
+          is_pool_funding_contributor: 1,
+        },
+      ]);
+
+      await expect(
+        repository.findPoolFundingAlignmentContext(77),
+      ).resolves.toEqual({
+        result_id: 77,
+        result_official_code: 123,
+        result_status_id: 24,
+        version_id: 2,
+        report_year_id: 2026,
+        is_synced_to_prms: 0,
+        is_pool_funding_contributor: 1,
+      });
+      expect(querySpy).toHaveBeenCalledWith(expect.any(String), [77]);
+    });
+
+    it('returns null when result context is missing', async () => {
+      querySpy.mockResolvedValueOnce([]);
+
+      await expect(
+        repository.findPoolFundingAlignmentContext(77),
+      ).resolves.toBeNull();
+    });
+
+    it('joins the primary result contract and AGRESSO tag', async () => {
+      await repository.findPoolFundingAlignmentContext(77);
+      const sql = querySpy.mock.calls[0][0] as string;
+
+      expect(sql).toContain('LEFT JOIN result_contracts rc');
+      expect(sql).toContain('AND rc.is_primary = TRUE');
+      expect(sql).toContain('LEFT JOIN agresso_contracts ac');
+      expect(sql).toContain('ac.is_pool_funding_contributor');
+      expect(sql).toContain('r.version_id');
+    });
+  });
+
   describe('filterByPrimaryContract', () => {
     it('returns empty string when codes empty', () => {
       expect(repository['filterByPrimaryContract']([])).toBe('');

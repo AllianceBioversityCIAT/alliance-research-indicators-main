@@ -3,6 +3,11 @@
 /node_modules
 /build
 
+# nvm
+/nvm
+.nvmrc
+.nvm/
+
 # Logs
 logs
 *.log

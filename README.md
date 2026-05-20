@@ -1,259 +1,484 @@
-# ALLIANCE RESEARCH INDICATORS MAIN
+# Alliance Research Indicators (ARI)
 
-# Table of Contents
+The **Alliance Research Indicators (ARI)** platform is the system of record for CGIAR Alliance research results reporting. It centralizes the capture, validation, governance, and publication of research **Results** (innovations, capacity sharing, policy change, OICRs, IP rights, knowledge products, etc.) so that contributors, MEL experts, and center admins can move from raw evidence to formally reported research outcomes against indicators, contracts, levers, and strategic outcomes.
 
-1. [Backend API Tech Stack](#backend-api-tech-stack)
-   - [Programming language](#programming-language)
-   - [Framework](#framework)
-   - [Build tool](#build-tool)
-   - [Code coverage tool](#code-coverage-tool)
-   - [Static code analysis](#static-code-analysis)
-   - [Dependency management](#dependency-management)
-   - [Dependency vulnerability scanning](#dependency-vulnerability-scanning)
-   - [Unit testing](#unit-testing)
-   - [API testing framework](#api-testing-framework)
-   - [API documentation](#api-documentation)
-2. [Architecture Diagram](#architecture-diagram)
-3. [Cross-Functional Requirements](#cross-functional-requirements)
-   - [Scalability](#scalability)
+This monorepo contains:
 
-## Backend API Tech Stack
+- **`server/researchindicators/`** — the NestJS backend API, RabbitMQ microservice listener, Socket.IO gateway, and embedded `/admin` SSR panel. Fully documented in [`docs/`](./docs/).
+- **`client/research-indicators/`** — the **STAR** frontend (sibling app). Owned independently; out of scope of this README.
 
-### Programming language
+> 📚 **New here? Start with the documentation map below**, not with this README's tech-stack section.
 
-TypeScript is a statically typed superset of JavaScript that compiles to plain JavaScript. It offers static type checking, which enhances code quality and developer productivity. TypeScript provides type safety and better tooling for building robust backend applications. Alternatives: JavaScript lacks static typing, which can lead to more runtime errors.
+---
 
-### Framework
+## Table of contents
 
-Nest.js is a progressive Node.js framework for building efficient and scalable server-side applications. It leverages TypeScript and follows modular architecture principles. Nest.js provides built-in support for dependency injection, middleware, and decorators, making it ideal for building RESTful APIs. Alternatives: Express.js is another popular framework, but Nest.js offers more structure and features out of the box.
+1. [Documentation map](#documentation-map)
+2. [What ARI does](#what-ari-does)
+3. [Personas & consumers](#personas--consumers)
+4. [Architecture overview](#architecture-overview)
+5. [Repository layout](#repository-layout)
+6. [Tech stack](#tech-stack)
+7. [Getting started](#getting-started)
+8. [Project structure (server)](#project-structure-server)
+9. [API surface conventions](#api-surface-conventions)
+10. [Authentication & authorization](#authentication--authorization)
+11. [Integrations](#integrations)
+12. [Database & migrations](#database--migrations)
+13. [Testing](#testing)
+14. [Real-time channel & messaging](#real-time-channel--messaging)
+15. [Admin SSR panel](#admin-ssr-panel)
+16. [Cross-functional requirements](#cross-functional-requirements)
+17. [SDD workflow (how to add a feature)](#sdd-workflow-how-to-add-a-feature)
+18. [License](#license)
 
-### Build tool
+---
 
-TypeScript Compiler (tsc) is the official TypeScript compiler that translates TypeScript code into JavaScript. It checks for syntax errors and emits clean JavaScript code. tsc is the standard build tool for TypeScript projects and seamlessly integrates with TypeScript workflows. Alternatives: Babel can also transpile TypeScript code, but tsc is preferred for its close integration with TypeScript.
+## Documentation map
 
-### Code coverage tool
+The full SDD constitutional baseline lives under [`docs/`](./docs/). Always read these before designing or changing anything:
 
-Istanbul is a code coverage tool for JavaScript applications. It instruments code to track which parts have been executed during testing. Istanbul provides accurate code coverage metrics and integrates well with testing frameworks like Jest. Alternatives: Blanket.js is another code coverage tool, but Istanbul is more widely used and supported.
+| File | What it is | When to consult |
+| --- | --- | --- |
+| [`docs/prd.md`](./docs/prd.md) | Product Requirements — problem, personas, goals, scope, user stories, acceptance criteria, open questions. | Scope, audience, or business intent questions. |
+| [`docs/system-design/design.md`](./docs/system-design/design.md) | System / UX-of-the-platform blueprint — IA, API consumer flows, response envelope, admin panel, design tokens, a11y, decisions log, open gaps. | Changes affecting how humans or machines experience the platform. |
+| [`docs/detailed-design/detailed-design.md`](./docs/detailed-design/detailed-design.md) | Technical implementation blueprint — module layout, data model, API rules, workflows, integrations, security, observability, testing. | Changes that touch code, schema, integrations, or infra-adjacent settings. |
+| [`docs/specs/general-setup/`](./docs/specs/general-setup/) | Methodology templates every module-level spec MUST follow (`requirements.md`, `design.md`, `task.md`). | Whenever you create a new spec under `docs/specs/<module>/<feature>/`. |
 
-### Static code analysis
+Agent-facing working manuals:
 
-ESLint is a highly configurable static analysis tool for identifying problematic patterns in JavaScript code. It enforces consistent coding styles and helps catch errors early. ESLint offers extensive customization options and supports TypeScript out of the box. Alternatives: TSLint is deprecated in favor of ESLint for TypeScript projects.
+- [`CLAUDE.md`](./CLAUDE.md) — root agent guide, links the constitutional baseline.
+- [`server/researchindicators/src/CLAUDE.md`](./server/researchindicators/src/CLAUDE.md) — code-level manual for working inside the NestJS source tree.
 
-### Dependency management
+---
 
-npm is the default package manager for Node.js. It manages dependencies and facilitates package installation, versioning, and dependency resolution. npm has a vast ecosystem of packages and is tightly integrated with Node.js development workflows. Alternatives: Yarn is another package manager, but npm is preferred for its widespread adoption and compatibility.
+## What ARI does
 
-### Dependency vulnerability scanning
+CGIAR research outputs are produced across many centers, contracts, and reporting platforms, each with its own conventions and validation rules. ARI replaces duplicated data entry, inconsistent taxonomies, and weak audit trails with **a single, governed source of truth**, exposed through:
 
-npm Audit is a built-in feature of npm that scans dependencies for known vulnerabilities. It provides actionable insights and recommendations for securing the application. npm Audit seamlessly integrates with npm and provides comprehensive vulnerability scanning without additional setup. Alternatives: Snyk offers similar functionality but requires additional configuration and integration.
+- A **versioned REST API** at `/api/v{n}/...` documented at `/swagger`.
+- A **Socket.IO** channel for real-time UI updates.
+- An **OpenSearch** surface for partner platforms.
+- A **RabbitMQ** microservice for cross-system events.
+- An embedded **`/admin`** SSR panel for operators.
 
-### Unit testing
+See [`docs/prd.md`](./docs/prd.md) for the full problem statement, goals, scope, user stories, and open questions.
 
-Jest is a popular testing framework for JavaScript applications. It provides a delightful testing experience with features like snapshot testing, mocking, and code coverage. Jest offers an all-in-one solution for unit testing with built-in assertion libraries and comprehensive test reporting. Alternatives: Mocha requires additional configuration and setup compared to Jest.
+---
 
-### API testing framework
+## Personas & consumers
 
-Supertest is a high-level abstraction for testing HTTP servers in Node.js. It provides a fluent API for making HTTP requests and assertions. Supertest integrates well with testing frameworks like Jest and provides a simple and expressive syntax for API testing. Alternatives: Postman offers similar functionality but is more suitable for manual testing and API documentation.
+**Primary personas** — humans interacting via the STAR frontend:
 
-### API documentation
+| Persona | Role |
+| --- | --- |
+| **Result Contributor** | CGIAR researcher / project staff reporting results. |
+| **MEL Regional Expert** | Monitoring, Evaluation & Learning expert validating and curating results. |
+| **Center / General Admin** | Center-level admin overseeing reporting, contracts, and users. |
+| **System Admin / Tech Support / Developer** | Platform operator and integrator. |
 
-Swagger is an open-source framework for designing, building, and documenting RESTful APIs. It provides tools for generating interactive API documentation from OpenAPI specifications. Swagger simplifies API documentation by automatically generating documentation from code annotations and comments. Alternatives: RAML and API Blueprint are alternatives to Swagger but are less widely adopted.
+**Machine consumers** — first-class API clients:
 
-### Architecture Diagram
+- **STAR frontend** (`client/research-indicators`) — primary human UI.
+- **PRMS / TIP / AICCRA** — partner CGIAR platforms reading from ARI.
+- **AI/ML formalization pipeline** — pushes raw AI-extracted results via `/results/ai/formalize`.
+- **Internal `/admin` SSR panel** — embedded React 19 SSR.
+
+---
+
+## Architecture overview
 
 ![Architecture Diagram](./Architecture.png)
 
-### Cross-Functional Requirements
+High-level topology (see [`docs/detailed-design/detailed-design.md` §1](./docs/detailed-design/detailed-design.md) for details):
+
+```
+             ┌────────────────┐
+             │   STAR (UI)    │  client/research-indicators
+             └───────┬────────┘
+                     │ HTTPS + WS
+             ┌───────▼────────┐         ┌──────────────────┐
+             │ ARI Server     │◄────────┤  AI Pipeline     │
+             │ (NestJS)       │   REST  └──────────────────┘
+             │  /api/v{n}     │
+             │  /swagger      │◄────────┤ PRMS / TIP / AICCRA (machine token)
+             │  /admin (SSR)  │
+             │  Socket.IO     │────────►│ STAR (real-time)
+             └──┬──┬──┬──┬──┬─┘
+                │  │  │  │  │
+    ┌───────────┘  │  │  │  └────────────┐
+    ▼              ▼  ▼  ▼               ▼
+  MySQL       OpenSearch  DynamoDB    RabbitMQ
+  (TypeORM)   (Results,   (Feedback)  (Microservice
+               PRMS,                   queue ARI_QUEUE)
+               Alliance
+               Staff)
+
+  External: ROAR Management (auth), CLARISA (master data),
+            AGRESSO (MSSQL + SOAP), TIP integration.
+```
+
+---
+
+## Repository layout
+
+```
+alliance-research-indicators-main/
+├── CLAUDE.md                              # Root agent working manual
+├── README.md                              # ← you are here
+├── Architecture.png                       # Architecture diagram
+├── docs/                                  # SDD constitutional baseline
+│   ├── prd.md
+│   ├── system-design/design.md
+│   ├── detailed-design/detailed-design.md
+│   └── specs/general-setup/{requirements,design,task}.md
+├── server/
+│   └── researchindicators/                # NestJS backend (this repo's focus)
+│       ├── src/                           # see "Project structure"
+│       │   └── CLAUDE.md                  # Code-level working manual
+│       ├── test/                          # Jest e2e suite
+│       └── package.json
+├── client/
+│   └── research-indicators/               # STAR frontend (sibling, out of scope)
+├── .husky/                                # Git hooks
+└── package.json                           # Husky management at repo root
+```
+
+---
+
+## Tech stack
+
+| Concern | Choice |
+| --- | --- |
+| Language | TypeScript 5.7 |
+| Runtime | Node.js ≥ 20.11.1 |
+| Framework | NestJS 10 |
+| ORM / DB | TypeORM 0.3 / MySQL (utf8mb4, `utf8mb4_unicode_520_ci`) |
+| Search | OpenSearch (mapping driven by `@OpenSearchProperty` decorator) |
+| Real-time | Socket.IO 4 |
+| Messaging | RabbitMQ (AMQPS) via `@nestjs/microservices` |
+| Auxiliary store | AWS DynamoDB (feedback) |
+| Auth | ROAR Management JWT + base64 `{client_id, client_secret}` machine token |
+| Admin UI | React 19 + Vite 7 (SSR via `ReactRendererService`) |
+| External integrations | CLARISA (HTTP), AGRESSO (MSSQL + SOAP), TIP, Azure |
+| Build | `tsc` for NestJS, Vite for admin client |
+| Lint | ESLint 9 + Prettier 3 |
+| Tests | Jest 29 (`ts-jest`) + Supertest 7 |
+| API docs | Swagger / OpenAPI (`@nestjs/swagger`) at `/swagger` |
+| Vulnerability scan | `npm audit` |
+| Security headers | Helmet + CSP |
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Node.js ≥ 20.11.1, npm 10+.
+- MySQL database reachable via the `ARI_MYSQL_*` env vars.
+- RabbitMQ broker reachable via `ARI_MQ_*`.
+- OpenSearch cluster (optional for local, required for search features).
+- DynamoDB credentials (optional locally; required for feedback).
+- Access to ROAR, CLARISA, AGRESSO, and TIP credentials (or stubbed endpoints for local dev).
+
+### Install
+
+```bash
+git clone <repo-url>
+cd alliance-research-indicators-main/server/researchindicators
+npm install
+```
+
+### Environment variables
+
+Create a `.env` file in `server/researchindicators/` based on the following keys:
 
-#### Scalability
+```env
+# HTTP
+ARI_PORT=3000
 
-Description: The system should be able to handle increasing loads and user traffic without compromising performance or availability.
+# MySQL — CORE datasource
+ARI_MYSQL_HOST=
+ARI_MYSQL_NAME=
+ARI_MYSQL_USER_NAME=
+ARI_MYSQL_USER_PASS=
+DB_PORT=3306
+
+# MySQL — TEST datasource (used by integration tests)
+ARI_TEST_MYSQL_HOST=
+ARI_TEST_MYSQL_NAME=
+ARI_TEST_MYSQL_USER_NAME=
+ARI_TEST_MYSQL_USER_PASS=
+
+# RabbitMQ microservice
+ARI_MQ_HOST=
+ARI_MQ_USER=
+ARI_MQ_PASSWORD=
+ARI_QUEUE=ari_queue
+
+# Logging
+SEE_ALL_LOGS=false
+```
 
-Best Practices:
+Additional integration-specific variables (CLARISA, AGRESSO, ROAR, TIP, OpenSearch, DynamoDB, Azure) live under their respective `domain/tools/<integration>/` modules — consult the module sources for the exact keys.
 
-- Use auto-scaling features provided by AWS Elastic Beanstalk to automatically adjust the number of instances based on demand.
-- Implement efficient caching mechanisms to reduce the load on backend services.
+### Run
 
-Example: The system automatically scales up during peak hours and scales down during periods of low activity.
+From `server/researchindicators/`:
 
-Tools: AWS Elastic Beanstalk, AWS Auto Scaling, Redis for caching.
+```bash
+# Dev — runs NestJS + Vite admin together
+npm run dev
 
-#### Security
+# Dev — NestJS only
+npm run start:dev
 
-Description: The system should ensure the confidentiality, integrity, and availability of data and resources.
+# Dev — Vite admin only (http://localhost:5173)
+npm run dev:admin
 
-Best Practices:
+# Build (NestJS + admin)
+npm run build
 
-- Implement encryption for data in transit and at rest using SSL/TLS and encryption at the database level.
-- Implement role-based access control (RBAC) to restrict access to sensitive resources.
+# Production
+npm run start:prod
+```
 
-Example: User authentication and authorization mechanisms are in place to prevent unauthorized access to sensitive data.
+Once running:
 
-Tools: AWS Cognito, AWS IAM, SSL/TLS certificates, AWS Key Management Service (KMS).
+- API: `http://localhost:${ARI_PORT}/api/v{n}/...`
+- Swagger UI: `http://localhost:${ARI_PORT}/swagger`
+- Admin panel: `http://localhost:${ARI_PORT}/admin`
 
-#### Reliability
+### Database migrations
 
-Description: The system should be highly reliable, with minimal downtime and disruptions.
+```bash
+npm run migration:generate -- ./src/db/migrations/<camelCaseName>
+npm run migration:dev:execute        # apply to local DB (via ts-node)
+npm run migration:execute            # apply built dist (production path)
+npm run migration:revert             # rollback the last migration
+```
 
-Best Practices:
+> **Migrations are append-only.** Never edit a migration after it's merged to `main`. See [`docs/detailed-design/detailed-design.md` §3.6](./docs/detailed-design/detailed-design.md).
 
-- Implement fault-tolerant architecture with redundancy at different levels of the system.
-- Set up automated backups and disaster recovery mechanisms for critical data and services.
+---
 
-Example: The system is designed to withstand hardware failures and network outages without impacting user experience.
+## Project structure (server)
 
-Tools: AWS Elastic Beanstalk, AWS RDS Multi-AZ deployment, AWS Backup.
+```
+server/researchindicators/src/
+├── main.ts                       # bootstraps HTTP + microservice apps
+├── app.module.ts                 # HTTP composition root
+├── app-microservice.module.ts    # RabbitMQ composition root
+├── admin/                        # /admin SSR panel (Vite + React 19)
+├── controllers/                  # cross-cutting controllers (Azure)
+├── db/
+│   ├── config/mysql/             # TypeORM datasource (CORE / TEST)
+│   ├── config/dynamo/            # DynamoDB module + service
+│   └── migrations/               # 238+ migrations (append-only)
+└── domain/
+    ├── routes/main.routes.ts     # RouterModule registration tree
+    ├── entities/<module>/        # one Nest module per entity cluster
+    ├── complementary-entities/   # secondary entities (e.g. user)
+    ├── tools/                    # external integrations
+    │   ├── agresso/  broker/  clarisa/  cron-jobs/
+    │   ├── dynamo-feedback/  open-search/  roar-management/
+    │   ├── socket/  tip-integration/
+    └── shared/                   # interceptors, guards, pipes, filters, utils
+```
 
-#### Performance
+Detailed conventions: [`server/researchindicators/src/CLAUDE.md`](./server/researchindicators/src/CLAUDE.md).
 
-Description: The system should deliver fast response times and low latency for user requests.
+---
 
-Best Practices:
+## API surface conventions
 
-- Optimize frontend and backend code for efficiency and speed.
-- Use content delivery networks (CDNs) to cache and deliver static assets closer to users.
+- **Global prefix:** `/api`
+- **Versioning:** URI-based (`/api/v1/...`, `/api/v2/...`)
+- **Response envelope** — every success and error response follows `ServerResponseDto`:
 
-Example: The average response time for API requests is under 100 milliseconds.
+  ```json
+  {
+    "data": <payload | []>,
+    "status": <HttpStatus>,
+    "description": "<human-readable summary>",
+    "errors": <string | string[] | null>,
+    "timestamp": "<ISO 8601>",
+    "path": "<request.url>"
+  }
+  ```
 
-Tools: Performance monitoring tools like AWS CloudWatch, New Relic, CDN providers like AWS CloudFront.
+- **List endpoints** use `page`, `limit`, `sort-order`, `sort-field`, and kebab-case filters parsed by `QueryParseBool` / `ListParseToArrayPipe`.
+- **Swagger** — every endpoint MUST declare `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, and per-param `@ApiQuery` / `@ApiBody`.
+- **Errors** — flow through `GlobalExceptions`; throw Nest HTTP exceptions (`UnauthorizedException`, `BadRequestException`, etc.), never raw `Error`s on the HTTP path.
 
-#### Maintainability
+See [`docs/system-design/design.md` §6](./docs/system-design/design.md) for layout patterns and [`docs/detailed-design/detailed-design.md` §4](./docs/detailed-design/detailed-design.md) for the full rule set.
 
-Description: The system should be easy to maintain, update, and troubleshoot.
+---
 
-Best Practices:
+## Authentication & authorization
 
-- Follow coding standards and best practices for clean, modular, and well-documented code.
-- Use automation for deployment, testing, and infrastructure management.
+ARI accepts **two token shapes** validated by `JwtMiddleware`:
 
-Example: The system architecture is well-documented, and changes can be easily understood and implemented by the development team.
+1. **ROAR JWT** — for human users. Validated against ROAR Management.
+2. **Machine token** — `Bearer base64({"client_id":"...","client_secret":"..."})`. Validated against `app_secrets` + `app_secret_host_list` (origin/IP allowlist).
 
-Tools: Code quality tools like ESLint, automated testing frameworks like Jest, infrastructure as code tools like AWS CloudFormation.
+Routes excluded from the JWT middleware: `/admin*`, `/admin/public*`, `/.well-known*`, `GET /`, `GET /favicon.ico`, `GET /api/configuration/:key`.
 
-#### Monitoring
+**Roles** (`SecRolesEnum`):
 
-Description: The system should provide comprehensive monitoring and logging capabilities to track performance, detect issues, and troubleshoot problems.
+| Role | Notes |
+| --- | --- |
+| `SYSTEM_ADMIN (1)` | Bypasses all `@Roles(...)` checks. |
+| `CONTRIBUTOR (3)` | Result contributor. |
+| `TECHNICAL_SUPPORT (7)` | Developer / support. |
+| `CENTER_ADMIN (9)` | Center-level admin. |
+| `MEL_REGIONAL_EXPERT (10)` | MEL reviewer. |
+| _Deprecated_ | `IT_SUPPORT(2)`, `GLOBAL(4)`, `CONTRACT_CONTRIBUTOR(5)`, `RESULT_CONTRIBUTOR(6)`, `TESTER(8)` — migration plan TBD. |
 
-Best Practices:
+`RolesGuard` reads `@Roles(...)` metadata. `ResultStatusGuard` gates result-mutating endpoints by the lifecycle state defined in `result_status_workflow`.
 
-- Set up centralized logging to capture and analyze logs from different components of the system.
-- Use monitoring tools to monitor key metrics, set up alerts, and respond to incidents proactively.
+See [`docs/detailed-design/detailed-design.md` §8](./docs/detailed-design/detailed-design.md).
 
-Example: The system generates alerts when CPU utilization exceeds a certain threshold or when error rates increase.
+---
 
-Tools: AWS CloudWatch, ELK Stack (Elasticsearch, Logstash, Kibana), Prometheus.
+## Integrations
 
-#### Cost Optimization
+| System | Folder | Transport | Direction |
+| --- | --- | --- | --- |
+| **ROAR Management** | `domain/tools/roar-management/` | HTTP | ARI → ROAR (token validation) |
+| **CLARISA** | `domain/tools/clarisa/` | HTTP | ARI ↔ CLARISA (master data) |
+| **AGRESSO** | `domain/tools/agresso/` | MSSQL + SOAP | ARI → AGRESSO (contracts, staff) |
+| **TIP** | `domain/tools/tip-integration/` | HTTP | ARI ↔ TIP |
+| **OpenSearch** | `domain/tools/open-search/` | HTTP | ARI → OpenSearch (Results / PRMS / Alliance Staff) |
+| **DynamoDB** | `domain/tools/dynamo-feedback/` | AWS SDK v3 | ARI ↔ DynamoDB (feedback store) |
+| **RabbitMQ** | `domain/tools/broker/` | AMQPS | ARI ↔ broker (queue `ARI_QUEUE`) |
+| **Socket.IO** | `domain/tools/socket/` | WS | ARI → clients (real-time events) |
+| **Azure** | `src/controllers/azure-*.controller.ts` | HTTP | inbound |
 
-Description: The system should be cost-effective, with efficient resource utilization and minimal waste.
+Integration rules (enforced):
 
-Best Practices:
+- Every integration encapsulates transport inside a single Nest service.
+- Controllers MUST NOT call transport clients directly.
+- Cron-driven integrations live under `domain/tools/cron-jobs/` and MUST log status to `sync_process_log`.
 
-- Optimize resource provisioning based on actual usage and demand patterns.
-- Use cost management tools to analyze spending, identify cost-saving opportunities, and optimize resource allocation.
+See [`docs/detailed-design/detailed-design.md` §7](./docs/detailed-design/detailed-design.md).
 
-Example: Unused resources are identified and decommissioned to reduce costs without impacting performance.
+---
 
-Tools: AWS Cost Explorer, AWS Trusted Advisor, Cloud cost optimization platforms like CloudHealth.
+## Database & migrations
 
-#### High Availability
+- **Engine:** MySQL with `utf8mb4` / `utf8mb4_unicode_520_ci`.
+- **ORM:** TypeORM 0.3, `synchronize: false`, `migrationsRun: false`.
+- **Datasource targets:** `CORE` and `TEST` (env-isolated) in `src/db/config/mysql/orm.config.ts`.
+- **Auditable base:** every domain entity extends `AuditableEntity`; mutations populate audit fields from `request.user`.
+- **Naming:**
+  - Tables `snake_case`; entities `PascalCase`.
+  - Indexes named `idx_<table>_<purpose>` (see `Result` entity for examples).
+  - Migration files: `<timestamp>-<camelCaseAction>.ts`.
+- **OpenSearch:** searchable columns are decorated with `@OpenSearchProperty({...})`. The same TypeORM entity is the source of truth for the OpenSearch mapping.
 
-Description: The system should ensure continuous availability and resilience to failures.
+The **Result** aggregate is the canonical example — `result_id` (PK) + `result_official_code` (business key), versioning via `version_id` / `is_snapshot` / `report_year_id`, and ~30 `OneToMany` relations covering all result types and attachments.
 
-Best Practices:
+---
 
-- Deploy resources across multiple availability zones (AZs) to distribute traffic and mitigate single points of failure.
-- Implement load balancing and failover mechanisms to reroute traffic in case of failures.
+## Testing
 
-Example: The system remains available even if one availability zone or component fails.
+```bash
+npm test            # unit tests (sibling *.spec.ts)
+npm run test:watch
+npm run test:cov    # with coverage
+npm run test:e2e    # supertest-based end-to-end (test/jest-e2e.json)
+```
 
-Tools: AWS Elastic Load Balancing (ELB), AWS Route 53, Multi-AZ deployments for database.
+- **Framework:** Jest 29 + ts-jest.
+- **Coverage threshold (global):** branches / functions / lines / statements ≥ **60%**.
+- **Coverage excludes:** `*.entity.ts`, `db/migrations/**`, `*.enum.ts`, `*.spec.ts`.
+- **Convention:** every controller, service, guard, interceptor, and middleware ships a sibling `*.spec.ts`. New role-restricted or status-guarded handlers MUST include both an "allowed" and a "denied" test case.
 
-#### Data Integrity
+---
 
-Description: The system should maintain the accuracy and consistency of data across different components and interactions.
+## Real-time channel & messaging
 
-Best Practices:
+- **Socket.IO gateway** — `domain/tools/socket/server.gateway.ts`. Used to emit result-update events to STAR for real-time UI refresh.
+- **RabbitMQ microservice** — bootstrapped in `main.ts` (`Transport.RMQ`, queue `ARI_QUEUE`, durable). Message handlers live in `domain/tools/broker/` (`AlianceManagementApp`, `AiRoarMiningApp`, `SelfApp`, `MessageMicroservice`).
 
-- Implement data validation and verification mechanisms to ensure the correctness of input and output data.
-- Use transactions and database constraints to enforce data integrity constraints.
+> Socket.IO event names and RabbitMQ message contracts are tracked as open work (see [`docs/system-design/design.md` §13](./docs/system-design/design.md) OG-4). Add new events through a module spec, not ad hoc.
 
-Example: Data stored in the database remains consistent and accurate, even under high concurrency and concurrent updates.
+---
 
-Tools: Database management systems like MySQL, CockroachDB, data validation libraries.
+## Admin SSR panel
 
-#### Version Control
+The `/admin` route serves a React 19 + Vite SSR panel hosted inside the Nest app. See [`server/researchindicators/src/admin/README-REACT.md`](./server/researchindicators/src/admin/README-REACT.md) for the page-recipe (component → route → controller → sidebar entry).
 
-Description: The system should utilize version control to manage and track changes to source code and configurations.
+Current state: `/admin` is excluded from the JWT middleware. **Before any production exposure**, the admin module MUST add an `AdminGuard` bound to the appropriate roles (`SYSTEM_ADMIN`, `TECHNICAL_SUPPORT`). Tracked in [`docs/system-design/design.md` §13 OG-3](./docs/system-design/design.md).
 
-Best Practices:
+---
 
-- Use a version control system (e.g., Git) to manage source code repositories and track changes over time.
-- Implement branching strategies and merge workflows to facilitate collaboration and code review.
+## Cross-functional requirements
 
-Example: All changes to the codebase are tracked through version control, with clear documentation and commit messages.
+These principles apply across the platform. Detailed practices and tool choices are kept here intentionally to set expectations for new contributors.
 
-Tools: Git, GitHub.
+### Scalability
+Handle increasing loads without compromising performance. Practices: AWS Elastic Beanstalk auto-scaling, Redis caching, query-tier optimization on `Result` relations. Tools: AWS Elastic Beanstalk, AWS Auto Scaling.
 
-#### Documentation
+### Security
+Confidentiality, integrity, availability. Practices: SSL/TLS in transit, encryption at rest, RBAC via `RolesGuard` + `SecRolesEnum`, machine-token allowlist (`app_secret_host_list`), Helmet CSP. Tools: AWS Cognito, AWS IAM, AWS KMS.
 
-Description: The system should be well-documented to facilitate understanding, usage, and maintenance.
+### Reliability
+Fault-tolerant architecture with redundancy. Practices: Multi-AZ RDS, automated backups, disaster recovery. Tools: AWS RDS Multi-AZ, AWS Backup.
 
-Best Practices:
+### Performance
+Fast response times and low latency. Practices: efficient TypeORM queries with selective `relations`, OpenSearch for heavy list operations, CDN for static assets. Tools: AWS CloudWatch, AWS CloudFront. _Target API p95 ≤ 100 ms — proposed, see [PRD §4](./docs/prd.md)._
 
-- Document architectural decisions, design patterns, and system components.
-- Provide developer documentation, API references, and deployment guides.
+### Maintainability
+Strict layering (`entities/<module>`, `tools/<integration>`, `shared/`), uniform response envelope, sibling `*.spec.ts` for every code unit, ESLint + Prettier enforced via Husky.
 
-Example: Architecture diagrams, API documentation, and deployment instructions are available for reference.
+### Monitoring
+Centralized logging via `LoggerUtil`, structured per-request context via `LoggingInterceptor` / `SetUpInterceptor`, status-based log levels in `ResponseInterceptor`. Tools: AWS CloudWatch, ELK stack.
 
-Tools: Notion, Confluence (JIRA), Swagger/OpenAPI for API documentation.
+### Cost Optimization
+Right-size provisioning, retire unused resources, use AWS Cost Explorer / Trusted Advisor.
 
-#### Compliance
+### High Availability
+Multi-AZ deployments, load balancing, health checks. Tools: AWS ELB, Route 53.
 
-Description: The system should adhere to relevant laws, regulations, and industry standards.
+### Data Integrity
+Schema-enforced via TypeORM + MySQL constraints, audit fields via `AuditableEntity`, `result_status_transitions` log for lifecycle changes, append-only migrations.
 
-Best Practices:
+### Version Control
+Git + GitHub. Commit convention: `<type>(<scope>): <subject>` (e.g. `fix(results.service): ...`). Husky hooks active — never bypass with `--no-verify` unless explicitly approved by a human.
 
-- Stay updated with legal and regulatory requirements relevant to the system and industry.
-- Implement security and privacy measures to protect sensitive data and ensure compliance with standards like GDPR, HIPAA, etc.
+### Documentation
+Architecture diagram (`Architecture.png`), full SDD baseline under `docs/`, Swagger at `/swagger`, agent guides in `CLAUDE.md` files.
 
-Example: Personal data is handled in compliance with GDPR regulations, with appropriate consent mechanisms and data protection measures.
+### Compliance
+PII / donor-restricted data handling under review — see open question [`docs/prd.md` §9 OQ-7](./docs/prd.md). Until resolved, treat contributor data as confidential.
 
-Tools: Compliance management frameworks, auditing tools, legal consultation.
+### Interoperability
+RESTful API + OpenSearch + Socket.IO + RabbitMQ. JWT (RFC 7519) for auth; machine tokens for partner platforms.
 
-#### Interoperability
+### Performance Testing
+Recommended tools: Apache JMeter, Gatling, Locust. No fixed cadence yet — see [PRD §9](./docs/prd.md).
 
-Description: The system should be compatible and able to communicate with external systems and services.
+### CI/CD
+Husky pre-commit hooks enforce lint/format. Pipeline specifics are tracked in ops docs (out of scope of this README).
 
-Best Practices:
+---
 
-- Follow standard protocols and formats for data exchange and integration (e.g., RESTful APIs, JSON).
-- Use industry-standard authentication and authorization mechanisms for secure integration.
+## SDD workflow (how to add a feature)
 
-Example: The system integrates seamlessly with third-party services and APIs using standard protocols.
+1. **Read** the relevant section(s) of `docs/prd.md`, `docs/system-design/design.md`, and `docs/detailed-design/detailed-design.md`.
+2. **Create a spec folder** under `docs/specs/<module>/<feature-slug>/` containing three files copied from the templates in `docs/specs/general-setup/`:
+   - `requirements.md`
+   - `design.md`
+   - `task.md`
+3. **Get approval** on the spec (engineering lead + product + security/devops if applicable).
+4. **Implement** following the canonical recipe in [`server/researchindicators/src/CLAUDE.md` §4](./server/researchindicators/src/CLAUDE.md): migration → entity → DTO → service → controller → routes → tests → docs.
+5. **Verify** locally: `npm run lint && npm test && npm run test:e2e`, confirm the endpoint appears in Swagger, confirm migrations apply and revert cleanly.
+6. **Open a PR** with a message in the project's `<type>(<scope>): <subject>` style; the spec's tasks should be checked off as they land.
 
-Tools: RESTful API standards, OAuth 2.0 for authentication, API gateways.
+---
 
-#### Performance Testing
+## License
 
-Description: The system should undergo performance testing to validate its ability to meet performance requirements under expected loads.
-
-Best Practices:
-
-- Define performance metrics and scenarios based on expected usage patterns and peak loads.
-- Conduct load testing, stress testing, and scalability testing to assess system performance and identify bottlenecks.
-
-Example: Performance tests simulate high user traffic and measure response times, throughput, and resource utilization.
-
-Tools: Apache JMeter, Gatling, Locust.
-
-#### Continuous Integration/Continuous Deployment (CI/CD)
-
-Description: The system should implement CI/CD pipelines to automate the build, test, and deployment processes.
-
-Best Practices:
-
-- Set up automated build and test pipelines to validate changes before deployment.
-- Use deployment automation tools to deploy changes to production with minimal manual intervention.
-
-Example: Code changes are automatically tested, validated, and deployed to production environments.
+See [`LICENSE`](./LICENSE).

@@ -1,0 +1,586 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  NotImplementedException,
+} from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { User } from '../../complementary-entities/secondary/user/user.entity';
+import { ResultRepository } from '../results/repositories/result.repository';
+import { ResultsUtil } from '../../shared/utils/results.util';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import {
+  AlignmentResponse,
+  UpdatePoolFundingAlignmentDto,
+} from './dto/update-pool-funding-alignment.dto';
+import {
+  IndicatorGroupResponse,
+  IndicatorPanelIndicatorResponse,
+  ListIndicatorsQueryDto,
+} from './dto/list-indicators-query.dto';
+import {
+  ContributionDto,
+  MappingResponse,
+} from './dto/upsert-indicator-mapping.dto';
+import { ReviewDecisionDto } from './dto/review-decision.dto';
+import {
+  PoolFundingAlignmentDetail,
+  ResultPoolFundingAlignmentRepository,
+} from './repositories/result-pool-funding-alignment.repository';
+import { ResultPoolFundingAlignment } from './entities/result-pool-funding-alignment.entity';
+import { ResultPoolFundingAlignmentSp } from './entities/result-pool-funding-alignment-sp.entity';
+import { ResultReviewHistory } from '../result-review-history/entities/result-review-history.entity';
+import { ServerGateway } from '../../tools/socket/server.gateway';
+import {
+  PoolFundingIndicatorMappingDetail,
+  ResultPoolFundingIndicatorMappingRepository,
+} from './repositories/result-pool-funding-indicator-mapping.repository';
+import { ResultPoolFundingIndicatorMapping } from './entities/result-pool-funding-indicator-mapping.entity';
+import { BilateralIndicatorTypeHandler } from './handlers/bilateral-indicator-type-handler.interface';
+import { CapacitySharingBilateralIndicatorTypeHandler } from './handlers/capacity-sharing.handler';
+import { InnovationDevelopmentBilateralIndicatorTypeHandler } from './handlers/innovation-development.handler';
+import { KnowledgeProductBilateralIndicatorTypeHandler } from './handlers/knowledge-product.handler';
+import { NoopBilateralIndicatorTypeHandler } from './handlers/noop.handler';
+import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-change.handler';
+
+const POOL_FUNDING_ALIGNMENT_CHANGED = 'POOL_FUNDING_ALIGNMENT_CHANGED';
+const INDICATOR_MAPPING_CHANGED = 'INDICATOR_MAPPING_CHANGED';
+
+@Injectable()
+export class BilateralService {
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly resultRepository: ResultRepository,
+    private readonly alignmentRepository: ResultPoolFundingAlignmentRepository,
+    private readonly mappingRepository: ResultPoolFundingIndicatorMappingRepository,
+    private readonly resultsUtil: ResultsUtil,
+    private readonly currentUser: CurrentUserUtil,
+    private readonly serverGateway: ServerGateway,
+    private readonly capacitySharingHandler: CapacitySharingBilateralIndicatorTypeHandler,
+    private readonly innovationDevelopmentHandler: InnovationDevelopmentBilateralIndicatorTypeHandler,
+    private readonly knowledgeProductHandler: KnowledgeProductBilateralIndicatorTypeHandler,
+    private readonly noopHandler: NoopBilateralIndicatorTypeHandler,
+    private readonly policyChangeHandler: PolicyChangeBilateralIndicatorTypeHandler,
+  ) {}
+
+  async getAlignment(
+    resultCode: string,
+    _user: User,
+  ): Promise<AlignmentResponse> {
+    const resultId = this.resultsUtil.resultId;
+    const [context, alignment] = await Promise.all([
+      this.resultRepository.findPoolFundingAlignmentContext(resultId),
+      this.alignmentRepository.findActiveAlignmentByResultId(resultId),
+    ]);
+
+    if (!context) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const eligible = this.toBoolean(context.is_pool_funding_contributor);
+    const isSyncedToPrms = this.toBoolean(context.is_synced_to_prms);
+    const visibleAlignment = eligible ? alignment : null;
+
+    return {
+      result_code: String(context.result_official_code ?? resultCode),
+      eligible,
+      has_pool_funding_alignment_eligible: eligible,
+      has_contribution: visibleAlignment?.has_contribution ?? null,
+      selected_levers: visibleAlignment?.selected_levers ?? [],
+      is_synced_to_prms: isSyncedToPrms,
+      is_read_only: isSyncedToPrms,
+    };
+  }
+
+  async updateAlignment(
+    resultCode: string,
+    dto: UpdatePoolFundingAlignmentDto,
+    user: User,
+  ): Promise<AlignmentResponse> {
+    const resultId = this.resultsUtil.resultId;
+    const [context, previousAlignment] = await Promise.all([
+      this.resultRepository.findPoolFundingAlignmentContext(resultId),
+      this.alignmentRepository.findActiveAlignmentByResultId(resultId),
+    ]);
+
+    if (!context) {
+      throw new NotFoundException('Result not found');
+    }
+
+    if (!this.toBoolean(context.is_pool_funding_contributor)) {
+      throw new BadRequestException(
+        'Result project is not a Pool Funding Contributor',
+      );
+    }
+
+    if (this.toBoolean(context.is_synced_to_prms)) {
+      throw new ConflictException('Result is already synced to PRMS');
+    }
+
+    const leverCodes = this.normalizeLeverCodes(dto);
+    const actorUserId = user?.sec_user_id ?? this.currentUser.user_id;
+    const now = new Date();
+
+    await this.dataSource.transaction(async (manager) => {
+      if (previousAlignment) {
+        await manager.getRepository(ResultPoolFundingAlignmentSp).update(
+          {
+            alignment_id: previousAlignment.id,
+            is_active: true,
+          },
+          {
+            is_active: false,
+            deleted_at: now,
+            updated_by: actorUserId,
+          },
+        );
+        await manager.getRepository(ResultPoolFundingAlignment).update(
+          {
+            id: previousAlignment.id,
+            is_active: true,
+          },
+          {
+            is_active: false,
+            deleted_at: now,
+            updated_by: actorUserId,
+          },
+        );
+      }
+
+      const newAlignment = await manager
+        .getRepository(ResultPoolFundingAlignment)
+        .save({
+          result_id: resultId,
+          has_contribution: dto.has_contribution,
+          created_by: actorUserId,
+          updated_by: actorUserId,
+        });
+
+      if (leverCodes.length) {
+        await manager.getRepository(ResultPoolFundingAlignmentSp).save(
+          leverCodes.map((leverCode) => ({
+            alignment_id: newAlignment.id,
+            lever_code: leverCode,
+            created_by: actorUserId,
+            updated_by: actorUserId,
+          })),
+        );
+      }
+
+      await manager.getRepository(ResultReviewHistory).save({
+        result_id: resultId,
+        version_id: context.version_id,
+        actor_user_id: actorUserId,
+        event_type: POOL_FUNDING_ALIGNMENT_CHANGED,
+        justification: dto.justification,
+        payload_before: this.toHistoryPayload(previousAlignment),
+        payload_after: {
+          has_contribution: dto.has_contribution,
+          lever_codes: leverCodes,
+        },
+        created_by: actorUserId,
+        updated_by: actorUserId,
+      });
+    });
+
+    const response = await this.getAlignment(resultCode, user);
+    this.serverGateway.emitPoolFundingAlignmentChanged({
+      result_code: response.result_code,
+      by_user_id: actorUserId,
+      at: new Date().toISOString(),
+    });
+
+    return response;
+  }
+
+  async listIndicators(
+    resultCode: string,
+    query: ListIndicatorsQueryDto,
+    user: User,
+  ): Promise<IndicatorGroupResponse[]> {
+    const alignment = await this.getAlignment(resultCode, user);
+
+    if (!alignment.has_contribution) {
+      return [];
+    }
+
+    const staleMappings =
+      await this.mappingRepository.findActiveStaleMappingsByResultAndLevers(
+        this.resultsUtil.resultId,
+        alignment.selected_levers.map((lever) => lever.lever_code),
+      );
+    const staleIndicatorsByLever = staleMappings.reduce((groups, mapping) => {
+      const indicator = this.toStaleIndicatorResponse(mapping);
+
+      if (this.matchesIndicatorQuery(indicator, query)) {
+        groups.set(mapping.lever_code, [
+          ...(groups.get(mapping.lever_code) ?? []),
+          indicator,
+        ]);
+      }
+
+      return groups;
+    }, new Map<string, IndicatorPanelIndicatorResponse[]>());
+
+    return alignment.selected_levers.map((lever) => ({
+      lever_code: lever.lever_code,
+      lever_name: lever.lever_name,
+      indicators: staleIndicatorsByLever.get(lever.lever_code) ?? [],
+    }));
+  }
+
+  async markIndicatorMappingsStale(
+    leverCode: string,
+    indicatorCode: string,
+    user?: User,
+  ): Promise<number> {
+    const normalizedLeverCode = leverCode?.trim();
+    const normalizedIndicatorCode = indicatorCode?.trim();
+
+    if (!normalizedLeverCode || !normalizedIndicatorCode) {
+      throw new BadRequestException(
+        'Lever code and indicator code are required to mark mappings stale',
+      );
+    }
+
+    const actorUserId = user?.sec_user_id ?? this.currentUser.user_id;
+
+    return this.mappingRepository.markActiveMappingsStaleByLeverIndicator(
+      normalizedLeverCode,
+      normalizedIndicatorCode,
+      actorUserId,
+    );
+  }
+
+  async upsertContribution(
+    resultCode: string,
+    indicatorCode: string,
+    dto: ContributionDto,
+    user: User,
+    leverCode: string,
+  ): Promise<MappingResponse> {
+    const resultId = this.resultsUtil.resultId;
+    const context = await this.getEditableContributionContext(resultId);
+    const alignment = await this.getActiveAlignmentForLever(
+      resultId,
+      leverCode,
+    );
+    const handler = this.getContributionHandler(dto.indicator_type ?? dto.type);
+    const previousMapping =
+      await this.mappingRepository.findActiveMappingByResultLeverIndicator(
+        resultId,
+        leverCode,
+        indicatorCode,
+      );
+    const actorUserId = user?.sec_user_id ?? this.currentUser.user_id;
+    const now = new Date();
+
+    let savedMapping: ResultPoolFundingIndicatorMapping;
+    await this.dataSource.transaction(async (manager) => {
+      if (previousMapping) {
+        await manager.getRepository(ResultPoolFundingIndicatorMapping).update(
+          { id: previousMapping.id, is_active: true },
+          {
+            is_active: false,
+            deleted_at: now,
+            updated_by: actorUserId,
+          },
+        );
+      }
+
+      const handlerResult = await handler.upsert(
+        { resultId, resultCode, indicatorCode, manager },
+        dto,
+      );
+      savedMapping = await manager
+        .getRepository(ResultPoolFundingIndicatorMapping)
+        .save({
+          result_id: resultId,
+          lever_code: leverCode,
+          indicator_code: indicatorCode,
+          indicator_type: handler.indicatorType,
+          result_capacity_sharing_id:
+            handlerResult.fkField === 'result_capacity_sharing_id'
+              ? handlerResult.fkId
+              : null,
+          result_knowledge_product_id:
+            handlerResult.fkField === 'result_knowledge_product_id'
+              ? handlerResult.fkId
+              : null,
+          result_policy_change_id:
+            handlerResult.fkField === 'result_policy_change_id'
+              ? handlerResult.fkId
+              : null,
+          result_innovation_dev_id:
+            handlerResult.fkField === 'result_innovation_dev_id'
+              ? handlerResult.fkId
+              : null,
+          other_contribution_narrative:
+            handlerResult.fkField === null ? String(dto.narrative ?? '') : null,
+          created_by: actorUserId,
+          updated_by: actorUserId,
+        });
+
+      await manager.getRepository(ResultReviewHistory).save({
+        result_id: resultId,
+        version_id: context.version_id,
+        actor_user_id: actorUserId,
+        event_type: INDICATOR_MAPPING_CHANGED,
+        payload_before: this.toMappingHistoryPayload(previousMapping),
+        payload_after: this.toMappingHistoryPayload(savedMapping),
+        created_by: actorUserId,
+        updated_by: actorUserId,
+      });
+    });
+
+    return this.toMappingResponse(
+      resultCode,
+      savedMapping,
+      alignment.selected_levers.find((lever) => lever.lever_code === leverCode)
+        ?.lever_name ?? leverCode,
+    );
+  }
+
+  async deleteContribution(
+    resultCode: string,
+    indicatorCode: string,
+    user: User,
+    leverCode: string,
+  ): Promise<void> {
+    const resultId = this.resultsUtil.resultId;
+    const context = await this.getEditableContributionContext(resultId);
+    await this.getActiveAlignmentForLever(resultId, leverCode);
+    const previousMapping =
+      await this.mappingRepository.findActiveMappingByResultLeverIndicator(
+        resultId,
+        leverCode,
+        indicatorCode,
+      );
+
+    if (!previousMapping) {
+      throw new NotFoundException('Pool funding indicator mapping not found');
+    }
+
+    const handler = this.getContributionHandler(previousMapping.indicator_type);
+    const actorUserId = user?.sec_user_id ?? this.currentUser.user_id;
+    const now = new Date();
+
+    await this.dataSource.transaction(async (manager) => {
+      await handler.delete({ resultId, resultCode, indicatorCode, manager });
+      await manager.getRepository(ResultPoolFundingIndicatorMapping).update(
+        { id: previousMapping.id, is_active: true },
+        {
+          is_active: false,
+          deleted_at: now,
+          updated_by: actorUserId,
+        },
+      );
+      await manager.getRepository(ResultReviewHistory).save({
+        result_id: resultId,
+        version_id: context.version_id,
+        actor_user_id: actorUserId,
+        event_type: INDICATOR_MAPPING_CHANGED,
+        payload_before: this.toMappingHistoryPayload(previousMapping),
+        payload_after: null,
+        created_by: actorUserId,
+        updated_by: actorUserId,
+      });
+    });
+  }
+
+  async reviewDecision(
+    _resultCode: string,
+    _dto: ReviewDecisionDto,
+    _user: User,
+  ): Promise<void> {
+    throw new NotImplementedException(
+      'Bilateral review decision is not implemented yet',
+    );
+  }
+
+  private toBoolean(
+    value: boolean | number | string | null | undefined,
+  ): boolean {
+    return value === true || value === 1 || value === '1' || value === 'true';
+  }
+
+  private normalizeLeverCodes(dto: UpdatePoolFundingAlignmentDto): string[] {
+    if (!dto.has_contribution) {
+      return [];
+    }
+
+    const leverCodes = Array.from(
+      new Set(
+        (dto.lever_codes ?? [])
+          .map((leverCode) => leverCode?.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (!leverCodes.length) {
+      throw new BadRequestException(
+        'At least one lever code is required when has_contribution is true',
+      );
+    }
+
+    return leverCodes;
+  }
+
+  private toHistoryPayload(
+    alignment: PoolFundingAlignmentDetail | null,
+  ): Record<string, unknown> | null {
+    if (!alignment) {
+      return null;
+    }
+
+    return {
+      has_contribution: alignment.has_contribution,
+      lever_codes: alignment.selected_levers.map((lever) => lever.lever_code),
+    };
+  }
+
+  private async getEditableContributionContext(resultId: number) {
+    const context =
+      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
+
+    if (!context) {
+      throw new NotFoundException('Result not found');
+    }
+
+    if (!this.toBoolean(context.is_pool_funding_contributor)) {
+      throw new BadRequestException(
+        'Result project is not a Pool Funding Contributor',
+      );
+    }
+
+    if (this.toBoolean(context.is_synced_to_prms)) {
+      throw new ConflictException('Result is already synced to PRMS');
+    }
+
+    return context;
+  }
+
+  private async getActiveAlignmentForLever(
+    resultId: number,
+    leverCode: string,
+  ): Promise<PoolFundingAlignmentDetail> {
+    if (!leverCode?.trim()) {
+      throw new BadRequestException('lever-code query parameter is required');
+    }
+
+    const alignment =
+      await this.alignmentRepository.findActiveAlignmentByResultId(resultId);
+
+    if (!alignment?.has_contribution) {
+      throw new NotFoundException('Pool funding alignment not found');
+    }
+
+    if (
+      !alignment.selected_levers.some((lever) => lever.lever_code === leverCode)
+    ) {
+      throw new BadRequestException('Lever code is not selected in alignment');
+    }
+
+    return alignment;
+  }
+
+  private getContributionHandler(
+    indicatorType: string,
+  ): BilateralIndicatorTypeHandler {
+    const handler = this.contributionHandlers.find(
+      (candidate) => candidate.indicatorType === indicatorType,
+    );
+
+    if (!handler) {
+      throw new BadRequestException(
+        `Unsupported indicator type: ${indicatorType ?? 'undefined'}`,
+      );
+    }
+
+    return handler;
+  }
+
+  private get contributionHandlers(): BilateralIndicatorTypeHandler[] {
+    return [
+      this.capacitySharingHandler,
+      this.innovationDevelopmentHandler,
+      this.knowledgeProductHandler,
+      this.noopHandler,
+      this.policyChangeHandler,
+    ];
+  }
+
+  private toMappingResponse(
+    resultCode: string,
+    mapping: ResultPoolFundingIndicatorMapping,
+    leverName: string,
+  ): MappingResponse {
+    return {
+      result_code: resultCode,
+      lever_code: mapping.lever_code,
+      lever_name: leverName,
+      indicator_code: mapping.indicator_code,
+      indicator_type: mapping.indicator_type,
+      is_stale: this.toBoolean(mapping.is_stale),
+    };
+  }
+
+  private toStaleIndicatorResponse(
+    mapping: PoolFundingIndicatorMappingDetail,
+  ): IndicatorPanelIndicatorResponse {
+    return {
+      indicator_code: mapping.indicator_code,
+      indicator_name: mapping.indicator_code,
+      indicator_type: mapping.indicator_type,
+      target_description: null,
+      is_active: false,
+      is_mapped: true,
+      is_stale: this.toBoolean(mapping.is_stale),
+    };
+  }
+
+  private matchesIndicatorQuery(
+    indicator: IndicatorPanelIndicatorResponse,
+    query: ListIndicatorsQueryDto,
+  ): boolean {
+    if (
+      query.indicator_type &&
+      indicator.indicator_type !== query.indicator_type
+    ) {
+      return false;
+    }
+
+    if (!query.search?.trim()) {
+      return true;
+    }
+
+    const search = query.search.trim().toLowerCase();
+
+    return [
+      indicator.indicator_code,
+      indicator.indicator_name,
+      indicator.indicator_type,
+    ].some((value) => value.toLowerCase().includes(search));
+  }
+
+  private toMappingHistoryPayload(
+    mapping: Partial<ResultPoolFundingIndicatorMapping> | null,
+  ): Record<string, unknown> | null {
+    if (!mapping) {
+      return null;
+    }
+
+    return {
+      lever_code: mapping.lever_code,
+      indicator_code: mapping.indicator_code,
+      indicator_type: mapping.indicator_type,
+      result_capacity_sharing_id: mapping.result_capacity_sharing_id,
+      result_knowledge_product_id: mapping.result_knowledge_product_id,
+      result_policy_change_id: mapping.result_policy_change_id,
+      result_innovation_dev_id: mapping.result_innovation_dev_id,
+      other_contribution_narrative: mapping.other_contribution_narrative,
+      is_stale: this.toBoolean(mapping.is_stale),
+    };
+  }
+}

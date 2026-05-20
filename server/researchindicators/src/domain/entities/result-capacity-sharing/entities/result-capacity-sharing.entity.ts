@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { SessionFormat } from '../../session-formats/entities/session-format.entity';
 import { SessionType } from '../../session-types/entities/session-type.entity';
@@ -8,6 +8,7 @@ import { Gender } from '../../genders/entities/gender.entity';
 import { SessionPurpose } from '../../session-purposes/entities/session-purpose.entity';
 import { DeliveryModality } from '../../delivery-modalities/entities/delivery-modality.entity';
 import { Result } from '../../results/entities/result.entity';
+import { ResultPoolFundingIndicatorMapping } from '../../bilateral/entities/result-pool-funding-indicator-mapping.entity';
 
 @Entity('result_capacity_sharing')
 export class ResultCapacitySharing extends AuditableEntity {
@@ -172,4 +173,10 @@ export class ResultCapacitySharing extends AuditableEntity {
   )
   @JoinColumn({ name: 'delivery_modality_id' })
   delivery_modality!: DeliveryModality;
+
+  @OneToMany(
+    () => ResultPoolFundingIndicatorMapping,
+    (mapping) => mapping.result_capacity_sharing,
+  )
+  pool_funding_indicator_mappings?: ResultPoolFundingIndicatorMapping[];
 }

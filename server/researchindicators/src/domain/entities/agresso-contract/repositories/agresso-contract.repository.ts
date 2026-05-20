@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
+import { DataSource, FindOptionsWhere, In, Repository } from 'typeorm';
 import { AgressoContract } from '../entities/agresso-contract.entity';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../../tools/broker/aliance-management.app';
@@ -15,15 +15,41 @@ import {
   isValidText,
 } from '../../../shared/utils/query-sanitizer.util';
 import { User } from '../../../complementary-entities/secondary/user/user.entity';
+import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
+import { AgressoContractOpensearchDto } from '../../../tools/open-search/agresso-contract/dto/agresso-contract.opensearch.dto';
+import { FindAllOptions } from '../../../shared/enum/find-all-options';
 
 @Injectable()
-export class AgressoContractRepository extends Repository<AgressoContract> {
+export class AgressoContractRepository
+  extends Repository<AgressoContract>
+  implements ElasticFindEntity<AgressoContractOpensearchDto>
+{
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUser: CurrentUserUtil,
     private readonly alianceManagementApp: AlianceManagementApp,
   ) {
     super(AgressoContract, dataSource.createEntityManager());
+  }
+
+  async findDataForOpenSearch(
+    option: FindAllOptions,
+    ids?: string[],
+  ): Promise<AgressoContractOpensearchDto[]> {
+    const where: FindOptionsWhere<AgressoContract> = {};
+    if (option !== FindAllOptions.SHOW_ALL) where.is_active = true;
+    if (ids?.length) where.agreement_id = In(ids);
+
+    const contracts = await this.find({ where });
+    return contracts.map((contract) => ({
+      agreement_id: contract.agreement_id,
+      projectDescription: contract.projectDescription,
+      project_lead_description: contract.project_lead_description,
+      description: contract.description,
+      funding_type: contract.funding_type,
+      contract_status: contract.contract_status,
+      is_pool_funding_contributor: contract.is_pool_funding_contributor,
+    }));
   }
 
   async findAllContracts(
@@ -42,8 +68,12 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
-        .map(([key, value]) => `ac.${key} like '%${value}%'`)
-        .join(' AND ')}`
+          .map(([key, value]) =>
+            key === 'is_pool_funding_contributor'
+              ? `ac.${key} = ${value ? 1 : 0}`
+              : `ac.${key} like '%${value}%'`,
+          )
+          .join(' AND ')}`
       : '';
     const query = `
     select ac.*,
@@ -329,6 +359,10 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       if (isEmpty(attr)) return '';
       return filter;
     };
+    const poolFundingContributorFilter =
+      typeof filter?.is_pool_funding_contributor === 'boolean'
+        ? `AND ac.is_pool_funding_contributor = ${filter.is_pool_funding_contributor ? 1 : 0}`
+        : '';
 
     const dateFilterClause = this.buildDateFilterClause(filter);
     const indicators = await this.dataSource.getRepository(Indicator).find();
@@ -372,6 +406,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter.project_name}%'`)}
     ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'`)}
     ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
+    ${poolFundingContributorFilter}
     ${dateFilterClause}
     ${validFilter(filter?.status, this.buildStatusFilterClause(filter.status))}
   `;
@@ -408,6 +443,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         paginated_contracts.lever_full_name,
         paginated_contracts.lever_other_names,
         paginated_contracts.is_science_program,
+        paginated_contracts.is_pool_funding_contributor,
         paginated_contracts.funding_type,
         paginated_contracts.ubwClientDescription
     FROM (
@@ -426,6 +462,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             cl.full_name as lever_full_name,
             cl.other_names as lever_other_names,
             IF(pfc.id IS NOT NULL, TRUE, FALSE) AS is_science_program,
+            ac.is_pool_funding_contributor,
             ac.funding_type,
             CASE 
                 WHEN ac.ubwClientDescription = 'ExCIAT' THEN 'CIAT'
@@ -448,6 +485,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter?.project_name}%'`)}
         ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter?.principal_investigator}%'`)}
         ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
+        ${poolFundingContributorFilter}
         ${dateFilterClause}
         ${validFilter(filter?.status, this.buildStatusFilterClause(filter?.status))}
         ${orderBy}

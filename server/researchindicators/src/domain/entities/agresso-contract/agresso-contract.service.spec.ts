@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractRepository } from './repositories/agresso-contract.repository';
@@ -10,6 +11,7 @@ import { StringKeys } from '../../shared/global-dto/types-global';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
+import { OpenSearchAgressoContractApi } from '../../tools/open-search/agresso-contract/agresso-contract.opensearch.api';
 
 // Mock the utility functions
 jest.mock('../../shared/utils/object.utils', () => ({
@@ -35,6 +37,11 @@ describe('AgressoContractService', () => {
     findContractsByUser: jest.fn(),
     findOneContract: jest.fn(),
     getContracts: jest.fn(),
+    save: jest.fn(),
+  };
+
+  const mockOpenSearchAgressoContractApi = {
+    uploadSingleToOpenSearch: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -60,6 +67,10 @@ describe('AgressoContractService', () => {
         {
           provide: CurrentUserUtil,
           useValue: mockCurrentUser,
+        },
+        {
+          provide: OpenSearchAgressoContractApi,
+          useValue: mockOpenSearchAgressoContractApi,
         },
       ],
     }).compile();
@@ -384,6 +395,103 @@ describe('AgressoContractService', () => {
         undefined,
       );
       expect(result).toEqual(expectedContracts);
+    });
+  });
+
+  describe('setPoolFundingTag', () => {
+    const baseContract = {
+      agreement_id: 'BIL-001',
+      funding_type: 'BILATERAL',
+      is_pool_funding_contributor: false,
+      pooled_funding_contracts: [],
+    } as AgressoContract;
+
+    it('should set pool funding contributor tag to true and audit the update', async () => {
+      const contract = { ...baseContract };
+      const savedContract = {
+        ...contract,
+        is_pool_funding_contributor: true,
+        updated_by: 456,
+      } as AgressoContract;
+      mockRepository.findOne.mockResolvedValue(contract);
+      mockRepository.save.mockResolvedValue(savedContract);
+
+      const result = await service.setPoolFundingTag('BIL-001', true, {
+        sec_user_id: 456,
+      });
+
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { agreement_id: 'BIL-001' },
+        relations: { pooled_funding_contracts: true },
+      });
+      expect(repository.save).toHaveBeenCalledWith({
+        ...contract,
+        is_pool_funding_contributor: true,
+        updated_by: 456,
+      });
+      expect(
+        mockOpenSearchAgressoContractApi.uploadSingleToOpenSearch,
+      ).toHaveBeenCalledWith(savedContract);
+      expect(result).toBe(savedContract);
+    });
+
+    it('should set pool funding contributor tag to false', async () => {
+      const contract = {
+        ...baseContract,
+        is_pool_funding_contributor: true,
+      } as AgressoContract;
+      const savedContract = {
+        ...contract,
+        is_pool_funding_contributor: false,
+        updated_by: 123,
+      } as AgressoContract;
+      mockRepository.findOne.mockResolvedValue(contract);
+      mockRepository.save.mockResolvedValue(savedContract);
+
+      const result = await service.setPoolFundingTag('BIL-001', false);
+
+      expect(repository.save).toHaveBeenCalledWith({
+        ...contract,
+        is_pool_funding_contributor: false,
+        updated_by: currentUser.user_id,
+      });
+      expect(result).toBe(savedContract);
+    });
+
+    it('should reject non-bilateral contracts', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...baseContract,
+        funding_type: 'W1W2',
+      });
+
+      await expect(service.setPoolFundingTag('NON-BIL', true)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.save).not.toHaveBeenCalled();
+      expect(
+        mockOpenSearchAgressoContractApi.uploadSingleToOpenSearch,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should reject active pooled funding contracts', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        ...baseContract,
+        pooled_funding_contracts: [{ id: 1, is_active: true }],
+      });
+
+      await expect(service.setPoolFundingTag('PF-001', true)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw not found when contract does not exist', async () => {
+      mockRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.setPoolFundingTag('MISSING', true)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(repository.save).not.toHaveBeenCalled();
     });
   });
 });

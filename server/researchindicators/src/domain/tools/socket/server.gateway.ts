@@ -8,6 +8,15 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { Socket, Server } from 'socket.io';
 
+export const POOL_FUNDING_ALIGNMENT_CHANGED_EVENT =
+  'result.pool-funding-alignment.changed';
+
+export interface PoolFundingAlignmentChangedPayload {
+  result_code: string;
+  by_user_id: number;
+  at: string;
+}
+
 @Injectable()
 @WebSocketGateway()
 export class ServerGateway
@@ -26,5 +35,11 @@ export class ServerGateway
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  emitPoolFundingAlignmentChanged(
+    payload: PoolFundingAlignmentChangedPayload,
+  ): void {
+    this.server?.emit(POOL_FUNDING_ALIGNMENT_CHANGED_EVENT, payload);
   }
 }

@@ -3,4 +3,5 @@ export enum ReportingPlatformEnum {
   PRMS = 'PRMS',
   TIP = 'TIP',
   AICCRA = 'AICCRA',
+  BILATERAL = 'BILATERAL',
 }

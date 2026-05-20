@@ -1,4 +1,5 @@
 import { ResultStatus } from '../result-status/entities/result-status.entity';
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { ResultStatusWorkflow } from './entities/result-status-workflow.entity';
 import { StatusTransitionTree } from './satus-graph';
 
@@ -147,5 +148,80 @@ describe('StatusTransitionTree', () => {
       transition(2, 1, s2, s1),
     ]);
     expect(tree.getGraph().paths).toEqual([]);
+  });
+
+  it('models only the allowed bilateral workflow transitions', () => {
+    const draft = status(ResultStatusEnum.DRAFT, 'Draft');
+    const pendingReview = status(
+      ResultStatusEnum.BILATERAL_PENDING_REVIEW,
+      'Bilateral Pending Review',
+    );
+    const approved = status(
+      ResultStatusEnum.BILATERAL_APPROVED,
+      'Bilateral Approved',
+    );
+    const rejected = status(
+      ResultStatusEnum.BILATERAL_REJECTED,
+      'Bilateral Rejected',
+    );
+
+    const tree = new StatusTransitionTree([
+      transition(
+        ResultStatusEnum.DRAFT,
+        ResultStatusEnum.BILATERAL_PENDING_REVIEW,
+        draft,
+        pendingReview,
+      ),
+      transition(
+        ResultStatusEnum.BILATERAL_PENDING_REVIEW,
+        ResultStatusEnum.BILATERAL_APPROVED,
+        pendingReview,
+        approved,
+      ),
+      transition(
+        ResultStatusEnum.BILATERAL_PENDING_REVIEW,
+        ResultStatusEnum.BILATERAL_REJECTED,
+        pendingReview,
+        rejected,
+      ),
+      transition(
+        ResultStatusEnum.BILATERAL_APPROVED,
+        ResultStatusEnum.BILATERAL_PENDING_REVIEW,
+        approved,
+        pendingReview,
+      ),
+      transition(
+        ResultStatusEnum.BILATERAL_REJECTED,
+        ResultStatusEnum.BILATERAL_PENDING_REVIEW,
+        rejected,
+        pendingReview,
+      ),
+    ]);
+    const canMoveDirectly = (from: ResultStatusEnum, to: ResultStatusEnum) =>
+      tree
+        .getPossibleTransitionsFrom(from)
+        .some((node) => node.statusId === to);
+
+    expect(
+      canMoveDirectly(
+        ResultStatusEnum.DRAFT,
+        ResultStatusEnum.BILATERAL_PENDING_REVIEW,
+      ),
+    ).toBe(true);
+    expect(
+      tree
+        .getPossibleTransitionsFrom(ResultStatusEnum.BILATERAL_PENDING_REVIEW)
+        .map((node) => node.statusId)
+        .sort((a, b) => a - b),
+    ).toEqual([
+      ResultStatusEnum.BILATERAL_APPROVED,
+      ResultStatusEnum.BILATERAL_REJECTED,
+    ]);
+    expect(
+      canMoveDirectly(
+        ResultStatusEnum.DRAFT,
+        ResultStatusEnum.BILATERAL_APPROVED,
+      ),
+    ).toBe(false);
   });
 });
