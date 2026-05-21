@@ -169,16 +169,20 @@ export class TipIntegrationService extends BaseApi {
           result.submitter?.email,
         );
 
-        const dataToSearch = result.submitter?.idCard ?? result.submitter?.email;
+        const dataToSearch =
+          result.submitter?.idCard ?? result.submitter?.email;
         if (isEmpty(dataToSearch)) {
           allianceUserStaff = await this.dataSource
             .getRepository(AllianceUserStaff)
             .findOne({
-              where: [{
-                carnet: dataToSearch,
-              }, {
-                email: Like(`%${dataToSearch?.trim()?.toLowerCase()}%`),
-              }],
+              where: [
+                {
+                  carnet: dataToSearch,
+                },
+                {
+                  email: Like(`%${dataToSearch?.trim()?.toLowerCase()}%`),
+                },
+              ],
             });
         }
 
@@ -214,8 +218,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-            user_id: carnet,
-          } as ResultUser)
+              user_id: carnet,
+            } as ResultUser)
           : null,
       };
 

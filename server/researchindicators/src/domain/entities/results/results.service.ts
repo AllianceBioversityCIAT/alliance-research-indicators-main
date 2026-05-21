@@ -997,7 +997,11 @@ export class ResultsService {
           break;
       }
 
-      await this.customStatus(result.status, newResult.result_id, processedResult?.result?.year);
+      await this.customStatus(
+        result.status,
+        newResult.result_id,
+        processedResult?.result?.year,
+      );
 
       return { ...newResult, error: false };
     } catch (error) {
@@ -1055,14 +1059,20 @@ export class ResultsService {
       });
 
       if (status === ResultStatusEnum.APPROVED) {
-        const resultrCode = await this.dataSource.getRepository(Result).findOne({
-          where: {
-            result_id: resultId,
-            is_active: true,
-          },
-        }).then((result) => result.result_official_code);
+        const resultrCode = await this.dataSource
+          .getRepository(Result)
+          .findOne({
+            where: {
+              result_id: resultId,
+              is_active: true,
+            },
+          })
+          .then((result) => result.result_official_code);
 
-        await this._greenCheckRepository.createSnapshot(resultrCode, reportYear)
+        await this._greenCheckRepository.createSnapshot(
+          resultrCode,
+          reportYear,
+        );
       }
     }
   }
@@ -1259,7 +1269,8 @@ export class ResultsService {
         );
       tempCountries.institutions = acept as ResultInstitution[];
       tempCountries.institutions_ai = pending as ResultInstitutionAi[];
-      tempCountries.is_partner_not_applicable = result?.is_partner_not_applicable;
+      tempCountries.is_partner_not_applicable =
+        result?.is_partner_not_applicable;
       tmpNewData.partners = tempCountries;
     }
 
@@ -1307,11 +1318,12 @@ export class ResultsService {
     resultId: number,
     saveGeoLocationDto: SaveGeoLocationDto,
   ) {
+    if (isEmpty(saveGeoLocationDto)) return this.findGeoLocation(resultId);
     await this.dataSource.transaction(async (manager) => {
       const geoScopeId: ClarisaGeoScopeEnum =
         this._clarisaGeoScopeService.transformGeoScope(
-          saveGeoLocationDto.geo_scope_id,
-          saveGeoLocationDto.countries,
+          saveGeoLocationDto?.geo_scope_id,
+          saveGeoLocationDto?.countries,
         );
 
       await manager.getRepository(this.mainRepo.target).update(resultId, {

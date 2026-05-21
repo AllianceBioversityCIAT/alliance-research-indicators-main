@@ -6,6 +6,7 @@ import {
   CurrentUserUtil,
   SetAuditEnum,
 } from '../../shared/utils/current-user.util';
+import { isEmpty } from 'lodash';
 
 @Injectable()
 export class ResultKnowledgeProductService {
@@ -31,11 +32,13 @@ export class ResultKnowledgeProductService {
   }
 
   async update(resultId: number, data: ResultKnowledgeProduct) {
+    if (isEmpty(data))
+      return this.mainRepo.findOne({ where: { result_id: resultId } });
     await this.mainRepo.update(resultId, {
-      open_access: data.open_access,
-      citation: data.citation,
-      publication_date: data.publication_date,
-      type: data.type,
+      open_access: data?.open_access,
+      citation: data?.citation,
+      publication_date: data?.publication_date,
+      type: data?.type,
       ...this._currentUser.audit(SetAuditEnum.UPDATE),
     });
     return this.mainRepo.findOne({ where: { result_id: resultId } });
