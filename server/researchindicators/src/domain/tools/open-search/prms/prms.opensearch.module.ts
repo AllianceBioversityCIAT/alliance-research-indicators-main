@@ -22,4 +22,4 @@ import { SaveResultService } from '../../../shared/services/save-all-sections.se
     SyncProcessLogModule,
   ],
 })
-export class PrmsOpenSearchModule { }
+export class PrmsOpenSearchModule {}

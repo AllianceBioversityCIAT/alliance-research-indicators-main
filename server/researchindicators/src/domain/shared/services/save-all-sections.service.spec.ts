@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { SaveResultService } from './save-all-sections.service';
 import { ResultsService } from '../../entities/results/results.service';
+import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { QueryService } from '../utils/query.service';
 import { CurrentUserUtil } from '../utils/current-user.util';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
@@ -17,6 +18,7 @@ describe('SaveResultService', () => {
   let service: SaveResultService;
   let resultRepoHandle: { findOne: jest.Mock; update: jest.Mock };
   let resultsService: jest.Mocked<ResultsService>;
+  let knowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
   let queryService: jest.Mocked<QueryService>;
   let currentUser: jest.Mocked<CurrentUserUtil>;
 
@@ -81,11 +83,21 @@ describe('SaveResultService', () => {
             updateGeneralInfo: jest.fn(),
             updateResultAlignment: jest.fn(),
             updateInactiveResult: jest.fn(),
+            findResultAlignment: jest
+              .fn()
+              .mockResolvedValue({ primary_levers: [] }),
+            saveGeoLocation: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
+          provide: ResultKnowledgeProductService,
+          useValue: { update: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
           provide: QueryService,
-          useValue: { deleteFullResultById: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            deleteFullResultById: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: CurrentUserUtil,
@@ -99,6 +111,7 @@ describe('SaveResultService', () => {
 
     service = module.get(SaveResultService);
     resultsService = module.get(ResultsService);
+    knowledgeProductService = module.get(ResultKnowledgeProductService);
     queryService = module.get(QueryService);
     currentUser = module.get(CurrentUserUtil);
   });
@@ -116,7 +129,10 @@ describe('SaveResultService', () => {
       } as any);
       const counters = new CounterResults();
 
-      await service.saveAllSections(minimalResultDto(), prmsExtraData(counters));
+      await service.saveAllSections(
+        minimalResultDto(),
+        prmsExtraData(counters),
+      );
 
       expect(resultsService.createResult).toHaveBeenCalledWith(
         expect.anything(),
@@ -155,9 +171,15 @@ describe('SaveResultService', () => {
       } as any);
       const counters = new CounterResults();
 
-      await service.saveAllSections(minimalResultDto(), prmsExtraData(counters));
+      await service.saveAllSections(
+        minimalResultDto(),
+        prmsExtraData(counters),
+      );
 
-      expect(resultsService.updateInactiveResult).toHaveBeenCalledWith(9, false);
+      expect(resultsService.updateInactiveResult).toHaveBeenCalledWith(
+        9,
+        false,
+      );
       expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
     });
 
@@ -170,7 +192,10 @@ describe('SaveResultService', () => {
       resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('x'));
       const counters = new CounterResults();
 
-      await service.saveAllSections(minimalResultDto(), prmsExtraData(counters));
+      await service.saveAllSections(
+        minimalResultDto(),
+        prmsExtraData(counters),
+      );
 
       expect(queryService.deleteFullResultById).toHaveBeenCalledWith(42);
       expect(counters[CounterResultsEnum.ERROR]).toBe(1);
@@ -182,6 +207,63 @@ describe('SaveResultService', () => {
           counters: new CounterResults(),
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should persist public_link and sync geo location and knowledge product', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 5,
+        result_official_code: 7001,
+      } as any);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/public';
+      dto.geoScope = { geo_scope_id: 2, countries: [] } as any;
+      dto.knowledgeProduct = { open_access: true, citation: 'cite' } as any;
+
+      await service.saveAllSections(dto, prmsExtraData(counters));
+
+      expect(resultRepoHandle.update).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({
+          public_link: 'https://example.org/public',
+          external_link: 'e',
+        }),
+      );
+      expect(resultsService.saveGeoLocation).toHaveBeenCalledWith(
+        5,
+        dto.geoScope,
+      );
+      expect(knowledgeProductService.update).toHaveBeenCalledWith(
+        5,
+        dto.knowledgeProduct,
+      );
+      expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('should merge STAR primary levers before updating alignment', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 3,
+        result_official_code: 7001,
+      } as any);
+      resultsService.findResultAlignment.mockResolvedValue({
+        primary_levers: [{ lever_id: 1, is_primary: true }],
+      } as any);
+      const dto = minimalResultDto();
+      dto.alignments.primary_levers = [
+        { lever_id: 2, is_primary: false },
+      ] as any;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultsService.findResultAlignment).toHaveBeenCalledWith(3);
+      const alignmentArg =
+        resultsService.updateResultAlignment.mock.calls[0][1];
+      expect(alignmentArg.primary_levers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ lever_id: 1, is_primary: true }),
+          expect.objectContaining({ lever_id: 2, is_primary: false }),
+        ]),
+      );
     });
   });
 

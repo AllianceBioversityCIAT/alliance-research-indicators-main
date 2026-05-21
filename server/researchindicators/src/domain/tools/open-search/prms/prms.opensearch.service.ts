@@ -39,17 +39,15 @@ import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clar
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { firstValueFrom } from 'rxjs';
-import {
-  CounterResults,
-  CounterResultsEnum,
-} from '../../tip-integration/dto/response-year-tip.dto';
+import { CounterResults } from '../../tip-integration/dto/response-year-tip.dto';
 import { SyncProcessLogService } from '../../../entities/sync-process-log/sync-process-log.service';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 
 @Injectable()
 export class PrmsOpenSearchService
-  implements ExternalMappersInterface<ExternalMappersDto> {
+  implements ExternalMappersInterface<ExternalMappersDto>
+{
   private readonly logger = new LoggerUtil({
     name: PrmsOpenSearchService.name,
   });
@@ -66,7 +64,7 @@ export class PrmsOpenSearchService
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly syncProcessLogService: SyncProcessLogService,
     private readonly saveResultService: SaveResultService,
-  ) { }
+  ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
     for (const result of res) {
@@ -303,7 +301,9 @@ export class PrmsOpenSearchService
             .getRepository(AllianceUserStaff)
             .findOne({
               where: {
-                email: Like(`%${item.created_by?.email?.trim()?.toLowerCase()}%`),
+                email: Like(
+                  `%${item.created_by?.email?.trim()?.toLowerCase()}%`,
+                ),
               },
             });
         }
@@ -333,7 +333,9 @@ export class PrmsOpenSearchService
         contract_id: primaryContract?.agreement_id,
       };
 
-      const prmsLever = await this.clarisaLeversService.findOne(item?.result_level?.code);
+      const prmsLever = await this.clarisaLeversService.findOne(
+        item?.result_level?.code,
+      );
 
       const lever = await this.clarisaLeversService.homologatedData(
         primaryContract?.departmentId,

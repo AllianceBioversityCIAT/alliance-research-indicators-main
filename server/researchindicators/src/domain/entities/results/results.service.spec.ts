@@ -2299,6 +2299,23 @@ describe('ResultsService', () => {
       });
     });
 
+    it('should return existing geo location when dto is null or undefined', async () => {
+      const resultId = 1;
+      const existing = { geo_scope_id: 1, countries: [], regions: [] };
+      const findGeoLocationSpy = jest
+        .spyOn(service, 'findGeoLocation')
+        .mockResolvedValue(existing as any);
+
+      const fromNull = await service.saveGeoLocation(resultId, null);
+      const fromUndefined = await service.saveGeoLocation(resultId, undefined);
+
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+      expect(findGeoLocationSpy).toHaveBeenCalledTimes(2);
+      expect(findGeoLocationSpy).toHaveBeenCalledWith(resultId);
+      expect(fromNull).toEqual(existing);
+      expect(fromUndefined).toEqual(existing);
+    });
+
     it('should save geo location with comment_geo_scope', async () => {
       // Arrange
       const resultId = 1;

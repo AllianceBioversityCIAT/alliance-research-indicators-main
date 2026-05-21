@@ -58,6 +58,17 @@ describe('ResultKnowledgeProductService', () => {
 
   // [CLAUDE/DONE] 80
   describe('update', () => {
+    it('should return existing record without updating when data is empty', async () => {
+      const existing = { result_id: 10, open_access: false };
+      mockFindOne.mockResolvedValue(existing);
+
+      const result = await service.update(10, {} as any);
+
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockFindOne).toHaveBeenCalledWith({ where: { result_id: 10 } });
+      expect(result).toEqual(existing);
+    });
+
     it('should update fields and return the updated record', async () => {
       const updated = { result_id: 10, open_access: true, citation: 'Cite' };
       mockUpdate.mockResolvedValue({ affected: 1 });

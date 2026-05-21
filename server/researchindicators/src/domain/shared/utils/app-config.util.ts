@@ -9,7 +9,7 @@ import { AppConfig as AppConfigEntity } from '../../entities/app-config/entities
  */
 @Injectable()
 export class AppConfig {
-  constructor(private readonly dataSource: DataSource) { }
+  constructor(private readonly dataSource: DataSource) {}
   //RabbitMQ host
   get ARI_MQ_HOST(): string {
     return process.env.ARI_MQ_HOST;
@@ -385,11 +385,13 @@ export class AppConfig {
   }
 
   async DB_SUPPORT_EMAIL(): Promise<string> {
-    const appConfig = await this.dataSource.getRepository(AppConfigEntity).findOne({
-      where: {
-        key: 'ARI_SUPPORT_EMAIL',
-      },
-    });
+    const appConfig = await this.dataSource
+      .getRepository(AppConfigEntity)
+      .findOne({
+        where: {
+          key: 'ARI_SUPPORT_EMAIL',
+        },
+      });
     return appConfig?.simple_value;
   }
 }

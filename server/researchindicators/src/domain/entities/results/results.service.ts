@@ -143,7 +143,7 @@ export class ResultsService {
     private readonly _resultsUtil: ResultsUtil,
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
-  ) { }
+  ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -709,21 +709,21 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: true,
-            result_lever_strategic_outcomes:
-              el?.result_lever_strategic_outcomes,
-            result_lever_sdg_targets: el?.result_lever_sdg_targets,
-          }))
+              lever_id: el.lever_id,
+              is_primary: true,
+              result_lever_strategic_outcomes:
+                el?.result_lever_strategic_outcomes,
+              result_lever_sdg_targets: el?.result_lever_sdg_targets,
+            }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: false,
-            result_lever_sdg_targets: el?.result_lever_sdg_targets,
-          }))
+              lever_id: el.lever_id,
+              is_primary: false,
+              result_lever_sdg_targets: el?.result_lever_sdg_targets,
+            }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -989,7 +989,11 @@ export class ResultsService {
           break;
       }
 
-      await this.customStatus(result.status, newResult.result_id, processedResult?.result?.year);
+      await this.customStatus(
+        result.status,
+        newResult.result_id,
+        processedResult?.result?.year,
+      );
 
       return { ...newResult, error: false };
     } catch (error) {
@@ -1047,14 +1051,20 @@ export class ResultsService {
       });
 
       if (status === ResultStatusEnum.APPROVED) {
-        const resultrCode = await this.dataSource.getRepository(Result).findOne({
-          where: {
-            result_id: resultId,
-            is_active: true,
-          },
-        }).then((result) => result.result_official_code);
+        const resultrCode = await this.dataSource
+          .getRepository(Result)
+          .findOne({
+            where: {
+              result_id: resultId,
+              is_active: true,
+            },
+          })
+          .then((result) => result.result_official_code);
 
-        await this._greenCheckRepository.createSnapshot(resultrCode, reportYear)
+        await this._greenCheckRepository.createSnapshot(
+          resultrCode,
+          reportYear,
+        );
       }
     }
   }
@@ -1251,7 +1261,8 @@ export class ResultsService {
         );
       tempCountries.institutions = acept as ResultInstitution[];
       tempCountries.institutions_ai = pending as ResultInstitutionAi[];
-      tempCountries.is_partner_not_applicable = result?.is_partner_not_applicable;
+      tempCountries.is_partner_not_applicable =
+        result?.is_partner_not_applicable;
       tmpNewData.partners = tempCountries;
     }
 
@@ -1299,11 +1310,12 @@ export class ResultsService {
     resultId: number,
     saveGeoLocationDto: SaveGeoLocationDto,
   ) {
+    if (isEmpty(saveGeoLocationDto)) return this.findGeoLocation(resultId);
     await this.dataSource.transaction(async (manager) => {
       const geoScopeId: ClarisaGeoScopeEnum =
         this._clarisaGeoScopeService.transformGeoScope(
-          saveGeoLocationDto.geo_scope_id,
-          saveGeoLocationDto.countries,
+          saveGeoLocationDto?.geo_scope_id,
+          saveGeoLocationDto?.countries,
         );
 
       await manager.getRepository(this.mainRepo.target).update(resultId, {
@@ -1322,8 +1334,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-              (el) => el.isoAlpha2 === country.isoAlpha2,
-            )?.result_countries_sub_nationals
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
             : [];
           return country;
         },
@@ -1489,7 +1501,7 @@ export class ResultsService {
           'indicator',
           'result_status_id',
           'result_status',
-          'platform_code'
+          'platform_code',
         ],
         where: {
           created_by: this.currentUser.user_id,
