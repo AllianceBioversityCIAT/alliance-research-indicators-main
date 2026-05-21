@@ -1,10 +1,11 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class Updatefulldelete1778510205765 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP FUNCTION IF EXISTS full_delete_result_version`);
-        await queryRunner.query(`CREATE FUNCTION \`full_delete_result_version\`(resultCode BIGINT) RETURNS tinyint(1)
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS full_delete_result_version`,
+    );
+    await queryRunner.query(`CREATE FUNCTION \`full_delete_result_version\`(resultCode BIGINT) RETURNS tinyint(1)
     READS SQL DATA
 BEGIN
                         
@@ -166,8 +167,10 @@ BEGIN
                         
                     END`);
 
-        await queryRunner.query(`DROP PROCEDURE IF EXISTS SP_delete_result_version`);
-        await queryRunner.query(`CREATE PROCEDURE \`SP_delete_result_version\`(IN resultCode BIGINT,IN reportYear INT)
+    await queryRunner.query(
+      `DROP PROCEDURE IF EXISTS SP_delete_result_version`,
+    );
+    await queryRunner.query(`CREATE PROCEDURE \`SP_delete_result_version\`(IN resultCode BIGINT,IN reportYear INT)
 BEGIN
                         
                         DECLARE temp_result_id BIGINT;
@@ -329,11 +332,14 @@ BEGIN
 
                         
                     END`);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP FUNCTION IF EXISTS full_delete_result_version`);
-        await queryRunner.query(`DROP PROCEDURE IF EXISTS SP_delete_result_version`);
-    }
-
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS full_delete_result_version`,
+    );
+    await queryRunner.query(
+      `DROP PROCEDURE IF EXISTS SP_delete_result_version`,
+    );
+  }
 }

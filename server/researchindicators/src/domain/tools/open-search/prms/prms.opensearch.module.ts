@@ -7,10 +7,11 @@ import { ResultKnowledgeProductModule } from '../../../entities/result-knowledge
 import { PooledFundingContractsModule } from '../../../entities/pooled-funding-contracts/pooled-funding-contracts.module';
 import { ClarisaLeversModule } from '../../clarisa/entities/clarisa-levers/clarisa-levers.module';
 import { SyncProcessLogModule } from '../../../entities/sync-process-log/sync-process-log.module';
+import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 
 @Module({
   controllers: [PrmsOpenSearchController],
-  providers: [PrmsOpenSearchService],
+  providers: [PrmsOpenSearchService, SaveResultService],
   exports: [PrmsOpenSearchService],
   imports: [
     HttpModule,

@@ -148,12 +148,16 @@ describe('AppConfig', () => {
   });
 
   it('DB_SUPPORT_EMAIL returns simple_value from app_config for ARI_SUPPORT_EMAIL key', async () => {
-    const findOne = jest.fn().mockResolvedValue({ simple_value: 'db-support@example.com' });
+    const findOne = jest
+      .fn()
+      .mockResolvedValue({ simple_value: 'db-support@example.com' });
     const ds = {
       getRepository: jest.fn().mockReturnValue({ findOne }),
     } as unknown as DataSource;
     const cfg = new AppConfig(ds);
-    await expect(cfg.DB_SUPPORT_EMAIL()).resolves.toBe('db-support@example.com');
+    await expect(cfg.DB_SUPPORT_EMAIL()).resolves.toBe(
+      'db-support@example.com',
+    );
     expect(findOne).toHaveBeenCalledWith({
       where: { key: 'ARI_SUPPORT_EMAIL' },
     });
