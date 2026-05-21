@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ResultCapacitySharingService } from './result-capacity-sharing.service';
 import { ResultCapacitySharing } from './entities/result-capacity-sharing.entity';
@@ -218,6 +218,21 @@ describe('ResultCapacitySharingService', () => {
         service.update(1, new UpdateResultCapacitySharingDto()),
       ).rejects.toThrow(ConflictException);
 
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it('should throw when start_date format is invalid', async () => {
+      capacityFindOne.mockResolvedValue({
+        result_id: 44,
+        is_active: true,
+      });
+
+      const dto = new UpdateResultCapacitySharingDto();
+      dto.start_date = 'Sun Oct 31 2021' as unknown as Date;
+
+      await expect(service.update(44, dto, false)).rejects.toThrow(
+        BadRequestException,
+      );
       expect(transaction).not.toHaveBeenCalled();
     });
 

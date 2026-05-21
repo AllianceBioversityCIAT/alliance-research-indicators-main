@@ -1511,8 +1511,8 @@ export class ResultsService {
           'result_status',
           'platform_code',
           'public_link',
-          'public_link',
-          'report_year_id'
+          'external_link',
+          'report_year_id',
         ],
         where: {
           created_by: this.currentUser.user_id,
@@ -1553,7 +1553,7 @@ export class ResultsService {
             },
             relations: {
               lever: true,
-            }
+            },
           });
 
         return results.map((result) => {

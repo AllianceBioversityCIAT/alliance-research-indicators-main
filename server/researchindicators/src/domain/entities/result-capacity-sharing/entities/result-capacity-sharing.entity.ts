@@ -109,13 +109,13 @@ export class ResultCapacitySharing extends AuditableEntity {
   })
   is_attending_organization?: boolean;
 
-  @Column('text', {
+  @Column('timestamp', {
     name: 'start_date',
     nullable: true,
   })
   start_date?: Date;
 
-  @Column('text', {
+  @Column('timestamp', {
     name: 'end_date',
     nullable: true,
   })

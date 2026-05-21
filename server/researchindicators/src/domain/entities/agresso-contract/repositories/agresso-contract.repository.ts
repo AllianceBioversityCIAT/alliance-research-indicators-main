@@ -22,8 +22,7 @@ import { FindAllOptions } from '../../../shared/enum/find-all-options';
 @Injectable()
 export class AgressoContractRepository
   extends Repository<AgressoContract>
-  implements ElasticFindEntity<AgressoContractOpensearchDto>
-{
+  implements ElasticFindEntity<AgressoContractOpensearchDto> {
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUser: CurrentUserUtil,
@@ -68,12 +67,12 @@ export class AgressoContractRepository
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
-          .map(([key, value]) =>
-            key === 'is_pool_funding_contributor'
-              ? `ac.${key} = ${value ? 1 : 0}`
-              : `ac.${key} like '%${value}%'`,
-          )
-          .join(' AND ')}`
+        .map(([key, value]) =>
+          key === 'is_pool_funding_contributor'
+            ? `ac.${key} = ${value ? 1 : 0}`
+            : `ac.${key} like '%${value}%'`,
+        )
+        .join(' AND ')}`
       : '';
     const query = `
     select ac.*,
