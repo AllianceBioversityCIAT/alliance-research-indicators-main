@@ -183,6 +183,18 @@ export class ResultsService {
       onlyOwnResults: boolean;
     },
   ) {
+    if (!this.mainRepo) {
+      const allKeys = Object.keys(this);
+      const definedKeys = allKeys.filter((k) => (this as any)[k] != null);
+      const undefinedKeys = allKeys.filter((k) => (this as any)[k] == null);
+      throw new BadRequestException({
+        diagnostic: 'ResultsService.mainRepo is undefined at request time',
+        constructorName: this.constructor?.name,
+        totalKeys: allKeys.length,
+        definedKeys,
+        undefinedKeys,
+      });
+    }
     const filtersData = {
       status: filters?.status ?? [],
       contracts: filters?.contracts ?? [],
