@@ -719,22 +719,25 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     };
   }) {
     let query = '';
-    if (filters.status.length > 0) {
+    if ((filters?.status?.length ?? 0) > 0) {
       query += `AND r.result_status_id IN (${formatArrayToQuery<number>(filters.status)})`;
     }
-    if (filters.contracts.length > 0) {
+    if ((filters?.contracts?.length ?? 0) > 0) {
       query += `AND rc.contract_id IN (${formatArrayToQuery<string>(filters.contracts)})`;
     }
-    if (filters.years.length > 0) {
+    if ((filters?.years?.length ?? 0) > 0) {
       query += `AND r.report_year_id IN (${formatArrayToQuery<string>(filters.years)})`;
     }
-    if (filters.sources.length > 0) {
+    if ((filters?.sources?.length ?? 0) > 0) {
       query += `AND r.platform_code IN (${formatArrayToQuery<string>(filters.sources)})`;
     }
-    if (filters.indicators.length > 0) {
+    if ((filters?.indicators?.length ?? 0) > 0) {
       query += `AND r.indicator_id IN (${formatArrayToQuery<number>(filters.indicators)})`;
     }
-    if (filters.currentUser.onlyOwnResults) {
+    if (
+      filters?.currentUser?.onlyOwnResults &&
+      filters?.currentUser?.userId != null
+    ) {
       query += `AND r.created_by = ${filters.currentUser.userId}`;
     }
 
