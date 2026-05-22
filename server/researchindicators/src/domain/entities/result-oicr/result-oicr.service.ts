@@ -86,7 +86,7 @@ export class ResultOicrService {
     private readonly resultStatusWorkflowHandler: StatusWorkflowFunctionHandlerService,
   ) {}
 
-  async create(resultId: number, manager: EntityManager) {
+  async create(resultId: number, manager: EntityManager, createdBy?: number) {
     const entityManager: Repository<ResultOicr> = selectManager(
       manager,
       ResultOicr,
@@ -94,7 +94,9 @@ export class ResultOicrService {
     );
     return entityManager.save({
       result_id: resultId,
-      ...this.currentUser.audit(SetAuditEnum.NEW),
+      ...(createdBy != null
+        ? { created_by: createdBy }
+        : this.currentUser.audit(SetAuditEnum.NEW)),
     });
   }
 

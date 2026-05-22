@@ -5,6 +5,7 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { DataSource, EntityManager, In, Not } from 'typeorm';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
@@ -338,8 +339,13 @@ describe('ResultsService', () => {
           useValue: mockResultSdgsService,
         },
         {
-          provide: ResultOicrService,
-          useValue: mockResultOicrService,
+          provide: ModuleRef,
+          useValue: {
+            resolve: jest.fn(async (token: unknown) => {
+              if (token === ResultOicrService) return mockResultOicrService;
+              return undefined;
+            }),
+          },
         },
         {
           provide: ClarisaCountriesService,
@@ -1326,6 +1332,7 @@ describe('ResultsService', () => {
         expect(mockResultOicrService.create).toHaveBeenCalledWith(
           savedResult.result_id,
           expect.any(Object),
+          expect.anything(),
         );
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
         expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
