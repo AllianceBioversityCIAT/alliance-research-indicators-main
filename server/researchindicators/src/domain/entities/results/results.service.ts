@@ -188,11 +188,25 @@ export class ResultsService {
       const definedKeys = allKeys.filter((k) => (this as any)[k] != null);
       const undefinedKeys = allKeys.filter((k) => (this as any)[k] == null);
       throw new BadRequestException({
-        diagnostic: 'ResultsService.mainRepo is undefined at request time',
-        constructorName: this.constructor?.name,
-        totalKeys: allKeys.length,
-        definedKeys,
-        undefinedKeys,
+        message: {
+          diagnostic: 'ResultsService.mainRepo is undefined at request time',
+          constructorName: this.constructor?.name,
+          isResultsServiceInstance: this.constructor?.name === 'ResultsService',
+          prototypeMatches:
+            Object.getPrototypeOf(this) ===
+            Object.getPrototypeOf(Object.create(this.constructor.prototype)),
+          totalKeys: allKeys.length,
+          definedKeys,
+          undefinedKeys,
+          probeAdjacent: {
+            hasDataSource: this.dataSource != null,
+            hasCurrentUser: (this as any).currentUser != null,
+            hasResultsUtil: (this as any)._resultsUtil != null,
+            hasResultOicrService: (this as any)._resultOicrService != null,
+          },
+        },
+        error: 'DI-Diagnostic',
+        statusCode: 400,
       });
     }
     const filtersData = {
