@@ -161,6 +161,46 @@ graph TD
 
 ## 5. Phase 0 — Foundation
 
+> **Mandatory verification gate after EVERY task in this phase and beyond.**
+>
+> Before merging any task that touches DI (new service, new module import, new injection, new controller), confirm the following on the target environment:
+>
+> ```
+> GET /api/v2/results?page=1&limit=10&sort-order=DESC&sort-field=code&only-own-results=false
+> Expected: 200 OK with `data: [...]`
+>
+> If 500 with `Cannot read properties of undefined (reading 'user_id')`:
+>   STOP. The task you just merged tripped the empty-shell DI cycle (see design.md §3.4).
+>   Revert immediately and bisect.
+> ```
+>
+> Same check applies to `GET /api/results?limit=2`, `GET /api/results/validate-title?title=test`,
+> `GET /api/results/last-updated/current-user`. If any of these return 500 with the same shape,
+> all `ResultsService` methods are affected — same root cause.
+
+### T-00 — Pre-requisite: remove dead `CurrentUserUtil` injection from `ResultRepository`
+
+- **Status:** pending
+- **Size:** XS
+- **Dependencies:** —
+- **Requirements covered:** NFR-BIL-* (stability)
+- **Design references:** §3.4 (DI scope constraints) — Constraint D
+- **Scope:** In `server/researchindicators/src/domain/entities/results/repositories/result.repository.ts`:
+  - Remove the `private readonly currentUserUtil: CurrentUserUtil` parameter from the constructor.
+  - Remove the `import { CurrentUserUtil }` line.
+  - Update the sibling spec `result.repository.spec.ts` — the `new ResultRepository(...)` call drops one arg.
+  - Verify: `grep this.currentUserUtil` in the file returns zero matches (it was already dead code).
+- **Tests:**
+  - All existing `result.repository.spec.ts` tests still pass with the trimmed constructor.
+  - `npm run lint` clean.
+  - `npx tsc --noEmit` clean.
+- **Done criteria:**
+  - [ ] `ResultRepository` constructor has 2 params (was 3): `appConfig`, `dataSource`.
+  - [ ] `ResultRepository` is now singleton scope (no REQUEST cascade from this provider).
+  - [ ] **Verification gate passes** on the target environment (`/api/v2/results` returns 200).
+- **Why this is a pre-requisite:** `BilateralService` injects `ResultRepository`. If `ResultRepository` is REQUEST-scoped (which it currently is, because of the dead injection), then `BilateralService` becomes REQUEST-scoped too. That adds another consumer to the REQUEST-scope cascade that causes the empty-shell bug. Cleaning this first eliminates one source of cascade.
+- **Skills:** `nestjs-expert`.
+
 ### T-01 — Schema: extend `agresso_contract`, `result`, `indicator`
 
 - **Status:** pending
@@ -246,22 +286,27 @@ graph TD
 
 - **Status:** pending
 - **Size:** S
-- **Dependencies:** T-03, T-04
+- **Dependencies:** T-00 (mandatory), T-03, T-04
 - **Requirements covered:** all R-BIL-0xx (skeleton hosts later tasks)
-- **Design references:** §4, §7.1, §7.3, §7.7
+- **Design references:** §3.4 (DI constraints — MANDATORY), §4, §7.1, §7.3, §7.7
 - **Scope:**
   - `bilateral.module.ts` with imports for the new entities, ResultsModule, ClarisaModule, ResultReviewHistoryModule, SocketModule.
-  - `bilateral.controller.ts` — empty Controller shell with `@ApiTags('Bilateral')` + `@ApiBearerAuth()` + `@UseGuards(RolesGuard)`.
-  - `bilateral.service.ts` — empty class with the public method signatures from §7.2.
+  - `bilateral.controller.ts` — empty Controller shell with `@ApiTags('Bilateral')` + `@ApiBearerAuth()` + `@UseGuards(RolesGuard)`. **Will extract `User` from `@Req() req` and pass to `BilateralService` as a method parameter** (Constraint A).
+  - `bilateral.service.ts` — `@Injectable()` (default singleton scope, **NOT REQUEST scope**). Method signatures from §7.2 accept `User` (or `sec_user_id`) as a parameter. **MUST NOT inject `CurrentUserUtil`** (Constraint A).
   - `handlers/bilateral-indicator-type-handler.interface.ts` — the interface from §7.3.
-  - `handlers/noop.handler.ts` — for types 4 / 8.
+  - `handlers/noop.handler.ts` — for types 4 / 8. Singleton scope, no `CurrentUserUtil` injection.
   - Wire into `app.module.ts` + `domain/routes/main.routes.ts`.
 - **Tests:** Controller + service spec stubs (will be fleshed out by later tasks).
 - **Done criteria:**
   - [ ] Files compile.
   - [ ] Swagger UI loads with a `Bilateral` tag and empty endpoints list.
   - [ ] `npm test` green.
+  - [ ] **`BilateralService.constructor` does NOT include `CurrentUserUtil`** (grep check).
+  - [ ] **No `@Injectable({ scope: Scope.REQUEST })` decorator on any bilateral provider** (grep check).
+  - [ ] **Verification gate passes** (`/api/v2/results` returns 200 after this task is merged).
 - **Skills:** `nestjs-expert`, `api-design-principles`.
+
+> ⚠ **The previous bilateral implementation (reverted on 2026-05-22) violated Constraint A** by having `BilateralService` inject `CurrentUserUtil`. That single line forced `BilateralService` into REQUEST scope, which tipped the `ResultsService ↔ ResultOicrService` cycle past its breaking point and produced empty-shell `ResultsService` instances. Do not repeat.
 
 ### T-06 — Config: feature flags
 

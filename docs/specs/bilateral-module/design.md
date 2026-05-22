@@ -111,6 +111,57 @@ This design closes most of the open decisions from `./requirements.md` §10 with
 - New searchable columns get `@OpenSearchProperty`.
 - Sibling `*.spec.ts` per controller / service / guard / interceptor.
 
+### 3.4 DI scope constraints (lessons from first implementation attempt)
+
+> **Why this section exists.** The first implementation attempt of this module (branch `AC-1594-bilateral-module`, merged to dev on 2026-05-22) introduced a latent bug that broke `GET /api/v2/results` with `TypeError: Cannot read properties of undefined (reading 'user_id')` (and the same shape for every other `ResultsService` method). Diagnostic instrumentation proved that `ResultsService` was being handed to request handlers as an **empty shell** — correct class & prototype but `Object.keys(this).length === 0`. This entire section codifies how to avoid reproducing that bug.
+>
+> The bug was bisected to the bilateral merge alone (dev at `4a9fedd9` worked; same dev + bilateral broke `/api/v2/results`).
+
+**Root cause (codebase pre-existing condition, not bilateral's fault):**
+
+`ResultsService` and `ResultOicrService` have a `forwardRef` circular dependency. Both are auto-promoted to `Scope.REQUEST` because they inject `CurrentUserUtil` (which is `Scope.REQUEST`). NestJS resolves this cycle per request by:
+
+1. Creating an empty proxy of one side (correct class, no constructor run yet),
+2. Constructing the other side with the proxy,
+3. Coming back to fill in the proxy's constructor properties.
+
+Step 3 is a race. Under sufficient REQUEST-scoped consumers in the graph, the empty proxy can be handed to a request handler before step 3 completes. That's the empty shell.
+
+**Constraint A — `BilateralService` MUST be singleton (default scope)**
+
+- MUST NOT inject `CurrentUserUtil`.
+- MUST receive user info (typically `sec_user_id`, sometimes a `User` object) as **method parameters** from `BilateralController`.
+- `BilateralController` extracts user from the request (`@Req() req`) and passes it through.
+
+**Constraint B — `BilateralService` MUST NOT inject any other REQUEST-scoped provider**
+
+- This includes `ResultRepository` if it is REQUEST-scoped at the time of integration. Before adding bilateral, verify `ResultRepository`'s injections — if it still has the dead `CurrentUserUtil` injection (see Constraint D), that must be removed first.
+- The bilateral repositories (`ResultPoolFundingAlignmentRepository`, etc.) are themselves singletons by design — they inject only `DataSource`.
+
+**Constraint C — `BilateralModule` MUST keep its DI footprint minimal**
+
+- Import only modules whose exported providers are singletons.
+- Specifically: **do not import `ResultsModule` if it would bring in REQUEST-scoped consumers**. If `BilateralService` needs `ResultRepository`, get it as a singleton (Constraint D first) and import only what's needed.
+
+**Constraint D — `ResultRepository` cleanup is a pre-requisite for this module**
+
+`ResultRepository` injects `CurrentUserUtil` but never reads it (`this.currentUserUtil` is dead code, added 2025-03-18 and never used). Removing it returns `ResultRepository` to singleton scope and eliminates one cascade source. **This cleanup is task 0 of the implementation plan** — must land before any bilateral code that consumes `ResultRepository`.
+
+**Verification gate (mandatory after each implementation step)**
+
+After every commit that touches DI (new service, new module import, new injection), run against the deployed environment:
+
+```
+GET /api/v2/results?page=1&limit=10&sort-order=DESC&sort-field=code&only-own-results=false
+Expected: 200 with `data: [...]`
+If 500 with `Cannot read properties of undefined (reading 'user_id')` or `400 BadRequestException` with diagnostic dump:
+  STOP. Do not merge further. Bisect the most recent commit.
+```
+
+**Long-term cleanup (out of scope for this module, but documented for the team)**
+
+The fragile cycle should ultimately be removed by refactoring `CurrentUserUtil` to use `AsyncLocalStorage` instead of `Scope.REQUEST`. That removes REQUEST-scope cascade at the root and makes `ResultsService` / `ResultOicrService` / their consumers all singletons. The cycle would then resolve once at startup, not per request. Tracked separately as a tech-debt item.
+
 ---
 
 ## 4. Extended directory structure
