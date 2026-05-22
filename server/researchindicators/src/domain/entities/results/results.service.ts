@@ -185,14 +185,14 @@ export class ResultsService {
     },
   ) {
     const filtersData = {
-      status: filters.status,
-      contracts: filters.contracts,
-      years: filters.years,
-      sources: filters.sources,
-      indicators: filters.indicators,
+      status: filters?.status ?? [],
+      contracts: filters?.contracts ?? [],
+      years: filters?.years ?? [],
+      sources: filters?.sources ?? [],
+      indicators: filters?.indicators ?? [],
       currentUser: {
-        onlyOwnResults: filters.onlyOwnResults,
-        userId: this.currentUser.user_id,
+        onlyOwnResults: filters?.onlyOwnResults ?? false,
+        userId: this.currentUser?.user_id,
       },
     };
     return this.mainRepo.findResultsV2(
