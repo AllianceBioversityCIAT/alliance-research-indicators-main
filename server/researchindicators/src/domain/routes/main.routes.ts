@@ -66,8 +66,10 @@ import { ResultStatusTransitionsModule } from '../entities/result-status-transit
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
-import { BilateralModule } from '../entities/bilateral/bilateral.module';
-import { RESULT_CODE } from '../shared/utils/results.util';
+// BISECT: imports removed alongside the disabled bilateral child route below.
+// Restore both `BilateralModule` and `RESULT_CODE` when re-enabling.
+// import { BilateralModule } from '../entities/bilateral/bilateral.module';
+// import { RESULT_CODE } from '../shared/utils/results.util';
 
 const capSharingChildren: Routes = [
   {
