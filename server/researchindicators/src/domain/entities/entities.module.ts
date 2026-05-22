@@ -184,14 +184,17 @@ import { ResultReviewHistoryModule } from './result-review-history/result-review
     LeverSdgTargetsModule,
     ResultLeverSdgTargetsModule,
     ReportsModule,
-    BilateralModule,
+    // BISECT: BilateralModule disabled to test if its import of ResultsModule
+    // is the trigger for ResultsService DI failure. Restore after diagnosis.
+    // BilateralModule,
     ResultReviewHistoryModule,
   ],
   exports: [
     AgressoContractModule,
     AppSecretsModule,
     ReportsModule,
-    BilateralModule,
+    // BISECT: see imports comment above
+    // BilateralModule,
     ResultReviewHistoryModule,
   ],
 })

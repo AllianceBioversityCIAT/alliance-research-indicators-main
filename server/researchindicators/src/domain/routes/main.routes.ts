@@ -74,10 +74,13 @@ const capSharingChildren: Routes = [
 ];
 
 const ResultsChildren: Routes = [
-  {
-    path: `${RESULT_CODE}/pool-funding-alignment`,
-    module: BilateralModule,
-  },
+  // BISECT: temporarily disabled to test if BilateralModule's nested route
+  // registration is the trigger for ResultsService DI failure on /api/v2/results.
+  // Restore after diagnosis.
+  // {
+  //   path: `${RESULT_CODE}/pool-funding-alignment`,
+  //   module: BilateralModule,
+  // },
   {
     path: 'intellectual-property',
     module: ResultIpRightsModule,
