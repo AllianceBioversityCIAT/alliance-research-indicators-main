@@ -162,6 +162,33 @@ If 500 with `Cannot read properties of undefined (reading 'user_id')` or `400 Ba
 
 The fragile cycle should ultimately be removed by refactoring `CurrentUserUtil` to use `AsyncLocalStorage` instead of `Scope.REQUEST`. That removes REQUEST-scope cascade at the root and makes `ResultsService` / `ResultOicrService` / their consumers all singletons. The cycle would then resolve once at startup, not per request. Tracked separately as a tech-debt item.
 
+### 3.5 Local-only auth bypass (developer convenience)
+
+A developer-only env flag was added on `AC-1594-bilateral-module-v2` to streamline local testing of the verification gate (§3.4): `ARI_LOCAL_AUTH_BYPASS`.
+
+**Behavior:**
+- When `ARI_LOCAL_AUTH_BYPASS=true` (the literal string) AND `ARI_IS_PRODUCTION` is not `true`, `JwtMiddleware` skips token validation and injects a mock SYSTEM_ADMIN user (`sec_user_id: 1`).
+- Default is OFF. Without the env var, behavior is unchanged.
+- Every request that uses the bypass logs `[LOCAL_AUTH_BYPASS] Skipping JWT validation for ${method} ${url} — DEV ONLY` via the standard Nest `Logger`. If this line appears in any deployed environment's logs, treat it as a security incident.
+
+**Where it's safe:**
+- Local development only.
+- Eliminates the "Unknown token error" 401 when a dev/prod-issued token doesn't validate against the developer's local backend (different ROAR signing key or local can't reach the ROAR validation endpoint).
+
+**Where it MUST NOT be enabled:**
+- `dev` environment `.env`
+- `staging` environment `.env`
+- `prod` environment `.env`
+- Any CI/CD pipeline that deploys to a shared environment
+
+**Double-guard:** even if someone accidentally sets `ARI_LOCAL_AUTH_BYPASS=true` in a deployed `.env`, the getter requires `!ENV.IS_PRODUCTION` to honor it. As long as production environments set `ARI_IS_PRODUCTION=true`, prod is protected. Dev and staging are protected only by the absence of the env var — so please don't add it there.
+
+**Implementation:**
+- Env getter: `ENV.LOCAL_AUTH_BYPASS` in `server/researchindicators/src/domain/shared/utils/env.utils.ts`
+- Bypass check: top of `JwtMiddleware.use()` in `server/researchindicators/src/domain/shared/middlewares/jwr.middleware.ts`
+
+This is debug/diagnostic infrastructure, not a production feature. If the local test loop tightens up enough that it's no longer needed, feel free to remove the flag in a future cleanup commit.
+
 ---
 
 ## 4. Extended directory structure
