@@ -1,8 +1,7 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import { ResultsController } from './results.controller';
 import { ResultRepository } from './repositories/result.repository';
-import { ResultOicrModule } from '../result-oicr/result-oicr.module';
 import { ResultKeywordsModule } from '../result-keywords/result-keywords.module';
 import { ResultLeversModule } from '../result-levers/result-levers.module';
 import { ResultContractsModule } from '../result-contracts/result-contracts.module';
@@ -69,7 +68,6 @@ import { GreenChecksModule } from '../green-checks/green-checks.module';
     ResultInnovationDevModule,
     ResultSdgsModule,
     ResultIpRightsModule,
-    forwardRef(() => ResultOicrModule),
     ClarisaCountriesModule,
     ResultInstitutionsModule,
     ResultEvidencesModule,
