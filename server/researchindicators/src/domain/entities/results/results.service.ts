@@ -5,9 +5,8 @@ import {
   Injectable,
   NotFoundException,
   Inject,
+  forwardRef,
 } from '@nestjs/common';
-import { ContextIdFactory, ModuleRef, REQUEST } from '@nestjs/core';
-import { Request } from 'express';
 import { DataSource, EntityManager, FindOneOptions, In, Not } from 'typeorm';
 import {
   ResultFiltersInterface,
@@ -132,8 +131,8 @@ export class ResultsService {
     private readonly _agressoContractService: AgressoContractService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
     private readonly _resultSdgsService: ResultSdgsService,
-    private readonly moduleRef: ModuleRef,
-    @Inject(REQUEST) private readonly request: Request,
+    @Inject(forwardRef(() => ResultOicrService))
+    private readonly _resultOicrService: ResultOicrService,
     private readonly _clarisaCountriesService: ClarisaCountriesService,
     private readonly _resultInstitutionsService: ResultInstitutionsService,
     private readonly _resultEvidencesService: ResultEvidencesService,
@@ -144,7 +143,7 @@ export class ResultsService {
     private readonly _resultsUtil: ResultsUtil,
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -204,7 +203,7 @@ export class ResultsService {
             hasDataSource: this.dataSource != null,
             hasCurrentUser: (this as any).currentUser != null,
             hasResultsUtil: (this as any)._resultsUtil != null,
-            hasModuleRef: (this as any).moduleRef != null,
+            hasResultOicrService: (this as any)._resultOicrService != null,
           },
         },
         error: 'DI-Diagnostic',
@@ -528,19 +527,9 @@ export class ResultsService {
       case IndicatorsEnum.INNOVATION_DEV:
         await this._resultInnovationDevService.create(resultId, manager);
         break;
-      case IndicatorsEnum.OICR: {
-        // Lazy resolve to break the ResultsService ↔ ResultOicrService
-        // forwardRef circular dependency that produced empty-shell
-        // ResultsService instances per request under REQUEST scope.
-        const contextId = ContextIdFactory.getByRequest(this.request);
-        const oicrService = await this.moduleRef.resolve(
-          ResultOicrService,
-          contextId,
-          { strict: false },
-        );
-        await oicrService.create(resultId, manager);
+      case IndicatorsEnum.OICR:
+        await this._resultOicrService.create(resultId, manager);
         break;
-      }
       case IndicatorsEnum.KNOWLEDGE_PRODUCT:
         await this._resultKnowledgeProductService.create(resultId, manager);
         break;
@@ -754,21 +743,21 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -1379,8 +1368,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },

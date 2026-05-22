@@ -66,8 +66,10 @@ import { ResultStatusTransitionsModule } from '../entities/result-status-transit
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
-import { BilateralModule } from '../entities/bilateral/bilateral.module';
-import { RESULT_CODE } from '../shared/utils/results.util';
+// BISECT: imports removed alongside the disabled bilateral child route below.
+// Restore both `BilateralModule` and `RESULT_CODE` when re-enabling.
+// import { BilateralModule } from '../entities/bilateral/bilateral.module';
+// import { RESULT_CODE } from '../shared/utils/results.util';
 
 const capSharingChildren: Routes = [
   {
@@ -77,10 +79,13 @@ const capSharingChildren: Routes = [
 ];
 
 const ResultsChildren: Routes = [
-  {
-    path: `${RESULT_CODE}/pool-funding-alignment`,
-    module: BilateralModule,
-  },
+  // BISECT: temporarily disabled to test if BilateralModule's nested route
+  // registration is the trigger for ResultsService DI failure on /api/v2/results.
+  // Restore after diagnosis.
+  // {
+  //   path: `${RESULT_CODE}/pool-funding-alignment`,
+  //   module: BilateralModule,
+  // },
   {
     path: 'intellectual-property',
     module: ResultIpRightsModule,

@@ -5,7 +5,6 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
-import { ModuleRef, REQUEST } from '@nestjs/core';
 import { DataSource, EntityManager, In, Not } from 'typeorm';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
@@ -339,17 +338,8 @@ describe('ResultsService', () => {
           useValue: mockResultSdgsService,
         },
         {
-          provide: ModuleRef,
-          useValue: {
-            resolve: jest.fn(async (token: unknown) => {
-              if (token === ResultOicrService) return mockResultOicrService;
-              return undefined;
-            }),
-          },
-        },
-        {
-          provide: REQUEST,
-          useValue: {},
+          provide: ResultOicrService,
+          useValue: mockResultOicrService,
         },
         {
           provide: ClarisaCountriesService,
