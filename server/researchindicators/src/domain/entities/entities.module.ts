@@ -94,9 +94,7 @@ import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module
 import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.module';
 import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { ReportsModule } from './reports/reports.module';
-// BISECT: import removed alongside the disabled BilateralModule registration below.
-// Restore when re-enabling.
-// import { BilateralModule } from './bilateral/bilateral.module';
+import { BilateralModule } from './bilateral/bilateral.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 
 @Module({
@@ -196,17 +194,14 @@ import { ResultReviewHistoryModule } from './result-review-history/result-review
     LeverSdgTargetsModule,
     ResultLeverSdgTargetsModule,
     ReportsModule,
-    // BISECT: BilateralModule disabled to test if its import of ResultsModule
-    // is the trigger for ResultsService DI failure. Restore after diagnosis.
-    // BilateralModule,
+    BilateralModule,
     ResultReviewHistoryModule,
   ],
   exports: [
     AgressoContractModule,
     AppSecretsModule,
     ReportsModule,
-    // BISECT: see imports comment above
-    // BilateralModule,
+    BilateralModule,
     ResultReviewHistoryModule,
   ],
 })

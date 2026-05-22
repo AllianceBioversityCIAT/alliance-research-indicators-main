@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import { ResultsController } from './results.controller';
 import { ResultRepository } from './repositories/result.repository';
@@ -30,7 +30,6 @@ import { AgressoContractModule } from '../agresso-contract/agresso-contract.modu
 import { ResultInnovationDevModule } from '../result-innovation-dev/result-innovation-dev.module';
 import { ResultSdgsModule } from '../result-sdgs/result-sdgs.module';
 import { ResultIpRightsModule } from '../result-ip-rights/result-ip-rights.module';
-import { ResultOicrModule } from '../result-oicr/result-oicr.module';
 import { ClarisaCountriesModule } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.module';
 import { ResultInstitutionsModule } from '../result-institutions/result-institutions.module';
 import { ResultEvidencesModule } from '../result-evidences/result-evidences.module';
@@ -69,7 +68,6 @@ import { GreenChecksModule } from '../green-checks/green-checks.module';
     ResultInnovationDevModule,
     ResultSdgsModule,
     ResultIpRightsModule,
-    forwardRef(() => ResultOicrModule),
     ClarisaCountriesModule,
     ResultInstitutionsModule,
     ResultEvidencesModule,
