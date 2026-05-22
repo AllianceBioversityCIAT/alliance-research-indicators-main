@@ -89,7 +89,9 @@ import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module
 import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.module';
 import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { ReportsModule } from './reports/reports.module';
-import { BilateralModule } from './bilateral/bilateral.module';
+// BISECT: import removed alongside the disabled BilateralModule registration below.
+// Restore when re-enabling.
+// import { BilateralModule } from './bilateral/bilateral.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 
 @Module({
