@@ -7,7 +7,6 @@ import { ResultOpensearchDto } from '../../../tools/open-search/results/dto/resu
 import { formatArrayToQuery } from '../../../shared/utils/queries.util';
 import { isEmpty } from '../../../shared/utils/object.utils';
 import { AppConfig } from '../../../shared/utils/app-config.util';
-import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
@@ -24,7 +23,6 @@ export class ResultRepository
 {
   constructor(
     private readonly appConfig: AppConfig,
-    private readonly currentUserUtil: CurrentUserUtil,
     private readonly dataSource: DataSource,
   ) {
     super(Result, dataSource.createEntityManager());

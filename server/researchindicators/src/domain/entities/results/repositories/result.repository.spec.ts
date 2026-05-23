@@ -1,7 +1,6 @@
 import { DataSource } from 'typeorm';
 import { ResultRepository, ResultFiltersInterface } from './result.repository';
 import { AppConfig } from '../../../shared/utils/app-config.util';
-import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { FindAllOptions } from '../../../shared/enum/find-all-options';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
@@ -14,8 +13,6 @@ describe('ResultRepository', () => {
     ARI_MYSQL_NAME: 'test_schema',
   } as AppConfig;
 
-  const currentUserUtil = {} as CurrentUserUtil;
-
   const createDataSource = () =>
     ({
       createEntityManager: jest.fn().mockReturnValue({}),
@@ -26,7 +23,7 @@ describe('ResultRepository', () => {
 
   beforeEach(() => {
     dataSource = createDataSource();
-    repository = new ResultRepository(appConfig, currentUserUtil, dataSource);
+    repository = new ResultRepository(appConfig, dataSource);
     querySpy = jest.spyOn(repository, 'query').mockResolvedValue([] as any);
   });
 
