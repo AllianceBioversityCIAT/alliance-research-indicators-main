@@ -131,9 +131,12 @@ export class AgressoContractService {
       contract.pooled_funding_contracts?.some((item) => item.is_active) ??
       false;
 
-    return (
-      contract.funding_type?.toUpperCase() === 'BILATERAL' &&
-      !hasActivePooledFundingContract
-    );
+    // AGRESSO funding_type uses short codes: 'BLR' = Bilateral, 'POL' = Pooled, etc.
+    // We accept either the short code or the long form for forward-compat.
+    const fundingType = contract.funding_type?.toUpperCase();
+    const isBilateralFunding =
+      fundingType === 'BLR' || fundingType === 'BILATERAL';
+
+    return isBilateralFunding && !hasActivePooledFundingContract;
   }
 }
