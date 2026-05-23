@@ -4,7 +4,7 @@
 > **Purpose:** single landing page for endpoints, auth, events, flags, and payload shapes. Every section links back to the canonical SDD source so this doc never silently drifts.
 > **Companion docs (canonical, this file links to them):** [`./requirements.md`](./requirements.md) · [`./design.md`](./design.md) · [`./tasks.md`](./tasks.md) · [`./test-report.md`](./test-report.md) · [`./jira-us/`](./jira-us/).
 > **STAR-side tasks tracking this handoff:** `T-13` (US1 project tag visibility), `T-14` (US2 alignment section), `T-19` (US3/US4 indicator panel + contribution forms) — see [`./tasks.md` §6, §7](./tasks.md).
-> **Branch this is built against:** `AC-1594-bilateral-module` (merged with `staging` as of 2026-05-19).
+> **Branch this is built against:** `AC-1594-bilateral-module-v2` (rebased on `staging`; SP catalog wave landed 2026-05-23, commit `5d48b27b`).
 
 ---
 
@@ -91,6 +91,8 @@ Body for the PATCH:
 | --- | --- | --- |
 | `GET` | `/api/v1/results/:resultCode/pool-funding-alignment` | ROAR JWT |
 
+> **Path gotcha:** `:resultCode` is matched by `(\d+)` — pass the numeric `result_official_code` (e.g. `19792`), **not** the `STAR-19792` display prefix. A `STAR-…` value 404s.
+
 Response `data` (`AlignmentResponse` — `dto/update-pool-funding-alignment.dto.ts`):
 
 ```ts
@@ -99,7 +101,13 @@ Response `data` (`AlignmentResponse` — `dto/update-pool-funding-alignment.dto.
   eligible: boolean;                            // === has_pool_funding_alignment_eligible
   has_pool_funding_alignment_eligible: boolean; // alias — read either
   has_contribution: boolean | null;             // null = never set
-  selected_levers: { lever_code: string; lever_name: string }[];
+  selected_science_programs: {                  // NEW (2026-05-23) — render this in the picker
+    code: string;                               // e.g. "SP01"
+    name: string;                               // e.g. "Breeding for Tomorrow"
+    category: string | null;                    // "Science programs" | "Scaling programs" | "Accelerators"
+    color: string | null;                       // hex, e.g. "#ef4444" (matches the mockup chip colors)
+  }[];
+  selected_levers: { lever_code: string; lever_name: string }[]; // DEPRECATED — kept for back-compat; safe to ignore once you've migrated to selected_science_programs
   is_synced_to_prms: boolean;
   is_read_only: boolean;
 }
@@ -109,6 +117,7 @@ UX rules:
 - `eligible === false` → **do not render** the Pool Funding Alignment section at all.
 - `is_read_only === true` → render the section but disable every input + show a "synced — read only" badge.
 - `has_contribution === false` → hide the SP picker.
+- Render the SP chips from `selected_science_programs[]` using `name` + `color`. Group by `category` if you want to match the mockup's three sub-headers ("Science programs", "Scaling programs", "Accelerators").
 
 ### 4.3 PATCH alignment
 
@@ -121,13 +130,17 @@ Body (`UpdatePoolFundingAlignmentDto`):
 ```ts
 {
   has_contribution: boolean;          // required
-  lever_codes?: string[];             // required when has_contribution=true; >=1 non-blank entry
+  sp_codes?: string[];                // NEW (preferred) — required when has_contribution=true; >=1 non-blank SP code (e.g. ["SP01","SP06"])
+  lever_codes?: string[];             // DEPRECATED — fallback only when sp_codes is absent; do not send for new builds
   justification?: string;             // optional, goes into result_review_history
 }
 ```
 
+Precedence: if both `sp_codes` and `lever_codes` are sent, the server uses `sp_codes` and ignores `lever_codes`. A stale FE that still sends `lever_codes` keeps working unchanged.
+
 - Editing succeeds **regardless of `result_status`** (AR.1). No need to check status before showing the edit button.
 - Returns `409` if `is_synced_to_prms = true` (AR.2).
+- Returns `400` if `has_contribution=true` and neither `sp_codes` nor `lever_codes` carries at least one non-blank entry.
 - Emits Socket.IO event — see [§6](#6-real-time-events-socketio).
 
 ### 4.4 GET indicators panel
@@ -183,9 +196,31 @@ Response `data` is `MappingResponse`:
 }
 ```
 
----
+### 4.6 Science Programs catalog (NEW — 2026-05-23)
 
-## 5. Business / UX rules the FE must honour
+Read-only catalog the FE uses to populate the SP picker grid. Seeded from CLARISA's CGIAR-entities portfolio (`Science programs` / `Scaling programs` / `Accelerators`) plus PRMS Reporting color codes.
+
+| Verb | Path | Auth |
+| --- | --- | --- |
+| `GET` | `/api/tools/clarisa/science-programs` | ROAR JWT |
+| `GET` | `/api/tools/clarisa/science-programs/:code` | ROAR JWT |
+
+Response `data` (list endpoint):
+
+```ts
+{
+  official_code: string;     // PK — "SP01" .. "SP13"
+  name: string;              // "Breeding for Tomorrow"
+  category: string | null;   // "Science programs" | "Scaling programs" | "Accelerators"
+  color: string | null;      // hex for chip background / left-border accent
+  is_active: boolean;        // always true today; filter on this for forward-compat
+}[]
+```
+
+UX rules:
+- Use this as the **picker source** when the user is choosing which SPs to tag on PATCH alignment.
+- The 13 entries are currently static (DB-seeded). A periodic sync from CLARISA cgiar-entities is planned but not yet wired — treat the catalog as cacheable for the session.
+- Order returned by `official_code ASC`. Sort/group on the client if the mockup requires category-first ordering.
 
 > Canonical: [`./requirements.md` §6.2–§6.4](./requirements.md), [`./design.md` §10](./design.md).
 
@@ -305,14 +340,15 @@ Each environment (staging, production, launch Centers) flips these independently
 | Capability | Status (server) | Status (handoff) |
 | --- | --- | --- |
 | AGRESSO tag (`R-BIL-001..003`) | LIVE | Build the column, badge, filter chip, Excel column. |
-| Alignment GET + PATCH (`R-BIL-010..016`) | LIVE | Build the section + form per §4.2–§4.3. |
+| Alignment GET + PATCH (`R-BIL-010..016`) | LIVE — alignment shape now SP-aware (`selected_science_programs` + `sp_codes`) | Build the section + form per §4.2–§4.3. |
+| SP catalog (`GET /api/tools/clarisa/science-programs`) | LIVE — seeded with 13 SPs (SP01–SP13) + category + color | Use as the picker source per §4.6. |
 | Indicators panel (`R-BIL-020..022`) | LIVE (returns groups with **empty arrays** until SP ToC sync lands) | Build the panel skeleton + empty state. Real indicator rows appear when T-31 completes. |
 | Indicator mapping POST/PATCH/DELETE (`R-BIL-030..035`) | LIVE | Build the per-type contribution forms per §7. |
 | Socket event `result.pool-funding-alignment.changed` | LIVE | Subscribe and reconcile. |
 | Push to PRMS + admin retry (`R-BIL-040..045`) | **PENDING** — T-25 paused, T-26..T-28 not started, blocked by T-21/T-23. | Do not build push-status UI yet. |
 | Push success/failure socket events | **PENDING** — T-26. | Do not build the toast/notification surface yet. |
 | W3 Registry sync (`R-BIL-050..053`) | **PENDING** — T-22/T-29/T-30 blocked. | No UI work needed. |
-| SP ToC sync (`R-BIL-060..063`) | **PENDING** — T-31/T-32. | No UI work needed. |
+| SP ToC sync (`R-BIL-060..063`) | **PENDING** — T-31/T-32. Catalog itself is seeded (above); indicators-per-SP sync is still TBD. | No UI work needed for the indicator stream yet. |
 
 When you need ground truth on "is X live yet?", check [`./tasks.md` §5–§9](./tasks.md) — task statuses there are authoritative.
 
@@ -322,7 +358,7 @@ When you need ground truth on "is X live yet?", check [`./tasks.md` §5–§9](.
 
 - ARI server: `cd server/researchindicators && npm run dev` (HTTP + admin SSR + microservice).
 - Swagger UI: `http://localhost:<port>/swagger` — every endpoint above has `@ApiTags('Bilateral')` or `@ApiTags('Agresso Contracts')`. Use this as the live contract source when in doubt.
-- Local DB: TypeORM + MySQL. Run `npm run migration:dev:execute` after pulling to apply new migrations (the 9 bilateral migrations under `db/migrations/1779190000001..009`).
+- Local DB: TypeORM + MySQL. Run `npm run migration:dev:execute` after pulling to apply new migrations (the 10 bilateral / catalog migrations under `db/migrations/1779190000001..010`, the last one seeds the SP catalog).
 - Toggle flags via `server/researchindicators/.env` (template: `.env.example`).
 - Live test fixtures for every endpoint live in [`../../../server/researchindicators/test/bilateral.e2e-spec.ts`](../../../server/researchindicators/test/bilateral.e2e-spec.ts) and [`../../../server/researchindicators/test/agresso-contract.e2e-spec.ts`](../../../server/researchindicators/test/agresso-contract.e2e-spec.ts) — the request shapes there are the canonical example payloads.
 
@@ -343,5 +379,6 @@ When you need ground truth on "is X live yet?", check [`./tasks.md` §5–§9](.
 | Date | Change | Author |
 | --- | --- | --- |
 | 2026-05-19 | Initial handoff after Phase 0–2 backend + T-24 push skeleton landed (commit `e838e2f8`) and `staging` was merged in (`9ffaad71`). | ARI backend team |
+| 2026-05-23 | **SP catalog wave (commit `5d48b27b`).** Three FE-visible deltas: (1) new endpoint `GET /api/tools/clarisa/science-programs` returns 13 SPs with name/category/color (§4.6); (2) alignment GET response now ships `selected_science_programs[]` enriched with name/category/color — keep using this instead of `selected_levers[]`, which is now deprecated back-compat (§4.2); (3) alignment PATCH accepts `sp_codes` (preferred) alongside deprecated `lever_codes` (§4.3). Also documented the numeric `:resultCode` gotcha — pass `19792`, not `STAR-19792`. | ARI backend team |
 
 When this drifts from the canonical sources, the canonical sources win. Open a PR against this file alongside the backend change so the handoff stays current.
