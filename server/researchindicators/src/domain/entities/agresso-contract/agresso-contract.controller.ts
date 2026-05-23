@@ -1,9 +1,23 @@
-import { Controller, Get, Query, HttpStatus, Param } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+  Version,
+} from '@nestjs/common';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -16,6 +30,11 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
 import { isEmpty } from '../../shared/utils/object.utils';
+import { PoolFundingTagDto } from './dto/pool-funding-tag.dto';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { RolesGuard } from '../../shared/guards/roles.guard';
+import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -52,6 +71,12 @@ export class AgressoContractController {
     required: false,
     description: 'Show countries',
   })
+  @ApiQuery({
+    name: 'pool-funding-contributor',
+    required: false,
+    type: Boolean,
+    description: 'Filter by pool funding contributor tag',
+  })
   @ApiOperation({ summary: 'Find all contracts', deprecated: true })
   find(
     @Query('project') project: string,
@@ -60,6 +85,7 @@ export class AgressoContractController {
     @Query('page') page: string,
     @Query('limit') limit: string,
     @Query('show_countries') showCountries: string,
+    @Query('pool-funding-contributor') poolFundingContributor: TrueFalseEnum,
   ) {
     return this.agressoContractService
       .findContracts(
@@ -67,6 +93,9 @@ export class AgressoContractController {
           agreement_id: project,
           funding_type: fundingType,
           contract_status: contractStatus,
+          is_pool_funding_contributor: this.parseOptionalBoolean(
+            poolFundingContributor,
+          ),
         },
         {
           limit: +limit,
@@ -223,6 +252,12 @@ export class AgressoContractController {
     description: 'Exclude pooled funding contracts from results',
     enum: TrueFalseEnum,
   })
+  @ApiQuery({
+    name: 'pool-funding-contributor',
+    required: false,
+    type: Boolean,
+    description: 'Filter by pool funding contributor tag',
+  })
   async findContracts(
     @Query('current-user') currentUser: TrueFalseEnum,
     @Query('contract-code') contractCode: string,
@@ -240,6 +275,7 @@ export class AgressoContractController {
     @Query('exclude-pooled-funding') excludePooledFunding: TrueFalseEnum,
     @Query('with-indicators')
     withIndicators: TrueFalseEnum = TrueFalseEnum.TRUE,
+    @Query('pool-funding-contributor') poolFundingContributor: TrueFalseEnum,
   ) {
     if (isEmpty(withIndicators)) withIndicators = TrueFalseEnum.TRUE; //TODO: Remove this once a pipe is implemented in the query parameter
     return this.agressoContractService
@@ -255,6 +291,9 @@ export class AgressoContractController {
           end_date: endDate,
           status: status.map((s) => AgressoContractStatus[s?.toUpperCase()]),
           exclude_pooled_funding: excludePooledFunding == TrueFalseEnum.TRUE,
+          is_pool_funding_contributor: this.parseOptionalBoolean(
+            poolFundingContributor,
+          ),
         },
         orderField,
         direction,
@@ -264,6 +303,46 @@ export class AgressoContractController {
       .then((response) =>
         ResponseUtils.format({
           description: 'Contracts found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  private parseOptionalBoolean(value?: TrueFalseEnum): boolean | undefined {
+    return isEmpty(value) ? undefined : new QueryParseBool().transform(value);
+  }
+
+  @Patch(':code/pool-funding-tag')
+  @Version('1')
+  @ApiOperation({ summary: 'Update the pool funding contributor tag' })
+  @ApiParam({
+    name: 'code',
+    type: String,
+    description: 'AGRESSO contract code',
+  })
+  @ApiBody({
+    type: PoolFundingTagDto,
+    description: 'Pool funding contributor tag payload',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UseGuards(RolesGuard)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async updatePoolFundingTag(
+    @Param('code') contractCode: string,
+    @Body() payload: PoolFundingTagDto,
+  ) {
+    return this.agressoContractService
+      .setPoolFundingTag(contractCode, payload.is_pool_funding_contributor)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Pool funding contributor tag updated',
           status: HttpStatus.OK,
           data: response,
         }),

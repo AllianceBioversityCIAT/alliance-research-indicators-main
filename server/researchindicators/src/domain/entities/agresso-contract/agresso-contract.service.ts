@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { AgressoContractWhere } from './dto/agresso-contract.dto';
@@ -9,6 +13,8 @@ import { AgressoContractRepository } from './repositories/agresso-contract.repos
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
+import { User } from '../../complementary-entities/secondary/user/user.entity';
+import { OpenSearchAgressoContractApi } from '../../tools/open-search/agresso-contract/agresso-contract.opensearch.api';
 
 @Injectable()
 export class AgressoContractService {
@@ -16,6 +22,7 @@ export class AgressoContractService {
     private readonly dataSource: DataSource,
     private readonly _agressoContractRepository: AgressoContractRepository,
     private readonly currentUser: CurrentUserUtil,
+    private readonly _openSearchAgressoContractApi: OpenSearchAgressoContractApi,
   ) {}
 
   async findContracts(
@@ -73,6 +80,46 @@ export class AgressoContractService {
       direction,
       pagination,
       query,
+    );
+  }
+
+  async setPoolFundingTag(
+    contractCode: string,
+    value: boolean,
+    user?: Pick<User, 'sec_user_id'>,
+  ): Promise<AgressoContract> {
+    const contract = await this._agressoContractRepository.findOne({
+      where: { agreement_id: contractCode },
+      relations: { pooled_funding_contracts: true },
+    });
+
+    if (!contract) {
+      throw new NotFoundException('Contract not found');
+    }
+
+    if (!this.isBilateralTagTarget(contract)) {
+      throw new BadRequestException(
+        'Only bilateral non-pooled funding contracts can be tagged as pool funding contributors',
+      );
+    }
+
+    contract.is_pool_funding_contributor = value;
+    contract.updated_by = user?.sec_user_id ?? this.currentUser.user_id;
+
+    const savedContract = await this._agressoContractRepository.save(contract);
+    this._openSearchAgressoContractApi.uploadSingleToOpenSearch(savedContract);
+
+    return savedContract;
+  }
+
+  private isBilateralTagTarget(contract: AgressoContract): boolean {
+    const hasActivePooledFundingContract =
+      contract.pooled_funding_contracts?.some((item) => item.is_active) ??
+      false;
+
+    return (
+      contract.funding_type?.toUpperCase() === 'BILATERAL' &&
+      !hasActivePooledFundingContract
     );
   }
 }
