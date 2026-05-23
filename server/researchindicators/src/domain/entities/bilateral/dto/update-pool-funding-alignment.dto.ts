@@ -6,12 +6,20 @@ export interface SelectedLeverResponse {
   lever_name: string;
 }
 
+export interface SelectedScienceProgramResponse {
+  code: string;
+  name: string;
+  category: string | null;
+  color: string | null;
+}
+
 export interface AlignmentResponse {
   result_code: string;
   eligible: boolean;
   has_pool_funding_alignment_eligible: boolean;
   has_contribution: boolean | null;
   selected_levers: SelectedLeverResponse[];
+  selected_science_programs: SelectedScienceProgramResponse[];
   is_synced_to_prms: boolean;
   is_read_only: boolean;
 }
@@ -26,7 +34,18 @@ export class UpdatePoolFundingAlignmentDto {
 
   @ApiPropertyOptional({
     type: [String],
-    description: 'Selected SP / Accelerator lever codes',
+    description:
+      'Selected CGIAR Science Program codes (SP01–SP13). Preferred over lever_codes.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  sp_codes?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'DEPRECATED — use sp_codes. Kept for backwards compatibility.',
+    deprecated: true,
   })
   @IsOptional()
   @IsArray()

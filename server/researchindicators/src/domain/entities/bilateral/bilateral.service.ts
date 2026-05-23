@@ -10,8 +10,10 @@ import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { ResultRepository } from '../results/repositories/result.repository';
 import {
   AlignmentResponse,
+  SelectedScienceProgramResponse,
   UpdatePoolFundingAlignmentDto,
 } from './dto/update-pool-funding-alignment.dto';
+import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
 import {
   IndicatorGroupResponse,
   IndicatorPanelIndicatorResponse,
@@ -69,6 +71,7 @@ export class BilateralService {
     private readonly knowledgeProductHandler: KnowledgeProductBilateralIndicatorTypeHandler,
     private readonly noopHandler: NoopBilateralIndicatorTypeHandler,
     private readonly policyChangeHandler: PolicyChangeBilateralIndicatorTypeHandler,
+    private readonly clarisaScienceProgramsService: ClarisaScienceProgramsService,
   ) {}
 
   async getAlignment(
@@ -88,16 +91,40 @@ export class BilateralService {
     const eligible = this.toBoolean(context.is_pool_funding_contributor);
     const isSyncedToPrms = this.toBoolean(context.is_synced_to_prms);
     const visibleAlignment = eligible ? alignment : null;
+    const selectedLevers = visibleAlignment?.selected_levers ?? [];
+    const selectedSciencePrograms = await this.toSelectedSciencePrograms(
+      selectedLevers.map((lever) => lever.lever_code),
+    );
 
     return {
       result_code: String(context.result_official_code ?? resultCode),
       eligible,
       has_pool_funding_alignment_eligible: eligible,
       has_contribution: visibleAlignment?.has_contribution ?? null,
-      selected_levers: visibleAlignment?.selected_levers ?? [],
+      selected_levers: selectedLevers,
+      selected_science_programs: selectedSciencePrograms,
       is_synced_to_prms: isSyncedToPrms,
       is_read_only: isSyncedToPrms,
     };
+  }
+
+  private async toSelectedSciencePrograms(
+    codes: string[],
+  ): Promise<SelectedScienceProgramResponse[]> {
+    if (!codes.length) return [];
+
+    const catalog = await this.clarisaScienceProgramsService.findAll();
+    const byCode = new Map(catalog.map((sp) => [sp.official_code, sp]));
+
+    return codes.map((code) => {
+      const match = byCode.get(code);
+      return {
+        code,
+        name: match?.name ?? code,
+        category: match?.category ?? null,
+        color: match?.color ?? null,
+      };
+    });
   }
 
   async updateAlignment(
@@ -418,21 +445,21 @@ export class BilateralService {
       return [];
     }
 
-    const leverCodes = Array.from(
+    // Prefer sp_codes (new) over lever_codes (legacy back-compat).
+    const sourceCodes = dto.sp_codes?.length ? dto.sp_codes : dto.lever_codes;
+    const codes = Array.from(
       new Set(
-        (dto.lever_codes ?? [])
-          .map((leverCode) => leverCode?.trim())
-          .filter(Boolean),
+        (sourceCodes ?? []).map((code) => code?.trim()).filter(Boolean),
       ),
     );
 
-    if (!leverCodes.length) {
+    if (!codes.length) {
       throw new BadRequestException(
-        'At least one lever code is required when has_contribution is true',
+        'At least one Science Program code (sp_codes) is required when has_contribution is true',
       );
     }
 
-    return leverCodes;
+    return codes;
   }
 
   private toHistoryPayload(
