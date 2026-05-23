@@ -43,6 +43,9 @@ import { ResultQuantification } from '../../result-quantifications/entities/resu
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
 import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
 import { ResultKnowledgeProduct } from '../../result-knowledge-product/entities/result-knowledge-product.entity';
+import { ResultPoolFundingAlignment } from '../../bilateral/entities/result-pool-funding-alignment.entity';
+import { ResultPoolFundingIndicatorMapping } from '../../bilateral/entities/result-pool-funding-indicator-mapping.entity';
+import { ResultReviewHistory } from '../../result-review-history/entities/result-review-history.entity';
 
 @Entity('results')
 @Index('idx_results_snapshot_active_report_year', [
@@ -366,4 +369,16 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultKnowledgeProduct, (rkp) => rkp.result)
   knowledge_products?: ResultKnowledgeProduct[];
+
+  @OneToMany(() => ResultPoolFundingAlignment, (alignment) => alignment.result)
+  pool_funding_alignments?: ResultPoolFundingAlignment[];
+
+  @OneToMany(
+    () => ResultPoolFundingIndicatorMapping,
+    (mapping) => mapping.result,
+  )
+  pool_funding_indicator_mappings?: ResultPoolFundingIndicatorMapping[];
+
+  @OneToMany(() => ResultReviewHistory, (history) => history.result)
+  review_history?: ResultReviewHistory[];
 }
