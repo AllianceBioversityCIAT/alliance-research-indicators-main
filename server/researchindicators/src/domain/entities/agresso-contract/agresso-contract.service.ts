@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { AgressoContractWhere } from './dto/agresso-contract.dto';
@@ -22,7 +23,13 @@ export class AgressoContractService {
     private readonly dataSource: DataSource,
     private readonly _agressoContractRepository: AgressoContractRepository,
     private readonly currentUser: CurrentUserUtil,
-    private readonly _openSearchAgressoContractApi: OpenSearchAgressoContractApi,
+    // OpenSearchAgressoContractApi is REQUEST-scoped (transitive through
+    // AgressoContractRepository -> CurrentUserUtil). Constructor-injecting it
+    // here cascades extra REQUEST-scope depth into ResultsService (which
+    // injects AgressoContractService), tripping the ResultsService ↔
+    // ResultOicrService forwardRef empty-shell cycle. Lazy-resolved at the
+    // single usage site via moduleRef instead. See design.md §3.4.
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   async findContracts(
@@ -107,7 +114,14 @@ export class AgressoContractService {
     contract.updated_by = user?.sec_user_id ?? this.currentUser.user_id;
 
     const savedContract = await this._agressoContractRepository.save(contract);
-    this._openSearchAgressoContractApi.uploadSingleToOpenSearch(savedContract);
+
+    // Lazy-resolve to avoid REQUEST-scope cascade in constructor (see §3.4).
+    const openSearchApi = await this.moduleRef.resolve(
+      OpenSearchAgressoContractApi,
+      undefined,
+      { strict: false },
+    );
+    void openSearchApi.uploadSingleToOpenSearch(savedContract);
 
     return savedContract;
   }
