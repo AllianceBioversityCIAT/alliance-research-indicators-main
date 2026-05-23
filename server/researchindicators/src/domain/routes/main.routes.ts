@@ -63,6 +63,8 @@ import { ResultStatusTransitionsModule } from '../entities/result-status-transit
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
+import { BilateralModule } from '../entities/bilateral/bilateral.module';
+import { RESULT_CODE } from '../shared/utils/results.util';
 
 const capSharingChildren: Routes = [
   {
@@ -72,6 +74,10 @@ const capSharingChildren: Routes = [
 ];
 
 const ResultsChildren: Routes = [
+  {
+    path: `${RESULT_CODE}/pool-funding-alignment`,
+    module: BilateralModule,
+  },
   {
     path: 'intellectual-property',
     module: ResultIpRightsModule,

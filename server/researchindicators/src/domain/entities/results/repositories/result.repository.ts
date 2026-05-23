@@ -16,6 +16,16 @@ import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 
+export interface PoolFundingAlignmentContext {
+  result_id: number;
+  result_official_code: number;
+  result_status_id: number;
+  version_id?: number;
+  report_year_id?: number;
+  is_synced_to_prms: boolean | number | string;
+  is_pool_funding_contributor: boolean | number | string;
+}
+
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
@@ -163,6 +173,37 @@ export class ResultRepository
                     AND r.is_snapshot = FALSE
                   GROUP BY r.result_id;`;
     return this.query(query);
+  }
+
+  async findPoolFundingAlignmentContext(
+    resultId: number,
+  ): Promise<PoolFundingAlignmentContext | null> {
+    const query = `
+      SELECT
+        r.result_id,
+        r.result_official_code,
+        r.result_status_id,
+        r.version_id,
+        r.report_year_id,
+        r.is_synced_to_prms,
+        COALESCE(ac.is_pool_funding_contributor, FALSE) AS is_pool_funding_contributor
+      FROM results r
+      LEFT JOIN result_contracts rc
+        ON rc.result_id = r.result_id
+        AND rc.is_active = TRUE
+        AND rc.is_primary = TRUE
+      LEFT JOIN agresso_contracts ac
+        ON ac.agreement_id = rc.contract_id
+        AND ac.is_active = TRUE
+      WHERE r.result_id = ?
+        AND r.is_active = TRUE
+      LIMIT 1;
+    `;
+
+    const rows = (await this.query(query, [
+      resultId,
+    ])) as PoolFundingAlignmentContext[];
+    return rows[0] ?? null;
   }
 
   private queryConstructorContract(
