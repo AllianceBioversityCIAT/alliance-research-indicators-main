@@ -38,7 +38,7 @@
   - `npm run migration:dev:execute` re-apply → ✓ (idempotent).
   - `npx eslint --fix` on new files → clean.
 - **Status:** [x] completed
-- **Commit:** (filled in at commit time)
+- **Commit:** `8b59a099`
 
 ---
 
