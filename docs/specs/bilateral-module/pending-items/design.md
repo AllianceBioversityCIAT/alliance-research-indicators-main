@@ -1,376 +1,660 @@
-# Design — Bilateral / Pending items (Phase 1.5 + architectural deltas)
+# Design — Bilateral / Pending items (v2: CLARISA-source SPs + admin-owned project mapping)
 
 - **Module:** bilateral
 - **Spec id:** 2026-05-bilateral-pending-items
-- **Status:** draft
+- **Status:** draft v2
 - **Owner:** ARI backend team
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked detailed design:** [`../../../detailed-design/detailed-design.md`](../../../detailed-design/detailed-design.md) (§persistence, §integrations, §observability)
-- **Parent design:** [`../design.md`](../design.md) — this spec EXTENDS the parent with §3.6 (two-upstream sync) + §3.7 (source-based read-only) once landed.
-- **Last updated:** 2026-05-23
+- **Parent design:** [`../design.md`](../design.md) — this spec EXTENDS the parent with new §3.6 (CLARISA-source SP linkage + admin mapping) and §3.7 (source-based read-only gate) once landed.
+- **Last updated:** 2026-05-25
 
 ---
 
-## 1. Goals & non-goals
+## 1. Executive summary
+
+This wave introduces:
+
+1. A new persistent join table `bilateral_project_mapping` (R-BIL-079) and a new admin SSR page `/admin/bilateral-project-mappings` (R-BIL-080) to maintain it manually.
+2. Two new ARI tool services — `ClarisaProjectsService` (R-BIL-076) and `PrmsTocService` (R-BIL-077) — that proxy live reads from the upstream sources with 5-min in-memory caches.
+3. Two new ARI public endpoints — `GET /api/v1/results/:resultCode/bilateral/science-programs` and `GET .../bilateral/hlos-indicators` — that the STAR FE consumes to populate the SP picker and HLO panel.
+4. Phase 1.5 cleanups inherited from v1: catalog-aware PATCH validation (R-BIL-070), source-based read-only gate (R-BIL-071), `lever_code → sp_code` rename (R-BIL-073), `icon_key` column (R-BIL-074), operational rollout (R-BIL-075).
+
+The static `clarisa_science_programs` catalog is reclassified as **display-only fallback** (icons / colors / names); CLARISA is the new picker source of truth.
+
+---
+
+## 2. Goals & non-goals
 
 **Goals:**
-- Ship catalog input validation that prevents typos from persisting (R-BIL-070).
-- Add the source-based read-only gate so PRMS-sourced results are read-only on bilateral surfaces (R-BIL-071).
-- Wire a two-upstream periodic sync that keeps the catalog current without code releases (R-BIL-072).
-- Clean up the misleading column name and extend the catalog with the fields the FE + future PRMS-push mapper need (R-BIL-073, R-BIL-074).
-- Close the operational gap: get the seed migration to dev/staging/prod (R-BIL-075).
+- Make the SP picker source the CLARISA per-project list (R-BIL-076).
+- Make the HLO panel proxy PRMS ToC (R-BIL-077).
+- Provide the admin surface that owns the AGRESSO ↔ CLARISA project join (R-BIL-079, R-BIL-080).
+- Land Phase 1.5 hardening (R-BIL-070, R-BIL-071, R-BIL-073, R-BIL-074, R-BIL-075).
+- Keep the work shipped on `5d48b27b` useful (catalog as display fallback).
 
 **Non-goals:**
-- Re-architecting the bilateral surface against a read-only PRMS adapter (R-BIL-071 is a gate, not a refactor).
-- Synchronising indicators-per-SP (T-31 territory, unchanged).
-- Implementing PRMS push (Phase 3, blocked on external decisions T-21 / T-23).
-- Adding W3 Registry sync (Phase 4, blocked on T-22).
+- Replicating CLARISA's project↔SP or PRMS's ToC catalogs in our DB.
+- AI-assisted mapping suggestions (deferred T-15.16).
+- Bulk CSV import (deferred per OQ-RV-7).
+- Phase 3 push / Phase 4 W3 sync (unchanged).
 
 ---
 
-## 2. Architecture
-
-The diff is small and bounded: one new validation hop in `BilateralService.normalizeLeverCodes`, one new gate evaluator inside `BilateralService.getAlignment` + `updateAlignment`, two new cron jobs reusing the existing `tools/cron-jobs/` pattern, two new migrations, two new entity columns.
+## 3. Architecture overview
 
 ```mermaid
 graph TD
-  subgraph "Phase 1.5 changes"
-    A[PATCH alignment] --> A1[normalizeLeverCodes]
-    A1 --> A2{lookup sp_codes in catalog}
-    A2 -- unknown --> A3[400 BadRequest]
-    A2 -- ok --> A4[existing persist path]
-    G[GET alignment] --> G1{platform_code === 'PRMS'?}
-    G1 -- yes --> G2[is_read_only = true]
-    G1 -- no --> G3[is_read_only = is_synced_to_prms]
-    P[PATCH / contribution] --> P1{platform_code === 'PRMS'?}
-    P1 -- yes --> P2[409 Conflict]
-    P1 -- no --> P3[existing path]
+  subgraph "STAR FE"
+    FE_PICKER[SP picker]
+    FE_HLO[HLO/indicator panel]
+    FE_ADMIN[Admin SSR: /admin/bilateral-project-mappings]
   end
-  subgraph "Periodic sync"
-    C[cron clarisa.science-programs] --> CL[CLARISA /api/cgiar-entities]
-    CL --> CCAT[(clarisa_science_programs)]
-    PR[cron prms-reporting.science-programs] --> PRMS[PRMS /api/.../reporting-initiatives]
-    PRMS --> CCAT
-    CCAT --> SVC[ClarisaScienceProgramsService]
-    SVC --> BS[BilateralService.getAlignment]
+
+  subgraph "ARI HTTP"
+    EP_SP["GET /api/v1/results/:resultCode/bilateral/science-programs"]
+    EP_HLO["GET /api/v1/results/:resultCode/bilateral/hlos-indicators"]
+    EP_PATCH["PATCH /api/v1/results/:resultCode/pool-funding-alignment"]
+    EP_ADMIN["GET/POST/PATCH /api/admin/bilateral-project-mappings"]
   end
+
+  subgraph "ARI services (singleton)"
+    SRV_BIL[BilateralService]
+    SRV_BPM[BilateralProjectMappingService]
+    SRV_CLA[ClarisaProjectsService<br/>5-min in-mem cache]
+    SRV_PRMS[PrmsTocService<br/>5-min in-mem cache]
+    SRV_SP[ClarisaScienceProgramsService<br/>display fallback only]
+  end
+
+  subgraph "ARI MySQL"
+    T_MAP[(bilateral_project_mapping)]
+    T_ALG[(result_pool_funding_alignment + _sp)]
+    T_CSP[(clarisa_science_programs)]
+    T_AGR[(agresso_contract)]
+    T_RES[(result)]
+  end
+
+  subgraph "Upstreams"
+    CLA[(CLARISA<br/>api.clarisa.cgiar.org/api/projects)]
+    PRMS[(PRMS ToC<br/>URL TBC OQ-RV-2)]
+  end
+
+  FE_PICKER --> EP_SP
+  FE_HLO --> EP_HLO
+  FE_ADMIN --> EP_ADMIN
+  EP_SP --> SRV_BIL
+  EP_HLO --> SRV_BIL
+  EP_PATCH --> SRV_BIL
+  EP_ADMIN --> SRV_BPM
+  SRV_BIL --> SRV_BPM
+  SRV_BIL --> SRV_CLA
+  SRV_BIL --> SRV_PRMS
+  SRV_BIL --> SRV_SP
+  SRV_BPM --> T_MAP
+  SRV_BPM --> SRV_CLA
+  SRV_CLA --> CLA
+  SRV_PRMS --> PRMS
+  SRV_SP --> T_CSP
+  SRV_BIL --> T_ALG
+  SRV_BIL --> T_RES
+  T_MAP -. FK-by-value .-> T_AGR
 ```
-
-### 2.1 Composition
-
-New files:
-
-- `src/db/migrations/<timestamp>-renameLeverCodeToSpCodeOnAlignmentSp.ts` — R-BIL-073.
-- `src/db/migrations/<timestamp>-extendScienceProgramCatalogColumns.ts` — R-BIL-074 (columns + `icon_key` seed).
-- `src/domain/tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.sync.ts` — CLARISA sync leg (R-BIL-072).
-- `src/domain/tools/cron-jobs/clarisa-science-programs.cron.ts` — CLARISA cron (R-BIL-072).
-- `src/domain/tools/cron-jobs/prms-reporting-science-programs.cron.ts` — PRMS Reporting cron (R-BIL-072).
-- `src/domain/tools/prms-reporting/prms-reporting.service.ts` (new tool if not present) — thin HTTP client for the reporting-initiatives endpoint.
-- Sibling `*.spec.ts` for `BilateralService`, `BilateralController`, `ClarisaScienceProgramsService`, `ClarisaScienceProgramsController` (NFR-BIL-070).
-
-Modified files:
-
-- `src/domain/entities/bilateral/bilateral.service.ts` — add catalog validation in `normalizeLeverCodes`; add source-based read-only gate in `getAlignment`, `updateAlignment`, `upsertContribution`, `deleteContribution`.
-- `src/domain/entities/bilateral/entities/result-pool-funding-alignment-sp.entity.ts` — column rename `lever_code` → `sp_code`, index rename, property rename.
-- `src/domain/entities/bilateral/repositories/result-pool-funding-alignment-sp.repository.ts` — references update.
-- `src/domain/entities/bilateral/repositories/result-pool-funding-alignment.repository.ts` — references update where `selected_levers` is hydrated.
-- `src/domain/entities/bilateral/dto/update-pool-funding-alignment.dto.ts` — `SelectedScienceProgramResponse` gets `reporting_enabled?: boolean | null; icon_key?: string | null`.
-- `src/domain/tools/clarisa/entities/clarisa-science-programs/entities/clarisa-science-program.entity.ts` — three new columns.
-- `src/domain/tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service.ts` — expose new columns on `findAll` / `findByCode`.
-- `src/domain/entities/results/entities/result.entity.ts` — no change (already exposes `platform_code`).
-- `src/domain/shared/utils/env.utils.ts` — new flag `BILATERAL_SP_SYNC_ENABLED`; new var `PRMS_REPORTING_PHASE_ID`.
-
-### 2.2 Reuse
-
-- `ClarisaService.cloneAllControlList` — pattern only; not used directly because our sync is two-upstream.
-- `LoggerUtil` — sync logging.
-- `sync_process_log` table — both crons write rows.
-- `HttpModule` — for both sync legs; PRMS leg uses bearer auth via existing PRMS credentials.
-- `ResultRepository.findPoolFundingAlignmentContext` — already returns `platform_code`; reused unchanged.
 
 ---
 
-## 3. Data model
+## 4. Extended directory structure
 
-### 3.1 `result_pool_funding_alignment_sp` (R-BIL-073)
-
-- Path: `src/domain/entities/bilateral/entities/result-pool-funding-alignment-sp.entity.ts`.
-- Column rename: `lever_code VARCHAR(50) NOT NULL` → `sp_code VARCHAR(50) NOT NULL`. Data preserved (codes are already SP codes despite the legacy column name).
-- Index rename: `idx_result_pool_funding_alignment_sp_lever` → `idx_result_pool_funding_alignment_sp_sp`.
-- Property rename on entity: `lever_code: string` → `sp_code: string`. `@OpenSearchProperty({ type: 'keyword' })` decoration carried over.
-- Migration: `<timestamp>-renameLeverCodeToSpCodeOnAlignmentSp.ts` — up: `ALTER TABLE ... CHANGE COLUMN lever_code sp_code VARCHAR(50) NOT NULL; ALTER TABLE ... RENAME INDEX ...`. Down: inverse.
-
-### 3.2 `clarisa_science_programs` (R-BIL-074)
-
-- Path: `src/domain/tools/clarisa/entities/clarisa-science-programs/entities/clarisa-science-program.entity.ts`.
-- New columns (all nullable):
-  - `reporting_enabled BOOLEAN NULL` — populated by R-BIL-072 PRMS leg.
-  - `prms_id INT NULL UNIQUE` — populated by R-BIL-072 PRMS leg; used by the future T-25 mapper.
-  - `icon_key VARCHAR(64) NULL` — seeded equal to `official_code`; gives FE a stable lookup key decoupled from the code.
-- Seed (in same migration): `UPDATE clarisa_science_programs SET icon_key = official_code WHERE icon_key IS NULL`.
-- Migration: `<timestamp>-extendScienceProgramCatalogColumns.ts`.
-
-### 3.3 `sync_process_log` row types (R-BIL-072)
-
-- New `process` values: `'clarisa.science-programs'`, `'prms-reporting.science-programs'`. No schema change (column already accepts free-form strings).
-
-No OpenSearch decoration changes.
+```
+server/researchindicators/src/
+├── db/migrations/
+│   ├── <ts>-renameLeverCodeToSpCodeOnAlignmentSp.ts           # T-15.3 / R-BIL-073
+│   ├── <ts>-addIconKeyToScienceProgram.ts                     # T-15.4 / R-BIL-074
+│   └── <ts>-createBilateralProjectMapping.ts                  # T-15.13 / R-BIL-079
+│
+├── domain/entities/bilateral/
+│   ├── bilateral.service.ts                                   # MODIFIED (T-15.1, T-15.2, T-15.11)
+│   ├── bilateral.service.spec.ts                              # NEW (T-15.6)
+│   ├── bilateral.controller.ts                                # MODIFIED (adds /bilateral/science-programs + /hlos-indicators routes)
+│   ├── bilateral.controller.spec.ts                           # NEW (T-15.6)
+│   ├── dto/
+│   │   ├── update-pool-funding-alignment.dto.ts               # MODIFIED — add icon_key, allocation, mapping_status fields
+│   │   └── bilateral-science-programs.response.dto.ts         # NEW (T-15.11)
+│   │   └── bilateral-hlos-indicators.response.dto.ts          # NEW (T-15.12)
+│   ├── entities/
+│   │   └── result-pool-funding-alignment-sp.entity.ts         # MODIFIED — column rename (T-15.3)
+│   └── repositories/
+│       ├── result-pool-funding-alignment.repository.ts        # MODIFIED — references update
+│       └── result-pool-funding-alignment-sp.repository.ts     # MODIFIED — references update
+│
+├── domain/entities/bilateral-project-mapping/                 # NEW MODULE (T-15.13, T-15.14)
+│   ├── bilateral-project-mapping.module.ts
+│   ├── bilateral-project-mapping.controller.ts                # admin REST surface
+│   ├── bilateral-project-mapping.controller.spec.ts
+│   ├── bilateral-project-mapping.service.ts                   # CRUD + lookup helper
+│   ├── bilateral-project-mapping.service.spec.ts
+│   ├── repositories/
+│   │   └── bilateral-project-mapping.repository.ts
+│   ├── entities/
+│   │   └── bilateral-project-mapping.entity.ts                # extends AuditableEntity
+│   ├── enum/
+│   │   └── mapping-source.enum.ts                             # MANUAL | AI_SUGGESTED | AI_AUTO
+│   └── dto/
+│       ├── create-bilateral-project-mapping.dto.ts
+│       ├── update-bilateral-project-mapping.dto.ts
+│       └── list-bilateral-project-mappings.query.dto.ts
+│
+├── domain/tools/clarisa/entities/clarisa-science-programs/
+│   └── entities/clarisa-science-program.entity.ts             # MODIFIED — add icon_key (T-15.4)
+│
+├── domain/tools/clarisa/projects/                              # NEW TOOL (T-15.10)
+│   ├── clarisa-projects.module.ts
+│   ├── clarisa-projects.service.ts                            # thin HTTP client + 5-min cache
+│   ├── clarisa-projects.service.spec.ts
+│   ├── dto/
+│   │   └── clarisa-project.types.ts                           # response shapes
+│
+├── domain/tools/prms-toc/                                      # NEW TOOL (T-15.12)
+│   ├── prms-toc.module.ts
+│   ├── prms-toc.service.ts                                    # thin HTTP client + 5-min cache
+│   ├── prms-toc.service.spec.ts
+│   └── dto/
+│       └── prms-toc.types.ts
+│
+└── admin/                                                       # NEW PAGE (T-15.15)
+    ├── controllers/admin.controller.ts                        # MODIFIED — add /admin/bilateral-project-mappings handler
+    ├── services/admin.service.ts                              # MODIFIED — add listBilateralProjectMappings()
+    └── client/
+        ├── src/pages/BilateralProjectMappings/
+        │   ├── BilateralProjectMappingsList.tsx
+        │   ├── BilateralProjectMappingForm.tsx
+        │   └── index.tsx
+        └── src/App.tsx                                        # MODIFIED — add route + sidebar entry
+```
 
 ---
 
-## 4. API surface
+## 5. Data model
 
-### PATCH /api/v1/results/:resultCode/pool-funding-alignment
+### 5.1 `bilateral_project_mapping` (R-BIL-079, NEW)
 
-- **Controller:** `src/domain/entities/bilateral/bilateral.controller.ts` (unchanged).
-- **Roles / Guards:** unchanged (`@Roles(CONTRIBUTOR, CENTER_ADMIN, SYSTEM_ADMIN)` + `ResultOwnerGuard`).
-- **Body DTO:** `update-pool-funding-alignment.dto.ts` (unchanged shape).
-- **Response data shape:** unchanged.
-- **Swagger:** existing annotations retained; description updated to mention `400` (unknown SP) and the new `409` description for source-PRMS.
-- **Errors:**
-  - `400` `{ unknown_sp_codes: string[] }` — R-BIL-070.
-  - `409` `description = "Result is PRMS-sourced; bilateral alignment is read-only in STAR"` — R-BIL-071.
-  - existing `409` for `is_synced_to_prms = true` continues (different description).
-- **Notes:** the source gate fires BEFORE role/owner checks (architectural constraint).
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | BIGINT PK auto-increment | Primary key. |
+| `agresso_agreement_id` | VARCHAR(50) NOT NULL | FK-by-value to `agresso_contract.agreement_id`. We do not enforce a hard FK because AGRESSO sync may add rows out-of-order. |
+| `clarisa_project_id` | INT NOT NULL | Upstream CLARISA `project.id`. |
+| `clarisa_project_short_name` | VARCHAR(500) NULL | Denormalized snapshot for display + audit (CLARISA can change `short_name` upstream; we record what the operator saw at mapping time). |
+| `source` | ENUM(`MANUAL`, `AI_SUGGESTED`, `AI_AUTO`) NOT NULL DEFAULT `MANUAL` | Forward-compatible with T-15.16. |
+| `confidence_score` | FLOAT NULL | Populated only when `source != MANUAL`. |
+| `notes` | TEXT NULL | Operator-facing free text. |
+| `is_active` | BOOLEAN NOT NULL DEFAULT TRUE | Soft-delete. |
+| `created_by` | INT NULL | `AuditableEntity` standard. |
+| `created_date` | TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP | |
+| `updated_by` | INT NULL | |
+| `updated_date` | TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP | |
+| `deleted_at` | TIMESTAMP NULL | |
 
-### GET /api/v1/results/:resultCode/pool-funding-alignment
+**Indexes:**
+- `idx_bpm_agreement` on `(agresso_agreement_id)` — primary lookup path for R-BIL-076 / R-BIL-070.
+- `idx_bpm_clarisa_project` on `(clarisa_project_id)` — operator search.
+- **Partial-unique** on `(agresso_agreement_id)` WHERE `is_active = TRUE` — at most one active mapping per contract.
 
-- Response `data.is_read_only` becomes the union of the two gates.
-- Each `selected_science_programs[]` entry gains optional `reporting_enabled?: boolean | null` and `icon_key?: string | null`.
+In MySQL, partial-unique is emulated by a generated column `active_agreement_id = IF(is_active = 1, agresso_agreement_id, NULL)` with a unique index on that column. Same effect, MySQL-compatible. Captured as design decision D-PI-9.
 
-### GET /api/tools/clarisa/science-programs[/<:code>]
+### 5.2 `result_pool_funding_alignment_sp` (R-BIL-073, MODIFIED)
 
-- Each entry gains `reporting_enabled`, `prms_id`, `icon_key` (all nullable). No behavior change.
+Pure rename: `lever_code` → `sp_code`. Index renamed `idx_..._lever` → `idx_..._sp`. Data preserved. The entity property changes from `lever_code: string` to `sp_code: string`; `@OpenSearchProperty({ type: 'keyword' })` decoration carried over.
 
-### POST/PATCH/DELETE /api/v1/results/:resultCode/pool-funding-alignment/indicators/:indicatorCode/contribution
+### 5.3 `clarisa_science_programs` (R-BIL-074, MODIFIED)
 
-- Same 409 gate as PATCH alignment (R-BIL-071). No body shape change.
+Adds `icon_key VARCHAR(64) NULL`. Seed in same migration: `UPDATE clarisa_science_programs SET icon_key = official_code WHERE icon_key IS NULL`.
 
-No new endpoints. No version bump (all additive).
+The table is **reclassified** as a display-only fallback. The single-row API (`GET /api/tools/clarisa/science-programs[/:code]`) stays live but is marked **DEPRECATED for picker use** in `frontend-handoff.md`.
 
----
-
-## 5. Workflows & business rules
-
-### 5.1 `normalizeLeverCodes` validation (R-BIL-070)
-
-```
-input: dto, catalogCodesSet := ClarisaScienceProgramsService.findAll().map(sp => sp.official_code)
-if !dto.has_contribution: return []
-sourceCodes := dto.sp_codes ?? dto.lever_codes ?? []
-cleaned := unique(trim(non-blank(sourceCodes)))
-if cleaned.length === 0: 400 "At least one Science Program code (sp_codes) is required"
-unknown := cleaned.filter(c => !catalogCodesSet.has(c))
-if unknown.length > 0: 400 description="Unknown Science Program codes" errors={unknown_sp_codes: unknown}
-return cleaned
-```
-
-- Catalog fetched ONCE per request (cached at service-call scope, NOT process-cached — keeps simple).
-- Future optimisation (deferred): in-memory cache invalidated by a sync-completed event.
-
-### 5.2 Source-based read-only gate (R-BIL-071)
-
-```
-on getAlignment:
-  context := resultRepository.findPoolFundingAlignmentContext(resultId)
-  isPrmsSourced := context.platform_code === 'PRMS'
-  isSyncedToPrms := bool(context.is_synced_to_prms)
-  is_read_only := isPrmsSourced || isSyncedToPrms
-
-on updateAlignment / upsertContribution / deleteContribution:
-  context := resultRepository.findPoolFundingAlignmentContext(resultId)
-  if context.platform_code === 'PRMS':
-    throw 409 "Result is PRMS-sourced; bilateral alignment is read-only in STAR"
-  // existing is_synced_to_prms gate continues to fire after
-```
-
-- Both gates evaluated server-side; FE renders based on `is_read_only`. The 409 is a defensive backstop.
-
-### 5.3 CLARISA sync leg (R-BIL-072)
-
-```
-@Cron('0 0 3 * * *')  // 03:00 UTC daily
-syncFromClarisa():
-  if !env.BILATERAL_SP_SYNC_ENABLED: return
-  log := sync_process_log.start('clarisa.science-programs')
-  try:
-    raw := clarisaHttp.get('/api/cgiar-entities')
-    filtered := raw
-      .filter(e => SP_CATEGORY_NAMES.includes(e.cgiarEntityTypeDTO.name))
-      .filter(e => /^SP[0-9]{2}$/.test(e.code))
-    deduped := dedupeByLatestYear(filtered)
-    for each entry:
-      upsert(clarisa_science_programs, {
-        official_code: entry.code,
-        name: entry.name.trim(),
-        category: entry.cgiarEntityTypeDTO.name,
-        is_active: true,
-        // color / reporting_enabled / prms_id / icon_key NOT touched
-      })
-    log.success(count=deduped.length)
-  catch e:
-    log.fail(message=e.message); LoggerUtil.error(...)
-```
-
-### 5.4 PRMS Reporting sync leg (R-BIL-072)
-
-```
-@Cron('0 15 3 * * *')  // 03:15 UTC daily
-syncFromPrmsReporting():
-  if !env.BILATERAL_SP_SYNC_ENABLED: return
-  log := sync_process_log.start('prms-reporting.science-programs')
-  try:
-    raw := prmsHttp.get(`/api/results/admin-panel/phases/${env.PRMS_REPORTING_PHASE_ID}/reporting-initiatives`)
-    for sp in raw.response.science_programs.filter(s => /^SP[0-9]{2}$/.test(s.official_code)):
-      // ONLY update existing rows; do NOT INSERT (CLARISA owns existence)
-      updateIfExists(clarisa_science_programs, official_code=sp.official_code, {
-        color: sp.color,
-        reporting_enabled: sp.reporting_enabled,
-        prms_id: sp.id,
-        // official_code / name / category / icon_key NOT touched
-      })
-    log.success(count=raw.response.science_programs.length)
-  catch e:
-    log.fail(message=e.message); LoggerUtil.error(...)
-```
-
-### 5.5 Conflict policy (R-BIL-072)
-
-- CLARISA leg writes ONLY: `official_code`, `name`, `category`, `is_active`.
-- PRMS leg writes ONLY: `color`, `reporting_enabled`, `prms_id`.
-- `icon_key` is seed-only; never overwritten by either sync (until a future spec gives the FE team a way to upload icons).
-- Both legs are idempotent. Rerunning either leg yields the same end-state.
-
-### 5.6 Transactional boundaries
-
-- Each sync leg wraps its writes in `manager.transaction` so a mid-iteration crash does not leave half-updated rows.
-- Each cron records start + end in `sync_process_log` regardless of success.
+### 5.4 No OpenSearch / Dynamo changes.
 
 ---
 
-## 6. Frontend (Admin SSR panel) impact
+## 6. API design
 
-No admin panel changes. The catalog table is operational, not human-edited via admin UI.
+### 6.1 `GET /api/v1/results/:resultCode/bilateral/science-programs` (R-BIL-076, NEW)
 
-A future spec MAY add an admin page to manually trigger the two sync legs and view the last `sync_process_log` row per process — out of scope here.
+- **Controller:** `bilateral.controller.ts`
+- **Roles:** any authenticated user (`@ApiBearerAuth()`).
+- **Path tokens:** `:resultCode(\d+)`.
+- **Query params:** none.
+- **Response data shape (TypeScript):**
 
-For STAR (sibling repo): tracked under existing STAR-side tasks `T-13` (project tag) / `T-14` (alignment section). No ARI work required; this design only constrains the contract STAR consumes.
+```ts
+type BilateralSciencePrograms = {
+  result_code: string;
+  mapping_status: "mapped" | "unmapped";
+  clarisa_project: { id: number; short_name: string } | null;
+  science_programs: Array<{
+    code: string;            // e.g. "SP09"
+    name: string;            // from CLARISA global_unit_object.name
+    category: string | null; // from CLARISA cgiar_entity_type_object.name OR local catalog fallback
+    color: string | null;    // from local catalog (CLARISA doesn't expose)
+    icon_key: string | null; // from local catalog
+    allocation: number | null; // % from CLARISA mapping (0–100)
+  }>;
+};
+```
+
+- **Errors:** `404` if result not found; `200` with empty list if unmapped (per R-BIL-076 scenarios).
+- **Swagger:** `@ApiTags('Bilateral')`, `@ApiOperation('Get Science Programs linked to the result\'s bilateral project')`, `@ApiOkResponse({type: BilateralSciencePrograms})`.
+
+### 6.2 `GET /api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=...` (R-BIL-077, NEW)
+
+- **Query params:**
+  - `sp_codes` — comma-separated list (e.g. `SP09,SP10`).
+- **Response data shape:**
+
+```ts
+type BilateralHlosByScienceProgram = Array<{
+  sp_code: string;
+  sp_name: string;
+  hlos: Array<{
+    id: number;
+    code: string;
+    title: string;
+    indicators: Array<{
+      id: number;
+      code: string;
+      name: string;
+    }>;
+  }>;
+}>;
+```
+
+- **Errors:** `503` if PRMS ToC integration is not yet configured (OQ-RV-2 open) OR upstream unreachable with cold cache; `200` with `[]` if `sp_codes` is empty/omitted.
+
+### 6.3 `GET /api/admin/bilateral-project-mappings` (R-BIL-080, NEW)
+
+- **Roles:** `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)` + `RolesGuard`.
+- **Query params:** `page` (default 1), `limit` (default 50, max 200), `search` (matches `agresso_agreement_id` ILIKE OR `clarisa_project_short_name` ILIKE), `is_active` (`true|false`), `source` (`MANUAL|AI_SUGGESTED|AI_AUTO`).
+- **Response data shape:** `{ items: BilateralProjectMappingDto[], meta: { total, page, limit, totalPages } }`.
+
+### 6.4 `POST /api/admin/bilateral-project-mappings` (R-BIL-080, NEW)
+
+- **Body:** `CreateBilateralProjectMappingDto`:
+
+```ts
+{
+  agresso_agreement_id: string;       // required
+  clarisa_project_id: number;         // required
+  clarisa_project_short_name?: string; // snapshot at mapping time, set server-side if omitted
+  source?: "MANUAL" | "AI_SUGGESTED" | "AI_AUTO"; // default MANUAL
+  confidence_score?: number;          // required when source != MANUAL
+  notes?: string;
+}
+```
+
+- **Errors:** `409 Conflict` with `description = "Active mapping already exists for this contract"` when an active row exists for the contract.
+
+### 6.5 `PATCH /api/admin/bilateral-project-mappings/:id` (R-BIL-080, NEW)
+
+- Same body as create with all fields optional; cannot change `agresso_agreement_id` (immutable; deactivate and create a new row instead).
+
+### 6.6 `PATCH /api/admin/bilateral-project-mappings/:id/deactivate` (R-BIL-080, NEW)
+
+- Body: optional `{ notes?: string }` to record reason.
+- Sets `is_active = false`, `updated_by = caller`, `deleted_at = now()`.
+
+### 6.7 `PATCH /api/v1/results/:resultCode/pool-funding-alignment` (R-BIL-070 + R-BIL-071, MODIFIED)
+
+- Body shape unchanged.
+- Adds 400 error with `errors = { unknown_sp_codes: string[] }`.
+- Adds 409 error when `result.platform_code === 'PRMS'`.
+- Swagger description updated to mention both.
+
+### 6.8 `GET /api/v1/results/:resultCode/pool-funding-alignment` (MODIFIED)
+
+- Each `selected_science_programs[]` entry gains `icon_key?: string | null` and (when sourced from a CLARISA-mapped path) `allocation?: number | null`.
+- `is_read_only` becomes the union of the two gates.
 
 ---
 
-## 7. Integration impact
+## 7. Backend module design
 
-### CLARISA
+### 7.1 `BilateralProjectMappingService` (T-15.14)
 
-- Files: new `src/domain/tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.sync.ts`.
-- New env vars: none (re-uses existing `ARI_CLARISA_HOST` / `ARI_CLARISA_USER` / `ARI_CLARISA_PASS`).
-- Cron: `0 0 3 * * *` (daily 03:00 UTC).
-- New message / event contracts: none.
+Singleton-scoped per parent design.md §3.4 Constraint A.
 
-### PRMS Reporting
+```ts
+@Injectable()
+export class BilateralProjectMappingService {
+  constructor(
+    private readonly repo: BilateralProjectMappingRepository,
+    private readonly dataSource: DataSource,
+  ) {}
 
-- Files: new `src/domain/tools/prms-reporting/prms-reporting.service.ts` if no existing service wraps the reporting endpoint (verify before scaffold).
-- New env vars: `ARI_PRMS_REPORTING_HOST` (reuse existing if present), `ARI_PRMS_REPORTING_PHASE_ID` (default `6`).
-- Cron: `0 15 3 * * *` (daily 03:15 UTC).
-- Auth: reuse existing PRMS auth pattern (Bearer; or app-secret per `app_secrets`).
-- New message / event contracts: none.
+  async list(query: ListMappingsDto): Promise<Paginated<BilateralProjectMapping>>;
+  async create(dto: CreateBilateralProjectMappingDto, user: User): Promise<BilateralProjectMapping>;
+  async update(id: number, dto: UpdateBilateralProjectMappingDto, user: User): Promise<BilateralProjectMapping>;
+  async deactivate(id: number, user: User, notes?: string): Promise<BilateralProjectMapping>;
 
-### Socket.IO / RabbitMQ / DynamoDB / OpenSearch
+  // Lookup helper consumed by BilateralService (T-15.11)
+  async findActiveByAgreementId(agreementId: string): Promise<BilateralProjectMapping | null>;
+}
+```
 
-- No changes.
+- `create` wraps insert + the partial-unique check in a `manager.transaction` so the conflict response is deterministic.
+- `deactivate` sets `is_active=false`, `deleted_at=now()`, audit fields.
+
+### 7.2 `ClarisaProjectsService` (T-15.10)
+
+```ts
+@Injectable()
+export class ClarisaProjectsService {
+  private cache: { data: ClarisaProject[]; fetchedAt: number } | null = null;
+  private readonly TTL_MS = 5 * 60 * 1000;
+
+  constructor(
+    private readonly http: HttpService,
+    private readonly env: AppConfig,
+  ) {}
+
+  async listBilateralProjects(): Promise<ClarisaProject[]>;       // cached, filtered to source_of_funding = "Bilateral"
+  async findProjectById(id: number): Promise<ClarisaProject | null>; // via cached list
+  private async fetchAll(): Promise<ClarisaProject[]>;             // raw fetch from /api/projects
+}
+```
+
+- Cache invalidation: TTL only (no event-based; CLARISA changes are rare).
+- On upstream error with warm cache: serve cache, log warning.
+- On upstream error with cold cache: throw `ServiceUnavailableException` (translates to 503 envelope).
+
+### 7.3 `PrmsTocService` (T-15.12)
+
+Same cache pattern as `ClarisaProjectsService`. Keyed by sorted comma-joined SP codes.
+
+Until OQ-RV-2 closes: implementation throws `ServiceUnavailableException` with `description = "PRMS ToC integration not yet configured"`. Tests verify the 503 path.
+
+### 7.4 `BilateralService` extensions (T-15.1, T-15.2, T-15.11)
+
+New methods:
+
+```ts
+async getScienceProgramsForResult(resultId: number, resultCode: string): Promise<BilateralSciencePrograms>;
+async getHlosByScienceProgramsForResult(resultId: number, resultCode: string, spCodes: string[]): Promise<BilateralHlosByScienceProgram>;
+```
+
+- `getScienceProgramsForResult` chain:
+  1. `resultRepository.findPoolFundingAlignmentContext(resultId)` → `agreement_id` (existing).
+  2. `bilateralProjectMappingService.findActiveByAgreementId(agreement_id)` → mapping or null.
+  3. If null: return `{ ..., mapping_status: "unmapped", science_programs: [], clarisa_project: null }`.
+  4. Else: `clarisaProjectsService.findProjectById(mapping.clarisa_project_id)`, filter `project_mappings_array` (`status="Confirmed"`, `portfolio.acronym=activePortfolio`), map each entry, enrich with catalog fallback.
+
+- `normalizeLeverCodes` extension (T-15.1) reuses `getScienceProgramsForResult` to compute the catalog set for validation.
+
+- `getAlignment` + write methods enforce R-BIL-071 source gate BEFORE role/owner checks via a private `assertPrmsSourceWritable(context)` helper.
+
+### 7.5 Module wiring
+
+- `BilateralProjectMappingModule` exports the service so `BilateralModule` can inject it.
+- `BilateralModule` imports `BilateralProjectMappingModule`, `ClarisaProjectsModule` (new), `PrmsTocModule` (new).
+- All four new providers are **singleton** (no `CurrentUserUtil` / `ResultsUtil` injection) per parent §3.4 Constraint A.
 
 ---
 
-## 8. Security & authorization
+## 8. Frontend / UX component architecture
 
-- **R-BIL-070** — no auth change. Validation runs after existing role/owner checks.
-- **R-BIL-071** — the gate runs server-side and fires for ALL callers, including `SYSTEM_ADMIN`. The constraint is architectural (PRMS owns the source of truth for PRMS-platform results), not authorization-driven.
-- **R-BIL-072** — cron context only; no HTTP surface. PRMS credentials are reused; no new secret rotation needed.
+### 8.1 Admin SSR page `/admin/bilateral-project-mappings` (R-BIL-080, T-15.15)
+
+Follows `src/admin/README-REACT.md` conventions. Two React 19 components:
+
+**`BilateralProjectMappingsList.tsx`** — paginated table:
+
+```
++--------------------------------------------------------------------------------------+
+| Bilateral project mappings                       [+ New mapping]    [Search: ___ ]   |
+| Filters: [is_active: All/Active/Inactive ▾]  [source: All/MANUAL/AI_*]               |
++--------------------------------------------------------------------------------------+
+| AGRESSO contract  | CLARISA project (short_name)  | Source  | Status   | Updated  |  |
+|-------------------|-------------------------------|---------|----------|----------|--|
+| D527              | T-PJ-003262-An innovative...  | MANUAL  | Active   | 2026-05-25 | [Edit] [Deactivate]
+| C0042             | 1078-CHI0   Supporting prep.. | MANUAL  | Active   | 2026-05-22 | [Edit] [Deactivate]
+| D420 (deactivated)| N-303008-GUATEMALA FOOD SEC.. | MANUAL  | Inactive | 2026-05-15 | [View]
+|------------------------------------------------------------------------------------|
+| ◀ 1 2 3 ▶  (showing 1-50 of 187)                                                   |
++------------------------------------------------------------------------------------+
+```
+
+**`BilateralProjectMappingForm.tsx`** — create / edit:
+
+```
++--------------------------------------------------------------------------------------+
+| New bilateral project mapping                                                        |
++--------------------------------------------------------------------------------------+
+| AGRESSO contract *      [ Pick contract... ▾ ]    (filtered to funding_type=BLR)     |
+|   D527 — USAID-CSISA-MEA — CIMMYT                                                    |
+|                                                                                       |
+| CLARISA bilateral project *  [ Pick project... ▾ ]   (filtered to source=Bilateral)  |
+|   T-PJ-003262-An innovative approach... (IITA, Nigeria, 2020-2025)                   |
+|   → SP allocation preview: SP09 (25%) + SP10 (75%)  ← read-only preview              |
+|                                                                                       |
+| Notes (optional)         [ ........................................ ]                |
+|                                                                                       |
+| Source                   ● Manual  ○ AI Suggested  ○ AI Auto                         |
+| Confidence (AI only)     [ ___ ]                                                     |
+|                                                                                       |
+|                                            [Cancel]  [Create mapping]                |
++--------------------------------------------------------------------------------------+
+```
+
+- AGRESSO picker → `GET /api/v1/agresso/contracts?pool-funding-contributor=true` (existing endpoint, sufficient).
+- CLARISA project picker → new `GET /api/admin/clarisa-projects?source_of_funding=Bilateral&search=...` (small wrapper around `ClarisaProjectsService.listBilateralProjects()`) — included under T-15.15.
+- SP allocation preview is read-only and informational only; it lets the operator confirm they picked the right project before committing.
+
+**Sidebar entry** added under "Bilateral" group:
+
+```
+ADMIN PANEL
+├── Dashboard
+├── Users
+├── Settings
+└── Bilateral
+    └── Project mappings   ← NEW
+```
+
+### 8.2 STAR FE (out-of-repo coordination only)
+
+The FE consumes the two new endpoints. ARI exposes them; ARI does not change `client/`. Updates to `frontend-handoff.md` describe:
+
+- Switch picker source from `/api/tools/clarisa/science-programs` to `GET .../bilateral/science-programs`.
+- Handle `mapping_status === "unmapped"` with a "Contact admin to link this contract" affordance.
+- Switch HLO panel to `GET .../bilateral/hlos-indicators` with the chosen `sp_codes`.
+- Bundle SP icons in STAR keyed by `icon_key` (e.g. `/assets/result-framework-reporting/SPs-Icons/${icon_key}.png`).
+- Continue to send `sp_codes` on PATCH; expect 400 with `errors.unknown_sp_codes` and 409 with the new source-PRMS description.
+
+---
+
+## 9. Shared contracts or package extensions
+
+No shared package extension. All DTOs live inside their owning module:
+
+- `update-pool-funding-alignment.dto.ts` — adds `icon_key?` and `allocation?` to `SelectedScienceProgramResponse`.
+- `bilateral-science-programs.response.dto.ts` — new.
+- `bilateral-hlos-indicators.response.dto.ts` — new.
+- `create-bilateral-project-mapping.dto.ts` + `update-bilateral-project-mapping.dto.ts` + `list-bilateral-project-mappings.query.dto.ts` — new.
+- `mapping-source.enum.ts` — new (MANUAL | AI_SUGGESTED | AI_AUTO).
+
+---
+
+## 10. Workflows & business rules
+
+### 10.1 SP picker open (R-BIL-076)
+
+```
+1. STAR FE GET /api/v1/results/:resultCode/bilateral/science-programs
+2. BilateralService:
+   a. resolve result → agreement_id
+   b. lookup active bilateral_project_mapping (BilateralProjectMappingService)
+   c. if null → return mapping_status: "unmapped", science_programs: []
+   d. else → ClarisaProjectsService.findProjectById(clarisa_project_id)
+      • cache: 5-min TTL
+   e. filter project_mappings_array (status="Confirmed", portfolio.acronym=activePortfolio)
+   f. enrich each from clarisa_science_programs (icon_key, color, category fallback)
+3. Return mapping_status: "mapped", clarisa_project: {id, short_name}, science_programs: [...]
+```
+
+### 10.2 PATCH alignment with validation (R-BIL-070)
+
+```
+1. STAR FE PATCH /api/v1/results/:resultCode/pool-funding-alignment with sp_codes
+2. BilateralService.updateAlignment:
+   a. R-BIL-071 source gate (assertPrmsSourceWritable)
+   b. R-BIL-015 synced gate (existing)
+   c. normalizeLeverCodes:
+      - if !has_contribution → return []
+      - else → fetch per-result SP list (reuses getScienceProgramsForResult)
+      - reject unknown codes with 400 { unknown_sp_codes }
+   d. existing persist path
+```
+
+### 10.3 Admin: create mapping (R-BIL-080)
+
+```
+1. Operator POST /api/admin/bilateral-project-mappings
+2. Guard chain: JwtMiddleware → RolesGuard(@Roles(CENTER_ADMIN, SYSTEM_ADMIN))
+3. BilateralProjectMappingService.create:
+   a. begin transaction
+   b. select-for-update on (agresso_agreement_id, is_active=true)
+   c. if row exists → throw 409 "Active mapping already exists"
+   d. resolve clarisa_project_short_name from cached CLARISA list if not provided
+   e. insert row with audit fields
+   f. commit
+4. Return new row
+```
+
+### 10.4 Admin: deactivate mapping (R-BIL-080)
+
+```
+1. Operator PATCH /api/admin/bilateral-project-mappings/:id/deactivate
+2. Service:
+   a. find by id; 404 if not exists
+   b. if already inactive → 200 no-op
+   c. set is_active=false, deleted_at=now(), updated_by=caller
+   d. append notes if provided
+3. Next R-BIL-076 call for any result with the same agreement_id returns mapping_status: "unmapped"
+```
+
+### 10.5 Cache invalidation
+
+- TTL-only. No event invalidation.
+- Operator-visible: after a CLARISA project picker refresh, the new project may take up to 5 minutes to appear if the cache was warm. Acceptable for first cut; if friction emerges, add a `POST /api/admin/clarisa-projects/refresh` endpoint in a follow-up.
+
+---
+
+## 11. Security & authorization
+
+- New admin endpoints: `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)` enforced via `RolesGuard`. `SYSTEM_ADMIN` bypasses role checks per existing convention.
+- R-BIL-071 source-based gate runs BEFORE role checks; `SYSTEM_ADMIN` cannot bypass.
+- No new secrets. CLARISA + PRMS ToC credentials reused from existing tool services.
 - No PII or donor-restricted data introduced.
+- Machine-token (client_id/client_secret) access — keep existing behavior; new admin surface NOT exposed to machine tokens (RolesGuard reads `request.user.roles` which is empty for machine tokens; explicit deny via role check).
 
 ---
 
-## 9. Observability
+## 12. Observability
 
-- New `LoggerUtil` lines:
-  - `[BilateralService] PATCH alignment rejected: unknown_sp_codes=[...]` (warn).
-  - `[BilateralService] PATCH alignment rejected: result is PRMS-sourced` (info).
-  - `[ClarisaScienceProgramsSync] CLARISA leg start/end (count=N, duration=Xms)` (info).
-  - `[ClarisaScienceProgramsSync] PRMS leg start/end (count=N, duration=Xms)` (info).
-- New `sync_process_log` row types: `clarisa.science-programs`, `prms-reporting.science-programs`. Operators can query `SELECT * FROM sync_process_log WHERE process LIKE '%science-programs%' ORDER BY started_at DESC LIMIT 20` for health.
-- No new CloudWatch metrics or dashboards (existing sync log monitoring covers both legs).
+New `LoggerUtil` lines:
 
----
+- `[BilateralService] PATCH alignment rejected: unknown_sp_codes=[...]` (warn).
+- `[BilateralService] PATCH alignment rejected: result is PRMS-sourced` (info).
+- `[ClarisaProjectsService] cache hit / miss / stale-served / cold-503` (debug / info).
+- `[PrmsTocService] cache hit / miss / cold-503` (debug / info).
+- `[BilateralProjectMappingService] mapping created / updated / deactivated` (info, with operator id).
 
-## 10. Testing strategy
-
-- **Unit (R-BIL-070):** `BilateralService.normalizeLeverCodes` — happy path, unknown code, mixed known+unknown, `has_contribution=false` short-circuit.
-- **Unit (R-BIL-071):** `BilateralService.getAlignment` + `updateAlignment` — STAR-sourced (pass), PRMS-sourced (gated), STAR-sourced + synced (existing gate), `SYSTEM_ADMIN` on PRMS-sourced (still 409).
-- **Unit (R-BIL-072):** two sync services — CLARISA filter + dedupe + trim, PRMS update-only (no INSERT), feature-flag-off short-circuit, error path writes `sync_process_log` failed row.
-- **Unit (R-BIL-074):** `ClarisaScienceProgramsService.findAll` + `findByCode` return new columns.
-- **Unit (NFR-BIL-070):** sibling `*.spec.ts` for all four classes.
-- **E2E (`test/bilateral.e2e-spec.ts`):** add cases for 400-unknown-sp, 409-PRMS-sourced (both GET shape + PATCH/POST gates), 200 after migration runs in test DB.
-- **Migration tests:** `npm run migration:dev:execute` then `npm run migration:revert` for each new migration; verify data preservation.
-- Coverage threshold: keep global ≥ 60%; bilateral module floor at 70% post-spec.
+No new dashboards or CloudWatch metrics. Existing access-log + error-rate alarms cover the new endpoints.
 
 ---
 
-## 11. Rollout
+## 13. Testing strategy
+
+- **Unit (T-15.1):** `BilateralService.normalizeLeverCodes` — happy, unknown-single, unknown-multi, mixed, has_contribution=false, unmapped.
+- **Unit (T-15.2):** `BilateralService` source gate — STAR-source happy, PRMS-source 409, STAR+synced still 409, SYSTEM_ADMIN on PRMS still 409.
+- **Unit (T-15.10):** `ClarisaProjectsService` — fetch + cache hit + warm-cache-on-error + cold-503.
+- **Unit (T-15.11):** `BilateralService.getScienceProgramsForResult` — mapped happy, unmapped, multi-portfolio filter, non-Confirmed filter.
+- **Unit (T-15.12):** `PrmsTocService` — interim 503, post-OQ-RV-2 happy path.
+- **Unit (T-15.13):** migration up/down preserves data.
+- **Unit (T-15.14):** `BilateralProjectMappingService` — create + 409 conflict on duplicate active, update, deactivate, lookup helper.
+- **Controller (T-15.14):** role denial, paginated list, search filter.
+- **E2E (`test/bilateral.e2e-spec.ts`):** add 400-unknown-sp, 409-PRMS-source on PATCH; mapping_status="unmapped" path; mapped path returns correct SP list.
+- **E2E (`test/bilateral-project-mappings.e2e-spec.ts`, new):** admin role allowed/denied; create/update/deactivate flow; partial-unique conflict.
+- Migration tests: forward + revert for each new migration.
+- Coverage: ≥ 60% global, ≥ 70% bilateral + bilateral-project-mapping.
+
+---
+
+## 14. Rollout
 
 Order (mandatory):
 
 1. **Land code on `AC-1594-bilateral-module-v2`**, all migrations included.
-2. **Apply migration `1779190000010` (the seed) to dev**, then run smoke `GET /api/tools/clarisa/science-programs` → 200, 13 rows.
-3. **Apply R-BIL-073 rename + R-BIL-074 columns migrations to dev**, smoke-test again.
-4. **Apply same migrations to staging** (verify), then **production** (verify).
-5. **Enable `ARI_BILATERAL_SP_SYNC_ENABLED=true` on dev** for one cycle, verify `sync_process_log` rows.
-6. Promote the flag to **staging**, then **production**, one env per cycle.
+2. **Apply migrations to dev** in order: `1779190000010` (if not already applied) → `<R-BIL-073 rename>` → `<R-BIL-074 icon_key>` → `<R-BIL-079 mapping table>`. Smoke `/api/tools/clarisa/science-programs` → 200; `/api/v2/results` → 200.
+3. **Seed initial mappings on dev manually** via the new admin page (10–20 high-traffic contracts to validate the flow).
+4. Apply same migrations to **staging**; replicate manual seeding.
+5. Apply to **production**; coordinate operator team to begin large-scale seeding.
 
-Feature flags (env):
-- `ARI_BILATERAL_SP_SYNC_ENABLED` (new, default `false`).
-- `ARI_PRMS_REPORTING_PHASE_ID` (new, default `6`).
+Feature flags (env, all new):
+
+- `ARI_BILATERAL_ACTIVE_PORTFOLIO` (default `"P25"`) — filter for R-BIL-076.
+- `ARI_PRMS_TOC_HOST` + `ARI_PRMS_TOC_AUTH` (new, pending OQ-RV-2; service returns 503 until both set).
 - `ARI_BILATERAL_MODULE_ENABLED` (existing, untouched).
 
 Backout:
-- For R-BIL-070 / R-BIL-071 code changes: standard PR revert.
-- For R-BIL-073 rename migration: `npm run migration:revert` reverses cleanly (data preserved).
-- For R-BIL-074 columns: same.
-- For R-BIL-072 syncs: flip flag off; data already in catalog is preserved.
+
+- Code: PR revert.
+- Migrations: `npm run migration:revert` peels back one at a time; data preserved.
+- Mapping rows: never hard-deleted; deactivate via admin UI.
 
 Comms:
-- STAR FE team: notified of new 400 / 409 codes + new response fields one sprint before staging promotion.
-- MEL PO: notified of `reporting_enabled` semantic when AC.4 of R-BIL-074 lands.
-- Ops: runbook update for the two new sync_process_log row types (NFR-BIL-072).
+
+- STAR FE team: new endpoints + `mapping_status` semantics one sprint before staging promotion.
+- MEL PO: needs to close OQ-RV-3..5 + OQ-RV-7 + OQ-RV-9 before production promotion.
+- Ops: runbook entry for "no mappings yet" state + manual seeding workflow.
 
 ---
 
-## 12. Design decisions log
+## 15. Design decisions log
 
 | # | Date | Decision | Rationale |
 | --- | --- | --- | --- |
-| D-PI-1 | 2026-05-23 | Source-based read-only gate runs BEFORE role/owner checks. | The constraint is architectural — even `SYSTEM_ADMIN` must not mutate PRMS-sourced data via STAR. Putting it after RBAC would let SYSTEM_ADMIN bypass it. |
-| D-PI-2 | 2026-05-23 | Two-upstream sync split: CLARISA owns existence + identity; PRMS enriches. | CLARISA is canonical for portfolio composition (per System Office). PRMS owns reporting-cycle state (`reporting_enabled`) and its own PK. Each leg writes ONLY its owned columns to avoid conflicts. |
-| D-PI-3 | 2026-05-23 | `icon_key` is seed-only, never overwritten by either sync. | Neither upstream exposes icon assets. The FE bundles icons keyed by `icon_key`; the column is a stable contract, decoupled from `official_code` for any future rebrand. |
-| D-PI-4 | 2026-05-23 | PRMS leg ONLY updates existing rows; never INSERTs. | Prevents PRMS dirty data (e.g. `SGP-02` mixed in with SP-prefix codes) from polluting the catalog. CLARISA leg is the only insert path. |
-| D-PI-5 | 2026-05-23 | Sync feature flag is single (`ARI_BILATERAL_SP_SYNC_ENABLED`) and gates BOTH legs. | Avoids the partial-state failure mode where one leg runs but not the other (e.g. CLARISA on, PRMS off → `color` always NULL). |
-| D-PI-6 | 2026-05-23 | Validation in R-BIL-070 accepts any catalog row regardless of `is_active`. | Catalog rows are never hard-deleted (D-PI-4 backstop). Validating against `is_active=true` only would break previously-valid alignment rows when an SP rotates out of the active portfolio. |
+| D-PI-1 | 2026-05-23 | Source-based read-only gate runs BEFORE role/owner checks. | Architectural — even SYSTEM_ADMIN must not mutate PRMS-sourced data via STAR. |
+| D-PI-2 | 2026-05-23 | (Superseded by D-PI-7.) v1 two-upstream sync model. | — |
+| D-PI-3 | 2026-05-23 | `icon_key` seed-only, never overwritten by upstream sync. | Upstreams don't expose icon assets; the column is a stable FE contract. |
+| D-PI-4 | 2026-05-23 | (Superseded by D-PI-7.) v1 PRMS leg only updates, never inserts. | — |
+| D-PI-5 | 2026-05-23 | (Superseded by D-PI-7.) v1 single sync feature flag. | — |
+| D-PI-6 | 2026-05-23 | Catalog validation accepts any row regardless of `is_active`. | Prevents drift breakage on existing alignments. Carried forward in R-BIL-070 (now against per-result list). |
+| D-PI-7 | 2026-05-25 | Drop the periodic sync; CLARISA and PRMS ToC become **live read sources** with a 5-min in-memory cache. | Avoids drift; respects canonical ownership; faster picker latency on warm cache; tolerates short upstream hiccups. |
+| D-PI-8 | 2026-05-25 | The AGRESSO ↔ CLARISA project join is **owned by ARI** in a new `bilateral_project_mapping` table; first cut is manual; schema is forward-compatible with AI suggestions. | No upstream join field exists; admin-owned table avoids brittle string parsing of CLARISA `short_name`. |
+| D-PI-9 | 2026-05-25 | Partial-unique on `(agresso_agreement_id) WHERE is_active=true` is emulated in MySQL via a generated column. | MySQL doesn't support partial-unique natively; generated column achieves the same constraint. |
+| D-PI-10 | 2026-05-25 | The `clarisa_science_programs` table is reclassified as a **display-only fallback** (icons / colors / names) — no longer the picker source. Migration `1779190000010` stays applied; new icon_key column added. | Preserves the work shipped on `5d48b27b`; lets the FE render icons offline; ensures display continuity if CLARISA is briefly unreachable. |
+| D-PI-11 | 2026-05-25 | The mapping table snapshot `clarisa_project_short_name` (denormalized at create time) intentionally drifts from the live CLARISA `short_name`. | Audit trail of what the operator saw at mapping time. Live UI reads CLARISA for the current name when needed. |
+| D-PI-12 | 2026-05-25 | TTL-only cache invalidation (no event-driven). | Project↔SP changes are rare; complexity of event invalidation is not justified for the first cut. If friction emerges, add a manual refresh endpoint. |
 
 ---
 
-## 13. Open questions
+## 16. Open questions
 
 | # | Question | Owner | Due |
 | --- | --- | --- | --- |
-| OQ-PI-1 | Should `reporting_enabled = false` SPs be hidden or greyed in the picker? | STAR FE + MEL PO | 2026-06-15 |
-| OQ-PI-2 | Should R-BIL-070 hard-reject `is_active = false` catalog rows? | ARI backend (lead) | 2026-06-15 |
-| OQ-PI-3 | Is daily 03:00/03:15 UTC right, or do we add a manual trigger endpoint? | ops | 2026-06-30 |
-| OQ-PI-4 | Does PRMS Reporting expose a stable per-phase endpoint for previous cycles (in case we ever need historical)? | PRMS team | 2026-07-15 |
+| OQ-RV-2 | PRMS ToC endpoint URL/auth/payload for HLOs given SP codes. | PRMS team | 2026-06-05 |
+| OQ-RV-3 | Multi-contract STAR result: UNION or INTERSECT SP sets? | MEL PO + STAR FE | 2026-06-15 |
+| OQ-RV-4 | Filter `status = "Confirmed"` only, or include `Pending` / `Draft`? | MEL PO | 2026-06-15 |
+| OQ-RV-5 | Active-portfolio filter on multi-portfolio projects? | MEL PO | 2026-06-15 |
+| OQ-RV-6 | CLARISA `/api/projects` performance at production scale? | CLARISA team | 2026-06-30 |
+| OQ-RV-7 | Bulk CSV import in Phase 1 or 2? | MEL PO + ops | 2026-06-15 |
+| OQ-RV-8 | AI provider + workflow scoping. | ARI backend lead + PO | 2026-07-15 |
+| OQ-RV-9 | Deactivation semantics for persisted alignment rows? | MEL PO + ARI backend | 2026-06-15 |
 
 ---
 
-## 14. References
+## 17. References
 
 - Parent spec: [`../requirements.md`](../requirements.md), [`../design.md`](../design.md), [`../tasks.md`](../tasks.md), [`../frontend-handoff.md`](../frontend-handoff.md).
-- Approved proposal: [`./proposal.md`](./proposal.md).
-- Repo commits: `5d48b27b` (SP catalog wave), `c19efe1a` (FE handoff doc), `c6709e67` (this spec's proposal).
+- Approved proposal: [`./proposal.md`](./proposal.md) v2 (commit `a8d58256`).
+- Repo commits: `5d48b27b` (SP catalog wave), `c19efe1a` (FE handoff doc), `c6709e67` (proposal v1), `a8d58256` (proposal v2 consolidated).
 - Detailed design baseline: [`../../../detailed-design/detailed-design.md`](../../../detailed-design/detailed-design.md) §integrations.
+- Admin SSR conventions: [`../../../../server/researchindicators/src/admin/README-REACT.md`](../../../../server/researchindicators/src/admin/README-REACT.md).
