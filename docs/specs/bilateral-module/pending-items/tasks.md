@@ -28,7 +28,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | todo |
 | T-15.11 | `GET .../bilateral/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | todo |
 | T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | R-BIL-077 | blocked (OQ-RV-2) |
-| T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | todo |
+| T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | [x] done (2026-05-25) |
 | T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | todo |
 | T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | R-BIL-080 (UI) | todo |
 | T-15.16 | AI-assisted mapping suggestions | (forward-compat, deferred) | deferred |
@@ -346,8 +346,8 @@ graph TD
   - [ ] `npm run migration:revert` runs cleanly.
 - **Dependencies:** none (unblocks downstream).
 - **Estimated effort:** M
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done — see [`./execution.md`](./execution.md) T-15.13 entry. Partial-unique behavior verified via manual MySQL exercise (3 inserts + 1 deactivate).
 
 ---
 
