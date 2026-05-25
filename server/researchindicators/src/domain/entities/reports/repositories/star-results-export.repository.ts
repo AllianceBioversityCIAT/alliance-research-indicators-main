@@ -33,7 +33,7 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  *
  * Requires MySQL views: report_general_information, report_alliance_alignment,
  * report_partners, report_geo_location, report_evidences, report_ip_rights,
- * report_capacity_sharing_development.
+ * report_capacity_sharing_development, report_policy_change.
  */
 @Injectable()
 export class StarResultsExportRepository {
@@ -113,14 +113,19 @@ export class StarResultsExportRepository {
         csd.\`language\` AS \`language\`,
         csd.start_date AS start_date,
         csd.end_date AS end_date,
-        csd.delivery_modality AS delivery_modality
+        csd.delivery_modality AS delivery_modality,
+        pc.policy_type AS policy_type,
+        pc.policy_stage AS policy_stage,
+        pc.evidence_stage AS evidence_stage,
+        pc.implementing_organizations AS implementing_organizations
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id
       LEFT JOIN report_geo_location gl ON gl.result_id = gi.result_id
       LEFT JOIN report_evidences ev ON ev.result_id = gi.result_id
       LEFT JOIN report_ip_rights ip ON ip.result_id = gi.result_id
-      LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id`;
+      LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id
+      LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id`;
 
     const v2Filters = this.mapReportDtoToFindResultsV2Filters(filters);
     const search = filters.filters.search ?? '';

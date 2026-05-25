@@ -1,7 +1,7 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
 
 /**
- * Raw data sheet columns A–BB (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–BF (reference workbook "Raw data" header row).
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'result_code', header: 'Result Code', width: 14 },
@@ -182,6 +182,14 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
     cellDataType: 'date',
   },
   { key: 'delivery_modality', header: 'Delivery modality', width: 24 },
+  { key: 'policy_type', header: 'Policy type', width: 28 },
+  { key: 'policy_stage', header: 'Policy stage', width: 28 },
+  { key: 'evidence_stage', header: 'Evidence for stage', width: 36 },
+  {
+    key: 'implementing_organizations',
+    header: 'Implementing organizations',
+    width: 56,
+  },
 ];
 
 export const STAR_RESULTS_METADATA_DICTIONARY_COLUMNS: ExcelColumnSpec[] = [

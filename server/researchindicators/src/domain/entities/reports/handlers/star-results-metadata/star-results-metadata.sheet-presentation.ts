@@ -41,6 +41,12 @@ export const STAR_RAW_COLUMN_GROUP_FALLBACK: Array<{
     label: 'CAPSHARING DETAILS',
     fillArgb: 'FF4D7C31',
   },
+  {
+    fromCol: 55,
+    toCol: 58,
+    label: 'POLICY DETAILS',
+    fillArgb: 'FFDA7842',
+  },
 ];
 
 /** Preamble without column groups (groups come from DB or fallback in the handler). */
@@ -53,7 +59,7 @@ export const STAR_RAW_SHEET_PREAMBLE_BASE: Omit<
   bannerTitleFillArgb: STAR_RAW_BANNER_TITLE_FILL_ARGB,
   bannerTitleFontArgb: STAR_RAW_BANNER_TITLE_FONT_ARGB,
   bannerTitleMergeFromCol: 3,
-  bannerTitleMergeToCol: 54,
+  bannerTitleMergeToCol: 58,
   logoMergeFromCol: 1,
   logoMergeToCol: 2,
   /** Row 1 only so row 2 subtitle merge does not overlap the logo merge. */
