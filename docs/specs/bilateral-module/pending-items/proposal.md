@@ -1,45 +1,87 @@
-# Proposal — Bilateral module pending items inventory
+# Proposal — Bilateral module pending items (v2: CLARISA-source SPs + admin-owned project mapping)
 
 ## 1. Document control
 
 | Field | Value |
 | --- | --- |
 | Spec path | `docs/specs/bilateral-module/pending-items/` |
-| Status | DRAFT — awaiting approval before `/sdd-specify` |
-| Author | ARI backend team (drafted in session, 2026-05-23) |
+| Status | DRAFT v2 (2026-05-25) — consolidated; awaiting approval before re-running `/sdd-specify` |
+| Author | ARI backend team |
 | Parent spec | [`../requirements.md`](../requirements.md) · [`../design.md`](../design.md) · [`../tasks.md`](../tasks.md) · [`../frontend-handoff.md`](../frontend-handoff.md) |
 | Constitutional baseline | [`../../../prd.md`](../../../prd.md) · [`../../../system-design/design.md`](../../../system-design/design.md) · [`../../../detailed-design/detailed-design.md`](../../../detailed-design/detailed-design.md) |
+| Version | v2 (2026-05-25). See [§14 Changelog](#14-changelog) for v1→v2 evolution. v1 was approved 2026-05-23 (commit `c6709e67`). |
 
 ---
 
 ## 2. Intent
 
-Capture in one reviewable place everything that is still pending for the bilateral module so the team can prioritize, owner-assign, and either fold each item into the existing `tasks.md` or trigger `/sdd-specify` for a new wave of full SDD docs.
+Capture in one reviewable place everything still pending for the bilateral module so the team can prioritize, owner-assign, and either fold each item into the existing `tasks.md` or trigger `/sdd-specify` for a fresh wave of full SDD docs.
 
-The trigger for this proposal is that since the Phase 0–2 backend landed (`AC-1594-bilateral-module-v2`, commits up to `c19efe1a`), three categories of work have accumulated outside the original `tasks.md` plan:
+The v2 wave re-anchors the architecture on three corrections that emerged after v1 was approved:
 
-1. **SP catalog wave hardening** (added after `5d48b27b`) — Phase 1.5 cleanups discovered while integrating the FE picker.
-2. **Architectural decisions taken in-flight** that need to be reflected in `design.md` (two-upstream sync, STAR-vs-PRMS read-only gate).
-3. **Pre-existing phases that are still pending or blocked** (Phase 3 push, Phase 4 W3 sync, Phase 5 SP ToC sync, Phase 6 rollout) — already enumerated in `tasks.md` but worth re-pricing against the current state of the world.
+1. **SP-per-project linkage lives in CLARISA `/api/projects`, not in our DB.** Each CLARISA project carries a `project_mappings_array[]` listing its allocated SPs with `smo_code`, `status`, `allocation`, and full SP metadata. The static `clarisa_science_programs` catalog seeded by migration `1779190000010` is reclassified as **display-only fallback** (icons / colors / names).
+2. **HLOs and indicators live in PRMS ToC.** Given a set of SP codes, a PRMS ToC endpoint returns the HLOs/indicators for those SPs. ARI proxies that call; no local cache of HLOs.
+3. **The join from STAR/AGRESSO to CLARISA project is owned by ARI** through a new admin-maintained table. CLARISA does not expose AGRESSO `agreement_id` as a join key, so we own the mapping ourselves through a new admin SSR module (`/admin/bilateral-project-mappings`). First cut is manual; the schema is forward-compatible with AI-assisted suggestions later.
 
-This proposal does not implement any of those items. It scopes the **inventory document** that will sit alongside `tasks.md` and feed the next `/sdd-specify` wave.
+Inherited from v1 and still in scope: Phase 1.5 SP-catalog hardening cleanups (catalog validation, source-based read-only gate, column rename, operational rollout); Phase 3–6 task statuses are re-priced in `tasks.md` against current state.
 
 ---
 
 ## 3. Problem / current behavior
 
-- `tasks.md` was written before the SP catalog wave and does not have entries for items A1–A7 below (introduced 2026-05-23).
-- `design.md` §3.4 / §3.5 documents the DI scope and local auth bypass constraints but does not yet capture the two-upstream sync model (CLARISA for name/category, PRMS Reporting for color / `reporting_enabled` / `prms_id`) or the STAR-vs-PRMS read-only gate.
-- `frontend-handoff.md` §4.6 (commit `c19efe1a`) tells the FE the SP catalog is live, but several follow-on backend hardening items must land before the picker can be fully trusted (catalog validation, source-based read-only, periodic sync).
-- There is no single place a new contributor can answer "what's left on the bilateral module?". Today the answer is fragmented across `tasks.md`, three open Jira AC blockers (D-push-auth, D-source-w3, OQ-US5-3/6), and undocumented in-flight architectural decisions.
+The 2026-05-23 SP catalog wave (commit `5d48b27b`) seeded a static `clarisa_science_programs` table with all 13 SPs and made the STAR picker source it directly. That assumes "any SP is valid for any bilateral project", which the FE mockup contradicts:
+
+> "Select the Science Program(s) this is related to" — the dropdown should show only SPs **linked to this bilateral project**, not all 13.
+
+CLARISA evidence (probed 2026-05-25, `/api/projects`):
+
+```json
+{
+  "id": 1,
+  "short_name": "T-PJ-003262-An innovative approach to agribusiness training...",
+  "source_of_funding": "Bilateral",
+  "lead_institution_object": { "id": 45, "acronym": "IITA" },
+  "project_mappings_array": [
+    {
+      "id": 43, "project_id": 1, "program_id": 275,
+      "allocation": 25, "status": "Confirmed",
+      "global_unit_object": {
+        "smo_code": "SP09", "name": "Scaling for Impact",
+        "cgiar_entity_type_object": { "code": 23, "name": "Scaling programs" },
+        "portfolio_object": { "acronym": "P25" }
+      }
+    },
+    {
+      "allocation": 75, "status": "Confirmed",
+      "global_unit_object": { "smo_code": "SP10", "name": "Gender Equality and Inclusion", "..." }
+    }
+  ]
+}
+```
+
+So today's gaps:
+
+1. STAR's SP picker shows all 13 SPs from our local catalog → should show only the SPs CLARISA links to this result's bilateral project (filtered to `status="Confirmed"` and `portfolio.acronym = "P25"`).
+2. The HLO/indicator picker has no data source wired (T-31 was planned as a local cache) → should call a PRMS ToC endpoint passing the chosen SPs.
+3. PATCH alignment validation in R-BIL-070 hits the wrong list (full 13 instead of per-project subset).
+4. The link between a STAR result and a CLARISA project is undefined in our current code: the result has an AGRESSO contract (`agreement_id`, e.g. `D527`) — but CLARISA `/api/projects` does not expose AGRESSO contract IDs. **Resolution:** ARI owns the join via a new admin-maintained `bilateral_project_mapping` table.
+5. No operator surface exists to maintain that mapping. We need a new admin SSR page (`/admin/bilateral-project-mappings`) — list / search / create / edit / deactivate. AI-assisted suggestions are a future enhancement, NOT in the first cut.
+6. `tasks.md` was written before any of this and does not have entries for items below.
+7. `design.md` does not yet capture the two live read sources (CLARISA + PRMS ToC), the admin-owned mapping table, or the source-based read-only gate.
+8. `frontend-handoff.md` §4.6 (commit `c19efe1a`) tells the FE the static catalog is live but several follow-on backend changes must land before the picker can be fully trusted.
 
 ---
 
 ## 4. Proposed outcome
 
-A new sub-spec at `docs/specs/bilateral-module/pending-items/` with the standard SDD trio (`requirements.md`, `design.md`, `tasks.md`) once approved, anchored on the inventory below.
-
-The inventory itself is the contents of §8 of this proposal — once approved, `/sdd-specify` will lift each item into formal requirements with traceability to `R-BIL-*` IDs.
+- A new persistent table `bilateral_project_mapping` stores the join AGRESSO `agreement_id` ↔ CLARISA `project.id`. The mapping is admin-owned, supports `source = MANUAL | AI_SUGGESTED | AI_AUTO` and `is_active` history.
+- A new admin SSR page at `/admin/bilateral-project-mappings` lets operators list, search, create, edit, and deactivate mappings. Bulk import (CSV) and AI suggestions are out of scope for the first cut.
+- A new ARI endpoint surfaces, for a given STAR result, the SPs CLARISA associates with its mapped bilateral project. The STAR picker reads from this endpoint.
+- A new ARI endpoint accepts a list of SP codes and returns the HLOs/indicators PRMS ToC exposes for them. The STAR "Map HLOs and/or indicators" panel reads from this endpoint.
+- PATCH alignment validation switches from "code exists in local catalog" to "code is in the SP list returned by the per-project endpoint for this result".
+- When a result's AGRESSO contract has no active mapping, the SP picker endpoint returns 200 with `{ science_programs: [], mapping_status: "unmapped" }`, so the FE can show a "Contact admin to link this contract" affordance instead of an empty dropdown.
+- The local `clarisa_science_programs` table is preserved as **display-only fallback** (icons / colors / human-readable names).
+- The periodic two-upstream sync (v1 R-BIL-072) is dropped. v1 T-15.5 deleted.
 
 ---
 
@@ -47,24 +89,39 @@ The inventory itself is the contents of §8 of this proposal — once approved, 
 
 In scope:
 
-- Phase 1.5 (SP catalog hardening) — A1 through A7 below.
-- Architectural deltas to `design.md` triggered by Phase 1.5 (two-upstream sync, source-based read-only).
-- Re-validation of Phase 3–6 task statuses (T-21..T-38) and surfacing of current blockers.
-- A status field on every pending item (READY, BLOCKED-BY-X, NEEDS-DECISION).
+- **New table `bilateral_project_mapping`** — owns the AGRESSO `agreement_id` ↔ CLARISA `project.id` join.
+- **New admin SSR module `/admin/bilateral-project-mappings`** — list, search, create, edit, deactivate; uses existing admin layout, sidebar entry, RBAC (`CENTER_ADMIN`, `SYSTEM_ADMIN`).
+- New backend service `BilateralProjectMappingService` with full CRUD + history.
+- New backend controller `BilateralProjectMappingController` for the admin REST surface (`/api/admin/bilateral-project-mappings`).
+- New ARI endpoint `GET /api/v1/results/:resultCode/bilateral/science-programs` — returns the SPs CLARISA links to the result's mapped bilateral project, enriched from the local catalog for display fields.
+- New ARI endpoint `GET /api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=SP01,SP06` — returns the HLOs/indicators PRMS ToC exposes for the chosen SPs.
+- New ARI tool service `src/domain/tools/clarisa/projects/clarisa-projects.service.ts` — thin client over CLARISA `/api/projects` with a short-TTL in-memory cache.
+- New ARI tool service `src/domain/tools/prms-toc/prms-toc.service.ts` — thin client over the PRMS ToC HLO endpoint.
+- Phase 1.5 hardening inherited from v1: `sp_codes` catalog-aware validation, source-based read-only gate, column rename `lever_code → sp_code`, operational rollout of migrations, sibling `*.spec.ts` coverage, parent-doc updates.
+- Update `selected_science_programs[]` enrichment to source codes from CLARISA and display fields (icon_key/color/category) from the local catalog.
+- Update `frontend-handoff.md` with the new endpoints + the `mapping_status: "unmapped"` UX path + admin module pointer.
+- Re-pricing of Phase 3+ tasks (T-21..T-38) and surfacing current external blockers.
 
-Out of scope:
+Out of scope (first cut — captured as future enhancements):
 
-- Implementing any of the pending items (this is a tracking proposal, not a delivery one).
-- Re-writing the existing `tasks.md` Phase 0–2 entries — those are landed and authoritative.
-- Cross-module work (W3 Registry sync depends on System Office decisions; PRMS push depends on PRMS team decisions). Captured but not specified here.
+- **AI-assisted mapping suggestions** — separate follow-up spec; column `source` on the mapping table is forward-compatible with `AI_SUGGESTED` / `AI_AUTO` values so we don't paint ourselves into a corner.
+- **Bulk CSV import** of historical mappings — separate follow-up; UI will support one-by-one entry first.
+- Removing or repurposing the existing `clarisa_science_programs` table — kept as the display catalog.
+- Removing migrations already landed (`1779190000010`); harmless under the new model.
+- Caching strategy beyond a basic 5-min in-memory cache.
+- Phase 3+ work (push, W3 sync) — untouched.
+- Implementing any of the inventory items below — this is a scoping proposal; `/sdd-specify` produces the executable plan.
 
 ---
 
 ## 6. Non-goals
 
-- We are **not** committing to ship every item in §8 in the next release. The proposal is scoping a backlog, not a roadmap.
-- We are **not** rewriting `tasks.md` task IDs — new items will be appended as `T-15.1`, `T-39+`, etc.
-- We are **not** changing the SDD methodology — this is an additional sub-spec, not a new template.
+- Replicating CLARISA's project↔SP table or PRMS's ToC HLO catalogs in our DB (only the **join layer** AGRESSO↔CLARISA-project is ours; the SP and HLO catalogs stay upstream).
+- Replacing existing alignment / mapping endpoints — only the SP / HLO data sources change.
+- Building admin tooling to edit project↔SP linkages — CLARISA is canonical for that.
+- Building AI suggestions in this wave (forward-compatible schema only).
+- Re-writing the original `tasks.md` Phase 0–2 entries — those are landed and authoritative.
+- Changing the SDD methodology — this is an additional sub-spec, not a new template.
 
 ---
 
@@ -72,154 +129,152 @@ Out of scope:
 
 | Affected | How |
 | --- | --- |
-| ARI backend team | Owns Phase 1.5 + Phase 3+ implementation. |
-| STAR frontend team | Indirectly — items A2, A5 change backend contract (404 on unknown sp_codes, read-only flag on PRMS-sourced results). |
-| PRMS team | Blocks T-21, T-23 (decisions on push auth and US5 acceptance criteria). |
-| System Office | Blocks T-22 (W3 Registry source decision). |
-| `docs/specs/bilateral-module/tasks.md` | Will receive new T-IDs once `/sdd-specify` runs. |
-| `docs/specs/bilateral-module/design.md` | Will receive new §3.6 (two-upstream sync) and §3.7 (source-based read-only). |
-| `docs/specs/bilateral-module/frontend-handoff.md` | §4.6 will be amended once A2 and A5 land (validation behavior + read-only gate). |
+| ARI backend team | Owns the Phase 1.5 + v2 implementation. |
+| STAR frontend | Switches the SP picker source from `/api/tools/clarisa/science-programs` (deprecated) to the new `/api/v1/results/:resultCode/bilateral/science-programs`. Switches the HLO/indicator picker to the new `/api/v1/results/:resultCode/bilateral/hlos-indicators`. Must handle `mapping_status: "unmapped"` empty state. |
+| ARI admin SSR panel (`src/admin/`) | New page `/admin/bilateral-project-mappings` with React 19 list/edit components, new sidebar entry, new `AdminService` methods. Follows `src/admin/README-REACT.md` patterns. |
+| Bilateral operators (new persona) | Use the admin page to manually link AGRESSO contracts → CLARISA bilateral projects. Operators need `CENTER_ADMIN` or `SYSTEM_ADMIN` role. |
+| PRMS team | Confirms the ToC HLO endpoint URL + auth + payload (OQ-RV-2). |
+| CLARISA team | (No upstream join field needed — closed by our own mapping table.) |
+| PRMS team (Phase 3) | Blocks T-21, T-23 (decisions on push auth and US5 acceptance criteria). |
+| System Office (Phase 4) | Blocks T-22 (W3 Registry source decision). |
+| `docs/specs/bilateral-module/pending-items/requirements.md` | Regenerated; R-BIL-070 modified; R-BIL-072 deleted; R-BIL-074 narrowed; new R-BIL-076..080 added. |
+| `docs/specs/bilateral-module/pending-items/design.md` | Regenerated; new §3 entity (`bilateral_project_mapping`), §5 workflows (mapping lookup + proxy flows), §6 admin SSR, §7 integrations (CLARISA + PRMS ToC live read sources). New decisions D-PI-7..D-PI-10. |
+| `docs/specs/bilateral-module/pending-items/tasks.md` | Regenerated; T-15.4 narrowed; T-15.5 deleted; new T-15.10..15. T-15.16 captured as deferred (AI assist). |
+| `docs/specs/bilateral-module/design.md` | Will receive new §3.6 (CLARISA-source SPs + admin mapping) and §3.7 (source-based read-only) once landed. |
+| `docs/specs/bilateral-module/frontend-handoff.md` | §4.6 will be amended once R-BIL-076..080 land. |
 
 ---
 
-## 8. Pending items inventory
-
-### 8.A — Phase 1.5: SP catalog wave hardening (READY, near-term)
-
-| ID | Item | Status | Notes |
-| --- | --- | --- | --- |
-| **A1** | STAR FE consumes new alignment shape (`selected_science_programs[]`, `sp_codes`) and fixes `STAR-19792` → `19792` URL bug | NEEDS FE OWNER | Doc: `frontend-handoff.md` §4.2/§4.3/§4.6. Icons: PRMS pattern `/assets/result-framework-reporting/SPs-Icons/{official_code}.png` — STAR should bundle, not hotlink |
-| **A2** | `BilateralService.normalizeLeverCodes` must reject unknown `sp_codes` against `clarisa_science_programs` catalog | READY | Today: any string is persisted. Fix: lookup + `BadRequestException` on miss |
-| **A3** | Sibling `*.spec.ts` for `BilateralService`, `BilateralController`, `ClarisaScienceProgramsService`, `ClarisaScienceProgramsController` | READY | Required by `src/CLAUDE.md` §9; 60% coverage gate at risk |
-| **A4** | Rename `result_pool_funding_alignment_sp.lever_code` → `sp_code` (or document the semantic mismatch) | READY (low priority) | Column now stores SP codes, name is misleading |
-| **A5** | Source-based read-only gate: `is_read_only = true` when `result.platform_code === 'PRMS'` (in addition to `is_synced_to_prms`) | NEEDS DECISION | Per session clarification: "if from PRMS, info should be mapped only, not edited" |
-| **A6** | Apply migration `1779190000010` to dev / staging / prod | READY | Only ran locally so far; endpoint will 500 in any env without the seed |
-| **A7** | Update `tasks.md` to include A1–A6 as `T-15.1..T-15.7` (or equivalent) | READY | Doc/code drift per `CLAUDE.md` §1 |
-
-### 8.B — Architectural deltas to capture in `design.md`
-
-| ID | Item | Status |
-| --- | --- | --- |
-| **B1** | Document two-upstream sync model: CLARISA owns `code` / `name` / `category` / `acronym`; PRMS Reporting owns `color` / `reporting_enabled` / `prms_id`. Catalog row is a join of both. | READY |
-| **B2** | Document source-based read-only gate alongside A5 (linked) | READY |
-| **B3** | Document SP icon strategy: bundle in STAR FE keyed by `official_code`; backend may later add `icon_key` nullable column | READY |
-| **B4** | Optional follow-on migrations: `reporting_enabled BOOLEAN`, `prms_id INT UNIQUE`, `icon_key VARCHAR(64)` columns on `clarisa_science_programs` | NEEDS DECISION (vs. wait for live sync) |
-
-### 8.C — Phase 3: Push to PRMS (BLOCKED, pre-existing in `tasks.md`)
-
-| ID | Item | Status |
-| --- | --- | --- |
-| **T-21** | Close **D-push-auth** with PRMS team | BLOCKER — external |
-| **T-23** | Close **OQ-US5-3** + **OQ-US5-6** with PRMS team | BLOCKER — external |
-| **T-25** | `ResultToPrmsMapper` + payload-shape tests | BLOCKED by T-21 |
-| **T-26** | Push service + queue consumer + retry cron | BLOCKED by T-25 |
-| **T-27** | Approve transition triggers push enqueue | BLOCKED by T-26 |
-| **T-28** | Admin push retry endpoint + SSR page | BLOCKED by T-26 |
-
-### 8.D — Phase 4: W3 Registry sync (BLOCKED, pre-existing)
-
-| ID | Item | Status |
-| --- | --- | --- |
-| **T-22** | Close **D-source-w3** with System Office | BLOCKER — external |
-| **T-29** | W3 Registry sync module + cron | BLOCKED by T-22 |
-| **T-30** | Admin W3 sync endpoint + SSR page | BLOCKED by T-29 |
-
-### 8.E — Phase 5: SP ToC sync (READY but de-prioritized, pre-existing)
-
-| ID | Item | Status |
-| --- | --- | --- |
-| **T-31** | SP ToC sync module + cron (indicators-per-SP). Catalog itself is now seeded (A6); this task is now scoped to indicators per SP, not SP metadata | READY |
-| **T-32** | Admin SP ToC sync endpoint + SSR page | READY |
-| **NEW** | Periodic catalog sync from CLARISA + PRMS Reporting (per B1) — covers SP metadata refresh only | READY |
-
-### 8.F — Phase 6: Rollout (READY when Phase 3+ lands)
-
-| ID | Item | Status |
-| --- | --- | --- |
-| **T-33** | Full E2E suite | DEPENDS on Phase 3 |
-| **T-34** | Idempotency + failure-injection tests | DEPENDS on T-26 |
-| **T-35** | CloudWatch dashboard + alarms | READY when push lands |
-| **T-36** | Runbook | DEPENDS on Phase 3 |
-| **T-37** | Staging dry-runs | DEPENDS on Phase 3 |
-| **T-38** | Production rollout | DEPENDS on T-37 |
-
----
-
-## 9. Requirement delta preview
+## 8. Requirement delta preview
 
 ### ADDED requirements
 
-- **R-BIL-070** — `sp_codes` MUST be validated against `clarisa_science_programs` on PATCH alignment; unknown codes return 400 with the offending list in `errors`. (A2)
-- **R-BIL-071** — Alignment is read-only (`is_read_only=true`, mutations 409) when the parent `result.platform_code === 'PRMS'`, regardless of `is_synced_to_prms`. (A5)
-- **R-BIL-072** — `clarisa_science_programs` catalog SHALL be sourced from two upstreams: CLARISA `/api/cgiar-entities` (filtered to `^SP[0-9]{2}$`) for `code`/`name`/`category`, and PRMS Reporting `/api/results/admin-panel/phases/:phaseId/reporting-initiatives` for `color`/`reporting_enabled`/`prms_id`. Sync is periodic; race conditions resolved by upstream-preserves-wins on each column. (B1)
+- **R-BIL-076** — `GET /api/v1/results/:resultCode/bilateral/science-programs` returns the SPs CLARISA associates with the result's mapped bilateral project. Source: `clarisa.projects[].project_mappings_array[]` filtered to `status="Confirmed"` AND `portfolio_object.acronym = active portfolio` (default `"P25"`, env-driven). Response enriched from `clarisa_science_programs` for `icon_key` / `color` / `category`. Each entry carries `allocation` (%). When no active mapping exists for the result's AGRESSO contract, response is `200` with `{ science_programs: [], mapping_status: "unmapped" }`.
+- **R-BIL-077** — `GET /api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=...` returns the HLOs and indicators PRMS ToC exposes for the given SP codes. Each entry groups under its SP. Endpoint, auth, and shape per OQ-RV-2.
+- **R-BIL-078** — ARI owns the AGRESSO contract ↔ CLARISA project join through a persistent table `bilateral_project_mapping`. Resolution of a STAR result to its CLARISA project flows: `result → agresso_contract.agreement_id → bilateral_project_mapping → clarisa.projects.id`. The latest active mapping (`is_active=true`) wins when more than one historical row exists for a contract.
+- **R-BIL-079** — New persistent table `bilateral_project_mapping`. Columns: `id` (PK), `agresso_agreement_id` (FK-by-value to `agresso_contract.agreement_id`), `clarisa_project_id` (INT, the upstream CLARISA `project.id`), `clarisa_project_short_name` (VARCHAR, denormalized for display + auditability), `source` (ENUM: `MANUAL` | `AI_SUGGESTED` | `AI_AUTO`, default `MANUAL`), `confidence_score` (FLOAT nullable, populated only when `source != MANUAL`), `notes` (TEXT nullable), `is_active` (BOOLEAN), full `AuditableEntity` audit fields. Indexes: `idx_bpm_agreement` on `agresso_agreement_id`, `idx_bpm_clarisa_project` on `clarisa_project_id`, partial-unique on `(agresso_agreement_id) WHERE is_active = true`.
+- **R-BIL-080** — New admin SSR page `/admin/bilateral-project-mappings` + REST surface `/api/admin/bilateral-project-mappings` for list (paginated, search by AGRESSO ID or project short_name, filter by `is_active` + `source`), create, edit, deactivate. Access: `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)`. CLARISA project picker on the create/edit form is populated from cached CLARISA `/api/projects` (CLARISA-projects tool service from R-BIL-076). AGRESSO contract picker is populated from existing `AgressoContractService` filtered to `funding_type IN ('BLR','BILATERAL')`. All writes audited via `AuditableEntity`. Deactivate is soft (set `is_active=false`, preserve row for audit).
 
 ### MODIFIED requirements
 
-- **R-BIL-015 / R-BIL-034** — extended to include the source-based read-only gate (currently only covers post-PRMS-sync state). (A5)
-- **`tasks.md` T-31** — re-scoped from "SP catalog sync" to "indicators-per-SP sync" (catalog metadata sync is now covered by NEW above). (E)
+- **R-BIL-070** — validation source changes from `clarisa_science_programs` (active rows) to **the SP list returned by R-BIL-076 for the same result**. Error payload structure unchanged (`{ unknown_sp_codes: string[] }`).
+- **R-BIL-074** — narrowed: keep `icon_key` (still useful for FE display); **drop `reporting_enabled` and `prms_id` columns** — neither upstream owns those concepts under the new model.
+- **R-BIL-015 / R-BIL-034** (parent spec) — extended to include the source-based read-only gate (currently only covers post-PRMS-sync state). (R-BIL-071 in this spec covers it.)
+- **parent `tasks.md` T-31** — re-scoped from "SP catalog sync" to "indicators-per-SP sync" (catalog metadata is no longer ours; HLOs come live from PRMS ToC under R-BIL-077).
 
 ### REMOVED requirements
 
-- None.
+- **R-BIL-072** (v1) — periodic two-upstream sync of the SP catalog. Deleted. CLARISA and PRMS ToC become live read sources; no local sync.
+
+### Tasks delta (vs the 2026-05-24 trio)
+
+| Task | Action | Notes |
+| --- | --- | --- |
+| T-15.5 | **DROP** | periodic sync no longer needed. |
+| T-15.4 | **NARROW** | add only `icon_key` (drop `reporting_enabled`, `prms_id`). |
+| T-15.1 | **MODIFY** | validation source becomes R-BIL-076 result instead of `ClarisaScienceProgramsService.findAll()`. |
+| T-15.8 | **MODIFY** | doc updates include deprecation note on `/api/tools/clarisa/science-programs` direct consumption + admin module pointer. |
+| **T-15.10** | **ADD** | `src/domain/tools/clarisa/projects/clarisa-projects.service.ts` — thin client + 5-min in-memory cache; methods `listBilateralProjectsWithMappings()`, `findProjectById(id)`. |
+| **T-15.11** | **ADD** | controller + service for `GET /api/v1/results/:resultCode/bilateral/science-programs` (consumes mapping table + CLARISA projects service). |
+| **T-15.12** | **ADD** | `src/domain/tools/prms-toc/prms-toc.service.ts` + controller + service for `GET /api/v1/results/:resultCode/bilateral/hlos-indicators`. **BLOCKED on OQ-RV-2.** |
+| **T-15.13** | **ADD** | Migration `<timestamp>-createBilateralProjectMapping.ts` + entity `BilateralProjectMapping` extending `AuditableEntity`. |
+| **T-15.14** | **ADD** | `BilateralProjectMappingService` (CRUD + history) + `BilateralProjectMappingController` (admin REST surface) + DTOs + repository. Role-gated to `CENTER_ADMIN` / `SYSTEM_ADMIN`. Includes lookup helper `findActiveByAgreementId(agreement_id)` consumed by T-15.11. |
+| **T-15.15** | **ADD** | Admin SSR page `/admin/bilateral-project-mappings` (React 19 list + edit components per `src/admin/README-REACT.md`) + matching `AdminController` handler + new sidebar entry + new `AdminService` method. |
+| **T-15.16** | **DEFERRED** | AI-assisted mapping suggestions; captured for backlog only. Not in scope for first cut. |
 
 ---
 
-## 10. Approach options
+## 9. Approach options
 
-### Option 1 — Append everything inline to existing `tasks.md`
+### Option A — Pure CLARISA + PRMS proxy (no local cache)
 
-Pros: single file, no new sub-spec, fastest.
-Cons: blurs the original Phase 0–2 plan with mid-flight discoveries; loses the SDD "one feature folder per change" convention; can't run `/sdd-specify` cleanly.
+Pros: simplest. Both sources canonical; no consistency risk. No cron, no extra columns.
+Cons: every picker open hits CLARISA + PRMS. Latency depends on upstreams. Outage → picker empty.
 
-### Option 2 — Create `pending-items/` as a new SDD sub-spec (Recommended)
+### Option B — CLARISA + PRMS proxy with short-TTL in-memory cache (Recommended)
 
-Pros: matches the convention (`docs/specs/<module>/<feature>/`); proposal here becomes inventory, `/sdd-specify` lifts it into formal `requirements.md` + `design.md` + `tasks.md`; preserves the original `tasks.md` as the Phase 0–2 baseline; gives Phase 1.5 + architectural deltas their own traceable lineage.
-Cons: one extra folder; one extra hop for readers.
+Pros: both sources canonical; pick latency fast on warm cache; tolerates short upstream hiccups. Local `clarisa_science_programs` covers display-field enrichment.
+Cons: cache invalidation TTL-based (acceptable — project↔SP changes are rare).
 
-### Option 3 — One sub-spec per item (A1 through F38)
+### Option C — Keep the periodic sync model (Option from v1)
 
-Pros: maximum traceability.
-Cons: ceremony overload for items that are 1-line code changes (A2, A6); fragments review.
-
----
-
-## 11. Recommended approach
-
-**Option 2.** It is the smallest change that respects the SDD methodology, keeps the original tasks.md as a historical baseline, and gives the team a single approvable artifact (this proposal) that decides scope before any detailed spec work begins.
-
-The sub-spec at `docs/specs/bilateral-module/pending-items/` will, after `/sdd-specify`, contain:
-
-- `requirements.md` — formal versions of R-BIL-070 / 071 / 072 plus traceability for A1–A7.
-- `design.md` — the two-upstream sync diagram, source-based read-only flow, icon strategy.
-- `tasks.md` — new T-IDs `T-15.1..T-15.7` (Phase 1.5) plus a re-pricing of T-21..T-38 reflecting current blockers and dependencies.
+Pros: catalog always available offline; deterministic.
+Cons: wrong source of truth; drift the moment CLARISA reallocates an SP or PRMS rewires a ToC link.
 
 ---
 
-## 12. Risks, dependencies, and open questions
+## 10. Recommended approach
 
-| Risk / Question | Mitigation |
-| --- | --- |
-| Phase 1.5 items (A2, A5) change FE contract; STAR build that already consumes today's contract could break. | Both are additive at the response level (`is_read_only` already exists; 400 on bad code is correct error semantics). Coordinate landing window with STAR FE team. |
-| Two-upstream sync (B1) introduces consistency risk if CLARISA and PRMS disagree on what exists. | Design intent: CLARISA wins on existence (is the SP in the portfolio at all?); PRMS only enriches existing rows. Capture this in design.md. |
-| Phase 3+ blockers (T-21, T-22, T-23) are external; no internal action will unblock them. | Track in this proposal; escalate via PO; do not start dependent work until they close. |
-| Static seed for catalog will drift the moment PRMS recolors an SP. | Acceptable for now; periodic sync (E) is the eventual fix. |
-| Migration A6 (apply `1779190000010` to dev/staging/prod) blocks ANY environment from using the SP endpoint. | Highest-priority operational item — should land before A1 (FE consumption) in any non-local env. |
+**Option B.** Smallest safe path that:
+
+1. Puts CLARISA + PRMS ToC in their rightful places as canonical.
+2. Keeps user experience snappy (5-min in-memory cache per upstream).
+3. Preserves work already shipped (local catalog stays useful for icons/colors/names).
+4. Drops the most invalidated piece (cron sync) without scrapping landed migrations.
+
+Implementation:
+- `ClarisaProjectsService.listBilateralProjectsWithMappings()` — caches the filtered, mapping-projected output of `/api/projects` for 300 s. On upstream error with warm cache, serve cache + log; with cold cache, 503.
+- `PrmsTocService.listHlosByScienceProgram(sp_codes)` — same TTL pattern, keyed by sorted comma-joined SP code tuple.
+- `BilateralProjectMappingService.findActiveByAgreementId(agreement_id)` — single DB query, no cache (admin writes need immediate visibility).
 
 ---
 
-## 13. Success criteria
+## 11. Risks, dependencies, and open questions
+
+| # | Item | Notes |
+| --- | --- | --- |
+| ~~OQ-RV-1~~ | ~~Canonical join key STAR result → CLARISA project~~ | **CLOSED 2026-05-25** — resolved by introducing the admin-owned `bilateral_project_mapping` table (R-BIL-079 / R-BIL-080). |
+| **OQ-RV-2** | Confirm the PRMS ToC endpoint that takes SP codes and returns HLOs / indicators. URL, auth, payload, supported filters (portfolio, status). | Owner: PRMS team. Due: 2026-06-05. **BLOCKER for R-BIL-077 / T-15.12.** |
+| **OQ-RV-3** | When a STAR result is funded by multiple AGRESSO contracts each mapped to a different CLARISA project, do we UNION or INTERSECT the SP sets for the picker? | Owner: MEL PO + STAR FE. Due: 2026-06-15. |
+| **OQ-RV-4** | Should the picker show only SPs whose `status === "Confirmed"`, or also `Pending` / `Draft`? | Owner: MEL PO. Due: 2026-06-15. |
+| **OQ-RV-5** | Should the picker filter on the active portfolio (`P25`)? If a project has mappings to multiple portfolios (P22 + P25), do we show only the current one? | Owner: MEL PO. Due: 2026-06-15. |
+| **OQ-RV-6** | Does CLARISA `/api/projects` require additional filters for performance once we hit production (today returns 299 records in ~1 MB; tolerable but worth confirming)? | Owner: CLARISA team. Due: 2026-06-30. |
+| **OQ-RV-7** | Admin UX: should bulk CSV import be Phase 1 or Phase 2? With 200+ bilateral contracts, one-by-one mapping is operator-painful — but a CSV importer is its own task and pushes T-15.15 over a one-day budget. | Owner: MEL PO + ops. Due: 2026-06-15. |
+| **OQ-RV-8** | AI assistance scoping: which LLM / embedding service for suggestions? Operator workflow — "suggest top-N", auto-apply with confidence threshold, or pure suggestion? | Owner: ARI backend lead + PO. Due: 2026-07-15 (T-15.16 is deferred). |
+| **OQ-RV-9** | When deactivating a mapping, what happens to STAR results that already have `selected_science_programs` persisted from that mapping? Leave alone / re-validate on next read / flag as `is_stale`? | Owner: MEL PO + ARI backend. Due: 2026-06-15. |
+| Risk | CLARISA latency on picker open. | Mitigation: 5-min in-memory cache; circuit-breaker after 3 failures. |
+| Risk | PRMS ToC endpoint not yet documented. | Block T-15.12 until OQ-RV-2 closes. Document explicit `503` response with retry hint until then. |
+| Risk | Operator burden of manual mapping at launch (200+ bilateral contracts). | Mitigation: launch with the mapping page; track admin workload weekly; if friction is high, accelerate T-15.16 (AI assist) or follow-on CSV import into a Phase 1.6 wave. |
+| Risk | Local fallback catalog drifts vs CLARISA. | Acceptable: it's display-only. Codes are CLARISA-canonical. |
+| Risk | Phase 3+ blockers (T-21, T-22, T-23) are external; no internal action will unblock them. | Track in this proposal; escalate via PO; do not start dependent work until they close. |
+
+---
+
+## 12. Success criteria
 
 - This proposal is approved by the bilateral module PO.
-- `/sdd-specify bilateral-module/pending-items` produces a clean three-file spec set.
+- PRMS team confirms OQ-RV-2; MEL PO closes OQ-RV-3..5 + OQ-RV-7 + OQ-RV-9. OQ-RV-8 (AI scoping) MAY remain open; T-15.16 is deferred and not on this wave's critical path.
+- `/sdd-specify bilateral-module/pending-items` is re-run; the resulting `requirements.md` / `design.md` / `tasks.md` reflect this v2 proposal (R-BIL-072 removed, R-BIL-076..080 added, T-15.5 dropped, T-15.10..15 added, T-15.16 captured-but-deferred).
+- STAR FE handoff doc updated to consume the new endpoints and stops calling `/api/tools/clarisa/science-programs` directly (kept available but deprecated). FE handles `mapping_status: "unmapped"` empty state.
+- Admin SSR page renders the mapping list/edit and a `CENTER_ADMIN` can create + deactivate a mapping end-to-end in dev environment.
 - Every item in §8 has an owner and a status in the resulting `tasks.md`.
-- `frontend-handoff.md` §12 changelog references the new spec so the FE team knows where to look for next-wave context.
 
 ---
 
-## 14. Next step
+## 13. Next step
 
 ```text
 /sdd-specify bilateral-module/pending-items
 ```
 
-After approval of this proposal, that command will generate the formal `requirements.md`, `design.md`, and `tasks.md` for the pending-items wave. Until then, this proposal is the canonical reference for "what's left on the bilateral module".
+Re-run after this v2 is approved. With OQ-RV-1 closed (admin-owned join table), only T-15.12 (PRMS ToC endpoint, R-BIL-077) stays BLOCKED on OQ-RV-2 (PRMS team). The rest of the tasks (T-15.10..15) are READY in the regenerated `tasks.md` as soon as PO approves.
+
+Sensible PR sequencing:
+
+1. **T-15.13** (mapping table + entity) — unblocks everything downstream; small migration.
+2. **T-15.10** (CLARISA projects tool) + **T-15.14** (mapping admin service+controller) — can land in parallel.
+3. **T-15.15** (admin SSR page) — needs T-15.14.
+4. **T-15.11** (per-result SP endpoint) — needs T-15.10 + T-15.14.
+5. **T-15.12** (PRMS ToC endpoint) — when OQ-RV-2 closes.
+6. **T-15.16** (AI assist) — deferred backlog.
+
+---
+
+## 14. Changelog
+
+| Date | Version | Change | Commit |
+| --- | --- | --- | --- |
+| 2026-05-23 | v1 | Initial inventory proposal: A1–A7 Phase 1.5 hardening + B1–B4 architectural deltas + C/D/E/F Phase 3+ re-pricing. Approached SP linkage as a static seed in `clarisa_science_programs` with R-BIL-072 periodic sync (CLARISA owns name/category, PRMS owns color/reporting_enabled/prms_id). Approved by PO. | `c6709e67` (proposal) → `a9a0b7c7` (R/D/T trio) |
+| 2026-05-25 | v2 | Three architectural corrections folded in: (1) SP-per-project linkage owned by CLARISA `/api/projects.project_mappings_array[]`, not by us; (2) HLOs/indicators owned by PRMS ToC, proxied live; (3) AGRESSO contract ↔ CLARISA project join owned by ARI via a new admin-maintained `bilateral_project_mapping` table — manual first cut, schema forward-compatible with AI suggestions. Deltas: R-BIL-072 removed; R-BIL-074 narrowed (drop `reporting_enabled` + `prms_id`); R-BIL-076..080 added; T-15.5 dropped; T-15.10..15 added; T-15.16 deferred. OQ-RV-1 (upstream join field) closed by introducing our own table. Local `clarisa_science_programs` reclassified as display-only fallback. | (this commit) |
+
+When the resulting `requirements.md` / `design.md` / `tasks.md` are regenerated by `/sdd-specify`, they supersede the 2026-05-24 trio. The `5d48b27b` SP catalog wave migration stays — the table is now a display fallback, not a picker source.
