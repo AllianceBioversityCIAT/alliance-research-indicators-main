@@ -73,6 +73,10 @@ describe('StarResultsExportRepository', () => {
     expect(sql).toContain(
       'csd.group_session_participants_total AS number_people_trained_total',
     );
+    expect(sql).toContain(
+      'LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id',
+    );
+    expect(sql).toContain('pc.policy_type AS policy_type');
     expect(params).toEqual([10, 20, 10, 20]);
   });
 

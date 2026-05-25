@@ -151,10 +151,13 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(byKey.get('start_date')?.cellDataType).toBe('date');
     expect(byKey.get('end_date')?.cellDataType).toBe('date');
     expect(byKey.get('result_code')?.cellDataType).toBeUndefined();
-    expect(raw!.columns).toHaveLength(54);
+    expect(raw!.columns).toHaveLength(58);
     expect(
       raw!.columns.find((c) => c.key === 'training_engagement_report')?.header,
     ).toBe('Training type');
+    expect(raw!.columns.find((c) => c.key === 'policy_type')?.header).toBe(
+      'Policy type',
+    );
   });
 
   it('renders typed reporting_year and creation_date cells in exported xlsx', async () => {
