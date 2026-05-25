@@ -64,6 +64,15 @@ describe('StarResultsExportRepository', () => {
     const [sql, params] = dataSourceQuery.mock.calls[0];
     expect(sql).toContain('WHERE gi.result_id IN');
     expect(sql).toContain('ORDER BY FIELD');
+    expect(sql).toContain(
+      'LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id',
+    );
+    expect(sql).toContain(
+      'csd.training_engagement_report AS training_engagement_report',
+    );
+    expect(sql).toContain(
+      'csd.group_session_participants_total AS number_people_trained_total',
+    );
     expect(params).toEqual([10, 20, 10, 20]);
   });
 
