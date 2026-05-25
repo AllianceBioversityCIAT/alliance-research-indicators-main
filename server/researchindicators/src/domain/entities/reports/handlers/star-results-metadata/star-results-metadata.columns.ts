@@ -1,7 +1,7 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
 
 /**
- * Raw data sheet columns A–AG (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–BB (reference workbook "Raw data" header row).
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'result_code', header: 'Result Code', width: 14 },
@@ -107,6 +107,81 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
     header: 'Does asset need refinement?',
     width: 36,
   },
+  { key: 'training_engagement_report', header: 'Training type', width: 28 },
+  {
+    key: 'is_this_training_engagement',
+    header: 'Training or engagement?',
+    width: 28,
+  },
+  { key: 'length_training', header: 'Length training', width: 22 },
+  { key: 'degree', header: 'Degree', width: 20 },
+  { key: 'total_participants', header: 'Total participants', width: 20 },
+  {
+    key: 'number_people_trained_total',
+    header: 'Number people trained TOTAL',
+    width: 28,
+  },
+  {
+    key: 'number_people_trained_female',
+    header: 'Number people trained FEMALE',
+    width: 28,
+  },
+  {
+    key: 'number_people_trained_male',
+    header: 'Number people trained MALE',
+    width: 26,
+  },
+  {
+    key: 'number_people_trained_non_binary',
+    header: 'Number people trained NON BINARY',
+    width: 32,
+  },
+  {
+    key: 'group_session_purpose_name',
+    header: 'What was the purpose of this training/engagement?*',
+    width: 48,
+  },
+  {
+    key: 'group_is_attending_organization',
+    header: 'Were the trainees attending on behalf of an organization?*',
+    width: 52,
+  },
+  {
+    key: 'organizations_on_behalf',
+    header: 'Organizations on behalf',
+    width: 48,
+  },
+  {
+    key: 'individual_trainee_affiliation',
+    header: 'Trainee affiliation',
+    width: 48,
+  },
+  { key: 'individual_trainee_name', header: 'Trainee name', width: 28 },
+  {
+    key: 'individual_trainee_nationality',
+    header: 'Trainee nationality',
+    width: 28,
+  },
+  { key: 'individual_gender', header: 'Trainee Gender', width: 20 },
+  {
+    key: 'traning_supervisor',
+    header: 'Training / Engagement supervisor',
+    width: 36,
+  },
+  { key: 'language', header: 'Language', width: 20 },
+  {
+    key: 'start_date',
+    header: 'Start date',
+    width: 16,
+    cellDataType: 'date',
+  },
+  {
+    key: 'end_date',
+    header: 'End date',
+    width: 16,
+    cellDataType: 'date',
+  },
+  { key: 'delivery_modality', header: 'Delivery modality', width: 24 },
 ];
 
 export const STAR_RESULTS_METADATA_DICTIONARY_COLUMNS: ExcelColumnSpec[] = [

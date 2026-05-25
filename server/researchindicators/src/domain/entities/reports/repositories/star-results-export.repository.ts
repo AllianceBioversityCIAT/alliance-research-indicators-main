@@ -32,7 +32,8 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  * If the view SQL looks “sparse”, it is because **filters live in phase 1**, not duplicated here.
  *
  * Requires MySQL views: report_general_information, report_alliance_alignment,
- * report_partners, report_geo_location, report_evidences, report_ip_rights.
+ * report_partners, report_geo_location, report_evidences, report_ip_rights,
+ * report_capacity_sharing_development.
  */
 @Injectable()
 export class StarResultsExportRepository {
@@ -92,13 +93,34 @@ export class StarResultsExportRepository {
         ip.third_party AS third_party,
         ip.legal_restrictions_publication AS legal_restrictions_publication,
         ip.commercialization_potential_asset AS commercialization_potential_asset,
-        ip.asset_need_refinement AS asset_need_refinement
+        ip.asset_need_refinement AS asset_need_refinement,
+        csd.training_engagement_report AS training_engagement_report,
+        csd.is_this_training_engagement AS is_this_training_engagement,
+        csd.length_training AS length_training,
+        csd.\`degree\` AS \`degree\`,
+        csd.group_session_participants_total AS total_participants,
+        csd.group_session_participants_total AS number_people_trained_total,
+        csd.group_session_participants_female AS number_people_trained_female,
+        csd.group_session_participants_male AS number_people_trained_male,
+        csd.group_session_participants_non_binary AS number_people_trained_non_binary,
+        csd.group_session_purpose_name AS group_session_purpose_name,
+        csd.group_is_attending_organization AS group_is_attending_organization,
+        csd.individual_trainee_affiliation AS individual_trainee_affiliation,
+        csd.individual_trainee_name AS individual_trainee_name,
+        csd.individual_trainee_nationality AS individual_trainee_nationality,
+        csd.individual_gender AS individual_gender,
+        csd.traning_supervisor AS traning_supervisor,
+        csd.\`language\` AS \`language\`,
+        csd.start_date AS start_date,
+        csd.end_date AS end_date,
+        csd.delivery_modality AS delivery_modality
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id
       LEFT JOIN report_geo_location gl ON gl.result_id = gi.result_id
       LEFT JOIN report_evidences ev ON ev.result_id = gi.result_id
-      LEFT JOIN report_ip_rights ip ON ip.result_id = gi.result_id`;
+      LEFT JOIN report_ip_rights ip ON ip.result_id = gi.result_id
+      LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id`;
 
     const v2Filters = this.mapReportDtoToFindResultsV2Filters(filters);
     const search = filters.filters.search ?? '';
