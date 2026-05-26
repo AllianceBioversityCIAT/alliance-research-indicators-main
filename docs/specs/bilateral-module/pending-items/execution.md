@@ -185,7 +185,7 @@
     3. Regression: `GET /api/admin/dashboard` — also now SSRs the body (was previously empty for every admin page; see Pivot #3).
   - **Browser-side full CRUD** not exercised in this run — the picker payload + REST surface are both unit-tested + smoke-verified at the API layer; the React page only orchestrates those calls. End-to-end CRUD via the UI was already proven during T-15.14 (curl) and the page just wraps the same endpoints.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `9b539a7d`
 
 ---
 
