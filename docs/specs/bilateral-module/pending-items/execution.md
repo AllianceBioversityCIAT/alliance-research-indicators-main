@@ -163,7 +163,7 @@
   - `frontend-handoff.md` §4 numbering preserved (no renumber of §4.1–§4.5).
   - `tasks.md` §13 Sign-off kept in place; new §14/§15 append cleanly at the end.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `8a00dcfc`
 
 ---
 
