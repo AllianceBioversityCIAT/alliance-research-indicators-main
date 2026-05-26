@@ -173,7 +173,7 @@
     3. `GET /api/v1/results/19792/pool-funding-alignment/science-programs` → SP09 + SP10 with `icon_key: "SP09"` / `"SP10"` (was `null` pre-T-15.4).
     4. Mapping deactivated as cleanup.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `7696433b`
 
 ---
 
