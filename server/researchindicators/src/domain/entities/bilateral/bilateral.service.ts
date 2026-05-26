@@ -277,7 +277,11 @@ export class BilateralService {
       throw new ConflictException('Result is already synced to PRMS');
     }
 
-    const leverCodes = this.normalizeLeverCodes(dto);
+    const leverCodes = await this.normalizeLeverCodes(
+      dto,
+      resultId,
+      resultCode,
+    );
     const actorUserId = user.sec_user_id;
     const now = new Date();
 
@@ -565,7 +569,23 @@ export class BilateralService {
     return value === true || value === 1 || value === '1' || value === 'true';
   }
 
-  private normalizeLeverCodes(dto: UpdatePoolFundingAlignmentDto): string[] {
+  /**
+   * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.1 / R-BIL-070
+   *
+   * Normalizes input `sp_codes` (or legacy `lever_codes`) and validates each
+   * one against the per-result SP list returned by R-BIL-076 (delegated to
+   * `getScienceProgramsForResult`). Unknown codes — typos, stale FE bundles,
+   * wrong-project picks — produce a 400 with `errors.unknown_sp_codes` so the
+   * FE can highlight which inputs failed.
+   *
+   * Validation skipped when `has_contribution === false` (codes are dropped
+   * per the existing R-BIL-014 behavior).
+   */
+  private async normalizeLeverCodes(
+    dto: UpdatePoolFundingAlignmentDto,
+    resultId: number,
+    resultCode: string,
+  ): Promise<string[]> {
     if (!dto.has_contribution) {
       return [];
     }
@@ -580,6 +600,25 @@ export class BilateralService {
       throw new BadRequestException(
         'At least one Science Program code (sp_codes) is required when has_contribution is true',
       );
+    }
+
+    const perResult = await this.getScienceProgramsForResult(
+      resultId,
+      resultCode,
+    );
+    const validCodes = new Set(perResult.science_programs.map((sp) => sp.code));
+    const unknownCodes = codes.filter((code) => !validCodes.has(code));
+
+    if (unknownCodes.length) {
+      // GlobalExceptions surfaces `exception.response.message` into the
+      // envelope's `errors` field — packing the structured payload as
+      // `message` is how the FE receives `errors.unknown_sp_codes`.
+      throw new BadRequestException({
+        message: {
+          description: 'Unknown Science Program codes',
+          unknown_sp_codes: unknownCodes,
+        },
+      });
     }
 
     return codes;

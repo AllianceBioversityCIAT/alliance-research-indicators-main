@@ -17,7 +17,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 
 | Task | Title | Maps to | Status |
 | --- | --- | --- | --- |
-| T-15.1 | Catalog-aware validation on PATCH alignment | R-BIL-070 | todo |
+| T-15.1 | Catalog-aware validation on PATCH alignment | R-BIL-070 | [x] done (2026-05-26) |
 | T-15.2 | Source-based read-only gate | R-BIL-071 (modifies R-BIL-015 / R-BIL-034) | todo |
 | T-15.3 | Migration: rename `lever_code` → `sp_code` | R-BIL-073 | todo |
 | T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | todo |
@@ -95,13 +95,13 @@ graph TD
   - Reuses `BilateralService.getScienceProgramsForResult` — DO NOT re-implement the chain in the validator.
   - When the result is unmapped, the per-result list is `[]`; non-empty `sp_codes` therefore rejects with 400 (per R-BIL-070 scenario 4).
 - **Acceptance / done check:**
-  - [ ] AC.1–AC.4 from R-BIL-070 pass.
-  - [ ] `npm test -- bilateral.service.spec` passes.
-  - [ ] Manual: PATCH with `sp_codes:["SP99"]` against a mapped result returns 400 with the structured `errors` payload.
+  - [x] AC.1–AC.4 from R-BIL-070 pass.
+  - [x] `npm test -- bilateral.service.spec` passes (focused spec `bilateral.service.normalizeLeverCodes.spec.ts`).
+  - [x] Manual: PATCH with `sp_codes:["SP99"]` against a mapped result returns 400 with the structured `errors` payload.
 - **Dependencies:** T-15.11 (the per-result SP endpoint must exist).
 - **Estimated effort:** S
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.1 entry. 4 unit tests + live smoke against CSICAP 19792. Surfaces a pre-existing alignment-table partial-unique bug noted as separate follow-up.
 
 ---
 

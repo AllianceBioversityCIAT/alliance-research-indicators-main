@@ -144,6 +144,38 @@
 
 ---
 
+### [x] T-15.1 — Catalog-aware validation on PATCH alignment
+
+- **Date:** 2026-05-26
+- **Requirements covered:** R-BIL-070 (all 4 scenarios)
+- **Files added:**
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.normalizeLeverCodes.spec.ts` (focused-scope spec for T-15.1; full bilateral.service spec lands in T-15.6)
+- **Files modified:**
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.ts` — `normalizeLeverCodes` extended to async, now takes `(dto, resultId, resultCode)`. When `has_contribution === true` and codes are present, it calls `this.getScienceProgramsForResult(resultId, resultCode)` (T-15.11), builds a `Set` from the response's `science_programs[].code`, and rejects any input not in that set. `updateAlignment` now `await`s the normalizer.
+- **Decisions made:**
+  - **Reuse `getScienceProgramsForResult` rather than re-implementing the chain.** The validator and the picker now agree on which codes are valid by construction — there's no second source-of-truth to drift.
+  - **Structured payload in `BadRequestException`.** GlobalExceptions surfaces `exception.response.message` into the envelope's `errors` field. To get `errors.unknown_sp_codes` to the FE without changing the global filter, I throw `new BadRequestException({ message: { description: 'Unknown Science Program codes', unknown_sp_codes } })`. The envelope's top-level `description` stays `"BadRequestException"` (the spec idealized this as `"Unknown Science Program codes"`, but matching that exactly would require touching the global filter — out of T-15.1 scope; the human-readable text is preserved inside `errors.description`).
+  - **`has_contribution === false` short-circuit kept first.** The validator returns `[]` immediately without calling `getScienceProgramsForResult`, so a `has_contribution: false` PATCH with stale codes still succeeds (R-BIL-014 behavior preserved).
+  - **Unmapped result rejects any non-empty codes by design.** R-BIL-076 returns an empty `science_programs[]` when no mapping exists, so the validator's diff naturally classifies every input as unknown. Tested explicitly as scenario 4.
+- **Issues encountered:**
+  - Live smoke surfaced a **pre-existing schema bug unrelated to T-15.1**: `result_pool_funding_alignment` has a plain `UNIQUE INDEX uq_..._result_active(result_id, is_active)`. The constraint should have been partial-unique (only on `is_active=true`) — as it stands, a second deactivated row collides with the first. Visible only on the write path, AFTER my validator passes — so it incidentally proves R-BIL-070 scenarios 1 + 3 (validation passed; we got into the write). Captured as a follow-up; should be a sibling migration converting `uq_..._result_active` to the same STORED GENERATED column + UNIQUE pattern used by `bilateral_project_mapping` (D-PI-9).
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - Unit: `npx jest src/domain/entities/bilateral` → **33/33 passing** (4 new T-15.1 + 8 existing T-15.11 + 21 existing T-15.14).
+  - Lint `npx eslint --fix` → clean.
+  - Nest boot clean; DI gate `/api/v2/results` → 200.
+  - **Live end-to-end smoke against CSICAP (result 19792, AGRESSO `D527`, mapped to CLARISA project 1 with SP09 + SP10):**
+    1. POST mapping `D527 → 1` → 201 ✓
+    2. **Scenario 2** — PATCH `{has_contribution:true, sp_codes:["SP09","SP99"]}` → **400** with `errors.unknown_sp_codes: ["SP99"]` and `errors.description: "Unknown Science Program codes"` ✓
+    3. **Scenario 1** — PATCH `{has_contribution:true, sp_codes:["SP09"]}` → validation passes (then hits pre-existing write-side schema bug → 500) ✓ validator-side
+    4. **Scenario 4** — Deactivate mapping; PATCH `{has_contribution:true, sp_codes:["SP09"]}` against now-unmapped result → **400** with `errors.unknown_sp_codes: ["SP09"]` ✓
+    5. **Scenario 3** — PATCH `{has_contribution:false, sp_codes:["SP99"]}` → validation skipped (then same write-side bug → 500) ✓ validator-side
+    6. Cleanup: mapping `id=4` left deactivated for audit.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
 ## Pivot Record #2 — Endpoint URL path uses existing controller namespace
 
 - **Task affected:** T-15.11 (also retroactively updates R-BIL-076 + R-BIL-077 + design.md §6.1–6.2 + architecture mermaid + frontend-handoff §4.6–4.7)
