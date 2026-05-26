@@ -144,6 +144,32 @@
 
 ---
 
+### [~] T-15.7 — Rollout (dev leg done; staging + prod queued for DevOps)
+
+- **Date:** 2026-05-26
+- **Requirements covered:** R-BIL-075 (dev leg), NFR-BIL-072 (zero-500 post-rollout)
+- **Files added:**
+  - `docs/specs/bilateral-module/pending-items/rollout-checklist.md` — env-by-env rollout commands, smoke curls (A/B/C/D), rollback sequence (LIFO `migration:revert`), per-env sign-off blocks, safety-export instructions for `bilateral_project_mapping`, and a known-risks table.
+- **Files modified:**
+  - `docs/specs/bilateral-module/pending-items/tasks.md` — T-15.7 marked `[~] in progress`; dev leg ticked; staging + prod linked to the new checklist.
+- **Decisions made:**
+  - **Dev leg is the only part I could fully execute** without staging/prod creds. Marked done with the migration round-trip evidence already captured during T-15.3 / T-15.4 / T-15.13 development.
+  - **Smoke set widened from the spec's original 2 checks to 4** (A: catalog + icon_key, B: DI sanity `/api/v2/results`, C: mapping endpoint registered, D: per-result picker on a known bilateral result). C and D are new — they catch regressions specific to the Phase 1.5 surfaces, not just the parent catalog endpoint. NFR-BIL-072's "zero 500s" target is more directly verified by C + D than by A alone.
+  - **`bilateral_project_mapping` safety export is in the rollback path.** Catalog tables are regenerable from migrations; the mapping table holds operator-created data that survives between environments. Documented explicitly to avoid an accidental destructive revert in prod.
+  - **Operator-validation step added to staging sign-off** (a STAR FE engineer creates one mapping end-to-end via the admin SSR page and confirms the per-result picker only shows that project's SPs). Catches the integration seam between the admin module (T-15.15) + the per-result picker (T-15.11) + the catalog enrichment (T-15.4) in a way curl alone can't.
+- **Issues encountered:**
+  - First live verification hit a transient `read ETIMEDOUT` on the MySQL connection pool (stale connection from earlier dev work). Retry was clean; flagged as a known interaction in the checklist so DevOps doesn't mistake a transient pool issue for a rollout failure.
+- **Verification (dev leg only — staging + prod blocked on DevOps):**
+  - Migration ledger: `npm run migration:dev:execute` → `No migrations are pending`.
+  - Smoke A: `GET /api/tools/clarisa/science-programs` → `status=200`, 13 rows, all `icon_key` populated. Sample: `SP01 → icon_key=SP01, color=#ef4444`.
+  - Smoke B: `GET /api/v2/results?limit=1` → 200.
+  - Smoke C: `GET /api/bilateral-project-mappings?limit=1` → 200, `meta.total=3` (the 3 inactive D527 rows from prior smokes).
+  - Smoke D: (already verified end-to-end during T-15.11) — result `19792` (CSICAP) → AGRESSO `D527` → CLARISA project `1` (T-PJ-003262 IITA) → `SP09 25% + SP10 75%` Confirmed in P25.
+- **Status:** [~] dev leg completed; staging + prod tracked in the checklist (awaiting DevOps owner assignment + off-peak window confirmation).
+- **Commit:** (pending — this entry + checklist + tasks.md flip)
+
+---
+
 ### [x] T-15.6 — Sibling spec backfill
 
 - **Date:** 2026-05-26

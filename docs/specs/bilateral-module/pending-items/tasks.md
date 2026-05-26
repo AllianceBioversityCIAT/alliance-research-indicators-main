@@ -22,7 +22,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.3 | Migration: rename `lever_code` → `sp_code` | R-BIL-073 | [x] done (2026-05-26) |
 | T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | [x] done (2026-05-26) |
 | T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | [x] done (2026-05-26) |
-| T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | todo |
+| T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | [~] in progress — dev done; staging+prod queued for DevOps (see [`./rollout-checklist.md`](./rollout-checklist.md)) |
 | T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | [x] done (2026-05-26) |
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | [x] done (2026-05-26) |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | [x] done (2026-05-26) |
@@ -208,13 +208,13 @@ graph TD
   - Off-peak window per ops runbook.
   - Have `npm run migration:revert` rollback path ready.
 - **Acceptance / done check:**
-  - [ ] All four migrations applied on dev; smoke 200 + 13 rows; `/api/v2/results` 200.
-  - [ ] Same on staging.
-  - [ ] Same on production.
+  - [x] All four migrations applied on dev; smoke 200 + 13 rows + every `icon_key` populated; `/api/v2/results` 200; `/api/bilateral-project-mappings` 200; per-result picker verified on result 19792 (CSICAP).
+  - [ ] Same on staging — see [`./rollout-checklist.md`](./rollout-checklist.md) §4.2.
+  - [ ] Same on production — see [`./rollout-checklist.md`](./rollout-checklist.md) §4.3.
 - **Dependencies:** T-15.3, T-15.4, T-15.13.
 - **Estimated effort:** S per env
-- **Owner:** TBA (DevOps)
-- **Status:** todo
+- **Owner:** DevOps (paired with ARI backend)
+- **Status:** [~] in progress (2026-05-26) — dev leg complete; staging + prod queued. Rollout commands, smokes, rollback sequence, sign-off blocks, and per-env safety-export instructions captured in [`./rollout-checklist.md`](./rollout-checklist.md).
 
 ---
 
