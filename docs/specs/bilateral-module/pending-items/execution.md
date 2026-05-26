@@ -171,7 +171,7 @@
     4. `npm run migration:dev:execute` re-apply → ✓ idempotent.
   - **Write-path** indirect verification: typecheck + entity wiring + unit tests + GET round-trip prove the rename is structurally correct. End-to-end PATCH could not be exercised against result 19792 because of the pre-existing `result_pool_funding_alignment.uq_..._result_active` plain-unique bug (documented in T-15.1's execution entry — fires on the parent alignment row, before alignment_sp is touched). That's a separate follow-up; T-15.3 correctness is established by all the other checks.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `2c650db4`
 
 ---
 
