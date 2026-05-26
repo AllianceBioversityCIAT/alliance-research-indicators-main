@@ -160,7 +160,7 @@
   - §15 "Re-price log" cross-link anchor (`#15-re-price-log`) is the lowercased section heading, which matches GitHub-flavored markdown's anchor generation.
   - The other parent-spec content + the pending-items sub-spec content remain unchanged outside this update.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `daca84ac`
 
 ---
 
