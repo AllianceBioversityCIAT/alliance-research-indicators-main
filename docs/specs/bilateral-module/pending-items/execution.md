@@ -172,7 +172,7 @@
     5. **Scenario 3** — PATCH `{has_contribution:false, sp_codes:["SP99"]}` → validation skipped (then same write-side bug → 500) ✓ validator-side
     6. Cleanup: mapping `id=4` left deactivated for audit.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `309d03fe`
 
 ---
 
