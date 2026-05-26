@@ -173,7 +173,7 @@
     6. Mapping deactivated as cleanup.
   - **Revert path** intentionally not re-tested after smoke step 5 — the smoke produced exactly the data condition the DOWN can't unwind, which is the property documented in the DOWN comment.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `12216a73`
 
 ---
 
