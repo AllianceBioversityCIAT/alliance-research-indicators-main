@@ -26,7 +26,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | todo |
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | todo |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | [x] done (2026-05-26) |
-| T-15.11 | `GET .../bilateral/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | todo |
+| T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | [x] done (2026-05-26) |
 | T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | R-BIL-077 | blocked (OQ-RV-2) |
 | T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | [x] done (2026-05-25) |
 | T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | [x] done (2026-05-26) |
@@ -224,7 +224,7 @@ graph TD
 - **Files touched:**
   - `docs/specs/bilateral-module/design.md` — new §3.6 "CLARISA-source SPs + admin mapping" and §3.7 "Source-based read-only gate", cross-linked here.
   - `docs/specs/bilateral-module/tasks.md` — new §10 "Phase 1.5 deltas" pointing to this sub-spec, listing T-15.1..15.16 with current status; §11 "Re-price log" entry per T-15.9.
-  - `docs/specs/bilateral-module/frontend-handoff.md` — §4.2 updated for the new union semantic of `is_read_only`; §4.3 updated for the new 400 validation; §4.6 rewritten — picker source is now `GET .../bilateral/science-programs`, deprecate `/api/tools/clarisa/science-programs` for picker use; new §4.7 for HLO endpoint; new §4.8 for admin module pointer; §12 changelog entry.
+  - `docs/specs/bilateral-module/frontend-handoff.md` — §4.2 updated for the new union semantic of `is_read_only`; §4.3 updated for the new 400 validation; §4.6 rewritten — picker source is now `GET .../pool-funding-alignment/science-programs`, deprecate `/api/tools/clarisa/science-programs` for picker use; new §4.7 for HLO endpoint; new §4.8 for admin module pointer; §12 changelog entry.
 - **Description:** Keep parent specs aligned with code after Phase 1.5 lands. Doc/code drift is exactly what root `CLAUDE.md` §1 warns against.
 - **Implementation notes:**
   - Land AFTER code for T-15.1, T-15.2, T-15.11, T-15.13, T-15.14, T-15.15 is merged.
@@ -280,7 +280,7 @@ graph TD
 
 ---
 
-### T-15.11 — `GET .../bilateral/science-programs` endpoint + service
+### T-15.11 — `GET .../pool-funding-alignment/science-programs` endpoint + service
 
 - **Requirements covered:** R-BIL-076 + R-BIL-078
 - **Files touched:**
@@ -297,8 +297,8 @@ graph TD
   - [ ] Manual: tag CSICAP (D527 → CLARISA project ID), hit the endpoint, see only the project's SPs.
 - **Dependencies:** T-15.10, T-15.14 (lookup helper).
 - **Estimated effort:** M
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.11 entry + Pivot Record #2 (URL path uses existing `pool-funding-alignment/` namespace, not idealized `/bilateral/`). 8 unit tests + live end-to-end smoke against CSICAP `19792` (D527 → CLARISA project 1 → SP09 25% + SP10 75% returned with color enrichment).
 
 ---
 

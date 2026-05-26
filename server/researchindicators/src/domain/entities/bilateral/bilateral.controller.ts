@@ -72,6 +72,28 @@ export class BilateralController {
       );
   }
 
+  @Get('science-programs')
+  @Version('1')
+  @GetResultVersion()
+  @ApiOperation({
+    summary:
+      'Get Science Programs linked to the result’s mapped bilateral project (R-BIL-076)',
+  })
+  async getScienceProgramsForResult() {
+    return this.bilateralService
+      .getScienceProgramsForResult(
+        this.resultsUtil.resultId,
+        String(this.resultsUtil.resultCode),
+      )
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Bilateral science programs found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('indicators')
   @Version('1')
   @GetResultVersion()

@@ -309,7 +309,7 @@ The system SHALL apply all bilateral migrations to dev, then staging, then produ
 
 ---
 
-### R-BIL-076 — `GET /api/v1/results/:resultCode/bilateral/science-programs`
+### R-BIL-076 — `GET /api/v1/results/:resultCode/pool-funding-alignment/science-programs`
 
 The system SHALL return the SPs CLARISA associates with the result's mapped bilateral project, enriched with display fields from the local catalog.
 
@@ -581,7 +581,7 @@ No OpenSearch decorations on new tables.
 
 | Verb | Path | Auth | Notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/v1/results/:resultCode/bilateral/science-programs` | ROAR JWT | NEW (R-BIL-076). |
+| `GET` | `/api/v1/results/:resultCode/pool-funding-alignment/science-programs` | ROAR JWT | NEW (R-BIL-076). |
 | `GET` | `/api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=...` | ROAR JWT | NEW (R-BIL-077). Returns 503 until OQ-RV-2 closes. |
 | `GET` | `/api/bilateral-project-mappings?page=&limit=&search=&is_active=&source=` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080). |
 | `POST` | `/api/bilateral-project-mappings` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080). 409 on partial-unique conflict. |

@@ -17,7 +17,7 @@ This wave introduces:
 
 1. A new persistent join table `bilateral_project_mapping` (R-BIL-079) and a new admin SSR page `/admin/bilateral-project-mappings` (R-BIL-080) to maintain it manually.
 2. Two new ARI tool services — `ClarisaProjectsService` (R-BIL-076) and `PrmsTocService` (R-BIL-077) — that proxy live reads from the upstream sources with 5-min in-memory caches.
-3. Two new ARI public endpoints — `GET /api/v1/results/:resultCode/bilateral/science-programs` and `GET .../bilateral/hlos-indicators` — that the STAR FE consumes to populate the SP picker and HLO panel.
+3. Two new ARI public endpoints — `GET /api/v1/results/:resultCode/pool-funding-alignment/science-programs` and `GET .../bilateral/hlos-indicators` — that the STAR FE consumes to populate the SP picker and HLO panel.
 4. Phase 1.5 cleanups inherited from v1: catalog-aware PATCH validation (R-BIL-070), source-based read-only gate (R-BIL-071), `lever_code → sp_code` rename (R-BIL-073), `icon_key` column (R-BIL-074), operational rollout (R-BIL-075).
 
 The static `clarisa_science_programs` catalog is reclassified as **display-only fallback** (icons / colors / names); CLARISA is the new picker source of truth.
@@ -52,7 +52,7 @@ graph TD
   end
 
   subgraph "ARI HTTP"
-    EP_SP["GET /api/v1/results/:resultCode/bilateral/science-programs"]
+    EP_SP["GET /api/v1/results/:resultCode/pool-funding-alignment/science-programs"]
     EP_HLO["GET /api/v1/results/:resultCode/bilateral/hlos-indicators"]
     EP_PATCH["PATCH /api/v1/results/:resultCode/pool-funding-alignment"]
     EP_ADMIN["GET/POST/PATCH /api/bilateral-project-mappings"]
@@ -216,7 +216,7 @@ The table is **reclassified** as a display-only fallback. The single-row API (`G
 
 ## 6. API design
 
-### 6.1 `GET /api/v1/results/:resultCode/bilateral/science-programs` (R-BIL-076, NEW)
+### 6.1 `GET /api/v1/results/:resultCode/pool-funding-alignment/science-programs` (R-BIL-076, NEW)
 
 - **Controller:** `bilateral.controller.ts`
 - **Roles:** any authenticated user (`@ApiBearerAuth()`).
@@ -486,7 +486,7 @@ No shared package extension. All DTOs live inside their owning module:
 ### 10.1 SP picker open (R-BIL-076)
 
 ```
-1. STAR FE GET /api/v1/results/:resultCode/bilateral/science-programs
+1. STAR FE GET /api/v1/results/:resultCode/pool-funding-alignment/science-programs
 2. BilateralService:
    a. resolve result → agreement_id
    b. lookup active bilateral_project_mapping (BilateralProjectMappingService)

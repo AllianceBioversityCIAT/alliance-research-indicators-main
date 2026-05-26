@@ -9,6 +9,8 @@ import { ResultPoolFundingIndicatorMappingRepository } from './repositories/resu
 import { AgressoContractModule } from '../agresso-contract/agresso-contract.module';
 import { ClarisaModule } from '../../tools/clarisa/clarisa.module';
 import { ClarisaScienceProgramsModule } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.module';
+import { ClarisaProjectsModule } from '../../tools/clarisa/projects/clarisa-projects.module';
+import { BilateralProjectMappingModule } from '../bilateral-project-mapping/bilateral-project-mapping.module';
 import { ResultsModule } from '../results/results.module';
 import { ResultReviewHistoryModule } from '../result-review-history/result-review-history.module';
 import { SocketModule } from '../../tools/socket/socket.module';
@@ -36,6 +38,8 @@ import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-cha
     AgressoContractModule,
     ClarisaModule,
     ClarisaScienceProgramsModule,
+    ClarisaProjectsModule,
+    BilateralProjectMappingModule,
     ResultsModule,
     ResultReviewHistoryModule,
     SocketModule,

@@ -25,6 +25,17 @@ export class ENV {
   }
 
   /**
+   * @sdd-spec bilateral-module/pending-items — T-15.11 / R-BIL-076
+   *
+   * Active CGIAR portfolio used to filter CLARISA project_mappings_array[]
+   * when computing the SP picker source per result. Default `P25` matches
+   * the current 2025-2030 portfolio.
+   */
+  static get BILATERAL_ACTIVE_PORTFOLIO(): string {
+    return process.env.ARI_BILATERAL_ACTIVE_PORTFOLIO?.trim() || 'P25';
+  }
+
+  /**
    * LOCAL DEVELOPMENT ONLY: skip JWT validation and inject a mock SYSTEM_ADMIN user.
    *
    * Purpose: lets a developer hit the API from their machine without setting up a

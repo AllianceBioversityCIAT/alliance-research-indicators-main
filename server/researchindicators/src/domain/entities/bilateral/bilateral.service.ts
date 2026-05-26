@@ -14,6 +14,13 @@ import {
   UpdatePoolFundingAlignmentDto,
 } from './dto/update-pool-funding-alignment.dto';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
+import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
+import {
+  BilateralScienceProgramItem,
+  BilateralScienceProgramsResponse,
+} from './dto/bilateral-science-programs.response.dto';
+import { ENV } from '../../shared/utils/env.utils';
 import {
   IndicatorGroupResponse,
   IndicatorPanelIndicatorResponse,
@@ -72,7 +79,125 @@ export class BilateralService {
     private readonly noopHandler: NoopBilateralIndicatorTypeHandler,
     private readonly policyChangeHandler: PolicyChangeBilateralIndicatorTypeHandler,
     private readonly clarisaScienceProgramsService: ClarisaScienceProgramsService,
+    private readonly clarisaProjectsService: ClarisaProjectsService,
+    private readonly bilateralProjectMappingService: BilateralProjectMappingService,
   ) {}
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.11 / R-BIL-076 / R-BIL-078
+   *
+   * Per-result Science Programs picker source. Chain:
+   *   result → result_contracts (primary, active) → agresso_contracts.agreement_id
+   *          → bilateral_project_mapping (active) → CLARISA project_mappings_array
+   *
+   * Filters: only `status === "Confirmed"` AND `portfolio.acronym === activePortfolio`
+   * (env-driven, default `P25`). Display fields (color / icon_key) enriched from
+   * the local clarisa_science_programs catalog (now a display-only fallback,
+   * per D-PI-10).
+   *
+   * Always returns 200. `mapping_status === "unmapped"` covers both
+   * "no AGRESSO contract" and "no active mapping row" — the FE renders the
+   * same affordance either way ("Contact admin to link this contract").
+   */
+  async getScienceProgramsForResult(
+    resultId: number,
+    resultCode: string,
+  ): Promise<BilateralScienceProgramsResponse> {
+    const context =
+      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
+
+    if (!context) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const agreementId = context.agresso_agreement_id?.trim();
+    const baseResponse = {
+      result_code: String(context.result_official_code ?? resultCode),
+    };
+
+    if (!agreementId) {
+      return {
+        ...baseResponse,
+        mapping_status: 'unmapped',
+        clarisa_project: null,
+        science_programs: [],
+      };
+    }
+
+    const mapping =
+      await this.bilateralProjectMappingService.findActiveByAgreementId(
+        agreementId,
+      );
+
+    if (!mapping) {
+      return {
+        ...baseResponse,
+        mapping_status: 'unmapped',
+        clarisa_project: null,
+        science_programs: [],
+      };
+    }
+
+    const project = await this.clarisaProjectsService.findProjectById(
+      mapping.clarisa_project_id,
+    );
+
+    if (!project) {
+      // Mapping points at a project CLARISA no longer exposes — treat as
+      // unmapped from the picker's perspective, but surface the snapshot
+      // we have so ops can spot the drift.
+      return {
+        ...baseResponse,
+        mapping_status: 'unmapped',
+        clarisa_project: {
+          id: mapping.clarisa_project_id,
+          short_name: mapping.clarisa_project_short_name ?? '',
+        },
+        science_programs: [],
+      };
+    }
+
+    const activePortfolio = ENV.BILATERAL_ACTIVE_PORTFOLIO;
+    const filteredMappings = (project.project_mappings_array ?? []).filter(
+      (m) =>
+        m.status === 'Confirmed' &&
+        m.global_unit_object?.portfolio_object?.acronym === activePortfolio,
+    );
+
+    const catalog = await this.clarisaScienceProgramsService.findAll();
+    const catalogByCode = new Map(catalog.map((sp) => [sp.official_code, sp]));
+
+    const science_programs: BilateralScienceProgramItem[] = filteredMappings
+      .map((m) => {
+        const code = m.global_unit_object.smo_code;
+        const fallback = catalogByCode.get(code);
+        return {
+          code,
+          name: (m.global_unit_object.name ?? fallback?.name ?? code).trim(),
+          category:
+            m.global_unit_object.cgiar_entity_type_object?.name ??
+            fallback?.category ??
+            null,
+          color: fallback?.color ?? null,
+          // icon_key column is added by T-15.4; until that migration lands
+          // the FE falls back to using `code` as the asset key. The response
+          // shape is stable either way.
+          icon_key:
+            (fallback as { icon_key?: string | null } | undefined)?.icon_key ??
+            null,
+          allocation: typeof m.allocation === 'number' ? m.allocation : null,
+        };
+      })
+      // Stable order: by code so the FE picker is deterministic.
+      .sort((a, b) => a.code.localeCompare(b.code));
+
+    return {
+      ...baseResponse,
+      mapping_status: 'mapped',
+      clarisa_project: { id: project.id, short_name: project.short_name },
+      science_programs,
+    };
+  }
 
   async getAlignment(
     resultId: number,
@@ -448,9 +573,7 @@ export class BilateralService {
     // Prefer sp_codes (new) over lever_codes (legacy back-compat).
     const sourceCodes = dto.sp_codes?.length ? dto.sp_codes : dto.lever_codes;
     const codes = Array.from(
-      new Set(
-        (sourceCodes ?? []).map((code) => code?.trim()).filter(Boolean),
-      ),
+      new Set((sourceCodes ?? []).map((code) => code?.trim()).filter(Boolean)),
     );
 
     if (!codes.length) {

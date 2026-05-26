@@ -110,6 +110,58 @@
 
 ---
 
+### [x] T-15.11 — `GET .../pool-funding-alignment/science-programs` endpoint + service
+
+- **Date:** 2026-05-26
+- **Requirements covered:** R-BIL-076 (per-result SP endpoint) + R-BIL-078 (result→project resolution)
+- **Files added:**
+  - `server/researchindicators/src/domain/entities/bilateral/dto/bilateral-science-programs.response.dto.ts`
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.getScienceProgramsForResult.spec.ts` (focused-scope spec; full bilateral.service spec lands in T-15.6)
+- **Files modified:**
+  - `server/researchindicators/src/domain/entities/results/repositories/result.repository.ts` — extended `PoolFundingAlignmentContext` with `agresso_agreement_id` and `platform_code`; extended the SQL to project both. `platform_code` is added now so T-15.2 can reuse the same context lookup.
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.ts` — new method `getScienceProgramsForResult(resultId, resultCode)` chains result → agreement_id → `BilateralProjectMappingService.findActiveByAgreementId` → `ClarisaProjectsService.findProjectById` → filter (Confirmed + activePortfolio) → enrich from local catalog. Sorted by code.
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.controller.ts` — new `@Get('science-programs')` under existing controller (lands at `/api/v1/results/:resultCode/pool-funding-alignment/science-programs`).
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.module.ts` — imports `ClarisaProjectsModule` + `BilateralProjectMappingModule`.
+  - `server/researchindicators/src/domain/shared/utils/env.utils.ts` — new `ENV.BILATERAL_ACTIVE_PORTFOLIO` getter (default `"P25"`, env-driven via `ARI_BILATERAL_ACTIVE_PORTFOLIO`).
+- **Decisions made:**
+  - "Unmapped" covers three cases: (a) result has no AGRESSO contract, (b) no active row in `bilateral_project_mapping`, (c) mapping points at a project CLARISA no longer exposes. All return 200 with `mapping_status: "unmapped"` + empty `science_programs`. Case (c) also surfaces the snapshot `clarisa_project` so ops can spot drift.
+  - Active-portfolio filter is env-driven, not hard-coded. Default `"P25"` matches the current 2025–2030 portfolio. When the next portfolio rolls out, ops flips one env var, no code change.
+  - `icon_key` is sourced from the local catalog `clarisa_science_programs.icon_key`, which doesn't exist yet (T-15.4 ships it). For now the field is always `null`; T-15.4 just adds the column + seeds it. The response shape is stable either way.
+  - Sorted `science_programs[]` by code (`SP01 → SP13`) so the FE picker is deterministic regardless of CLARISA's mapping array order.
+- **Issues encountered → Pivot Record #2.**
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - Unit: `npx jest src/domain/entities/bilateral/bilateral.service.getScienceProgramsForResult` → **8/8 passing** (404, unmapped-no-contract, unmapped-no-row, unmapped-stale-project, mapped-happy, non-Confirmed filter, multi-portfolio filter, deterministic sort).
+  - Lint clean.
+  - Nest boot: route registered at `/api/v1/results/:resultCode(\d+)/pool-funding-alignment/science-programs` (version 1). DI gate `/api/v2/results` → 200.
+  - **Live end-to-end smoke against CSICAP (result 19792, AGRESSO contract D527):**
+    1. Pre-mapping → `mapping_status: "unmapped"`, empty list, 200 ✓
+    2. Created mapping `D527 → CLARISA project 1` (T-PJ-003262, IITA, Nigeria) via `POST /api/bilateral-project-mappings` → 201
+    3. Re-fetch → `mapping_status: "mapped"`, `clarisa_project.short_name` populated from CLARISA, `science_programs: [SP09 25%, SP10 75%]` with colors enriched from local catalog (#ec4899, #8b5cf6). EXACTLY what CLARISA defines for that project. ✓
+    4. Mapping row cleaned up.
+- **Status:** [x] completed
+- **Commit:** (filled in at commit time)
+
+---
+
+## Pivot Record #2 — Endpoint URL path uses existing controller namespace
+
+- **Task affected:** T-15.11 (also retroactively updates R-BIL-076 + R-BIL-077 + design.md §6.1–6.2 + architecture mermaid + frontend-handoff §4.6–4.7)
+- **Date:** 2026-05-26
+- **Discovery:** Design.md §6.1 idealized the endpoint URL as `/api/v1/results/:resultCode/bilateral/science-programs`. The existing `BilateralController` is mounted in `main.routes.ts` at `${RESULT_CODE}/pool-funding-alignment`, so adding a `@Get('science-programs')` handler lands at `/api/v1/results/:resultCode/pool-funding-alignment/science-programs`. Moving to a `/bilateral/...` namespace would require either (a) splitting the controller into two and mounting them at different routes, or (b) a major route refactor of existing endpoints (`pool-funding-alignment`, `pool-funding-alignment/indicators`).
+- **Alternatives considered:**
+  1. **Refactor: split the controller in two**, mount the new one at `bilateral/`. Pros: matches the idealized URL. Cons: doubles surface area; existing `pool-funding-alignment` controller stays; new `bilateral/` controller would have to re-import `ResultsUtil` for the same `:resultCode` token. Net negative.
+  2. **Accept existing namespace** (`pool-funding-alignment/`). Pros: zero refactor; sibling to existing `pool-funding-alignment/indicators` which is also a picker source; consistent URL design. Cons: spec deviation.
+- **Decision:** Option 2. The URL design intent in design.md was idealized without checking the existing controller path. The implementation should match the existing convention — `pool-funding-alignment/science-programs` reads naturally alongside `pool-funding-alignment/indicators` (both are picker sources for the same alignment workflow). Same applies to the future T-15.12 (`pool-funding-alignment/hlos-indicators`).
+- **Spec impact:**
+  - `requirements.md` — R-BIL-076 + R-BIL-077 paths updated.
+  - `design.md` — §6.1 + §6.2 + architecture mermaid updated.
+  - `tasks.md` — T-15.11 + T-15.12 path updated.
+  - `frontend-handoff.md` — pending T-15.8 doc update will reflect the new path; STAR FE consumes `/api/v1/results/:resultCode/pool-funding-alignment/science-programs` (and similarly for HLOs in T-15.12).
+- **Verification after pivot:** Live smoke against CSICAP green at the new path (see T-15.11 verification above).
+
+---
+
 ## Pivot Record #1 — Admin REST surface URL path
 
 - **Task affected:** T-15.14 (also retroactively updates R-BIL-080 + design.md §6.3–6.6 + architecture mermaid)

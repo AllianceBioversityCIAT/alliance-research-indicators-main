@@ -24,6 +24,15 @@ export interface PoolFundingAlignmentContext {
   report_year_id?: number;
   is_synced_to_prms: boolean | number | string;
   is_pool_funding_contributor: boolean | number | string;
+  // @sdd-spec bilateral-module/pending-items T-15.11 / R-BIL-078 — primary
+  // contract id is needed by the per-result SP endpoint to look up the
+  // active bilateral_project_mapping row. NULL when the result has no
+  // primary active contract.
+  agresso_agreement_id?: string | null;
+  // @sdd-spec bilateral-module/pending-items T-15.2 / R-BIL-071 — surfaced
+  // here so the source-based read-only gate can read it without a second
+  // round-trip. Populated when the row exists in `results`.
+  platform_code?: string | null;
 }
 
 @Injectable()
@@ -186,6 +195,8 @@ export class ResultRepository
         r.version_id,
         r.report_year_id,
         r.is_synced_to_prms,
+        r.platform_code,
+        ac.agreement_id AS agresso_agreement_id,
         COALESCE(ac.is_pool_funding_contributor, FALSE) AS is_pool_funding_contributor
       FROM results r
       LEFT JOIN result_contracts rc
