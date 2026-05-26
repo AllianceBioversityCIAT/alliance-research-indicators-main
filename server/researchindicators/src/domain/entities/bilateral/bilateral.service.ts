@@ -210,6 +210,11 @@ export class BilateralService {
 
     const eligible = this.toBoolean(context.is_pool_funding_contributor);
     const isSyncedToPrms = this.toBoolean(context.is_synced_to_prms);
+    // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.2 / R-BIL-071
+    // Source-based gate: any PRMS-sourced result is read-only on bilateral
+    // surfaces regardless of sync state. Unions with the existing R-BIL-015
+    // synced gate so the FE only needs to read `is_read_only`.
+    const isPrmsSourced = this.isPrmsSourced(context.platform_code);
     const visibleAlignment = eligible ? alignment : null;
     const selectedLevers = visibleAlignment?.selected_levers ?? [];
     const selectedSciencePrograms = await this.toSelectedSciencePrograms(
@@ -224,7 +229,7 @@ export class BilateralService {
       selected_levers: selectedLevers,
       selected_science_programs: selectedSciencePrograms,
       is_synced_to_prms: isSyncedToPrms,
-      is_read_only: isSyncedToPrms,
+      is_read_only: isPrmsSourced || isSyncedToPrms,
     };
   }
 
@@ -262,6 +267,12 @@ export class BilateralService {
     if (!context) {
       throw new NotFoundException('Result not found');
     }
+
+    // R-BIL-071: architectural source gate runs first — PRMS owns the data
+    // regardless of contributor status or sync state, so reject before any
+    // domain-eligibility check fires (avoids leaking "not a contributor"
+    // when the real reason is "we don't own this result").
+    this.assertPrmsSourceWritable(context.platform_code);
 
     if (!this.toBoolean(context.is_pool_funding_contributor)) {
       throw new BadRequestException(
@@ -643,6 +654,10 @@ export class BilateralService {
       throw new NotFoundException('Result not found');
     }
 
+    // R-BIL-071: same architectural source gate as updateAlignment — runs
+    // first so PRMS-sourced results always return the locked 409 wording.
+    this.assertPrmsSourceWritable(context.platform_code);
+
     if (!this.toBoolean(context.is_pool_funding_contributor)) {
       throw new BadRequestException(
         'Result project is not a Pool Funding Contributor',
@@ -654,6 +669,26 @@ export class BilateralService {
     }
 
     return context;
+  }
+
+  // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.2 / R-BIL-071
+  //
+  // Architectural gate: PRMS-sourced results are read-only on bilateral
+  // surfaces no matter what. Runs BEFORE role/owner checks (RolesGuard
+  // bypasses SYSTEM_ADMIN, but this rejects it too — PRMS owns the data).
+  // Description wording is locked: the FE keys off it.
+  private isPrmsSourced(platformCode: string | null | undefined): boolean {
+    return platformCode === 'PRMS';
+  }
+
+  private assertPrmsSourceWritable(
+    platformCode: string | null | undefined,
+  ): void {
+    if (this.isPrmsSourced(platformCode)) {
+      throw new ConflictException(
+        'Result is PRMS-sourced; bilateral alignment is read-only in STAR',
+      );
+    }
   }
 
   private async getActiveAlignmentForLever(

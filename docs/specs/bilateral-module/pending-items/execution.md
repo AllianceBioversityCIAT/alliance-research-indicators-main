@@ -144,6 +144,36 @@
 
 ---
 
+### [x] T-15.2 — Source-based read-only gate
+
+- **Date:** 2026-05-26
+- **Requirements covered:** R-BIL-071 (all 4 scenarios) — modifies R-BIL-015 / R-BIL-034 (union semantic on `is_read_only`)
+- **Files added:**
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.sourceReadOnlyGate.spec.ts` — focused-scope spec covering all 4 R-BIL-071 scenarios.
+- **Files modified:**
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.ts` — adds private `isPrmsSourced(platformCode)` and `assertPrmsSourceWritable(platformCode)` helpers. `getAlignment` returns `is_read_only = isPrmsSourced || isSyncedToPrms` (union of the two gates). `updateAlignment` and `getEditableContributionContext` (shared by `upsertContribution` + `deleteContribution`) call the assert helper before any other domain check.
+  - `server/researchindicators/src/domain/entities/bilateral/dto/update-pool-funding-alignment.dto.ts` — `AlignmentResponse.is_read_only` docstring documents the union semantic.
+- **Decisions made:**
+  - **Gate placement: before the contributor-eligibility check.** R-BIL-071 says "BEFORE role/owner checks" (architectural). Live smoke against PRMS result 28731 showed the existing contributor check was firing first and leaking 400 "not a Pool Funding Contributor" — which is misleading. Real reason is "PRMS owns this result, period." Moved the gate up; PRMS results now always surface the locked 409 wording.
+  - **Reused `context.platform_code`** from `PoolFundingAlignmentContext` (added in T-15.11 for exactly this purpose). No second query.
+  - **Locked the 409 wording.** `"Result is PRMS-sourced; bilateral alignment is read-only in STAR"` — FE may key off it. Hard-coded in the helper, asserted verbatim in the unit test, smoke-verified live.
+  - **Union semantic on `is_read_only`** keeps the FE simple — one flag covers both gates. `is_synced_to_prms` is still exposed so existing FE telemetry that distinguishes the two reasons keeps working.
+  - **Helper kept private + small** — no new interface surface; the architectural decision lives in one file. The full spec backfill for `BilateralService` (T-15.6) will pick it up.
+- **Issues encountered:** none — the gate-ordering discovery was caught in the live smoke before commit.
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - Unit: `npx jest src/domain/entities/bilateral` → **37/37 passing** (4 new T-15.2 + 4 T-15.1 + 8 T-15.11 + 21 bilateral-project-mapping).
+  - Lint clean.
+  - **Live smoke (dev :3001):**
+    1. **Scenario 1** — `GET /api/v1/results/28731/pool-funding-alignment?reportingPlatforms=PRMS` → 200 with `is_read_only: true`, `is_synced_to_prms: false`. ✓
+    2. **Scenario 2** — `PATCH` same → **409 ConflictException**, errors = `"Result is PRMS-sourced; bilateral alignment is read-only in STAR"` (verbatim). ✓
+    3. **Scenario 3** — covered by unit test (regression: STAR + synced still returns "Result is already synced to PRMS").
+    4. **Scenario 4** — `GET /api/v1/results/19792/pool-funding-alignment` (STAR + non-synced) → `is_read_only: false` (no false-positive). PATCH passes the gate and hits the pre-existing `result_pool_funding_alignment.uq_..._result_active` write-side bug noted in T-15.1's entry — gate-side verified.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
 ### [x] T-15.3 — Migration: rename `lever_code` → `sp_code`
 
 - **Date:** 2026-05-26

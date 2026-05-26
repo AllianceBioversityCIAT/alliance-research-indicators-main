@@ -18,7 +18,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | Task | Title | Maps to | Status |
 | --- | --- | --- | --- |
 | T-15.1 | Catalog-aware validation on PATCH alignment | R-BIL-070 | [x] done (2026-05-26) |
-| T-15.2 | Source-based read-only gate | R-BIL-071 (modifies R-BIL-015 / R-BIL-034) | todo |
+| T-15.2 | Source-based read-only gate | R-BIL-071 (modifies R-BIL-015 / R-BIL-034) | [x] done (2026-05-26) |
 | T-15.3 | Migration: rename `lever_code` → `sp_code` | R-BIL-073 | [x] done (2026-05-26) |
 | T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | [x] done (2026-05-26) |
 | T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | todo |
@@ -117,13 +117,13 @@ graph TD
   - `ResultRepository.findPoolFundingAlignmentContext` already returns `platform_code`; reuse — do not add a new query.
   - The 409 description text MUST match R-BIL-071 wording exactly (FE may key off it).
 - **Acceptance / done check:**
-  - [ ] AC.1–AC.4 from R-BIL-071 pass.
-  - [ ] `npm test -- bilateral.service.spec` passes.
-  - [ ] Manual: GET a PRMS-sourced result → `is_read_only:true`; PATCH it as SYSTEM_ADMIN → 409.
+  - [x] AC.1–AC.4 from R-BIL-071 pass.
+  - [x] `npm test -- bilateral.service.spec` passes (focused spec `bilateral.service.sourceReadOnlyGate.spec.ts`).
+  - [x] Manual: GET PRMS-sourced result 28731 → `is_read_only:true`; PATCH it as SYSTEM_ADMIN bypass → 409 with the locked R-BIL-071 wording.
 - **Dependencies:** none.
 - **Estimated effort:** S
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.2 entry. Gate placed BEFORE the contributor-eligibility check so PRMS results always surface the source-gate 409 instead of leaking "not a contributor".
 
 ---
 

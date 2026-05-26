@@ -28,6 +28,11 @@ export interface AlignmentResponse {
   selected_levers: SelectedLeverResponse[];
   selected_science_programs: SelectedScienceProgramResponse[];
   is_synced_to_prms: boolean;
+  // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.2 / R-BIL-071
+  // Union of two gates:
+  //   1. PRMS-sourced (`platform_code === 'PRMS'`) — PRMS owns the data, STAR is read-only.
+  //   2. Synced to PRMS (`is_synced_to_prms === true`) — STAR-sourced result already pushed.
+  // Writes against either condition return 409 even for SYSTEM_ADMIN.
   is_read_only: boolean;
 }
 
