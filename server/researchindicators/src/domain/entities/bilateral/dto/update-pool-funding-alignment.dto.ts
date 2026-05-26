@@ -11,6 +11,13 @@ export interface SelectedScienceProgramResponse {
   name: string;
   category: string | null;
   color: string | null;
+  // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.4 / R-BIL-074
+  // Stable per-SP FE asset key (defaults to `code` until per-SP branding splits).
+  icon_key?: string | null;
+  // Optional — populated when the entry came from the CLARISA per-result path
+  // (R-BIL-076). Null when the source is the local alignment row (legacy lever
+  // catalog), which doesn't carry allocations.
+  allocation?: number | null;
 }
 
 export interface AlignmentResponse {

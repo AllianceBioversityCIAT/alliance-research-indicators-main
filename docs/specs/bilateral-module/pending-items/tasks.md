@@ -20,7 +20,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.1 | Catalog-aware validation on PATCH alignment | R-BIL-070 | [x] done (2026-05-26) |
 | T-15.2 | Source-based read-only gate | R-BIL-071 (modifies R-BIL-015 / R-BIL-034) | todo |
 | T-15.3 | Migration: rename `lever_code` → `sp_code` | R-BIL-073 | todo |
-| T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | todo |
+| T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | [x] done (2026-05-26) |
 | T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | todo |
 | T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | todo |
 | T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | todo |
@@ -166,14 +166,14 @@ graph TD
   - `src/domain/entities/bilateral/dto/update-pool-funding-alignment.dto.ts` — `SelectedScienceProgramResponse` gains `icon_key?: string | null` and `allocation?: number | null`.
 - **Description:** Adds one column to the catalog. Seeded `icon_key = official_code` for all 13 rows. Drop the v1 `reporting_enabled` + `prms_id` (out of v2 scope).
 - **Acceptance / done check:**
-  - [ ] Migration applies; 13 rows have `icon_key = official_code`.
-  - [ ] `GET /api/tools/clarisa/science-programs` returns `icon_key` on every entry.
-  - [ ] `GET .../pool-funding-alignment` carries `icon_key` on each `selected_science_programs[]` entry.
-  - [ ] Migration reverts cleanly.
+  - [x] Migration applies; 13 rows have `icon_key = official_code`.
+  - [x] `GET /api/tools/clarisa/science-programs` returns `icon_key` on every entry.
+  - [x] `GET .../pool-funding-alignment/science-programs` carries `icon_key` on each `science_programs[]` entry.
+  - [x] Migration reverts cleanly.
 - **Dependencies:** none.
 - **Estimated effort:** S
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.4 entry.
 
 ---
 

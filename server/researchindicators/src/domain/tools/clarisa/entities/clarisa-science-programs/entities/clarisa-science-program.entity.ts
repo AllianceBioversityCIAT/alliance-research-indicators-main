@@ -32,6 +32,18 @@ export class ClarisaScienceProgram {
   })
   color?: string;
 
+  // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.4 / R-BIL-074
+  // Stable FE asset key. Seeded to `official_code` for the 13 catalog rows so
+  // the FE resolves `/assets/.../SPs-Icons/${icon_key}.png` without per-SP
+  // overrides. Nullable to keep the catalog live during rollout.
+  @Column('varchar', {
+    length: 64,
+    nullable: true,
+    name: 'icon_key',
+    comment: 'Stable FE asset key — defaults to official_code',
+  })
+  icon_key?: string | null;
+
   @Column('boolean', { default: true, name: 'is_active' })
   is_active!: boolean;
 }

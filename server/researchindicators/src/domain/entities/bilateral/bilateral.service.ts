@@ -179,12 +179,7 @@ export class BilateralService {
             fallback?.category ??
             null,
           color: fallback?.color ?? null,
-          // icon_key column is added by T-15.4; until that migration lands
-          // the FE falls back to using `code` as the asset key. The response
-          // shape is stable either way.
-          icon_key:
-            (fallback as { icon_key?: string | null } | undefined)?.icon_key ??
-            null,
+          icon_key: fallback?.icon_key ?? null,
           allocation: typeof m.allocation === 'number' ? m.allocation : null,
         };
       })
@@ -248,6 +243,7 @@ export class BilateralService {
         name: match?.name ?? code,
         category: match?.category ?? null,
         color: match?.color ?? null,
+        icon_key: match?.icon_key ?? null,
       };
     });
   }

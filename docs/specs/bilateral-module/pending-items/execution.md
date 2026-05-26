@@ -144,6 +144,39 @@
 
 ---
 
+### [x] T-15.4 — Migration: add `icon_key` to catalog
+
+- **Date:** 2026-05-26
+- **Requirements covered:** R-BIL-074
+- **Files added:**
+  - `server/researchindicators/src/db/migrations/1779190000012-addIconKeyToScienceProgram.ts`
+- **Files modified:**
+  - `server/researchindicators/src/domain/tools/clarisa/entities/clarisa-science-programs/entities/clarisa-science-program.entity.ts` — adds `@Column('varchar', { length: 64, nullable: true, name: 'icon_key' }) icon_key?: string | null`.
+  - `server/researchindicators/src/domain/entities/bilateral/dto/update-pool-funding-alignment.dto.ts` — `SelectedScienceProgramResponse` gains optional `icon_key` and `allocation`.
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.ts` — drops the T-15.11 placeholder cast (`(fallback as { icon_key?: string | null } | undefined)?.icon_key`) now that the column exists on the entity; adds `icon_key` enrichment in `toSelectedSciencePrograms` so the existing alignment GET also carries it.
+- **Decisions made:**
+  - **Nullable column.** Migration is `NULL`-able and seed-fills `icon_key = official_code` in the same transaction. Keeps the catalog endpoint live during rollout (T-15.7) — environments that haven't applied this migration yet still respond 200, just without the `icon_key` field.
+  - **Seed inline, not in a separate `seed-data` step.** All 13 catalog rows are seeded `official_code → icon_key` in the same UP block. Future branding splits (e.g. "SP09 needs a custom asset") are operator UPDATEs, not migration churn.
+  - **Drop the v1 `reporting_enabled` + `prms_id`.** Per requirements doc §7 R-BIL-074 "Out of scope vs v1", those are no longer mirrored. Just the one column.
+- **Issues encountered:** none.
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - Unit: `npx jest src/domain/entities/bilateral src/domain/tools/clarisa` → **228/228 passing**. The existing T-15.11 spec keeps asserting `icon_key: null` because its catalog mock doesn't include the field — which is still correct: fallback returns `undefined` → coalesces to `null`.
+  - Lint clean.
+  - **Migration round-trip** (dev DB):
+    1. `npm run migration:dev:execute` → ✓ applied, 13 rows updated.
+    2. `npm run migration:revert` → ✓ column dropped, migrations row removed.
+    3. `npm run migration:dev:execute` re-apply → ✓ idempotent.
+  - **Live smoke (dev :3001):**
+    1. `GET /api/tools/clarisa/science-programs` → 13/13 rows, `icon_key === official_code` for all (sample: `{official_code: "SP01", icon_key: "SP01", color: "#ef4444", ...}`).
+    2. POST mapping `D527 → CLARISA project 1` → 201.
+    3. `GET /api/v1/results/19792/pool-funding-alignment/science-programs` → SP09 + SP10 with `icon_key: "SP09"` / `"SP10"` (was `null` pre-T-15.4).
+    4. Mapping deactivated as cleanup.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
 ### [x] T-15.1 — Catalog-aware validation on PATCH alignment
 
 - **Date:** 2026-05-26
