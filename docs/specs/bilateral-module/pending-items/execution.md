@@ -83,6 +83,33 @@
 
 ---
 
+### [x] T-15.10 — `ClarisaProjectsService` tool + 5-min cache
+
+- **Date:** 2026-05-26
+- **Requirements covered:** R-BIL-076 (data source) + NFR-BIL-073 (upstream resilience)
+- **Files added:**
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.module.ts`
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.service.ts`
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.service.spec.ts`
+  - `server/researchindicators/src/domain/tools/clarisa/projects/dto/clarisa-project.types.ts`
+- **Decisions made:**
+  - Reused the existing `Clarisa` connection class (`src/domain/tools/clarisa/clarisa.connection.ts`) — it already handles the CLARISA Bearer-token flow via `auth/login`. My probe earlier used Basic auth (which CLARISA also accepts), but Bearer matches the rest of the codebase; no need to introduce a second auth path.
+  - Service is singleton-scoped (per parent design.md §3.4 Constraint A and design D-PI-7) — no `CurrentUserUtil` / `ResultsUtil`. The picker hot path can call this freely without re-introducing the empty-shell DI cycle.
+  - Cache: in-memory `{data, fetchedAt}`, TTL 5 min, no event invalidation (per D-PI-12). Project↔SP changes are rare; admin refresh endpoint is a future enhancement.
+  - Resilience (per NFR-BIL-073): warm-cache-serve-on-error keeps the picker working during short CLARISA hiccups; cold-cache → `ServiceUnavailableException` so the response envelope is a clean 503 instead of leaking an upstream stack trace.
+  - Added `resetCacheForTests()` test seam — lets specs reset cache between cases without waiting 5 minutes. Marked non-public in the JSDoc.
+  - Stubbed the internal `connection` field directly in the service spec (rather than mocking the entire `HttpService` axios chain). Cleaner test, focuses assertions on caching + resilience.
+- **Issues encountered:** none.
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - Unit: `npx jest src/domain/tools/clarisa/projects` → **7/7 passing** (bilateral filter, cache hit, findProjectById happy / not-found / NaN-id short-circuit, warm-cache-serve-on-error, cold-503).
+  - Lint: `npx eslint --fix` → clean.
+  - Live wiring not exercised here (module isn't imported into any consumer yet). Will be exercised end-to-end in T-15.11 (per-result SP endpoint) and T-15.15 (admin SSR project picker).
+- **Status:** [x] completed
+- **Commit:** (filled in at commit time)
+
+---
+
 ## Pivot Record #1 — Admin REST surface URL path
 
 - **Task affected:** T-15.14 (also retroactively updates R-BIL-080 + design.md §6.3–6.6 + architecture mermaid)

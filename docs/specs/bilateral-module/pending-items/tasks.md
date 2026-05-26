@@ -25,7 +25,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | todo |
 | T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | todo |
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | todo |
-| T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | todo |
+| T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | [x] done (2026-05-26) |
 | T-15.11 | `GET .../bilateral/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | todo |
 | T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | R-BIL-077 | blocked (OQ-RV-2) |
 | T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | [x] done (2026-05-25) |
@@ -275,8 +275,8 @@ graph TD
   - [ ] Upstream error + cold cache → throws `ServiceUnavailableException` (envelope status 503).
 - **Dependencies:** none.
 - **Estimated effort:** M
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.10 entry. 7 unit tests cover filter, cache hit, warm-cache-on-error, cold-503. Reuses existing `Clarisa` connection (Bearer token via `auth/login`) instead of Basic auth — both work, Bearer matches the rest of the codebase.
 
 ---
 
