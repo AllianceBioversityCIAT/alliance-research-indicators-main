@@ -106,7 +106,7 @@
   - Lint: `npx eslint --fix` → clean.
   - Live wiring not exercised here (module isn't imported into any consumer yet). Will be exercised end-to-end in T-15.11 (per-result SP endpoint) and T-15.15 (admin SSR project picker).
 - **Status:** [x] completed
-- **Commit:** (filled in at commit time)
+- **Commit:** `f9f6f851`
 
 ---
 
