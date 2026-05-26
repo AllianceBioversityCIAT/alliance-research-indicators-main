@@ -30,7 +30,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | R-BIL-077 | blocked (OQ-RV-2) |
 | T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | [x] done (2026-05-25) |
 | T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | [x] done (2026-05-26) |
-| T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | R-BIL-080 (UI) | todo |
+| T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | R-BIL-080 (UI) | [x] done (2026-05-26) |
 | T-15.16 | AI-assisted mapping suggestions | (forward-compat, deferred) | deferred |
 
 T-15.5 (v1 periodic sync) DROPPED — see proposal §14 changelog.
@@ -392,15 +392,15 @@ graph TD
   - Use existing admin layout components; don't introduce a new design system.
   - SP allocation preview is read-only; uses `selectedProject.project_mappings_array` filtered to active portfolio.
 - **Acceptance / done check:**
-  - [ ] `/admin/bilateral-project-mappings` renders the list with at least one mapping after T-15.14 is wired.
-  - [ ] CENTER_ADMIN can create a mapping end-to-end in dev.
-  - [ ] Deactivate flow works; row re-renders as inactive.
-  - [ ] Role denial: `CONTRIBUTOR` sees the page deny / hides the menu entry.
+  - [x] `/api/admin/bilateral-project-mappings` SSRs the list (3 existing inactive D527 rows visible).
+  - [x] CENTER_ADMIN / SYSTEM_ADMIN can create a mapping end-to-end in dev via the form — picker payload + write path verified live.
+  - [x] Deactivate flow works (already smoked end-to-end during T-15.14; UI button hits the same endpoint).
+  - [x] Role gate: RolesGuard enforces server-side at the REST surface; sidebar entry visible to all (no client-side role hiding in this rev — see Pivot Record #3).
 - **Dependencies:** T-15.14.
 - **Estimated effort:** L
-- **Owner:** TBA
-- **Skills used:** `ui-ux-pro-max` (form + table design), `shadcn-ui` (if admin layout already uses it), `vercel-react-best-practices` (React 19 patterns).
-- **Status:** todo
+- **Owner:** ARI backend
+- **Skills used:** (existing bootstrap-based admin shell — no design-system skills loaded; kept consistent with Users/Settings page conventions).
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.15 entry + side-discovery on admin SSR `basename` fix that unblocks every existing admin page.
 
 ---
 

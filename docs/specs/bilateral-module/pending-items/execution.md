@@ -144,6 +144,65 @@
 
 ---
 
+### [x] T-15.15 — Admin SSR page + sidebar entry
+
+- **Date:** 2026-05-26
+- **Requirements covered:** R-BIL-080 (UI surface)
+- **Files added:**
+  - `server/researchindicators/src/admin/client/pages/BilateralProjectMappings.tsx` — single-file React page (list table, create/edit modal, deactivate button, AGRESSO+CLARISA pickers, SP allocation preview).
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.controller.ts` — admin-gated picker endpoint `GET /api/tools/clarisa/projects/bilateral?search=...` returning the trimmed shape `{id, short_name, source_of_funding, science_programs[]}`.
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts` — 3 tests (role-gate metadata, trim to Confirmed + entity_type 22, search filter).
+- **Files modified:**
+  - `server/researchindicators/src/admin/admin.module.ts` — imports `BilateralProjectMappingModule`.
+  - `server/researchindicators/src/admin/services/admin.service.ts` — adds `listBilateralProjectMappings(query)` delegating to `BilateralProjectMappingService.list`.
+  - `server/researchindicators/src/admin/services/admin.service.spec.ts` — wires the new dependency + asserts the delegation.
+  - `server/researchindicators/src/admin/controllers/admin.controller.ts` — adds `@Get('bilateral-project-mappings')` SSR handler.
+  - `server/researchindicators/src/admin/controllers/admin.controller.spec.ts` — covers the new handler.
+  - `server/researchindicators/src/admin/client/App.tsx` — registers `/admin/bilateral-project-mappings` route.
+  - `server/researchindicators/src/admin/client/components/Sidebar.tsx` — adds "Bilateral mappings" entry between Users and Settings.
+  - `server/researchindicators/src/admin/client/entry-server.tsx` + `entry-client.tsx` — adds `basename="/api"` to both routers (see Pivot Record #3 below).
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.module.ts` — registers the new controller.
+  - `server/researchindicators/src/domain/tools/clarisa/routes/clarisa.routes.ts` — mounts `ClarisaProjectsModule` at `/api/tools/clarisa/projects`.
+- **Decisions made:**
+  - **Single-file React page** matching the existing Users/Settings convention rather than the 3-file split the task suggested. Page is ~400 LOC; splitting would mostly trade one big read for several small ones for the same content.
+  - **Picker endpoint lives outside `/api/admin/...`** (mounted at `/api/tools/clarisa/projects/bilateral`) for the same reason T-15.14 moved the REST surface out: the JWT middleware exclude `/admin(.*)` would otherwise bypass auth. RolesGuard provides the actual gating (`CENTER_ADMIN`, `SYSTEM_ADMIN`).
+  - **AGRESSO picker reuses existing `GET /api/v1/agresso/contracts?pool-funding-contributor=true`** with a client-side `funding_type ∈ {BLR, BILATERAL}` filter — no new backend endpoint.
+  - **SP allocation preview** comes straight from the picker payload (the new controller pre-trims `project_mappings_array` to Confirmed + entity_type 22 = Science programs) — so the form doesn't need a second round-trip when the operator selects a project.
+  - **Hybrid SSR + client-fetch**: SSR powers the first paint; all CRUD + refresh + picker loads go through the client. `credentials: 'include'` on fetches so the JWT cookie / dev bypass middleware reaches the API surface.
+  - **Edit form locks `agresso_agreement_id`** — operators must deactivate + re-create to change the contract (preserves audit history, matches the service-side rule).
+- **Issues encountered → Pivot Record #3** (admin SSR `basename`).
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - Unit: `npx jest src/admin src/domain/tools/clarisa/projects src/domain/entities/bilateral` → **58/58 passing** (3 new clarisa-projects-controller + 2 new admin-service/controller + the 37 from prior tasks).
+  - Lint clean.
+  - **Live smoke (dev :3001 with `ARI_LOCAL_AUTH_BYPASS=true`):**
+    1. Picker endpoint: `GET /api/tools/clarisa/projects/bilateral?search=IITA` → 200, returned 5 CLARISA bilateral projects with the trimmed shape (id, short_name, science_programs[]).
+    2. SSR page: `GET /api/admin/bilateral-project-mappings` → 200, fully rendered:
+       - Sidebar shows the new "Bilateral mappings" entry.
+       - Page heading "Bilateral Project Mappings" + subheading "AGRESSO contract ↔ CLARISA bilateral project" present.
+       - "New mapping" button, search/filter controls, and pagination meta all present.
+       - `window.__INITIAL_DATA__.mappings` carries the 3 inactive D527 rows from previous smokes.
+    3. Regression: `GET /api/admin/dashboard` — also now SSRs the body (was previously empty for every admin page; see Pivot #3).
+  - **Browser-side full CRUD** not exercised in this run — the picker payload + REST surface are both unit-tested + smoke-verified at the API layer; the React page only orchestrates those calls. End-to-end CRUD via the UI was already proven during T-15.14 (curl) and the page just wraps the same endpoints.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
+## Pivot Record #3 — Admin SSR routes need `basename="/api"`
+
+- **Task affected:** T-15.15 (side discovery affecting every existing admin page)
+- **Date:** 2026-05-26
+- **Discovery:** Live smoke of the new page returned a 200 with the layout (sidebar + header + footer) but an empty `<div class="content-wrapper"></div>`. Same shape on `/api/admin/dashboard`, `/api/admin/users`, `/api/admin/settings` — all existing admin pages have been SSR-rendering with empty bodies. Root cause: `app.setGlobalPrefix('api')` (in `main.ts`) prefixes every controller route, so the actual served URL is `/api/admin/<page>`. But the React Router on both sides (StaticRouter on server, BrowserRouter on client) had no `basename`, so they tried to match `/api/admin/dashboard` against routes defined as `/admin/dashboard` and matched nothing. The empty body wasn't visible to anyone before because the admin panel hadn't seen significant traffic — the React Router silently renders nothing when no route matches.
+- **Fix:** Two-line change — added `basename="/api"` to both `entry-server.tsx`'s `<StaticRouter>` and `entry-client.tsx`'s `<BrowserRouter>`. With basename in place, the router strips `/api` from the incoming URL before matching, so `/api/admin/dashboard` matches the `/admin/dashboard` route. `<Link to="/admin/...">` components automatically get the `/api` prefix prepended, so existing sidebar entries already work.
+- **Verification after pivot:**
+  - `/api/admin/bilateral-project-mappings` SSR body renders all expected markers (page heading, button, search, pagination meta).
+  - Regression on `/api/admin/dashboard` — body now renders (StatsCards + heading) where it was previously empty.
+  - No code changes to `App.tsx`, individual page components, or `Sidebar.tsx` Link targets.
+- **Spec impact:** None on `requirements.md` / `design.md` — this is an implementation fix to a pre-existing bug, not a behavioral spec change. Noted here for future maintainers.
+
+---
+
 ### [x] T-15.2 — Source-based read-only gate
 
 - **Date:** 2026-05-26

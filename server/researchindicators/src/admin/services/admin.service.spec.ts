@@ -1,16 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from './admin.service';
+import { BilateralProjectMappingService } from '../../domain/entities/bilateral-project-mapping/bilateral-project-mapping.service';
 
 describe('AdminService', () => {
   let service: AdminService;
+  const bilateralList = jest.fn();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AdminService],
+      providers: [
+        AdminService,
+        {
+          provide: BilateralProjectMappingService,
+          useValue: { list: bilateralList },
+        },
+      ],
     }).compile();
 
     service = module.get<AdminService>(AdminService);
   });
+
+  afterEach(() => jest.clearAllMocks());
 
   it('should be defined', () => {
     expect(service).toBeDefined();
@@ -26,6 +36,25 @@ describe('AdminService', () => {
         activeProjects: 45,
         pendingReviews: 23,
       });
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.15
+  describe('listBilateralProjectMappings', () => {
+    it('delegates to BilateralProjectMappingService.list with the given query', async () => {
+      const expected = {
+        items: [],
+        meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
+      };
+      bilateralList.mockResolvedValueOnce(expected);
+
+      const result = await service.listBilateralProjectMappings({
+        page: 1,
+        limit: 20,
+      });
+
+      expect(result).toBe(expected);
+      expect(bilateralList).toHaveBeenCalledWith({ page: 1, limit: 20 });
     });
   });
 
