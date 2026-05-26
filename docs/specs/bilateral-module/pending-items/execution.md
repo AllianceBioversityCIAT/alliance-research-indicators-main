@@ -79,7 +79,7 @@
     6. `POST` again after deactivate → 201 (partial-unique slot freed).
     7. DB cleanup.
 - **Status:** [x] completed
-- **Commit:** (filled in at commit time)
+- **Commit:** `b7bdc237`
 
 ---
 
