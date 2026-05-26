@@ -29,7 +29,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.11 | `GET .../bilateral/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | todo |
 | T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | R-BIL-077 | blocked (OQ-RV-2) |
 | T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | [x] done (2026-05-25) |
-| T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | todo |
+| T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | [x] done (2026-05-26) |
 | T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | R-BIL-080 (UI) | todo |
 | T-15.16 | AI-assisted mapping suggestions | (forward-compat, deferred) | deferred |
 
@@ -356,13 +356,13 @@ graph TD
 - **Requirements covered:** R-BIL-080 (REST surface) + R-BIL-078 (lookup helper)
 - **Files touched:**
   - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.ts` — CRUD + `findActiveByAgreementId(agreementId)` lookup helper + `deactivate(id, user, notes?)`.
-  - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.controller.ts` — `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)` + `RolesGuard`; routes `GET`, `POST`, `PATCH /:id`, `PATCH /:id/deactivate`. Versioned `/api/admin/bilateral-project-mappings`.
+  - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.controller.ts` — `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)` + `RolesGuard`; routes `GET`, `POST`, `PATCH /:id`, `PATCH /:id/deactivate`. Versioned `/api/bilateral-project-mappings`.
   - `src/domain/entities/bilateral-project-mapping/dto/create-bilateral-project-mapping.dto.ts`
   - `src/domain/entities/bilateral-project-mapping/dto/update-bilateral-project-mapping.dto.ts`
   - `src/domain/entities/bilateral-project-mapping/dto/list-bilateral-project-mappings.query.dto.ts`
   - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.spec.ts` — create (happy + 409 partial-unique conflict), update, deactivate, lookup helper.
   - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.controller.spec.ts` — role allow/deny + happy paths.
-  - `src/domain/routes/main.routes.ts` — register the new sub-resource path (`/api/admin/bilateral-project-mappings`).
+  - `src/domain/routes/main.routes.ts` — register the new sub-resource path (`/api/bilateral-project-mappings`).
 - **Description:** Singleton-scoped (no `CurrentUserUtil` / `ResultsUtil`). All writes audited. `create` wraps insert in a transaction + select-for-update on the active row to make the 409 conflict deterministic. `findActiveByAgreementId` is reused by T-15.11.
 - **Acceptance / done check:**
   - [ ] R-BIL-080 scenarios pass: create / deactivate / role-deny / partial-unique 409.
@@ -370,8 +370,8 @@ graph TD
   - [ ] Endpoints appear in `/swagger`.
 - **Dependencies:** T-15.13.
 - **Estimated effort:** L
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.14 entry + Pivot Record #1 (path moved from `/api/admin/bilateral-project-mappings` to `/api/bilateral-project-mappings`). 21 unit tests + full end-to-end CRUD smoke (create / 409 conflict / list / deactivate / re-create after deactivate) green.
 
 ---
 

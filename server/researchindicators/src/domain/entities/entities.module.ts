@@ -91,6 +91,7 @@ import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-l
 import { ReportsModule } from './reports/reports.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 import { BilateralModule } from './bilateral/bilateral.module';
+import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
 
 @Module({
   imports: [
@@ -186,6 +187,7 @@ import { BilateralModule } from './bilateral/bilateral.module';
     ReportsModule,
     ResultReviewHistoryModule,
     BilateralModule,
+    BilateralProjectMappingModule,
   ],
   exports: [
     AgressoContractModule,
@@ -193,6 +195,7 @@ import { BilateralModule } from './bilateral/bilateral.module';
     ReportsModule,
     ResultReviewHistoryModule,
     BilateralModule,
+    BilateralProjectMappingModule,
   ],
 })
 export class EntitiesModule {}

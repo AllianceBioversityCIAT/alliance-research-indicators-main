@@ -55,7 +55,7 @@ graph TD
     EP_SP["GET /api/v1/results/:resultCode/bilateral/science-programs"]
     EP_HLO["GET /api/v1/results/:resultCode/bilateral/hlos-indicators"]
     EP_PATCH["PATCH /api/v1/results/:resultCode/pool-funding-alignment"]
-    EP_ADMIN["GET/POST/PATCH /api/admin/bilateral-project-mappings"]
+    EP_ADMIN["GET/POST/PATCH /api/bilateral-project-mappings"]
   end
 
   subgraph "ARI services (singleton)"
@@ -268,13 +268,13 @@ type BilateralHlosByScienceProgram = Array<{
 
 - **Errors:** `503` if PRMS ToC integration is not yet configured (OQ-RV-2 open) OR upstream unreachable with cold cache; `200` with `[]` if `sp_codes` is empty/omitted.
 
-### 6.3 `GET /api/admin/bilateral-project-mappings` (R-BIL-080, NEW)
+### 6.3 `GET /api/bilateral-project-mappings` (R-BIL-080, NEW)
 
 - **Roles:** `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)` + `RolesGuard`.
 - **Query params:** `page` (default 1), `limit` (default 50, max 200), `search` (matches `agresso_agreement_id` ILIKE OR `clarisa_project_short_name` ILIKE), `is_active` (`true|false`), `source` (`MANUAL|AI_SUGGESTED|AI_AUTO`).
 - **Response data shape:** `{ items: BilateralProjectMappingDto[], meta: { total, page, limit, totalPages } }`.
 
-### 6.4 `POST /api/admin/bilateral-project-mappings` (R-BIL-080, NEW)
+### 6.4 `POST /api/bilateral-project-mappings` (R-BIL-080, NEW)
 
 - **Body:** `CreateBilateralProjectMappingDto`:
 
@@ -291,11 +291,11 @@ type BilateralHlosByScienceProgram = Array<{
 
 - **Errors:** `409 Conflict` with `description = "Active mapping already exists for this contract"` when an active row exists for the contract.
 
-### 6.5 `PATCH /api/admin/bilateral-project-mappings/:id` (R-BIL-080, NEW)
+### 6.5 `PATCH /api/bilateral-project-mappings/:id` (R-BIL-080, NEW)
 
 - Same body as create with all fields optional; cannot change `agresso_agreement_id` (immutable; deactivate and create a new row instead).
 
-### 6.6 `PATCH /api/admin/bilateral-project-mappings/:id/deactivate` (R-BIL-080, NEW)
+### 6.6 `PATCH /api/bilateral-project-mappings/:id/deactivate` (R-BIL-080, NEW)
 
 - Body: optional `{ notes?: string }` to record reason.
 - Sets `is_active = false`, `updated_by = caller`, `deleted_at = now()`.
@@ -515,7 +515,7 @@ No shared package extension. All DTOs live inside their owning module:
 ### 10.3 Admin: create mapping (R-BIL-080)
 
 ```
-1. Operator POST /api/admin/bilateral-project-mappings
+1. Operator POST /api/bilateral-project-mappings
 2. Guard chain: JwtMiddleware → RolesGuard(@Roles(CENTER_ADMIN, SYSTEM_ADMIN))
 3. BilateralProjectMappingService.create:
    a. begin transaction
@@ -530,7 +530,7 @@ No shared package extension. All DTOs live inside their owning module:
 ### 10.4 Admin: deactivate mapping (R-BIL-080)
 
 ```
-1. Operator PATCH /api/admin/bilateral-project-mappings/:id/deactivate
+1. Operator PATCH /api/bilateral-project-mappings/:id/deactivate
 2. Service:
    a. find by id; 404 if not exists
    b. if already inactive → 200 no-op

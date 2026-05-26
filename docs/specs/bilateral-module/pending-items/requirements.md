@@ -494,7 +494,8 @@ The system SHALL expose an admin SSR page and REST surface for operators to main
 
 **Details:**
 - SSR page: `/admin/bilateral-project-mappings` per `src/admin/README-REACT.md` conventions.
-- REST surface: `/api/admin/bilateral-project-mappings` (list paginated, create, update, deactivate).
+- REST surface: `/api/bilateral-project-mappings` (list paginated, create, update, deactivate).
+- **Pivot Record #1 (2026-05-26):** REST surface is intentionally NOT under `/api/admin/...`. The existing JWT middleware exclude `/admin(.*)` (in `src/app.module.ts`, crafted to skip JWT for the SSR admin pages at `/api/admin/...`) would otherwise bypass auth on these endpoints. Access is enforced server-side by `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)`; URL design is incidental. See `./execution.md` Pivot Record #1.
 - Pickers on the create/edit form:
   - **CLARISA project picker** — populated from cached CLARISA `/api/projects` (filtered by `source_of_funding = "Bilateral"`).
   - **AGRESSO contract picker** — populated from existing `AgressoContractService` filtered to `funding_type IN ('BLR', 'BILATERAL')`.
@@ -520,7 +521,7 @@ The system SHALL expose an admin SSR page and REST surface for operators to main
 #### Scenario: Operator without role is denied
 
 - GIVEN a user with role `CONTRIBUTOR` only
-- WHEN they hit `/api/admin/bilateral-project-mappings`
+- WHEN they hit `/api/bilateral-project-mappings`
 - THEN response is `403 Forbidden`
 
 #### Scenario: Partial-unique conflict on create
@@ -582,10 +583,10 @@ No OpenSearch decorations on new tables.
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/results/:resultCode/bilateral/science-programs` | ROAR JWT | NEW (R-BIL-076). |
 | `GET` | `/api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=...` | ROAR JWT | NEW (R-BIL-077). Returns 503 until OQ-RV-2 closes. |
-| `GET` | `/api/admin/bilateral-project-mappings?page=&limit=&search=&is_active=&source=` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080). |
-| `POST` | `/api/admin/bilateral-project-mappings` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080). 409 on partial-unique conflict. |
-| `PATCH` | `/api/admin/bilateral-project-mappings/:id` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080) — edit notes / clarisa_project_id / source. |
-| `PATCH` | `/api/admin/bilateral-project-mappings/:id/deactivate` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080) — soft-delete. |
+| `GET` | `/api/bilateral-project-mappings?page=&limit=&search=&is_active=&source=` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080). |
+| `POST` | `/api/bilateral-project-mappings` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080). 409 on partial-unique conflict. |
+| `PATCH` | `/api/bilateral-project-mappings/:id` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080) — edit notes / clarisa_project_id / source. |
+| `PATCH` | `/api/bilateral-project-mappings/:id/deactivate` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080) — soft-delete. |
 | `PATCH` | `/api/v1/results/:resultCode/pool-funding-alignment` | per R-BIL-013 | MODIFIED — adds catalog-aware 400 (R-BIL-070) and source-based 409 (R-BIL-071). |
 | `GET` | `/api/v1/results/:resultCode/pool-funding-alignment` | ROAR JWT | MODIFIED — `is_read_only` becomes union of synced + source gates; `selected_science_programs[]` gains `icon_key` + `allocation` (when from CLARISA path). |
 | `GET` | `/api/tools/clarisa/science-programs[/<:code>]` | ROAR JWT | MODIFIED — adds `icon_key`. Marked **DEPRECATED** for picker use; remains live for fallback enrichment. |
