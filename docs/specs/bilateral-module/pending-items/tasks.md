@@ -21,7 +21,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.2 | Source-based read-only gate | R-BIL-071 (modifies R-BIL-015 / R-BIL-034) | [x] done (2026-05-26) |
 | T-15.3 | Migration: rename `lever_code` → `sp_code` | R-BIL-073 | [x] done (2026-05-26) |
 | T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | [x] done (2026-05-26) |
-| T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | todo |
+| T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | [x] done (2026-05-26) |
 | T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | todo |
 | T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | [x] done (2026-05-26) |
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | [x] done (2026-05-26) |
@@ -189,12 +189,12 @@ graph TD
 - **Implementation notes:**
   - Mock `ClarisaScienceProgramsService`, `BilateralProjectMappingService`, `ClarisaProjectsService`, `PrmsTocService`, repositories with `jest.fn()` providers.
 - **Acceptance / done check:**
-  - [ ] All four spec files exist with passing tests.
-  - [ ] `npm run test:cov` shows ≥ 70% line coverage on `bilateral/` + `clarisa-science-programs/`.
+  - [x] All four spec files exist with passing tests (canonical `bilateral.service.spec.ts` + new `bilateral.controller.spec.ts` + new `clarisa-science-programs.service.spec.ts` + new `clarisa-science-programs.controller.spec.ts`). Existing focused specs (T-15.1 / T-15.2 / T-15.11) kept as-is — they own the deep R-BIL-070 / R-BIL-071 / R-BIL-076 scenarios.
+  - [x] Module-level coverage: bilateral 80.42% stmts / 80.29% lines; bilateral-project-mapping 86.73% / 87.91%; clarisa-science-programs 75% / 76.92%. All above the 70% NFR-BIL-070 target.
 - **Dependencies:** can land in parallel with T-15.1 / T-15.2 / T-15.11 / T-15.14.
 - **Estimated effort:** M
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.6 entry.
 
 ---
 

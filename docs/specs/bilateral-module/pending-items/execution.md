@@ -144,6 +144,39 @@
 
 ---
 
+### [x] T-15.6 — Sibling spec backfill
+
+- **Date:** 2026-05-26
+- **Requirements covered:** NFR-BIL-070 (spec coverage)
+- **Files added:**
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.spec.ts` — canonical service spec. Covers `getAlignment` (happy / eligible-false / not-found), `listIndicators` (empty / stale grouping / `indicator_type` filter), `upsertContribution` (happy / unknown indicator type / lever not in alignment), `deleteContribution` (happy / 404). The private `toSelectedSciencePrograms` is exercised transitively via `getAlignment`.
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.controller.spec.ts` — handler-level coverage. 7 delegation tests (each GET/PATCH/POST/DELETE handler) + role-metadata table assertion that the 4 mutation endpoints carry `@Roles(CONTRIBUTOR, CENTER_ADMIN, SYSTEM_ADMIN)` and the 3 read endpoints do not (RolesGuard short-circuits on missing metadata).
+  - `server/researchindicators/src/domain/tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service.spec.ts` — `findAll` (active filter + ASC sort), `findByCode` (happy + null on miss).
+  - `server/researchindicators/src/domain/tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.controller.spec.ts` — 200/404 envelope wiring for `findAll` + `findByCode`.
+- **Decisions made:**
+  - **Kept the 3 focused specs (T-15.1 / T-15.2 / T-15.11) alongside the canonical one** instead of consolidating. They own the deep R-BIL-070 / R-BIL-071 / R-BIL-076 scenarios verbatim and were already commit-anchored in the execution history. The canonical `bilateral.service.spec.ts` covers the methods those focused specs don't touch.
+  - **Mocked `manager.getRepository().save` to echo back the payload** (TypeORM's actual behavior) so `savedMapping` in `upsertContribution` carries the `lever_code` / `indicator_code` / `indicator_type` fields the service's response builder reads.
+  - **Override RolesGuard + ResultOwnerGuard with passthrough** in the controller spec via `.overrideGuard()` rather than providing the full DI graph (`ResultUsersService`, `Reflector`, etc.). Handler tests don't exercise guards; the role-metadata block asserts the decorator wiring directly via the `Reflector`.
+  - **`getHlosByScienceProgramsForResult` is NOT specced here** — the method doesn't exist yet (T-15.12 blocked on OQ-RV-2). Will land with that task; the canonical spec file is the natural home.
+- **Issues encountered:**
+  - First run: `bilateral.controller.spec.ts` failed at Nest's testing-module compile step because `RolesGuard` + `ResultOwnerGuard` were being instantiated and pulled in `ResultUsersService`. Fixed with `.overrideGuard()` for both.
+  - First run: `bilateral.service.spec.ts` `upsertContribution` happy path asserted `lever_code: 'SP01'` on the response but the mock `save` returned a bare `{ id: 1 }` without echoing the payload. Fixed by mocking `save` with a payload-echoing implementation.
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - **87/87 tests passing** across the bilateral + bilateral-project-mapping + clarisa-science-programs + clarisa-projects + admin suites (11 spec files total).
+  - Lint clean.
+  - **Module-level coverage** (`npx jest --coverage --testPathPattern=...`):
+    - `bilateral/` — **80.42% stmts**, 66.99% branches, 93.33% funcs, **80.29% lines**
+    - `bilateral-project-mapping/` — **86.73% stmts**, 84% branches, 100% funcs, **87.91% lines**
+    - `clarisa-science-programs/` — **75% stmts**, 100% branches, 100% funcs, **76.92% lines**
+    - Both controller files: 100% across the board.
+    - `bilateral.service.ts`: 88.94% stmts / 91.11% funcs / 88.5% lines (uncovered: `markIndicatorMappingsStale` 411–422 + a few defensive branches in `getEditableContributionContext`).
+  - The global jest threshold warning (`60% not met`) is expected when running a subset of suites — the project has hundreds of suites; running ~11 of them gives a global aggregate below threshold even though the targeted modules are well above. NFR-BIL-070 specifies the **module** target (≥70%) which we cleared.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
 ### [x] T-15.9 — Re-price Phase 3+ tasks (T-21..T-38)
 
 - **Date:** 2026-05-26
