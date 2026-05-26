@@ -173,7 +173,7 @@
     - `bilateral.service.ts`: 88.94% stmts / 91.11% funcs / 88.5% lines (uncovered: `markIndicatorMappingsStale` 411–422 + a few defensive branches in `getEditableContributionContext`).
   - The global jest threshold warning (`60% not met`) is expected when running a subset of suites — the project has hundreds of suites; running ~11 of them gives a global aggregate below threshold even though the targeted modules are well above. NFR-BIL-070 specifies the **module** target (≥70%) which we cleared.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `0a1b1c66`
 
 ---
 
