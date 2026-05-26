@@ -557,7 +557,7 @@ graph TD
 
 ### T-21 — BLOCKER: close **D-push-auth** with PRMS team
 
-- **Status:** pending (blocker)
+- **Status:** open (blocker) — no movement since 2026-05-25 ([§15](#15-re-price-log))
 - **Size:** S (coordination, not code)
 - **Dependencies:** —
 - **Requirements covered:** NFR-BIL-002, R-BIL-040, R-BIL-044
@@ -570,7 +570,7 @@ graph TD
 
 ### T-22 — BLOCKER: close **D-source-w3** with System Office
 
-- **Status:** pending (blocker)
+- **Status:** open (blocker) — no movement since 2026-05-25 ([§15](#15-re-price-log))
 - **Size:** S (coordination)
 - **Dependencies:** —
 - **Requirements covered:** R-BIL-050, OQ-B
@@ -583,7 +583,7 @@ graph TD
 
 ### T-23 — BLOCKER: close **OQ-US5-3** + **OQ-US5-6** with PRMS team
 
-- **Status:** pending (blocker)
+- **Status:** open (blocker) — no movement since 2026-05-25 ([§15](#15-re-price-log))
 - **Size:** S (coordination)
 - **Dependencies:** T-21
 - **Requirements covered:** R-BIL-042, R-BIL-044, R-BIL-045
@@ -595,7 +595,7 @@ graph TD
 
 ### T-24 — Push module skeleton
 
-- **Status:** pending
+- **Status:** landed (commit `e838e2f8`, 2026-05-19) — skeleton in place; service body waits on T-25 / T-26 ([§15](#15-re-price-log))
 - **Size:** S
 - **Dependencies:** T-21
 - **Requirements covered:** R-BIL-040, R-BIL-041
@@ -606,7 +606,7 @@ graph TD
 
 ### T-25 — `ResultToPrmsMapper` + payload-shape tests
 
-- **Status:** pending
+- **Status:** not started — unblocked locally (only T-24 needed; effort unchanged L) ([§15](#15-re-price-log))
 - **Size:** L
 - **Dependencies:** T-24, T-03, T-16
 - **Requirements covered:** R-BIL-041, NFR-BIL-006
@@ -622,7 +622,7 @@ graph TD
 
 ### T-26 — Push service + queue consumer + retry cron
 
-- **Status:** pending
+- **Status:** not started — waits on T-23 (OQ-US5-3 / OQ-US5-6) + T-25; effort unchanged L ([§15](#15-re-price-log))
 - **Size:** L
 - **Dependencies:** T-23, T-25
 - **Requirements covered:** R-BIL-040, R-BIL-042, R-BIL-043, R-BIL-044, R-BIL-045, NFR-BIL-003, NFR-BIL-004, NFR-BIL-009
@@ -640,7 +640,7 @@ graph TD
 
 ### T-27 — Approve transition triggers push enqueue
 
-- **Status:** pending
+- **Status:** not started — waits on T-26 ([§15](#15-re-price-log))
 - **Size:** S
 - **Dependencies:** T-26, T-02
 - **Requirements covered:** R-BIL-040, R-BIL-045
@@ -653,7 +653,7 @@ graph TD
 
 ### T-28 — Admin push retry endpoint + SSR page
 
-- **Status:** pending
+- **Status:** not started — waits on T-26; SSR shell now unblocked (T-15.15 fixed admin `basename`) so the page can land as soon as the push service backs it ([§15](#15-re-price-log))
 - **Size:** M
 - **Dependencies:** T-26
 - **Requirements covered:** R-BIL-044
@@ -666,7 +666,7 @@ graph TD
 
 ### T-29 — W3 Registry sync module + cron
 
-- **Status:** pending
+- **Status:** not started — waits on T-22 (D-source-w3) ([§15](#15-re-price-log))
 - **Size:** L
 - **Dependencies:** T-22, T-01
 - **Requirements covered:** R-BIL-050, R-BIL-051, R-BIL-052, NFR-BIL-003, NFR-BIL-004
@@ -680,7 +680,7 @@ graph TD
 
 ### T-30 — Admin W3 sync endpoint + SSR page
 
-- **Status:** pending
+- **Status:** not started — waits on T-29; SSR shell ready (see T-28 note on admin `basename`) ([§15](#15-re-price-log))
 - **Size:** M
 - **Dependencies:** T-29
 - **Requirements covered:** R-BIL-053
@@ -690,7 +690,7 @@ graph TD
 
 ### T-31 — SP ToC sync module + cron
 
-- **Status:** pending
+- **Status:** scope narrowed → S/M — the SP catalog half is covered by T-15.4 + T-15.11 + the live CLARISA `/api/projects` proxy; only the indicators-per-SP HLO surface remains, and that's now T-15.12 (live proxy via PRMS ToC). T-31 collapses to "delete the dead cron + sync code" once T-15.12 unblocks (OQ-RV-2). ([§15](#15-re-price-log))
 - **Size:** L
 - **Dependencies:** T-01
 - **Requirements covered:** R-BIL-060, R-BIL-061, R-BIL-062, NFR-BIL-003, NFR-BIL-004
@@ -703,7 +703,7 @@ graph TD
 
 ### T-32 — Admin SP ToC sync endpoint + SSR page
 
-- **Status:** pending
+- **Status:** likely DROPPED — replaced by the on-demand live proxy pattern from T-15.12. Confirm + close at the same time as T-31 collapses. ([§15](#15-re-price-log))
 - **Size:** M
 - **Dependencies:** T-31
 - **Requirements covered:** R-BIL-063
@@ -717,7 +717,7 @@ graph TD
 
 ### T-33 — Full E2E test suite
 
-- **Status:** pending
+- **Status:** not started — deferred until Phase 3 unblocks; scope unchanged L ([§15](#15-re-price-log))
 - **Size:** L
 - **Dependencies:** T-11, T-17, T-26, T-29, T-31
 - **Requirements covered:** NFR-BIL-007, every functional requirement
@@ -734,7 +734,7 @@ graph TD
 
 ### T-34 — Idempotency + failure-injection tests
 
-- **Status:** pending
+- **Status:** not started — waits on T-26; scope unchanged M ([§15](#15-re-price-log))
 - **Size:** M
 - **Dependencies:** T-26
 - **Requirements covered:** NFR-BIL-009, R-BIL-042, R-BIL-044
@@ -747,7 +747,7 @@ graph TD
 
 ### T-35 — CloudWatch dashboard + alarms
 
-- **Status:** pending
+- **Status:** not started — waits on T-33 + T-34 ([§15](#15-re-price-log))
 - **Size:** M
 - **Dependencies:** T-33, T-34
 - **Requirements covered:** NFR-BIL-004
@@ -760,7 +760,7 @@ graph TD
 
 ### T-36 — Runbook
 
-- **Status:** pending
+- **Status:** not started — waits on Phase 3 services landing ([§15](#15-re-price-log))
 - **Size:** S
 - **Dependencies:** T-26, T-29, T-31, T-35
 - **Requirements covered:** NFR-BIL-004
@@ -772,7 +772,7 @@ graph TD
 
 ### T-37 — Staging rollout + dry-run cycles
 
-- **Status:** pending
+- **Status:** not started — DevOps coordination required; Phase 1.5 migrations (T-15.3 + T-15.4 + T-15.13) need to roll separately first via Phase 1.5 T-15.7 ([§15](#15-re-price-log))
 - **Size:** M
 - **Dependencies:** T-33, T-34, T-35, T-36
 - **Requirements covered:** §14
@@ -784,7 +784,7 @@ graph TD
 
 ### T-38 — Production rollout
 
-- **Status:** pending
+- **Status:** not started — waits on T-37 ([§15](#15-re-price-log))
 - **Size:** M
 - **Dependencies:** T-37
 - **Requirements covered:** §14
@@ -872,7 +872,7 @@ Phase 1.5 carries the two PO clarifications from 2026-05-25 (CLARISA-source SPs;
 | T-15.6 | Sibling `*.spec.ts` coverage backfill | todo | — |
 | T-15.7 | Apply migrations to dev / staging / production | todo | — |
 | T-15.8 | Doc updates (this section + design §3.6/§3.7 + frontend-handoff §4.6–§4.8) | in progress | — |
-| T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | todo (see §15 below) | — |
+| T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | `[x]` done (2026-05-26) — inline statuses on §8/§9 task headers + log entry in §15 | — |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | `[x]` done (2026-05-26) | `f9f6f851` |
 | T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | `[x]` done (2026-05-26) | `92e2fd52` |
 | T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | blocked (OQ-RV-2) | — |

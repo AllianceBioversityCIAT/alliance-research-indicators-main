@@ -144,6 +144,26 @@
 
 ---
 
+### [x] T-15.9 — Re-price Phase 3+ tasks (T-21..T-38)
+
+- **Date:** 2026-05-26
+- **Requirements covered:** (operational — no R-ID)
+- **Files modified:**
+  - `docs/specs/bilateral-module/tasks.md` — updated the inline `Status:` line on T-21 through T-38 (18 entries). Each now carries a current status note and a back-link to §15 "Re-price log". Notable changes: T-24 marked **landed** with commit `e838e2f8`; T-31 marked **scope narrowed → S/M** (catalog half covered by T-15.4 + T-15.11 + the live CLARISA proxy; only the HLO indicators-per-SP surface remains, now T-15.12); T-32 marked **likely DROPPED** (replaced by the on-demand live proxy pattern from T-15.12). §15 re-price log already in place from T-15.8.
+- **Decisions made:**
+  - **Inline `Status:` lines were normalized from "pending" → either "open (blocker)", "landed", "not started", or "scope narrowed" / "likely DROPPED"** to remove the ambiguity of "pending" (which conflated "blocked", "not started", and "in progress"). Each line carries a one-line context so a reader doesn't have to scroll to §15 for the gist.
+  - **Hyperlinked each inline status back to `#15-re-price-log`** so the relationship between the per-task line and the summary table is explicit. The §15 table stays authoritative; per-task lines defer to it.
+  - **T-28 + T-30 (admin SSR pages)** carry an extra note: their SSR shells are now unblocked by T-15.15's `basename="/api"` fix — when the push and W3 services land, the admin pages can ship without re-debugging admin routing.
+- **Issues encountered:** none.
+- **Verification:**
+  - Spot-check: every T-2X and T-3X task header now has a current `Status:` line. (No other content touched.)
+  - §15 "Re-price log" cross-link anchor (`#15-re-price-log`) is the lowercased section heading, which matches GitHub-flavored markdown's anchor generation.
+  - The other parent-spec content + the pending-items sub-spec content remain unchanged outside this update.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
 ### [x] T-15.8 — Doc updates to parent specs
 
 - **Date:** 2026-05-26

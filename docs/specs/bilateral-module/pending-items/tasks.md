@@ -24,7 +24,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | todo |
 | T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | todo |
 | T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | [x] done (2026-05-26) |
-| T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | todo |
+| T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | [x] done (2026-05-26) |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | [x] done (2026-05-26) |
 | T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | [x] done (2026-05-26) |
 | T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | R-BIL-077 | blocked (OQ-RV-2) |
@@ -246,13 +246,13 @@ graph TD
   - `docs/specs/bilateral-module/tasks.md` — update `Status` on T-21..T-38; add §11 "Re-price log" entry dated 2026-05-25 with each task's current status and blocker; mark T-31 narrowed (catalog covered by T-15.11; only indicators-per-SP scope remains via the PRMS ToC proxy in T-15.12).
 - **Description:** Walk Phase 3–6 task list, refresh statuses, list current external blockers (T-21 D-push-auth, T-22 D-source-w3, T-23 OQ-US5-3/6), and re-scope T-31.
 - **Acceptance / done check:**
-  - [ ] Every T-21..T-38 has a current `Status`.
-  - [ ] §11 re-price log entry exists for 2026-05-25.
-  - [ ] T-31 carries the "scope narrowed — HLO surface now via T-15.12" note.
+  - [x] Every T-21..T-38 has a current `Status:` line pointing back to parent `tasks.md` §15 re-price log (no longer the generic "pending").
+  - [x] §15 re-price log entry exists for 2026-05-25 (landed under T-15.8; covers every T-21..T-38 line + the T-31 / T-32 collapse rationale).
+  - [x] T-31 carries the "scope narrowed — HLO surface now via T-15.12" note (inline status + §15 row).
 - **Dependencies:** none.
 - **Estimated effort:** S
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.9 entry.
 
 ---
 
