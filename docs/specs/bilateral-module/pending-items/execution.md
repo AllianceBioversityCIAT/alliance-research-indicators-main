@@ -170,7 +170,7 @@
     3. **Scenario 3** — covered by unit test (regression: STAR + synced still returns "Result is already synced to PRMS").
     4. **Scenario 4** — `GET /api/v1/results/19792/pool-funding-alignment` (STAR + non-synced) → `is_read_only: false` (no false-positive). PATCH passes the gate and hits the pre-existing `result_pool_funding_alignment.uq_..._result_active` write-side bug noted in T-15.1's entry — gate-side verified.
 - **Status:** [x] completed
-- **Commit:** (pending)
+- **Commit:** `d18691b1`
 
 ---
 
