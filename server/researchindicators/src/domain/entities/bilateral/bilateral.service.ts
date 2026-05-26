@@ -318,9 +318,11 @@ export class BilateralService {
 
       if (leverCodes.length) {
         await manager.getRepository(ResultPoolFundingAlignmentSp).save(
-          leverCodes.map((leverCode) => ({
+          leverCodes.map((spCode) => ({
             alignment_id: newAlignment.id,
-            lever_code: leverCode,
+            // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3
+            // / R-BIL-073 — entity property renamed `lever_code` → `sp_code`.
+            sp_code: spCode,
             created_by: actorUserId,
             updated_by: actorUserId,
           })),

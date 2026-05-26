@@ -12,7 +12,11 @@ import { ResultPoolFundingAlignment } from './result-pool-funding-alignment.enti
 
 @Entity('result_pool_funding_alignment_sp')
 @Index('idx_result_pool_funding_alignment_sp_alignment', ['alignment_id'])
-@Index('idx_result_pool_funding_alignment_sp_lever', ['lever_code'])
+// @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3 / R-BIL-073
+// Column renamed from `lever_code` to `sp_code` (it always held a CGIAR
+// Science Program code, never a Lever). API contract is preserved upstream
+// via SQL alias in `result-pool-funding-alignment.repository.ts`.
+@Index('idx_result_pool_funding_alignment_sp_sp', ['sp_code'])
 export class ResultPoolFundingAlignmentSp extends AuditableEntity {
   @PrimaryGeneratedColumn({
     name: 'id',
@@ -27,12 +31,12 @@ export class ResultPoolFundingAlignmentSp extends AuditableEntity {
   alignment_id!: number;
 
   @Column('varchar', {
-    name: 'lever_code',
+    name: 'sp_code',
     length: 50,
     nullable: false,
   })
   @OpenSearchProperty({ type: 'keyword' })
-  lever_code!: string;
+  sp_code!: string;
 
   @ManyToOne(
     () => ResultPoolFundingAlignment,

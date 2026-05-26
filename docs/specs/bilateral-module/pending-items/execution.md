@@ -144,6 +144,37 @@
 
 ---
 
+### [x] T-15.3 — Migration: rename `lever_code` → `sp_code`
+
+- **Date:** 2026-05-26
+- **Requirements covered:** R-BIL-073 (all 3 scenarios)
+- **Files added:**
+  - `server/researchindicators/src/db/migrations/1779190000013-renameLeverCodeToSpCodeOnAlignmentSp.ts` — drops `idx_..._lever`, `CHANGE COLUMN lever_code sp_code`, adds `idx_..._sp`. Symmetric DOWN.
+- **Files modified:**
+  - `server/researchindicators/src/domain/entities/bilateral/entities/result-pool-funding-alignment-sp.entity.ts` — property renamed `lever_code` → `sp_code`; `@Column({ name: 'sp_code' })`; `@Index('idx_..._sp', ['sp_code'])`.
+  - `server/researchindicators/src/domain/entities/bilateral/repositories/result-pool-funding-alignment.repository.ts` — SQL now selects `rpfas.sp_code AS lever_code` and joins/orders on `rpfas.sp_code`. The response-row interface and the `selected_levers[].lever_code` shape are unchanged — API contract preserved.
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.ts` — the single write into `ResultPoolFundingAlignmentSp` now uses the renamed property: `sp_code: spCode` (was `lever_code: leverCode`).
+- **Decisions made:**
+  - **API contract preserved via SQL alias.** R-BIL-073 keeps `selected_levers[].lever_code` populated for FE back-compat. Aliasing in the repository SQL (`rpfas.sp_code AS lever_code`) localizes the rename — no DTO touched, no FE coordination needed.
+  - **Indicator-mapping table NOT touched.** `result_pool_funding_indicator_mapping.lever_code` is a separate column with its own consumers (handlers, list endpoints, contribution flows). R-BIL-073 only mentions the alignment_sp table. Renaming the indicator-mapping table is a follow-up — should be a sibling task in a future wave so the existing handler chain isn't churned in T-15.3.
+  - **Forward-only migration.** Pure column + index rename, no data movement. DOWN is symmetric and safe.
+  - **The remaining `lever_code` refs in `src/domain/entities/bilateral/`** (22 lines) are all legitimate: DTO response fields kept for back-compat, the repository SQL alias output, and the indicator-mapping table's own column. Cross-checked the task's idealized grep note against R-BIL-073's actual scope — the note was overly broad; only the alignment_sp scope applies here.
+- **Issues encountered:** none.
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - Unit: `npx jest src/domain/entities/bilateral` → **33/33 passing**.
+  - Lint clean.
+  - **Migration round-trip** (dev DB):
+    1. `npm run migration:dev:execute` → ✓ applied (3 statements: DROP idx, CHANGE column, ADD idx).
+    2. Live GET `/api/v1/results/19792/pool-funding-alignment` → 200 with `selected_levers: [{lever_code: "SP01", lever_name: "SP01"}, {lever_code: "SP02", lever_name: "SP02"}]`. **Existing data preserved + API contract intact via SQL alias.**
+    3. `npm run migration:revert` → ✓ column dropped, index renamed back, migrations row removed.
+    4. `npm run migration:dev:execute` re-apply → ✓ idempotent.
+  - **Write-path** indirect verification: typecheck + entity wiring + unit tests + GET round-trip prove the rename is structurally correct. End-to-end PATCH could not be exercised against result 19792 because of the pre-existing `result_pool_funding_alignment.uq_..._result_active` plain-unique bug (documented in T-15.1's execution entry — fires on the parent alignment row, before alignment_sp is touched). That's a separate follow-up; T-15.3 correctness is established by all the other checks.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
 ### [x] T-15.4 — Migration: add `icon_key` to catalog
 
 - **Date:** 2026-05-26

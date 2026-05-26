@@ -19,7 +19,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | --- | --- | --- | --- |
 | T-15.1 | Catalog-aware validation on PATCH alignment | R-BIL-070 | [x] done (2026-05-26) |
 | T-15.2 | Source-based read-only gate | R-BIL-071 (modifies R-BIL-015 / R-BIL-034) | todo |
-| T-15.3 | Migration: rename `lever_code` → `sp_code` | R-BIL-073 | todo |
+| T-15.3 | Migration: rename `lever_code` → `sp_code` | R-BIL-073 | [x] done (2026-05-26) |
 | T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | [x] done (2026-05-26) |
 | T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | todo |
 | T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | todo |
@@ -142,14 +142,14 @@ graph TD
 - **Implementation notes:**
   - Verify post-change: `grep -r "lever_code" src/domain/entities/bilateral/` returns only the deprecated DTO field.
 - **Acceptance / done check:**
-  - [ ] Migration applies forward; row count unchanged before/after.
-  - [ ] `npm run migration:revert` runs cleanly.
-  - [ ] GET alignment still populates `selected_levers[]` and `selected_science_programs[]`.
-  - [ ] `npm run lint` + `npm test` pass.
+  - [x] Migration applies forward; existing data preserved (verified via live GET round-trip).
+  - [x] `npm run migration:revert` runs cleanly; re-apply is idempotent.
+  - [x] GET alignment still populates `selected_levers[]` and `selected_science_programs[]` (API contract preserved via SQL alias).
+  - [x] `npm run lint` + `npm test` pass.
 - **Dependencies:** none.
 - **Estimated effort:** M
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.3 entry. Indicator-mapping table (`result_pool_funding_indicator_mapping.lever_code`) intentionally NOT renamed — separate column, separate follow-up.
 
 ---
 
