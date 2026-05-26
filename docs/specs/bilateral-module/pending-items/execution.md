@@ -140,7 +140,7 @@
     3. Re-fetch → `mapping_status: "mapped"`, `clarisa_project.short_name` populated from CLARISA, `science_programs: [SP09 25%, SP10 75%]` with colors enriched from local catalog (#ec4899, #8b5cf6). EXACTLY what CLARISA defines for that project. ✓
     4. Mapping row cleaned up.
 - **Status:** [x] completed
-- **Commit:** (filled in at commit time)
+- **Commit:** `92e2fd52`
 
 ---
 
