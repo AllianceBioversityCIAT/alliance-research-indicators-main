@@ -189,6 +189,46 @@ A developer-only env flag was added on `AC-1594-bilateral-module-v2` to streamli
 
 This is debug/diagnostic infrastructure, not a production feature. If the local test loop tightens up enough that it's no longer needed, feel free to remove the flag in a future cleanup commit.
 
+### 3.6 CLARISA-source SPs + admin-owned project mapping (Phase 1.5)
+
+> Sub-spec of record: [`./pending-items/`](./pending-items/) (`requirements.md` / `design.md` / `tasks.md` / `execution.md`).
+
+After Phase 0–2 landed (commit `e838e2f8`) and the static SP catalog seeded (commit `5d48b27b`), two PO clarifications on 2026-05-25 reshaped the SP picker architecture:
+
+1. **CLARISA `/api/projects` owns the per-project SP linkage**, not us. Each project carries a `project_mappings_array[]` listing its allocated SPs with `status` + portfolio. The local `clarisa_science_programs` catalog is **reclassified as display-only fallback** (icons, colors, names) — it is no longer the picker source.
+2. **No upstream join field exists between AGRESSO and CLARISA**, so the join from AGRESSO `agreement_id` → CLARISA `project.id` is owned by ARI through a new admin-maintained table.
+
+| Concern | Resolution | Where |
+| --- | --- | --- |
+| Per-result SP picker source | Live read from CLARISA `/api/projects` → filter by mapped project → filter to `Confirmed` + active portfolio (env `ARI_BILATERAL_ACTIVE_PORTFOLIO`, default `P25`) → enrich display fields from local catalog. | `BilateralService.getScienceProgramsForResult` (T-15.11) + `ClarisaProjectsService` (T-15.10) |
+| AGRESSO ↔ CLARISA project join | New auditable table `bilateral_project_mapping` with `MANUAL` / `AI_SUGGESTED` / `AI_AUTO` `source` enum (last two reserved for future AI-assist wave); partial-unique on active rows via STORED GENERATED column `active_agreement_id` + UNIQUE index. | Migration `1779190000011-createBilateralProjectMapping` (T-15.13) |
+| Admin CRUD surface | `BilateralProjectMappingService` (singleton; `findActiveByAgreementId` is the lookup helper R-BIL-076 + R-BIL-070 both reuse) + REST `GET/POST/PATCH /:id/deactivate` at `/api/bilateral-project-mappings`. | T-15.14 + Pivot Record #1 (URL moved out of `/api/admin/...` because the JWT exclude `/admin(.*)` swept it). |
+| Operator UI | SSR React page at `/api/admin/bilateral-project-mappings` with AGRESSO + CLARISA pickers + SP allocation preview; new picker endpoint `GET /api/tools/clarisa/projects/bilateral`. Same wave fixed an existing admin-SSR `basename` bug that was producing empty bodies on every admin page (Pivot Record #3). | T-15.15 + new `ClarisaProjectsController`. |
+| Catalog-aware PATCH validation | `BilateralService.normalizeLeverCodes` is now async and reuses `getScienceProgramsForResult` to reject unknown `sp_codes` with structured `errors.unknown_sp_codes`. | T-15.1 |
+| `icon_key` on catalog | New nullable `VARCHAR(64)` column on `clarisa_science_programs`, seeded `icon_key = official_code` so the existing `/assets/.../SPs-Icons/${icon_key}.png` pattern keeps working. | Migration `1779190000012-addIconKeyToScienceProgram` (T-15.4) |
+| `lever_code` → `sp_code` rename | Pure column + index rename on `result_pool_funding_alignment_sp` (the column always held an SP code, never a Lever). API contract preserved via SQL alias. | Migration `1779190000013-renameLeverCodeToSpCodeOnAlignmentSp` (T-15.3) |
+| HLOs/indicators per SP | Owned by PRMS ToC (URL pending OQ-RV-2). New endpoint `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators` ships in interim 503 mode until OQ-RV-2 closes. | T-15.12 (blocked) |
+
+Sequencing: code-only tasks all landed on `AC-1594-bilateral-module-v2` between 2026-05-25 and 2026-05-26 (commits `8b59a099` → `2a7e9819`). The cron-driven periodic sync in the original v1 proposal was **dropped** (D-PI-7) — live proxy + 5-min in-memory cache replaces it.
+
+### 3.7 Source-based read-only gate (Phase 1.5)
+
+> Sub-spec of record: [`./pending-items/requirements.md` R-BIL-071](./pending-items/requirements.md) — modifies the prior R-BIL-015 / R-BIL-034 read-only semantics.
+
+The existing `is_synced_to_prms` gate (R-BIL-015 / R-BIL-034) only fires after STAR has pushed a result to PRMS. PRMS-sourced results that **start their life in PRMS** never go through that flow, so the bilateral surface was leaving them writeable when it shouldn't have been.
+
+The Phase 1.5 gate is purely architectural: **any result with `platform_code === 'PRMS'` is read-only on bilateral surfaces, full stop**, regardless of role / owner / sync state.
+
+| Surface | Behavior |
+| --- | --- |
+| `GET .../pool-funding-alignment` | `is_read_only = (platform_code === 'PRMS') || is_synced_to_prms` — single union flag so the FE only needs to read one field. `is_synced_to_prms` stays exposed so existing telemetry that distinguishes the two reasons keeps working. |
+| `PATCH .../pool-funding-alignment` | Throws `409 Conflict` with `description = "Result is PRMS-sourced; bilateral alignment is read-only in STAR"` (locked wording — FE may key off it). |
+| `POST/PATCH/DELETE .../indicators/.../contribution` | Same 409, same wording — gate is shared via the `getEditableContributionContext` helper. |
+
+**Ordering matters.** The gate runs **before** the contributor-eligibility check (`is_pool_funding_contributor`) and the synced-state check (`is_synced_to_prms`). Live smoke during T-15.2 caught a 400 "not a Pool Funding Contributor" leaking on PRMS results because the order was wrong — moved the gate to fire first, so PRMS results always surface the source-gate 409 with the locked wording. See `pending-items/execution.md` T-15.2 entry for the discovery + decision.
+
+The gate reuses `platform_code` already returned by `ResultRepository.findPoolFundingAlignmentContext` — no new query, no new interface.
+
 ---
 
 ## 4. Extended directory structure

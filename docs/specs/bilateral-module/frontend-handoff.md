@@ -109,15 +109,20 @@ Response `data` (`AlignmentResponse` — `dto/update-pool-funding-alignment.dto.
   }[];
   selected_levers: { lever_code: string; lever_name: string }[]; // DEPRECATED — kept for back-compat; safe to ignore once you've migrated to selected_science_programs
   is_synced_to_prms: boolean;
-  is_read_only: boolean;
+  is_read_only: boolean; // UPDATED (2026-05-26) — see UX rules below
 }
 ```
 
+Each `selected_science_programs[]` entry now also carries `icon_key?: string | null` and `allocation?: number | null` (the latter is populated when the entry originated from the CLARISA per-result path — see [§4.6](#46-per-result-science-programs-picker-new--2026-05-26)). Both are optional; treat missing values as "fall back to the existing `code`-based bundled asset" and "no allocation displayed".
+
 UX rules:
 - `eligible === false` → **do not render** the Pool Funding Alignment section at all.
-- `is_read_only === true` → render the section but disable every input + show a "synced — read only" badge.
+- `is_read_only === true` → render the section but disable every input + show a "read-only" badge. **The flag is now a union of two server-side gates** (R-BIL-071, landed 2026-05-26):
+  1. The result is **PRMS-sourced** (`platform_code === 'PRMS'`) — PRMS owns it, STAR is just displaying it.
+  2. The result is **already synced to PRMS** (`is_synced_to_prms === true`) — STAR-sourced result that's already been pushed.
+  - Either condition flips `is_read_only`. Server-side, write attempts return `409` with description `"Result is PRMS-sourced; bilateral alignment is read-only in STAR"` (PRMS-sourced) or `"Result is already synced to PRMS"` (synced). Both are 409s — distinguish in the toast/error UI by the description text if you want to. `is_synced_to_prms` stays exposed for telemetry, but `is_read_only` is the only field the picker needs to consult.
 - `has_contribution === false` → hide the SP picker.
-- Render the SP chips from `selected_science_programs[]` using `name` + `color`. Group by `category` if you want to match the mockup's three sub-headers ("Science programs", "Scaling programs", "Accelerators").
+- Render the SP chips from `selected_science_programs[]` using `name` + `color`. Group by `category` if you want to match the mockup's three sub-headers ("Science programs", "Scaling programs", "Accelerators"). Use `icon_key` to resolve `/assets/result-framework-reporting/SPs-Icons/${icon_key}.png` — defaults to the SP code.
 
 ### 4.3 PATCH alignment
 
@@ -139,8 +144,20 @@ Body (`UpdatePoolFundingAlignmentDto`):
 Precedence: if both `sp_codes` and `lever_codes` are sent, the server uses `sp_codes` and ignores `lever_codes`. A stale FE that still sends `lever_codes` keeps working unchanged.
 
 - Editing succeeds **regardless of `result_status`** (AR.1). No need to check status before showing the edit button.
-- Returns `409` if `is_synced_to_prms = true` (AR.2).
+- Returns `409` if **either** read-only condition fires (PRMS-sourced OR already synced) — see [§4.2](#42-get-alignment).
 - Returns `400` if `has_contribution=true` and neither `sp_codes` nor `lever_codes` carries at least one non-blank entry.
+- **NEW (2026-05-26) — Returns `400` when any submitted `sp_code` isn't in the result's per-project SP list** (R-BIL-070). The error envelope carries `errors.unknown_sp_codes: string[]` so the FE can highlight which inputs failed:
+  ```jsonc
+  {
+    "description": "BadRequestException",
+    "status": 400,
+    "errors": {
+      "description": "Unknown Science Program codes",
+      "unknown_sp_codes": ["SP99"]
+    }
+  }
+  ```
+  The valid set for a given result comes from [§4.6](#46-per-result-science-programs-picker-new--2026-05-26) — the picker source and the validator agree by construction (both share the same chain). If the result is **unmapped** (no active `bilateral_project_mapping` row), the per-result list is `[]` and any non-empty `sp_codes` rejects with this 400. UX: when this happens, surface the existing "Contact admin to link this contract" affordance (same one [§4.6](#46-per-result-science-programs-picker-new--2026-05-26) uses for the unmapped state).
 - Emits Socket.IO event — see [§6](#6-real-time-events-socketio).
 
 ### 4.4 GET indicators panel
@@ -196,33 +213,100 @@ Response `data` is `MappingResponse`:
 }
 ```
 
-### 4.6 Science Programs catalog (NEW — 2026-05-23)
+### 4.6 Per-result Science Programs picker (NEW — 2026-05-26)
 
-Read-only catalog the FE uses to populate the SP picker grid. Seeded from CLARISA's CGIAR-entities portfolio (`Science programs` / `Scaling programs` / `Accelerators`) plus PRMS Reporting color codes.
+> **Supersedes** the static-catalog picker pattern documented in this section's 2026-05-23 revision. Sub-spec of record: [`./pending-items/requirements.md` R-BIL-076](./pending-items/requirements.md).
+
+The SP picker is now **per-result**, not a static list of all 13 SPs. PO ruling (2026-05-25): CLARISA `/api/projects` owns the per-project SP linkage; the picker shows only the SPs that the result's mapped bilateral project actually participates in.
 
 | Verb | Path | Auth |
 | --- | --- | --- |
-| `GET` | `/api/tools/clarisa/science-programs` | ROAR JWT |
-| `GET` | `/api/tools/clarisa/science-programs/:code` | ROAR JWT |
+| `GET` | `/api/v1/results/:resultCode/pool-funding-alignment/science-programs` | ROAR JWT |
 
-Response `data` (list endpoint):
+Response `data` (`BilateralSciencePrograms`):
 
 ```ts
 {
-  official_code: string;     // PK — "SP01" .. "SP13"
-  name: string;              // "Breeding for Tomorrow"
-  category: string | null;   // "Science programs" | "Scaling programs" | "Accelerators"
-  color: string | null;      // hex for chip background / left-border accent
-  is_active: boolean;        // always true today; filter on this for forward-compat
-}[]
+  result_code: string;
+  mapping_status: "mapped" | "unmapped";       // "unmapped" = no active bilateral_project_mapping row OR no AGRESSO contract OR CLARISA no longer exposes the linked project
+  clarisa_project: { id: number; short_name: string } | null;
+  science_programs: {
+    code: string;             // e.g. "SP09" — matches `selected_science_programs[].code` from §4.2
+    name: string;             // CLARISA-side name (falls back to the local catalog if absent)
+    category: string | null;  // "Science programs" | "Scaling programs" | "Accelerators"
+    color: string | null;     // hex — enriched from the local catalog (display-only fallback)
+    icon_key: string | null;  // FE asset key — defaults to `code`
+    allocation: number | null; // 0–100, CLARISA-side allocation for the active portfolio (P25)
+  }[];                        // sorted by code ASC; deterministic for the picker
+}
 ```
 
 UX rules:
-- Use this as the **picker source** when the user is choosing which SPs to tag on PATCH alignment.
-- The 13 entries are currently static (DB-seeded). A periodic sync from CLARISA cgiar-entities is planned but not yet wired — treat the catalog as cacheable for the session.
-- Order returned by `official_code ASC`. Sort/group on the client if the mockup requires category-first ordering.
+- Use this as the **picker source** for choosing which SPs to tag on PATCH alignment. The list is already filtered to `status === "Confirmed"` + the active portfolio (`P25` by default; env-driven via `ARI_BILATERAL_ACTIVE_PORTFOLIO` on the server).
+- `mapping_status === "unmapped"` → show an empty picker with a **"Contact admin to link this contract"** affordance. The result has no active `bilateral_project_mapping` row, so no SP is currently valid for it. Any PATCH `sp_codes` would 400 (see [§4.3](#43-patch-alignment)).
+- `clarisa_project.short_name` is useful as a hover tooltip / subtitle near the picker so the user knows which CLARISA project the SPs come from.
+- `allocation` lets you show the % chip next to each SP (e.g. "SP09 — 25%"). Treat `null` as "no allocation displayed" rather than zero.
+- Same `code` values flow through `selected_science_programs[]` on [§4.2](#42-get-alignment) and through the PATCH `sp_codes` payload — no transformation needed.
 
-> Canonical: [`./requirements.md` §6.2–§6.4](./requirements.md), [`./design.md` §10](./design.md).
+**Deprecated for picker use** — the legacy static catalog endpoint stays live as a **display-only fallback** (icons / colors / names) when the picker enrichment can't reach CLARISA:
+
+| Verb | Path | Status |
+| --- | --- | --- |
+| `GET` | `/api/tools/clarisa/science-programs` | DEPRECATED for picker — use as enrichment fallback only. Now also returns `icon_key`. |
+| `GET` | `/api/tools/clarisa/science-programs/:code` | Same. |
+
+The 13 entries are still seeded by migration. Don't drive the picker from them — use the per-result endpoint above so the user only sees SPs that apply to their result's bilateral project.
+
+> Canonical: [`./pending-items/requirements.md` R-BIL-076 + R-BIL-078](./pending-items/requirements.md) (with R-BIL-070 covering the matching PATCH validation contract).
+
+### 4.7 HLOs/indicators per SP (NEW — 2026-05-26; PENDING upstream)
+
+For the "Map HLOs and/or indicators" panel. Given the SP codes the operator selected on the alignment, the endpoint returns the HLOs (+ child indicators) PRMS ToC exposes for those SPs.
+
+| Verb | Path | Auth |
+| --- | --- | --- |
+| `GET` | `/api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators?sp_codes=SP09,SP10` | ROAR JWT |
+
+Response `data` (`BilateralHlosIndicators`):
+
+```ts
+{
+  sp_code: string;
+  sp_name: string;
+  hlos: {
+    id: number;
+    code: string;
+    title: string;
+    indicators: { id: number; code: string; name: string }[];
+  }[];
+}[]
+```
+
+**Status — BLOCKED on OQ-RV-2** (PRMS team confirms endpoint URL / auth / payload). Until that closes, the server ships the interim 503 path:
+
+```jsonc
+{
+  "description": "ServiceUnavailableException",
+  "status": 503,
+  "errors": "PRMS ToC integration not yet configured"
+}
+```
+
+FE handling: surface a "ToC HLOs not yet wired" empty state — same shape you'd render for the "ToC catalog not yet synced" state in [§4.4](#44-get-indicators-panel). When OQ-RV-2 closes, the server flips to the live proxy with no shape change required on the FE.
+
+### 4.8 Admin: bilateral project mappings (NEW — 2026-05-26)
+
+The AGRESSO ↔ CLARISA project join is **operator-maintained** (no upstream join field exists). This is what powers the per-result SP picker above; if a result's AGRESSO contract has no active mapping, the picker is empty.
+
+| Audience | Surface |
+| --- | --- |
+| Operators (`CENTER_ADMIN` / `SYSTEM_ADMIN`) | SSR admin page `/api/admin/bilateral-project-mappings` — list + create/edit modal with AGRESSO picker, CLARISA project picker, and SP allocation preview. Deactivate flow soft-deletes; re-create after deactivate is allowed (partial-unique on the active row). |
+| Programmatic | REST surface at `/api/bilateral-project-mappings` (`GET` list + filters, `POST` create, `PATCH /:id`, `PATCH /:id/deactivate`). Same role gate. Note the URL is **not** under `/api/admin/...` — see Pivot Record #1 in [`./pending-items/execution.md`](./pending-items/execution.md). |
+| FE awareness | The STAR app itself doesn't render or edit mappings — operators do that in the admin panel. STAR FE only needs to handle the `mapping_status: "unmapped"` branch from [§4.6](#46-per-result-science-programs-picker-new--2026-05-26) gracefully. |
+
+Picker source endpoint (used by the admin form, not by STAR directly): `GET /api/tools/clarisa/projects/bilateral?search=...` — same role gate, returns a trimmed payload with the project's Confirmed SPs.
+
+> Canonical: [`./pending-items/requirements.md` R-BIL-078 / R-BIL-079 / R-BIL-080](./pending-items/requirements.md).
 
 | Rule | Source | UX implication |
 | --- | --- | --- |
@@ -380,5 +464,6 @@ When you need ground truth on "is X live yet?", check [`./tasks.md` §5–§9](.
 | --- | --- | --- |
 | 2026-05-19 | Initial handoff after Phase 0–2 backend + T-24 push skeleton landed (commit `e838e2f8`) and `staging` was merged in (`9ffaad71`). | ARI backend team |
 | 2026-05-23 | **SP catalog wave (commit `5d48b27b`).** Three FE-visible deltas: (1) new endpoint `GET /api/tools/clarisa/science-programs` returns 13 SPs with name/category/color (§4.6); (2) alignment GET response now ships `selected_science_programs[]` enriched with name/category/color — keep using this instead of `selected_levers[]`, which is now deprecated back-compat (§4.2); (3) alignment PATCH accepts `sp_codes` (preferred) alongside deprecated `lever_codes` (§4.3). Also documented the numeric `:resultCode` gotcha — pass `19792`, not `STAR-19792`. | ARI backend team |
+| 2026-05-26 | **Phase 1.5 wave (commits `8b59a099` → `2a7e9819`, branch `AC-1594-bilateral-module-v2`).** FE-visible deltas, all driven by the [`./pending-items/`](./pending-items/) sub-spec: (1) **picker source is now per-result** — `GET /api/v1/results/:resultCode/pool-funding-alignment/science-programs` returns only the SPs CLARISA links to the result's mapped bilateral project (§4.6); the static catalog endpoint stays live as display-only fallback. (2) **PATCH alignment now 400s on unknown `sp_codes`** with structured `errors.unknown_sp_codes` (§4.3). (3) **`is_read_only` is now a union** of `platform_code === 'PRMS'` OR `is_synced_to_prms` — PRMS-sourced results are always read-only (§4.2). (4) `selected_science_programs[]` gains optional `icon_key` (defaults to SP code) and `allocation` (when sourced from CLARISA per-result path) (§4.2). (5) New endpoint stub `GET .../hlos-indicators` returns interim 503 until OQ-RV-2 closes (§4.7). (6) New admin module at `/api/admin/bilateral-project-mappings` for operators to maintain the AGRESSO ↔ CLARISA join — STAR FE only needs to handle `mapping_status: "unmapped"` from the picker (§4.8). | ARI backend team |
 
 When this drifts from the canonical sources, the canonical sources win. Open a PR against this file alongside the backend change so the handoff stays current.

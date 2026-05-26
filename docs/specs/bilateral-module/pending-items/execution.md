@@ -144,6 +144,29 @@
 
 ---
 
+### [x] T-15.8 — Doc updates to parent specs
+
+- **Date:** 2026-05-26
+- **Requirements covered:** NFR-BIL-071 (doc alignment)
+- **Files modified:**
+  - `docs/specs/bilateral-module/design.md` — new §3.6 ("CLARISA-source SPs + admin-owned project mapping (Phase 1.5)") + §3.7 ("Source-based read-only gate (Phase 1.5)"). Each cross-links to the pending-items sub-spec and to the relevant T-15.N task IDs / commit hashes / Pivot Records.
+  - `docs/specs/bilateral-module/tasks.md` — appended §14 "Phase 1.5 deltas — pending-items sub-spec" (T-15.1..15.16 status table + Pivot Records list + carried-forward bug callout) + §15 "Re-price log" (Phase 3+ re-evaluation dated 2026-05-25).
+  - `docs/specs/bilateral-module/frontend-handoff.md` — §4.2 (union `is_read_only` semantic + new `icon_key` / `allocation` fields on `selected_science_programs[]`), §4.3 (catalog-aware 400 with structured `errors.unknown_sp_codes` payload), §4.6 (rewritten — per-result picker is now the source; legacy catalog demoted to display-only fallback), new §4.7 (HLO endpoint stub returning interim 503), new §4.8 (admin module pointer), §12 changelog entry for 2026-05-26.
+- **Decisions made:**
+  - **Numbered the new tasks.md sections §14 + §15** rather than the spec-idealized §10 + §11 because the parent file already had sections §10–§13 (Cross-cutting / Risks / DoD / Sign-off). Renumbering existing sections would break cross-refs across the spec tree; appending preserves them.
+  - **Kept the legacy `GET /api/tools/clarisa/science-programs` endpoint documented as a deprecated fallback** instead of removing the doc entirely. It's still live (returns the 13 SPs with `icon_key` from T-15.4) — the FE may need it transiently if the per-result enrichment path can't reach CLARISA. Removal is a future cleanup once the FE stops keying off it.
+  - **Cross-linked each pending-items entry from the parent** rather than duplicating content. Parent specs stay as the high-level reference; `pending-items/` carries the depth (12 design decisions, 11 functional requirements, 16 task entries, 3 Pivot Records, full execution history).
+- **Issues encountered:** none.
+- **Verification:**
+  - Pre-existing parent-spec content untouched outside the new sections.
+  - All cross-refs (`./pending-items/...`, `./pending-items/execution.md`, anchor links within `frontend-handoff.md`) resolve.
+  - `frontend-handoff.md` §4 numbering preserved (no renumber of §4.1–§4.5).
+  - `tasks.md` §13 Sign-off kept in place; new §14/§15 append cleanly at the end.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
 ### [x] T-15.15 — Admin SSR page + sidebar entry
 
 - **Date:** 2026-05-26

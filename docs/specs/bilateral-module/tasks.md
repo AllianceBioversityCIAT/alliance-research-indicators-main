@@ -853,3 +853,63 @@ The bilateral module is "done" when:
 [ ] Security — <name>
 [ ] QA lead — <name>
 ```
+
+---
+
+## 14. Phase 1.5 deltas — pending-items sub-spec
+
+> Sub-spec of record: [`./pending-items/`](./pending-items/) — `requirements.md` (R-BIL-070..080), `design.md` (D-PI-1..12), `tasks.md` (T-15.1..15.16), `execution.md` (live progress + 3 Pivot Records).
+
+Phase 1.5 carries the two PO clarifications from 2026-05-25 (CLARISA-source SPs; admin-owned AGRESSO ↔ CLARISA mapping) plus all the cleanup that landed in the same wave. Task IDs use the `T-15.N` decimal suffix to slot between Phase 0–2 (T-00..T-20) and Phase 3+ (T-21..T-38).
+
+| Task | Title | Status | Commit |
+| --- | --- | --- | --- |
+| T-15.1 | Catalog-aware validation on PATCH alignment | `[x]` done (2026-05-26) | `309d03fe` |
+| T-15.2 | Source-based read-only gate | `[x]` done (2026-05-26) | `d18691b1` |
+| T-15.3 | Migration: rename `lever_code` → `sp_code` | `[x]` done (2026-05-26) | `2c650db4` |
+| T-15.4 | Migration: add `icon_key` to catalog | `[x]` done (2026-05-26) | `7696433b` |
+| T-15.5 | ~~v1 periodic sync~~ | DROPPED (D-PI-7) | — |
+| T-15.6 | Sibling `*.spec.ts` coverage backfill | todo | — |
+| T-15.7 | Apply migrations to dev / staging / production | todo | — |
+| T-15.8 | Doc updates (this section + design §3.6/§3.7 + frontend-handoff §4.6–§4.8) | in progress | — |
+| T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | todo (see §15 below) | — |
+| T-15.10 | `ClarisaProjectsService` tool + 5-min cache | `[x]` done (2026-05-26) | `f9f6f851` |
+| T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | `[x]` done (2026-05-26) | `92e2fd52` |
+| T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | blocked (OQ-RV-2) | — |
+| T-15.13 | Migration + entity for `bilateral_project_mapping` | `[x]` done (2026-05-25) | `8b59a099` |
+| T-15.14 | `BilateralProjectMappingService` + controller + DTOs | `[x]` done (2026-05-26) | `b7bdc237` |
+| T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | `[x]` done (2026-05-26) | `9b539a7d` |
+| T-15.16 | AI-assisted mapping suggestions | deferred (OQ-RV-8) | — |
+
+**Pivot Records** (in [`./pending-items/execution.md`](./pending-items/execution.md)):
+- **#1** — Admin REST surface moved from `/api/admin/bilateral-project-mappings` to `/api/bilateral-project-mappings` (JWT middleware exclude `/admin(.*)` was sweeping the role-gated endpoints).
+- **#2** — Per-result SP endpoint URL lands at `.../pool-funding-alignment/science-programs` (existing controller namespace) instead of the idealized `.../bilateral/science-programs`.
+- **#3** — Admin SSR routers needed `basename="/api"` — every existing admin page was SSR-rendering with an empty body before this fix.
+
+**Carried-forward bug** (out of Phase 1.5 scope; flagged during T-15.1 + T-15.3 smoke): `result_pool_funding_alignment.uq_..._result_active` is a plain `UNIQUE (result_id, is_active)` index — not partial — so the second deactivated row collides. Recommended follow-up: a sibling migration converting it to the same STORED GENERATED column + UNIQUE pattern used by `bilateral_project_mapping` (D-PI-9).
+
+---
+
+## 15. Re-price log
+
+Operational record of how Phase 3+ task estimates shift as Phase 1.5 work lands and as external blockers move.
+
+### 2026-05-25 — Phase 1.5 wave
+
+Triggered by the two PO clarifications on 2026-05-25 (CLARISA-source SPs; admin-owned AGRESSO ↔ CLARISA mapping). Re-evaluating Phase 3+:
+
+| Task | Prior status | New status (2026-05-25) | Notes |
+| --- | --- | --- | --- |
+| T-21 (BLOCKER D-push-auth) | open | open | PRMS liaison; no movement. |
+| T-22 (BLOCKER D-source-w3) | open | open | System Office liaison; no movement. |
+| T-23 (BLOCKER OQ-US5-3 / OQ-US5-6) | open | open | PRMS liaison + PO; no movement. |
+| T-24 (Push module skeleton) | landed (commit `e838e2f8`) | landed | No change. |
+| T-25..T-28 (Push payload + queue + admin retry) | not started | unblocked locally — wait on T-21/T-23 | Effort unchanged (M/L mix). |
+| T-29..T-30 (W3 Registry sync + admin) | not started | wait on T-22 | Effort unchanged (M/L). |
+| **T-31 (SP ToC sync module + cron)** | **L** | **Scope narrowed → S/M** | **The SP catalog half is now covered by T-15.4 + T-15.11 + the live CLARISA `/api/projects` proxy. Only the indicators-per-SP HLO surface remains — and that's already moved into T-15.12 as a live proxy via PRMS ToC. T-31 collapses into "delete dead code" once T-15.12 unblocks (OQ-RV-2).** |
+| T-32 (Admin SP ToC sync endpoint + SSR page) | not started | likely DROPPED | Replaced by the on-demand live proxy pattern from T-15.12. Confirm + close at the same time as T-31 collapses. |
+| T-33..T-38 (E2E, observability, runbook, rollout) | not started | unchanged scope; deferred until Phase 3 unblocks | DevOps coordination still required for T-37/T-38. |
+
+**Net effect**: Phase 3+ effort shrinks by ~1 L task (T-31) and possibly ~1 M task (T-32), at the cost of the Phase 1.5 wave that just landed (one M-sized integration tool + one S-sized HLO proxy stub + one L-sized admin UI). The trade is favorable — the bilateral picker contract is now locked end-to-end against CLARISA, and the operator UI is live in dev.
+
+(Future re-price entries appended below in dated subsections as the spec evolves.)

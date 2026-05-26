@@ -23,7 +23,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | [x] done (2026-05-26) |
 | T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | todo |
 | T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | todo |
-| T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | todo |
+| T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | [x] done (2026-05-26) |
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | todo |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | [x] done (2026-05-26) |
 | T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | [x] done (2026-05-26) |
@@ -229,13 +229,13 @@ graph TD
 - **Implementation notes:**
   - Land AFTER code for T-15.1, T-15.2, T-15.11, T-15.13, T-15.14, T-15.15 is merged.
 - **Acceptance / done check:**
-  - [ ] Parent `design.md` has §3.6 + §3.7.
-  - [ ] Parent `tasks.md` has §10 + §11 entries.
-  - [ ] `frontend-handoff.md` §4.2/§4.3/§4.6/§4.7/§4.8 + §12 reflect Phase 1.5 behavior.
+  - [x] Parent `design.md` has §3.6 (CLARISA-source SPs + admin mapping) + §3.7 (source-based read-only gate).
+  - [x] Parent `tasks.md` has §14 (Phase 1.5 deltas — pending-items sub-spec) + §15 (Re-price log) entries. (Numbered §14/§15 rather than the spec-idealized §10/§11 because the parent already had §10–§13; appending preserved existing cross-refs.)
+  - [x] `frontend-handoff.md` §4.2 (union `is_read_only`) + §4.3 (catalog-aware 400) + §4.6 (rewritten — per-result picker; legacy catalog demoted to fallback) + new §4.7 (HLO endpoint stub) + new §4.8 (admin module pointer) + §12 changelog reflect Phase 1.5 behavior.
 - **Dependencies:** T-15.1, T-15.2, T-15.11, T-15.13, T-15.14, T-15.15.
 - **Estimated effort:** S
-- **Owner:** TBA
-- **Status:** todo
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.8 entry.
 
 ---
 
