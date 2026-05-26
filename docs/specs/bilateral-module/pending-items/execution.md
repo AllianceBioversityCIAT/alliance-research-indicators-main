@@ -166,7 +166,7 @@
   - Smoke C: `GET /api/bilateral-project-mappings?limit=1` → 200, `meta.total=3` (the 3 inactive D527 rows from prior smokes).
   - Smoke D: (already verified end-to-end during T-15.11) — result `19792` (CSICAP) → AGRESSO `D527` → CLARISA project `1` (T-PJ-003262 IITA) → `SP09 25% + SP10 75%` Confirmed in P25.
 - **Status:** [~] dev leg completed; staging + prod tracked in the checklist (awaiting DevOps owner assignment + off-peak window confirmation).
-- **Commit:** (pending — this entry + checklist + tasks.md flip)
+- **Commit:** `a4395e56`
 
 ---
 
