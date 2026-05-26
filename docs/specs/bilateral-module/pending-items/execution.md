@@ -144,6 +144,39 @@
 
 ---
 
+### [x] T-15.17 — Migration: fix `result_pool_funding_alignment` partial-unique
+
+- **Date:** 2026-05-26
+- **Requirements covered:** (operational — pre-existing bug surfaced during T-15.1 / T-15.3 live smokes; no R-ID)
+- **Files added:**
+  - `server/researchindicators/src/db/migrations/1779190000014-fixResultPoolFundingAlignmentPartialUnique.ts` — DROP plain UNIQUE `(result_id, is_active)` → ADD STORED GENERATED `active_result_id = IF(is_active = 1, result_id, NULL)` → ADD UNIQUE on the generated column. Same D-PI-9 pattern `bilateral_project_mapping` uses.
+- **Files modified:**
+  - `server/researchindicators/src/domain/entities/bilateral/entities/result-pool-funding-alignment.entity.ts` — removed the stale `@Index('uq_..._result_active', ['result_id', 'is_active'], {unique:true})` decorator (it was the truth before this migration; misleading after). Generated column intentionally NOT mapped on the entity (TypeORM would try to write to it otherwise).
+  - `docs/specs/bilateral-module/pending-items/tasks.md` — added T-15.17 task entry to the §1 table and §3 task list.
+  - `docs/specs/bilateral-module/pending-items/rollout-checklist.md` — added migration 5 to the apply list (§1) + a new bullet in §3 documenting the forward-only-in-practice DOWN; updated §4.1 dev sign-off.
+- **Decisions made:**
+  - **Forward-only in practice.** The DOWN path is theoretically symmetric but practically only succeeds on a freshly-applied DB before any deactivate+re-create operator activity. Once the table accumulates ≥ 2 deactivated rows for any single `result_id`, the old plain-unique can no longer be re-added without data loss. The migration transaction rolls back cleanly when that happens, leaving the new index in place and the ledger consistent. Documented in the migration's DOWN comment AND in the rollout checklist's risk section. This is the correct safety posture — rolling back would otherwise require silently picking which deactivated row to delete.
+  - **No service/repository code change.** `BilateralService.updateAlignment` already does deactivate-then-insert inside a single transaction, which is exactly the pattern the new partial-unique permits. The bug was purely at the schema layer; the application code was correct from day one.
+  - **Lands as T-15.17 in pending-items**, not as a separate sub-spec. The bug was discovered during Phase 1.5 smoke; the sub-spec is the natural home for the audit trail. No new R-BIL requirement — marked operational (same convention as T-15.9).
+- **Issues encountered:**
+  - Initial DOWN attempt failed (as expected) with `Duplicate entry '17936-0' for key 'uq_result_pool_funding_alignment_result_active'` after the smoke test had created multiple deactivated rows. Updated the migration's DOWN comment to document this as a known property, not a bug. The forward path completed cleanly + the migration ledger correctly stayed at "applied" after the failed revert.
+- **Verification:**
+  - Typecheck `tsc -p tsconfig.build.json` → clean.
+  - Unit: `npx jest src/domain/entities/bilateral` → **60/60 passing** (no behavior regression).
+  - Lint clean.
+  - **Live reproduction (dev :3001):**
+    1. Apply migration → 3 ALTER statements + ledger insert, all in one transaction.
+    2. POST mapping `D527 → CLARISA project 1` → 201.
+    3. PATCH `{has_contribution: true, sp_codes: ['SP09']}` against result 19792 → **200** (was 500 `Duplicate entry '17936-0'` before this fix). ✓
+    4. PATCH `{has_contribution: false}` → 200. ✓
+    5. PATCH `{has_contribution: true, sp_codes: ['SP10']}` → 200 (third deactivate+insert cycle in a row). ✓
+    6. Mapping deactivated as cleanup.
+  - **Revert path** intentionally not re-tested after smoke step 5 — the smoke produced exactly the data condition the DOWN can't unwind, which is the property documented in the DOWN comment.
+- **Status:** [x] completed
+- **Commit:** (pending)
+
+---
+
 ### [~] T-15.7 — Rollout (dev leg done; staging + prod queued for DevOps)
 
 - **Date:** 2026-05-26

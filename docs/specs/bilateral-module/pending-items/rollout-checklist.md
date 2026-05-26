@@ -17,6 +17,7 @@
 | 2 | `1779190000011` | `createBilateralProjectMapping.ts` | T-15.13 | Creates `bilateral_project_mapping` table + STORED GENERATED column + partial-unique index | Drops table |
 | 3 | `1779190000012` | `addIconKeyToScienceProgram.ts` | T-15.4 | `ALTER TABLE clarisa_science_programs ADD COLUMN icon_key VARCHAR(64) NULL` + seeds `icon_key = official_code` for 13 rows | Drops column |
 | 4 | `1779190000013` | `renameLeverCodeToSpCodeOnAlignmentSp.ts` | T-15.3 | DROP idx → `CHANGE COLUMN lever_code sp_code VARCHAR(50)` → ADD idx | Symmetric inverse |
+| 5 | `1779190000014` | `fixResultPoolFundingAlignmentPartialUnique.ts` | T-15.17 | DROP plain UNIQUE → ADD STORED GENERATED `active_result_id` → ADD UNIQUE on it | **Forward-only in practice** — DOWN fails once the table accumulates ≥ 2 deactivated rows per result. See §3 + the migration's DOWN comment. |
 
 Apply in **numeric order**. TypeORM's `migration:execute` does this automatically — the table `<schema>.migrations` tracks which have run.
 
@@ -105,13 +106,14 @@ npm run migration:revert
 
 Revert order is LIFO. To roll all 4 Phase 1.5 migrations back, run `migration:revert` 4 times — confirming each step.
 
-The migrations are designed to be **symmetric**:
+The migrations are mostly symmetric, with one exception:
+- `1779190000014` (T-15.17 partial-unique fix) — **forward-only in practice**. The DOWN tries to re-add the old plain `UNIQUE (result_id, is_active)` index, which throws 1062 once the table holds ≥ 2 deactivated rows for any single result. The migration transaction rolls back cleanly, but you cannot actually undo this one without first manually pruning deactivated alignment rows (`DELETE FROM result_pool_funding_alignment WHERE is_active = 0` if history isn't needed). **Don't include this in any blind `migration:revert` loop in production.**
 - `1779190000013` (T-15.3 rename) — DOWN inverts the rename; preserves rows.
 - `1779190000012` (T-15.4 icon_key) — DOWN drops the column; data loss is the seed `icon_key = official_code`, which is regenerable.
 - `1779190000011` (T-15.13 mapping table) — DOWN drops the table; **data loss = all mapping rows operators created**. Before reverting in production, export the table.
 - `1779190000010` (catalog seed) — DOWN drops the table; **data loss = the 13 SP rows**, regenerable from the migration.
 
-⚠️ **Always export `bilateral_project_mapping` before reverting** if there are operator-created rows. The catalog tables are regenerable; the mapping table is not.
+⚠️ **Always export `bilateral_project_mapping` before reverting** if there are operator-created rows. The catalog tables are regenerable; the mapping table is not. ⚠️ **Do not attempt to revert `1779190000014` on a populated environment** — prune `result_pool_funding_alignment` first.
 
 ```bash
 # Safety export (run from the deploy box, against the env DB):
@@ -129,6 +131,7 @@ mysqldump -h $ARI_MYSQL_HOST -u $ARI_MYSQL_USER -p$ARI_MYSQL_PASSWORD \
 - [x] Migration 2 (mapping table) — applied 2026-05-25 (T-15.13).
 - [x] Migration 3 (icon_key) — applied 2026-05-26 (T-15.4); revert + re-apply round-trip clean.
 - [x] Migration 4 (lever_code → sp_code) — applied 2026-05-26 (T-15.3); revert + re-apply round-trip clean.
+- [x] Migration 5 (alignment partial-unique fix) — applied 2026-05-26 (T-15.17); forward verified by reproducing the prior 500 (now 200); DOWN intentionally not re-tested on populated dev (would fail by design — see §3).
 - [x] Smoke A (catalog endpoint) — 200, 13 rows, all `icon_key` populated.
 - [x] Smoke B (DI sanity) — `/api/v2/results` 200.
 - [x] Smoke C (mapping endpoint) — 200, `meta.total` populated.

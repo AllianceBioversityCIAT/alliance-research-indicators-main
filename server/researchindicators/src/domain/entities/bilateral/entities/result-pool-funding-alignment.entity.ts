@@ -11,15 +11,14 @@ import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { ResultPoolFundingAlignmentSp } from './result-pool-funding-alignment-sp.entity';
 
+// @sdd-spec docs/specs/bilateral-module/pending-items — T-15.17
+// Partial-unique on the active row is enforced at the DB layer via a
+// STORED GENERATED column `active_result_id` + a UNIQUE index on it
+// (migration 1779190000014). The generated column is intentionally NOT
+// mapped on the entity — TypeORM would otherwise try to write to it.
+// Same pattern as `bilateral_project_mapping` (D-PI-9).
 @Entity('result_pool_funding_alignment')
 @Index('idx_result_pool_funding_alignment_result', ['result_id'])
-@Index(
-  'uq_result_pool_funding_alignment_result_active',
-  ['result_id', 'is_active'],
-  {
-    unique: true,
-  },
-)
 export class ResultPoolFundingAlignment extends AuditableEntity {
   @PrimaryGeneratedColumn({
     name: 'id',

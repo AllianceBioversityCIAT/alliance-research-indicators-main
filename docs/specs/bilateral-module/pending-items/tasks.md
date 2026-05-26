@@ -32,6 +32,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | [x] done (2026-05-26) |
 | T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | R-BIL-080 (UI) | [x] done (2026-05-26) |
 | T-15.16 | AI-assisted mapping suggestions | (forward-compat, deferred) | deferred |
+| T-15.17 | Migration: fix `result_pool_funding_alignment` partial-unique | (operational — pre-existing bug surfaced during T-15.1 / T-15.3 smoke) | [x] done (2026-05-26) |
 
 T-15.5 (v1 periodic sync) DROPPED — see proposal §14 changelog.
 
@@ -416,11 +417,33 @@ graph TD
 
 ---
 
+### T-15.17 — Migration: fix `result_pool_funding_alignment` partial-unique
+
+- **Requirements covered:** (operational — no R-ID; carried-forward bug)
+- **Files touched:**
+  - `src/db/migrations/1779190000014-fixResultPoolFundingAlignmentPartialUnique.ts` — DROP the plain unique → ADD STORED GENERATED `active_result_id` → ADD UNIQUE on the generated column. Same D-PI-9 pattern as `bilateral_project_mapping`.
+  - `src/domain/entities/bilateral/entities/result-pool-funding-alignment.entity.ts` — remove the stale `@Index('uq_result_pool_funding_alignment_result_active', ['result_id', 'is_active'], {unique:true})` decorator (it was the truth before the migration; misleading after). Generated column intentionally NOT mapped on the entity.
+- **Description:** Pre-existing partial-unique emulation bug surfaced during T-15.1 / T-15.3 live smokes. The original UNIQUE on `(result_id, is_active)` reads as "at most one row per (result, active-state)" — fails on the second deactivation because both rows would have `(result_id, 0)`. The intended semantic is "at most one ACTIVE row per result", which is what the D-PI-9 pattern (used by `bilateral_project_mapping`) actually enforces.
+- **Implementation notes:**
+  - Forward path is clean. DOWN is best-effort: only safe immediately after UP, before any deactivate+re-create operator activity. Once the table holds ≥ 2 deactivated rows for any result, `ADD UNIQUE INDEX` on the old shape throws 1062 and the migration transaction rolls back; new index + generated column remain in place. This is the correct safety posture — rolling back would otherwise require silently picking which deactivated row to delete. Documented in the migration's DOWN comment.
+  - Coordinate with the rollout in `./rollout-checklist.md` — this migration becomes the 5th in the Phase 1.5 batch and inherits the same per-env smoke sequence.
+- **Acceptance / done check:**
+  - [x] Migration applies forward on dev.
+  - [x] Reproduce the previously-failing PATCH (was 500 `Duplicate entry '17936-0'`) → now returns 200.
+  - [x] PATCH `has_contribution: false` + subsequent PATCH cycles all return 200.
+  - [x] 60/60 bilateral tests still passing.
+- **Dependencies:** none (independent of Phase 1.5 work — but lands as part of the same wave).
+- **Estimated effort:** S
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.17 entry. Rollout checklist updated to include this migration as step 5.
+
+---
+
 ## 4. Standard task categories — coverage map
 
 | Category | Covered by |
 | --- | --- |
-| Schema migrations | T-15.3, T-15.4, T-15.13 |
+| Schema migrations | T-15.3, T-15.4, T-15.13, T-15.17 |
 | Entity | T-15.3, T-15.4, T-15.13 |
 | DTO | T-15.4, T-15.11, T-15.12, T-15.14 |
 | Repository | T-15.3, T-15.13 |
