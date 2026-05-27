@@ -33,7 +33,7 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  *
  * Requires MySQL views: report_general_information, report_alliance_alignment,
  * report_partners, report_geo_location, report_evidences, report_ip_rights,
- * report_capacity_sharing_development, report_policy_change.
+ * report_capacity_sharing_development, report_policy_change, report_oicr.
  */
 @Injectable()
 export class StarResultsExportRepository {
@@ -42,6 +42,12 @@ export class StarResultsExportRepository {
    * front `limit` for the Excel file; it is only for chunking requests).
    */
   private static readonly FIND_V2_EXPORT_PAGE_SIZE = 2000;
+
+  /**
+   * Raised for phase-2 only (same connection) so `report_*` views with heavy `GROUP_CONCAT`
+   * are not truncated at the default 1024-byte limit. `SET LOCAL` reverts on commit/rollback.
+   */
+  private static readonly GROUP_CONCAT_MAX_LEN = 4_194_304;
 
   constructor(
     private readonly dataSource: DataSource,
@@ -117,7 +123,20 @@ export class StarResultsExportRepository {
         pc.policy_type AS policy_type,
         pc.policy_stage AS policy_stage,
         pc.evidence_stage AS evidence_stage,
-        pc.implementing_organizations AS implementing_organizations
+        pc.implementing_organizations AS implementing_organizations,
+        oc.impact_area AS impact_area,
+        oc.mel_regional_expert AS mel_regional_expert,
+        oc.sharepoint_link AS sharepoint_link,
+        oc.oicr_internal_code AS oicr_internal_code,
+        oc.tagging AS tagging,
+        oc.general_comment AS general_comment,
+        oc.maturity_level AS maturity_level,
+        oc.outcome_impact_statement AS outcome_impact_statement,
+        oc.short_outcome_impact_statement AS short_outcome_impact_statement,
+        CONCAT_WS(CHAR(10), oc.quantifications, oc.extrapolated_estimates) AS quantification,
+        oc.authors_contact_persons AS authors_contact_persons,
+        oc.for_external_use AS for_external_use,
+        oc.for_external_use_description AS for_external_use_description
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id
@@ -125,7 +144,8 @@ export class StarResultsExportRepository {
       LEFT JOIN report_evidences ev ON ev.result_id = gi.result_id
       LEFT JOIN report_ip_rights ip ON ip.result_id = gi.result_id
       LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id
-      LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id`;
+      LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id
+      LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id`;
 
     const v2Filters = this.mapReportDtoToFindResultsV2Filters(filters);
     const search = filters.filters.search ?? '';
@@ -148,10 +168,37 @@ export class StarResultsExportRepository {
     const sql = `${selectBody}
       WHERE gi.result_id IN (${ph})
       ORDER BY FIELD(gi.result_id, ${ph})`;
-    return this.dataSource.query(sql, [
-      ...orderedIds,
-      ...orderedIds,
-    ]) as Promise<Record<string, unknown>[]>;
+    const params = [...orderedIds, ...orderedIds];
+    return this.queryPhase2WithGroupConcatLimit(sql, params);
+  }
+
+  /**
+   * Pins one pool connection, raises `group_concat_max_len` for the transaction only, then runs
+   * the export SELECT (views rely on nested `GROUP_CONCAT`).
+   */
+  private async queryPhase2WithGroupConcatLimit(
+    sql: string,
+    params: unknown[],
+  ): Promise<Record<string, unknown>[]> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    try {
+      await queryRunner.startTransaction();
+      await queryRunner.query(
+        `SET LOCAL group_concat_max_len = ${StarResultsExportRepository.GROUP_CONCAT_MAX_LEN}`,
+      );
+      const rows = (await queryRunner.query(sql, params)) as Record<
+        string,
+        unknown
+      >[];
+      await queryRunner.commitTransaction();
+      return rows;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private mapReportDtoToFindResultsV2Filters(dto: FullFiltersReportDto): {
