@@ -23,6 +23,7 @@ describe('BilateralController (T-15.6)', () => {
   const bilateral = {
     getAlignment: jest.fn(),
     getScienceProgramsForResult: jest.fn(),
+    getHlosIndicatorsForResult: jest.fn(),
     listIndicators: jest.fn(),
     updateAlignment: jest.fn(),
     upsertContribution: jest.fn(),
@@ -86,6 +87,25 @@ describe('BilateralController (T-15.6)', () => {
       );
       expect(response).toMatchObject({
         description: 'Bilateral science programs found',
+        status: HttpStatus.OK,
+      });
+    });
+
+    it('GET /hlos-indicators → delegates to getHlosIndicatorsForResult', async () => {
+      bilateral.getHlosIndicatorsForResult.mockResolvedValueOnce({
+        mapping_status: 'mapped',
+        aow_status: 'has_aow',
+        pairs: [],
+      });
+
+      const response = await controller.getHlosIndicatorsForResult();
+
+      expect(bilateral.getHlosIndicatorsForResult).toHaveBeenCalledWith(
+        19792,
+        '19792',
+      );
+      expect(response).toMatchObject({
+        description: 'Bilateral HLOs and indicators found',
         status: HttpStatus.OK,
       });
     });
@@ -224,10 +244,11 @@ describe('BilateralController (T-15.6)', () => {
       },
     );
 
-    it('read endpoints (GET /, GET /science-programs, GET /indicators) do NOT carry @Roles — RolesGuard short-circuits when no metadata', () => {
+    it('read endpoints (GET /, GET /science-programs, GET /hlos-indicators, GET /indicators) do NOT carry @Roles — RolesGuard short-circuits when no metadata', () => {
       for (const handler of [
         'getAlignment',
         'getScienceProgramsForResult',
+        'getHlosIndicatorsForResult',
         'listIndicators',
       ]) {
         const fn = (

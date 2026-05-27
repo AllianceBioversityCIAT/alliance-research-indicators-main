@@ -7,8 +7,8 @@
 
 export interface ClarisaCgiarEntityType {
   code: number;
-  name: string; // 'Science programs' | 'Scaling programs' | 'Accelerators' | ...
-  prefix?: string | null;
+  name: string; // 'Science programs' | 'Scaling programs' | 'Accelerators' | 'Key Area of Work' | ...
+  prefix?: string | null; // 'SP' | 'AOW' | ... — used by T-15.12 to find AOW entries
   level?: number | null;
   portfolio_id?: number | null;
 }
@@ -26,10 +26,11 @@ export interface ClarisaGlobalUnit {
   name: string;
   short_name?: string | null;
   acronym?: string | null;
-  smo_code: string; // e.g. 'SP09'
+  smo_code: string; // e.g. 'SP09' (level 1) or 'AOW06' (level 2)
   year?: number;
-  level?: number;
-  global_unit_type_id?: number;
+  level?: number; // 1 = Science Program, 2 = Key Area of Work (AOW)
+  parent_id?: number | null; // AOW entries point at their parent SP's `id`
+  global_unit_type_id?: number; // 22/23/24 = SP, 26 = AOW (test data 2026-05-27)
   portfolio_id?: number;
   cgiar_entity_type_object?: ClarisaCgiarEntityType;
   portfolio_object?: ClarisaPortfolio;

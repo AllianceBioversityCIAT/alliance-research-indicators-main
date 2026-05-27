@@ -27,7 +27,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | [x] done (2026-05-26) |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | [x] done (2026-05-26) |
 | T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | [x] done (2026-05-26) |
-| T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | R-BIL-077 | blocked (OQ-RV-2) |
+| T-15.12 | `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint | R-BIL-077 | [x] done (2026-05-27) |
 | T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | [x] done (2026-05-25) |
 | T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | [x] done (2026-05-26) |
 | T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | R-BIL-080 (UI) | [x] done (2026-05-26) |
@@ -55,7 +55,7 @@ graph TD
   T7[T-15.7 rollout]
   T8[T-15.8 doc updates]
   T9[T-15.9 re-price Phase 3+]
-  T12[T-15.12 PRMS ToC endpoint]
+  T12[T-15.12 PRMS ToC endpoint - done]
   T16[T-15.16 AI assist - DEFERRED]
 
   T13 --> T14
@@ -77,7 +77,7 @@ graph TD
   T15 --> T8
   T7 -.->|after migrations land| many
   T9 -.->|independent| T9
-  T12 -.->|blocked OQ-RV-2| T12
+  T12 -.->|done — AOW derived from CLARISA| T12
   T16 -.->|deferred| T16
 ```
 
@@ -303,29 +303,40 @@ graph TD
 
 ---
 
-### T-15.12 — `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint
+### T-15.12 — `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint
 
-- **Requirements covered:** R-BIL-077
-- **Files touched:**
+- **Requirements covered:** R-BIL-077 + NFR-BIL-073
+- **Files touched (as built):**
   - `src/domain/tools/prms-toc/prms-toc.module.ts`
-  - `src/domain/tools/prms-toc/prms-toc.service.ts` — method `listHlosBySps(spCodes: string[])`. Cache key: sorted+joined codes; TTL 5 min. Interim: throws `ServiceUnavailableException("PRMS ToC integration not yet configured")` until env vars `ARI_PRMS_TOC_HOST` + auth are set.
-  - `src/domain/tools/prms-toc/prms-toc.service.spec.ts` — interim 503, post-config happy path (mocked).
-  - `src/domain/tools/prms-toc/dto/prms-toc.types.ts` — placeholder types (refine when OQ-RV-2 closes).
+  - `src/domain/tools/prms-toc/prms-toc.service.ts` — methods `getTocResults(program, areaOfWork)` + `getTocResultsForPairs(pairs)`. Cache key: composite `${program}-${areaOfWork}`; TTL 5 min; same warm-on-error / cold-503 pattern as `ClarisaProjectsService`.
+  - `src/domain/tools/prms-toc/prms-toc.service.spec.ts` — 13 tests covering happy path, cache hit, per-pair keying, whitespace trimming, missing-input 503, missing-host 503, warm-cache-on-error, cold-503, empty-payload guard, batch helper (order preservation + empty input).
+  - `src/domain/tools/prms-toc/dto/prms-toc.types.ts` — TypeScript shapes matching the live upstream (envelope, payload, outcomes/outputs/indicators/targets-by-center).
   - `src/domain/entities/bilateral/bilateral.controller.ts` — new `@Get('hlos-indicators')` handler.
-  - `src/domain/entities/bilateral/bilateral.service.ts` — `getHlosByScienceProgramsForResult` delegates to `PrmsTocService.listHlosBySps`.
-  - `src/domain/entities/bilateral/dto/bilateral-hlos-indicators.response.dto.ts` — new DTO shape per design §6.2.
-  - `src/domain/shared/utils/env.utils.ts` — new getters `PRMS_TOC_HOST`, `PRMS_TOC_AUTH`.
-- **Description:** Wire the HLO/indicator panel data source. **BLOCKED on OQ-RV-2** (PRMS team confirms endpoint URL/auth/payload). Ship the 503 interim path so the FE can wire its retry logic before the upstream is ready.
+  - `src/domain/entities/bilateral/bilateral.service.ts` — new `getHlosIndicatorsForResult(resultId, resultCode)` + private `derivePairsFromProjectMappings(project)` helper; new constructor dep on `PrmsTocService`.
+  - `src/domain/entities/bilateral/dto/bilateral-hlos-indicators.response.dto.ts` — response shape with `aow_status` discriminator.
+  - `src/domain/shared/utils/env.utils.ts` — new `PRMS_TOC_HOST` getter (no `PRMS_TOC_AUTH` — test endpoint has no auth).
+  - `src/domain/tools/clarisa/projects/dto/clarisa-project.types.ts` — surfaces `parent_id` on `ClarisaGlobalUnit`; documents `prefix` semantics on `ClarisaCgiarEntityType`.
+  - `src/domain/entities/bilateral/bilateral.service.getHlosIndicatorsForResult.spec.ts` — 6 focused scenarios.
+  - `src/domain/entities/bilateral/bilateral.module.ts` — imports `PrmsTocModule`.
+  - `.env.example` — documents `ARI_PRMS_TOC_HOST=https://prtest-back.ciat.cgiar.org`.
+- **Description:** Wires the HLO/indicator panel data source. Endpoint takes no extra params from the FE — `(program, areaOfWork)` pairs are derived from the mapped CLARISA project's `project_mappings_array[]` (level-2 AOW entries paired with their `parent_id` → SP). Fans out one PRMS call per pair, cached. Always returns 200; the FE drives empty-state UX from `aow_status` (`unmapped` / `no_aow_mappings` / `has_aow`).
 - **Implementation notes:**
-  - When OQ-RV-2 closes, refine `dto/prms-toc.types.ts` to match the actual upstream payload and remove the interim 503 branch.
+  - PRMS upstream observed (2026-05-27): `GET https://prtest-back.ciat.cgiar.org/api/public-results-framework/toc-results?program=<SP>&areaOfWork=<AOW>`. Both params required (400 without `areaOfWork`); no auth observed on the test host.
+  - AOW comes from CLARISA (D-PI-13). CLARISA does NOT expose AOW at the project root, but DOES expose it inside `project_mappings_array[]` as level-2 entries whose `parent_id` points back to the level-1 SP entry's `id`. 3 of 31 Bilateral projects in TEST currently carry AOW-level mappings; the other 28 are SP-only and surface as `aow_status: "no_aow_mappings"`.
+  - URL stays under `pool-funding-alignment/` (not the idealized `/bilateral/`) — matches Pivot Record #2 from T-15.11.
+  - Resilience: 5-min in-memory TTL, warm-cache-on-error serves stale, cold cache failures translate to 503 envelope.
 - **Acceptance / done check:**
-  - [ ] Until OQ-RV-2: endpoint returns 503 with the documented description.
-  - [ ] After OQ-RV-2: scenarios from R-BIL-077 pass (happy, empty sp_codes, upstream unreachable).
-- **Dependencies:** OQ-RV-2 (blocker).
-- **Estimated effort:** M (interim) + M (post-OQ-RV-2)
-- **Owner:** TBA
-- **Status:** blocked
-- **Blocker:** OQ-RV-2 (PRMS team).
+  - [x] Endpoint returns 200 with the three `aow_status` shapes documented above.
+  - [x] PRMS upstream unreachable + cold cache → 503 with `"PRMS ToC temporarily unreachable"`.
+  - [x] `ARI_PRMS_TOC_HOST` missing → 503 with `"PRMS ToC integration not configured"`.
+  - [x] Sibling specs added: `prms-toc.service.spec.ts` (13) + `bilateral.service.getHlosIndicatorsForResult.spec.ts` (6). Existing focused specs (T-15.1 / T-15.2 / T-15.11 / T-15.6) green after provider mock added.
+  - [x] Full jest suite: 279 suites / 1580 tests green.
+  - [x] `npx eslint --fix` on touched files → clean.
+  - [x] Swagger: `/swagger` will show the new endpoint under the `Bilateral` tag with the locked operation summary.
+- **Dependencies:** T-15.10 (CLARISA projects tool — already done), T-15.14 (mapping lookup — already done).
+- **Estimated effort:** M (delivered)
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-27) — see [`./execution.md`](./execution.md) T-15.12 entry.
 
 ---
 
@@ -472,7 +483,7 @@ graph TD
 | T-15.6 | 4 sibling spec files | ≥ 70% bilateral module coverage. |
 | T-15.10 | `clarisa-projects.service.spec.ts` | cache hit + warm-on-error + cold-503. |
 | T-15.11 | `bilateral.service.spec.ts` | R-BIL-076 + R-BIL-078 scenarios. |
-| T-15.12 | `prms-toc.service.spec.ts` | interim 503 + post-OQ-RV-2 happy path. |
+| T-15.12 | `prms-toc.service.spec.ts` + `bilateral.service.getHlosIndicatorsForResult.spec.ts` | 13 + 6 scenarios — happy path, cache hit, per-pair keying, warm-on-error, cold-503, missing-host 503, pair-derivation from CLARISA, AOW filtering. |
 | T-15.13 | migration tests | partial-unique enforced. |
 | T-15.14 | service + controller + e2e (new `test/bilateral-project-mappings.e2e-spec.ts`) | create / 409 / update / deactivate / role allow+deny. |
 | T-15.15 | (manual + Playwright if available) | end-to-end create + deactivate flow in dev. |
@@ -500,7 +511,7 @@ A task is NOT done until:
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| RB-1 | 2026-05-25 | PRMS ToC endpoint URL/auth/payload is unknown (OQ-RV-2). | Ship T-15.12 in interim 503 mode; refine when OQ-RV-2 closes. | PRMS team | open |
+| RB-1 | 2026-05-25 | PRMS ToC endpoint URL/auth/payload is unknown (OQ-RV-2). | Ship T-15.12 in interim 503 mode; refine when OQ-RV-2 closes. | PRMS team | closed 2026-05-27 — URL supplied, no auth on test host, T-15.12 shipped end-to-end. |
 | RB-2 | 2026-05-25 | Renaming `lever_code` could surface hidden consumers. | Pre-merge grep + `git log -S lever_code`. | ARI backend | open |
 | RB-3 | 2026-05-25 | OQ-PI-2 (hard-reject `is_active=false`) carried from v1; could change T-15.1 behavior post-merge. | Default to D-PI-6 (accept any row); follow-on PR if OQ resolves differently. | ARI backend | open |
 | RB-4 | 2026-05-25 | T-15.7 production rollout needs DevOps coordination. | Schedule off-peak; backout via `migration:revert`. | DevOps | open |
@@ -514,7 +525,7 @@ A task is NOT done until:
 
 The spec is complete when:
 - [ ] T-15.1, T-15.2, T-15.3, T-15.4, T-15.6, T-15.7, T-15.8, T-15.9, T-15.10, T-15.11, T-15.13, T-15.14, T-15.15 are `done`.
-- [ ] T-15.12 is `done` if OQ-RV-2 closed; otherwise `blocked` is acceptable in the first wave.
+- [x] T-15.12 is `done` — OQ-RV-2 closed in practice 2026-05-27 (PRMS team-supplied URL works without auth on the test host).
 - [ ] All R-BIL-070..080 acceptance criteria are checked.
 - [ ] NFR-BIL-070..073 verification passes.
 - [ ] Coverage ≥ 60% global, ≥ 70% bilateral + bilateral-project-mapping.

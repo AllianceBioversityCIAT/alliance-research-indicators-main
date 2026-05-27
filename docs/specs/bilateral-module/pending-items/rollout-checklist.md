@@ -38,6 +38,13 @@ npm run build               # builds dist/
 
 # Confirm env vars target the right DB:
 echo "$ARI_MYSQL_HOST $ARI_MYSQL_DATABASE"   # sanity — must match expected env
+
+# T-15.12 / R-BIL-077 — confirm PRMS ToC host is set on the deployed env:
+echo "$ARI_PRMS_TOC_HOST"   # should print https://prtest-back.ciat.cgiar.org
+# When unset, GET .../pool-funding-alignment/hlos-indicators returns 503 with
+# "PRMS ToC integration not configured (ARI_PRMS_TOC_HOST missing)" — by design,
+# not a crash, but the FE panel will look broken. Same value across dev/staging/
+# prod during the testing wave (no environment-specific PRMS host yet).
 ```
 
 ### 2.2 Apply migrations
@@ -84,6 +91,16 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   "$BASE/api/v1/results/<known-bilateral-result-code>/pool-funding-alignment/science-programs" \
   | jq '.status, .data.mapping_status'
 # Expected: 200, and "mapped" or "unmapped" (both are valid).
+
+# E. HLOs/indicators endpoint (T-15.12) — must respond 200 regardless of mapping state:
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$BASE/api/v1/results/<known-bilateral-result-code>/pool-funding-alignment/hlos-indicators" \
+  | jq '.status, .data.aow_status, (.data.pairs | length)'
+# Expected: 200, and one of:
+#   "unmapped"        — no bilateral_project_mapping for this result's contract
+#   "no_aow_mappings" — mapped but the CLARISA project has no AOW entries
+#   "has_aow"         — mapped + ≥ 1 (SP, AOW) pair derived; pairs[] populated
+# A 503 here usually means ARI_PRMS_TOC_HOST is unset OR PRMS upstream is down.
 ```
 
 If any of A–D fails, **stop and proceed to §3 rollback**. Don't continue to the next env.

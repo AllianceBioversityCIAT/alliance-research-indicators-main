@@ -15,11 +15,16 @@ import {
 } from './dto/update-pool-funding-alignment.dto';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import {
   BilateralScienceProgramItem,
   BilateralScienceProgramsResponse,
 } from './dto/bilateral-science-programs.response.dto';
+import {
+  BilateralHlosIndicatorsResponse,
+  BilateralHlosPair,
+} from './dto/bilateral-hlos-indicators.response.dto';
 import { ENV } from '../../shared/utils/env.utils';
 import {
   IndicatorGroupResponse,
@@ -81,6 +86,7 @@ export class BilateralService {
     private readonly clarisaScienceProgramsService: ClarisaScienceProgramsService,
     private readonly clarisaProjectsService: ClarisaProjectsService,
     private readonly bilateralProjectMappingService: BilateralProjectMappingService,
+    private readonly prmsTocService: PrmsTocService,
   ) {}
 
   /**
@@ -192,6 +198,207 @@ export class BilateralService {
       clarisa_project: { id: project.id, short_name: project.short_name },
       science_programs,
     };
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12 / R-BIL-077
+   *
+   * HLO/indicator panel data source. Walks the same chain as the SP picker
+   * (result → AGRESSO → bilateral_project_mapping → CLARISA project), then
+   * derives (program, areaOfWork) pairs from the CLARISA project's
+   * `project_mappings_array[]`:
+   *
+   *   - Level-1 SP entries (prefix "SP") are the *programs*.
+   *   - Level-2 AOW entries (prefix "AOW", `parent_id` → SP.id) are the
+   *     *areaOfWork* values. Each AOW yields one (parent_SP, AOW) pair.
+   *
+   * For each pair we call `PrmsTocService.getTocResults` (cached per pair),
+   * group the response under the pair, and return all of them under a single
+   * `pairs[]`. The endpoint always returns 200 — see `aow_status` for the
+   * three valid empty-`pairs` states (`unmapped`, `no_aow_mappings`).
+   *
+   * Why AOW must come from CLARISA: PRMS requires `areaOfWork` (400 without)
+   * and exposes no `/aow-by-program` listing endpoint we can probe; CLARISA
+   * already carries the AOW mappings on each project — see
+   * `./execution.md` T-15.12 entry for the live-probe evidence.
+   */
+  async getHlosIndicatorsForResult(
+    resultId: number,
+    resultCode: string,
+  ): Promise<BilateralHlosIndicatorsResponse> {
+    const context =
+      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
+
+    if (!context) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const baseResponse = {
+      result_code: String(context.result_official_code ?? resultCode),
+    };
+    const agreementId = context.agresso_agreement_id?.trim();
+
+    if (!agreementId) {
+      return {
+        ...baseResponse,
+        mapping_status: 'unmapped',
+        aow_status: 'unmapped',
+        clarisa_project: null,
+        pairs: [],
+      };
+    }
+
+    const mapping =
+      await this.bilateralProjectMappingService.findActiveByAgreementId(
+        agreementId,
+      );
+
+    if (!mapping) {
+      return {
+        ...baseResponse,
+        mapping_status: 'unmapped',
+        aow_status: 'unmapped',
+        clarisa_project: null,
+        pairs: [],
+      };
+    }
+
+    const project = await this.clarisaProjectsService.findProjectById(
+      mapping.clarisa_project_id,
+    );
+
+    if (!project) {
+      return {
+        ...baseResponse,
+        mapping_status: 'unmapped',
+        aow_status: 'unmapped',
+        clarisa_project: {
+          id: mapping.clarisa_project_id,
+          short_name: mapping.clarisa_project_short_name ?? '',
+        },
+        pairs: [],
+      };
+    }
+
+    const projectRef = { id: project.id, short_name: project.short_name };
+    const pairs = this.derivePairsFromProjectMappings(project);
+
+    if (!pairs.length) {
+      // Project is mapped, but its CLARISA project_mappings_array carries
+      // only SP-level entries (no AOWs) — PRMS cannot answer without an
+      // AOW, so we surface this distinct state for the FE.
+      return {
+        ...baseResponse,
+        mapping_status: 'mapped',
+        aow_status: 'no_aow_mappings',
+        clarisa_project: projectRef,
+        pairs: [],
+      };
+    }
+
+    const payloads = await this.prmsTocService.getTocResultsForPairs(pairs);
+    const enrichedPairs: BilateralHlosPair[] = pairs.map((p, i) => {
+      const payload = payloads[i];
+      const outcomes = payload.tocResultsOutcomes ?? [];
+      const outputs = payload.tocResultsOutputs ?? [];
+      return {
+        program: p.program,
+        area_of_work: p.areaOfWork,
+        composite_code: payload.compositeCode ?? `${p.program}-${p.areaOfWork}`,
+        outcomes,
+        outputs,
+        metadata: {
+          total: outcomes.length + outputs.length,
+          outcomes: outcomes.length,
+          outputs: outputs.length,
+        },
+      };
+    });
+
+    return {
+      ...baseResponse,
+      mapping_status: 'mapped',
+      aow_status: 'has_aow',
+      clarisa_project: projectRef,
+      pairs: enrichedPairs,
+    };
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12
+   *
+   * Walks a CLARISA project's `project_mappings_array[]`, picks Confirmed
+   * AOW entries in the active portfolio, and pairs each one with its parent
+   * SP via `global_unit_object.parent_id` → SP.id.
+   *
+   * Drops AOWs whose parent SP we can't resolve from the same mappings —
+   * defensive against unexpected CLARISA shapes. Order is stable: by parent
+   * SP smo_code, then by AOW smo_code, so cache keys land deterministically.
+   */
+  private derivePairsFromProjectMappings(project: {
+    project_mappings_array?: Array<{
+      status?: string;
+      global_unit_object?: {
+        smo_code?: string;
+        level?: number;
+        parent_id?: number | null;
+        cgiar_entity_type_object?: { prefix?: string | null };
+        portfolio_object?: { acronym?: string };
+        id?: number;
+      };
+    }>;
+  }): Array<{ program: string; areaOfWork: string }> {
+    const activePortfolio = ENV.BILATERAL_ACTIVE_PORTFOLIO;
+    const mappings = project.project_mappings_array ?? [];
+
+    const inActivePortfolio = (m: (typeof mappings)[number]) =>
+      m.global_unit_object?.portfolio_object?.acronym === activePortfolio;
+
+    // Index SP entries (level 1, prefix SP) by their CLARISA id so we can
+    // resolve an AOW's parent_id back to its SP smo_code without a second
+    // CLARISA fetch.
+    const spById = new Map<number, string>();
+    for (const m of mappings) {
+      const u = m.global_unit_object;
+      if (!u) continue;
+      const prefix = u.cgiar_entity_type_object?.prefix?.toUpperCase();
+      if (
+        m.status === 'Confirmed' &&
+        u.level === 1 &&
+        prefix === 'SP' &&
+        u.smo_code &&
+        typeof u.id === 'number' &&
+        inActivePortfolio(m)
+      ) {
+        spById.set(u.id, u.smo_code);
+      }
+    }
+
+    const pairs: Array<{ program: string; areaOfWork: string }> = [];
+    for (const m of mappings) {
+      const u = m.global_unit_object;
+      if (!u) continue;
+      const prefix = u.cgiar_entity_type_object?.prefix?.toUpperCase();
+      const isAow =
+        m.status === 'Confirmed' &&
+        u.level === 2 &&
+        prefix === 'AOW' &&
+        u.smo_code &&
+        typeof u.parent_id === 'number' &&
+        inActivePortfolio(m);
+
+      if (!isAow) continue;
+
+      const program = spById.get(u.parent_id as number);
+      if (!program) continue; // AOW whose parent SP isn't in the same project — skip.
+      pairs.push({ program, areaOfWork: u.smo_code as string });
+    }
+
+    return pairs.sort(
+      (a, b) =>
+        a.program.localeCompare(b.program) ||
+        a.areaOfWork.localeCompare(b.areaOfWork),
+    );
   }
 
   async getAlignment(

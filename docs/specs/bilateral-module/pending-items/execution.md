@@ -500,6 +500,51 @@
 
 ---
 
+### [x] T-15.12 — `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint
+
+- **Date:** 2026-05-27
+- **Requirements covered:** R-BIL-077 (HLOs/indicators source) + NFR-BIL-073 (resilience)
+- **Files added:**
+  - `server/researchindicators/src/domain/tools/prms-toc/prms-toc.module.ts`
+  - `server/researchindicators/src/domain/tools/prms-toc/prms-toc.service.ts`
+  - `server/researchindicators/src/domain/tools/prms-toc/prms-toc.service.spec.ts`
+  - `server/researchindicators/src/domain/tools/prms-toc/dto/prms-toc.types.ts`
+  - `server/researchindicators/src/domain/entities/bilateral/dto/bilateral-hlos-indicators.response.dto.ts`
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.getHlosIndicatorsForResult.spec.ts`
+- **Files modified:**
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.ts` (new method + private `derivePairsFromProjectMappings` helper, new constructor param)
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.controller.ts` (new `@Get('hlos-indicators')` handler)
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.module.ts` (imports `PrmsTocModule`)
+  - `server/researchindicators/src/domain/shared/utils/env.utils.ts` (new `PRMS_TOC_HOST` getter)
+  - `server/researchindicators/src/domain/tools/clarisa/projects/dto/clarisa-project.types.ts` (surfaces `parent_id` + clarifies `prefix` doc on `ClarisaCgiarEntityType`)
+  - All 3 focused bilateral specs + canonical bilateral spec + controller spec (added `PrmsTocService` provider mock to keep their DI graphs compilable)
+  - `server/researchindicators/.env.example` (documents `ARI_PRMS_TOC_HOST`)
+- **PRMS endpoint observed (2026-05-27):** `GET https://prtest-back.ciat.cgiar.org/api/public-results-framework/toc-results?program=<SP>&areaOfWork=<AOW>` returns `{ response: { compositeCode, year, tocResultsOutcomes[], tocResultsOutputs[], metadata }, statusCode, message, ... }`. Both query params are REQUIRED — omitting `areaOfWork` returns 400. No auth header observed for the test host.
+- **Key discovery — AOW resolution path:** AOW is NOT exposed at the CLARISA project level. It IS exposed inside `project_mappings_array[]` as level-2 entries (`global_unit_type_id === 26`, `cgiar_entity_type_object.prefix === "AOW"`), whose `parent_id` points back to the level-1 SP entry's `id`. Live probe (2026-05-27): 3 of 31 Bilateral projects in TEST have AOW-level mappings; the rest are SP-only.
+- **Decisions made:**
+  - **D-PI-13 — AOW derivation from CLARISA, not FE-supplied** (operator-approved 2026-05-27): The endpoint takes no extra params; the backend derives (program = parent-SP smo_code, areaOfWork = AOW smo_code) pairs from the mapped CLARISA project. Rationale: CLARISA already carries the data; PRMS doesn't expose a `/aow-by-program` listing; pushing AOW knowledge onto the FE creates a contract gap we'd have to close again later.
+  - **`aow_status` is a first-class response field** with three valid states: `unmapped` (no bilateral_project_mapping), `no_aow_mappings` (mapped but CLARISA project carries only SP entries — PRMS cannot answer), `has_aow` (≥ 1 pair fanned out). Lets the FE render distinct empty-state affordances without inferring from the empty `pairs[]`.
+  - **5-min TTL cache keyed by `compositeCode`** matching `ClarisaProjectsService` pattern; same warm-on-error / cold-503 resilience.
+  - **Service is singleton-scoped** (no `CurrentUserUtil` / `ResultsUtil`) per parent design §3.4 Constraint A.
+  - **URL stays under `/pool-funding-alignment/`** (not the idealized `/bilateral/`) — matches Pivot Record #2 from T-15.11.
+- **Issues encountered:** none on the implementation. The pre-existing TS error in `test/app.e2e-spec.ts` (supertest CommonJS interop) is unrelated.
+- **Verification:**
+  - `npx tsc --noEmit -p tsconfig.json` → only the pre-existing supertest error in `test/app.e2e-spec.ts`; no errors in `src/`.
+  - `npx jest --testPathPattern="(prms-toc|bilateral)" --silent` → **9 suites, 80 tests, all green** (T-15.12 contributes 13 PrmsTocService tests + 6 BilateralService.getHlosIndicatorsForResult scenarios; existing focused specs adjusted with the new mock provider stay green).
+  - Full suite `npx jest --silent` → **279 suites, 1580 tests, all green**.
+  - `npx eslint --fix` on touched files → clean.
+- **Frontend handoff (FE questions answered):**
+  - **Endpoint:** `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators` — no query params.
+  - **Always 200.** Use `aow_status` to drive the empty-state UX:
+    - `unmapped` → "Ask admin to map this contract" (same affordance as the SP picker).
+    - `no_aow_mappings` → "This project has no AOWs in CLARISA — HLO/indicator panel is empty by design" (or hide the panel).
+    - `has_aow` → render `pairs[]`; each pair carries `program`, `area_of_work`, `composite_code`, `outcomes[]`, `outputs[]`, `metadata`.
+  - **Indicator-level fields** mirror PRMS upstream (`indicator_id`, `indicator_description`, `unit_messurament`, `type_name`, `target_value_sum`, `progress_percentage`, etc.) — see `prms-toc.types.ts` for the full TypeScript shape.
+  - **503** from this endpoint means PRMS upstream is unreachable AND the cache is cold; retry after a short backoff.
+- **Status:** [x] completed — unblocks OQ-RV-2 (which is now closed in practice; PRMS team-supplied URL works).
+
+---
+
 ## Summary
 
 Pending — spec in execution; see `tasks.md` for live task statuses.

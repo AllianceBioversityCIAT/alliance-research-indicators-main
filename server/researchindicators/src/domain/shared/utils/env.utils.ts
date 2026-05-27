@@ -36,6 +36,19 @@ export class ENV {
   }
 
   /**
+   * @sdd-spec bilateral-module/pending-items — T-15.12 / R-BIL-077
+   *
+   * Base host for the PRMS public-results-framework ToC integration. The
+   * service composes `${host}/api/public-results-framework/toc-results`
+   * with `?program=<SP>&areaOfWork=<AOW>`. Same URL is used in every
+   * environment for the testing wave (per user direction 2026-05-27).
+   * When unset, `PrmsTocService` returns 503 instead of crashing.
+   */
+  static get PRMS_TOC_HOST(): string {
+    return process.env.ARI_PRMS_TOC_HOST?.trim() || '';
+  }
+
+  /**
    * LOCAL DEVELOPMENT ONLY: skip JWT validation and inject a mock SYSTEM_ADMIN user.
    *
    * Purpose: lets a developer hit the API from their machine without setting up a

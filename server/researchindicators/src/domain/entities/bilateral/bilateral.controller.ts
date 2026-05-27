@@ -94,6 +94,34 @@ export class BilateralController {
       );
   }
 
+  // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12 / R-BIL-077
+  //
+  // No query params — pairs are derived from CLARISA's project_mappings_array
+  // (AOW entries with parent_id → SP). Always 200; see `aow_status` for the
+  // three valid empty-`pairs` states. PRMS unreachable + cold cache surfaces
+  // as 503 via the upstream service.
+  @Get('hlos-indicators')
+  @Version('1')
+  @GetResultVersion()
+  @ApiOperation({
+    summary:
+      'Get PRMS HLOs/indicators for the (SP, AOW) pairs derived from the mapped bilateral project (R-BIL-077)',
+  })
+  async getHlosIndicatorsForResult() {
+    return this.bilateralService
+      .getHlosIndicatorsForResult(
+        this.resultsUtil.resultId,
+        String(this.resultsUtil.resultCode),
+      )
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Bilateral HLOs and indicators found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('indicators')
   @Version('1')
   @GetResultVersion()
