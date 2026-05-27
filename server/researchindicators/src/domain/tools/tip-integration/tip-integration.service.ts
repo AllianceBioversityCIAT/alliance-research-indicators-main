@@ -9,8 +9,6 @@ import { isEmpty } from '../../shared/utils/object.utils';
 import { firstValueFrom } from 'rxjs';
 import {
   CounterResults,
-  CounterResultsEnum,
-  ResultsTipMapping,
   TipKnowledgeProductDto,
   TipKnowledgeProductsResponseDto,
   TipRegionDto,
@@ -32,20 +30,16 @@ import { ClarisaCountry } from '../clarisa/entities/clarisa-countries/entities/c
 import { ResultEvidence } from '../../entities/result-evidences/entities/result-evidence.entity';
 import { ResultKnowledgeProduct } from '../../entities/result-knowledge-product/entities/result-knowledge-product.entity';
 import { DataSource, Like } from 'typeorm';
-import { Result } from '../../entities/results/entities/result.entity';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
-import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
-import {
-  filterByUniqueKeyWithPriority,
-  mergeArraysWithPriority,
-} from '../../shared/utils/array.util';
-import { TrueFalseEnum } from '../../shared/enum/queries.enum';
+
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
 import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
 import { SyncProcessEnum } from '../../entities/sync-process-log/enum/sync-process.enum';
+import { SaveResultService } from '../../shared/services/save-all-sections.service';
+import { ExternalMappersDto } from '../../shared/global-dto/external-mappers.dto';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -63,6 +57,7 @@ export class TipIntegrationService extends BaseApi {
     private readonly _currentUser: CurrentUserUtil,
     private readonly tipIntegrationRepository: TipIntegrationRepository,
     private readonly syncProcessLogService: SyncProcessLogService,
+    private readonly saveResultService: SaveResultService,
   ) {
     super(
       httpService,
@@ -129,7 +124,12 @@ export class TipIntegrationService extends BaseApi {
           );
         });
       const mappedData = await this.processing(response.data, year);
-      await this.createKpInStar(mappedData, resultSaved, counters);
+      await this.saveResultService.bulkSaveAllSections(mappedData, {
+        platformCode: ReportingPlatformEnum.TIP,
+        resultSaved,
+        counters,
+        appliedVersion: false,
+      });
       if (response.data_count < limit) {
         pendingData = false;
         await this.inactiveAllTipResults(resultSaved);
@@ -142,9 +142,9 @@ export class TipIntegrationService extends BaseApi {
   }
 
   async processing(results: TipKnowledgeProductDto[], year: number) {
-    const resultsMapped: ResultsTipMapping[] = [];
+    const resultsMapped: ExternalMappersDto[] = [];
     for (const result of results) {
-      const resultMapped: ResultsTipMapping = new ResultsTipMapping();
+      const resultMapped: ExternalMappersDto = new ExternalMappersDto();
       resultMapped.official_code = result.id;
 
       let projectId: string = null;
@@ -171,7 +171,7 @@ export class TipIntegrationService extends BaseApi {
 
         const dataToSearch =
           result.submitter?.idCard ?? result.submitter?.email;
-        if (isEmpty(dataToSearch)) {
+        if (!isEmpty(dataToSearch)) {
           allianceUserStaff = await this.dataSource
             .getRepository(AllianceUserStaff)
             .findOne({
@@ -318,124 +318,5 @@ export class TipIntegrationService extends BaseApi {
       }
     }
     return this.clarisaLeversService.findByNames(clarisaLevers);
-  }
-
-  async createKpInStar(
-    results: ResultsTipMapping[],
-    resultSaved: number[],
-    counters: CounterResults = {
-      createdRecords: 0,
-      updatedRecords: 0,
-      errorRecords: 0,
-    },
-  ) {
-    let typeCounter: CounterResultsEnum = null;
-
-    for (const result of results) {
-      this.logger.debug(`Processing result ${result.official_code} from TIP.`);
-      this._currentUser.setSystemUser(result.userData, true);
-      resultSaved.push(result.official_code);
-      let createNewResult: Result = null;
-      try {
-        let findResult = await this.dataSource.getRepository(Result).findOne({
-          where: {
-            result_official_code: result.official_code,
-            platform_code: ReportingPlatformEnum.TIP,
-            report_year_id: result.createResult.year,
-          },
-        });
-
-        if (!findResult) {
-          createNewResult = await this.resultsService.createResult(
-            result.createResult,
-            ReportingPlatformEnum.TIP,
-            {
-              notContract: true,
-              result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
-              validateTitle: false,
-            },
-            result.official_code,
-          );
-          findResult = createNewResult;
-          this.logger.debug(
-            `Creating new result ${findResult.result_official_code} from TIP.`,
-          );
-          typeCounter = CounterResultsEnum.CREATED;
-        } else {
-          await this.resultKnowledgeProductService.activeKpByResultId(
-            findResult.result_id,
-          );
-          this.logger.debug(
-            `Updating result ${findResult.result_official_code} from TIP.`,
-          );
-          typeCounter = CounterResultsEnum.UPDATED;
-        }
-        await this.dataSource
-          .getRepository(Result)
-          .update(findResult.result_id, {
-            public_link: result.public_link,
-            created_at: result.created_at,
-          });
-
-        await this.resultsService.updateGeneralInfo(
-          findResult.result_id,
-          result.generalInformation,
-          TrueFalseEnum.FALSE,
-          false,
-          false,
-        );
-
-        const tempAlignment = await this.resultsService.findResultAlignment(
-          findResult.result_id,
-        );
-
-        result.alignments.primary_levers = filterByUniqueKeyWithPriority(
-          mergeArraysWithPriority<ResultLever>(
-            tempAlignment.primary_levers,
-            result.alignments.primary_levers,
-            'lever_id',
-          ),
-          'lever_id',
-          'is_primary',
-        ) as ResultLever[];
-
-        await this.resultsService.updateResultAlignment(
-          findResult.result_id,
-          result.alignments,
-        );
-
-        await this.resultsService.saveGeoLocation(
-          findResult.result_id,
-          result.geoScope,
-        );
-
-        await this.resultKnowledgeProductService.update(
-          findResult.result_id,
-          result.knowledgeProduct,
-        );
-        this.logger.log(
-          `Processed result ${findResult.result_official_code} from TIP.`,
-        );
-        this.logger.log(
-          `Successfully processed result ${findResult.result_id} from TIP.`,
-        );
-      } catch (error) {
-        if (createNewResult) {
-          this.logger.error(
-            `Error processing result ${createNewResult.result_id}, rolling back. Error: ${error.message}`,
-          );
-          await this._queryService.deleteFullResultById(
-            createNewResult.result_id,
-          );
-        }
-        this.logger.error(`Error processing tip result: ${error.message}`);
-        typeCounter = CounterResultsEnum.ERROR;
-      }
-      counters[typeCounter]++;
-      this._currentUser.clearSystemUser();
-      this.logger.debug(
-        `Finished processing result ${result.official_code} from TIP.`,
-      );
-    }
   }
 }

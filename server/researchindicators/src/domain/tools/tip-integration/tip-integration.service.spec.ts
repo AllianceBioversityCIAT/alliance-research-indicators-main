@@ -14,12 +14,10 @@ import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import * as mapperModule from './mapper/tip-integration.mapper';
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
 import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
+import { SaveResultService } from '../../shared/services/save-all-sections.service';
+import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { BadRequestException } from '@nestjs/common';
-import {
-  CounterResults,
-  ResultsTipMapping,
-  TipKnowledgeProductDto,
-} from './dto/response-year-tip.dto';
+import { TipKnowledgeProductDto } from './dto/response-year-tip.dto';
 import { of } from 'rxjs';
 
 describe('TipIntegrationService', () => {
@@ -30,10 +28,8 @@ describe('TipIntegrationService', () => {
   let clarisaCountriesService: jest.Mocked<ClarisaCountriesService>;
   let clarisaLeversService: jest.Mocked<ClarisaLeversService>;
   let resultRepository: jest.Mocked<ResultRepository>;
-  let resultKnowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
-  let currentUser: jest.Mocked<CurrentUserUtil>;
-  let queryService: jest.Mocked<QueryService>;
   let syncProcessLogService: jest.Mocked<SyncProcessLogService>;
+  let saveResultService: jest.Mocked<SaveResultService>;
 
   const mockResultRepo = {
     findOne: jest.fn(),
@@ -123,6 +119,12 @@ describe('TipIntegrationService', () => {
             endSync: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: SaveResultService,
+          useValue: {
+            bulkSaveAllSections: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -133,10 +135,8 @@ describe('TipIntegrationService', () => {
     clarisaCountriesService = module.get(ClarisaCountriesService);
     clarisaLeversService = module.get(ClarisaLeversService);
     resultRepository = module.get(ResultRepository);
-    resultKnowledgeProductService = module.get(ResultKnowledgeProductService);
-    currentUser = module.get(CurrentUserUtil);
-    queryService = module.get(QueryService);
     syncProcessLogService = module.get(SyncProcessLogService);
+    saveResultService = module.get(SaveResultService);
 
     jest
       .spyOn(mapperModule, 'tipIntegrationMapper')
@@ -234,16 +234,47 @@ describe('TipIntegrationService', () => {
         .spyOn(service as any, 'getRequest')
         .mockReturnValue(of({ data: mockResponse }));
       jest.spyOn(service, 'processing').mockResolvedValue([]);
-      jest.spyOn(service, 'createKpInStar').mockResolvedValue(undefined);
       jest.spyOn(service, 'inactiveAllTipResults').mockResolvedValue(undefined);
 
       await service.getKnowledgeProductsByYear(2025);
 
       expect(syncProcessLogService.initiateSync).toHaveBeenCalled();
       expect(service.processing).toHaveBeenCalledWith([], 2025);
-      expect(service.createKpInStar).toHaveBeenCalled();
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledWith([], {
+        platformCode: ReportingPlatformEnum.TIP,
+        resultSaved: expect.any(Array),
+        counters: expect.any(Object),
+        appliedVersion: false,
+      });
       expect(service.inactiveAllTipResults).toHaveBeenCalled();
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+    });
+
+    it('should paginate when data_count equals limit', async () => {
+      const page1 = {
+        data: [{ id: 1 }],
+        data_count: 50,
+      };
+      const page2 = {
+        data: [{ id: 2 }],
+        data_count: 10,
+      };
+      const getRequestSpy = jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValueOnce(of({ data: page1 }))
+        .mockReturnValueOnce(of({ data: page2 }));
+      jest
+        .spyOn(service, 'processing')
+        .mockResolvedValueOnce([{ official_code: 1 }] as any)
+        .mockResolvedValueOnce([{ official_code: 2 }] as any);
+      jest.spyOn(service, 'inactiveAllTipResults').mockResolvedValue(undefined);
+
+      await service.getKnowledgeProductsByYear(2026);
+
+      expect(getRequestSpy).toHaveBeenCalledTimes(2);
+      expect(getRequestSpy.mock.calls[1][0]).toContain('offset=50');
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledTimes(2);
+      expect(syncProcessLogService.update).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -415,107 +446,6 @@ describe('TipIntegrationService', () => {
 
       expect(clarisaLeversService.findByNames).toHaveBeenCalledWith([]);
       expect(result).toEqual([]);
-    });
-  });
-
-  // [CLAUDE/DONE] 197
-  describe('createKpInStar', () => {
-    const mockFoundResult = { result_id: 10, result_official_code: 42 };
-    const baseMapping: ResultsTipMapping = {
-      official_code: 42,
-      resultOfficialCode: 42,
-      external_link: 'http://link',
-      public_link: 'http://public',
-      created_at: new Date(),
-      userData: null,
-      createResult: {
-        year: 2025,
-        title: 'Test',
-        indicator_id: 1,
-        contract_id: 'AGR-1',
-      } as any,
-      generalInformation: {} as any,
-      evidence: {} as any,
-      knowledgeProduct: {} as any,
-      geoScope: {} as any,
-      alignments: {
-        primary_levers: [],
-        contracts: [],
-        contributor_levers: [],
-        result_sdgs: [],
-      } as any,
-    };
-
-    beforeEach(() => {
-      mockResultRepo.findOne.mockReset();
-      mockResultRepo.update.mockReset();
-      mockResultRepo.update.mockResolvedValue(undefined);
-      resultsService.createResult.mockResolvedValue(mockFoundResult as any);
-      resultsService.updateGeneralInfo.mockResolvedValue(undefined);
-      resultsService.findResultAlignment.mockResolvedValue({
-        primary_levers: [],
-        contracts: [],
-      } as any);
-      resultsService.updateResultAlignment.mockResolvedValue(undefined);
-      resultsService.saveGeoLocation.mockResolvedValue(undefined);
-      resultKnowledgeProductService.activeKpByResultId.mockResolvedValue(
-        undefined,
-      );
-      resultKnowledgeProductService.update.mockResolvedValue(undefined);
-    });
-
-    it('should create a new result and increment createdRecords when not found', async () => {
-      mockResultRepo.findOne.mockResolvedValue(null);
-      const counters = new CounterResults();
-
-      await service.createKpInStar([baseMapping], [], counters);
-
-      expect(resultsService.createResult).toHaveBeenCalled();
-      expect(currentUser.setSystemUser).toHaveBeenCalled();
-      expect(currentUser.clearSystemUser).toHaveBeenCalled();
-      expect(counters.createdRecords).toBe(1);
-    });
-
-    it('should update existing result and increment updatedRecords when found', async () => {
-      mockResultRepo.findOne.mockResolvedValue(mockFoundResult);
-      const counters = new CounterResults();
-
-      await service.createKpInStar([baseMapping], [], counters);
-
-      expect(resultsService.createResult).not.toHaveBeenCalled();
-      expect(
-        resultKnowledgeProductService.activeKpByResultId,
-      ).toHaveBeenCalledWith(10);
-      expect(counters.updatedRecords).toBe(1);
-    });
-
-    it('should rollback new result and increment errorRecords on error', async () => {
-      mockResultRepo.findOne.mockResolvedValue(null);
-      resultsService.updateGeneralInfo.mockRejectedValue(new Error('DB error'));
-      queryService.deleteFullResultById.mockResolvedValue(undefined);
-      const counters = new CounterResults();
-
-      await service.createKpInStar([baseMapping], [], counters);
-
-      expect(queryService.deleteFullResultById).toHaveBeenCalledWith(10);
-      expect(counters.errorRecords).toBe(1);
-    });
-
-    it('should push official_code to resultSaved array', async () => {
-      mockResultRepo.findOne.mockResolvedValue(null);
-      const resultSaved: number[] = [];
-
-      await service.createKpInStar([baseMapping], resultSaved);
-
-      expect(resultSaved).toContain(42);
-    });
-
-    it('should use default counter object when none provided', async () => {
-      mockResultRepo.findOne.mockResolvedValue(null);
-
-      await expect(
-        service.createKpInStar([baseMapping], []),
-      ).resolves.not.toThrow();
     });
   });
 });
