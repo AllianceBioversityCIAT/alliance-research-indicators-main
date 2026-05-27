@@ -690,26 +690,22 @@ graph TD
 
 ### T-31 — SP ToC sync module + cron
 
-- **Status:** scope narrowed → S/M — the SP catalog half is covered by T-15.4 + T-15.11 + the live CLARISA `/api/projects` proxy; only the indicators-per-SP HLO surface remains, and that's now T-15.12 (live proxy via PRMS ToC). T-31 collapses to "delete the dead cron + sync code" once T-15.12 unblocks (OQ-RV-2). ([§15](#15-re-price-log))
-- **Size:** L
+- **Status:** **DROPPED (2026-05-27)** — fully superseded by the live-proxy pattern shipped in T-15.12 (commit `907993e7`). The SP catalog half is owned by T-15.4 + T-15.11 + the live CLARISA `/api/projects` proxy; the HLO/indicator half is owned by `PrmsTocService` + `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators`, which derives `(program, areaOfWork)` pairs from CLARISA at request time and fans out to PRMS ToC (cached 5 min per pair). No cron, no local persistence — no work remaining for this task. See [§15 — 2026-05-27 re-price entry](#15-re-price-log).
+- **Size:** L → 0 (dropped)
 - **Dependencies:** T-01
-- **Requirements covered:** R-BIL-060, R-BIL-061, R-BIL-062, NFR-BIL-003, NFR-BIL-004
-- **Design references:** §7.5, §10.5, **D3**
-- **Scope:** `domain/tools/sp-toc-sync/` — connection + service + DTOs. Cron `sp-toc.cron.ts`. Stable indicator-code preservation. Inactivate-on-absence flow. Triggers T-18 stale flag where applicable.
-- **Tests:**
-  - Upsert by stable code; rename only changes display name.
-  - Removed indicator → `is_active=false`; mappings flagged stale.
-- **Skills:** `nestjs-expert`, `error-handling-patterns`.
+- **Requirements covered:** R-BIL-060, R-BIL-061, R-BIL-062, NFR-BIL-003, NFR-BIL-004 — all delivered via the live-proxy path (no local catalog of HLOs/indicators is maintained).
+- **Design references:** §7.5, §10.5, **D3** — D3 explicitly contemplated the live-proxy alternative; T-15.12 made it the default.
+- **Scope (was):** `domain/tools/sp-toc-sync/` — connection + service + DTOs + cron. **Not built.**
+- **Cleanup:** there is no dead cron/sync code to delete — the module was never scaffolded. The `ARI_BILATERAL_SP_TOC_SYNC_ENABLED` env flag (env.utils.ts) is now unused; remove on next env-var sweep.
 
 ### T-32 — Admin SP ToC sync endpoint + SSR page
 
-- **Status:** likely DROPPED — replaced by the on-demand live proxy pattern from T-15.12. Confirm + close at the same time as T-31 collapses. ([§15](#15-re-price-log))
-- **Size:** M
-- **Dependencies:** T-31
-- **Requirements covered:** R-BIL-063
+- **Status:** **DROPPED (2026-05-27)** — superseded by T-15.12 alongside T-31. No admin trigger is needed because there is no local catalog to refresh — the live proxy reads upstream every request (with a 5-min in-memory cache that can be invalidated by restarting the service if ever urgent). See [§15 — 2026-05-27 re-price entry](#15-re-price-log).
+- **Size:** M → 0 (dropped)
+- **Dependencies:** T-31 (also dropped)
+- **Requirements covered:** R-BIL-063 — delivered transitively via the live-proxy path (no manual sync trigger required).
 - **Design references:** §6.6, §8.5
-- **Scope:** `POST /api/v1/admin/sync/sp-toc?dry-run=true|false` + SSR page `SyncSpToc.tsx`.
-- **Skills:** `nestjs-expert`, `vercel-react-best-practices`, `ui-ux-pro-max`.
+- **Scope (was):** `POST /api/v1/admin/sync/sp-toc?dry-run=true|false` + SSR page `SyncSpToc.tsx`. **Not built.**
 
 ---
 
@@ -875,7 +871,7 @@ Phase 1.5 carries the two PO clarifications from 2026-05-25 (CLARISA-source SPs;
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | `[x]` done (2026-05-26) — inline statuses on §8/§9 task headers + log entry in §15 | — |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | `[x]` done (2026-05-26) | `f9f6f851` |
 | T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | `[x]` done (2026-05-26) | `92e2fd52` |
-| T-15.12 | `PrmsTocService` + `GET .../bilateral/hlos-indicators` endpoint | blocked (OQ-RV-2) | — |
+| T-15.12 | `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint | `[x]` done (2026-05-27) | `907993e7` |
 | T-15.13 | Migration + entity for `bilateral_project_mapping` | `[x]` done (2026-05-25) | `8b59a099` |
 | T-15.14 | `BilateralProjectMappingService` + controller + DTOs | `[x]` done (2026-05-26) | `b7bdc237` |
 | T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | `[x]` done (2026-05-26) | `9b539a7d` |
@@ -906,10 +902,24 @@ Triggered by the two PO clarifications on 2026-05-25 (CLARISA-source SPs; admin-
 | T-24 (Push module skeleton) | landed (commit `e838e2f8`) | landed | No change. |
 | T-25..T-28 (Push payload + queue + admin retry) | not started | unblocked locally — wait on T-21/T-23 | Effort unchanged (M/L mix). |
 | T-29..T-30 (W3 Registry sync + admin) | not started | wait on T-22 | Effort unchanged (M/L). |
-| **T-31 (SP ToC sync module + cron)** | **L** | **Scope narrowed → S/M** | **The SP catalog half is now covered by T-15.4 + T-15.11 + the live CLARISA `/api/projects` proxy. Only the indicators-per-SP HLO surface remains — and that's already moved into T-15.12 as a live proxy via PRMS ToC. T-31 collapses into "delete dead code" once T-15.12 unblocks (OQ-RV-2).** |
-| T-32 (Admin SP ToC sync endpoint + SSR page) | not started | likely DROPPED | Replaced by the on-demand live proxy pattern from T-15.12. Confirm + close at the same time as T-31 collapses. |
+| **T-31 (SP ToC sync module + cron)** | **L** | **Scope narrowed → S/M (superseded 2026-05-27)** | **Superseded by T-15.12 live-proxy pattern — see 2026-05-27 entry below.** |
+| T-32 (Admin SP ToC sync endpoint + SSR page) | not started | likely DROPPED (confirmed 2026-05-27) | **Confirmed DROPPED — see 2026-05-27 entry below.** |
 | T-33..T-38 (E2E, observability, runbook, rollout) | not started | unchanged scope; deferred until Phase 3 unblocks | DevOps coordination still required for T-37/T-38. |
 
 **Net effect**: Phase 3+ effort shrinks by ~1 L task (T-31) and possibly ~1 M task (T-32), at the cost of the Phase 1.5 wave that just landed (one M-sized integration tool + one S-sized HLO proxy stub + one L-sized admin UI). The trade is favorable — the bilateral picker contract is now locked end-to-end against CLARISA, and the operator UI is live in dev.
+
+### 2026-05-27 — T-15.12 lands; T-31 + T-32 dropped
+
+Triggered by T-15.12 shipping end-to-end (commit `907993e7` on `AC-1594-bilateral-module-v2`). PRMS team supplied the ToC URL (`prtest-back.ciat.cgiar.org/api/public-results-framework/toc-results?program=<SP>&areaOfWork=<AOW>`, public, no auth); OQ-RV-2 closed in practice. Live probe of CLARISA `/api/projects` confirmed AOWs live inside `project_mappings_array[]` as level-2 entries (`global_unit_type_id: 26`, `cgiar_entity_type_object.prefix: "AOW"`) whose `parent_id` points back to the SP entry's `id` — so `(program, areaOfWork)` pairs are derivable from the mapped CLARISA project without any new ingestion source. Decision **D-PI-13** (in [`./pending-items/execution.md`](./pending-items/execution.md) T-15.12 entry) locks this in.
+
+| Task | Prior status | New status (2026-05-27) | Notes |
+| --- | --- | --- | --- |
+| **T-15.12** | `blocked (OQ-RV-2)` | **`[x]` done** (`907993e7`) | Endpoint `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators` (no params; AOW derived from CLARISA). Response carries `aow_status: 'unmapped' \| 'no_aow_mappings' \| 'has_aow'` + `pairs[]` grouped by `(program, area_of_work)`. 5-min in-memory cache per pair; warm-on-error / cold-503. 13 PrmsTocService unit tests + 6 BilateralService.getHlosIndicatorsForResult scenarios green; full suite 279/279 (1580 tests). |
+| **T-31 (SP ToC sync module + cron)** | Scope narrowed → S/M (pending T-15.12) | **DROPPED** | Fully superseded — see §8 entry. No cron, no local catalog of HLOs/indicators; the live proxy in T-15.12 handles every read. Sole cleanup: drop the unused `ARI_BILATERAL_SP_TOC_SYNC_ENABLED` env flag on next sweep. |
+| **T-32 (Admin SP ToC sync endpoint + SSR page)** | Likely DROPPED | **DROPPED** | Confirmed — no admin trigger needed because there is no local catalog to refresh. Restarting the service flushes the in-memory cache if ever urgent; not worth a dedicated admin surface for a 5-min TTL. |
+| OQ-RV-2 (PRMS ToC endpoint URL/auth) | open | **closed 2026-05-27** | Resolved via `ARI_PRMS_TOC_HOST=https://prtest-back.ciat.cgiar.org` in `.env`. Same value across dev/staging/prod during the testing wave. Documented in [`./pending-items/rollout-checklist.md` §2.1](./pending-items/rollout-checklist.md). |
+| OQ-IM-2 (AOW data source — FE blocker) | open | **answered 2026-05-27** | Today's read-only audit (delivered to FE; see Slack/PR thread) confirms: AOW is a real CGIAR ToC level-2 entity, sourced from CLARISA (NOT PRMS), 1:1 with indicators via `(SP × AOW) → ToC result → indicator`. The persist-vs-proxy decision now belongs in a future `indicator-mapping/area-of-work-model/` sub-spec — the T-15.12 endpoint already serves the data live. |
+
+**Net effect**: Phase 3+ effort shrinks by another L (T-31) + M (T-32) — both confirmed dropped, not just narrowed. Phase 1.5 wave is now fully shipped on dev for code-only tasks; the remaining open items are staging+prod rollout (T-15.7 §4.2/§4.3) and operational seeding of `bilateral_project_mapping` rows.
 
 (Future re-price entries appended below in dated subsections as the spec evolves.)
