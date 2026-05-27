@@ -542,6 +542,7 @@
   - **Indicator-level fields** mirror PRMS upstream (`indicator_id`, `indicator_description`, `unit_messurament`, `type_name`, `target_value_sum`, `progress_percentage`, etc.) — see `prms-toc.types.ts` for the full TypeScript shape.
   - **503** from this endpoint means PRMS upstream is unreachable AND the cache is cold; retry after a short backoff.
 - **Status:** [x] completed — unblocks OQ-RV-2 (which is now closed in practice; PRMS team-supplied URL works).
+- **Commit:** `907993e7`
 
 ---
 
