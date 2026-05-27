@@ -1,7 +1,7 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
 
 /**
- * Raw data sheet columns A–BF (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–BS (reference workbook "Raw data" header row).
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'result_code', header: 'Result Code', width: 14 },
@@ -190,6 +190,52 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
     header: 'Implementing organizations',
     width: 56,
   },
+  { key: 'mel_regional_expert', header: 'MEL Regional Expert', width: 28 },
+  {
+    key: 'sharepoint_link',
+    header: 'SharePoint Folder Link',
+    width: 40,
+    hyperlink: {
+      urlField: 'sharepoint_link',
+      displayField: 'sharepoint_link',
+      emptyDisplay: '',
+      linkAppearance: {
+        colorArgb: 'FF0563C1',
+        underline: true,
+      },
+    },
+  },
+  { key: 'oicr_internal_code', header: 'OICR No', width: 20 },
+  { key: 'tagging', header: 'Tagging', width: 28 },
+  { key: 'general_comment', header: 'Existing OICR', width: 36 },
+  { key: 'maturity_level', header: 'Maturity of change', width: 28 },
+  {
+    key: 'outcome_impact_statement',
+    header: 'Elaboration of outcome/impact statement',
+    width: 48,
+  },
+  {
+    key: 'short_outcome_impact_statement',
+    header: 'Short Outcome/Impact Statement',
+    width: 40,
+  },
+  { key: 'quantification', header: 'Quantification', width: 56 },
+  {
+    key: 'authors_contact_persons',
+    header: 'Authors and Contact Persons',
+    width: 56,
+  },
+  {
+    key: 'for_external_use',
+    header: 'Further communication opportunities',
+    width: 36,
+  },
+  {
+    key: 'for_external_use_description',
+    header: 'Further communication opportunities description',
+    width: 48,
+  },
+  { key: 'impact_area', header: 'Impact Areas', width: 56 },
 ];
 
 export const STAR_RESULTS_METADATA_DICTIONARY_COLUMNS: ExcelColumnSpec[] = [
