@@ -143,7 +143,7 @@ export class ResultsService {
     private readonly _resultsUtil: ResultsUtil,
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -709,21 +709,21 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -1334,8 +1334,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },
@@ -1502,6 +1502,9 @@ export class ResultsService {
           'result_status_id',
           'result_status',
           'platform_code',
+          'public_link',
+          'external_link',
+          'report_year_id'
         ],
         where: {
           created_by: this.currentUser.user_id,
@@ -1518,11 +1521,12 @@ export class ResultsService {
         take: take,
       })
       .then(async (results) => {
+        const resultIds = results.map((el) => el.result_id);
         const results_contract = await this.dataSource
           .getRepository(ResultContract)
           .find({
             where: {
-              result_id: In(results.map((el) => el.result_id)),
+              result_id: In(resultIds),
               is_primary: true,
               is_active: true,
             },
@@ -1531,13 +1535,30 @@ export class ResultsService {
             },
           });
 
+        const results_levers = await this.dataSource
+          .getRepository(ResultLever)
+          .find({
+            where: {
+              result_id: In(resultIds),
+              is_primary: true,
+              is_active: true,
+            },
+            relations: {
+              lever: true,
+            }
+          });
+
         return results.map((result) => {
           const contract = results_contract.find(
+            (el) => el.result_id === result.result_id,
+          );
+          const levers = results_levers.filter(
             (el) => el.result_id === result.result_id,
           );
           return {
             ...result,
             result_contracts: contract ?? null,
+            result_levers: levers ?? [],
           };
         });
       });
