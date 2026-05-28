@@ -15,6 +15,7 @@ import {
 } from './dto/update-pool-funding-alignment.dto';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import {
@@ -85,6 +86,7 @@ export class BilateralService {
     private readonly policyChangeHandler: PolicyChangeBilateralIndicatorTypeHandler,
     private readonly clarisaScienceProgramsService: ClarisaScienceProgramsService,
     private readonly clarisaProjectsService: ClarisaProjectsService,
+    private readonly clarisaCgiarEntitiesService: ClarisaCgiarEntitiesService,
     private readonly bilateralProjectMappingService: BilateralProjectMappingService,
     private readonly prmsTocService: PrmsTocService,
   ) {}
@@ -205,22 +207,26 @@ export class BilateralService {
    *
    * HLO/indicator panel data source. Walks the same chain as the SP picker
    * (result → AGRESSO → bilateral_project_mapping → CLARISA project), then
-   * derives (program, areaOfWork) pairs from the CLARISA project's
-   * `project_mappings_array[]`:
+   * builds (program, areaOfWork) pairs from two CLARISA sources:
    *
-   *   - Level-1 SP entries (prefix "SP") are the *programs*.
-   *   - Level-2 AOW entries (prefix "AOW", `parent_id` → SP.id) are the
-   *     *areaOfWork* values. Each AOW yields one (parent_SP, AOW) pair.
+   *   - *program* (Science Program) — level-1 "SP" entries in the mapped
+   *     project's `project_mappings_array[]`. Reliable.
+   *   - *areaOfWork* — the AOWs that name each SP as their parent in the
+   *     canonical `GET /api/cgiar-entities?version=2` catalog
+   *     (`ClarisaCgiarEntitiesService`). The project's own AOW entries are NOT
+   *     used: they all point at the same global `parent_id` and can't be
+   *     resolved in-project, so they yielded at most one pair across the entire
+   *     catalog. The catalog references the parent by SP *code*, which resolves
+   *     cleanly.
    *
-   * For each pair we call `PrmsTocService.getTocResults` (cached per pair),
-   * group the response under the pair, and return all of them under a single
-   * `pairs[]`. The endpoint always returns 200 — see `aow_status` for the
-   * three valid empty-`pairs` states (`unmapped`, `no_aow_mappings`).
+   * Each SP × its catalog AOWs is one pair. We fan out one PRMS call per pair
+   * (cached), keep only pairs PRMS has ToC data for (most AOWs have none), and
+   * return them under `pairs[]`. The endpoint always returns 200 — see
+   * `aow_status` for the valid empty-`pairs` states (`unmapped`,
+   * `no_aow_mappings`).
    *
    * Why AOW must come from CLARISA: PRMS requires `areaOfWork` (400 without)
-   * and exposes no `/aow-by-program` listing endpoint we can probe; CLARISA
-   * already carries the AOW mappings on each project — see
-   * `./execution.md` T-15.12 entry for the live-probe evidence.
+   * and exposes no `/aow-by-program` listing endpoint we can probe.
    */
   async getHlosIndicatorsForResult(
     resultId: number,
@@ -281,12 +287,30 @@ export class BilateralService {
     }
 
     const projectRef = { id: project.id, short_name: project.short_name };
-    const pairs = this.derivePairsFromProjectMappings(project);
+
+    // SP (code + display name) from the project, AOW from the cgiar-entities
+    // catalog (keyed by SP code). Each SP × its catalog AOWs is one
+    // (program, areaOfWork) pair. Display names are carried through for the FE
+    // panel — the SP/AOW codes alone aren't human-readable.
+    const programs = this.deriveSciencePrograms(project);
+    const programNameByCode = new Map(programs.map((p) => [p.code, p.name]));
+    const spCodes = programs.map((p) => p.code);
+    const aowsBySp =
+      await this.clarisaCgiarEntitiesService.getAreasOfWorkBySp(spCodes);
+
+    const pairs: Array<{ program: string; areaOfWork: string }> = [];
+    const aowNameByComposite = new Map<string, string>();
+    for (const program of spCodes) {
+      for (const aow of aowsBySp.get(program) ?? []) {
+        pairs.push({ program, areaOfWork: aow.code });
+        aowNameByComposite.set(`${program}-${aow.code}`, aow.name);
+      }
+    }
 
     if (!pairs.length) {
-      // Project is mapped, but its CLARISA project_mappings_array carries
-      // only SP-level entries (no AOWs) — PRMS cannot answer without an
-      // AOW, so we surface this distinct state for the FE.
+      // Mapped, but no (SP, AOW) pair could be derived — either the project
+      // carries no Confirmed SP in the active portfolio, or the catalog lists
+      // no AOWs for those SPs. Nothing for PRMS to answer.
       return {
         ...baseResponse,
         mapping_status: 'mapped',
@@ -297,23 +321,45 @@ export class BilateralService {
     }
 
     const payloads = await this.prmsTocService.getTocResultsForPairs(pairs);
-    const enrichedPairs: BilateralHlosPair[] = pairs.map((p, i) => {
-      const payload = payloads[i];
-      const outcomes = payload.tocResultsOutcomes ?? [];
-      const outputs = payload.tocResultsOutputs ?? [];
+    const enrichedPairs: BilateralHlosPair[] = pairs
+      .map((p, i) => {
+        const payload = payloads[i];
+        const outcomes = payload.tocResultsOutcomes ?? [];
+        const outputs = payload.tocResultsOutputs ?? [];
+        return {
+          program: p.program,
+          program_name: programNameByCode.get(p.program) ?? p.program,
+          area_of_work: p.areaOfWork,
+          area_of_work_name:
+            aowNameByComposite.get(`${p.program}-${p.areaOfWork}`) ??
+            p.areaOfWork,
+          composite_code:
+            payload.compositeCode ?? `${p.program}-${p.areaOfWork}`,
+          outcomes,
+          outputs,
+          metadata: {
+            total: outcomes.length + outputs.length,
+            outcomes: outcomes.length,
+            outputs: outputs.length,
+          },
+        };
+      })
+      // Keep only AOWs that actually carry ToC results. PRMS has no data for
+      // most (SP, AOW) combinations; surfacing empty AOWs would bury the few
+      // with HLOs under dozens of blanks.
+      .filter((p) => p.metadata.total > 0);
+
+    if (!enrichedPairs.length) {
+      // Candidate pairs existed, but PRMS has ToC data for none of them. Same
+      // empty-panel affordance as "no AOW mappings" for the FE.
       return {
-        program: p.program,
-        area_of_work: p.areaOfWork,
-        composite_code: payload.compositeCode ?? `${p.program}-${p.areaOfWork}`,
-        outcomes,
-        outputs,
-        metadata: {
-          total: outcomes.length + outputs.length,
-          outcomes: outcomes.length,
-          outputs: outputs.length,
-        },
+        ...baseResponse,
+        mapping_status: 'mapped',
+        aow_status: 'no_aow_mappings',
+        clarisa_project: projectRef,
+        pairs: [],
       };
-    });
+    }
 
     return {
       ...baseResponse,
@@ -327,37 +373,29 @@ export class BilateralService {
   /**
    * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12
    *
-   * Walks a CLARISA project's `project_mappings_array[]`, picks Confirmed
-   * AOW entries in the active portfolio, and pairs each one with its parent
-   * SP via `global_unit_object.parent_id` → SP.id.
-   *
-   * Drops AOWs whose parent SP we can't resolve from the same mappings —
-   * defensive against unexpected CLARISA shapes. Order is stable: by parent
-   * SP smo_code, then by AOW smo_code, so cache keys land deterministically.
+   * Extracts the Science Programs from a CLARISA project's
+   * `project_mappings_array[]`: Confirmed, level-1, prefix "SP", in the active
+   * portfolio. Returns code + display name (name falls back to code), deduped
+   * by code and sorted so derived pairs + PRMS cache keys land deterministically.
+   * AOWs are NOT read here — they come from the cgiar-entities catalog (see
+   * getHlosIndicatorsForResult).
    */
-  private derivePairsFromProjectMappings(project: {
+  private deriveSciencePrograms(project: {
     project_mappings_array?: Array<{
       status?: string;
       global_unit_object?: {
         smo_code?: string;
+        name?: string;
         level?: number;
-        parent_id?: number | null;
         cgiar_entity_type_object?: { prefix?: string | null };
         portfolio_object?: { acronym?: string };
-        id?: number;
       };
     }>;
-  }): Array<{ program: string; areaOfWork: string }> {
+  }): Array<{ code: string; name: string }> {
     const activePortfolio = ENV.BILATERAL_ACTIVE_PORTFOLIO;
     const mappings = project.project_mappings_array ?? [];
+    const nameByCode = new Map<string, string>();
 
-    const inActivePortfolio = (m: (typeof mappings)[number]) =>
-      m.global_unit_object?.portfolio_object?.acronym === activePortfolio;
-
-    // Index SP entries (level 1, prefix SP) by their CLARISA id so we can
-    // resolve an AOW's parent_id back to its SP smo_code without a second
-    // CLARISA fetch.
-    const spById = new Map<number, string>();
     for (const m of mappings) {
       const u = m.global_unit_object;
       if (!u) continue;
@@ -367,38 +405,16 @@ export class BilateralService {
         u.level === 1 &&
         prefix === 'SP' &&
         u.smo_code &&
-        typeof u.id === 'number' &&
-        inActivePortfolio(m)
+        u.portfolio_object?.acronym === activePortfolio &&
+        !nameByCode.has(u.smo_code)
       ) {
-        spById.set(u.id, u.smo_code);
+        nameByCode.set(u.smo_code, (u.name ?? u.smo_code).trim());
       }
     }
 
-    const pairs: Array<{ program: string; areaOfWork: string }> = [];
-    for (const m of mappings) {
-      const u = m.global_unit_object;
-      if (!u) continue;
-      const prefix = u.cgiar_entity_type_object?.prefix?.toUpperCase();
-      const isAow =
-        m.status === 'Confirmed' &&
-        u.level === 2 &&
-        prefix === 'AOW' &&
-        u.smo_code &&
-        typeof u.parent_id === 'number' &&
-        inActivePortfolio(m);
-
-      if (!isAow) continue;
-
-      const program = spById.get(u.parent_id as number);
-      if (!program) continue; // AOW whose parent SP isn't in the same project — skip.
-      pairs.push({ program, areaOfWork: u.smo_code as string });
-    }
-
-    return pairs.sort(
-      (a, b) =>
-        a.program.localeCompare(b.program) ||
-        a.areaOfWork.localeCompare(b.areaOfWork),
-    );
+    return [...nameByCode.entries()]
+      .map(([code, name]) => ({ code, name }))
+      .sort((a, b) => a.code.localeCompare(b.code));
   }
 
   async getAlignment(

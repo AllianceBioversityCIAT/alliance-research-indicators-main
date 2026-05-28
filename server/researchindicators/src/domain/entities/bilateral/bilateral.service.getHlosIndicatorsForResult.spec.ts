@@ -13,21 +13,30 @@ import { NoopBilateralIndicatorTypeHandler } from './handlers/noop.handler';
 import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-change.handler';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { PrmsTocPayload } from '../../tools/prms-toc/dto/prms-toc.types';
+import { ClarisaAreaOfWork } from '../../tools/clarisa/cgiar-entities/dto/clarisa-cgiar-entity.types';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12 / R-BIL-077
 //
-// Focused spec for BilateralService.getHlosIndicatorsForResult. Covers:
-//   1. Unmapped result (no agreement_id)        → aow_status: 'unmapped'
-//   2. Mapped, but no active bilateral_project_mapping → 'unmapped'
-//   3. Mapped, CLARISA project has only SP-level mappings → 'no_aow_mappings'
-//   4. Mapped + AOWs present                    → 'has_aow', pairs ordered + populated
-//   5. AOW with parent_id pointing outside the project mappings → skipped
-//   6. Non-Confirmed AOW + wrong-portfolio AOW  → filtered out
+// Focused spec for BilateralService.getHlosIndicatorsForResult. The chain:
+//   result → AGRESSO → bilateral_project_mapping → CLARISA project
+//          → SP codes (from the project) × AOWs (from the cgiar-entities
+//            catalog) → PRMS ToC per pair → keep only populated pairs.
 //
-// The PRMS upstream is stubbed via PrmsTocService — we don't go to the wire here.
+// Covers:
+//   1. Unmapped result (no agreement_id)              → aow_status: 'unmapped'
+//   2. Mapped, no active bilateral_project_mapping    → 'unmapped'
+//   3. Mapped project no longer exposed by CLARISA    → 'unmapped'
+//   4. Mapped, project carries no Confirmed SP        → 'no_aow_mappings'
+//   5. Mapped + SP×catalog AOWs with ToC data         → 'has_aow', pairs populated
+//   6. Pairs PRMS has no data for are dropped
+//   7. All derived pairs empty in PRMS                → 'no_aow_mappings'
+//   8. Non-Confirmed / wrong-portfolio SPs filtered out
+//
+// CLARISA + PRMS upstreams are stubbed — we don't go to the wire here.
 
 const sp = (
   id: number,
@@ -43,7 +52,7 @@ const sp = (
   global_unit_object: {
     id,
     smo_code: smoCode,
-    name: smoCode,
+    name: `Program ${smoCode}`,
     level: 1,
     parent_id: null,
     global_unit_type_id: 23,
@@ -56,33 +65,22 @@ const sp = (
   },
 });
 
-const aow = (
-  id: number,
-  smoCode: string,
-  parentId: number,
-  portfolio = 'P25',
-  status = 'Confirmed',
-) => ({
-  id: id + 5000,
-  project_id: 1,
-  program_id: id,
-  allocation: 100,
-  status,
-  global_unit_object: {
-    id,
-    smo_code: smoCode,
-    name: smoCode,
-    level: 2,
-    parent_id: parentId,
-    global_unit_type_id: 26,
-    cgiar_entity_type_object: {
-      code: 26,
-      name: 'Key Area of Work',
-      prefix: 'AOW',
-    },
-    portfolio_object: { id: 3, acronym: portfolio },
-  },
-});
+const catalog = (
+  bySp: Record<string, string[]>,
+): Map<string, ClarisaAreaOfWork[]> => {
+  const map = new Map<string, ClarisaAreaOfWork[]>();
+  for (const [program, aows] of Object.entries(bySp)) {
+    map.set(
+      program,
+      aows.map((code) => ({
+        code,
+        name: `${code} name`,
+        composite_code: `${program}-${code}`,
+      })),
+    );
+  }
+  return map;
+};
 
 const payload = (program: string, areaOfWork: string): PrmsTocPayload => ({
   compositeCode: `${program}-${areaOfWork}`,
@@ -92,12 +90,7 @@ const payload = (program: string, areaOfWork: string): PrmsTocPayload => ({
       toc_result_id: 1,
       category: 'OUTCOME',
       result_title: `Outcome for ${program}-${areaOfWork}`,
-      indicators: [
-        {
-          indicator_id: '1',
-          indicator_description: 'one',
-        },
-      ],
+      indicators: [{ indicator_id: '1', indicator_description: 'one' }],
     },
   ],
   tocResultsOutputs: [
@@ -111,12 +104,20 @@ const payload = (program: string, areaOfWork: string): PrmsTocPayload => ({
   metadata: { total: 2, outcomes: 1, outputs: 1 },
 });
 
+const emptyPayload = (program: string, areaOfWork: string): PrmsTocPayload => ({
+  compositeCode: `${program}-${areaOfWork}`,
+  tocResultsOutcomes: [],
+  tocResultsOutputs: [],
+  metadata: { total: 0, outcomes: 0, outputs: 0 },
+});
+
 describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
   let service: BilateralService;
 
   const findContext = jest.fn();
   const findActiveByAgreementId = jest.fn();
   const findProjectById = jest.fn();
+  const getAreasOfWorkBySp = jest.fn();
   const getTocResultsForPairs = jest.fn();
 
   beforeEach(async () => {
@@ -149,14 +150,12 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
           provide: ClarisaScienceProgramsService,
           useValue: { findAll: jest.fn() },
         },
+        { provide: ClarisaProjectsService, useValue: { findProjectById } },
         {
-          provide: ClarisaProjectsService,
-          useValue: { findProjectById },
+          provide: ClarisaCgiarEntitiesService,
+          useValue: { getAreasOfWorkBySp },
         },
-        {
-          provide: PrmsTocService,
-          useValue: { getTocResultsForPairs },
-        },
+        { provide: PrmsTocService, useValue: { getTocResultsForPairs } },
         {
           provide: BilateralProjectMappingService,
           useValue: { findActiveByAgreementId },
@@ -190,6 +189,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
     expect(out.pairs).toEqual([]);
     expect(out.clarisa_project).toBeNull();
     expect(findActiveByAgreementId).not.toHaveBeenCalled();
+    expect(getAreasOfWorkBySp).not.toHaveBeenCalled();
     expect(getTocResultsForPairs).not.toHaveBeenCalled();
   });
 
@@ -206,131 +206,6 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
     expect(out.aow_status).toBe('unmapped');
     expect(out.clarisa_project).toBeNull();
     expect(getTocResultsForPairs).not.toHaveBeenCalled();
-  });
-
-  it('returns aow_status="no_aow_mappings" when the CLARISA project carries only SP-level entries', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
-    findActiveByAgreementId.mockResolvedValueOnce({
-      clarisa_project_id: 1,
-      clarisa_project_short_name: 'T-PJ-003262',
-    });
-    findProjectById.mockResolvedValueOnce({
-      id: 1,
-      short_name: 'T-PJ-003262',
-      project_mappings_array: [sp(275, 'SP09'), sp(276, 'SP10')],
-    });
-
-    const out = await service.getHlosIndicatorsForResult(19792, '19792');
-
-    expect(out.mapping_status).toBe('mapped');
-    expect(out.aow_status).toBe('no_aow_mappings');
-    expect(out.pairs).toEqual([]);
-    expect(out.clarisa_project).toEqual({ id: 1, short_name: 'T-PJ-003262' });
-    expect(getTocResultsForPairs).not.toHaveBeenCalled();
-  });
-
-  it('derives (parent_SP, AOW) pairs and fans out to PRMS once per pair', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
-    findActiveByAgreementId.mockResolvedValueOnce({
-      clarisa_project_id: 6,
-      clarisa_project_short_name: 'L-LTG001',
-    });
-    findProjectById.mockResolvedValueOnce({
-      id: 6,
-      short_name: 'L-LTG001',
-      project_mappings_array: [
-        sp(267, 'SP01'),
-        sp(275, 'SP09'),
-        aow(412, 'AOW06', 267), // → (SP01, AOW06)
-        aow(420, 'AOW01', 275), // → (SP09, AOW01)
-      ],
-    });
-    getTocResultsForPairs.mockResolvedValueOnce([
-      payload('SP01', 'AOW06'),
-      payload('SP09', 'AOW01'),
-    ]);
-
-    const out = await service.getHlosIndicatorsForResult(19792, '19792');
-
-    expect(out.mapping_status).toBe('mapped');
-    expect(out.aow_status).toBe('has_aow');
-    expect(getTocResultsForPairs).toHaveBeenCalledWith([
-      { program: 'SP01', areaOfWork: 'AOW06' },
-      { program: 'SP09', areaOfWork: 'AOW01' },
-    ]);
-    expect(out.pairs).toHaveLength(2);
-    expect(out.pairs[0]).toMatchObject({
-      program: 'SP01',
-      area_of_work: 'AOW06',
-      composite_code: 'SP01-AOW06',
-      metadata: { total: 2, outcomes: 1, outputs: 1 },
-    });
-    expect(out.pairs[0].outcomes).toHaveLength(1);
-    expect(out.pairs[0].outputs).toHaveLength(1);
-  });
-
-  it('skips AOWs whose parent_id does not match any SP in the same project', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
-    findActiveByAgreementId.mockResolvedValueOnce({
-      clarisa_project_id: 6,
-      clarisa_project_short_name: 'L-LTG001',
-    });
-    findProjectById.mockResolvedValueOnce({
-      id: 6,
-      short_name: 'L-LTG001',
-      project_mappings_array: [
-        sp(267, 'SP01'),
-        aow(412, 'AOW06', 267), // parent SP01 present → kept
-        aow(421, 'AOW99', 9999), // parent missing → dropped
-      ],
-    });
-    getTocResultsForPairs.mockResolvedValueOnce([payload('SP01', 'AOW06')]);
-
-    const out = await service.getHlosIndicatorsForResult(19792, '19792');
-
-    expect(getTocResultsForPairs).toHaveBeenCalledWith([
-      { program: 'SP01', areaOfWork: 'AOW06' },
-    ]);
-    expect(out.pairs.map((p) => p.area_of_work)).toEqual(['AOW06']);
-  });
-
-  it('filters out non-Confirmed AOWs and wrong-portfolio AOWs', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
-    findActiveByAgreementId.mockResolvedValueOnce({
-      clarisa_project_id: 6,
-      clarisa_project_short_name: 'L-LTG001',
-    });
-    findProjectById.mockResolvedValueOnce({
-      id: 6,
-      short_name: 'L-LTG001',
-      project_mappings_array: [
-        sp(267, 'SP01'),
-        aow(412, 'AOW06', 267), // Confirmed + P25 → kept
-        aow(413, 'AOW07', 267, 'P25', 'Pending'), // not Confirmed → dropped
-        aow(414, 'AOW08', 267, 'P22'), // wrong portfolio → dropped
-      ],
-    });
-    getTocResultsForPairs.mockResolvedValueOnce([payload('SP01', 'AOW06')]);
-
-    const out = await service.getHlosIndicatorsForResult(19792, '19792');
-
-    expect(out.pairs.map((p) => p.area_of_work)).toEqual(['AOW06']);
   });
 
   it('returns aow_status="unmapped" when the mapping points at a CLARISA project no longer exposed', async () => {
@@ -351,5 +226,162 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
     expect(out.aow_status).toBe('unmapped');
     expect(out.clarisa_project).toEqual({ id: 999, short_name: 'snapshot' });
     expect(getTocResultsForPairs).not.toHaveBeenCalled();
+  });
+
+  it('returns aow_status="no_aow_mappings" when the project carries no Confirmed SP', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 19792,
+      result_official_code: 19792,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 1,
+      clarisa_project_short_name: 'T-PJ-003262',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 1,
+      short_name: 'T-PJ-003262',
+      project_mappings_array: [], // no SP entries
+    });
+    getAreasOfWorkBySp.mockResolvedValueOnce(new Map());
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(out.mapping_status).toBe('mapped');
+    expect(out.aow_status).toBe('no_aow_mappings');
+    expect(out.pairs).toEqual([]);
+    expect(out.clarisa_project).toEqual({ id: 1, short_name: 'T-PJ-003262' });
+    expect(getTocResultsForPairs).not.toHaveBeenCalled();
+  });
+
+  it('pairs each project SP with its catalog AOWs and fans out to PRMS once per pair', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 19792,
+      result_official_code: 19792,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 22,
+      clarisa_project_short_name: '1414-EC00 DESIRA',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 22,
+      short_name: '1414-EC00 DESIRA',
+      project_mappings_array: [sp(2, 'SP02'), sp(6, 'SP06')],
+    });
+    getAreasOfWorkBySp.mockResolvedValueOnce(
+      catalog({ SP02: ['AOW03'], SP06: ['AOW01'] }),
+    );
+    getTocResultsForPairs.mockResolvedValueOnce([
+      payload('SP02', 'AOW03'),
+      payload('SP06', 'AOW01'),
+    ]);
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(getAreasOfWorkBySp).toHaveBeenCalledWith(['SP02', 'SP06']);
+    expect(out.mapping_status).toBe('mapped');
+    expect(out.aow_status).toBe('has_aow');
+    expect(getTocResultsForPairs).toHaveBeenCalledWith([
+      { program: 'SP02', areaOfWork: 'AOW03' },
+      { program: 'SP06', areaOfWork: 'AOW01' },
+    ]);
+    expect(out.pairs).toHaveLength(2);
+    expect(out.pairs[0]).toMatchObject({
+      program: 'SP02',
+      program_name: 'Program SP02', // SP display name from the project
+      area_of_work: 'AOW03',
+      area_of_work_name: 'AOW03 name', // AOW display name from the catalog
+      composite_code: 'SP02-AOW03',
+      metadata: { total: 2, outcomes: 1, outputs: 1 },
+    });
+    expect(out.pairs[0].outcomes).toHaveLength(1);
+    expect(out.pairs[0].outputs).toHaveLength(1);
+  });
+
+  it('drops pairs PRMS has no ToC data for', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 19792,
+      result_official_code: 19792,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 22,
+      clarisa_project_short_name: 'DESIRA',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 22,
+      short_name: 'DESIRA',
+      project_mappings_array: [sp(2, 'SP02')],
+    });
+    getAreasOfWorkBySp.mockResolvedValueOnce(
+      catalog({ SP02: ['AOW01', 'AOW02', 'AOW03'] }),
+    );
+    getTocResultsForPairs.mockResolvedValueOnce([
+      emptyPayload('SP02', 'AOW01'), // 404 → empty → dropped
+      emptyPayload('SP02', 'AOW02'), // 404 → empty → dropped
+      payload('SP02', 'AOW03'), // populated → kept
+    ]);
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(out.aow_status).toBe('has_aow');
+    expect(out.pairs.map((p) => p.area_of_work)).toEqual(['AOW03']);
+  });
+
+  it('returns aow_status="no_aow_mappings" when PRMS has data for none of the derived pairs', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 19792,
+      result_official_code: 19792,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 22,
+      clarisa_project_short_name: 'DESIRA',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 22,
+      short_name: 'DESIRA',
+      project_mappings_array: [sp(2, 'SP02')],
+    });
+    getAreasOfWorkBySp.mockResolvedValueOnce(catalog({ SP02: ['AOW09'] }));
+    getTocResultsForPairs.mockResolvedValueOnce([
+      emptyPayload('SP02', 'AOW09'),
+    ]);
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(out.mapping_status).toBe('mapped');
+    expect(out.aow_status).toBe('no_aow_mappings');
+    expect(out.pairs).toEqual([]);
+  });
+
+  it('filters out non-Confirmed and wrong-portfolio SPs before catalog lookup', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 19792,
+      result_official_code: 19792,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 6,
+      clarisa_project_short_name: 'L-LTG001',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 6,
+      short_name: 'L-LTG001',
+      project_mappings_array: [
+        sp(1, 'SP01'), // Confirmed + P25 → kept
+        sp(9, 'SP09', 'P25', 'Pending'), // not Confirmed → dropped
+        sp(10, 'SP10', 'P22'), // wrong portfolio → dropped
+      ],
+    });
+    getAreasOfWorkBySp.mockResolvedValueOnce(catalog({ SP01: ['AOW06'] }));
+    getTocResultsForPairs.mockResolvedValueOnce([payload('SP01', 'AOW06')]);
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(getAreasOfWorkBySp).toHaveBeenCalledWith(['SP01']);
+    expect(out.pairs.map((p) => p.program)).toEqual(['SP01']);
+    expect(out.pairs.map((p) => p.area_of_work)).toEqual(['AOW06']);
   });
 });

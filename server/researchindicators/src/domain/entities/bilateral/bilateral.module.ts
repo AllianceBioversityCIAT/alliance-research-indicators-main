@@ -10,6 +10,7 @@ import { AgressoContractModule } from '../agresso-contract/agresso-contract.modu
 import { ClarisaModule } from '../../tools/clarisa/clarisa.module';
 import { ClarisaScienceProgramsModule } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.module';
 import { ClarisaProjectsModule } from '../../tools/clarisa/projects/clarisa-projects.module';
+import { ClarisaCgiarEntitiesModule } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.module';
 import { PrmsTocModule } from '../../tools/prms-toc/prms-toc.module';
 import { BilateralProjectMappingModule } from '../bilateral-project-mapping/bilateral-project-mapping.module';
 import { ResultsModule } from '../results/results.module';
@@ -40,6 +41,7 @@ import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-cha
     ClarisaModule,
     ClarisaScienceProgramsModule,
     ClarisaProjectsModule,
+    ClarisaCgiarEntitiesModule,
     PrmsTocModule,
     BilateralProjectMappingModule,
     ResultsModule,

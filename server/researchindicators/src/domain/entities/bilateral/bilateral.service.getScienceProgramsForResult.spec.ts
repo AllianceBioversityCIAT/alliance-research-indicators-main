@@ -13,6 +13,7 @@ import { NoopBilateralIndicatorTypeHandler } from './handlers/noop.handler';
 import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-change.handler';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 
@@ -91,6 +92,10 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
         {
           provide: ClarisaProjectsService,
           useValue: { findProjectById },
+        },
+        {
+          provide: ClarisaCgiarEntitiesService,
+          useValue: { getAreasOfWorkBySp: jest.fn() },
         },
         {
           provide: BilateralProjectMappingService,

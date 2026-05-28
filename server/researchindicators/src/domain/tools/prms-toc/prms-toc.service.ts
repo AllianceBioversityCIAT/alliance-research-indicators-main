@@ -89,6 +89,19 @@ export class PrmsTocService {
       );
       return payload;
     } catch (err) {
+      // A 404 is data-absence, not an outage: PRMS answers "No work packages
+      // were found for the provided filters" when a (program, areaOfWork) pair
+      // has no ToC catalogue entry. We enumerate every AOW of a Science Program
+      // and most have no ToC, so 404 MUST resolve to an empty payload —
+      // otherwise the panel's PRMS fan-out would 503 on the first miss. Cache
+      // the empty so we don't re-probe a known-empty pair within the TTL.
+      const status = (err as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === 404) {
+        const empty = this.emptyPayload(key);
+        this.cache.set(key, { data: empty, fetchedAt: now });
+        return empty;
+      }
       if (hit) {
         this.logger.warn(
           `[PrmsTocService] upstream error for ${key}; serving stale cache (age=${Math.round(
@@ -133,6 +146,15 @@ export class PrmsTocService {
 
   private cacheKey(program: string, areaOfWork: string): string {
     return `${program}-${areaOfWork}`;
+  }
+
+  private emptyPayload(compositeCode: string): PrmsTocPayload {
+    return {
+      compositeCode,
+      tocResultsOutcomes: [],
+      tocResultsOutputs: [],
+      metadata: { total: 0, outcomes: 0, outputs: 0 },
+    };
   }
 
   private assertHost(): string {

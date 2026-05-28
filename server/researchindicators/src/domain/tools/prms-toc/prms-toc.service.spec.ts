@@ -166,6 +166,35 @@ describe('PrmsTocService', () => {
         service.getTocResults('SP02', 'AOW03'),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
+
+    it('treats a 404 as data-absence: returns an empty payload, not a 503', async () => {
+      httpGet.mockReturnValueOnce(
+        throwError(() => ({
+          response: {
+            status: 404,
+            data: { message: 'No work packages were found' },
+          },
+        })),
+      );
+
+      const out = await service.getTocResults('SP02', 'AOW09');
+
+      expect(out.compositeCode).toBe('SP02-AOW09');
+      expect(out.tocResultsOutcomes).toEqual([]);
+      expect(out.tocResultsOutputs).toEqual([]);
+      expect(out.metadata).toEqual({ total: 0, outcomes: 0, outputs: 0 });
+    });
+
+    it('caches a 404 empty payload so a known-empty pair is not re-probed', async () => {
+      httpGet.mockReturnValueOnce(
+        throwError(() => ({ response: { status: 404 } })),
+      );
+
+      await service.getTocResults('SP02', 'AOW09');
+      await service.getTocResults('SP02', 'AOW09');
+
+      expect(httpGet).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('getTocResultsForPairs', () => {
