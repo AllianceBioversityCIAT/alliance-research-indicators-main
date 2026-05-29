@@ -31,6 +31,48 @@ const getCapacitySharingTimestampFormat = (
 const isValidCapacitySharingTimestampString = (value: string): boolean =>
   getCapacitySharingTimestampFormat(value) !== null;
 
+const invalidTimestampException = (fieldName: string): BadRequestException =>
+  new BadRequestException(`Invalid ${fieldName}: not a valid timestamp`);
+
+const parseValidDate = (
+  value: Date | number,
+  fieldName: string,
+): Date => {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw invalidTimestampException(fieldName);
+  }
+  return parsed;
+};
+
+const parseCapacitySharingTimestampString = (
+  value: string,
+  fieldName: string,
+): Date | null => {
+  const trimmed = value.trim();
+
+  if (trimmed === '') {
+    return null;
+  }
+
+  if (trimmed === 'Invalid Date') {
+    throw new BadRequestException(`Invalid ${fieldName}: Invalid Date`);
+  }
+
+  if (!isValidCapacitySharingTimestampString(trimmed)) {
+    throw new BadRequestException(
+      `Invalid ${fieldName} format. Use ISO 8601 (e.g. 2025-06-06T12:51:43.861Z) or YYYY-MM-DD HH:mm:ss[.ffffff]`,
+    );
+  }
+
+  const parsed = toDateFromCapacitySharingString(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    throw invalidTimestampException(fieldName);
+  }
+
+  return parsed;
+};
+
 const toDateFromCapacitySharingString = (value: string): Date => {
   const trimmed = value.trim();
   const format = getCapacitySharingTimestampFormat(trimmed);
@@ -63,50 +105,12 @@ export const parseCapacitySharingTimestamp = (
     return null;
   }
 
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) {
-      throw new BadRequestException(
-        `Invalid ${fieldName}: not a valid timestamp`,
-      );
-    }
-    return value;
-  }
-
-  if (typeof value === 'number') {
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException(
-        `Invalid ${fieldName}: not a valid timestamp`,
-      );
-    }
-    return parsed;
+  if (value instanceof Date || typeof value === 'number') {
+    return parseValidDate(value, fieldName);
   }
 
   if (typeof value === 'string') {
-    const trimmed = value.trim();
-
-    if (trimmed === '') {
-      return null;
-    }
-
-    if (trimmed === 'Invalid Date') {
-      throw new BadRequestException(`Invalid ${fieldName}: Invalid Date`);
-    }
-
-    if (!isValidCapacitySharingTimestampString(trimmed)) {
-      throw new BadRequestException(
-        `Invalid ${fieldName} format. Use ISO 8601 (e.g. 2025-06-06T12:51:43.861Z) or YYYY-MM-DD HH:mm:ss[.ffffff]`,
-      );
-    }
-
-    const parsed = toDateFromCapacitySharingString(trimmed);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException(
-        `Invalid ${fieldName}: not a valid timestamp`,
-      );
-    }
-
-    return parsed;
+    return parseCapacitySharingTimestampString(value, fieldName);
   }
 
   throw new BadRequestException(
