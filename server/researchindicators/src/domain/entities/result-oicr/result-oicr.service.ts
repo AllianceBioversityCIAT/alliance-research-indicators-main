@@ -490,16 +490,20 @@ export class ResultOicrService {
     const stepTwo = await this.findStepTwoOicr(resultId);
     const stepThree = await this.resultService.findGeoLocation(resultId);
     const baseInformation = await this.resultService.findBaseInfo(resultId);
-    const stepFour = await this.mainRepo
+    const { general_comment: stepFour, cgspace_link } = await this.mainRepo
       .findOne({
         where: {
           result_id: resultId,
         },
         select: {
           general_comment: true,
+          cgspace_link: true,
         },
       })
-      .then((result) => result?.general_comment || '');
+      .then((result) => ({
+        general_comment: result?.general_comment,
+        cgspace_link: result?.cgspace_link,
+      }));
 
     return {
       step_one: stepOne,
@@ -509,6 +513,7 @@ export class ResultOicrService {
         general_comment: stepFour,
       },
       base_information: baseInformation,
+      cgspace_link,
     };
   }
 
