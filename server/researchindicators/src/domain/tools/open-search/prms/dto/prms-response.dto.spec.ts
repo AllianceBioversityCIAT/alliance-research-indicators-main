@@ -23,7 +23,9 @@ import {
 
 describe('prms-response DTOs', () => {
   it('should allow constructing exported mapper classes', () => {
-    expect(new PrmsKnowledgeProductDto()).toBeInstanceOf(PrmsKnowledgeProductDto);
+    expect(new PrmsKnowledgeProductDto()).toBeInstanceOf(
+      PrmsKnowledgeProductDto,
+    );
     expect(new PrmsResponseDto()).toBeInstanceOf(PrmsResponseDto);
     expect(new PrmsResultByInitiativesDto()).toBeInstanceOf(
       PrmsResultByInitiativesDto,
@@ -33,9 +35,7 @@ describe('prms-response DTOs', () => {
     expect(new IndicatorCategoryMapper()).toBeInstanceOf(
       IndicatorCategoryMapper,
     );
-    expect(new GeographicFocusMapper()).toBeInstanceOf(
-      GeographicFocusMapper,
-    );
+    expect(new GeographicFocusMapper()).toBeInstanceOf(GeographicFocusMapper);
     expect(new RegionMapper()).toBeInstanceOf(RegionMapper);
     expect(new CountryMapper()).toBeInstanceOf(CountryMapper);
     expect(new ContributingCenterMapper()).toBeInstanceOf(

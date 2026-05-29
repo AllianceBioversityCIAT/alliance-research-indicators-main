@@ -35,6 +35,24 @@ export const STAR_RAW_COLUMN_GROUP_FALLBACK: Array<{
   { fromCol: 24, toCol: 27, label: 'GEOGRAPHIC SCOPE', fillArgb: 'FF5A91D3' },
   { fromCol: 28, toCol: 28, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
   { fromCol: 29, toCol: 33, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
+  {
+    fromCol: 34,
+    toCol: 54,
+    label: 'CAPSHARING DETAILS',
+    fillArgb: 'FF4D7C31',
+  },
+  {
+    fromCol: 55,
+    toCol: 58,
+    label: 'POLICY DETAILS',
+    fillArgb: 'FFDA7842',
+  },
+  {
+    fromCol: 59,
+    toCol: 71,
+    label: 'OICR DETAILS',
+    fillArgb: 'FFD9A041',
+  },
 ];
 
 /** Preamble without column groups (groups come from DB or fallback in the handler). */
@@ -47,7 +65,7 @@ export const STAR_RAW_SHEET_PREAMBLE_BASE: Omit<
   bannerTitleFillArgb: STAR_RAW_BANNER_TITLE_FILL_ARGB,
   bannerTitleFontArgb: STAR_RAW_BANNER_TITLE_FONT_ARGB,
   bannerTitleMergeFromCol: 3,
-  bannerTitleMergeToCol: 33,
+  bannerTitleMergeToCol: 71,
   logoMergeFromCol: 1,
   logoMergeToCol: 2,
   /** Row 1 only so row 2 subtitle merge does not overlap the logo merge. */

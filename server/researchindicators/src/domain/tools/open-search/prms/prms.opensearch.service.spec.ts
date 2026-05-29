@@ -14,16 +14,11 @@ import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clar
 import { SyncProcessLogService } from '../../../entities/sync-process-log/sync-process-log.service';
 import { ExternalMappersDto } from '../../../shared/global-dto/external-mappers.dto';
 import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
-import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
-import { ResultStatusEnum } from '../../../entities/result-status/enum/result-status.enum';
 import { ResultResponseMapper } from './dto/prms-response.dto';
 import { ResultTypeEnum } from './enum/rsult-type.enum';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
 import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
-import {
-  CounterResults,
-  CounterResultsEnum,
-} from '../../tip-integration/dto/response-year-tip.dto';
+import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual('typeorm');
@@ -45,6 +40,7 @@ describe('PrmsOpenSearchService', () => {
   let pooledFundingContractsService: jest.Mocked<PooledFundingContractsService>;
   let clarisaLeversService: jest.Mocked<ClarisaLeversService>;
   let syncProcessLogService: jest.Mocked<SyncProcessLogService>;
+  let saveResultService: jest.Mocked<SaveResultService>;
 
   const buildResultMapper = (
     overrides: Partial<ResultResponseMapper> = {},
@@ -133,7 +129,9 @@ describe('PrmsOpenSearchService', () => {
         },
         {
           provide: QueryService,
-          useValue: { deleteFullResultById: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            deleteFullResultById: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: ResultKnowledgeProductService,
@@ -179,6 +177,12 @@ describe('PrmsOpenSearchService', () => {
             endSync: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: SaveResultService,
+          useValue: {
+            bulkSaveAllSections: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -190,6 +194,7 @@ describe('PrmsOpenSearchService', () => {
     pooledFundingContractsService = module.get(PooledFundingContractsService);
     clarisaLeversService = module.get(ClarisaLeversService);
     syncProcessLogService = module.get(SyncProcessLogService);
+    saveResultService = module.get(SaveResultService);
   });
 
   afterEach(() => {
@@ -220,6 +225,7 @@ describe('PrmsOpenSearchService', () => {
       expect(firstUrl).toContain('year=2024');
       expect(syncProcessLogService.update).toHaveBeenCalled();
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalled();
     });
 
     it('should omit year query param when year is empty', async () => {
@@ -254,20 +260,24 @@ describe('PrmsOpenSearchService', () => {
     });
 
     it('should map a valid row without created_by', async () => {
-      const row = buildResultMapper({ result_level: { code: 'L9', name: '', description: '' } });
+      const row = buildResultMapper({
+        result_level: { code: 'L9', name: '', description: '' },
+      });
       const out = await service.processData([row]);
       expect(out).toHaveLength(1);
       expect(out[0].createResult.indicator_id).toBeDefined();
       expect(out[0].alignments.contracts.length).toBeGreaterThan(0);
       expect(clarisaLeversService.findOne).toHaveBeenCalledWith('L9');
-      expect(pooledFundingContractsService.findMappingPooledFundingContracts).toHaveBeenCalledWith(
-        'PFUND',
-      );
+      expect(
+        pooledFundingContractsService.findMappingPooledFundingContracts,
+      ).toHaveBeenCalledWith('PFUND');
     });
 
     it('should prefer PRMS lever id over Clarisa when both are present', async () => {
       clarisaLeversService.findOne.mockResolvedValueOnce({ id: 999 } as any);
-      clarisaLeversService.findByShortName.mockResolvedValueOnce({ id: 1 } as any);
+      clarisaLeversService.findByShortName.mockResolvedValueOnce({
+        id: 1,
+      } as any);
       const out = await service.processData([buildResultMapper()]);
       expect(out[0].alignments.primary_levers[0].lever_id).toBe(999);
     });
@@ -391,19 +401,23 @@ describe('PrmsOpenSearchService', () => {
 
     it('should fall back to Clarisa lever when PRMS lever is missing', async () => {
       clarisaLeversService.findOne.mockResolvedValueOnce(null as any);
-      clarisaLeversService.findByShortName.mockResolvedValueOnce({ id: 42 } as any);
+      clarisaLeversService.findByShortName.mockResolvedValueOnce({
+        id: 42,
+      } as any);
       const out = await service.processData([buildResultMapper()]);
       expect(out[0].alignments.primary_levers[0].lever_id).toBe(42);
     });
 
     it('should not push primary contract when agreement_id is empty', async () => {
-      pooledFundingContractsService.findMappingPooledFundingContracts.mockResolvedValueOnce([
-        {
-          agreement_id: '',
-          ubwClientDescription: 'exbio',
-          departmentId: 10,
-        },
-      ] as any);
+      pooledFundingContractsService.findMappingPooledFundingContracts.mockResolvedValueOnce(
+        [
+          {
+            agreement_id: '',
+            ubwClientDescription: 'exbio',
+            departmentId: 10,
+          },
+        ] as any,
+      );
 
       const out = await service.processData([buildResultMapper()]);
       expect(out[0].alignments.contracts).toEqual([]);
@@ -506,7 +520,8 @@ describe('PrmsOpenSearchService', () => {
       await service.mapToExternalCreateResultDto([payload]);
 
       expect(resultsService.updateResultAlignment).toHaveBeenCalled();
-      const alignmentArg = resultsService.updateResultAlignment.mock.calls[0][1];
+      const alignmentArg =
+        resultsService.updateResultAlignment.mock.calls[0][1];
       expect(alignmentArg.primary_levers.length).toBeGreaterThan(0);
     });
 
@@ -516,9 +531,7 @@ describe('PrmsOpenSearchService', () => {
         result_id: 888,
         result_official_code: 55,
       } as any);
-      resultsService.updateGeneralInfo.mockRejectedValueOnce(
-        new Error('boom'),
-      );
+      resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('boom'));
 
       await service.mapToExternalCreateResultDto([basePayload()]);
 
@@ -537,138 +550,6 @@ describe('PrmsOpenSearchService', () => {
       await service.mapToExternalCreateResultDto([basePayload()]);
 
       expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('createResultInStar', () => {
-    const minimalResultDto = (): ExternalMappersDto => {
-      const r = new ExternalMappersDto();
-      r.official_code = 7001;
-      r.external_link = 'e';
-      r.created_at = new Date();
-      r.status_id = ResultStatusEnum.SUBMITTED_IN_PRMS;
-      r.userData = { sec_user_id: 1 } as any;
-      r.createResult = {
-        year: 2024,
-        indicator_id: 1,
-        title: 't',
-        description: 'd',
-        contract_id: 'c',
-      } as any;
-      r.generalInformation = {
-        title: 't',
-        description: 'd',
-        keywords: [],
-        main_contact_person: null,
-        main_contact_person_ai: null,
-        year: 2024,
-      };
-      r.alignments = {
-        primary_levers: [],
-        contracts: [],
-        contributor_levers: [],
-        result_sdgs: [],
-      } as any;
-      return r;
-    };
-
-    it('should create PRMS result and increment created counter', async () => {
-      resultRepoHandle.findOne.mockResolvedValue(null);
-      resultsService.createResult.mockResolvedValue({
-        result_id: 1,
-        result_official_code: 7001,
-      } as any);
-      const counters = new CounterResults();
-      const saved: number[] = [];
-
-      await service.createResultInStar(
-        [minimalResultDto()],
-        saved,
-        null as unknown as number,
-        counters,
-      );
-
-      expect(resultsService.createResult).toHaveBeenCalledWith(
-        expect.anything(),
-        ReportingPlatformEnum.PRMS,
-        expect.objectContaining({
-          isSnapshot: false,
-        }),
-        7001,
-      );
-      expect(counters[CounterResultsEnum.CREATED]).toBe(1);
-    });
-
-    it('should mark snapshot when official code repeats', async () => {
-      resultRepoHandle.findOne.mockResolvedValue(null);
-      resultsService.createResult.mockResolvedValue({
-        result_id: 2,
-        result_official_code: 7001,
-      } as any);
-      const dto = minimalResultDto();
-      const dtoSnapshot = minimalResultDto();
-      const counters = new CounterResults();
-
-      await service.createResultInStar(
-        [dto, dtoSnapshot],
-        [],
-        null as unknown as number,
-        counters,
-      );
-
-      const secondCallOpts = resultsService.createResult.mock.calls[1][2];
-      expect(secondCallOpts.isSnapshot).toBe(true);
-    });
-
-    it('should update inactive result when PRMS row already exists', async () => {
-      resultRepoHandle.findOne.mockResolvedValue({
-        result_id: 9,
-        result_official_code: 7001,
-      } as any);
-      const counters = new CounterResults();
-
-      await service.createResultInStar(
-        [minimalResultDto()],
-        [],
-        null as unknown as number,
-        counters,
-      );
-
-      expect(resultsService.updateInactiveResult).toHaveBeenCalledWith(9, false);
-      expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
-    });
-
-    it('should increment error counter and rollback on failure after create', async () => {
-      resultRepoHandle.findOne.mockResolvedValue(null);
-      resultsService.createResult.mockResolvedValue({
-        result_id: 42,
-        result_official_code: 7001,
-      } as any);
-      resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('x'));
-      const counters = new CounterResults();
-
-      await service.createResultInStar(
-        [minimalResultDto()],
-        [],
-        null as unknown as number,
-        counters,
-      );
-
-      expect(queryService.deleteFullResultById).toHaveBeenCalledWith(42);
-      expect(counters[CounterResultsEnum.ERROR]).toBe(1);
-    });
-
-    it('should accept default CounterResults argument shape', async () => {
-      resultRepoHandle.findOne.mockResolvedValue({
-        result_id: 9,
-        result_official_code: 7001,
-      } as any);
-      await service.createResultInStar(
-        [minimalResultDto()],
-        [],
-        null as unknown as number,
-      );
-      expect(resultsService.updateInactiveResult).toHaveBeenCalled();
     });
   });
 });
