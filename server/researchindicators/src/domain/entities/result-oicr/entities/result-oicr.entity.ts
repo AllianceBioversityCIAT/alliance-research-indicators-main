@@ -15,6 +15,13 @@ export class ResultOicr extends AuditableEntity {
 
   @Column({
     type: 'text',
+    name: 'cgspace_link',
+    nullable: true,
+  })
+  cgspace_link: string;
+
+  @Column({
+    type: 'text',
     name: 'oicr_internal_code',
     comment: 'OICR internal code for the result',
     nullable: true,

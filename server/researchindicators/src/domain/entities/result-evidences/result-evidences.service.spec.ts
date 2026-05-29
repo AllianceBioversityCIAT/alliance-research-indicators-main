@@ -9,11 +9,14 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { EvidenceRoleEnum } from '../evidence-roles/enums/evidence-role.enum';
 import { CreateResultEvidenceDto } from './dto/create-result-evidence.dto';
+import { ResultOicr } from '../result-oicr/entities/result-oicr.entity';
 
 describe('ResultEvidencesService', () => {
   let service: ResultEvidencesService;
   const find = jest.fn();
   const transaction = jest.fn();
+  const oicrUpdate = jest.fn().mockResolvedValue(undefined);
+  const oicrFindOne = jest.fn();
 
   const mockRepository = {
     find,
@@ -22,8 +25,15 @@ describe('ResultEvidencesService', () => {
     },
   };
 
+  const mockOicrRepository = {
+    update: oicrUpdate,
+    findOne: oicrFindOne,
+  };
+
   const mockDataSource = {
-    getRepository: jest.fn().mockReturnValue(mockRepository),
+    getRepository: jest.fn((entity) =>
+      entity === ResultOicr ? mockOicrRepository : mockRepository,
+    ),
     transaction,
   };
 
@@ -108,7 +118,7 @@ describe('ResultEvidencesService', () => {
       createSpy.mockRestore();
     });
 
-    it('should upsert notable references for OICR indicator', async () => {
+    it('should upsert notable references and persist cgspace_link for OICR indicator', async () => {
       resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
       jest.spyOn(service, 'create').mockResolvedValue([] as any);
       transaction.mockImplementation(
@@ -120,6 +130,7 @@ describe('ResultEvidencesService', () => {
         notable_references: [
           { link: 'l', notable_reference_type_id: 1 } as any,
         ],
+        cgspace_link: 'https://cgspace.cgiar.org/handle/10568/12345',
       };
 
       await service.updateResultEvidences(2, body);
@@ -129,7 +140,24 @@ describe('ResultEvidencesService', () => {
         body.notable_references,
         ['notable_reference_type_id', 'link'],
       );
+      expect(oicrUpdate).toHaveBeenCalledWith(2, {
+        cgspace_link: body.cgspace_link,
+      });
       resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+    });
+
+    it('should not update cgspace_link when indicator is not OICR', async () => {
+      jest.spyOn(service, 'create').mockResolvedValue([] as any);
+      transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) => cb({}),
+      );
+
+      await service.updateResultEvidences(3, {
+        evidence: [{ evidence_url: 'u' } as any],
+        cgspace_link: 'https://cgspace.cgiar.org/handle/10568/99999',
+      });
+
+      expect(oicrUpdate).not.toHaveBeenCalled();
     });
   });
 
@@ -147,18 +175,32 @@ describe('ResultEvidencesService', () => {
           is_active: true,
         },
       });
-      expect(out).toEqual({ evidence: ev, notable_references: null });
+      expect(out).toEqual({
+        evidence: ev,
+        notable_references: null,
+        cgspace_link: null,
+      });
     });
 
-    it('should include notable references for OICR', async () => {
+    it('should include notable references and cgspace_link for OICR', async () => {
       resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
       find.mockResolvedValue([]);
       mockNotableRefs.find.mockResolvedValue([{ ref: 1 }]);
+      const cgspaceLink = 'https://cgspace.cgiar.org/handle/10568/54321';
+      oicrFindOne.mockResolvedValue({ cgspace_link: cgspaceLink });
 
       const out = await service.findPrincipalEvidence(6);
 
       expect(mockNotableRefs.find).toHaveBeenCalledWith(6);
-      expect(out.notable_references).toEqual([{ ref: 1 }]);
+      expect(oicrFindOne).toHaveBeenCalledWith({
+        select: { cgspace_link: true },
+        where: { result_id: 6, is_active: true },
+      });
+      expect(out).toEqual({
+        evidence: [],
+        notable_references: [{ ref: 1 }],
+        cgspace_link: cgspaceLink,
+      });
       resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
     });
   });
