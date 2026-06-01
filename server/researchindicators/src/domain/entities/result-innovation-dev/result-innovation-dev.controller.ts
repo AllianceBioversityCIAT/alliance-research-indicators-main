@@ -5,6 +5,7 @@ import {
   Patch,
   UseInterceptors,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { ResultInnovationDevService } from './result-innovation-dev.service';
 import { CreateResultInnovationDevDto } from './dto/create-result-innovation-dev.dto';
@@ -13,6 +14,7 @@ import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 @ApiTags('Results Innovation Development')
 @ApiBearerAuth()
@@ -26,6 +28,7 @@ export class ResultInnovationDevController {
 
   @Patch(`${RESULT_CODE}`)
   @GetResultVersion()
+  @UseGuards(ResultStatusGuard)
   create(@Body() createResultInnovationDevDto: CreateResultInnovationDevDto) {
     return this.resultInnovationDevService
       .update(this._currentResult.resultId, createResultInnovationDevDto)
