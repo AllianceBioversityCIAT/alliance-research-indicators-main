@@ -5,6 +5,7 @@ import {
   Patch,
   HttpStatus,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { ResultIpRightsService } from './result-ip-rights.service';
 import { UpdateIpRightDto } from './dto/update-ip-right.dto';
@@ -13,6 +14,7 @@ import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 @ApiTags('Intellectual Property Rights')
 @UseInterceptors(SetUpInterceptor)
@@ -41,6 +43,7 @@ export class ResultIpRightsController {
 
   @Patch(RESULT_CODE)
   @GetResultVersion()
+  @UseGuards(ResultStatusGuard)
   update(@Body() updateData: UpdateIpRightDto) {
     return this._resultIpRightsService
       .update(this._resultsUtil.resultId, updateData)
