@@ -2,8 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 
 const TIMESTAMP_FORMAT = {
   isoZ: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z?$/,
-  isoOffset:
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?[+-]\d{2}:\d{2}$/,
+  isoOffset: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?[+-]\d{2}:\d{2}$/,
   mysql: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/,
   dateOnly: /^\d{4}-\d{2}-\d{2}$/,
 } as const;
@@ -34,10 +33,7 @@ const isValidCapacitySharingTimestampString = (value: string): boolean =>
 const invalidTimestampException = (fieldName: string): BadRequestException =>
   new BadRequestException(`Invalid ${fieldName}: not a valid timestamp`);
 
-const parseValidDate = (
-  value: Date | number,
-  fieldName: string,
-): Date => {
+const parseValidDate = (value: Date | number, fieldName: string): Date => {
   const parsed = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     throw invalidTimestampException(fieldName);
