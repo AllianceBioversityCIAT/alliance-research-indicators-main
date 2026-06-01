@@ -67,7 +67,12 @@ describe('ResultStatusWorkflowController', () => {
   });
 
   it('getConfigWorkflow', async () => {
-    const cfg = {};
+    const cfg = [
+      {
+        result_status_id: 3,
+        is_status_change_validation_required: true,
+      },
+    ];
     mockService.getConfigWorkflowByIndicatorAndFromStatus.mockResolvedValue(
       cfg,
     );
@@ -76,6 +81,11 @@ describe('ResultStatusWorkflowController', () => {
     expect(
       mockService.getConfigWorkflowByIndicatorAndFromStatus,
     ).toHaveBeenCalledWith(1, 2);
+    expect(ResponseUtils.format).toHaveBeenCalledWith({
+      data: cfg,
+      description: 'Config workflow found',
+      status: HttpStatus.OK,
+    });
   });
 
   it('getNextSteps', async () => {

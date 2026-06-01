@@ -49,6 +49,14 @@ export class ResultStatusWorkflow extends AuditableEntity {
 
   @Column({
     type: 'boolean',
+    name: 'is_status_change_validation_required',
+    nullable: false,
+    default: false,
+  })
+  is_status_change_validation_required!: boolean;
+
+  @Column({
+    type: 'boolean',
     name: 'is_editable_date',
     nullable: false,
     default: false,
