@@ -20,8 +20,7 @@ import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 @Injectable()
 export class ResultRepository
   extends Repository<Result>
-  implements ElasticFindEntity<ResultOpensearchDto>
-{
+  implements ElasticFindEntity<ResultOpensearchDto> {
   constructor(
     private readonly appConfig: AppConfig,
     private readonly currentUserUtil: CurrentUserUtil,
@@ -212,11 +211,10 @@ export class ResultRepository
 											  'start_date', ac.start_date,
 											  'deleted_at', ac.deleted_at))`;
 
-      queryParts.contracts.select = `,${
-        filters?.primary_contract
-          ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
-          : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
-      } as result_contracts`;
+      queryParts.contracts.select = `,${filters?.primary_contract
+        ? `if(rc.result_contract_id is not null, ${tempQuery}, null)`
+        : `JSON_ARRAYAGG(COALESCE(${tempQuery}))`
+        } as result_contracts`;
 
       if (filters?.primary_contract) {
         queryParts.contracts.groupBy = `,rc.result_contract_id`;
@@ -580,12 +578,47 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     return tokens.length > 0 ? tokens : [search];
   }
 
-  private static readonly FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT = 8;
+  private static readonly FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT = 10;
 
   /** Placeholders in buildFindResultsV2SearchRelevanceSelectFragment before creator-name CASEs. */
-  private static readonly FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT = 9;
+  private static readonly FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT = 11;
+  //TODO: This needs to be corrected once the PDF is complete.
+  /**
+   * Built URL for platforms that do not persist `public_link` (IF ELSE branch).
+   * Replace `return 'NULL'` with the final expression once base URL, path, and per-`platform_code` rules are defined.
+   *
+   * STAR reference (export): {@link StarResultsExportRepository.findStarResultsMetadataRows}
+   * `CONCAT_WS('', '${ARI_CLIENT_HOST}/result/STAR-', result_code, '/general-information')`
+   */
+  private buildFindResultsV2BuiltPublicLinkSqlExpression(): string {
+    // const host = this.appConfig.ARI_CLIENT_HOST;
+    // return `CASE r.platform_code
+    //   WHEN 'STAR' THEN CONCAT_WS(
+    //     '',
+    //     '${host}/result/',
+    //     r.result_official_code,
+    //     '/general-information'
+    //   )
+    //   -- WHEN 'OTHER_PLATFORM' THEN CONCAT_WS('', '${host}/...', r.result_official_code, '...')
+    //   ELSE NULL
+    // END`;
+    return 'NULL';
+  }
+
+  /**
+   * Effective `public_link` for findResultsV2. Reuse the same expression in SELECT, WHERE, and relevance.
+   * PRMS/TIP: `r.public_link` column; otherwise: {@link buildFindResultsV2BuiltPublicLinkSqlExpression}.
+   */
+  private buildFindResultsV2PublicLinkSqlExpression(): string {
+    return `IF(
+      r.platform_code IN ('PRMS', 'TIP'),
+      r.public_link,
+      ${this.buildFindResultsV2BuiltPublicLinkSqlExpression()}
+    )`;
+  }
 
   private buildFindResultsV2SearchStaticWhereFragment(): string {
+    const publicLinkExpr = this.buildFindResultsV2PublicLinkSqlExpression();
     return `
     AND ((
             r.report_year_id IN (?)
@@ -602,7 +635,9 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       OR i.name like CONCAT('%',?, '%')
       OR rs.name LIKE CONCAT('%',?, '%')
       OR rc.contract_id = ?
-      OR cl.short_name LIKE CONCAT('%',?, '%')`;
+      OR cl.short_name LIKE CONCAT('%',?, '%')
+      OR (${publicLinkExpr}) LIKE CONCAT('%',?, '%')
+      OR ro.cgspace_link LIKE CONCAT('%',?, '%')`;
   }
 
   /**
@@ -628,6 +663,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
   private buildFindResultsV2SearchRelevanceSelectFragment(
     creatorNameTokens: string[],
   ): string {
+    const publicLinkExpr = this.buildFindResultsV2PublicLinkSqlExpression();
     const nameRelevanceCases = creatorNameTokens.map(
       () =>
         `(CASE WHEN (su.first_name LIKE CONCAT('%', ?, '%') OR su.last_name LIKE CONCAT('%', ?, '%')) THEN 220 ELSE 0 END)`,
@@ -649,6 +685,8 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       (CASE WHEN rs.name LIKE CONCAT('%', ?, '%') THEN 380 ELSE 0 END) +
       (CASE WHEN rc.contract_id = ? THEN 750 ELSE 0 END) +
       (CASE WHEN cl.short_name LIKE CONCAT('%', ?, '%') THEN 320 ELSE 0 END) +
+      (CASE WHEN (${publicLinkExpr}) LIKE CONCAT('%', ?, '%') THEN 500 ELSE 0 END) +
+      (CASE WHEN ro.cgspace_link LIKE CONCAT('%', ?, '%') THEN 500 ELSE 0 END) +
       ${nameRelevanceCases}
     ) AS _search_relevance`;
   }
@@ -734,8 +772,8 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 
     const staticWhereParams = search
       ? Array(
-          ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT,
-        ).fill(search)
+        ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT,
+      ).fill(search)
       : [];
     const creatorNameWhereParams = creatorNameTokens.flatMap((t) => [t, t]);
     const searchWhereParams = search
@@ -747,11 +785,11 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       : '';
     const relevanceParams = search
       ? [
-          ...Array(
-            ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT,
-          ).fill(search),
-          ...creatorNameTokens.flatMap((t) => [t, t]),
-        ]
+        ...Array(
+          ResultRepository.FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT,
+        ).fill(search),
+        ...creatorNameTokens.flatMap((t) => [t, t]),
+      ]
       : [];
 
     const fromAndJoins = `
@@ -769,7 +807,8 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       AND rl.is_active = TRUE
       AND rl.is_primary = TRUE
     LEFT JOIN sec_users su ON su.sec_user_id = r.created_by
-    LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id`;
+    LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id
+    LEFT JOIN result_oicrs ro ON ro.result_id = r.result_id`;
 
     const countQuery = `
     SELECT COUNT(tmp.total) AS total FROM (SELECT COUNT(DISTINCT r.result_id) AS total
@@ -780,7 +819,6 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       ${search ? searchConditions : ''}
     GROUP BY r.result_id
     ORDER BY r.result_official_code ASC) tmp`;
-
     const mainQuery = `
     SELECT
       r.created_at,
@@ -795,11 +833,12 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
       r.title,
       r.indicator_id,
       r.external_link,
-      r.public_link,
+      ${this.buildFindResultsV2PublicLinkSqlExpression()} AS public_link,
       i.name AS indicator_name,
       r.result_status_id AS status_id,
       rs.name AS status_name,
       rs.config as status_config,
+      ro.cgspace_link,
       GROUP_CONCAT(DISTINCT r2.report_year_id ORDER BY r2.report_year_id DESC) AS snapshot_years,
       rc.contract_id,
       ac.description as contract_description,
@@ -834,9 +873,9 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     const rawData = await this.query(mainQuery, mainQueryParams);
     const data = search
       ? rawData.map((row: Record<string, unknown>) => {
-          const { _search_relevance: _r, ...rest } = row;
-          return rest;
-        })
+        const { _search_relevance: _r, ...rest } = row;
+        return rest;
+      })
       : rawData;
 
     return {
