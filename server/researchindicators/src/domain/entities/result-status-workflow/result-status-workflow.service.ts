@@ -48,7 +48,7 @@ export class ResultStatusWorkflowService {
     private readonly currentResult: ResultsUtil,
     private readonly currentUserUtil: CurrentUserUtil,
     private readonly handlerService: StatusWorkflowFunctionHandlerService,
-  ) {}
+  ) { }
 
   private async getStatusesByIds(statusIds: number[]) {
     return this.dataSource.getRepository(ResultStatus).find({
