@@ -424,21 +424,29 @@ describe('ResultRepository', () => {
 
   describe('findResultsV2', () => {
     it('joins result_oicrs and selects cgspace_link', async () => {
-      querySpy
-        .mockResolvedValueOnce([{ total: 0 }])
-        .mockResolvedValueOnce([]);
-      await repository.findResultsV2('', undefined, undefined, emptyFindResultsV2Filters());
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
+      await repository.findResultsV2(
+        '',
+        undefined,
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
       const mainSql = querySpy.mock.calls[1][0] as string;
-      expect(mainSql).toContain('LEFT JOIN result_oicrs ro ON ro.result_id = r.result_id');
+      expect(mainSql).toContain(
+        'LEFT JOIN result_oicrs ro ON ro.result_id = r.result_id',
+      );
       expect(mainSql).toContain('ro.cgspace_link');
       expect(mainSql).toMatch(/IF\([\s\S]*AS public_link/);
     });
 
     it('omits search fragments when search is empty', async () => {
-      querySpy
-        .mockResolvedValueOnce([{ total: 0 }])
-        .mockResolvedValueOnce([]);
-      await repository.findResultsV2('', undefined, undefined, emptyFindResultsV2Filters());
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
+      await repository.findResultsV2(
+        '',
+        undefined,
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
       const countSql = querySpy.mock.calls[0][0] as string;
       const mainSql = querySpy.mock.calls[1][0] as string;
       expect(countSql).not.toContain('ro.cgspace_link LIKE');
@@ -450,9 +458,13 @@ describe('ResultRepository', () => {
     it('includes public_link and cgspace_link search with aligned placeholder counts', async () => {
       const search = '10568/12345';
       const staticWhereCount =
-        ResultRepository['FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT'];
+        ResultRepository[
+          'FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT'
+        ];
       const staticRelevanceCount =
-        ResultRepository['FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT'];
+        ResultRepository[
+          'FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT'
+        ];
       querySpy
         .mockResolvedValueOnce([{ total: 1 }])
         .mockResolvedValueOnce([{ result_id: 1, _search_relevance: 500 }]);
@@ -474,9 +486,9 @@ describe('ResultRepository', () => {
       expect(mainParams).toHaveLength(
         staticRelevanceCount + staticWhereCount + 4 + 2,
       );
-      expect(mainParams.slice(0, staticRelevanceCount).every((p) => p === search)).toBe(
-        true,
-      );
+      expect(
+        mainParams.slice(0, staticRelevanceCount).every((p) => p === search),
+      ).toBe(true);
       expect(
         mainParams
           .slice(staticRelevanceCount, staticRelevanceCount + staticWhereCount)
@@ -487,12 +499,14 @@ describe('ResultRepository', () => {
 
     it('binds creator-name tokens separately for multi-word search', async () => {
       const staticWhereCount =
-        ResultRepository['FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT'];
+        ResultRepository[
+          'FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT'
+        ];
       const staticRelevanceCount =
-        ResultRepository['FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT'];
-      querySpy
-        .mockResolvedValueOnce([{ total: 0 }])
-        .mockResolvedValueOnce([]);
+        ResultRepository[
+          'FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT'
+        ];
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
       await repository.findResultsV2(
         'john doe',
         undefined,
@@ -506,17 +520,23 @@ describe('ResultRepository', () => {
 
       expect(countSql).toContain('su.first_name LIKE');
       expect(countParams).toHaveLength(staticWhereCount + 4);
-      expect(countParams.slice(0, staticWhereCount).every((p) => p === 'john doe')).toBe(
-        true,
-      );
+      expect(
+        countParams.slice(0, staticWhereCount).every((p) => p === 'john doe'),
+      ).toBe(true);
       expect(countParams.slice(creatorWhereOffset)).toEqual([
         'john',
         'john',
         'doe',
         'doe',
       ]);
-      expect(mainParams.slice(11, 15)).toEqual(['john', 'john', 'doe', 'doe']);
-      expect(mainParams.slice(25, 29)).toEqual(['john', 'john', 'doe', 'doe']);
+      const creatorRelevanceEnd = staticRelevanceCount + 4;
+      const creatorWhereStart = creatorRelevanceEnd + staticWhereCount;
+      expect(
+        mainParams.slice(staticRelevanceCount, creatorRelevanceEnd),
+      ).toEqual(['john', 'john', 'doe', 'doe']);
+      expect(
+        mainParams.slice(creatorWhereStart, creatorWhereStart + 4),
+      ).toEqual(['john', 'john', 'doe', 'doe']);
     });
 
     it('strips _search_relevance from returned rows when search is provided', async () => {
@@ -536,9 +556,7 @@ describe('ResultRepository', () => {
     });
 
     it('applies onlyOwnResults filter in SQL', async () => {
-      querySpy
-        .mockResolvedValueOnce([{ total: 0 }])
-        .mockResolvedValueOnce([]);
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
       const filters = emptyFindResultsV2Filters();
       filters.currentUser.onlyOwnResults = true;
       await repository.findResultsV2('', undefined, undefined, filters);
@@ -547,9 +565,7 @@ describe('ResultRepository', () => {
     });
 
     it('uses custom sort when search is absent', async () => {
-      querySpy
-        .mockResolvedValueOnce([{ total: 0 }])
-        .mockResolvedValueOnce([]);
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
       await repository.findResultsV2(
         '',
         { page: 2, limit: 5 },
