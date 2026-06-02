@@ -61,6 +61,14 @@ describe('SaveResultService', () => {
     currentCode: null as number | null,
   });
 
+  const tipExtraData = (counters = new CounterResults()) => ({
+    platformCode: ReportingPlatformEnum.TIP,
+    appliedVersion: false,
+    counters,
+    resultSaved: [] as number[],
+    currentCode: null as number | null,
+  });
+
   beforeEach(async () => {
     resultRepoHandle = {
       findOne: jest.fn(),
@@ -160,8 +168,55 @@ describe('SaveResultService', () => {
 
       await service.bulkSaveAllSections([dto, dtoSnapshot], extraData);
 
+      const firstCallOpts = resultsService.createResult.mock.calls[0][2];
       const secondCallOpts = resultsService.createResult.mock.calls[1][2];
+      expect(firstCallOpts.isSnapshot).toBe(false);
       expect(secondCallOpts.isSnapshot).toBe(true);
+    });
+
+    it('should not mark snapshot when appliedVersion is false even if official code repeats', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 10,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      const dtoDuplicate = minimalResultDto();
+      const counters = new CounterResults();
+
+      await service.bulkSaveAllSections(
+        [dto, dtoDuplicate],
+        tipExtraData(counters),
+      );
+
+      expect(resultsService.createResult).toHaveBeenCalledTimes(2);
+      for (const call of resultsService.createResult.mock.calls) {
+        expect(call[2].isSnapshot).toBe(false);
+      }
+    });
+
+    it('should not mark snapshot for PRMS when each bulk item has a different official code', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 1,
+        result_official_code: 7001,
+      } as any);
+      const dtoA = minimalResultDto();
+      const dtoB = minimalResultDto();
+      dtoB.official_code = 7002;
+      const counters = new CounterResults();
+
+      await service.bulkSaveAllSections(
+        [dtoA, dtoB],
+        prmsExtraData(counters),
+      );
+
+      expect(resultsService.createResult.mock.calls[0][2].isSnapshot).toBe(
+        false,
+      );
+      expect(resultsService.createResult.mock.calls[1][2].isSnapshot).toBe(
+        false,
+      );
     });
 
     it('should update inactive result when PRMS row already exists', async () => {

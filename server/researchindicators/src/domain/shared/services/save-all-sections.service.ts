@@ -85,7 +85,7 @@ export class SaveResultService {
             result_status_id:
               extraData?.statusMapper?.[result.status_id] ?? result.status_id,
             validateTitle: false,
-            isSnapshot: !isNewCode,
+            isSnapshot: extraData?.appliedVersion ? !isNewCode : false,
           },
           result.official_code,
         );
