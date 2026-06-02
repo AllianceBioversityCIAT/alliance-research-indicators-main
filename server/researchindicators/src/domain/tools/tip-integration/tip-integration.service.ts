@@ -83,9 +83,14 @@ export class TipIntegrationService extends BaseApi {
     );
   }
 
-  async inactiveAllTipResults(resultCodes: number[]): Promise<void> {
-    const tipResultIds =
-      await this.tipIntegrationRepository.allTipResultId(resultCodes);
+  async inactiveAllTipResults(
+    resultCodes: number[],
+    year?: number,
+  ): Promise<void> {
+    const tipResultIds = await this.tipIntegrationRepository.allTipResultId(
+      resultCodes,
+      year,
+    );
     for (const resultId of tipResultIds) {
       await this.tipIntegrationRepository.inactiveAllTipResults(resultId);
     }
@@ -132,7 +137,7 @@ export class TipIntegrationService extends BaseApi {
       });
       if (response.data_count < limit) {
         pendingData = false;
-        await this.inactiveAllTipResults(resultSaved);
+        await this.inactiveAllTipResults(resultSaved, year);
       } else {
         offset += limit;
       }
