@@ -206,10 +206,7 @@ describe('SaveResultService', () => {
       dtoB.official_code = 7002;
       const counters = new CounterResults();
 
-      await service.bulkSaveAllSections(
-        [dtoA, dtoB],
-        prmsExtraData(counters),
-      );
+      await service.bulkSaveAllSections([dtoA, dtoB], prmsExtraData(counters));
 
       expect(resultsService.createResult.mock.calls[0][2].isSnapshot).toBe(
         false,

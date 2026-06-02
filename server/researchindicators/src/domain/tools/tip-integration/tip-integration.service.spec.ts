@@ -185,6 +185,7 @@ describe('TipIntegrationService', () => {
 
       expect(tipIntegrationRepository.allTipResultId).toHaveBeenCalledWith(
         resultCodes,
+        undefined,
       );
       expect(
         tipIntegrationRepository.inactiveAllTipResults,
@@ -205,9 +206,31 @@ describe('TipIntegrationService', () => {
 
       await service.inactiveAllTipResults([]);
 
+      expect(tipIntegrationRepository.allTipResultId).toHaveBeenCalledWith(
+        [],
+        undefined,
+      );
       expect(
         tipIntegrationRepository.inactiveAllTipResults,
       ).not.toHaveBeenCalled();
+    });
+
+    it('should forward year to repository when inactivating stale TIP results', async () => {
+      const resultCodes = [101];
+      tipIntegrationRepository.allTipResultId.mockResolvedValue([9] as any);
+      tipIntegrationRepository.inactiveAllTipResults.mockResolvedValue(
+        undefined,
+      );
+
+      await service.inactiveAllTipResults(resultCodes, 2026);
+
+      expect(tipIntegrationRepository.allTipResultId).toHaveBeenCalledWith(
+        resultCodes,
+        2026,
+      );
+      expect(
+        tipIntegrationRepository.inactiveAllTipResults,
+      ).toHaveBeenCalledWith(9);
     });
   });
 
@@ -246,7 +269,7 @@ describe('TipIntegrationService', () => {
         counters: expect.any(Object),
         appliedVersion: false,
       });
-      expect(service.inactiveAllTipResults).toHaveBeenCalled();
+      expect(service.inactiveAllTipResults).toHaveBeenCalledWith([], 2025);
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
     });
 
@@ -275,6 +298,10 @@ describe('TipIntegrationService', () => {
       expect(getRequestSpy.mock.calls[1][0]).toContain('offset=50');
       expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledTimes(2);
       expect(syncProcessLogService.update).toHaveBeenCalledTimes(2);
+      expect(service.inactiveAllTipResults).toHaveBeenCalledWith(
+        expect.any(Array),
+        2026,
+      );
     });
   });
 
