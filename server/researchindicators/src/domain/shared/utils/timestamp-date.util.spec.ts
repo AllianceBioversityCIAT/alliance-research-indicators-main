@@ -43,9 +43,9 @@ describe('parseCapacitySharingTimestamp', () => {
   });
 
   it('should throw for unsupported value types', () => {
-    expect(() =>
-      parseCapacitySharingTimestamp(true, 'start_date'),
-    ).toThrow(BadRequestException);
+    expect(() => parseCapacitySharingTimestamp(true, 'start_date')).toThrow(
+      BadRequestException,
+    );
   });
 
   it('should parse ISO string with Z', () => {

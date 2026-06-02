@@ -9,13 +9,17 @@ export class TipIntegrationRepository {
   });
   constructor(private readonly dataSource: DataSource) {}
 
-  async allTipResultId(resultCodes: number[]): Promise<number[]> {
+  async allTipResultId(
+    resultCodes: number[],
+    year?: number,
+  ): Promise<number[]> {
     const resultCodesQuery = resultCodes.join(',');
     const query = `select GROUP_CONCAT(r.result_id) as ids
                     from results r 
                     where r.platform_code = 'TIP'
+                    ${year ? `and r.report_year_id = ?` : ''}
                     AND r.result_official_code not in (${resultCodesQuery})`;
-    const result = await this.dataSource.query(query);
+    const result = await this.dataSource.query(query, year ? [year] : []);
     return result[0]?.ids?.split(',') ?? [];
   }
 
