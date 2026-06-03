@@ -66,8 +66,19 @@ describe('AppConfigService', () => {
 
   describe('getAllConfigs', () => {
     it('should delegate to AppConfigRepository.findAll', async () => {
-      const rows = [{ key: 'k1' }] as AppConfig[];
-      mockAppConfigRepository.findAll.mockResolvedValue(rows);
+      const payload = {
+        data: [{ key: 'k1' }] as AppConfig[],
+        pagination: {
+          total: 1,
+          page: 1,
+          limit: 20,
+          pageSize: 1,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
+      mockAppConfigRepository.findAll.mockResolvedValue(payload);
 
       const result = await service.getAllConfigs(
         { category: 'EMAIL' },
@@ -82,7 +93,7 @@ describe('AppConfigService', () => {
         { page: 1, limit: 20 },
         'test',
       );
-      expect(result).toBe(rows);
+      expect(result).toBe(payload);
     });
 
     it('should default sorting to empty object when omitted', async () => {

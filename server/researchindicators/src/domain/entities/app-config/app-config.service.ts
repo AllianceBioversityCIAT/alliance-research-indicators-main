@@ -7,7 +7,10 @@ import {
   SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { UpdateAppConfigDto } from './dtos/update-app-config.dto';
-import { AppConfigRepository } from './repositories/app-config.repository';
+import {
+  AppConfigFindAllResult,
+  AppConfigRepository,
+} from './repositories/app-config.repository';
 import { AppConfigSorting } from './enum/app-config-forting.enum';
 
 @Injectable()
@@ -54,7 +57,7 @@ export class AppConfigService {
     sorting?: { field?: AppConfigSorting; order?: 'ASC' | 'DESC' },
     pagination?: { page?: number; limit?: number },
     search?: string,
-  ): Promise<AppConfig[]> {
+  ): Promise<AppConfigFindAllResult> {
     return this.appConfigRepository.findAll(
       filters,
       sorting ?? {},

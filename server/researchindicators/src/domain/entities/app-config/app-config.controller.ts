@@ -58,13 +58,14 @@ export class AppConfigController {
     name: 'page',
     required: false,
     type: Number,
-    description: 'Page number (1-based)',
+    description: 'Page number (1-based). Only applies when limit is set.',
   })
   @ApiQuery({
     name: 'limit',
     required: false,
     type: Number,
-    description: 'Maximum number of items per page',
+    description:
+      'Maximum number of items per page. When omitted, all matching rows are returned.',
   })
   @ApiQuery({
     name: 'sort-field',
@@ -90,14 +91,18 @@ export class AppConfigController {
     @Query('sort-order', new DefaultValuePipe('ASC'))
     sortOrder?: 'ASC' | 'DESC',
   ) {
-    const pageNumber = page ? Number(page) : undefined;
     const limitNumber = limit ? Number(limit) : undefined;
+    const hasValidLimit =
+      limitNumber !== undefined &&
+      !Number.isNaN(limitNumber) &&
+      limitNumber > 0;
+    const pageNumber = hasValidLimit && page ? Number(page) : undefined;
 
     return this.appConfigService
       .getAllConfigs(
         { category, subcategory },
         { field: sortField, order: sortOrder },
-        { page: pageNumber, limit: limitNumber },
+        hasValidLimit ? { page: pageNumber, limit: limitNumber } : undefined,
         search,
       )
       .then((data) =>

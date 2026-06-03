@@ -6,6 +6,17 @@ describe('AppConfigRepository', () => {
   let repository: AppConfigRepository;
   const query = jest.fn();
 
+  const paginationMeta = (overrides: Record<string, unknown> = {}) => ({
+    total: 0,
+    page: 1,
+    limit: 0,
+    pageSize: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+    ...overrides,
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     const dataSource = {
@@ -16,44 +27,95 @@ describe('AppConfigRepository', () => {
   });
 
   describe('findAll', () => {
-    it('should list active configs with sort and no search params', async () => {
+    it('should list active configs with sort and pagination metadata', async () => {
       const rows = [{ key: 'k1' }];
-      query.mockResolvedValue(rows);
+      query.mockResolvedValueOnce(rows);
 
       const result = await repository.findAll(
         {},
         { field: AppConfigSorting.KEY, order: 'ASC' },
       );
 
+      expect(query).toHaveBeenCalledTimes(1);
       const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).not.toContain('SELECT COUNT(*)');
       expect(sql).not.toContain('_search_relevance');
       expect(sql).toContain('WHERE ac.is_active = TRUE');
       expect(sql).toContain('ORDER BY ac.`key` ASC');
+      expect(sql).not.toContain('LIMIT');
       expect(params).toEqual([]);
-      expect(result).toBe(rows);
+      expect(result).toEqual({
+        data: rows,
+        pagination: paginationMeta({
+          total: 1,
+          limit: 1,
+          pageSize: 1,
+          totalPages: 1,
+        }),
+      });
     });
 
-    it('should apply filters and pagination', async () => {
-      query.mockResolvedValue([]);
+    it('should return all rows when limit is not provided', async () => {
+      const rows = [{ key: 'k1' }, { key: 'k2' }];
+      query.mockResolvedValueOnce(rows);
 
-      await repository.findAll(
+      const result = await repository.findAll({}, {}, { page: 3 });
+
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql] = query.mock.calls[0] as [string, unknown[]];
+      expect(sql).not.toContain('LIMIT');
+      expect(sql).not.toContain('SELECT COUNT(*)');
+      expect(result.pagination).toEqual(
+        paginationMeta({
+          total: 2,
+          page: 1,
+          limit: 2,
+          pageSize: 2,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        }),
+      );
+    });
+
+    it('should apply filters and pagination when limit is set', async () => {
+      query.mockResolvedValueOnce([{ total: 12 }]).mockResolvedValueOnce([]);
+
+      const result = await repository.findAll(
         { category: 'EMAIL', subcategory: 'READINESS_LEVEL_7' },
         { field: AppConfigSorting.CATEGORY, order: 'DESC' },
         { page: 2, limit: 5 },
       );
 
-      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain('ac.category = ?');
-      expect(sql).toContain('ac.subcategory = ?');
-      expect(sql).toContain('LIMIT 5 OFFSET 5');
+      const [countSql, countParams] = query.mock.calls[0] as [
+        string,
+        unknown[],
+      ];
+      const [sql, params] = query.mock.calls[1] as [string, unknown[]];
+      expect(countSql).toContain('ac.category = ?');
+      expect(countSql).toContain('ac.subcategory = ?');
+      expect(countParams).toEqual(['EMAIL', 'READINESS_LEVEL_7']);
+      expect(sql).toContain('LIMIT ? OFFSET ?');
       expect(sql).toContain('ORDER BY ac.category DESC');
-      expect(params).toEqual(['EMAIL', 'READINESS_LEVEL_7']);
+      expect(params).toEqual(['EMAIL', 'READINESS_LEVEL_7', 5, 5]);
+      expect(result.pagination).toEqual(
+        paginationMeta({
+          total: 12,
+          page: 2,
+          limit: 5,
+          totalPages: 3,
+          hasNextPage: true,
+          hasPreviousPage: true,
+        }),
+      );
     });
 
     it('should search with relevance, bind params in order, and strip score column', async () => {
-      query.mockResolvedValue([
-        { key: 'email.to', category: 'EMAIL', _search_relevance: 2000 },
-      ]);
+      query
+        .mockResolvedValueOnce([{ total: 1 }])
+        .mockResolvedValueOnce([
+          { key: 'email.to', category: 'EMAIL', _search_relevance: 2000 },
+        ]);
 
       const result = await repository.findAll(
         { category: 'EMAIL' },
@@ -62,35 +124,48 @@ describe('AppConfigRepository', () => {
         '  email  ',
       );
 
-      const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+      const [sql, params] = query.mock.calls[1] as [string, unknown[]];
       expect(sql).toContain('_search_relevance');
       expect(sql).toContain('ORDER BY _search_relevance DESC, ac.`key` ASC');
-      expect(sql).toContain('LIMIT 20 OFFSET 0');
+      expect(sql).toContain('LIMIT ? OFFSET ?');
       expect(params).toEqual([
         ...Array(9).fill('email'),
         'EMAIL',
         ...Array(7).fill('email'),
+        20,
+        0,
       ]);
-      expect(result).toEqual([{ key: 'email.to', category: 'EMAIL' }]);
+      expect(result).toEqual({
+        data: [{ key: 'email.to', category: 'EMAIL' }],
+        pagination: paginationMeta({
+          total: 1,
+          limit: 20,
+          pageSize: 1,
+          totalPages: 1,
+        }),
+      });
     });
 
     it('should order by relevance only when search is set and sort field is missing', async () => {
-      query.mockResolvedValue([{ key: 'k' }]);
+      query.mockResolvedValueOnce([]);
 
       await repository.findAll({}, {}, undefined, 'term');
 
+      expect(query).toHaveBeenCalledTimes(1);
       const [sql] = query.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain('ORDER BY _search_relevance DESC');
       expect(sql).not.toContain('ORDER BY _search_relevance DESC,');
     });
 
     it('should ignore blank search', async () => {
-      query.mockResolvedValue([]);
+      query.mockResolvedValueOnce([]);
 
       await repository.findAll({}, {}, undefined, '   ');
 
+      expect(query).toHaveBeenCalledTimes(1);
       const [sql, params] = query.mock.calls[0] as [string, unknown[]];
       expect(sql).not.toContain('_search_relevance');
+      expect(sql).not.toContain('SELECT COUNT(*)');
       expect(params).toEqual([]);
     });
   });
