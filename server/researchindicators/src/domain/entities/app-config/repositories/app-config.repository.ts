@@ -91,15 +91,54 @@ export class AppConfigRepository extends Repository<AppConfig> {
     return `ORDER BY ${fieldMap[sorting.field]} ${direction}`;
   }
 
-  private getPaginationQuery(pagination?: {
-    page?: number;
-    limit?: number;
-  }): string {
-    if (!pagination?.page || !pagination?.limit) return '';
+  private resolvePagination(pagination?: { page?: number; limit?: number }): {
+    page: number;
+    limit: number | null;
+    applyLimit: boolean;
+    offset: number;
+  } {
+    const hasLimit =
+      pagination?.limit !== undefined &&
+      pagination?.limit !== null &&
+      Number(pagination.limit) > 0;
     const page = !pagination?.page || pagination.page < 1 ? 1 : pagination.page;
-    const limit = !pagination?.limit ? 100 : pagination.limit;
-    const offset = (page - 1) * limit;
-    return `LIMIT ${limit} OFFSET ${offset}`;
+
+    if (!hasLimit) {
+      return { page: 1, limit: null, applyLimit: false, offset: 0 };
+    }
+
+    const limit = Number(pagination.limit);
+    return {
+      page,
+      limit,
+      applyLimit: true,
+      offset: (page - 1) * limit,
+    };
+  }
+
+  private buildFindAllFromAndWhere(
+    filtersQuery: string,
+    searchWhereFragment: string,
+  ): string {
+    return `FROM app_config ac 
+                        LEFT JOIN sec_users su ON su.sec_user_id = ac.updated_by 
+                        WHERE ac.is_active = TRUE
+                        ${filtersQuery}
+                        ${searchWhereFragment}`;
+  }
+
+  private mapFindAllRows(
+    rawData: Record<string, unknown>[],
+    hasSearch: boolean,
+  ): AppConfig[] {
+    if (!hasSearch) {
+      return rawData as unknown as AppConfig[];
+    }
+
+    return rawData.map((row) => {
+      const { _search_relevance: _r, ...rest } = row;
+      return rest as unknown as AppConfig;
+    });
   }
 
   async findAll(
@@ -107,14 +146,15 @@ export class AppConfigRepository extends Repository<AppConfig> {
     sorting: { field?: AppConfigSorting; order?: 'ASC' | 'DESC' },
     pagination?: { page?: number; limit?: number },
     search?: string,
-  ): Promise<AppConfig[]> {
+  ): Promise<AppConfigFindAllResult> {
     const trimmedSearch = search?.trim() ?? '';
     const hasSearch = trimmedSearch.length > 0;
 
     const { fragment: filtersQuery, params: filterParams } =
       this.getFiltersQuery(filters);
     const sortingQuery = this.getSortingQuery(sorting, hasSearch);
-    const paginationQuery = this.getPaginationQuery(pagination);
+    const { page, limit, applyLimit, offset } =
+      this.resolvePagination(pagination);
 
     const searchWhereFragment = hasSearch
       ? this.buildFindAppConfigSearchWhereFragment()
@@ -134,6 +174,12 @@ export class AppConfigRepository extends Repository<AppConfig> {
         ).fill(trimmedSearch)
       : [];
 
+    const fromAndWhere = this.buildFindAllFromAndWhere(
+      filtersQuery,
+      searchWhereFragment,
+    );
+
+    const paginationClause = applyLimit ? 'LIMIT ? OFFSET ?' : '';
     const query = `SELECT 
                             ac.\`key\`,
                             ac.category,
@@ -144,30 +190,49 @@ export class AppConfigRepository extends Repository<AppConfig> {
                             ac.updated_at,
                             IF(su.sec_user_id IS NULL, NULL, CONCAT_WS('', su.first_name, ' ', su.last_name)) updated_by
                             ${relevanceFragment}
-                        FROM app_config ac 
-                        LEFT JOIN sec_users su ON su.sec_user_id = ac.updated_by 
-                        WHERE ac.is_active = TRUE
-                        ${filtersQuery}
-                        ${searchWhereFragment}
+                        ${fromAndWhere}
                         ${sortingQuery}
-                        ${paginationQuery}`;
+                        ${paginationClause}`;
 
     const queryParams = [
       ...relevanceParams,
       ...filterParams,
       ...searchWhereParams,
+      ...(applyLimit ? [limit, offset] : []),
     ];
 
-    const rawData = await this.query(query, queryParams);
-
-    if (!hasSearch) {
-      return rawData;
+    let total: number;
+    if (applyLimit) {
+      const countQuery = `SELECT COUNT(*) AS total ${fromAndWhere}`;
+      const countParams = [...filterParams, ...searchWhereParams];
+      const totalResult = await this.query(countQuery, countParams);
+      total = Number(totalResult?.[0]?.total ?? 0);
     }
 
-    return rawData.map((row: Record<string, unknown>) => {
-      const { _search_relevance: _r, ...rest } = row;
-      return rest as unknown as AppConfig;
-    });
+    const rawData = await this.query(query, queryParams);
+    const data = this.mapFindAllRows(rawData, hasSearch);
+
+    if (!applyLimit) {
+      total = data.length;
+    }
+
+    const effectiveLimit = applyLimit ? limit : total;
+    const totalPages =
+      effectiveLimit > 0 ? Math.ceil(total / effectiveLimit) : 0;
+    const responsePage = applyLimit ? page : 1;
+
+    return {
+      data,
+      pagination: {
+        total,
+        page: responsePage,
+        limit: effectiveLimit,
+        pageSize: data.length,
+        totalPages,
+        hasNextPage: applyLimit && responsePage < totalPages,
+        hasPreviousPage: applyLimit && responsePage > 1,
+      },
+    };
   }
 
   async findAllCategoriesAndSubcategories(): Promise<{
@@ -189,4 +254,19 @@ export class AppConfigRepository extends Repository<AppConfig> {
       ),
     };
   }
+}
+
+export interface AppConfigFindAllPagination {
+  total: number;
+  page: number;
+  limit: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface AppConfigFindAllResult {
+  data: AppConfig[];
+  pagination: AppConfigFindAllPagination;
 }
