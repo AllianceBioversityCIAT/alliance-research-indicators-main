@@ -11,6 +11,7 @@ describe('AppConfigController', () => {
   let controller: AppConfigController;
   const mockService = {
     findConfigByKey: jest.fn(),
+    getAllConfigs: jest.fn(),
     updateConfig: jest.fn(),
   };
   const mockFormat = jest.fn();
@@ -30,6 +31,34 @@ describe('AppConfigController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('getAllConfigs', async () => {
+    const rows = [{ key: 'a' }];
+    mockService.getAllConfigs.mockResolvedValue(rows);
+    mockFormat.mockReturnValue({});
+
+    await controller.getAllConfigs(
+      'email',
+      'EMAIL',
+      'READINESS_LEVEL_7',
+      '2',
+      '10',
+      'key' as any,
+      'DESC',
+    );
+
+    expect(mockService.getAllConfigs).toHaveBeenCalledWith(
+      { category: 'EMAIL', subcategory: 'READINESS_LEVEL_7' },
+      { field: 'key', order: 'DESC' },
+      { page: 2, limit: 10 },
+      'email',
+    );
+    expect(ResponseUtils.format).toHaveBeenCalledWith({
+      data: rows,
+      description: 'Configurations retrieved successfully',
+      status: HttpStatus.OK,
+    });
   });
 
   it('getConfigByKey', async () => {
