@@ -136,7 +136,8 @@ export class StarResultsExportRepository {
         CONCAT_WS(CHAR(10), oc.quantifications, oc.extrapolated_estimates) AS quantification,
         oc.authors_contact_persons AS authors_contact_persons,
         oc.for_external_use AS for_external_use,
-        oc.for_external_use_description AS for_external_use_description
+        oc.for_external_use_description AS for_external_use_description,
+        oc.existing_oicr AS existing_oicr
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id
