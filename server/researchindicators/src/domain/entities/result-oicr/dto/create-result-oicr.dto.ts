@@ -29,4 +29,6 @@ export class CreateResultOicrDto {
   base_information: CreateResultDto;
   @ApiProperty({ type: ExtraInfoDto, required: false })
   extra_info?: ExtraInfoDto;
+  @ApiProperty({ type: String, required: false })
+  cgspace_link?: string;
 }
