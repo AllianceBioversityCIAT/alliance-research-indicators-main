@@ -139,6 +139,7 @@ export class StarResultsExportRepository {
         oc.for_external_use AS for_external_use,
         oc.for_external_use_description AS for_external_use_description,
         oc.existing_oicr AS existing_oicr,
+        oc.cgspace_link AS cgspace_link,
         lkr.link_results AS link_results
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id

@@ -112,6 +112,7 @@ describe('StarResultsExportRepository', () => {
       'LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id',
     );
     expect(sql).toContain('oc.impact_area AS impact_area');
+    expect(sql).toContain('oc.cgspace_link AS cgspace_link');
     expect(sql).toContain('oc.for_external_use AS for_external_use');
     expect(sql).toContain(
       'oc.for_external_use_description AS for_external_use_description',

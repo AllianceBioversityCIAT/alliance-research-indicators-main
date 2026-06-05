@@ -1,7 +1,7 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
 
 /**
- * Raw data sheet columns A–BT (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–BU (reference workbook "Raw data" header row).
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'result_code', header: 'Result Code', width: 14 },
@@ -209,6 +209,20 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'oicr_internal_code', header: 'OICR No', width: 20 },
   { key: 'tagging', header: 'Tagging', width: 28 },
   { key: 'existing_oicr', header: 'Existing OICR', width: 36 },
+  {
+    key: 'cgspace_link',
+    header: 'CGSpace link',
+    width: 40,
+    hyperlink: {
+      urlField: 'cgspace_link',
+      displayField: 'cgspace_link',
+      emptyDisplay: 'Not available',
+      linkAppearance: {
+        colorArgb: 'FF0563C1',
+        underline: true,
+      },
+    },
+  },
   { key: 'maturity_level', header: 'Maturity of change', width: 28 },
   {
     key: 'outcome_impact_statement',
