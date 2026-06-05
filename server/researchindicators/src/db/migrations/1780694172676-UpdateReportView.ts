@@ -84,9 +84,34 @@ export class UpdateReportView1780694172676 implements MigrationInterface {
             WHERE root.is_active = TRUE
                 AND root.is_snapshot = FALSE
             ORDER BY root.result_id ASC; `);
+
+        await queryRunner.query(`CREATE OR REPLACE VIEW report_link_result AS
+SELECT 
+	root.result_id,
+	report_field(GROUP_CONCAT(CONCAT('', '• [',i.name ,'] ', r.result_official_code, ' - ', r.title ) SEPARATOR '\n'), FALSE, NULL) link_results
+FROM results root
+	LEFT JOIN link_results lr ON lr.result_id = root.result_id 
+		AND lr.link_result_role_id = 4
+	LEFT JOIN results r ON r.result_id = lr.other_result_id 
+	LEFT JOIN indicators i ON i.indicator_id = r.indicator_id 
+WHERE root.is_active
+	AND NOT root.is_snapshot
+GROUP BY root.result_id;`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE OR REPLACE VIEW report_link_result AS
+SELECT 
+	root.result_id,
+	report_field(GROUP_CONCAT(CONCAT('', '• [',i.name ,']', r.result_official_code, ' - ', r.title ) SEPARATOR '\n'), FALSE, NULL) link_results
+FROM results root
+	LEFT JOIN link_results lr ON lr.result_id = root.result_id 
+		AND lr.link_result_role_id = 4
+	LEFT JOIN results r ON r.result_id = lr.other_result_id 
+	LEFT JOIN indicators i ON i.indicator_id = r.indicator_id 
+WHERE root.is_active
+	AND NOT root.is_snapshot
+GROUP BY root.result_id;`);
         await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
             SELECT
                 root.result_id,
