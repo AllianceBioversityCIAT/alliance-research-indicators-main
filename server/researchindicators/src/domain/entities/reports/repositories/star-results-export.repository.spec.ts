@@ -117,6 +117,10 @@ describe('StarResultsExportRepository', () => {
       'oc.for_external_use_description AS for_external_use_description',
     );
     expect(sql).toContain(') AS quantification');
+    expect(sql).toContain(
+      'LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id',
+    );
+    expect(sql).toContain('lkr.link_results AS link_results');
     expect(params).toEqual([10, 20, 10, 20]);
   });
 

@@ -33,7 +33,8 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  *
  * Requires MySQL views: report_general_information, report_alliance_alignment,
  * report_partners, report_geo_location, report_evidences, report_ip_rights,
- * report_capacity_sharing_development, report_policy_change, report_oicr.
+ * report_capacity_sharing_development, report_policy_change, report_oicr,
+ * report_link_result.
  */
 @Injectable()
 export class StarResultsExportRepository {
@@ -137,7 +138,8 @@ export class StarResultsExportRepository {
         oc.authors_contact_persons AS authors_contact_persons,
         oc.for_external_use AS for_external_use,
         oc.for_external_use_description AS for_external_use_description,
-        oc.existing_oicr AS existing_oicr
+        oc.existing_oicr AS existing_oicr,
+        lkr.link_results AS link_results
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id
@@ -146,7 +148,8 @@ export class StarResultsExportRepository {
       LEFT JOIN report_ip_rights ip ON ip.result_id = gi.result_id
       LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id
       LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id
-      LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id`;
+      LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id
+      LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id`;
 
     const v2Filters = this.mapReportDtoToFindResultsV2Filters(filters);
     const search = filters.filters.search ?? '';
