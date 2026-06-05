@@ -207,7 +207,7 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   },
   { key: 'oicr_internal_code', header: 'OICR No', width: 20 },
   { key: 'tagging', header: 'Tagging', width: 28 },
-  { key: 'general_comment', header: 'Existing OICR', width: 36 },
+  { key: 'existing_oicr', header: 'Existing OICR', width: 36 },
   { key: 'maturity_level', header: 'Maturity of change', width: 28 },
   {
     key: 'outcome_impact_statement',

@@ -613,8 +613,10 @@ describe('ResultOicrService', () => {
         title: 'Test',
         description: 'Test Description',
       });
+      const cgspaceLink = 'https://cgspace.cgiar.org/handle/10568/12345';
       mockResultOicrRepository.findOne.mockResolvedValue({
         general_comment: 'Test comment',
+        cgspace_link: cgspaceLink,
       } as any);
 
       // Act
@@ -625,8 +627,14 @@ describe('ResultOicrService', () => {
       expect((service as any).findStepTwoOicr).toHaveBeenCalledWith(resultId);
       expect(mockResultsService.findGeoLocation).toHaveBeenCalledWith(resultId);
       expect(mockResultsService.findBaseInfo).toHaveBeenCalledWith(resultId);
+      expect(mockResultOicrRepository.findOne).toHaveBeenCalledWith({
+        where: { result_id: resultId },
+        select: { general_comment: true, cgspace_link: true },
+      });
       expect(result.step_one).toEqual(stepOneResult);
       expect(result.step_two).toEqual(stepTwoResult);
+      expect(result.cgspace_link).toBe(cgspaceLink);
+      expect(result.step_four).toEqual({ general_comment: 'Test comment' });
     });
 
     it('should handle errors when finding modal data', async () => {

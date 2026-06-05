@@ -11,6 +11,13 @@ export class CreateResultEvidenceDto {
   })
   evidence: ResultEvidence[];
 
+  @ApiProperty({
+    type: String,
+    required: false,
+    description: 'CGSpace link',
+  })
+  cgspace_link?: string;
+
   @ApiProperty({ type: [ResultNotableReference] })
   notable_references?: ResultNotableReference[];
 }
