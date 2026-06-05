@@ -7,6 +7,7 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 jest.mock('../../shared/utils/response.utils');
 
@@ -34,7 +35,10 @@ describe('LinkResultsController', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(ResultStatusGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
     controller = module.get(LinkResultsController);
   });
 
