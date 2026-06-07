@@ -155,10 +155,17 @@ server/researchindicators/src/
 │
 ├── domain/tools/prms-toc/                                      # NEW TOOL (T-15.12)
 │   ├── prms-toc.module.ts
-│   ├── prms-toc.service.ts                                    # thin HTTP client + 5-min cache
+│   ├── prms-toc.service.ts                                    # thin HTTP client + 5-min cache (404 = empty payload)
 │   ├── prms-toc.service.spec.ts
 │   └── dto/
 │       └── prms-toc.types.ts
+│
+├── domain/tools/clarisa/cgiar-entities/                        # NEW TOOL (T-15.12-rev) — SP→AOW catalog
+│   ├── clarisa-cgiar-entities.module.ts
+│   ├── clarisa-cgiar-entities.service.ts                      # GET /api/cgiar-entities?version=2 + 5-min cache
+│   ├── clarisa-cgiar-entities.service.spec.ts
+│   └── dto/
+│       └── clarisa-cgiar-entity.types.ts
 │
 └── admin/                                                       # NEW PAGE (T-15.15)
     ├── controllers/admin.controller.ts                        # MODIFIED — add /admin/bilateral-project-mappings handler
@@ -243,30 +250,36 @@ type BilateralSciencePrograms = {
 - **Errors:** `404` if result not found; `200` with empty list if unmapped (per R-BIL-076 scenarios).
 - **Swagger:** `@ApiTags('Bilateral')`, `@ApiOperation('Get Science Programs linked to the result\'s bilateral project')`, `@ApiOkResponse({type: BilateralSciencePrograms})`.
 
-### 6.2 `GET /api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=...` (R-BIL-077, NEW)
+### 6.2 `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators` (R-BIL-077, NEW)
 
-- **Query params:**
-  - `sp_codes` — comma-separated list (e.g. `SP09,SP10`).
-- **Response data shape:**
+> Shipped shape (T-15.12) + AOW source revision (T-15.12-rev / D-PI-14). The FE
+> passes **no** params: the backend takes the Science Program from the mapped
+> CLARISA project and each SP's Areas of Work from the `cgiar-entities` catalog,
+> then fans out one PRMS call per `(program, areaOfWork)` pair.
+
+- **Query params:** none.
+- **Response data shape:** `BilateralHlosIndicatorsResponse` (see `bilateral-hlos-indicators.response.dto.ts`):
 
 ```ts
-type BilateralHlosByScienceProgram = Array<{
-  sp_code: string;
-  sp_name: string;
-  hlos: Array<{
-    id: number;
-    code: string;
-    title: string;
-    indicators: Array<{
-      id: number;
-      code: string;
-      name: string;
-    }>;
+interface BilateralHlosIndicatorsResponse {
+  result_code: string;
+  mapping_status: 'mapped' | 'unmapped';
+  aow_status: 'unmapped' | 'no_aow_mappings' | 'has_aow';
+  clarisa_project: { id: number; short_name: string } | null;
+  pairs: Array<{
+    program: string; // SP code, e.g. "SP02"
+    area_of_work: string; // AOW code, e.g. "AOW03"
+    composite_code: string; // "SP02-AOW03" — mirrors PRMS upstream
+    outcomes: PrmsTocResult[];
+    outputs: PrmsTocResult[];
+    metadata: { total: number; outcomes: number; outputs: number };
   }>;
-}>;
+}
 ```
 
-- **Errors:** `503` if PRMS ToC integration is not yet configured (OQ-RV-2 open) OR upstream unreachable with cold cache; `200` with `[]` if `sp_codes` is empty/omitted.
+- **AOW source (D-PI-14):** Areas of Work come from `GET /api/cgiar-entities?version=2` (`ClarisaCgiarEntitiesService`), keyed to their parent SP by **code** — NOT from the project's `project_mappings_array[]` (those all share global `parent_id` 267 and are unusable). Pairs PRMS returns **404** for are treated as data-absence and dropped from `pairs[]`.
+- **Always `200`** — empty states are driven by `aow_status`, not HTTP status. `no_aow_mappings` means "nothing to show": no Confirmed SP in the active portfolio, no catalog AOWs for those SPs, OR PRMS has ToC data for none of the derived pairs.
+- **Errors:** `503` only if `ARI_PRMS_TOC_HOST` is unset OR PRMS is unreachable with a cold cache (a real outage, not a per-pair 404).
 
 ### 6.3 `GET /api/bilateral-project-mappings` (R-BIL-080, NEW)
 
@@ -364,19 +377,19 @@ export class ClarisaProjectsService {
 - On upstream error with warm cache: serve cache, log warning.
 - On upstream error with cold cache: throw `ServiceUnavailableException` (translates to 503 envelope).
 
-### 7.3 `PrmsTocService` (T-15.12)
+### 7.3 `PrmsTocService` + `ClarisaCgiarEntitiesService` (T-15.12, T-15.12-rev)
 
-Same cache pattern as `ClarisaProjectsService`. Keyed by sorted comma-joined SP codes.
+`PrmsTocService` — same cache pattern as `ClarisaProjectsService`, keyed per `compositeCode` (`<SP>-<AOW>`, e.g. `SP02-AOW03`). `getTocResults(program, areaOfWork)` returns the inner `response` payload; `getTocResultsForPairs(pairs)` fans out in input order. A PRMS **404** ("No work packages found") resolves to a cached **empty payload** (data-absence), NOT a 503 — only `ARI_PRMS_TOC_HOST` missing or a real upstream failure with cold cache throws `ServiceUnavailableException`.
 
-Until OQ-RV-2 closes: implementation throws `ServiceUnavailableException` with `description = "PRMS ToC integration not yet configured"`. Tests verify the 503 path.
+`ClarisaCgiarEntitiesService` (T-15.12-rev / D-PI-14) — live-fetches `GET /api/cgiar-entities?version=2` with the same 5-min TTL + stale-on-error pattern. `getAreasOfWorkBySp(spCodes)` returns each requested SP's active Areas of Work (level-2 "Key Area of Work" entries whose `parent.code` matches), the canonical SP→AOW relation the HLO panel pairs against.
 
 ### 7.4 `BilateralService` extensions (T-15.1, T-15.2, T-15.11)
 
 New methods:
 
 ```ts
-async getScienceProgramsForResult(resultId: number, resultCode: string): Promise<BilateralSciencePrograms>;
-async getHlosByScienceProgramsForResult(resultId: number, resultCode: string, spCodes: string[]): Promise<BilateralHlosByScienceProgram>;
+async getScienceProgramsForResult(resultId: number, resultCode: string): Promise<BilateralScienceProgramsResponse>;
+async getHlosIndicatorsForResult(resultId: number, resultCode: string): Promise<BilateralHlosIndicatorsResponse>;
 ```
 
 - `getScienceProgramsForResult` chain:
@@ -385,6 +398,12 @@ async getHlosByScienceProgramsForResult(resultId: number, resultCode: string, sp
   3. If null: return `{ ..., mapping_status: "unmapped", science_programs: [], clarisa_project: null }`.
   4. Else: `clarisaProjectsService.findProjectById(mapping.clarisa_project_id)`, filter `project_mappings_array` (`status="Confirmed"`, `portfolio.acronym=activePortfolio`), map each entry, enrich with catalog fallback.
 
+- `getHlosIndicatorsForResult` chain (T-15.12 + T-15.12-rev / D-PI-14):
+  1. Same context → mapping → `clarisaProjectsService.findProjectById` walk as the SP picker (unmapped / project-gone short-circuits return `aow_status: "unmapped"`).
+  2. `deriveScienceProgramCodes(project)` — Confirmed, level-1, prefix `"SP"`, active-portfolio SP codes (deduped, sorted).
+  3. `clarisaCgiarEntitiesService.getAreasOfWorkBySp(spCodes)` → AOWs per SP from the catalog; build one `(program, areaOfWork)` pair per SP × AOW. No pairs → `aow_status: "no_aow_mappings"`.
+  4. `prmsTocService.getTocResultsForPairs(pairs)` (parallel, cached); keep only pairs with `total > 0`. None populated → `aow_status: "no_aow_mappings"`; else `has_aow` with `pairs[]`.
+
 - `normalizeLeverCodes` extension (T-15.1) reuses `getScienceProgramsForResult` to compute the catalog set for validation.
 
 - `getAlignment` + write methods enforce R-BIL-071 source gate BEFORE role/owner checks via a private `assertPrmsSourceWritable(context)` helper.
@@ -392,8 +411,8 @@ async getHlosByScienceProgramsForResult(resultId: number, resultCode: string, sp
 ### 7.5 Module wiring
 
 - `BilateralProjectMappingModule` exports the service so `BilateralModule` can inject it.
-- `BilateralModule` imports `BilateralProjectMappingModule`, `ClarisaProjectsModule` (new), `PrmsTocModule` (new).
-- All four new providers are **singleton** (no `CurrentUserUtil` / `ResultsUtil` injection) per parent §3.4 Constraint A.
+- `BilateralModule` imports `BilateralProjectMappingModule`, `ClarisaProjectsModule` (new), `ClarisaCgiarEntitiesModule` (new, T-15.12-rev), `PrmsTocModule` (new).
+- All new providers are **singleton** (no `CurrentUserUtil` / `ResultsUtil` injection) per parent §3.4 Constraint A.
 
 ---
 

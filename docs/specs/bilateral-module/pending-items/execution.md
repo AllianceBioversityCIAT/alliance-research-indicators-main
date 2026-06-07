@@ -521,9 +521,10 @@
   - `server/researchindicators/.env.example` (documents `ARI_PRMS_TOC_HOST`)
 - **PRMS endpoint observed (2026-05-27):** `GET https://prtest-back.ciat.cgiar.org/api/public-results-framework/toc-results?program=<SP>&areaOfWork=<AOW>` returns `{ response: { compositeCode, year, tocResultsOutcomes[], tocResultsOutputs[], metadata }, statusCode, message, ... }`. Both query params are REQUIRED — omitting `areaOfWork` returns 400. No auth header observed for the test host.
 - **Key discovery — AOW resolution path:** AOW is NOT exposed at the CLARISA project level. It IS exposed inside `project_mappings_array[]` as level-2 entries (`global_unit_type_id === 26`, `cgiar_entity_type_object.prefix === "AOW"`), whose `parent_id` points back to the level-1 SP entry's `id`. Live probe (2026-05-27): 3 of 31 Bilateral projects in TEST have AOW-level mappings; the rest are SP-only.
+  - **⚠️ SUPERSEDED 2026-05-28 — see T-15.12-rev / D-PI-14 below.** This in-project resolution does not work in practice: every AOW entry across the whole CLARISA catalog points at the same global `parent_id` (267 = SP01), so it resolves only when the same project also carries that exact SP id. Across all 299 production projects this yielded exactly **one** distinct pair (`SP01-AOW06`), which PRMS test has no ToC data for. AOW is now sourced from the `cgiar-entities` catalog instead.
 - **Decisions made:**
-  - **D-PI-13 — AOW derivation from CLARISA, not FE-supplied** (operator-approved 2026-05-27): The endpoint takes no extra params; the backend derives (program = parent-SP smo_code, areaOfWork = AOW smo_code) pairs from the mapped CLARISA project. Rationale: CLARISA already carries the data; PRMS doesn't expose a `/aow-by-program` listing; pushing AOW knowledge onto the FE creates a contract gap we'd have to close again later.
-  - **`aow_status` is a first-class response field** with three valid states: `unmapped` (no bilateral_project_mapping), `no_aow_mappings` (mapped but CLARISA project carries only SP entries — PRMS cannot answer), `has_aow` (≥ 1 pair fanned out). Lets the FE render distinct empty-state affordances without inferring from the empty `pairs[]`.
+  - **D-PI-13 — AOW derivation from CLARISA, not FE-supplied** (operator-approved 2026-05-27): The endpoint takes no extra params; the backend derives (program = parent-SP smo_code, areaOfWork = AOW smo_code) pairs from the mapped CLARISA project. Rationale: CLARISA already carries the data; PRMS doesn't expose a `/aow-by-program` listing; pushing AOW knowledge onto the FE creates a contract gap we'd have to close again later. **⚠️ The "AOW from CLARISA, not FE-supplied" principle still holds; the _mechanism_ (project `project_mappings_array[]` level-2 entries) is SUPERSEDED by D-PI-14 — AOW now comes from the `cgiar-entities` catalog keyed by SP code.**
+  - **`aow_status` is a first-class response field** with three valid states: `unmapped` (no bilateral_project_mapping), `no_aow_mappings` (mapped but nothing to show), `has_aow` (≥ 1 populated pair). Lets the FE render distinct empty-state affordances without inferring from the empty `pairs[]`. **(D-PI-14 widened `no_aow_mappings` to also cover "PRMS has no ToC data for any derived pair".)**
   - **5-min TTL cache keyed by `compositeCode`** matching `ClarisaProjectsService` pattern; same warm-on-error / cold-503 resilience.
   - **Service is singleton-scoped** (no `CurrentUserUtil` / `ResultsUtil`) per parent design §3.4 Constraint A.
   - **URL stays under `/pool-funding-alignment/`** (not the idealized `/bilateral/`) — matches Pivot Record #2 from T-15.11.
@@ -543,6 +544,39 @@
   - **503** from this endpoint means PRMS upstream is unreachable AND the cache is cold; retry after a short backoff.
 - **Status:** [x] completed — unblocks OQ-RV-2 (which is now closed in practice; PRMS team-supplied URL works).
 - **Commit:** `907993e7`
+
+---
+
+### [x] T-15.12-rev — AOW source switched to the `cgiar-entities` catalog
+
+- **Date:** 2026-05-28
+- **Requirements covered:** R-BIL-077 (HLOs/indicators source) — revises the AOW derivation mechanism shipped in T-15.12.
+- **Why (root cause):** The T-15.12 mechanism derived AOW from the mapped project's `project_mappings_array[]` level-2 entries, pairing each AOW with its parent SP via `parent_id` → SP `id` **within the same project**. Live re-probe of CLARISA production (2026-05-28) showed this is structurally broken:
+  - All **29** AOW entries in the entire CLARISA catalog reference the same global `parent_id = 267`, and `id 267 = SP01`. An AOW therefore resolves only when its project _also_ carries the SP with `id 267`.
+  - Across all **299** production projects (197 Bilateral), this produced exactly **one** distinct pair: `SP01-AOW06` (from 4 projects). PRMS test returns **404** for `SP01-AOW06`.
+  - PRMS test _does_ carry rich ToC data (e.g. `SP02-AOW03` = 4 outcomes / 4 outputs), but **no** project's `project_mappings_array` derives an `SP02-*` pair — so the panel could never populate end-to-end under the old mechanism.
+- **Fix:** Take the **Science Program from the project** (level-1 `project_mappings_array` entries, unchanged) but take the **Areas of Work from the canonical `GET /api/cgiar-entities?version=2` catalog**, where each level-2 "Key Area of Work" names its parent SP by **code** (`parent.code`, e.g. `"SP02"`) and echoes `compose_code` (`"SP02-AOW03"`). Each SP × its catalog AOWs is one `(program, areaOfWork)` pair. With this, project #22 (DESIRA, the project D527 maps to) carries SP02 + SP06 and the panel populates with **10 populated pairs**.
+- **Files added:**
+  - `server/researchindicators/src/domain/tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service.ts` (live-fetch + TTL cache + stale-on-error, mirrors `ClarisaProjectsService`)
+  - `…/cgiar-entities/clarisa-cgiar-entities.module.ts`
+  - `…/cgiar-entities/dto/clarisa-cgiar-entity.types.ts`
+  - `…/cgiar-entities/clarisa-cgiar-entities.service.spec.ts`
+- **Files modified:**
+  - `…/entities/bilateral/bilateral.service.ts` — `derivePairsFromProjectMappings` → `deriveScienceProgramCodes`; `getHlosIndicatorsForResult` now fetches AOWs from the catalog, fans out to PRMS, and **drops pairs PRMS has no ToC data for**.
+  - `…/tools/prms-toc/prms-toc.service.ts` — a PRMS **404 now resolves to an empty (cached) payload**, not a `ServiceUnavailableException`. Required because we enumerate every AOW of an SP and most have no ToC; without this the fan-out would 503 on the first miss. Real outages (5xx / network, cold cache) still 503.
+  - `…/entities/bilateral/bilateral.module.ts` — imports `ClarisaCgiarEntitiesModule`.
+  - `…/entities/bilateral/dto/bilateral-hlos-indicators.response.dto.ts` — doc comment + widened `no_aow_mappings` semantics.
+  - All focused bilateral specs + `prms-toc.service.spec.ts` (new 404 cases; new catalog provider mock).
+- **Decisions made:**
+  - **D-PI-14 — AOW sourced from the `cgiar-entities` catalog, keyed by SP code** (operator-approved 2026-05-28). Supersedes the _mechanism_ of D-PI-13 (project `project_mappings_array[]` level-2 entries); keeps its _principle_ (AOW is CLARISA-owned, not FE-supplied). Rationale: the project-embedded AOW data is unusable (global `parent_id`), and the catalog is the canonical SP→AOW relation. The endpoint contract (no FE params, always 200, `aow_status` + `pairs[]`) is unchanged.
+  - **PRMS 404 = data-absence, not outage.** Empty pairs are cached and dropped from `pairs[]`, so the panel only shows AOWs that actually carry HLOs.
+  - **`no_aow_mappings` widened** to mean "nothing to show": no Confirmed SP in the active portfolio, no catalog AOWs for those SPs, OR PRMS has ToC data for none of the derived pairs.
+- **Verification:**
+  - `npx jest` (bilateral + prms-toc + cgiar-entities) → **10 suites, 90 tests green**.
+  - `npx tsc --noEmit` → only the pre-existing supertest error in `test/app.e2e-spec.ts`; no errors in changed files.
+  - `npx eslint --fix` on touched files → clean.
+  - **Live end-to-end sim** (D527 → project #22 DESIRA → SP02+SP06 → catalog AOWs → PRMS): `aow_status: has_aow`, **10 populated pairs** (`SP02-AOW01..05`, `SP06-AOW01..05`). No remap required.
+- **Status:** [x] completed.
 
 ---
 

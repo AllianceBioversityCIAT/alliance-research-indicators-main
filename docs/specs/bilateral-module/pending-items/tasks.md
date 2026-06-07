@@ -308,21 +308,22 @@ graph TD
 - **Requirements covered:** R-BIL-077 + NFR-BIL-073
 - **Files touched (as built):**
   - `src/domain/tools/prms-toc/prms-toc.module.ts`
-  - `src/domain/tools/prms-toc/prms-toc.service.ts` — methods `getTocResults(program, areaOfWork)` + `getTocResultsForPairs(pairs)`. Cache key: composite `${program}-${areaOfWork}`; TTL 5 min; same warm-on-error / cold-503 pattern as `ClarisaProjectsService`.
+  - `src/domain/tools/prms-toc/prms-toc.service.ts` — methods `getTocResults(program, areaOfWork)` + `getTocResultsForPairs(pairs)`. Cache key: composite `${program}-${areaOfWork}`; TTL 5 min; same warm-on-error / cold-503 pattern as `ClarisaProjectsService`. (T-15.12-rev: a per-pair **404 now returns a cached empty payload**, not a 503 — we enumerate every AOW of an SP and most have no ToC.)
   - `src/domain/tools/prms-toc/prms-toc.service.spec.ts` — 13 tests covering happy path, cache hit, per-pair keying, whitespace trimming, missing-input 503, missing-host 503, warm-cache-on-error, cold-503, empty-payload guard, batch helper (order preservation + empty input).
   - `src/domain/tools/prms-toc/dto/prms-toc.types.ts` — TypeScript shapes matching the live upstream (envelope, payload, outcomes/outputs/indicators/targets-by-center).
   - `src/domain/entities/bilateral/bilateral.controller.ts` — new `@Get('hlos-indicators')` handler.
-  - `src/domain/entities/bilateral/bilateral.service.ts` — new `getHlosIndicatorsForResult(resultId, resultCode)` + private `derivePairsFromProjectMappings(project)` helper; new constructor dep on `PrmsTocService`.
+  - `src/domain/entities/bilateral/bilateral.service.ts` — new `getHlosIndicatorsForResult(resultId, resultCode)`; constructor deps on `PrmsTocService` + `ClarisaCgiarEntitiesService`. (T-15.12-rev: the private `derivePairsFromProjectMappings(project)` helper was replaced by `deriveScienceProgramCodes(project)` — see revision note below.)
   - `src/domain/entities/bilateral/dto/bilateral-hlos-indicators.response.dto.ts` — response shape with `aow_status` discriminator.
   - `src/domain/shared/utils/env.utils.ts` — new `PRMS_TOC_HOST` getter (no `PRMS_TOC_AUTH` — test endpoint has no auth).
   - `src/domain/tools/clarisa/projects/dto/clarisa-project.types.ts` — surfaces `parent_id` on `ClarisaGlobalUnit`; documents `prefix` semantics on `ClarisaCgiarEntityType`.
-  - `src/domain/entities/bilateral/bilateral.service.getHlosIndicatorsForResult.spec.ts` — 6 focused scenarios.
-  - `src/domain/entities/bilateral/bilateral.module.ts` — imports `PrmsTocModule`.
+  - `src/domain/entities/bilateral/bilateral.service.getHlosIndicatorsForResult.spec.ts` — focused scenarios.
+  - `src/domain/entities/bilateral/bilateral.module.ts` — imports `PrmsTocModule` (+ `ClarisaCgiarEntitiesModule`, T-15.12-rev).
   - `.env.example` — documents `ARI_PRMS_TOC_HOST=https://prtest-back.ciat.cgiar.org`.
-- **Description:** Wires the HLO/indicator panel data source. Endpoint takes no extra params from the FE — `(program, areaOfWork)` pairs are derived from the mapped CLARISA project's `project_mappings_array[]` (level-2 AOW entries paired with their `parent_id` → SP). Fans out one PRMS call per pair, cached. Always returns 200; the FE drives empty-state UX from `aow_status` (`unmapped` / `no_aow_mappings` / `has_aow`).
+  - **(T-15.12-rev, 2026-05-28)** `src/domain/tools/clarisa/cgiar-entities/{clarisa-cgiar-entities.service.ts, .module.ts, .service.spec.ts, dto/clarisa-cgiar-entity.types.ts}` — new SP→AOW catalog tool.
+- **Description:** Wires the HLO/indicator panel data source. Endpoint takes no extra params from the FE. The **Science Program** comes from the mapped CLARISA project's `project_mappings_array[]` (level-1 SP entries); each SP's **Areas of Work** come from the `cgiar-entities` catalog (D-PI-14). Each SP × its AOWs is one `(program, areaOfWork)` pair; fans out one PRMS call per pair, cached, and drops pairs PRMS has no data for. Always returns 200; the FE drives empty-state UX from `aow_status` (`unmapped` / `no_aow_mappings` / `has_aow`).
 - **Implementation notes:**
   - PRMS upstream observed (2026-05-27): `GET https://prtest-back.ciat.cgiar.org/api/public-results-framework/toc-results?program=<SP>&areaOfWork=<AOW>`. Both params required (400 without `areaOfWork`); no auth observed on the test host.
-  - AOW comes from CLARISA (D-PI-13). CLARISA does NOT expose AOW at the project root, but DOES expose it inside `project_mappings_array[]` as level-2 entries whose `parent_id` points back to the level-1 SP entry's `id`. 3 of 31 Bilateral projects in TEST currently carry AOW-level mappings; the other 28 are SP-only and surface as `aow_status: "no_aow_mappings"`.
+  - **AOW source — SUPERSEDED (T-15.12-rev / D-PI-14, 2026-05-28).** Originally (D-PI-13) AOW was read from the project's `project_mappings_array[]` level-2 entries via `parent_id` → SP. That mechanism is unusable: all AOW entries share global `parent_id` 267 (= SP01), so across all 299 production projects it yielded only `SP01-AOW06`, which PRMS test lacks. AOW is now sourced from `GET /api/cgiar-entities?version=2` (`ClarisaCgiarEntitiesService`), where each AOW names its parent SP by **code**. `no_aow_mappings` now also covers "PRMS has ToC data for none of the derived pairs".
   - URL stays under `pool-funding-alignment/` (not the idealized `/bilateral/`) — matches Pivot Record #2 from T-15.11.
   - Resilience: 5-min in-memory TTL, warm-cache-on-error serves stale, cold cache failures translate to 503 envelope.
 - **Acceptance / done check:**

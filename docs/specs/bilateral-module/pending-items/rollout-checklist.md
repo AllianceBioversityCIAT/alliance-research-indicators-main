@@ -98,8 +98,8 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   | jq '.status, .data.aow_status, (.data.pairs | length)'
 # Expected: 200, and one of:
 #   "unmapped"        — no bilateral_project_mapping for this result's contract
-#   "no_aow_mappings" — mapped but the CLARISA project has no AOW entries
-#   "has_aow"         — mapped + ≥ 1 (SP, AOW) pair derived; pairs[] populated
+#   "no_aow_mappings" — mapped but nothing to show (no SP, or PRMS has no ToC data for any pair)
+#   "has_aow"         — mapped + ≥ 1 (SP, AOW) pair with PRMS data; pairs[] populated
 # A 503 here usually means ARI_PRMS_TOC_HOST is unset OR PRMS upstream is down.
 ```
 
