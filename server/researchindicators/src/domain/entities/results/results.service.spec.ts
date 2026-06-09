@@ -107,6 +107,7 @@ describe('ResultsService', () => {
       isMainContactPerson: jest.fn(),
       target: {} as any,
       save: jest.fn(),
+      update: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     mockDataSource = {
@@ -553,6 +554,41 @@ describe('ResultsService', () => {
       // Assert
       expect(result).toBe(repositoryResult);
       expect(result).toEqual(repositoryResult);
+    });
+  });
+
+  describe('updateInactiveResult', () => {
+    it('should reactivate result and set snapshot flag', async () => {
+      mockCurrentUser.audit.mockReturnValue({
+        updated_by: 1,
+        last_updated_date: new Date(),
+      } as any);
+
+      await service.updateInactiveResult(15, true);
+
+      expect(mockMainRepo.update).toHaveBeenCalledWith(15, {
+        is_active: true,
+        is_snapshot: true,
+        updated_by: 1,
+        last_updated_date: expect.any(Date),
+      });
+      expect(mockCurrentUser.audit).toHaveBeenCalledWith(SetAuditEnum.UPDATE);
+    });
+
+    it('should clear snapshot flag when isSnapshot is false', async () => {
+      mockCurrentUser.audit.mockReturnValue({
+        updated_by: 2,
+        last_updated_date: new Date(),
+      } as any);
+
+      await service.updateInactiveResult(20, false);
+
+      expect(mockMainRepo.update).toHaveBeenCalledWith(20, {
+        is_active: true,
+        is_snapshot: false,
+        updated_by: 2,
+        last_updated_date: expect.any(Date),
+      });
     });
   });
 
