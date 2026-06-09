@@ -49,6 +49,18 @@ export class ENV {
   }
 
   /**
+   * @sdd-spec bilateral-module/toc-mapping-v2 — T-01 / R-BIL-090
+   *
+   * Base host for the lambda-toc catalog integration. The service composes
+   * `${host}/api/toc-integration/toc/results/category/{LEVEL}/initiative/{SP}`.
+   * No default — when unset, `TocIntegrationService` returns 503 instead of
+   * crashing (mirror of PRMS_TOC_HOST behavior).
+   */
+  static get TOC_INTEGRATION_HOST(): string {
+    return process.env.ARI_TOC_INTEGRATION_HOST?.trim() || '';
+  }
+
+  /**
    * LOCAL DEVELOPMENT ONLY: skip JWT validation and inject a mock SYSTEM_ADMIN user.
    *
    * Purpose: lets a developer hit the API from their machine without setting up a

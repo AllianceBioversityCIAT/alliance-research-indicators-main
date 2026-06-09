@@ -63,11 +63,11 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - Singleton scope (D-PI-12 constraint); no request-scoped injects.
   - Unknown-level responses are empty 200s upstream — never derive level validity here (design §6.2).
 - **Acceptance / done check:**
-  - [ ] Spec covers: TTL expiry (fake timers), warm-stale + warn, cold 503, empty-payload caching, fan-out call count ≤ sps×levels, missing env.
-  - [ ] `npm test -- toc-integration` green; lint green.
+  - [x] Spec covers: TTL expiry (fake timers), warm-stale + warn, cold 503, empty-payload caching, fan-out call count ≤ sps×levels, missing env.
+  - [x] `npm test -- toc-integration` green; lint green.
 - **Dependencies:** none
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** done — 2026-06-09, Reviewer PASS attempt 1 (see `execution.md`)
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
 
 ### T-02 — Level rules util + version constant + sole-consumer verification
