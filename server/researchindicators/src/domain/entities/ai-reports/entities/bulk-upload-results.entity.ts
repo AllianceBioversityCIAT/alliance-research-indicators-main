@@ -1,9 +1,9 @@
 import {
-    Column,
-    Entity,
-    JoinColumn,
-    ManyToOne,
-    PrimaryGeneratedColumn,
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
@@ -14,94 +14,100 @@ import { ResultStatus } from '../../result-status/entities/result-status.entity'
 
 @Entity('bulk_upload_results')
 export class BulkUploadResults extends AuditableEntity {
-    @PrimaryGeneratedColumn({
-        name: 'id',
-        type: 'bigint',
-    })
-    id!: number;
+  @PrimaryGeneratedColumn({
+    name: 'id',
+    type: 'bigint',
+  })
+  id!: number;
 
-    @Column({
-        name: 'bulk_upload_process_id',
-        type: 'bigint',
-    })
-    bulk_upload_process_id!: number;
+  @Column({
+    name: 'bulk_upload_process_id',
+    type: 'bigint',
+  })
+  bulk_upload_process_id!: number;
 
-    @Column({
-        name: 'result_id',
-        type: 'bigint',
-        nullable: true,
-    })
-    result_id?: number;
+  @Column({
+    name: 'result_id',
+    type: 'bigint',
+    nullable: true,
+  })
+  result_id?: number;
 
-    @Column({
-        name: 'missing_fields',
-        type: 'json',
-        nullable: true,
-    })
-    missing_fields?: string[];
+  @Column({
+    name: 'missing_fields',
+    type: 'json',
+    nullable: true,
+  })
+  missing_fields?: string[];
 
-    @Column({
-        name: 'manual_intervention_occurred',
-        type: 'boolean',
-        nullable: true,
-    })
-    manual_intervention_occurred?: boolean;
+  @Column({
+    name: 'manual_intervention_occurred',
+    type: 'boolean',
+    nullable: true,
+  })
+  manual_intervention_occurred?: boolean;
 
-    @Column({
-        name: 'suggested_status',
-        type: 'bigint',
-        nullable: true,
-    })
-    suggested_status?: ResultStatusEnum;
+  @Column({
+    name: 'suggested_status',
+    type: 'bigint',
+    nullable: true,
+  })
+  suggested_status?: ResultStatusEnum;
 
-    @Column({
-        name: 'final_status',
-        type: 'bigint',
-        nullable: true,
-    })
-    final_status?: ResultStatusEnum;
+  @Column({
+    name: 'final_status',
+    type: 'bigint',
+    nullable: true,
+  })
+  final_status?: ResultStatusEnum;
 
-    @Column({
-        name: 'title',
-        type: 'text',
-        nullable: true,
-    })
-    title?: string;
+  @Column({
+    name: 'title',
+    type: 'text',
+    nullable: true,
+  })
+  title?: string;
 
-    @Column({
-        name: 'indicator_id',
-        type: 'bigint',
-        nullable: true,
-    })
-    indicator_id?: number;
+  @Column({
+    name: 'indicator_id',
+    type: 'bigint',
+    nullable: true,
+  })
+  indicator_id?: number;
 
-    @Column({
-        name: 'error_message',
-        type: 'text',
-        nullable: true,
-    })
-    error_message?: string;
+  @Column({
+    name: 'error_message',
+    type: 'text',
+    nullable: true,
+  })
+  error_message?: string;
 
-    @ManyToOne(() => ResultStatus, (resultStatus) => resultStatus.final_status_results)
-    @JoinColumn({ name: 'final_status' })
-    final_status_result?: ResultStatus;
+  @ManyToOne(
+    () => ResultStatus,
+    (resultStatus) => resultStatus.final_status_results,
+  )
+  @JoinColumn({ name: 'final_status' })
+  final_status_result?: ResultStatus;
 
-    @ManyToOne(() => ResultStatus, (resultStatus) => resultStatus.suggested_status_results)
-    @JoinColumn({ name: 'suggested_status' })
-    suggested_status_result?: ResultStatus;
+  @ManyToOne(
+    () => ResultStatus,
+    (resultStatus) => resultStatus.suggested_status_results,
+  )
+  @JoinColumn({ name: 'suggested_status' })
+  suggested_status_result?: ResultStatus;
 
-    @ManyToOne(() => Indicator, (indicator) => indicator.bulkUploadResults)
-    @JoinColumn({ name: 'indicator_id' })
-    indicator?: Indicator;
+  @ManyToOne(() => Indicator, (indicator) => indicator.bulkUploadResults)
+  @JoinColumn({ name: 'indicator_id' })
+  indicator?: Indicator;
 
-    @ManyToOne(() => Result, (result) => result.bulkUploadResults)
-    @JoinColumn({ name: 'result_id' })
-    result?: Result;
+  @ManyToOne(() => Result, (result) => result.bulkUploadResults)
+  @JoinColumn({ name: 'result_id' })
+  result?: Result;
 
-    @ManyToOne(
-        () => BulkUploadProcesses,
-        (bulkUploadProcess) => bulkUploadProcess.bulkUploadResults,
-    )
-    @JoinColumn({ name: 'bulk_upload_process_id' })
-    bulkUploadProcess!: BulkUploadProcesses;
+  @ManyToOne(
+    () => BulkUploadProcesses,
+    (bulkUploadProcess) => bulkUploadProcess.bulkUploadResults,
+  )
+  @JoinColumn({ name: 'bulk_upload_process_id' })
+  bulkUploadProcess!: BulkUploadProcesses;
 }

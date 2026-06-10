@@ -8,4 +8,4 @@ import { AiMetadataRepository } from './repository/ia-metadata.repository';
   providers: [AiReportsService, AiMetadataRepository],
   exports: [AiReportsService, AiMetadataRepository],
 })
-export class AiReportsModule { }
+export class AiReportsModule {}

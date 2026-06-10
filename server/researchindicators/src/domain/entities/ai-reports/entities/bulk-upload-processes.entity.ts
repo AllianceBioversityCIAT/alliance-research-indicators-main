@@ -4,27 +4,27 @@ import { BulkUploadResults } from './bulk-upload-results.entity';
 
 @Entity('bulk_upload_processes')
 export class BulkUploadProcesses extends AuditableEntity {
-    @PrimaryGeneratedColumn({
-        name: 'id',
-        type: 'bigint',
-    })
-    id!: number;
+  @PrimaryGeneratedColumn({
+    name: 'id',
+    type: 'bigint',
+  })
+  id!: number;
 
-    @Column({
-        name: 'file_name',
-        type: 'text',
-    })
-    file_name!: string;
+  @Column({
+    name: 'file_name',
+    type: 'text',
+  })
+  file_name!: string;
 
-    @Column({
-        name: 'ai_interaction_id',
-        type: 'text',
-    })
-    ai_interaction_id!: string;
+  @Column({
+    name: 'ai_interaction_id',
+    type: 'text',
+  })
+  ai_interaction_id!: string;
 
-    @OneToMany(
-        () => BulkUploadResults,
-        (bulkUploadResult) => bulkUploadResult.bulkUploadProcess,
-    )
-    bulkUploadResults!: BulkUploadResults[];
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResult) => bulkUploadResult.bulkUploadProcess,
+  )
+  bulkUploadResults!: BulkUploadResults[];
 }

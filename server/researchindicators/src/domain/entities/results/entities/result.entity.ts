@@ -348,6 +348,9 @@ export class Result extends AuditableEntity {
   @OneToMany(() => ResultKnowledgeProduct, (rkp) => rkp.result)
   knowledge_products?: ResultKnowledgeProduct[];
 
-  @OneToMany(() => BulkUploadResults, (bulkUploadResult) => bulkUploadResult.result)
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResult) => bulkUploadResult.result,
+  )
   bulkUploadResults?: BulkUploadResults[];
 }

@@ -55,7 +55,12 @@ import {
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
-import { AiRawCountry, ProcessMedatada, ResultAiDto, ResultMetadata, ResultRawAi, RootAi } from './dto/result-ai.dto';
+import {
+  AiRawCountry,
+  ResultAiDto,
+  ResultRawAi,
+  RootAi,
+} from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
@@ -103,7 +108,11 @@ import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result
 import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 import { AiReportsService } from '../ai-reports/ai-reports.service';
-import { CreateAiReportDto, createBulkUploadProcessesDto, createBulkUploadResultsDto } from '../ai-reports/dto/create-ai-report.dto';
+import {
+  CreateAiReportDto,
+  createBulkUploadProcessesDto,
+  createBulkUploadResultsDto,
+} from '../ai-reports/dto/create-ai-report.dto';
 
 @Injectable()
 export class ResultsService {
@@ -146,7 +155,7 @@ export class ResultsService {
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
     private readonly _aiReportsService: AiReportsService,
-  ) { }
+  ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -712,21 +721,21 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: true,
-            result_lever_strategic_outcomes:
-              el?.result_lever_strategic_outcomes,
-            result_lever_sdg_targets: el?.result_lever_sdg_targets,
-          }))
+              lever_id: el.lever_id,
+              is_primary: true,
+              result_lever_strategic_outcomes:
+                el?.result_lever_strategic_outcomes,
+              result_lever_sdg_targets: el?.result_lever_sdg_targets,
+            }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: false,
-            result_lever_sdg_targets: el?.result_lever_sdg_targets,
-          }))
+              lever_id: el.lever_id,
+              is_primary: false,
+              result_lever_sdg_targets: el?.result_lever_sdg_targets,
+            }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -938,17 +947,25 @@ export class ResultsService {
     return results.map((el) => el.result_id);
   }
 
-  async formalizeResult(result: ResultRawAi, isbulk: boolean = false, resultMetadata?: createBulkUploadResultsDto[]) {
+  async formalizeResult(
+    result: ResultRawAi,
+    isbulk: boolean = false,
+    resultMetadata?: createBulkUploadResultsDto[],
+  ) {
     let resultExists: Result = null;
-    const elementResultMetadata: createBulkUploadResultsDto = new createBulkUploadResultsDto();
+    const elementResultMetadata: createBulkUploadResultsDto =
+      new createBulkUploadResultsDto();
     try {
       const processedResult = await this.createResultFromAiRoar(result);
 
-      elementResultMetadata.missing_fields = result?.metadata?.missing_fields?.map((el) => el?.trim()) ?? [];
-      elementResultMetadata.manual_intervention_occurred = result?.metadata?.manually_edited ?? false;
+      elementResultMetadata.missing_fields =
+        result?.metadata?.missing_fields?.map((el) => el?.trim()) ?? [];
+      elementResultMetadata.manual_intervention_occurred =
+        result?.metadata?.manually_edited ?? false;
       elementResultMetadata.suggested_status = result?.status;
       elementResultMetadata.title = result?.title;
-      elementResultMetadata.indicator_id = processedResult?.result?.indicator_id;
+      elementResultMetadata.indicator_id =
+        processedResult?.result?.indicator_id;
 
       const newResult = await this.createResult(processedResult.result);
       resultExists = newResult;
@@ -1006,7 +1023,8 @@ export class ResultsService {
         processedResult?.result?.year,
       );
 
-      elementResultMetadata.final_status = finalStatus ?? newResult?.result_status_id;
+      elementResultMetadata.final_status =
+        finalStatus ?? newResult?.result_status_id;
       elementResultMetadata.result_id = newResult.result_id;
       resultMetadata.push(elementResultMetadata);
       return { ...newResult, error: false };
@@ -1018,9 +1036,7 @@ export class ResultsService {
         await this._queryService.deleteFullResultById(resultExists.result_id);
       }
       const errorMessage = `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`;
-      this.logger.error(
-        errorMessage,
-      );
+      this.logger.error(errorMessage);
       elementResultMetadata.error_message = errorMessage;
       const tempExistsResult = await this.dataSource
         .getRepository(Result)
@@ -1046,7 +1062,6 @@ export class ResultsService {
           typeof error.message == 'object' ? error.name : error.message,
       };
     }
-
   }
 
   async customStatus(
@@ -1091,7 +1106,6 @@ export class ResultsService {
   }
 
   async createResultFromAiBulk(data: RootAi) {
-
     const { results, metadata } = data;
 
     const iaMetadataReport = new CreateAiReportDto();
@@ -1109,7 +1123,11 @@ export class ResultsService {
       | { error?: boolean; message_error?: string }
     )[] = [];
     for (const result of results) {
-      const newResult = await this.formalizeResult(result, true, iaMetadataReportResults);
+      const newResult = await this.formalizeResult(
+        result,
+        true,
+        iaMetadataReportResults,
+      );
       resultsCreated.push(newResult);
     }
     iaMetadataReport.bulkUploadResults = iaMetadataReportResults;
@@ -1370,8 +1388,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-              (el) => el.isoAlpha2 === country.isoAlpha2,
-            )?.result_countries_sub_nationals
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
             : [];
           return country;
         },

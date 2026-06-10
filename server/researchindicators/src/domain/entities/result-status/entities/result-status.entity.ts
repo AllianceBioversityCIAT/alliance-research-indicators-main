@@ -80,10 +80,16 @@ export class ResultStatus extends AuditableEntity {
   )
   result_status_workflows_to!: ResultStatusWorkflow[];
 
-  @OneToMany(() => BulkUploadResults, (bulkUploadResults) => bulkUploadResults.final_status_result)
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResults) => bulkUploadResults.final_status_result,
+  )
   final_status_results!: BulkUploadResults[];
 
-  @OneToMany(() => BulkUploadResults, (bulkUploadResults) => bulkUploadResults.suggested_status_result)
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResults) => bulkUploadResults.suggested_status_result,
+  )
   suggested_status_results!: BulkUploadResults[];
 }
 export class ResultStatusConfig {

@@ -2902,14 +2902,12 @@ describe('ResultsService', () => {
       } as any);
       jest.spyOn(service, 'updateGeneralInfo').mockResolvedValue(undefined);
       jest.spyOn(service, 'saveGeoLocation').mockResolvedValue(undefined);
-      jest.spyOn(service, 'customStatus').mockResolvedValue(
-        ResultStatusEnum.SUBMITTED,
-      );
+      jest
+        .spyOn(service, 'customStatus')
+        .mockResolvedValue(ResultStatusEnum.SUBMITTED);
 
       mockResultSdgsService.saveSdgAi = jest.fn().mockResolvedValue(undefined);
-      mockResultIpRightsService.update = jest
-        .fn()
-        .mockResolvedValue(undefined);
+      mockResultIpRightsService.update = jest.fn().mockResolvedValue(undefined);
       mockResultInstitutionsService.updatePartners = jest
         .fn()
         .mockResolvedValue(undefined);
