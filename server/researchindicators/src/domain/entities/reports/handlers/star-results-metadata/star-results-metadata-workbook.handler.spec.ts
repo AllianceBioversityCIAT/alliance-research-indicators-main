@@ -148,7 +148,26 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(byKey.get('creation_date')?.cellDataType).toBe('date');
     expect(byKey.get('primary_project_start_date')?.cellDataType).toBe('date');
     expect(byKey.get('primary_project_end_date')?.cellDataType).toBe('date');
+    expect(byKey.get('start_date')?.cellDataType).toBe('date');
+    expect(byKey.get('end_date')?.cellDataType).toBe('date');
     expect(byKey.get('result_code')?.cellDataType).toBeUndefined();
+    expect(raw!.columns).toHaveLength(71);
+    expect(
+      raw!.columns.find((c) => c.key === 'training_engagement_report')?.header,
+    ).toBe('Training type');
+    expect(raw!.columns.find((c) => c.key === 'policy_type')?.header).toBe(
+      'Policy type',
+    );
+    expect(raw!.columns.find((c) => c.key === 'impact_area')?.header).toBe(
+      'Impact Areas',
+    );
+    expect(raw!.columns.find((c) => c.key === 'for_external_use')?.header).toBe(
+      'Further communication opportunities',
+    );
+    expect(
+      raw!.columns.find((c) => c.key === 'for_external_use_description')
+        ?.header,
+    ).toBe('Further communication opportunities description');
   });
 
   it('renders typed reporting_year and creation_date cells in exported xlsx', async () => {

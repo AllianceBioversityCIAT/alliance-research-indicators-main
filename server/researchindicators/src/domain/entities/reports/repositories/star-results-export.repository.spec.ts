@@ -8,7 +8,20 @@ import { StarResultsExportRepository } from './star-results-export.repository';
 
 describe('StarResultsExportRepository', () => {
   let repo: StarResultsExportRepository;
-  const dataSourceQuery = jest.fn();
+  const queryRunnerQuery = jest.fn();
+  const queryRunnerConnect = jest.fn().mockResolvedValue(undefined);
+  const queryRunnerStartTransaction = jest.fn().mockResolvedValue(undefined);
+  const queryRunnerCommitTransaction = jest.fn().mockResolvedValue(undefined);
+  const queryRunnerRollbackTransaction = jest.fn().mockResolvedValue(undefined);
+  const queryRunnerRelease = jest.fn().mockResolvedValue(undefined);
+  const createQueryRunner = jest.fn(() => ({
+    connect: queryRunnerConnect,
+    startTransaction: queryRunnerStartTransaction,
+    commitTransaction: queryRunnerCommitTransaction,
+    rollbackTransaction: queryRunnerRollbackTransaction,
+    release: queryRunnerRelease,
+    query: queryRunnerQuery,
+  }));
   const findResultsV2 = jest.fn();
 
   const baseFilters: FullFiltersReportDto = {
@@ -26,12 +39,21 @@ describe('StarResultsExportRepository', () => {
   };
 
   beforeEach(async () => {
-    dataSourceQuery.mockReset();
+    queryRunnerQuery.mockReset();
+    queryRunnerConnect.mockClear();
+    queryRunnerStartTransaction.mockClear();
+    queryRunnerCommitTransaction.mockClear();
+    queryRunnerRollbackTransaction.mockClear();
+    queryRunnerRelease.mockClear();
+    createQueryRunner.mockClear();
     findResultsV2.mockReset();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StarResultsExportRepository,
-        { provide: DataSource, useValue: { query: dataSourceQuery } },
+        {
+          provide: DataSource,
+          useValue: { createQueryRunner },
+        },
         {
           provide: AppConfig,
           useValue: { ARI_CLIENT_HOST: 'https://app.example' },
@@ -49,7 +71,7 @@ describe('StarResultsExportRepository', () => {
     });
     const rows = await repo.findStarResultsMetadataRows(baseFilters);
     expect(rows).toEqual([]);
-    expect(dataSourceQuery).not.toHaveBeenCalled();
+    expect(createQueryRunner).not.toHaveBeenCalled();
   });
 
   it('runs phase-2 SQL when ids exist', async () => {
@@ -57,13 +79,44 @@ describe('StarResultsExportRepository', () => {
       data: [{ result_id: 10 }, { result_id: 20 }],
       pagination: { hasNextPage: false },
     });
-    dataSourceQuery.mockResolvedValueOnce([{ result_code: 'R1' }]);
+    queryRunnerQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([{ result_code: 'R1' }]);
     const rows = await repo.findStarResultsMetadataRows(baseFilters);
     expect(rows).toEqual([{ result_code: 'R1' }]);
-    expect(dataSourceQuery).toHaveBeenCalledTimes(1);
-    const [sql, params] = dataSourceQuery.mock.calls[0];
+    expect(createQueryRunner).toHaveBeenCalledTimes(1);
+    expect(queryRunnerStartTransaction).toHaveBeenCalledTimes(1);
+    expect(queryRunnerCommitTransaction).toHaveBeenCalledTimes(1);
+    expect(queryRunnerRelease).toHaveBeenCalledTimes(1);
+    expect(queryRunnerQuery).toHaveBeenCalledTimes(2);
+    expect(queryRunnerQuery.mock.calls[0][0]).toBe(
+      'SET LOCAL group_concat_max_len = 4194304',
+    );
+    const [sql, params] = queryRunnerQuery.mock.calls[1];
     expect(sql).toContain('WHERE gi.result_id IN');
     expect(sql).toContain('ORDER BY FIELD');
+    expect(sql).toContain(
+      'LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id',
+    );
+    expect(sql).toContain(
+      'csd.training_engagement_report AS training_engagement_report',
+    );
+    expect(sql).toContain(
+      'csd.group_session_participants_total AS number_people_trained_total',
+    );
+    expect(sql).toContain(
+      'LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id',
+    );
+    expect(sql).toContain('pc.policy_type AS policy_type');
+    expect(sql).toContain(
+      'LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id',
+    );
+    expect(sql).toContain('oc.impact_area AS impact_area');
+    expect(sql).toContain('oc.for_external_use AS for_external_use');
+    expect(sql).toContain(
+      'oc.for_external_use_description AS for_external_use_description',
+    );
+    expect(sql).toContain(') AS quantification');
     expect(params).toEqual([10, 20, 10, 20]);
   });
 
@@ -77,7 +130,7 @@ describe('StarResultsExportRepository', () => {
         data: [{ result_id: 2 }],
         pagination: { hasNextPage: false },
       });
-    dataSourceQuery.mockResolvedValueOnce([]);
+    queryRunnerQuery.mockResolvedValue(undefined);
     await repo.findStarResultsMetadataRows(baseFilters);
     expect(findResultsV2).toHaveBeenCalledTimes(2);
   });
@@ -97,7 +150,7 @@ describe('StarResultsExportRepository', () => {
       data: [{ result_id: 5 }],
       pagination: { hasNextPage: false },
     });
-    dataSourceQuery.mockResolvedValue([]);
+    queryRunnerQuery.mockResolvedValue(undefined);
     const filters: FullFiltersReportDto = {
       filters: {
         search: 'x',
@@ -132,7 +185,7 @@ describe('StarResultsExportRepository', () => {
       data: [{ result_id: 1 }],
       pagination: { hasNextPage: false },
     });
-    dataSourceQuery.mockResolvedValueOnce([]);
+    queryRunnerQuery.mockResolvedValue(undefined);
     const filters = {
       ...baseFilters,
       filters: {
@@ -154,9 +207,25 @@ describe('StarResultsExportRepository', () => {
       data: [{ result_id: 1 }],
       pagination: { hasNextPage: false },
     });
-    dataSourceQuery.mockResolvedValueOnce([]);
+    queryRunnerQuery.mockResolvedValue(undefined);
     await repo.findStarResultsMetadataRows(baseFilters);
-    const [sql] = dataSourceQuery.mock.calls[0];
+    const [sql] = queryRunnerQuery.mock.calls[1];
     expect(sql).toContain('https://app.example/result/STAR-');
+  });
+
+  it('rolls back and rethrows when phase-2 query fails', async () => {
+    findResultsV2.mockResolvedValueOnce({
+      data: [{ result_id: 1 }],
+      pagination: { hasNextPage: false },
+    });
+    queryRunnerQuery
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('db'));
+    await expect(repo.findStarResultsMetadataRows(baseFilters)).rejects.toThrow(
+      'db',
+    );
+    expect(queryRunnerRollbackTransaction).toHaveBeenCalledTimes(1);
+    expect(queryRunnerCommitTransaction).not.toHaveBeenCalled();
+    expect(queryRunnerRelease).toHaveBeenCalledTimes(1);
   });
 });

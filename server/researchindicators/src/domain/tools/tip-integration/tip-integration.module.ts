@@ -9,6 +9,7 @@ import { ClarisaCountriesModule } from '../clarisa/entities/clarisa-countries/cl
 import { ResultKnowledgeProductModule } from '../../entities/result-knowledge-product/result-knowledge-product.module';
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
 import { SyncProcessLogModule } from '../../entities/sync-process-log/sync-process-log.module';
+import { SaveResultService } from '../../shared/services/save-all-sections.service';
 
 @Module({
   imports: [
@@ -21,7 +22,11 @@ import { SyncProcessLogModule } from '../../entities/sync-process-log/sync-proce
     SyncProcessLogModule,
   ],
   controllers: [TipIntegrationController],
-  providers: [TipIntegrationService, TipIntegrationRepository],
+  providers: [
+    TipIntegrationService,
+    TipIntegrationRepository,
+    SaveResultService,
+  ],
   exports: [TipIntegrationRepository, TipIntegrationService],
 })
 export class TipIntegrationModule {}

@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultCapacitySharing } from './entities/result-capacity-sharing.entity';
 import { cleanNumberForDB, selectManager } from '../../shared/utils/orm.util';
@@ -45,6 +49,7 @@ import { ResultUserAi } from '../result-users/entities/result-user-ai.entity';
 import { ResultUser } from '../result-users/entities/result-user.entity';
 import { ClarisaLanguagesService } from '../../tools/clarisa/entities/clarisa-languages/clarisa-languages.service';
 import { ResultLanguage } from '../result-languages/entities/result-language.entity';
+import { parseCapacitySharingTimestamp } from '../../shared/utils/timestamp-date.util';
 @Injectable()
 export class ResultCapacitySharingService {
   private mainRepo: Repository<ResultCapacitySharing>;
@@ -301,13 +306,32 @@ export class ResultCapacitySharingService {
 
     const { result_id } = existResult;
 
+    const start_date = parseCapacitySharingTimestamp(
+      updateData?.start_date,
+      'start_date',
+    );
+    const end_date = parseCapacitySharingTimestamp(
+      updateData?.end_date,
+      'end_date',
+    );
+
+    if (
+      start_date instanceof Date &&
+      end_date instanceof Date &&
+      end_date.getTime() < start_date.getTime()
+    ) {
+      throw new BadRequestException(
+        'end_date must be greater than or equal to start_date',
+      );
+    }
+
     return this.dataSource.transaction(async (manager) => {
       await manager.getRepository(this.mainRepo.target).update(result_id, {
         session_format_id: updateData?.session_format_id,
         session_type_id: updateData?.session_type_id,
         delivery_modality_id: updateData?.delivery_modality_id,
-        start_date: updateData?.start_date,
-        end_date: updateData?.end_date,
+        start_date,
+        end_date,
         degree_id: updateData?.degree_id,
         session_length_id: updateData?.session_length_id,
         ...this._currentUser.audit(SetAuditEnum.UPDATE),

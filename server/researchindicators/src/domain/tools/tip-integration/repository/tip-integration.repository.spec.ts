@@ -28,6 +28,19 @@ describe('TipIntegrationRepository', () => {
     expect(queryMock.mock.calls[0][0] as string).toContain(
       'result_official_code not in (1,2)',
     );
+    expect(queryMock.mock.calls[0][0] as string).not.toContain(
+      'report_year_id',
+    );
+    expect(queryMock.mock.calls[0][1]).toEqual([]);
+  });
+
+  it('allTipResultId filters by report year when year is provided', async () => {
+    queryMock.mockResolvedValueOnce([{ ids: '99' }]);
+    await expect(repository.allTipResultId([1], 2026)).resolves.toEqual(['99']);
+    expect(queryMock.mock.calls[0][0] as string).toContain(
+      'r.report_year_id = ?',
+    );
+    expect(queryMock.mock.calls[0][1]).toEqual([2026]);
   });
 
   it('allTipResultId returns empty array when ids missing', async () => {
