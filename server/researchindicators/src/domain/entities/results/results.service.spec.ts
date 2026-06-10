@@ -55,6 +55,7 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
+import { AiReportsService } from '../ai-reports/ai-reports.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -93,6 +94,7 @@ describe('ResultsService', () => {
   let mockResultsUtil: jest.Mocked<ResultsUtil>;
   let mockGreenChecksService: { findByResultId: jest.Mock };
   let mockGreenCheckRepository: { createSnapshot: jest.Mock };
+  let mockAiReportsService: { create: jest.Mock };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -271,6 +273,10 @@ describe('ResultsService', () => {
       createSnapshot: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockAiReportsService = {
+      create: jest.fn().mockResolvedValue({ id: 1 }),
+    };
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -381,6 +387,10 @@ describe('ResultsService', () => {
         {
           provide: GreenCheckRepository,
           useValue: mockGreenCheckRepository,
+        },
+        {
+          provide: AiReportsService,
+          useValue: mockAiReportsService,
         },
       ],
     }).compile();
@@ -2867,6 +2877,70 @@ describe('ResultsService', () => {
 
   // [CLAUDE/DONE] 142
   describe('formalizeResult', () => {
+    it('should populate result metadata on successful bulk formalization', async () => {
+      const rawResult = {
+        title: 'Bulk Result',
+        status: ResultStatusEnum.SUBMITTED,
+        metadata: { missing_fields: [' field '], manually_edited: true },
+      } as any;
+      const resultMetadata: any[] = [];
+
+      jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue({
+        result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2024 },
+        generalInformation: {},
+        sdgs: [],
+        ipRights: {},
+        geoScope: {},
+        partners: [],
+        evidences: [],
+        policyChange: {},
+      } as any);
+      jest.spyOn(service, 'createResult').mockResolvedValue({
+        result_id: 42,
+        indicator_id: IndicatorsEnum.POLICY_CHANGE,
+        result_status_id: 1,
+      } as any);
+      jest.spyOn(service, 'updateGeneralInfo').mockResolvedValue(undefined);
+      jest.spyOn(service, 'saveGeoLocation').mockResolvedValue(undefined);
+      jest.spyOn(service, 'customStatus').mockResolvedValue(
+        ResultStatusEnum.SUBMITTED,
+      );
+
+      mockResultSdgsService.saveSdgAi = jest.fn().mockResolvedValue(undefined);
+      mockResultIpRightsService.update = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockResultInstitutionsService.updatePartners = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockResultEvidencesService.updateResultEvidences = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockResultPolicyChangeService.update = jest
+        .fn()
+        .mockResolvedValue(undefined);
+
+      const result = await service.formalizeResult(
+        rawResult,
+        true,
+        resultMetadata,
+      );
+
+      expect((result as any).error).toBe(false);
+      expect(resultMetadata).toHaveLength(1);
+      expect(resultMetadata[0]).toEqual(
+        expect.objectContaining({
+          missing_fields: ['field'],
+          manual_intervention_occurred: true,
+          suggested_status: ResultStatusEnum.SUBMITTED,
+          title: 'Bulk Result',
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_id: 42,
+          final_status: ResultStatusEnum.SUBMITTED,
+        }),
+      );
+    });
+
     it('should return result with error=true and call deleteFullResultById on exception in bulk mode', async () => {
       const rawResult = { title: 'Test', indicator: 'Policy Change' } as any;
 
@@ -2880,9 +2954,16 @@ describe('ResultsService', () => {
         }),
       } as any);
 
-      const result = await service.formalizeResult(rawResult, true);
+      const resultMetadata: any[] = [];
+      const result = await service.formalizeResult(
+        rawResult,
+        true,
+        resultMetadata,
+      );
 
       expect((result as any).error).toBe(true);
+      expect(resultMetadata).toHaveLength(1);
+      expect(resultMetadata[0].error_message).toContain('AI error');
     });
 
     it('should throw error when not in bulk mode', async () => {
@@ -2904,7 +2985,13 @@ describe('ResultsService', () => {
   // [CLAUDE/DONE] 143
   describe('createResultFromAiBulk', () => {
     it('should process all results and return errors/created partitioned', async () => {
-      const results = [{ title: 'R1' } as any, { title: 'R2' } as any];
+      const payload = {
+        results: [{ title: 'R1' } as any, { title: 'R2' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-123',
+          file_name: 'upload.xlsx',
+        },
+      };
 
       jest
         .spyOn(service, 'formalizeResult')
@@ -2915,10 +3002,41 @@ describe('ResultsService', () => {
           message_error: 'fail',
         } as any);
 
-      const output = await service.createResultFromAiBulk(results);
+      const output = await service.createResultFromAiBulk(payload);
 
       expect(output.results_created).toHaveLength(1);
       expect(output.results_errors).toHaveLength(1);
+    });
+
+    it('should persist bulk upload metadata through AiReportsService', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-456',
+          file_name: 'results.csv',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockImplementation(async (_result, _isbulk, resultMetadata) => {
+          resultMetadata?.push({ result_id: 99, title: 'R1' });
+          return { result_id: 99, error: false } as any;
+        });
+
+      await service.createResultFromAiBulk(payload);
+
+      expect(mockAiReportsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bulkUploadProcesses: expect.objectContaining({
+            ai_interaction_id: 'ai-456',
+            file_name: 'results.csv',
+            created_by: mockCurrentUser.user_id,
+          }),
+          bulkUploadResults: expect.arrayContaining([
+            expect.objectContaining({ result_id: 99, title: 'R1' }),
+          ]),
+        }),
+      );
     });
   });
 

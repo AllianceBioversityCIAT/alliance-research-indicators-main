@@ -38,6 +38,7 @@ import { ResultLeverStrategicOutcomeModule } from '../result-lever-strategic-out
 import { ResultKnowledgeProductModule } from '../result-knowledge-product/result-knowledge-product.module';
 import { ResultLeverSdgTargetsModule } from '../result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { GreenChecksModule } from '../green-checks/green-checks.module';
+import { AiReportsModule } from '../ai-reports/ai-reports.module';
 
 @Module({
   controllers: [ResultsController],
@@ -77,6 +78,7 @@ import { GreenChecksModule } from '../green-checks/green-checks.module';
     ResultKnowledgeProductModule,
     ResultLeverSdgTargetsModule,
     GreenChecksModule,
+    AiReportsModule,
   ],
   providers: [
     ResultsService,
@@ -86,4 +88,4 @@ import { GreenChecksModule } from '../green-checks/green-checks.module';
   ],
   exports: [ResultsService, ResultRepository],
 })
-export class ResultsModule {}
+export class ResultsModule { }
