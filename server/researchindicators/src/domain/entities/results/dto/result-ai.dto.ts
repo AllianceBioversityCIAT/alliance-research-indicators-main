@@ -249,6 +249,24 @@ export class OrganizationDetailed extends PartialType(AiRawInstitution) {
   other_type?: string;
 }
 
+export class ResultMetadata {
+  @ApiProperty({
+    type: [String],
+    description: 'Missing fields',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  missing_fields: string[];
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Manually edited',
+  })
+  @IsBoolean()
+  @IsNotEmpty()
+  manually_edited: boolean;
+}
+
 export class ResultRawAi {
   @ApiProperty({
     type: String,
@@ -775,6 +793,33 @@ export class ResultRawAi {
   @ValidateNested({ each: true })
   @Type(() => AiRawInstitution)
   trainees_description: AiRawInstitution[];
+
+  @ApiProperty({
+    type: ResultMetadata,
+    description: 'Metadata of the result',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ResultMetadata)
+  metadata: ResultMetadata;
+}
+
+export class ProcessMedatada {
+  @ApiProperty({
+    type: String,
+    description: 'Name of the file',
+  })
+  @IsString()
+  @IsNotEmpty()
+  file_name: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'AI interaction ID',
+  })
+  @IsString()
+  @IsNotEmpty()
+  ai_interaction_id: string;
 }
 
 export class RootAi {
@@ -787,4 +832,13 @@ export class RootAi {
   @ValidateNested({ each: true })
   @Type(() => ResultRawAi)
   results: ResultRawAi[];
+
+  @ApiProperty({
+    type: ProcessMedatada,
+    description: 'Metadata of the process',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ProcessMedatada)
+  metadata: ProcessMedatada;
 }
