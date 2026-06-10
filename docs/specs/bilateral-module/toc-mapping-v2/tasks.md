@@ -79,11 +79,11 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - `src/domain/entities/bilateral/utils/toc-level-rules.util.spec.ts` (new)
 - **Description:** Pure util exporting `resolveResultTypeKey(indicatorId)`, `allowedLevelsFor(key)` (capacity_sharing→[OUTPUT], innovation_dev→[OUTPUT], policy_change→[OUTCOME,EOI], else []), and `MAPPABLE_LIVE_VERSION = 2026`. Also: verify and record (in §7 below) that the STAR FE is the only consumer of `hlos-indicators` (grep envelope keys across repos + check API consumers) before T-03 lands.
 - **Acceptance / done check:**
-  - [ ] Util spec covers all four rule rows incl. unknown type → `[]`.
-  - [ ] Sole-consumer note recorded in §7 risks log with evidence.
+  - [x] Util spec covers all four rule rows incl. unknown type → `[]` (12 tests).
+  - [x] Sole-consumer note recorded in §7 risks log with evidence (RB-2 closed).
 - **Dependencies:** none
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** done — 2026-06-09, Reviewer PASS attempt 1 (see `execution.md`)
 - **Skills:** `nestjs-expert`
 
 ### T-03 — Reshape `GET …/hlos-indicators` to the frozen FE envelope
@@ -261,7 +261,7 @@ Per template §5: lint + unit green per task; migration forward/revert verified 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-06-09 | lambda-toc DNS resolution caveat (needed 8.8.8.8 locally) | Flag to infra before testing deploy; warm-cache resilience absorbs blips | Juanca | open |
-| RB-2 | 2026-06-09 | Sole-consumer assumption for in-place reshape | Verified + recorded in T-02 before T-03 lands | Juanca | open |
+| RB-2 | 2026-06-09 | Sole-consumer assumption for in-place reshape | **Verified 2026-06-09 (T-02):** server-side, `hlos-indicators` + `aow_status`/`no_aow_mappings` are referenced only inside `src/domain/entities/bilateral/` (controller/service/DTO + specs); client-side, only STAR FE surfaces (`api.service.ts`, `hlo-selection-modal`, `pool-funding-alignment.interface.ts`, fixtures), all migrating in lockstep per the client's own toc-mapping-v2 spec. No third-party consumers. In-place reshape cleared. | Juanca | closed |
 | RB-3 | 2026-06-09 | FE demo deadline 2026-06-11 | T-01→T-03→T-04 prioritized; write path parallelizable | Juanca | open |
 | RB-4 | 2026-06-09 | OQ-V2-2/3/5/6 pending BA | Build assumptions recorded (requirements §11–12); none block build | BA via Juanca | open |
 

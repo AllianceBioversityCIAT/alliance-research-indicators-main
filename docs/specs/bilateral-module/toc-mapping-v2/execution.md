@@ -48,3 +48,30 @@
 
 **Final verification:** lint clean, 12/12 task tests, full suite green, build clean. Reviewer re-ran lint + scoped tests independently.
 
+---
+
+### T-02 — Level rules util + version constant + sole-consumer verification — **PASS** (attempt 1/3)
+
+- **Date:** 2026-06-09
+- **Requirements covered:** R-BIL-091, R-BIL-097 (constant), risk RB-2 closure
+- **Attempts:** 1 (Implementer → Reviewer PASS, no rework)
+
+**Attempt 1 — Implementer:**
+
+- Files created:
+  - `server/researchindicators/src/domain/entities/bilateral/utils/toc-level-rules.util.ts` — `MAPPABLE_LIVE_VERSION = 2026` (D-V2-7), `TocResultTypeKey` union, `resolveResultTypeKey` (exhaustive `Record<IndicatorsEnum, TocResultTypeKey>`: 1→capacity_sharing, 2→innovation_dev, 3→knowledge_product, 4→policy_change, 5→oicr, 6→innovation_use; null/unknown→'unknown'), `allowedLevelsFor` (rule table per R-BIL-091; returns fresh arrays — callers cannot mutate the source of truth).
+  - `…/utils/toc-level-rules.util.spec.ts` — 12 tests (all rule rows, mapped + other enum members, unknown/null ids, 2026 constant, immutability).
+- Verification: `npm test -- toc-level-rules` 12/12; lint exit 0 (quirk files restored); build exit 0.
+- Sole-consumer evidence (RB-2): recorded in `tasks.md` §7 — server references confined to the bilateral module; client references confined to STAR FE surfaces covered by the client's toc-mapping-v2 spec. T-03 in-place reshape cleared.
+
+**Attempt 1 — Reviewer verdict:**
+
+> STATUS: PASS — Pure util exactly matches the R-BIL-091 rule table and D-V2-3/D-V2-7; exhaustive enum mapping gives compile-time drift protection; 12/12 tests re-verified independently; no scope creep, no migrations.
+
+**Decisions / issues encountered:**
+
+- Pre-existing artifact found: `src/domain/entities/bilateral/dto/bilateral-hlos-indicators.response.dto 2.ts` — a committed Finder-duplicate of the hlos DTO. **Follow-up: delete in T-03** (same file family being rewritten).
+- Pre-existing `tsc --noEmit` typings error in `test/app.e2e-spec.ts` (supertest typings; excluded from `tsconfig.build.json`) — verified to pre-exist without this diff; backlog note, out of spec scope.
+
+**Final verification:** scoped tests 12/12, lint clean, build clean; Reviewer re-ran independently.
+
