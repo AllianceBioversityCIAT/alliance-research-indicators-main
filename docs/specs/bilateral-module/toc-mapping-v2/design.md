@@ -88,7 +88,7 @@ Entity: `src/domain/entities/bilateral/entities/result-pool-funding-toc-alignmen
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | bigint PK auto | |
-| `result_id` | bigint, not null | FK-by-value to `results.result_id` (mirror sibling tables) |
+| `result_id` | bigint, not null | Real FK constraint `fk_rpfta_result` → `results.result_id` (mirrors sibling tables `fk_rpfa_result`/`fk_rpfim_result`; earlier "FK-by-value" wording was wrong — corrected at T-05) |
 | `sp_code` | varchar(50), not null | e.g. `SP01` |
 | `aligns_with_toc` | tinyint(1), not null | the per-SP Yes/No |
 | `level` | varchar(10), null | `OUTPUT` / `OUTCOME` / `EOI`; null when "No" |

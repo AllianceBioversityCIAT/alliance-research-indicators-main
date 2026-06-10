@@ -141,3 +141,36 @@
 - NFR-BIL-091 parallel-dispatch mock-ordering assertion absent from T-01's spec (parallelism structural via `Promise.all`) — noted, non-blocking; optional T-08/T-09 hardening.
 
 **Final verification:** lint clean, 24/24 scoped, full suite 282/1616 green, build clean, coverage floor holds. Reviewer independently re-ran lint, scoped tests, `test:cov`, and `tsc --noEmit`; RB-3 closed in `tasks.md` §7.
+
+---
+
+### T-05 — Migration + entity + repository for `result_pool_funding_toc_alignment` — **PASS** (attempt 1/3)
+
+- **Date:** 2026-06-10
+- **Requirements covered:** R-BIL-092 (schema), R-BIL-095 (snapshot columns), data reqs §8
+- **Attempts:** 1 (Implementer → Reviewer PASS, no rework)
+
+**Attempt 1 — Implementer:**
+
+- Files created:
+  - `server/researchindicators/src/db/migrations/1779190000015-createResultPoolFundingTocAlignment.ts` — design §4 verbatim (all columns incl. `unit_messurament` snapshot, D-V2-4); audit block byte-identical to sibling `1779190000006`; STORED GENERATED `active_result_sp` varchar(71) (`IF(is_active=1, CONCAT(result_id,':',sp_code), NULL)`); UNIQUE `idx_rpfta_active_result_sp` + `idx_rpfta_result`; real FK `fk_rpfta_result` → `results.result_id`; utf8mb4_unicode_520_ci; clean `down()` (drop FK + table).
+  - `…/bilateral/entities/result-pool-funding-toc-alignment.entity.ts` — extends `AuditableEntity`, 1:1 with the migration; generated column intentionally unmapped (sibling D-PI-9 pattern); no `@OpenSearchProperty`.
+  - `…/bilateral/repositories/result-pool-funding-toc-alignment.repository.ts` — `findActiveByResultId` (active, `sp_code ASC`), `upsertForSp(input, actorUserId, manager?)` (in-place update or insert; never a second active row; ToC/snapshot columns null on "No"), `deactivateForSps(resultId, spCodes, actorUserId, manager?)` (soft-deactivate + audit fields; empty-list fast path). Optional `EntityManager` pass-through ready for T-06's single transaction (§6.3).
+  - `…/repositories/result-pool-funding-toc-alignment.repository.spec.ts` — 8 tests (find filter/order, upsert insert/update-in-place, "No" nulls, manager routing, deactivate audit + short-circuit).
+- Files modified:
+  - `…/bilateral/bilateral.module.ts` — entity in `TypeOrmModule.forFeature`, repository provided + exported. (Datasource is glob-based — no orm.config change.)
+- Live DB verification (dev `192.168.20.210`): `migration:show` → sole pending; `migration:dev:execute` applied; `SHOW CREATE TABLE` confirmed columns/indexes/FK/collation; unique-index proof: second active insert for (1450, ZZT05) → `ER_DUP_ENTRY` on `idx_rpfta_active_result_sp`, inactive duplicate allowed (partial-unique semantics); test rows cleaned; `migration:revert` clean; re-applied and **left applied for T-06**.
+- Verification: lint green (quirk files restored); full `npm test` 283 suites / 1624 tests pass; build green.
+
+**Attempt 1 — Reviewer verdict:**
+
+> STATUS: PASS — T-05 implements design §4 verbatim (columns, partial-unique generated column, indexes, collation, clean down()), the entity/repository mirror sibling patterns with a §6.3-compatible EntityManager pass-through, append-only integrity holds, and lint/scoped tests/full suite (283/1624)/build were all independently re-verified green. All four implementer deviations are adjudicated acceptable — the real FK in fact mirrors what sibling migrations do; recommend correcting design.md's "FK-by-value" wording during T-09 doc sync (non-blocking).
+
+**Decisions / issues encountered:**
+
+- **Real FK constraint adjudicated correct:** design §4's "FK-by-value (mirror sibling tables)" was internally contradictory — siblings (`fk_rpfa_result`, `fk_rpfim_result`) all declare real FKs. Design §4 wording corrected by the Leader in this commit (not deferred to T-09).
+- Generated column declared `varchar(71)` (bigint 20 + ':' + 50) — CONCAT generated columns need an explicit type; pattern otherwise identical to `1779190000014`.
+- No `@ManyToOne` relation to `Result` — would touch `result.entity.ts`, out of scope; integrity enforced at DB layer.
+- Pre-existing flake in `star-results-metadata-workbook.handler.spec.ts` (failed once on a full run, passes in isolation and on re-run) — unrelated to this diff; backlog note.
+
+**Final verification:** lint clean, 8/8 scoped, full suite 283/1624 green, build clean, migration applied on dev DB. Reviewer independently re-ran lint, scoped + full suite, build, and verified the flake in isolation (20/20).

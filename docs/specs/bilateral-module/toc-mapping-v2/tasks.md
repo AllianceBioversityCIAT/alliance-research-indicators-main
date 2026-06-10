@@ -134,11 +134,11 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - datasource targets if entities are listed explicitly
 - **Description:** Table per design §4 incl. generated `active_result_sp` + unique `idx_rpfta_active_result_sp` (pattern from migration `1779190000014`) and `idx_rpfta_result`. Repository methods: `findActiveByResultId`, `upsertForSp` (update-in-place or insert), `deactivateForSps`.
 - **Acceptance / done check:**
-  - [ ] `npm run migration:run` applies; `npm run migration:revert` reverts cleanly.
-  - [ ] Inserting two active rows for the same (result, sp_code) fails on the unique index (manual or test).
+  - [x] `npm run migration:run` applies; `npm run migration:revert` reverts cleanly. *(Verified live on dev DB 2026-06-10 — sole-pending check, apply, revert, re-apply; left applied for T-06.)*
+  - [x] Inserting two active rows for the same (result, sp_code) fails on the unique index (manual or test). *(Live ER_DUP_ENTRY proof on `idx_rpfta_active_result_sp`; inactive duplicate allowed; test rows cleaned.)*
 - **Dependencies:** none
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** done — 2026-06-10, Reviewer PASS attempt 1 (see `execution.md`)
 - **Skills:** `nestjs-expert`
 
 ### T-06 — Write path: DTO + validation + per-SP upsert + cascade + version gate

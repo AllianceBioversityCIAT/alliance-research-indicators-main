@@ -3,9 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ResultPoolFundingAlignment } from './entities/result-pool-funding-alignment.entity';
 import { ResultPoolFundingAlignmentSp } from './entities/result-pool-funding-alignment-sp.entity';
 import { ResultPoolFundingIndicatorMapping } from './entities/result-pool-funding-indicator-mapping.entity';
+// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-05 / R-BIL-092, R-BIL-095
+import { ResultPoolFundingTocAlignment } from './entities/result-pool-funding-toc-alignment.entity';
 import { ResultPoolFundingAlignmentRepository } from './repositories/result-pool-funding-alignment.repository';
 import { ResultPoolFundingAlignmentSpRepository } from './repositories/result-pool-funding-alignment-sp.repository';
 import { ResultPoolFundingIndicatorMappingRepository } from './repositories/result-pool-funding-indicator-mapping.repository';
+import { ResultPoolFundingTocAlignmentRepository } from './repositories/result-pool-funding-toc-alignment.repository';
 import { AgressoContractModule } from '../agresso-contract/agresso-contract.module';
 import { ClarisaModule } from '../../tools/clarisa/clarisa.module';
 import { ClarisaScienceProgramsModule } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.module';
@@ -40,6 +43,7 @@ import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-cha
       ResultPoolFundingAlignment,
       ResultPoolFundingAlignmentSp,
       ResultPoolFundingIndicatorMapping,
+      ResultPoolFundingTocAlignment,
     ]),
     AgressoContractModule,
     ClarisaModule,
@@ -70,12 +74,14 @@ import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-cha
     ResultPoolFundingAlignmentRepository,
     ResultPoolFundingAlignmentSpRepository,
     ResultPoolFundingIndicatorMappingRepository,
+    ResultPoolFundingTocAlignmentRepository,
   ],
   exports: [
     TypeOrmModule,
     ResultPoolFundingAlignmentRepository,
     ResultPoolFundingAlignmentSpRepository,
     ResultPoolFundingIndicatorMappingRepository,
+    ResultPoolFundingTocAlignmentRepository,
     BilateralService,
     CapacitySharingBilateralIndicatorTypeHandler,
     InnovationDevelopmentBilateralIndicatorTypeHandler,
