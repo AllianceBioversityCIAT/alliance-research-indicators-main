@@ -1,9 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfig } from './entities/app-config.entity';
-import { cleanObject, isEmpty } from '../../shared/utils/object.utils';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
-import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import {
+  CurrentUserUtil,
+  SetAuditEnum,
+} from '../../shared/utils/current-user.util';
+import { UpdateAppConfigDto } from './dtos/update-app-config.dto';
+import {
+  AppConfigFindAllResult,
+  AppConfigRepository,
+} from './repositories/app-config.repository';
+import { AppConfigSorting } from './enum/app-config-forting.enum';
 
 @Injectable()
 export class AppConfigService {
@@ -11,6 +19,7 @@ export class AppConfigService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUserUtil: CurrentUserUtil,
+    private readonly appConfigRepository: AppConfigRepository,
   ) {
     this.mainRepo = this.dataSource.getRepository(AppConfig);
   }
@@ -21,7 +30,7 @@ export class AppConfigService {
     });
   }
 
-  async updateConfig(key: string, updateData: Partial<AppConfig>) {
+  async updateConfig(key: string, updateData: UpdateAppConfigDto) {
     const config = await this.mainRepo.findOne({
       where: { key },
     });
@@ -29,23 +38,38 @@ export class AppConfigService {
       throw new NotFoundException(`Config with key ${key} not found`);
     }
 
-    const objToUpdate = cleanObject(updateData);
-    const update: QueryDeepPartialEntity<AppConfig> = {};
-
-    if (!isEmpty(objToUpdate?.description)) {
-      update.description = objToUpdate.description;
-    }
-
-    if (!isEmpty(objToUpdate?.simple_value)) {
-      update.simple_value = objToUpdate.simple_value;
-    }
-
-    if (!isEmpty(objToUpdate?.json_value)) {
-      update.json_value = objToUpdate.json_value;
-    }
+    const update: QueryDeepPartialEntity<AppConfig> = {
+      simple_value: updateData?.simple_value,
+      json_value: updateData?.json_value,
+      description: updateData?.description,
+      category: updateData?.category,
+      subcategory: updateData?.subcategory,
+      ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
+    };
 
     await this.mainRepo.update(config.key, update);
 
     return { ...config, ...update };
+  }
+
+  async getAllConfigs(
+    filters: { category?: string; subcategory?: string },
+    sorting?: { field?: AppConfigSorting; order?: 'ASC' | 'DESC' },
+    pagination?: { page?: number; limit?: number },
+    search?: string,
+  ): Promise<AppConfigFindAllResult> {
+    return this.appConfigRepository.findAll(
+      filters,
+      sorting ?? {},
+      pagination,
+      search,
+    );
+  }
+
+  async getCategoriesAndSubcategories(): Promise<{
+    categories: string[];
+    subcategories: string[];
+  }> {
+    return this.appConfigRepository.findAllCategoriesAndSubcategories();
   }
 }
