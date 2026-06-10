@@ -22,6 +22,10 @@ export class AiReportsService {
       savedBulkUploadResult.suggested_status = item.suggested_status;
       savedBulkUploadResult.final_status = item.final_status;
       savedBulkUploadResult.result_id = item.result_id;
+      savedBulkUploadResult.created_by = item.created_by;
+      savedBulkUploadResult.title = item.title;
+      savedBulkUploadResult.indicator_id = item.indicator_id;
+      savedBulkUploadResult.error_message = item.error_message;
       savedBulkUploadResults.push(savedBulkUploadResult);
     }
     await this.aiMetadataRepository.bulkUploadResultsRepository.save(savedBulkUploadResults);

@@ -10,6 +10,7 @@ import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { BulkUploadProcesses } from './bulk-upload-processes.entity';
 import { Result } from '../../results/entities/result.entity';
 import { Indicator } from '../../indicators/entities/indicator.entity';
+import { ResultStatus } from '../../result-status/entities/result-status.entity';
 
 @Entity('bulk_upload_results')
 export class BulkUploadResults extends AuditableEntity {
@@ -80,6 +81,14 @@ export class BulkUploadResults extends AuditableEntity {
         nullable: true,
     })
     error_message?: string;
+
+    @ManyToOne(() => ResultStatus, (resultStatus) => resultStatus.final_status_results)
+    @JoinColumn({ name: 'final_status' })
+    final_status_result?: ResultStatus;
+
+    @ManyToOne(() => ResultStatus, (resultStatus) => resultStatus.suggested_status_results)
+    @JoinColumn({ name: 'suggested_status' })
+    suggested_status_result?: ResultStatus;
 
     @ManyToOne(() => Indicator, (indicator) => indicator.bulkUploadResults)
     @JoinColumn({ name: 'indicator_id' })
