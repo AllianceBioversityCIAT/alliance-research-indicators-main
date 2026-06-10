@@ -47,6 +47,8 @@ export class CreateClarisaSciencePrograms1779190000010
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE IF EXISTS \`clarisa_science_programs\`;`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS \`clarisa_science_programs\`;`,
+    );
   }
 }

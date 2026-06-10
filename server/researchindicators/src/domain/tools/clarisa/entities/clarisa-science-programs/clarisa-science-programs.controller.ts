@@ -1,5 +1,10 @@
 import { Controller, Get, HttpStatus, Param } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ClarisaScienceProgramsService } from './clarisa-science-programs.service';
 import { ResponseUtils } from '../../../../shared/utils/response.utils';
 
@@ -35,7 +40,9 @@ export class ClarisaScienceProgramsController {
     return this.clarisaScienceProgramsService.findByCode(code).then((data) =>
       ResponseUtils.format({
         data,
-        description: data ? 'Science program found' : 'Science program not found',
+        description: data
+          ? 'Science program found'
+          : 'Science program not found',
         status: data ? HttpStatus.OK : HttpStatus.NOT_FOUND,
       }),
     );
