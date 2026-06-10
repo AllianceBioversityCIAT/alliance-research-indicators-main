@@ -261,3 +261,49 @@
 - **Denied-role set**: no GUEST in `SecRolesEnum`; TESTER/GLOBAL/empty-roles/no-user used as the denied cases for the "e.g. GUEST" requirement.
 
 **Final verification:** lint clean, scoped 128/128, full suite 284/1660 green, coverage gate passes, build clean. Reviewer independently re-ran all of it and spot-read every AC-mapped test body for substance.
+
+---
+
+### T-09 — Spec-doc sync + archive disposition — **PASS** (attempt 1/3)
+
+- **Date:** 2026-06-10
+- **Requirements covered:** R-BIL-098 (preparation), proposal §5.8
+- **Attempts:** 1 (Implementer → Reviewer PASS, no rework)
+
+**Attempt 1 — Implementer (documentation-only; 9 files, all `docs/specs/bilateral-module/**`):**
+
+- Parent `design.md` (§3.6 row-scoped banner on the HLOs/indicators row), parent `tasks.md` (T-31 note; §14/§15 supersession markers; new dated §15 re-price entry recording the new envelope, OQ-V2-9 resolution, D-V2-1..8, gated T-10 cleanup), `frontend-handoff.md` (§4.7 banner + 2026-06-10 §12 changelog row), `frontend-data-model.md` (top-of-file banner enumerating superseded sections + §8 row), `pending-items/requirements.md` (R-BIL-077 archive banner + endpoint-inventory marker), `pending-items/design.md` (§6.2/§7.3 banners + §7.4 chain note — `ClarisaCgiarEntitiesService` explicitly stays live), `pending-items/tasks.md` (T-15.12 archive banner + required lineage note), `pending-items/rollout-checklist.md` (env check → `ARI_TOC_INTEGRATION_HOST`; smoke `jq` → new envelope keys — the one substantive replacement, verified against shipped code), `indicator-mapping/backend-response-to-fe.md` (§3 OQ-IM-2 banner — AOW gone from the wire; type-handler material untouched).
+- Deliberately untouched: all `execution.md` audit logs; dated proposals; `toc-mapping-v2/` itself; constitutional docs (independent grep: zero hits for the old read surface).
+
+**Attempt 1 — Reviewer verdict:**
+
+> STATUS: PASS — T-09's doc-only change set fully satisfies its acceptance criterion — no parent doc presents the retired (SP, AOW)-pair read as current behavior; all banners are dated 2026-06-10, link correctly to `toc-mapping-v2/`, correctly state the PRMS code retirement is gated on T-10, and the rollout-checklist's new env-var/envelope assertions match the shipped code exactly. Scope discipline is clean (9 files, all in `docs/specs/bilateral-module/`, no code, no execution logs, constitutional docs untouched).
+
+**Decisions / issues encountered:**
+
+- Parent `requirements.md` was in the intended-file list but contains no old-read surface (R-BIL-020 is implementation-agnostic) — nothing to supersede; left untouched.
+- Reviewer non-blocking observation: `pending-items/design.md` §1/§2 intro summaries still mention PrmsTocService proxying without an inline marker — within AC tolerance (no envelope keys; body sections bannered; dated doc).
+
+**Final verification:** Reviewer independently re-ran the acceptance grep across the module (excluding the active spec + execution logs), literally resolved banner link paths, and verified the rollout-checklist edits against `env.utils.ts`/`.env.example`/the T-03 DTO.
+
+---
+
+## 3. Summary — T-01…T-09 complete (2026-06-10)
+
+All non-gated tasks of spec `2026-06-toc-mapping-v2` are **done**, each on Reviewer PASS attempt 1/3:
+
+| Task | Commit | Outcome |
+| --- | --- | --- |
+| T-01 lambda-toc client | `92001d43` | PASS 1/3 |
+| T-02 level rules util + 2026 constant | `0217a320` | PASS 1/3 |
+| T-03 hlos read reshape (frozen envelope) | `b590cee4` | PASS 1/3 |
+| T-04 read AC matrix + Swagger (FE demo gate) | `b0cce611` | PASS 1/3 |
+| T-05 toc-alignment table/entity/repository | `a13d7875` | PASS 1/3 |
+| T-06 toc_alignments write path | `9a6a3449` | PASS 1/3 |
+| T-07 alignment read-back extension | `44c42f69` | PASS 1/3 |
+| T-08 full write/read-back AC matrix | `539e27bc` | PASS 1/3 |
+| T-09 spec-doc sync + archive disposition | (this commit) | PASS 1/3 |
+
+Final state: 284 suites / 1660 tests green; coverage 80.2/71.5/80.9/80.0 (floor 60); build + lint clean; migration `1779190000015` applied on the dev DB. **T-10 (delete the PRMS pair path) remains GATED** on a recorded cutover-verified note per R-BIL-098 AC.2.
+
+**Open follow-ups (owner Juanca):** RB-4 FE relay (read-back + error contracts — pending send); `chore(format)` commit for the three prettier-dirty quirk files; hygiene deletion of `bilateral.service.spec 2.ts` / `bilateral.service.getScienceProgramsForResult.spec 2.ts`; human `/swagger` + testing-env smoke alongside the 2026-06-11 FE demo; pre-existing `test/app.e2e-spec.ts` supertest typings + `star-results-metadata-workbook` flake (backlog).

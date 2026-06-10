@@ -252,6 +252,8 @@ type BilateralSciencePrograms = {
 
 ### 6.2 `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators` (R-BIL-077, NEW)
 
+> **🗄️ Archived — superseded (2026-06-10).** The envelope below (`aow_status` + `pairs[]` from the PRMS `(SP, AOW)`-pair fan-out) is no longer what the endpoint returns. It was reshaped in place (same `/v1`) to the lambda-toc level-based catalog read — see [`../toc-mapping-v2/design.md`](../toc-mapping-v2/design.md) §4 for the current envelope (`allowed_levels`, `version_locked`, `catalogs[]`) and §13 decisions D-V2-1..D-V2-8. Kept for lineage only.
+
 > Shipped shape (T-15.12) + AOW source revision (T-15.12-rev / D-PI-14). The FE
 > passes **no** params: the backend takes the Science Program from the mapped
 > CLARISA project and each SP's Areas of Work from the `cgiar-entities` catalog,
@@ -379,6 +381,8 @@ export class ClarisaProjectsService {
 
 ### 7.3 `PrmsTocService` + `ClarisaCgiarEntitiesService` (T-15.12, T-15.12-rev)
 
+> **🗄️ Archived — superseded (2026-06-10).** `PrmsTocService` and the `(SP, AOW)`-pair fan-out are no longer used by the hlos read flow — the read is now served by `domain/tools/toc-integration/` (lambda-toc, per `(SP, level)`); see [`../toc-mapping-v2/`](../toc-mapping-v2/). The code still exists; its deletion is **gated** on a cutover-verified note (toc-mapping-v2 T-10, R-BIL-098 AC.2). `ClarisaCgiarEntitiesService` itself stays live (only this flow's usage of it retires).
+
 `PrmsTocService` — same cache pattern as `ClarisaProjectsService`, keyed per `compositeCode` (`<SP>-<AOW>`, e.g. `SP02-AOW03`). `getTocResults(program, areaOfWork)` returns the inner `response` payload; `getTocResultsForPairs(pairs)` fans out in input order. A PRMS **404** ("No work packages found") resolves to a cached **empty payload** (data-absence), NOT a 503 — only `ARI_PRMS_TOC_HOST` missing or a real upstream failure with cold cache throws `ServiceUnavailableException`.
 
 `ClarisaCgiarEntitiesService` (T-15.12-rev / D-PI-14) — live-fetches `GET /api/cgiar-entities?version=2` with the same 5-min TTL + stale-on-error pattern. `getAreasOfWorkBySp(spCodes)` returns each requested SP's active Areas of Work (level-2 "Key Area of Work" entries whose `parent.code` matches), the canonical SP→AOW relation the HLO panel pairs against.
@@ -398,7 +402,7 @@ async getHlosIndicatorsForResult(resultId: number, resultCode: string): Promise<
   3. If null: return `{ ..., mapping_status: "unmapped", science_programs: [], clarisa_project: null }`.
   4. Else: `clarisaProjectsService.findProjectById(mapping.clarisa_project_id)`, filter `project_mappings_array` (`status="Confirmed"`, `portfolio.acronym=activePortfolio`), map each entry, enrich with catalog fallback.
 
-- `getHlosIndicatorsForResult` chain (T-15.12 + T-15.12-rev / D-PI-14):
+- `getHlosIndicatorsForResult` chain (T-15.12 + T-15.12-rev / D-PI-14) — **🗄️ superseded 2026-06-10**: steps 2–4 below (AOW pairing + PRMS fan-out) were replaced by the lambda-toc `(SP, level)` catalog read in [`../toc-mapping-v2/design.md`](../toc-mapping-v2/design.md) §4; only the step-1 context → mapping walk survives:
   1. Same context → mapping → `clarisaProjectsService.findProjectById` walk as the SP picker (unmapped / project-gone short-circuits return `aow_status: "unmapped"`).
   2. `deriveScienceProgramCodes(project)` — Confirmed, level-1, prefix `"SP"`, active-portfolio SP codes (deduped, sorted).
   3. `clarisaCgiarEntitiesService.getAreasOfWorkBySp(spCodes)` → AOWs per SP from the catalog; build one `(program, areaOfWork)` pair per SP × AOW. No pairs → `aow_status: "no_aow_mappings"`.

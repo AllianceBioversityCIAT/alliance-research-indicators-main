@@ -27,7 +27,7 @@ Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | [x] done (2026-05-26) |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | [x] done (2026-05-26) |
 | T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | [x] done (2026-05-26) |
-| T-15.12 | `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint | R-BIL-077 | [x] done (2026-05-27) |
+| T-15.12 | `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint | R-BIL-077 | [x] done (2026-05-27) — **read superseded 2026-06-10** by [`../toc-mapping-v2/`](../toc-mapping-v2/); code retirement gated on its T-10 |
 | T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | [x] done (2026-05-25) |
 | T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | [x] done (2026-05-26) |
 | T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | R-BIL-080 (UI) | [x] done (2026-05-26) |
@@ -304,6 +304,8 @@ graph TD
 ---
 
 ### T-15.12 — `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint
+
+> **🗄️ Archived — superseded (2026-06-10).** The read this task shipped (PRMS `(SP, AOW)`-pair fan-out, `aow_status` + `pairs[]`) was replaced by the lambda-toc level-based catalog read — see [`../toc-mapping-v2/`](../toc-mapping-v2/) (D-V2-1..D-V2-8; OQ-V2-9 → new table `result_pool_funding_toc_alignment`). **Lineage note:** the AOW-from-`cgiar-entities` work below (T-15.12-rev / D-PI-14) fed the superseded read only and is retired at the toc-mapping-v2 **T-10 cutover** — code deletion (`domain/tools/prms-toc/`, `ARI_PRMS_TOC_HOST`, AOW fan-out remnants) is **gated** on a recorded cutover-verified note (R-BIL-098 AC.2). Until then `PrmsTocService` remains in code, unused by the hlos read flow. `ClarisaCgiarEntitiesService` / `getAreasOfWorkBySp` stay live (only this flow's usage goes).
 
 - **Requirements covered:** R-BIL-077 + NFR-BIL-073
 - **Files touched (as built):**

@@ -201,10 +201,10 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - `docs/specs/bilateral-module/pending-items/` (archive banner on AOW-pair sections; T-15.12 lineage note)
 - **Description:** Mark the retired (SP, AOW) read contract as superseded by this spec; keep contract/SP-resolution/alignment GET-PATCH material live. Record OQ-V2-9 resolution and D-V2-* decisions where the parent docs reference the old envelope. No code.
 - **Acceptance / done check:**
-  - [ ] No parent doc presents `pairs[]`/`aow_status` as current behavior; banners link here.
+  - [x] No parent doc presents `pairs[]`/`aow_status` as current behavior; banners link here (9 docs bannered/synced; Reviewer grep-verified; constitutional docs needed nothing).
 - **Dependencies:** T-04, T-08
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** done — 2026-06-10, Reviewer PASS attempt 1 (see `execution.md`)
 
 ### T-10 — Post-cutover cleanup: delete the PRMS pair path — **GATED**
 
@@ -270,8 +270,8 @@ Per template §5: lint + unit green per task; migration forward/revert verified 
 
 ## 8. Done definition
 
-- [ ] T-01…T-09 done (T-10 separately gated on cutover verification).
-- [ ] All R-BIL-090…097 ACs checked; R-BIL-098 prepared (T-09) and executed (T-10) post-gate.
+- [x] T-01…T-09 done (T-10 separately gated on cutover verification). *(Completed 2026-06-10; every task Reviewer PASS attempt 1.)*
+- [x] All R-BIL-090…097 ACs checked (T-04/T-08 test matrices); R-BIL-098 prepared (T-09) — execution (T-10) pending the cutover gate.
 - [ ] Coverage green; Swagger current; migration reverts cleanly.
 - [ ] Frozen read-back shape relayed to the STAR FE; OQ statuses relayed to BA.
 - [ ] Rollout note (date, owner, backout = revert PR + `migration:revert`) recorded here.

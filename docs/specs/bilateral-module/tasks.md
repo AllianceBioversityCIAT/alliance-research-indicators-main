@@ -690,7 +690,7 @@ graph TD
 
 ### T-31 — SP ToC sync module + cron
 
-- **Status:** **DROPPED (2026-05-27)** — fully superseded by the live-proxy pattern shipped in T-15.12 (commit `907993e7`). The SP catalog half is owned by T-15.4 + T-15.11 + the live CLARISA `/api/projects` proxy; the HLO/indicator half is owned by `PrmsTocService` + `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators`, which derives `(program, areaOfWork)` pairs from CLARISA at request time and fans out to PRMS ToC (cached 5 min per pair). No cron, no local persistence — no work remaining for this task. See [§15 — 2026-05-27 re-price entry](#15-re-price-log).
+- **Status:** **DROPPED (2026-05-27)** — fully superseded by the live-proxy pattern shipped in T-15.12 (commit `907993e7`). The SP catalog half is owned by T-15.4 + T-15.11 + the live CLARISA `/api/projects` proxy; the HLO/indicator half is owned by `PrmsTocService` + `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators`, which derives `(program, areaOfWork)` pairs from CLARISA at request time and fans out to PRMS ToC (cached 5 min per pair). No cron, no local persistence — no work remaining for this task. See [§15 — 2026-05-27 re-price entry](#15-re-price-log). **⚠️ Superseded 2026-06-10:** the HLO/indicator half no longer reads from PRMS per `(SP, AOW)` pair — `GET .../hlos-indicators` was reshaped in place to a lambda-toc level-based catalog read (see [`./toc-mapping-v2/`](./toc-mapping-v2/) and the [§15 — 2026-06-10 entry](#15-re-price-log)). `PrmsTocService` remains in code only until the gated toc-mapping-v2 T-10 cleanup lands.
 - **Size:** L → 0 (dropped)
 - **Dependencies:** T-01
 - **Requirements covered:** R-BIL-060, R-BIL-061, R-BIL-062, NFR-BIL-003, NFR-BIL-004 — all delivered via the live-proxy path (no local catalog of HLOs/indicators is maintained).
@@ -871,7 +871,7 @@ Phase 1.5 carries the two PO clarifications from 2026-05-25 (CLARISA-source SPs;
 | T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | `[x]` done (2026-05-26) — inline statuses on §8/§9 task headers + log entry in §15 | — |
 | T-15.10 | `ClarisaProjectsService` tool + 5-min cache | `[x]` done (2026-05-26) | `f9f6f851` |
 | T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | `[x]` done (2026-05-26) | `92e2fd52` |
-| T-15.12 | `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint | `[x]` done (2026-05-27) | `907993e7` |
+| T-15.12 | `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint | `[x]` done (2026-05-27) — **read shape superseded 2026-06-10** by [`./toc-mapping-v2/`](./toc-mapping-v2/) (see [§15 — 2026-06-10](#15-re-price-log)) | `907993e7` |
 | T-15.13 | Migration + entity for `bilateral_project_mapping` | `[x]` done (2026-05-25) | `8b59a099` |
 | T-15.14 | `BilateralProjectMappingService` + controller + DTOs | `[x]` done (2026-05-26) | `b7bdc237` |
 | T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | `[x]` done (2026-05-26) | `9b539a7d` |
@@ -914,12 +914,21 @@ Triggered by T-15.12 shipping end-to-end (commit `907993e7` on `AC-1594-bilatera
 
 | Task | Prior status | New status (2026-05-27) | Notes |
 | --- | --- | --- | --- |
-| **T-15.12** | `blocked (OQ-RV-2)` | **`[x]` done** (`907993e7`) | Endpoint `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators` (no params; AOW derived from CLARISA). Response carries `aow_status: 'unmapped' \| 'no_aow_mappings' \| 'has_aow'` + `pairs[]` grouped by `(program, area_of_work)`. 5-min in-memory cache per pair; warm-on-error / cold-503. 13 PrmsTocService unit tests + 6 BilateralService.getHlosIndicatorsForResult scenarios green; full suite 279/279 (1580 tests). |
+| **T-15.12** | `blocked (OQ-RV-2)` | **`[x]` done** (`907993e7`) | Endpoint `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators` (no params; AOW derived from CLARISA). Response carries `aow_status: 'unmapped' \| 'no_aow_mappings' \| 'has_aow'` + `pairs[]` grouped by `(program, area_of_work)`. 5-min in-memory cache per pair; warm-on-error / cold-503. 13 PrmsTocService unit tests + 6 BilateralService.getHlosIndicatorsForResult scenarios green; full suite 279/279 (1580 tests). **⚠️ Read shape superseded 2026-06-10 — see the 2026-06-10 entry below.** |
 | **T-31 (SP ToC sync module + cron)** | Scope narrowed → S/M (pending T-15.12) | **DROPPED** | Fully superseded — see §8 entry. No cron, no local catalog of HLOs/indicators; the live proxy in T-15.12 handles every read. Sole cleanup: drop the unused `ARI_BILATERAL_SP_TOC_SYNC_ENABLED` env flag on next sweep. |
 | **T-32 (Admin SP ToC sync endpoint + SSR page)** | Likely DROPPED | **DROPPED** | Confirmed — no admin trigger needed because there is no local catalog to refresh. Restarting the service flushes the in-memory cache if ever urgent; not worth a dedicated admin surface for a 5-min TTL. |
 | OQ-RV-2 (PRMS ToC endpoint URL/auth) | open | **closed 2026-05-27** | Resolved via `ARI_PRMS_TOC_HOST=https://prtest-back.ciat.cgiar.org` in `.env`. Same value across dev/staging/prod during the testing wave. Documented in [`./pending-items/rollout-checklist.md` §2.1](./pending-items/rollout-checklist.md). |
 | OQ-IM-2 (AOW data source — FE blocker) | open | **answered 2026-05-27** | Today's read-only audit (delivered to FE; see Slack/PR thread) confirms: AOW is a real CGIAR ToC level-2 entity, sourced from CLARISA (NOT PRMS), 1:1 with indicators via `(SP × AOW) → ToC result → indicator`. The persist-vs-proxy decision now belongs in a future `indicator-mapping/area-of-work-model/` sub-spec — the T-15.12 endpoint already serves the data live. |
 
 **Net effect**: Phase 3+ effort shrinks by another L (T-31) + M (T-32) — both confirmed dropped, not just narrowed. Phase 1.5 wave is now fully shipped on dev for code-only tasks; the remaining open items are staging+prod rollout (T-15.7 §4.2/§4.3) and operational seeding of `bilateral_project_mapping` rows.
+
+### 2026-06-10 — toc-mapping-v2 supersedes the T-15.12 read shape
+
+Triggered by the [`./toc-mapping-v2/`](./toc-mapping-v2/) sub-spec landing (T-01..T-08 done, Reviewer-PASSed, branch `AC-1594-bilateral-module-v2`). `GET /api/v1/results/:resultCode/pool-funding-alignment/hlos-indicators` was **reshaped in place, same `/v1`** (D-V2-2): the (SP, AOW)-pair fan-out to PRMS public-results-framework is gone from the wire — `pairs[]` / `aow_status` / `no_aow_mappings` no longer exist. The endpoint now returns `{ result_code, mapping_status, clarisa_project, result_type, allowed_levels, version_locked, catalogs[] }`, sourced per `(SP, level)` from lambda-toc via the new `domain/tools/toc-integration/` module (env `ARI_TOC_INTEGRATION_HOST`). PATCH alignment accepts `toc_alignments[]` (atomic 400s with six error codes — D-V2-8; 409 `toc_mapping_version_locked` gate — D-V2-7), and GET/PATCH alignment read-back carries `version_locked` + snapshot-sourced `toc_alignments[]` (D-V2-5). **OQ-V2-9 resolved as a new table** `result_pool_funding_toc_alignment` (proposal Option A, D-V2-1). Full decision set: D-V2-1..D-V2-8 in `toc-mapping-v2/design.md` §13.
+
+| Task | Prior status | New status (2026-06-10) | Notes |
+| --- | --- | --- | --- |
+| **T-15.12** | `[x]` done (`907993e7`) | **read shape superseded** | The endpoint stays live, but with the toc-mapping-v2 envelope. `PrmsTocService` + the AOW fan-out still exist in code, unused by the hlos read flow. |
+| **PRMS pair machinery cleanup** | — | **GATED (toc-mapping-v2 T-10)** | Code deletion (`domain/tools/prms-toc/`, `ARI_PRMS_TOC_HOST`, AOW fan-out remnants in `bilateral.service.ts`) does NOT start until a cutover-verified note is recorded in `toc-mapping-v2/tasks.md` §7 (R-BIL-098 AC.2 — its own PR). |
 
 (Future re-price entries appended below in dated subsections as the spec evolves.)

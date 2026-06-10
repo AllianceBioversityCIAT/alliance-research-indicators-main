@@ -13,7 +13,7 @@
 | OQ / Item | Backend response | Why | Pre-condition |
 |---|---|---|---|
 | **OQ-IM-1** — contribution body shape (Path A) | **Deferred — needs PO sign-off** | Path A overturns R-BIL-031 (the spec explicitly mandates the 5 polymorphic types per D5/D12). | PO must explicitly retire R-BIL-031 + D5 + D12 (or amend them). |
-| **OQ-IM-2** — AOW data source (Path A) | **Deferred — needs BA sign-off + ingestion source decision** | AOW is not in the current backend spec at all. New entity + FK + ingestion pipeline. | BA confirms (a) AOW is a real taxonomy level, (b) where rows come from (CLARISA / PRMS / manual seed), and (c) indicator↔AOW cardinality (1:1 or many-to-many). |
+| **OQ-IM-2** — AOW data source (Path A) | **Deferred — needs BA sign-off + ingestion source decision** *(🗄️ superseded 2026-06-10 — AOW dropped from the read; see §3 banner)* | AOW is not in the current backend spec at all. New entity + FK + ingestion pipeline. | BA confirms (a) AOW is a real taxonomy level, (b) where rows come from (CLARISA / PRMS / manual seed), and (c) indicator↔AOW cardinality (1:1 or many-to-many). |
 | **OQ-IM-3** — `GET .../contribution?lever-code=` route (Path A) | **Accepted — implementable now** | Purely additive. No schema change. Doesn't conflict with any approved requirement. | Final body shape depends on OQ-IM-1's outcome — if OQ-IM-1 lands first, the GET returns the simplified `{ reason_code, quantitative_contribution_value? }`. If not, the GET returns the current polymorphic body. Either way the route can ship. |
 | **Bonus — `is_quantitative` on `indicator`** | **Accepted — implementable now** | One nullable column on a catalog table. Additive. | None — but the column source-of-truth needs BA confirmation if the catalog is ever auto-synced from PRMS/CLARISA (otherwise it stays a manually-seeded value). |
 | **Bonus — `disabled_reason` on panel response** | **Accepted — implementable now** | Server-computed string; surfaced on the existing response shape. | BA / FE align on the reason taxonomy (the strings the panel renders verbatim). |
@@ -82,6 +82,8 @@ If Path A is approved, OQ-IM-4 (where the "Why is this being reported?" dropdown
 ---
 
 ## 3. OQ-IM-2 — AOW data source — backend response
+
+> **🗄️ Archived — superseded (2026-06-10).** The AOW question this section deliberates is moot: AOW is gone from the ToC read entirely. After the interim answer (T-15.12 / D-PI-14: AOW from the `cgiar-entities` catalog feeding a PRMS `(SP, AOW)`-pair fan-out), `GET .../hlos-indicators` was reshaped to the lambda-toc **level-based catalog read** (`allowed_levels` + `catalogs[]` per `(SP, level)` — no AOW on the wire). See [`../toc-mapping-v2/`](../toc-mapping-v2/). No `area_of_work` entity will be built. This section is kept for lineage only; the rest of this doc (OQ-IM-1, OQ-IM-3, bonuses, type handlers) is unaffected.
 
 ### Backend position: DEFERRED pending BA sign-off
 

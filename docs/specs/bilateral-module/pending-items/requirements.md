@@ -361,6 +361,8 @@ The system SHALL return the SPs CLARISA associates with the result's mapped bila
 
 ### R-BIL-077 — `GET /api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=...`
 
+> **🗄️ Archived — superseded (2026-06-10).** This requirement's read lineage (the `?sp_codes=` stub → the T-15.12 no-params PRMS `(SP, AOW)`-pair read with `aow_status` + `pairs[]`) is retired. `GET .../hlos-indicators` now serves the lambda-toc **level-based catalog read** (`{ result_code, mapping_status, clarisa_project, result_type, allowed_levels, version_locked, catalogs[] }`) specified in [`../toc-mapping-v2/`](../toc-mapping-v2/) (decisions D-V2-1..D-V2-8; OQ-V2-9 → new table `result_pool_funding_toc_alignment`). The `PrmsTocService` machinery delivered for this requirement is still in code but unused — its deletion is gated on a cutover-verified note (toc-mapping-v2 T-10, R-BIL-098 AC.2). Kept below for lineage only.
+
 The system SHALL return the HLOs/indicators PRMS ToC exposes for the given SP codes.
 
 - **As a** STAR FE engineer rendering the "Map HLOs and/or indicators" panel
@@ -582,7 +584,7 @@ No OpenSearch decorations on new tables.
 | Verb | Path | Auth | Notes |
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/results/:resultCode/pool-funding-alignment/science-programs` | ROAR JWT | NEW (R-BIL-076). |
-| `GET` | `/api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=...` | ROAR JWT | NEW (R-BIL-077). Returns 503 until OQ-RV-2 closes. |
+| `GET` | `/api/v1/results/:resultCode/bilateral/hlos-indicators?sp_codes=...` | ROAR JWT | NEW (R-BIL-077). Returns 503 until OQ-RV-2 closes. **🗄️ Superseded 2026-06-10** — read reshaped to the lambda-toc level-based catalog envelope; see [`../toc-mapping-v2/`](../toc-mapping-v2/). |
 | `GET` | `/api/bilateral-project-mappings?page=&limit=&search=&is_active=&source=` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080). |
 | `POST` | `/api/bilateral-project-mappings` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080). 409 on partial-unique conflict. |
 | `PATCH` | `/api/bilateral-project-mappings/:id` | `CENTER_ADMIN`, `SYSTEM_ADMIN` | NEW (R-BIL-080) — edit notes / clarisa_project_id / source. |

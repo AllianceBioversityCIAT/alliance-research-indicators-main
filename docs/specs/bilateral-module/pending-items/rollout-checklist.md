@@ -39,6 +39,11 @@ npm run build               # builds dist/
 # Confirm env vars target the right DB:
 echo "$ARI_MYSQL_HOST $ARI_MYSQL_DATABASE"   # sanity — must match expected env
 
+# 🗄️ SUPERSEDED (2026-06-10): the hlos-indicators read no longer calls PRMS —
+# it reads lambda-toc via ARI_TOC_INTEGRATION_HOST (see ../toc-mapping-v2/
+# rollout notes, design.md §12). Check that var instead. ARI_PRMS_TOC_HOST is
+# only needed while the unused PrmsTocService code remains (removed at the
+# gated toc-mapping-v2 T-10 cleanup). Original check kept for lineage:
 # T-15.12 / R-BIL-077 — confirm PRMS ToC host is set on the deployed env:
 echo "$ARI_PRMS_TOC_HOST"   # should print https://prtest-back.ciat.cgiar.org
 # When unset, GET .../pool-funding-alignment/hlos-indicators returns 503 with
@@ -92,15 +97,16 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   | jq '.status, .data.mapping_status'
 # Expected: 200, and "mapped" or "unmapped" (both are valid).
 
-# E. HLOs/indicators endpoint (T-15.12) — must respond 200 regardless of mapping state:
+# E. HLOs/indicators endpoint (T-15.12) — 🗄️ SUPERSEDED (2026-06-10): the
+# endpoint no longer returns aow_status / pairs[] — it returns the lambda-toc
+# level-based envelope (mapping_status, allowed_levels, version_locked,
+# catalogs[]). Use the smoke check from ../toc-mapping-v2/ instead, e.g.:
 curl -s -H "Authorization: Bearer $TOKEN" \
   "$BASE/api/v1/results/<known-bilateral-result-code>/pool-funding-alignment/hlos-indicators" \
-  | jq '.status, .data.aow_status, (.data.pairs | length)'
-# Expected: 200, and one of:
-#   "unmapped"        — no bilateral_project_mapping for this result's contract
-#   "no_aow_mappings" — mapped but nothing to show (no SP, or PRMS has no ToC data for any pair)
-#   "has_aow"         — mapped + ≥ 1 (SP, AOW) pair with PRMS data; pairs[] populated
-# A 503 here usually means ARI_PRMS_TOC_HOST is unset OR PRMS upstream is down.
+  | jq '.status, .data.mapping_status, .data.version_locked, (.data.catalogs | length)'
+# Expected: 200, "mapped" or "unmapped", a boolean, and an integer (0 is valid).
+# A 503 here usually means ARI_TOC_INTEGRATION_HOST is unset OR lambda-toc is
+# down with a cold cache.
 ```
 
 If any of A–D fails, **stop and proceed to §3 rollback**. Don't continue to the next env.
