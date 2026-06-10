@@ -114,12 +114,12 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - `src/domain/entities/bilateral/bilateral.controller.ts` (Swagger annotations)
 - **Description:** Update service/controller specs for the reshaped read: mapped (multi-SP, multi-level), unmapped, empty upstream catalog, `allowed_levels: []` (zero upstream calls asserted), `version_locked`, target resolution (with/without 2026 target). Fixtures = handoff §2 payloads (FE parity). Update `@ApiOperation`/`@ApiResponse` DTO annotations.
 - **Acceptance / done check:**
-  - [ ] All R-BIL-090/091 ACs covered by passing tests; coverage ≥ 60% holds.
-  - [ ] `/swagger` renders the new response schema.
-  - [ ] This task closing = read path ready for FE integration (2026-06-11 demo).
+  - [x] All R-BIL-090/091 ACs covered by passing tests; coverage ≥ 60% holds (global 80.0/70.7/80.8/79.8).
+  - [x] `/swagger` renders the new response schema. *(Verified programmatically — typed `@ApiResponse` + `DECORATORS.API_MODEL_PROPERTIES_ARRAY` metadata asserted in controller spec; eyeball the rendered page alongside the FE demo.)*
+  - [x] This task closing = read path ready for FE integration (2026-06-11 demo).
 - **Dependencies:** T-03
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** done — 2026-06-10, Reviewer PASS attempt 1 (see `execution.md`)
 - **Skills:** `nestjs-expert`
 
 ### T-05 — Migration + entity + repository for `result_pool_funding_toc_alignment`
@@ -262,7 +262,7 @@ Per template §5: lint + unit green per task; migration forward/revert verified 
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-06-09 | lambda-toc DNS resolution caveat (needed 8.8.8.8 locally) | Flag to infra before testing deploy; warm-cache resilience absorbs blips | Juanca | open |
 | RB-2 | 2026-06-09 | Sole-consumer assumption for in-place reshape | **Verified 2026-06-09 (T-02):** server-side, `hlos-indicators` + `aow_status`/`no_aow_mappings` are referenced only inside `src/domain/entities/bilateral/` (controller/service/DTO + specs); client-side, only STAR FE surfaces (`api.service.ts`, `hlo-selection-modal`, `pool-funding-alignment.interface.ts`, fixtures), all migrating in lockstep per the client's own toc-mapping-v2 spec. No third-party consumers. In-place reshape cleared. | Juanca | closed |
-| RB-3 | 2026-06-09 | FE demo deadline 2026-06-11 | T-01→T-03→T-04 prioritized; write path parallelizable | Juanca | open |
+| RB-3 | 2026-06-09 | FE demo deadline 2026-06-11 | **Resolved 2026-06-10:** T-01→T-04 all landed; read path FE-ready (handoff-parity fixtures, Swagger schema wired). Remaining: human smoke on testing env + `/swagger` eyeball during the demo window. | Juanca | closed |
 | RB-4 | 2026-06-09 | OQ-V2-2/3/5/6 pending BA | Build assumptions recorded (requirements §11–12); none block build | BA via Juanca | open |
 
 ---

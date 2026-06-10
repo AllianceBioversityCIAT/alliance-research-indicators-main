@@ -110,3 +110,34 @@
 - Manual smoke vs live testing env deferred to the T-04/FE-demo window (covered meanwhile by deep-equality fixtures mirroring handoff §2).
 
 **Final verification:** lint clean, 79/79 scoped bilateral tests, full suite 282/1611 green, build clean. Reviewer independently re-ran lint, scoped bilateral + toc-integration + repository tests (43 additional), and build.
+
+---
+
+### T-04 — Read-path tests + Swagger (FE demo gate) — **PASS** (attempt 1/3)
+
+- **Date:** 2026-06-10
+- **Requirements covered:** R-BIL-090 AC.1–AC.5, R-BIL-091 AC.1–AC.2, NFR-BIL-091; closes risk RB-3 (read path FE-demo ready)
+- **Attempts:** 1 (Implementer → Reviewer PASS, no rework)
+
+**Attempt 1 — Implementer:**
+
+- Files modified (all under `server/researchindicators/src/domain/entities/bilateral/`):
+  - `bilateral.service.getHlosIndicatorsForResult.spec.ts` — 6 → 8 tests; full AC matrix: handoff §2→§4 parity test (toc_result_id 5187 / indicator 5972 / 11-entry 2020–2030 `targets[]` → single `('10', 2026)`; sibling 5973 without 2026 entry → `(null, 2026)`; deep `toEqual` proves `targets[]`/`unit_messurament`/`type_name` never reach the wire — AC.3); multi-SP × multi-level Policy Change (SP01+SP03 × OUTCOME+EOI; per-SP/per-level entries in rule order; EOI forces `aow_code: null`; empty (SP03, OUTCOME) keeps its level entry — AC.1/AC.5, R-BIL-091 AC.1); AC.2 absence assertions completed; Knowledge Product zero-upstream (R-BIL-091 AC.2); AC.4 + `version_locked` covered. NFR-BIL-091: exactly one `getTocResultsForSps(['SP01','SP03'], ['OUTCOME','EOI'])` batched call asserted.
+  - `bilateral.controller.spec.ts` — delegation (exact args, single call, `ResponseUtils.format` wrapper, `data` identity) + new Swagger-metadata describe asserting the real `DECORATORS.API_RESPONSE` / `DECORATORS.API_MODEL_PROPERTIES_ARRAY` keys: typed 200 + 404 + 503 on the hlos handler; response classes declare exactly the 7 frozen top-level fields, none of the legacy keys; nested classes annotated to the indicator leaf. Permission/role tests intact.
+  - `dto/bilateral-hlos-indicators.response.dto.ts` — interfaces → `@ApiProperty` classes in place (wire-neutral: no class-transformer decorators; service builds plain literals, classes used type-position only; examples mirror handoff §4). Added `BilateralTocProjectRef`.
+  - `bilateral.controller.ts` — `@ApiResponse` 200 (typed `BilateralHlosIndicatorsResponse`) / 404 / 503 on the hlos handler; controller-level `@ApiTags`/`@ApiBearerAuth` verified, not duplicated.
+- Verification (from `server/researchindicators/`): `npm run lint` green (quirk files restored); scoped 2 suites / 24 tests; full `npm test` 282 suites / 1616 tests pass; `npm run build` green; `npm run test:cov` global 80.02% stmts / 70.66% branches / 80.77% funcs / 79.79% lines (floor 60%).
+- Swagger verification level: programmatic (build + Reflect-metadata assertions on the exact keys SwaggerModule consumes). Human eyeball of `/swagger` advisable alongside the 2026-06-11 demo.
+
+**Attempt 1 — Reviewer verdict:**
+
+> STATUS: PASS — T-04 fully covers R-BIL-090 AC.1–AC.5 and R-BIL-091 AC.1–AC.2 with passing, handoff-parity tests, converts the response DTO to `@ApiProperty` classes wire-neutrally, and wires the frozen §5 envelope into Swagger with meaningful metadata assertions; lint/tests/coverage (80/70.7/80.8/79.8 ≥ 60%) and type-check all re-verified green. The 404/503 `@ApiResponse` decorators are an accepted spec-conformant addition (design §5 lists those errors); minor non-blocking note: `toc-integration.service.spec.ts` (T-01 scope) verifies fan-out call count/cache but has no explicit mock-ordering parallel-dispatch assertion — parallelism is structural via `Promise.all`.
+
+**Decisions / issues encountered:**
+
+- **First `@ApiResponse` usage in the repo** (no other handler uses it): adjudicated spec-conformant — design §5 lists 404/503 as the endpoint's error surface and requirements §9 mandates Swagger on every touched handler. Precedent now set for the module.
+- Per-method spec file extended (`bilateral.service.getHlosIndicatorsForResult.spec.ts`) rather than `bilateral.service.spec.ts` named in tasks.md — repo convention is per-method spec files; tasks.md naming predates the split.
+- Pre-existing committed Finder-duplicates `bilateral.service.spec 2.ts` / `bilateral.service.getScienceProgramsForResult.spec 2.ts` remain on the branch (out of T-03/T-04 scope; jest does not pick them up). **Follow-up: delete in a hygiene commit.** Owner: Juanca.
+- NFR-BIL-091 parallel-dispatch mock-ordering assertion absent from T-01's spec (parallelism structural via `Promise.all`) — noted, non-blocking; optional T-08/T-09 hardening.
+
+**Final verification:** lint clean, 24/24 scoped, full suite 282/1616 green, build clean, coverage floor holds. Reviewer independently re-ran lint, scoped tests, `test:cov`, and `tsc --noEmit`; RB-3 closed in `tasks.md` §7.

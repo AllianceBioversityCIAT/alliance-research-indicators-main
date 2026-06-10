@@ -17,27 +17,48 @@ import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
-import { TocResult } from '../../tools/toc-integration/dto/toc-integration.types';
+import {
+  TocIndicatorTarget,
+  TocResult,
+} from '../../tools/toc-integration/dto/toc-integration.types';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-090, R-BIL-091, R-BIL-097
+// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-04 / R-BIL-090, R-BIL-091, NFR-BIL-091
 //
-// Focused spec for the reshaped BilateralService.getHlosIndicatorsForResult
-// (frozen FE envelope, design §5 / §6.1). Minimal coverage for T-03 — the
-// exhaustive R-BIL-090/091 AC matrix lands in T-04. Covers:
+// Per-method spec for the reshaped BilateralService.getHlosIndicatorsForResult
+// (frozen FE envelope, design §5 / §6.1 / §11). T-03 landed the base shape
+// coverage; T-04 extends it to the full R-BIL-090/091 AC matrix. Covers:
 //
-//   1. 404 when the result does not exist
+//   1. 404 when the result does not exist (R-BIL-090 errors)
 //   2. Unmapped result → 'unmapped', catalogs: [], top-level fields present,
-//      zero upstream ToC calls
+//      zero upstream ToC calls (R-BIL-090 AC.4)
 //   3. Stale CLARISA project → 'unmapped' with the snapshot project ref
 //   4. Mapped happy path → one catalogs[] entry per SP × allowed level, wire
 //      mapping (aow_code / unit_of_measurement / single 2026 target), empty
-//      upstream catalogs keep their level entry, no legacy keys
-//   5. allowed_levels: [] (e.g. Knowledge Product) → catalogs: [], zero
-//      upstream calls
-//   6. version_locked flag off report_year_id vs MAPPABLE_LIVE_VERSION
+//      upstream catalogs keep their level entry (AC.5), no legacy keys (AC.2)
+//   5. Handoff §2 fixture parity → SP01 OUTPUT payload mirrored VERBATIM
+//      (toc_result 5187 / indicator 5972, 11-entry targets[]) maps to the
+//      handoff §4 wire shape; indicator without a 2026 target resolves to
+//      (null, 2026); the raw targets[] never reaches the wire (AC.3)
+//   6. Multi-SP × multi-level (Policy Change: SP01+SP03 × OUTCOME+EOI) →
+//      one catalogs[] entry per SP, one levels[] entry per allowed level,
+//      EOI forces aow_code: null, single batched fan-out with exact args
+//      (R-BIL-090 AC.1, R-BIL-091 AC.1, NFR-BIL-091)
+//   7. allowed_levels: [] (Knowledge Product) → catalogs: [], ZERO
+//      TocIntegrationService calls (R-BIL-091 AC.2)
+//   8. version_locked flag off report_year_id vs MAPPABLE_LIVE_VERSION,
+//      both branches (R-BIL-097 read flag)
+//
+// Fixture parity: the `handoffTocResult` builder mirrors the upstream payload
+// in the STAR client handoff §2 (backend-handoff.md) — same field names AND
+// values (incl. the upstream typo `unit_messurament`, `wp_short_name`,
+// `type_value`, per-year 2020–2030 `targets[]`) so these tests and the FE
+// Jest fixtures stay contract-identical (D-2 / requirements §11 D-2).
 //
 // CLARISA + lambda-toc upstreams are stubbed — we don't go to the wire here.
+// `TocIntegrationService` is mocked directly: cache/parallelism internals are
+// covered by `toc-integration.service.spec.ts`, not re-tested here.
 
 const sp = (
   id: number,
@@ -110,7 +131,63 @@ const tocResult = (
   ...overrides,
 });
 
-describe('BilateralService.getHlosIndicatorsForResult (T-03)', () => {
+// Handoff §2: "targets — per-year, 2020–2030" (11 entries). The 2026 entry
+// carries the handoff's verbatim `{ "target_value": "10", "target_date":
+// "2026" }`; the other ten years exist solely so AC.3 proves the raw array
+// is resolved server-side and never reaches the wire.
+const elevenYearTargets = (): TocIndicatorTarget[] =>
+  Array.from({ length: 11 }, (_, i) => {
+    const year = 2020 + i;
+    return {
+      target_value: year === 2026 ? '10' : String(i),
+      target_date: String(year),
+    };
+  });
+
+// Upstream payload mirrored VERBATIM from the STAR client handoff §2
+// (lambda-toc GET …/category/OUTPUT/initiative/SP01) — fixture parity with
+// the FE Jest fixtures. A second indicator without a 2026 target covers the
+// `(target_value: null, target_year: 2026)` branch of R-BIL-090 AC.3.
+const handoffTocResult = (): TocResult => ({
+  toc_result_id: 5187,
+  toc_internal_id: '3ca9f07b-…',
+  title: 'HLO1.AOW1.IO1 Steer to impact',
+  description: 'Market intelligence is packaged into…',
+  toc_type_id: null,
+  toc_level_id: null,
+  official_code: 'SP01',
+  work_package_id: 'd65e4401-…',
+  wp_short_name: 'AOW01',
+  phase: '99134294-…',
+  version_id: '7e94b127-…',
+  indicators: [
+    {
+      indicator_id: 5972,
+      toc_result_indicator_id: '76f57e62-…',
+      related_node_id: '70f1200f-…',
+      indicator_description: 'Number of new market intelligence briefs',
+      unit_messurament: 'Number',
+      type_value: 'Number of knowledge products',
+      type_name: 'Number of knowledge products',
+      location: 'global',
+      targets: elevenYearTargets(),
+    },
+    {
+      // No 2026 entry in targets[] → resolves to (null, 2026).
+      indicator_id: 5973,
+      toc_result_indicator_id: '76f57e63-…',
+      related_node_id: '70f12010-…',
+      indicator_description: 'Number of events where Market Intelligence…',
+      unit_messurament: 'Number',
+      type_value: 'custom',
+      type_name: 'custom',
+      location: 'global',
+      targets: [{ target_value: '5', target_date: '2025' }],
+    },
+  ],
+});
+
+describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
   let service: BilateralService;
 
   const findContext = jest.fn();
@@ -270,9 +347,137 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03)', () => {
     // No legacy keys anywhere (R-BIL-090 AC.2) and no raw targets array.
     expect(out).not.toHaveProperty('pairs');
     expect(out).not.toHaveProperty('aow_status');
+    expect(out).not.toHaveProperty('no_aow_mappings');
     expect(
       out.catalogs[0].levels[0].toc_results[0].indicators[0],
     ).not.toHaveProperty('targets');
+  });
+
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-04 / R-BIL-090 AC.3 (fixture parity: handoff §2 → §4)
+  it('maps the handoff §2 SP01 OUTPUT payload to the handoff §4 wire shape — single 2026 target resolved, null when no 2026 target exists', async () => {
+    findContext.mockResolvedValueOnce(context());
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 123,
+      clarisa_project_short_name: 'EMBRAPA - …',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 123,
+      short_name: 'EMBRAPA - …',
+      project_mappings_array: [sp(1, 'SP01')],
+    });
+    getTocResultsForSps.mockResolvedValueOnce(
+      new Map([['SP01:OUTPUT', [handoffTocResult()]]]),
+    );
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(out.mapping_status).toBe('mapped');
+    expect(out.clarisa_project).toEqual({
+      id: 123,
+      short_name: 'EMBRAPA - …',
+    });
+    // Deep equality is exhaustive: it also proves the 11-entry targets[]
+    // and every other upstream-only field (unit_messurament, type_name,
+    // toc_internal_id, …) never reach the wire (R-BIL-090 AC.3).
+    expect(out.catalogs).toEqual([
+      {
+        sp_code: 'SP01',
+        levels: [
+          {
+            level: 'OUTPUT',
+            toc_results: [
+              {
+                toc_result_id: 5187,
+                title: 'HLO1.AOW1.IO1 Steer to impact',
+                description: 'Market intelligence is packaged into…',
+                aow_code: 'AOW01', // wp_short_name → aow_code
+                indicators: [
+                  {
+                    // Handoff §4 wire example, byte-identical.
+                    indicator_id: 5972,
+                    indicator_description:
+                      'Number of new market intelligence briefs',
+                    unit_of_measurement: 'Number',
+                    type_value: 'Number of knowledge products',
+                    target_value: '10', // resolved from the 11-entry targets[]
+                    target_year: 2026,
+                  },
+                  {
+                    indicator_id: 5973,
+                    indicator_description:
+                      'Number of events where Market Intelligence…',
+                    unit_of_measurement: 'Number',
+                    type_value: 'custom', // unfiltered passthrough (OQ-V2-2)
+                    target_value: null, // no 2026 entry upstream
+                    target_year: 2026,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-04 / R-BIL-090 AC.1, R-BIL-091 AC.1, NFR-BIL-091
+  it('returns one catalogs[] entry per SP and one levels[] entry per allowed level for Policy Change (SP01+SP03 × OUTCOME+EOI) via a single bounded fan-out', async () => {
+    findContext.mockResolvedValueOnce(
+      context({ indicator_id: IndicatorsEnum.POLICY_CHANGE }),
+    );
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 22,
+      clarisa_project_short_name: '1414-EC00 DESIRA',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 22,
+      short_name: '1414-EC00 DESIRA',
+      project_mappings_array: [sp(1, 'SP01'), sp(3, 'SP03')],
+    });
+    getTocResultsForSps.mockResolvedValueOnce(
+      new Map([
+        ['SP01:OUTCOME', [tocResult('SP01', 11)]],
+        // Upstream wp_short_name present — EOI must still force null.
+        ['SP01:EOI', [tocResult('SP01', 12)]],
+        // Upstream {"response":[]} — the level entry MUST stay (AC.5).
+        ['SP03:OUTCOME', []],
+        ['SP03:EOI', [tocResult('SP03', 31)]],
+      ]),
+    );
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    // NFR-BIL-091: exactly ONE batched call carrying exactly (SPs, allowed
+    // levels) — upstream fan-out is bounded by |SPs| × |allowed levels|
+    // inside TocIntegrationService (parallelism/cache covered by its own
+    // spec, not re-tested here).
+    expect(getTocResultsForSps).toHaveBeenCalledTimes(1);
+    expect(getTocResultsForSps).toHaveBeenCalledWith(
+      ['SP01', 'SP03'],
+      ['OUTCOME', 'EOI'],
+    );
+
+    expect(out.mapping_status).toBe('mapped');
+    expect(out.result_type).toBe('policy_change');
+    expect(out.allowed_levels).toEqual(['OUTCOME', 'EOI']);
+    expect(out.version_locked).toBe(false); // report_year_id 2026 (R-BIL-097 AC.1)
+
+    // One catalogs[] entry per SP, in deterministic SP order (AC.1) …
+    expect(out.catalogs.map((c) => c.sp_code)).toEqual(['SP01', 'SP03']);
+    // … each with one levels[] entry per allowed level, in rule order
+    // (R-BIL-091 AC.1: catalogs for exactly OUTCOME + EOI).
+    for (const catalog of out.catalogs) {
+      expect(catalog.levels.map((l) => l.level)).toEqual(['OUTCOME', 'EOI']);
+    }
+
+    expect(out.catalogs[0].levels[0].toc_results[0].toc_result_id).toBe(11);
+    // EOI level forces aow_code: null even when upstream carried a
+    // wp_short_name (design §6.1 step 6).
+    expect(out.catalogs[0].levels[1].toc_results[0].aow_code).toBeNull();
+    // Empty upstream catalog for (SP03, OUTCOME) keeps its level entry with
+    // toc_results: [] and the request is still a 200 (R-BIL-090 AC.5).
+    expect(out.catalogs[1].levels[0].toc_results).toEqual([]);
+    expect(out.catalogs[1].levels[1].toc_results[0].toc_result_id).toBe(31);
   });
 
   it('returns catalogs: [] with ZERO upstream calls when allowed_levels is empty (e.g. Knowledge Product)', async () => {
@@ -295,7 +500,9 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03)', () => {
     expect(out.result_type).toBe('knowledge_product');
     expect(out.allowed_levels).toEqual([]);
     expect(out.catalogs).toEqual([]);
-    expect(getTocResultsForSps).not.toHaveBeenCalled();
+    // R-BIL-091 AC.2: zero TocIntegrationService calls — getTocResultsForSps
+    // is the service's only entry point in this flow.
+    expect(getTocResultsForSps).toHaveBeenCalledTimes(0);
   });
 
   it('sets version_locked: true when the live version year differs from MAPPABLE_LIVE_VERSION', async () => {

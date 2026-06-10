@@ -21,6 +21,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -35,6 +36,7 @@ import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { BilateralService } from './bilateral.service';
+import { BilateralHlosIndicatorsResponse } from './dto/bilateral-hlos-indicators.response.dto';
 import { ListIndicatorsQueryDto } from './dto/list-indicators-query.dto';
 import { ContributionDto } from './dto/upsert-indicator-mapping.dto';
 import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
@@ -95,6 +97,7 @@ export class BilateralController {
   }
 
   // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-090, R-BIL-091, R-BIL-097
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-04 / R-BIL-090 (Swagger: design §5)
   //
   // No query params — per-SP, per-allowed-level ToC catalogs are sourced from
   // lambda-toc for the mapped bilateral project (frozen FE envelope, design
@@ -106,6 +109,21 @@ export class BilateralController {
   @ApiOperation({
     summary:
       'Get the per-SP, per-allowed-level ToC catalogs for the mapped bilateral project (R-BIL-090)',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: BilateralHlosIndicatorsResponse,
+    description:
+      'Frozen FE envelope (design §5) inside the standard ServerResponseDto wrapper — empty catalogs are valid 200s (R-BIL-090 AC.5)',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Result not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description:
+      'lambda-toc unavailable with a cold catalog cache (NFR-BIL-090)',
   })
   async getHlosIndicatorsForResult() {
     return this.bilateralService
