@@ -5,20 +5,23 @@ import { BulkUploadResults } from './entities/bulk-upload-results.entity';
 
 @Injectable()
 export class AiReportsService {
-  constructor(private readonly aiMetadataRepository: AiMetadataRepository) {
-  }
+  constructor(private readonly aiMetadataRepository: AiMetadataRepository) {}
 
   async create(createAiReportDto: CreateAiReportDto) {
     const { bulkUploadProcesses, bulkUploadResults } = createAiReportDto;
 
-    const newBulkUploadProcess = await this.aiMetadataRepository.bulkUploadProcessesRepository.save(bulkUploadProcesses);
+    const newBulkUploadProcess =
+      await this.aiMetadataRepository.bulkUploadProcessesRepository.save(
+        bulkUploadProcesses,
+      );
 
     const savedBulkUploadResults: BulkUploadResults[] = [];
     for (const item of bulkUploadResults) {
       const savedBulkUploadResult = new BulkUploadResults();
       savedBulkUploadResult.bulk_upload_process_id = newBulkUploadProcess.id;
       savedBulkUploadResult.missing_fields = item.missing_fields;
-      savedBulkUploadResult.manual_intervention_occurred = item.manual_intervention_occurred;
+      savedBulkUploadResult.manual_intervention_occurred =
+        item.manual_intervention_occurred;
       savedBulkUploadResult.suggested_status = item.suggested_status;
       savedBulkUploadResult.final_status = item.final_status;
       savedBulkUploadResult.result_id = item.result_id;
@@ -28,9 +31,10 @@ export class AiReportsService {
       savedBulkUploadResult.error_message = item.error_message;
       savedBulkUploadResults.push(savedBulkUploadResult);
     }
-    await this.aiMetadataRepository.bulkUploadResultsRepository.save(savedBulkUploadResults);
+    await this.aiMetadataRepository.bulkUploadResultsRepository.save(
+      savedBulkUploadResults,
+    );
 
     return newBulkUploadProcess;
-
   }
 }

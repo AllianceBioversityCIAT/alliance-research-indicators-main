@@ -100,6 +100,9 @@ export class Indicator extends AuditableEntity {
   )
   result_status_workflows!: ResultStatusWorkflow[];
 
-  @OneToMany(() => BulkUploadResults, (bulkUploadResults) => bulkUploadResults.indicator)
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResults) => bulkUploadResults.indicator,
+  )
   bulkUploadResults!: BulkUploadResults[];
 }

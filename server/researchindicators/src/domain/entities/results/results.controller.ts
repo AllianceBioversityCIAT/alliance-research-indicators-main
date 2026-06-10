@@ -51,7 +51,7 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
-  ) { }
+  ) {}
 
   @ApiQuery({
     name: 'page',
@@ -577,15 +577,13 @@ export class ResultsController {
     @Body()
     data: RootAi,
   ) {
-    return this.resultsService
-      .createResultFromAiBulk(data)
-      .then((data) =>
-        ResponseUtils.format({
-          data: data,
-          description: 'AI Results created',
-          status: HttpStatus.CREATED,
-        }),
-      );
+    return this.resultsService.createResultFromAiBulk(data).then((data) =>
+      ResponseUtils.format({
+        data: data,
+        description: 'AI Results created',
+        status: HttpStatus.CREATED,
+      }),
+    );
   }
 
   @ApiOperation({ summary: 'Save data for Geo Location' })

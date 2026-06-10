@@ -1,9 +1,8 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class UpdateOicrLinkResult1780672573009 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
             SELECT
                 root.result_id,
                 report_field(ro.general_comment, TRUE, root.indicator_id = 5) general_comment,
@@ -82,10 +81,10 @@ export class UpdateOicrLinkResult1780672573009 implements MigrationInterface {
             WHERE root.is_active = TRUE
                 AND root.is_snapshot = FALSE
             ORDER BY root.result_id ASC; `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
             SELECT
                 root.result_id,
                 report_field(ro.general_comment, TRUE, root.indicator_id = 5) general_comment,
@@ -164,6 +163,5 @@ export class UpdateOicrLinkResult1780672573009 implements MigrationInterface {
             WHERE root.is_active = TRUE
                 AND root.is_snapshot = FALSE
             ORDER BY root.result_id ASC; `);
-    }
-
+  }
 }

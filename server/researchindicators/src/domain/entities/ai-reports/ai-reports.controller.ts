@@ -6,6 +6,5 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 @ApiBearerAuth()
 @Controller('ai-reports')
 export class AiReportsController {
-  constructor(private readonly aiReportsService: AiReportsService) { }
-
+  constructor(private readonly aiReportsService: AiReportsService) {}
 }
