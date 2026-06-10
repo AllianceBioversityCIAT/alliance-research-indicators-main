@@ -124,6 +124,54 @@ describe('ResultPoolFundingTocAlignmentRepository', () => {
       expect(result.aligns_with_toc).toBe(false);
     });
 
+    // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-08 / R-BIL-092 AC.3
+    it('re-submitting the same SP with a DIFFERENT indicator updates the single active row in place with the new snapshots — no second active row', async () => {
+      const existing = {
+        id: 4,
+        indicator_id: 12,
+      } as ResultPoolFundingTocAlignment;
+      jest
+        .spyOn(repository, 'findOne')
+        .mockResolvedValueOnce(existing)
+        .mockResolvedValueOnce({
+          ...existing,
+          indicator_id: 6001,
+        } as ResultPoolFundingTocAlignment);
+      const updateSpy = jest
+        .spyOn(repository, 'update')
+        .mockResolvedValue({ affected: 1 } as any);
+      const saveSpy = jest.spyOn(repository, 'save');
+      const createSpy = jest.spyOn(repository, 'create');
+
+      const result = await repository.upsertForSp(
+        {
+          ...baseInput,
+          indicator_id: 6001,
+          indicator_description: 'Replacement indicator description',
+          target_value: '4',
+        },
+        555,
+      );
+
+      // Same row id, new indicator + snapshots — never a new insert.
+      expect(updateSpy).toHaveBeenCalledWith(
+        { id: 4 },
+        expect.objectContaining({
+          aligns_with_toc: true,
+          level: 'OUTPUT',
+          toc_result_id: 7,
+          indicator_id: 6001,
+          indicator_description: 'Replacement indicator description',
+          target_value: '4',
+          updated_by: 555,
+        }),
+      );
+      expect(saveSpy).not.toHaveBeenCalled();
+      expect(createSpy).not.toHaveBeenCalled();
+      expect(result.id).toBe(4);
+      expect(result.indicator_id).toBe(6001);
+    });
+
     it('nulls every ToC/snapshot column when the input omits them ("No" answer)', async () => {
       jest.spyOn(repository, 'findOne').mockResolvedValue({
         id: 4,

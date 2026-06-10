@@ -265,6 +265,41 @@ describe('BilateralController (T-15.6)', () => {
       },
     );
 
+    // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-08 / R-BIL-092 AC.4
+    //
+    // Enforcement, not just metadata: a REAL RolesGuard + REAL Reflector
+    // evaluated against the PATCH handler's @Roles metadata. canActivate
+    // false ⇒ Nest throws ForbiddenException ⇒ 403 via the envelope.
+    describe('PATCH / role enforcement — denied vs allowed (R-BIL-092 AC.4)', () => {
+      const guard = new RolesGuard(new Reflector());
+      const contextFor = (requestUser: unknown) =>
+        ({
+          switchToHttp: () => ({ getRequest: () => ({ user: requestUser }) }),
+          getHandler: () => BilateralController.prototype.updateAlignment,
+          getClass: () => BilateralController,
+        }) as never;
+
+      it.each([
+        ['TESTER (guest-grade role)', [SecRolesEnum.TESTER]],
+        ['GLOBAL (deprecated viewer role)', [SecRolesEnum.GLOBAL]],
+        ['no roles at all', []],
+      ])('denies %s → 403', (_label, roles) => {
+        expect(guard.canActivate(contextFor({ roles }))).toBe(false);
+      });
+
+      it('denies an unauthenticated request (no user on the request)', () => {
+        expect(guard.canActivate(contextFor(undefined))).toBe(false);
+      });
+
+      it.each([
+        ['CONTRIBUTOR', [SecRolesEnum.CONTRIBUTOR]],
+        ['CENTER_ADMIN', [SecRolesEnum.CENTER_ADMIN]],
+        ['SYSTEM_ADMIN (platform bypass)', [SecRolesEnum.SYSTEM_ADMIN]],
+      ])('allows %s', (_label, roles) => {
+        expect(guard.canActivate(contextFor({ roles }))).toBe(true);
+      });
+    });
+
     it('read endpoints (GET /, GET /science-programs, GET /hlos-indicators, GET /indicators) do NOT carry @Roles — RolesGuard short-circuits when no metadata', () => {
       for (const handler of [
         'getAlignment',

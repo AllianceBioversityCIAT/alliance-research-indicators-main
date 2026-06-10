@@ -185,10 +185,10 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - repository spec for the new repository
 - **Description:** Tests for: per-SP independence (SP03 untouched at row level), "No" persistence, single-active-row upsert, cascade + fresh re-add, all six per-alignment 400 codes, `unknown_sp_codes` legacy contract, 409 gate + legacy-body bypass, snapshot persistence + drift read-back, validation-time cold-cache 503 persists nothing, role denial (403).
 - **Acceptance / done check:**
-  - [ ] Every R-BIL-092…097 AC has a passing test; `npm test` + coverage threshold green.
+  - [x] Every R-BIL-092…097 AC has a passing test; `npm test` + coverage threshold green (284 suites / 1660 tests; coverage 80.2/71.5/80.9 vs 60 floor; AC→test map in `execution.md`).
 - **Dependencies:** T-06, T-07
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** done — 2026-06-10, Reviewer PASS attempt 1 (see `execution.md`)
 - **Skills:** `nestjs-expert`
 
 ### T-09 — Spec-doc sync + archive disposition (handoff §6)

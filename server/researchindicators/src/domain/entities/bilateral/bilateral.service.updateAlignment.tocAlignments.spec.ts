@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   HttpException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { BilateralService } from './bilateral.service';
@@ -448,5 +449,566 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       fakeManager,
     );
     expect(upsertForSp).not.toHaveBeenCalled();
+  });
+
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-08 / R-BIL-092..097, NFR-BIL-090
+  //
+  // Exhaustive write matrix on top of the T-06 smoke tests above (tasks.md
+  // T-08, design §11). Fixtures keep handoff-§2 parity with the read-path
+  // specs: toc_result_id 5187, indicator 5972, `unit_messurament: 'Number'`,
+  // 2026 target ("10", "2026"). Indicator 6001 is the requirements §6
+  // "per-SP independence" scenario's re-submit target.
+  describe('T-08 — full write matrix (R-BIL-092..097, NFR-BIL-090)', () => {
+    const handoffCatalog: TocResult[] = [
+      {
+        toc_result_id: 5187,
+        toc_internal_id: '3ca9f07b-…',
+        title: 'HLO1.AOW1.IO1 Steer to impact',
+        description: 'Market intelligence is packaged into…',
+        toc_type_id: null,
+        toc_level_id: null,
+        official_code: 'SP01',
+        work_package_id: 'd65e4401-…',
+        wp_short_name: 'AOW01',
+        phase: '99134294-…',
+        version_id: '7e94b127-…',
+        indicators: [
+          {
+            indicator_id: 5972,
+            toc_result_indicator_id: '76f57e62-…',
+            related_node_id: '70f1200f-…',
+            indicator_description: 'Number of new market intelligence briefs',
+            unit_messurament: 'Number',
+            type_value: 'Number of knowledge products',
+            type_name: 'Number of knowledge products',
+            location: 'global',
+            targets: [
+              { target_value: '7', target_date: '2025' },
+              { target_value: '10', target_date: '2026' },
+            ],
+          },
+          {
+            // Requirements §6 R-BIL-092 scenario: the indicator the
+            // contributor switches SP01 to on the second PATCH.
+            indicator_id: 6001,
+            toc_result_indicator_id: '76f57e63-…',
+            related_node_id: '70f12010-…',
+            indicator_description: 'Number of events with MI evidence',
+            unit_messurament: 'Number',
+            type_value: 'custom',
+            type_name: 'custom',
+            location: 'global',
+            targets: [{ target_value: '4', target_date: '2026' }],
+          },
+        ],
+      },
+    ];
+
+    const sp01Yes = (indicatorId = 5972, contribution = 3) => ({
+      sp_code: 'SP01',
+      aligns_with_toc: true,
+      level: 'OUTPUT' as const,
+      toc_result_id: 5187,
+      indicator_id: indicatorId,
+      quantitative_contribution: contribution,
+    });
+
+    const patchDto = (
+      tocAlignments: UpdatePoolFundingAlignmentDto['toc_alignments'],
+      spCodes: string[] = ['SP01', 'SP03'],
+    ): UpdatePoolFundingAlignmentDto => ({
+      has_contribution: true,
+      sp_codes: spCodes,
+      toc_alignments: tocAlignments,
+    });
+
+    const expectAtomic400 = async (
+      dto: UpdatePoolFundingAlignmentDto,
+    ): Promise<{ sp_code: string; field: string; error: string }[]> => {
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      // Atomic (D-V2-8): nothing reaches the transaction, nothing persists.
+      expect(transaction).not.toHaveBeenCalled();
+      expect(upsertForSp).not.toHaveBeenCalled();
+      expect(deactivateForSps).not.toHaveBeenCalled();
+
+      const response = thrown!.getResponse() as {
+        message: {
+          toc_alignments: { sp_code: string; field: string; error: string }[];
+        };
+      };
+      return response.message.toc_alignments;
+    };
+
+    beforeEach(() => {
+      findContext.mockResolvedValue(baseContext());
+      findActiveAlignment.mockResolvedValue(null);
+      getTocResults.mockResolvedValue(handoffCatalog);
+    });
+
+    // -----------------------------------------------------------------------
+    // R-BIL-092 — per-SP ToC alignment write
+    // -----------------------------------------------------------------------
+    describe('R-BIL-092 — per-SP write independence + upsert semantics', () => {
+      it('AC.1 — PATCH for SP01+SP03 then PATCH changing only SP01: second call writes ONLY SP01, SP03 row never touched', async () => {
+        // First PATCH: alignments for both SPs.
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Yes(), { sp_code: 'SP03', aligns_with_toc: false }]),
+          user,
+        );
+        expect(upsertForSp).toHaveBeenCalledTimes(2);
+
+        // Saved state now has both rows active.
+        upsertForSp.mockClear();
+        deactivateForSps.mockClear();
+        findActiveTocRows.mockResolvedValue([
+          { id: 10, sp_code: 'SP01' },
+          { id: 11, sp_code: 'SP03' },
+        ]);
+
+        // Second PATCH: only SP01 in toc_alignments (SP03 stays selected).
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Yes(6001, 5)]),
+          user,
+        );
+
+        // Exactly one write, for SP01 only — no write, no deactivation ever
+        // issued for the absent SP03 (no deactivate-all-recreate).
+        expect(upsertForSp).toHaveBeenCalledTimes(1);
+        expect(upsertForSp.mock.calls[0][0].sp_code).toBe('SP01');
+        expect(
+          upsertForSp.mock.calls.some((call) => call[0].sp_code === 'SP03'),
+        ).toBe(false);
+        expect(deactivateForSps).not.toHaveBeenCalled();
+      });
+
+      it('AC.2 — { sp_code, aligns_with_toc: false } upserts the explicit "No" with NO ToC refs or snapshots, zero catalog calls', async () => {
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([{ sp_code: 'SP03', aligns_with_toc: false }]),
+          user,
+        );
+
+        // Exact payload: nothing beyond the "No" answer — the repository
+        // nulls level/toc_result_id/indicator_id + every snapshot column
+        // (pinned in the T-05 repository spec).
+        expect(upsertForSp).toHaveBeenCalledTimes(1);
+        expect(upsertForSp).toHaveBeenCalledWith(
+          {
+            result_id: 19792,
+            sp_code: 'SP03',
+            aligns_with_toc: false,
+          },
+          42,
+          fakeManager,
+        );
+        // "No" entries never consult the catalog.
+        expect(getTocResults).not.toHaveBeenCalled();
+      });
+
+      it('AC.3 — re-submitting the same SP with a different indicator routes through upsertForSp for that single (result, sp) row with the new snapshots', async () => {
+        // SP01 already has a saved active row (5972).
+        findActiveTocRows.mockResolvedValue([
+          { id: 10, sp_code: 'SP01', indicator_id: 5972 },
+        ]);
+
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Yes(6001, 5)], ['SP01']),
+          user,
+        );
+
+        // Single upsert keyed (result, sp) — update-in-place semantics live
+        // in the repository (T-05 spec); the service passes the new
+        // indicator + its 2026-resolved snapshots through verbatim.
+        expect(upsertForSp).toHaveBeenCalledTimes(1);
+        expect(upsertForSp).toHaveBeenCalledWith(
+          {
+            result_id: 19792,
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: 6001,
+            quantitative_contribution: 5,
+            toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+            indicator_description: 'Number of events with MI evidence',
+            unit_messurament: 'Number',
+            target_value: '4',
+            target_year: 2026,
+          },
+          42,
+          fakeManager,
+        );
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // R-BIL-093 — SP removal cascade + fresh re-add
+    // -----------------------------------------------------------------------
+    describe('R-BIL-093 — cascade + fresh re-add', () => {
+      it('AC.1 — PATCH dropping SP03 from sp_codes (toc_alignments present) deactivates SP03 inside the transaction', async () => {
+        findActiveTocRows.mockResolvedValue([
+          { id: 10, sp_code: 'SP01' },
+          { id: 11, sp_code: 'SP03' },
+        ]);
+
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Yes()], ['SP01']), // SP03 deselected
+          user,
+        );
+
+        expect(deactivateForSps).toHaveBeenCalledTimes(1);
+        // `fakeManager` = the cascade runs inside the same transaction as
+        // the upsert (design §6.3 step 5).
+        expect(deactivateForSps).toHaveBeenCalledWith(
+          19792,
+          ['SP03'],
+          42,
+          fakeManager,
+        );
+        expect(upsertForSp).toHaveBeenCalledTimes(1);
+        expect(upsertForSp.mock.calls[0][0].sp_code).toBe('SP01');
+      });
+
+      it('AC.2 — re-adding SP03 without a toc_alignments entry starts fresh: no upsert for SP03, no auto-revive of the deactivated row', async () => {
+        // SP03's old row is inactive → the active-only repository read
+        // excludes it (repository contract, T-05 spec). Only SP01 is live.
+        findActiveTocRows.mockResolvedValue([{ id: 10, sp_code: 'SP01' }]);
+
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Yes()], ['SP01', 'SP03']), // SP03 re-added
+          user,
+        );
+
+        // SP03 gets NO write of any kind — its deactivated row stays dead
+        // and read-back (active rows only) keeps excluding it.
+        expect(
+          upsertForSp.mock.calls.some((call) => call[0].sp_code === 'SP03'),
+        ).toBe(false);
+        expect(deactivateForSps).not.toHaveBeenCalled();
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // R-BIL-094 — per-alignment validation (atomic 400s)
+    // -----------------------------------------------------------------------
+    describe('R-BIL-094 — per-alignment validation errors', () => {
+      it('AC.1 — unknown indicator_id for SP01 + valid SP03 entry → single 400 identifying SP01/indicator_id; the valid SP03 entry is NOT persisted', async () => {
+        const errors = await expectAtomic400(
+          patchDto([
+            sp01Yes(9999), // not in the (SP01, OUTPUT) catalog
+            { sp_code: 'SP03', aligns_with_toc: false }, // valid
+          ]),
+        );
+
+        expect(errors).toEqual([
+          {
+            sp_code: 'SP01',
+            field: 'indicator_id',
+            error: 'unknown_indicator_id',
+          },
+        ]);
+      });
+
+      it('AC.2 — level OUTCOME on a Capacity Sharing result → 400 level_not_allowed, catalog never consulted for that entry', async () => {
+        const errors = await expectAtomic400(
+          patchDto([{ ...sp01Yes(), level: 'OUTCOME' }]),
+        );
+
+        expect(errors).toEqual([
+          { sp_code: 'SP01', field: 'level', error: 'level_not_allowed' },
+        ]);
+        // Disallowed-level entries never reach the catalog check —
+        // read and write share the same rule table (R-BIL-091 AC.3).
+        expect(getTocResults).not.toHaveBeenCalled();
+      });
+
+      it('AC.3 — unknown SP code still returns the legacy errors.unknown_sp_codes array (regression, toc_alignments present)', async () => {
+        let thrown: HttpException | undefined;
+        try {
+          await service.updateAlignment(
+            19792,
+            '19792',
+            patchDto([sp01Yes()], ['SP01', 'SP77']), // SP77 unknown
+            user,
+          );
+        } catch (err) {
+          thrown = err as HttpException;
+        }
+
+        expect(thrown).toBeInstanceOf(BadRequestException);
+        const response = thrown!.getResponse() as {
+          message: { unknown_sp_codes: string[] };
+        };
+        expect(response.message.unknown_sp_codes).toEqual(['SP77']);
+        // Legacy contract fires BEFORE the ToC machinery: no gate, no
+        // catalog call, nothing persisted.
+        expect(getTocResults).not.toHaveBeenCalled();
+        expect(transaction).not.toHaveBeenCalled();
+        expect(upsertForSp).not.toHaveBeenCalled();
+      });
+
+      it('error code: duplicate_sp_code — repeated sp_code entries collapse into one per-SP error', async () => {
+        const errors = await expectAtomic400(
+          patchDto([
+            { sp_code: 'SP01', aligns_with_toc: false },
+            { sp_code: 'SP01', aligns_with_toc: false },
+          ]),
+        );
+
+        expect(errors).toEqual([
+          { sp_code: 'SP01', field: 'sp_code', error: 'duplicate_sp_code' },
+        ]);
+      });
+
+      it('error code: sp_not_selected — alignment for an SP outside the effective sp_codes', async () => {
+        const errors = await expectAtomic400(
+          patchDto([{ sp_code: 'SP99', aligns_with_toc: false }]),
+        );
+
+        expect(errors).toEqual([
+          { sp_code: 'SP99', field: 'sp_code', error: 'sp_not_selected' },
+        ]);
+        expect(getTocResults).not.toHaveBeenCalled();
+      });
+
+      it('error code: missing_required_fields — ONE entry per missing field on a bare "Yes"', async () => {
+        const errors = await expectAtomic400(
+          patchDto([{ sp_code: 'SP01', aligns_with_toc: true }]),
+        );
+
+        // One entry per missing field (design §5 / RB-4 relay note).
+        expect(errors).toEqual([
+          {
+            sp_code: 'SP01',
+            field: 'level',
+            error: 'missing_required_fields',
+          },
+          {
+            sp_code: 'SP01',
+            field: 'toc_result_id',
+            error: 'missing_required_fields',
+          },
+          {
+            sp_code: 'SP01',
+            field: 'indicator_id',
+            error: 'missing_required_fields',
+          },
+        ]);
+      });
+
+      it('error code: missing_required_fields — a single missing field yields exactly one entry naming it', async () => {
+        const errors = await expectAtomic400(
+          patchDto([
+            {
+              sp_code: 'SP01',
+              aligns_with_toc: true,
+              level: 'OUTPUT',
+              toc_result_id: 5187,
+              // indicator_id missing
+            },
+          ]),
+        );
+
+        expect(errors).toEqual([
+          {
+            sp_code: 'SP01',
+            field: 'indicator_id',
+            error: 'missing_required_fields',
+          },
+        ]);
+      });
+
+      it('error code: unknown_toc_result_id — toc_result_id absent from the (SP, level) catalog', async () => {
+        const errors = await expectAtomic400(
+          patchDto([{ ...sp01Yes(), toc_result_id: 9999 }]),
+        );
+
+        expect(errors).toEqual([
+          {
+            sp_code: 'SP01',
+            field: 'toc_result_id',
+            error: 'unknown_toc_result_id',
+          },
+        ]);
+      });
+
+      it('error code: unknown_indicator_id — indicator absent under a valid toc_result', async () => {
+        const errors = await expectAtomic400(patchDto([sp01Yes(9999)]));
+
+        expect(errors).toEqual([
+          {
+            sp_code: 'SP01',
+            field: 'indicator_id',
+            error: 'unknown_indicator_id',
+          },
+        ]);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // R-BIL-095 — snapshots: populated on "Yes", null on "No", drift-proof
+    // -----------------------------------------------------------------------
+    describe('R-BIL-095 — display snapshots', () => {
+      it('AC.2 — "Yes" upsert carries every snapshot field from the catalog; "No" upsert carries none (exact payloads)', async () => {
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Yes(), { sp_code: 'SP03', aligns_with_toc: false }]),
+          user,
+        );
+
+        expect(upsertForSp).toHaveBeenNthCalledWith(
+          1,
+          {
+            result_id: 19792,
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: 5972,
+            quantitative_contribution: 3,
+            // All five snapshot fields, catalog-verbatim, 2026-resolved
+            // target — `unit_messurament` keeps the upstream spelling at
+            // rest (D-V2-4).
+            toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+            indicator_description: 'Number of new market intelligence briefs',
+            unit_messurament: 'Number',
+            target_value: '10',
+            target_year: 2026,
+          },
+          42,
+          fakeManager,
+        );
+        // The "No" payload has NO snapshot keys at all — the repository
+        // nulls every ToC/snapshot column (T-05 spec pins the nulling).
+        expect(upsertForSp).toHaveBeenNthCalledWith(
+          2,
+          { result_id: 19792, sp_code: 'SP03', aligns_with_toc: false },
+          42,
+          fakeManager,
+        );
+      });
+
+      it('AC.1 + R-BIL-096 AC.1 — save → upstream goes empty → read-back still serves the saved snapshots (SP01 "Yes" + SP03 "No"), zero upstream calls', async () => {
+        // Real read-back for this test: the saved rows round-trip through
+        // an in-memory store standing in for the snapshot table.
+        (service.getAlignment as unknown as jest.SpyInstance).mockRestore();
+        const savedRows: Record<string, unknown>[] = [];
+        upsertForSp.mockImplementation(async (input) => {
+          savedRows.push({ id: savedRows.length + 1, ...input });
+          return savedRows[savedRows.length - 1];
+        });
+        findActiveTocRows.mockImplementation(async () => savedRows);
+
+        const patchResponse = await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Yes(), { sp_code: 'SP03', aligns_with_toc: false }]),
+          user,
+        );
+
+        const expectedTocAlignments = [
+          {
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: 5972,
+            quantitative_contribution: 3,
+            toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+            indicator_description: 'Number of new market intelligence briefs',
+            // Wire rename from the stored `unit_messurament` (D-V2-4).
+            unit_of_measurement: 'Number',
+            target_value: '10',
+            target_year: 2026,
+          },
+          {
+            sp_code: 'SP03',
+            aligns_with_toc: false,
+            level: null,
+            toc_result_id: null,
+            indicator_id: null,
+            quantitative_contribution: null,
+            toc_result_title: null,
+            indicator_description: null,
+            unit_of_measurement: null,
+            target_value: null,
+            target_year: null,
+          },
+        ];
+        expect(patchResponse.toc_alignments).toEqual(expectedTocAlignments);
+
+        // Upstream catalog drifts to empty AFTER the save.
+        getTocResults.mockClear();
+        getTocResults.mockResolvedValue([]);
+
+        const getResponse = await service.getAlignment(19792, '19792', user);
+
+        // Saved titles/values survive the drift (R-BIL-095 AC.1) and the
+        // GET returns SP01 ("Yes" + snapshots) and SP03 ("No")
+        // (R-BIL-096 AC.1) without ever consulting upstream.
+        expect(getResponse.toc_alignments).toEqual(expectedTocAlignments);
+        expect(getTocResults).not.toHaveBeenCalled();
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // R-BIL-097 — version gate (write side; 409 + legacy bypass are pinned
+    // in the T-06 smoke tests above)
+    // -----------------------------------------------------------------------
+    describe('R-BIL-097 — version gate', () => {
+      it('AC.1 — result on live version 2026 (driver string form): PATCH with toc_alignments succeeds and persists', async () => {
+        // String report_year_id pins the Number(...) coercion on the gate.
+        findContext.mockResolvedValue(baseContext({ report_year_id: '2026' }));
+
+        await expect(
+          service.updateAlignment(19792, '19792', patchDto([sp01Yes()]), user),
+        ).resolves.toBeDefined();
+
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(upsertForSp).toHaveBeenCalledTimes(1);
+        expect(emit).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // NFR-BIL-090 — validation-path cold-cache 503
+    // -----------------------------------------------------------------------
+    describe('NFR-BIL-090 — validation-path 503', () => {
+      it('cold-cache catalog failure during validation → 503 propagates, transaction never entered, nothing persisted', async () => {
+        getTocResults.mockRejectedValue(
+          new ServiceUnavailableException(
+            'ToC integration service unavailable',
+          ),
+        );
+
+        await expect(
+          service.updateAlignment(19792, '19792', patchDto([sp01Yes()]), user),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+        expect(transaction).not.toHaveBeenCalled();
+        expect(upsertForSp).not.toHaveBeenCalled();
+        expect(deactivateForSps).not.toHaveBeenCalled();
+        expect(emit).not.toHaveBeenCalled();
+      });
+    });
   });
 });

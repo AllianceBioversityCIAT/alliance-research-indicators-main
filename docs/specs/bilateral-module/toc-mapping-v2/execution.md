@@ -234,3 +234,30 @@
 - **FE relay note (D-V2-5) recorded as RB-4 in `tasks.md` §7** — extended read-back shape + `[]`-when-ineligible + decimal-as-number + the T-06 error payloads + the T-03 null→`''` coercion, with wire examples in this log (T-06 §5 / T-07 report). **Pending send to STAR FE.** Owner: Juanca.
 
 **Final verification:** lint clean, scoped 102/102, full suite 284/1634 green, build clean. Reviewer independently re-ran lint, scoped + full suite, and build.
+
+---
+
+### T-08 — Write-path + read-back tests (full AC matrix) — **PASS** (attempt 1/3)
+
+- **Date:** 2026-06-10
+- **Requirements covered:** R-BIL-092…097 (every AC), NFR-BIL-090 (validation-path 503)
+- **Attempts:** 1 (Implementer → Reviewer PASS, no rework)
+
+**Attempt 1 — Implementer (test-only; zero production diffs):**
+
+- Files modified (+645 lines, 24 new tests):
+  - `bilateral.service.updateAlignment.tocAlignments.spec.ts` — 6 → 23+ tests; nested `T-08 — full write matrix` describe with handoff-§2-parity fixtures (toc_result 5187 / indicator 5972 / `unit_messurament: 'Number'` / ("10","2026"); indicator 6001 for re-submit). Covers per-SP independence (second PATCH writes ONLY SP01, nothing ever for SP03), "No" persistence, update-in-place pass-through, cascade + fresh re-add (no auto-revive), all six per-alignment error codes individually via an `expectAtomic400` helper (asserts transaction/upsert/deactivate uncalled every time), `missing_required_fields` one-entry-per-field pin, legacy `unknown_sp_codes` regression, 2026 write success (incl. driver string coercion), save→drift→read sequence through the real `getAlignment` (snapshots survive upstream `{"response":[]}`, zero upstream calls), cold-cache 503 with transaction never entered.
+  - `bilateral.controller.spec.ts` — 16 → 23; **real `RolesGuard` + real `Reflector`** executed against the PATCH handler's `@Roles` metadata: denied TESTER/GLOBAL/empty-roles/no-user (no GUEST exists in `SecRolesEnum`), allowed CONTRIBUTOR/CENTER_ADMIN/SYSTEM_ADMIN (R-BIL-092 AC.4).
+  - `result-pool-funding-toc-alignment.repository.spec.ts` — 8 → 9; AC.3 update-in-place with different indicator + new snapshots, `create`/`save` never called.
+- Verification: lint green (quirk files restored); scoped bilateral 11 suites / 128 tests; full `npm test` 284 suites / 1660 tests pass; coverage 80.18/71.53/80.90 (floor 60; bilateral.controller 100%, bilateral.service 92.5%, toc-alignment repository 100%); build green.
+
+**Attempt 1 — Reviewer verdict:**
+
+> STATUS: PASS — T-08 is a clean test-only change set (3 spec files, +645 lines, 0 production diffs) in which every AC of R-BIL-092…097 plus NFR-BIL-090's validation-path 503 is covered by a substantive, atomicity-asserting test — including real RolesGuard execution, all six per-alignment error codes, and a real-getAlignment save→drift→read sequence. Lint, scoped suites, full npm test (284/1660), coverage (80.18/71.53/80.90 vs 60 floor), and build are all green; both implementer ambiguity adjudications are sound and design-sanctioned.
+
+**Decisions / issues encountered:**
+
+- **"Verified at DB level" (R-BIL-092 AC.1) expressed at unit altitude** — adjudicated design-sanctioned: design §11 mandates unit mocking ("extend bilateral e2e if present; else covered by service-level specs" — no bilateral e2e exists) and `src/CLAUDE.md` §9 forbids MySQL in unit tests. Composition used: service asserts no write of any kind for the untouched SP; repository spec pins update-in-place keyed to the active row.
+- **Denied-role set**: no GUEST in `SecRolesEnum`; TESTER/GLOBAL/empty-roles/no-user used as the denied cases for the "e.g. GUEST" requirement.
+
+**Final verification:** lint clean, scoped 128/128, full suite 284/1660 green, coverage gate passes, build clean. Reviewer independently re-ran all of it and spot-read every AC-mapped test body for substance.
