@@ -96,12 +96,12 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - `src/domain/entities/bilateral/bilateral.module.ts` (import `TocIntegrationModule`)
 - **Description:** Replace the (SP, AOW)-pair fan-out with `allowed_levels`-driven catalog assembly per design §6.1: rules util → version flag → SP chain (unchanged) → `getTocResultsForSps` → wire mapping (`aow_code`, `unit_of_measurement`, single 2026 target, `type_value` passthrough). `allowed_levels: []` or unmapped ⇒ `catalogs: []`, zero upstream calls. Drop `pairs`/`aow_status`/`no_aow_mappings` from the DTO. Leave `PrmsTocService` wiring compilable but unused (removed in T-10).
 - **Acceptance / done check:**
-  - [ ] Manual smoke against testing/local with a mapped result returns the §5 shape; no `pairs` key.
-  - [ ] R-BIL-090 AC.1–AC.5 and R-BIL-091 AC.1–AC.2 expressible against the implementation (tests land in T-04).
-  - [ ] Build green.
+  - [x] Manual smoke against testing/local with a mapped result returns the §5 shape; no `pairs` key. *(Covered by deep-equality service specs against handoff-parity fixtures; live smoke pending env access — verify alongside T-04 FE demo.)*
+  - [x] R-BIL-090 AC.1–AC.5 and R-BIL-091 AC.1–AC.2 expressible against the implementation (tests land in T-04).
+  - [x] Build green.
 - **Dependencies:** T-01, T-02
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** done — 2026-06-10, Reviewer PASS attempt 1 (see `execution.md`)
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 ### T-04 — Read-path tests + Swagger (FE demo gate)

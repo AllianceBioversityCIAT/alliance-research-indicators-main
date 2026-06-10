@@ -15,28 +15,29 @@ import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clar
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
+import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
-import { PrmsTocPayload } from '../../tools/prms-toc/dto/prms-toc.types';
-import { ClarisaAreaOfWork } from '../../tools/clarisa/cgiar-entities/dto/clarisa-cgiar-entity.types';
+import { TocResult } from '../../tools/toc-integration/dto/toc-integration.types';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 
-// @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12 / R-BIL-077
+// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-090, R-BIL-091, R-BIL-097
 //
-// Focused spec for BilateralService.getHlosIndicatorsForResult. The chain:
-//   result → AGRESSO → bilateral_project_mapping → CLARISA project
-//          → SP codes (from the project) × AOWs (from the cgiar-entities
-//            catalog) → PRMS ToC per pair → keep only populated pairs.
+// Focused spec for the reshaped BilateralService.getHlosIndicatorsForResult
+// (frozen FE envelope, design §5 / §6.1). Minimal coverage for T-03 — the
+// exhaustive R-BIL-090/091 AC matrix lands in T-04. Covers:
 //
-// Covers:
-//   1. Unmapped result (no agreement_id)              → aow_status: 'unmapped'
-//   2. Mapped, no active bilateral_project_mapping    → 'unmapped'
-//   3. Mapped project no longer exposed by CLARISA    → 'unmapped'
-//   4. Mapped, project carries no Confirmed SP        → 'no_aow_mappings'
-//   5. Mapped + SP×catalog AOWs with ToC data         → 'has_aow', pairs populated
-//   6. Pairs PRMS has no data for are dropped
-//   7. All derived pairs empty in PRMS                → 'no_aow_mappings'
-//   8. Non-Confirmed / wrong-portfolio SPs filtered out
+//   1. 404 when the result does not exist
+//   2. Unmapped result → 'unmapped', catalogs: [], top-level fields present,
+//      zero upstream ToC calls
+//   3. Stale CLARISA project → 'unmapped' with the snapshot project ref
+//   4. Mapped happy path → one catalogs[] entry per SP × allowed level, wire
+//      mapping (aow_code / unit_of_measurement / single 2026 target), empty
+//      upstream catalogs keep their level entry, no legacy keys
+//   5. allowed_levels: [] (e.g. Knowledge Product) → catalogs: [], zero
+//      upstream calls
+//   6. version_locked flag off report_year_id vs MAPPABLE_LIVE_VERSION
 //
-// CLARISA + PRMS upstreams are stubbed — we don't go to the wire here.
+// CLARISA + lambda-toc upstreams are stubbed — we don't go to the wire here.
 
 const sp = (
   id: number,
@@ -65,60 +66,57 @@ const sp = (
   },
 });
 
-const catalog = (
-  bySp: Record<string, string[]>,
-): Map<string, ClarisaAreaOfWork[]> => {
-  const map = new Map<string, ClarisaAreaOfWork[]>();
-  for (const [program, aows] of Object.entries(bySp)) {
-    map.set(
-      program,
-      aows.map((code) => ({
-        code,
-        name: `${code} name`,
-        composite_code: `${program}-${code}`,
-      })),
-    );
-  }
-  return map;
-};
-
-const payload = (program: string, areaOfWork: string): PrmsTocPayload => ({
-  compositeCode: `${program}-${areaOfWork}`,
-  year: 2025,
-  tocResultsOutcomes: [
-    {
-      toc_result_id: 1,
-      category: 'OUTCOME',
-      result_title: `Outcome for ${program}-${areaOfWork}`,
-      indicators: [{ indicator_id: '1', indicator_description: 'one' }],
-    },
-  ],
-  tocResultsOutputs: [
-    {
-      toc_result_id: 2,
-      category: 'OUTPUT',
-      result_title: `Output for ${program}-${areaOfWork}`,
-      indicators: [],
-    },
-  ],
-  metadata: { total: 2, outcomes: 1, outputs: 1 },
+const context = (overrides: Record<string, unknown> = {}) => ({
+  result_id: 19792,
+  result_official_code: 19792,
+  report_year_id: 2026,
+  indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+  agresso_agreement_id: 'D527',
+  ...overrides,
 });
 
-const emptyPayload = (program: string, areaOfWork: string): PrmsTocPayload => ({
-  compositeCode: `${program}-${areaOfWork}`,
-  tocResultsOutcomes: [],
-  tocResultsOutputs: [],
-  metadata: { total: 0, outcomes: 0, outputs: 0 },
+const tocResult = (
+  spCode: string,
+  id: number,
+  overrides: Partial<TocResult> = {},
+): TocResult => ({
+  toc_result_id: id,
+  toc_internal_id: `internal-${id}`,
+  title: `ToC result ${id}`,
+  description: `Description ${id}`,
+  toc_type_id: 1,
+  toc_level_id: 1,
+  official_code: spCode,
+  work_package_id: 'wp-1',
+  wp_short_name: 'AOW01',
+  phase: '2026',
+  version_id: 'v1',
+  indicators: [
+    {
+      indicator_id: id * 10,
+      toc_result_indicator_id: `tri-${id}`,
+      related_node_id: `node-${id}`,
+      indicator_description: `Indicator for ${id}`,
+      unit_messurament: 'Number',
+      type_value: 'Custom',
+      type_name: 'Custom type',
+      location: null,
+      targets: [
+        { target_value: '5', target_date: '2025' },
+        { target_value: '12', target_date: '2026' },
+      ],
+    },
+  ],
+  ...overrides,
 });
 
-describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
+describe('BilateralService.getHlosIndicatorsForResult (T-03)', () => {
   let service: BilateralService;
 
   const findContext = jest.fn();
   const findActiveByAgreementId = jest.fn();
   const findProjectById = jest.fn();
-  const getAreasOfWorkBySp = jest.fn();
-  const getTocResultsForPairs = jest.fn();
+  const getTocResultsForSps = jest.fn();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -153,9 +151,10 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
         { provide: ClarisaProjectsService, useValue: { findProjectById } },
         {
           provide: ClarisaCgiarEntitiesService,
-          useValue: { getAreasOfWorkBySp },
+          useValue: { getAreasOfWorkBySp: jest.fn() },
         },
-        { provide: PrmsTocService, useValue: { getTocResultsForPairs } },
+        { provide: PrmsTocService, useValue: {} },
+        { provide: TocIntegrationService, useValue: { getTocResultsForSps } },
         {
           provide: BilateralProjectMappingService,
           useValue: { findActiveByAgreementId },
@@ -175,45 +174,26 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('returns aow_status="unmapped" when the result has no agreement_id', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: null,
-    });
+  it('returns "unmapped" with catalogs: [] and all top-level fields when the result has no agreement_id', async () => {
+    findContext.mockResolvedValueOnce(context({ agresso_agreement_id: null }));
 
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
-    expect(out.mapping_status).toBe('unmapped');
-    expect(out.aow_status).toBe('unmapped');
-    expect(out.pairs).toEqual([]);
-    expect(out.clarisa_project).toBeNull();
+    expect(out).toEqual({
+      result_code: '19792',
+      mapping_status: 'unmapped',
+      clarisa_project: null,
+      result_type: 'capacity_sharing',
+      allowed_levels: ['OUTPUT'],
+      version_locked: false,
+      catalogs: [],
+    });
     expect(findActiveByAgreementId).not.toHaveBeenCalled();
-    expect(getAreasOfWorkBySp).not.toHaveBeenCalled();
-    expect(getTocResultsForPairs).not.toHaveBeenCalled();
+    expect(getTocResultsForSps).not.toHaveBeenCalled();
   });
 
-  it('returns aow_status="unmapped" when there is no active mapping row', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'ZZZ999',
-    });
-    findActiveByAgreementId.mockResolvedValueOnce(null);
-
-    const out = await service.getHlosIndicatorsForResult(19792, '19792');
-
-    expect(out.aow_status).toBe('unmapped');
-    expect(out.clarisa_project).toBeNull();
-    expect(getTocResultsForPairs).not.toHaveBeenCalled();
-  });
-
-  it('returns aow_status="unmapped" when the mapping points at a CLARISA project no longer exposed', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
+  it('returns "unmapped" with the snapshot project ref when CLARISA no longer exposes the mapped project', async () => {
+    findContext.mockResolvedValueOnce(context());
     findActiveByAgreementId.mockResolvedValueOnce({
       clarisa_project_id: 999,
       clarisa_project_short_name: 'snapshot',
@@ -223,43 +203,13 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
     expect(out.mapping_status).toBe('unmapped');
-    expect(out.aow_status).toBe('unmapped');
     expect(out.clarisa_project).toEqual({ id: 999, short_name: 'snapshot' });
-    expect(getTocResultsForPairs).not.toHaveBeenCalled();
+    expect(out.catalogs).toEqual([]);
+    expect(getTocResultsForSps).not.toHaveBeenCalled();
   });
 
-  it('returns aow_status="no_aow_mappings" when the project carries no Confirmed SP', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
-    findActiveByAgreementId.mockResolvedValueOnce({
-      clarisa_project_id: 1,
-      clarisa_project_short_name: 'T-PJ-003262',
-    });
-    findProjectById.mockResolvedValueOnce({
-      id: 1,
-      short_name: 'T-PJ-003262',
-      project_mappings_array: [], // no SP entries
-    });
-    getAreasOfWorkBySp.mockResolvedValueOnce(new Map());
-
-    const out = await service.getHlosIndicatorsForResult(19792, '19792');
-
-    expect(out.mapping_status).toBe('mapped');
-    expect(out.aow_status).toBe('no_aow_mappings');
-    expect(out.pairs).toEqual([]);
-    expect(out.clarisa_project).toEqual({ id: 1, short_name: 'T-PJ-003262' });
-    expect(getTocResultsForPairs).not.toHaveBeenCalled();
-  });
-
-  it('pairs each project SP with its catalog AOWs and fans out to PRMS once per pair', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
+  it('assembles one catalogs[] entry per SP × allowed level with the frozen wire mapping (mapped happy path)', async () => {
+    findContext.mockResolvedValueOnce(context());
     findActiveByAgreementId.mockResolvedValueOnce({
       clarisa_project_id: 22,
       clarisa_project_short_name: '1414-EC00 DESIRA',
@@ -269,42 +219,66 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
       short_name: '1414-EC00 DESIRA',
       project_mappings_array: [sp(2, 'SP02'), sp(6, 'SP06')],
     });
-    getAreasOfWorkBySp.mockResolvedValueOnce(
-      catalog({ SP02: ['AOW03'], SP06: ['AOW01'] }),
+    getTocResultsForSps.mockResolvedValueOnce(
+      new Map([
+        ['SP02:OUTPUT', [tocResult('SP02', 1)]],
+        // Upstream {"response":[]} — the level entry MUST stay (AC.5).
+        ['SP06:OUTPUT', []],
+      ]),
     );
-    getTocResultsForPairs.mockResolvedValueOnce([
-      payload('SP02', 'AOW03'),
-      payload('SP06', 'AOW01'),
-    ]);
 
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
-    expect(getAreasOfWorkBySp).toHaveBeenCalledWith(['SP02', 'SP06']);
+    expect(getTocResultsForSps).toHaveBeenCalledWith(
+      ['SP02', 'SP06'],
+      ['OUTPUT'],
+    );
     expect(out.mapping_status).toBe('mapped');
-    expect(out.aow_status).toBe('has_aow');
-    expect(getTocResultsForPairs).toHaveBeenCalledWith([
-      { program: 'SP02', areaOfWork: 'AOW03' },
-      { program: 'SP06', areaOfWork: 'AOW01' },
-    ]);
-    expect(out.pairs).toHaveLength(2);
-    expect(out.pairs[0]).toMatchObject({
-      program: 'SP02',
-      program_name: 'Program SP02', // SP display name from the project
-      area_of_work: 'AOW03',
-      area_of_work_name: 'AOW03 name', // AOW display name from the catalog
-      composite_code: 'SP02-AOW03',
-      metadata: { total: 2, outcomes: 1, outputs: 1 },
+    expect(out.clarisa_project).toEqual({
+      id: 22,
+      short_name: '1414-EC00 DESIRA',
     });
-    expect(out.pairs[0].outcomes).toHaveLength(1);
-    expect(out.pairs[0].outputs).toHaveLength(1);
+    expect(out.catalogs).toEqual([
+      {
+        sp_code: 'SP02',
+        levels: [
+          {
+            level: 'OUTPUT',
+            toc_results: [
+              {
+                toc_result_id: 1,
+                title: 'ToC result 1',
+                description: 'Description 1',
+                aow_code: 'AOW01', // wp_short_name → aow_code
+                indicators: [
+                  {
+                    indicator_id: 10,
+                    indicator_description: 'Indicator for 1',
+                    unit_of_measurement: 'Number', // renamed from unit_messurament
+                    type_value: 'Custom', // unfiltered passthrough
+                    target_value: '12', // single resolved 2026 target
+                    target_year: 2026,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { sp_code: 'SP06', levels: [{ level: 'OUTPUT', toc_results: [] }] },
+    ]);
+    // No legacy keys anywhere (R-BIL-090 AC.2) and no raw targets array.
+    expect(out).not.toHaveProperty('pairs');
+    expect(out).not.toHaveProperty('aow_status');
+    expect(
+      out.catalogs[0].levels[0].toc_results[0].indicators[0],
+    ).not.toHaveProperty('targets');
   });
 
-  it('drops pairs PRMS has no ToC data for', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
+  it('returns catalogs: [] with ZERO upstream calls when allowed_levels is empty (e.g. Knowledge Product)', async () => {
+    findContext.mockResolvedValueOnce(
+      context({ indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT }),
+    );
     findActiveByAgreementId.mockResolvedValueOnce({
       clarisa_project_id: 22,
       clarisa_project_short_name: 'DESIRA',
@@ -314,74 +288,23 @@ describe('BilateralService.getHlosIndicatorsForResult (T-15.12)', () => {
       short_name: 'DESIRA',
       project_mappings_array: [sp(2, 'SP02')],
     });
-    getAreasOfWorkBySp.mockResolvedValueOnce(
-      catalog({ SP02: ['AOW01', 'AOW02', 'AOW03'] }),
-    );
-    getTocResultsForPairs.mockResolvedValueOnce([
-      emptyPayload('SP02', 'AOW01'), // 404 → empty → dropped
-      emptyPayload('SP02', 'AOW02'), // 404 → empty → dropped
-      payload('SP02', 'AOW03'), // populated → kept
-    ]);
-
-    const out = await service.getHlosIndicatorsForResult(19792, '19792');
-
-    expect(out.aow_status).toBe('has_aow');
-    expect(out.pairs.map((p) => p.area_of_work)).toEqual(['AOW03']);
-  });
-
-  it('returns aow_status="no_aow_mappings" when PRMS has data for none of the derived pairs', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
-    findActiveByAgreementId.mockResolvedValueOnce({
-      clarisa_project_id: 22,
-      clarisa_project_short_name: 'DESIRA',
-    });
-    findProjectById.mockResolvedValueOnce({
-      id: 22,
-      short_name: 'DESIRA',
-      project_mappings_array: [sp(2, 'SP02')],
-    });
-    getAreasOfWorkBySp.mockResolvedValueOnce(catalog({ SP02: ['AOW09'] }));
-    getTocResultsForPairs.mockResolvedValueOnce([
-      emptyPayload('SP02', 'AOW09'),
-    ]);
 
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
     expect(out.mapping_status).toBe('mapped');
-    expect(out.aow_status).toBe('no_aow_mappings');
-    expect(out.pairs).toEqual([]);
+    expect(out.result_type).toBe('knowledge_product');
+    expect(out.allowed_levels).toEqual([]);
+    expect(out.catalogs).toEqual([]);
+    expect(getTocResultsForSps).not.toHaveBeenCalled();
   });
 
-  it('filters out non-Confirmed and wrong-portfolio SPs before catalog lookup', async () => {
-    findContext.mockResolvedValueOnce({
-      result_id: 19792,
-      result_official_code: 19792,
-      agresso_agreement_id: 'D527',
-    });
-    findActiveByAgreementId.mockResolvedValueOnce({
-      clarisa_project_id: 6,
-      clarisa_project_short_name: 'L-LTG001',
-    });
-    findProjectById.mockResolvedValueOnce({
-      id: 6,
-      short_name: 'L-LTG001',
-      project_mappings_array: [
-        sp(1, 'SP01'), // Confirmed + P25 → kept
-        sp(9, 'SP09', 'P25', 'Pending'), // not Confirmed → dropped
-        sp(10, 'SP10', 'P22'), // wrong portfolio → dropped
-      ],
-    });
-    getAreasOfWorkBySp.mockResolvedValueOnce(catalog({ SP01: ['AOW06'] }));
-    getTocResultsForPairs.mockResolvedValueOnce([payload('SP01', 'AOW06')]);
+  it('sets version_locked: true when the live version year differs from MAPPABLE_LIVE_VERSION', async () => {
+    findContext.mockResolvedValueOnce(
+      context({ report_year_id: 2025, agresso_agreement_id: null }),
+    );
 
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
-    expect(getAreasOfWorkBySp).toHaveBeenCalledWith(['SP01']);
-    expect(out.pairs.map((p) => p.program)).toEqual(['SP01']);
-    expect(out.pairs.map((p) => p.area_of_work)).toEqual(['AOW06']);
+    expect(out.version_locked).toBe(true);
   });
 });

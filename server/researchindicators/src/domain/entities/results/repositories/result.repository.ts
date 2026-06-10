@@ -33,6 +33,10 @@ export interface PoolFundingAlignmentContext {
   // here so the source-based read-only gate can read it without a second
   // round-trip. Populated when the row exists in `results`.
   platform_code?: string | null;
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-091 —
+  // the result's indicator type drives the server-owned
+  // `result_type → allowed_levels` rule on the ToC catalog read.
+  indicator_id?: number | null;
 }
 
 @Injectable()
@@ -196,6 +200,7 @@ export class ResultRepository
         r.report_year_id,
         r.is_synced_to_prms,
         r.platform_code,
+        r.indicator_id,
         ac.agreement_id AS agresso_agreement_id,
         COALESCE(ac.is_pool_funding_contributor, FALSE) AS is_pool_funding_contributor
       FROM results r

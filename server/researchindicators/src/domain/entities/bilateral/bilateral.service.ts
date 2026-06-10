@@ -24,8 +24,21 @@ import {
 } from './dto/bilateral-science-programs.response.dto';
 import {
   BilateralHlosIndicatorsResponse,
-  BilateralHlosPair,
+  BilateralSpCatalog,
+  BilateralTocCatalogIndicator,
+  BilateralTocCatalogResult,
 } from './dto/bilateral-hlos-indicators.response.dto';
+import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import {
+  TocIndicator,
+  TocLevel,
+  TocResult,
+} from '../../tools/toc-integration/dto/toc-integration.types';
+import {
+  allowedLevelsFor,
+  MAPPABLE_LIVE_VERSION,
+  resolveResultTypeKey,
+} from './utils/toc-level-rules.util';
 import { ENV } from '../../shared/utils/env.utils';
 import {
   IndicatorGroupResponse,
@@ -89,6 +102,7 @@ export class BilateralService {
     private readonly clarisaCgiarEntitiesService: ClarisaCgiarEntitiesService,
     private readonly bilateralProjectMappingService: BilateralProjectMappingService,
     private readonly prmsTocService: PrmsTocService,
+    private readonly tocIntegrationService: TocIntegrationService,
   ) {}
 
   /**
@@ -203,30 +217,32 @@ export class BilateralService {
   }
 
   /**
-   * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12 / R-BIL-077
+   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-090, R-BIL-091, R-BIL-097
    *
-   * HLO/indicator panel data source. Walks the same chain as the SP picker
-   * (result → AGRESSO → bilateral_project_mapping → CLARISA project), then
-   * builds (program, areaOfWork) pairs from two CLARISA sources:
+   * ToC catalog read for the per-SP alignment panel, in the FROZEN FE
+   * envelope (design §5 / §6.1). Flow:
    *
-   *   - *program* (Science Program) — level-1 "SP" entries in the mapped
-   *     project's `project_mappings_array[]`. Reliable.
-   *   - *areaOfWork* — the AOWs that name each SP as their parent in the
-   *     canonical `GET /api/cgiar-entities?version=2` catalog
-   *     (`ClarisaCgiarEntitiesService`). The project's own AOW entries are NOT
-   *     used: they all point at the same global `parent_id` and can't be
-   *     resolved in-project, so they yielded at most one pair across the entire
-   *     catalog. The catalog references the parent by SP *code*, which resolves
-   *     cleanly.
+   *   1. Resolve context (`findPoolFundingAlignmentContext`) — 404 if absent.
+   *   2. `result_type` + `allowed_levels` from `toc-level-rules.util.ts`
+   *      (single source of truth, D-V2-3) off the result's indicator type.
+   *   3. `version_locked` = live version year (`context.report_year_id`,
+   *      literal year per D-V2-7) ≠ `MAPPABLE_LIVE_VERSION` (2026).
+   *   4. SP chain UNCHANGED: result → AGRESSO → bilateral_project_mapping
+   *      → CLARISA project → `deriveSciencePrograms`. Unmapped at any step
+   *      ⇒ `mapping_status: 'unmapped'`, `catalogs: []`, zero upstream ToC
+   *      calls (`clarisa_project` keeps the per-step null/snapshot-ref
+   *      semantics so ops can spot mapping drift).
+   *   5. Mapped but `allowed_levels: []` or no SPs ⇒ `catalogs: []`, zero
+   *      upstream calls (R-BIL-091 AC.2).
+   *   6. Else fan out `TocIntegrationService.getTocResultsForSps` (lambda-toc,
+   *      cached; cold-cache failure propagates as 503) and assemble one
+   *      `catalogs[]` entry per SP (deterministic SP order), each with one
+   *      `levels[]` entry per allowed level — an upstream `{"response":[]}`
+   *      keeps its level entry with `toc_results: []` (R-BIL-090 AC.5).
    *
-   * Each SP × its catalog AOWs is one pair. We fan out one PRMS call per pair
-   * (cached), keep only pairs PRMS has ToC data for (most AOWs have none), and
-   * return them under `pairs[]`. The endpoint always returns 200 — see
-   * `aow_status` for the valid empty-`pairs` states (`unmapped`,
-   * `no_aow_mappings`).
-   *
-   * Why AOW must come from CLARISA: PRMS requires `areaOfWork` (400 without)
-   * and exposes no `/aow-by-program` listing endpoint we can probe.
+   * The legacy (SP, AOW)-pair PRMS fan-out (`pairs` / `aow_status` /
+   * `no_aow_mappings`) is gone from this flow (R-BIL-090 AC.2); its physical
+   * removal is gated T-10 (R-BIL-098).
    */
   async getHlosIndicatorsForResult(
     resultId: number,
@@ -239,8 +255,15 @@ export class BilateralService {
       throw new NotFoundException('Result not found');
     }
 
+    const resultType = resolveResultTypeKey(context.indicator_id);
+    const allowedLevels = allowedLevelsFor(resultType);
+
     const baseResponse = {
       result_code: String(context.result_official_code ?? resultCode),
+      result_type: resultType,
+      allowed_levels: allowedLevels,
+      // D-V2-7: `report_year_id` carries the literal report year (e.g. 2026).
+      version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
     };
     const agreementId = context.agresso_agreement_id?.trim();
 
@@ -248,9 +271,8 @@ export class BilateralService {
       return {
         ...baseResponse,
         mapping_status: 'unmapped',
-        aow_status: 'unmapped',
         clarisa_project: null,
-        pairs: [],
+        catalogs: [],
       };
     }
 
@@ -263,9 +285,8 @@ export class BilateralService {
       return {
         ...baseResponse,
         mapping_status: 'unmapped',
-        aow_status: 'unmapped',
         clarisa_project: null,
-        pairs: [],
+        catalogs: [],
       };
     }
 
@@ -274,99 +295,106 @@ export class BilateralService {
     );
 
     if (!project) {
+      // Mapping points at a project CLARISA no longer exposes — treat as
+      // unmapped, but surface the snapshot we have so ops can spot the drift.
       return {
         ...baseResponse,
         mapping_status: 'unmapped',
-        aow_status: 'unmapped',
         clarisa_project: {
           id: mapping.clarisa_project_id,
           short_name: mapping.clarisa_project_short_name ?? '',
         },
-        pairs: [],
+        catalogs: [],
       };
     }
 
     const projectRef = { id: project.id, short_name: project.short_name };
+    const spCodes = this.deriveSciencePrograms(project).map((p) => p.code);
 
-    // SP (code + display name) from the project, AOW from the cgiar-entities
-    // catalog (keyed by SP code). Each SP × its catalog AOWs is one
-    // (program, areaOfWork) pair. Display names are carried through for the FE
-    // panel — the SP/AOW codes alone aren't human-readable.
-    const programs = this.deriveSciencePrograms(project);
-    const programNameByCode = new Map(programs.map((p) => [p.code, p.name]));
-    const spCodes = programs.map((p) => p.code);
-    const aowsBySp =
-      await this.clarisaCgiarEntitiesService.getAreasOfWorkBySp(spCodes);
-
-    const pairs: Array<{ program: string; areaOfWork: string }> = [];
-    const aowNameByComposite = new Map<string, string>();
-    for (const program of spCodes) {
-      for (const aow of aowsBySp.get(program) ?? []) {
-        pairs.push({ program, areaOfWork: aow.code });
-        aowNameByComposite.set(`${program}-${aow.code}`, aow.name);
-      }
-    }
-
-    if (!pairs.length) {
-      // Mapped, but no (SP, AOW) pair could be derived — either the project
-      // carries no Confirmed SP in the active portfolio, or the catalog lists
-      // no AOWs for those SPs. Nothing for PRMS to answer.
+    if (!spCodes.length || !allowedLevels.length) {
+      // Mapped, but nothing to fetch: no Confirmed SP in the active
+      // portfolio, or the result type maps to no allowed levels (pending
+      // OQ-V2-5). Zero upstream calls either way (design §6.1 step 4).
       return {
         ...baseResponse,
         mapping_status: 'mapped',
-        aow_status: 'no_aow_mappings',
         clarisa_project: projectRef,
-        pairs: [],
+        catalogs: [],
       };
     }
 
-    const payloads = await this.prmsTocService.getTocResultsForPairs(pairs);
-    const enrichedPairs: BilateralHlosPair[] = pairs
-      .map((p, i) => {
-        const payload = payloads[i];
-        const outcomes = payload.tocResultsOutcomes ?? [];
-        const outputs = payload.tocResultsOutputs ?? [];
-        return {
-          program: p.program,
-          program_name: programNameByCode.get(p.program) ?? p.program,
-          area_of_work: p.areaOfWork,
-          area_of_work_name:
-            aowNameByComposite.get(`${p.program}-${p.areaOfWork}`) ??
-            p.areaOfWork,
-          composite_code:
-            payload.compositeCode ?? `${p.program}-${p.areaOfWork}`,
-          outcomes,
-          outputs,
-          metadata: {
-            total: outcomes.length + outputs.length,
-            outcomes: outcomes.length,
-            outputs: outputs.length,
-          },
-        };
-      })
-      // Keep only AOWs that actually carry ToC results. PRMS has no data for
-      // most (SP, AOW) combinations; surfacing empty AOWs would bury the few
-      // with HLOs under dozens of blanks.
-      .filter((p) => p.metadata.total > 0);
+    const tocResultsByKey =
+      await this.tocIntegrationService.getTocResultsForSps(
+        spCodes,
+        allowedLevels,
+      );
 
-    if (!enrichedPairs.length) {
-      // Candidate pairs existed, but PRMS has ToC data for none of them. Same
-      // empty-panel affordance as "no AOW mappings" for the FE.
-      return {
-        ...baseResponse,
-        mapping_status: 'mapped',
-        aow_status: 'no_aow_mappings',
-        clarisa_project: projectRef,
-        pairs: [],
-      };
-    }
+    // One catalogs[] entry per SP (deriveSciencePrograms order), each with
+    // one levels[] entry per allowed level (allowedLevelsFor order). Empty
+    // upstream catalogs keep their level entry — never filtered out.
+    const catalogs: BilateralSpCatalog[] = spCodes.map((spCode) => ({
+      sp_code: spCode,
+      levels: allowedLevels.map((level) => ({
+        level,
+        toc_results: (tocResultsByKey.get(`${spCode}:${level}`) ?? []).map(
+          (tocResult) => this.toWireTocResult(tocResult, level),
+        ),
+      })),
+    }));
 
     return {
       ...baseResponse,
       mapping_status: 'mapped',
-      aow_status: 'has_aow',
       clarisa_project: projectRef,
-      pairs: enrichedPairs,
+      catalogs,
+    };
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-090
+   *
+   * Upstream `TocResult` → frozen wire shape (design §6.1 step 6):
+   * `wp_short_name` → `aow_code` (forced null at `EOI` level).
+   */
+  private toWireTocResult(
+    tocResult: TocResult,
+    level: TocLevel,
+  ): BilateralTocCatalogResult {
+    return {
+      toc_result_id: tocResult.toc_result_id,
+      title: tocResult.title,
+      description: tocResult.description ?? '',
+      aow_code: level === 'EOI' ? null : (tocResult.wp_short_name ?? null),
+      indicators: (tocResult.indicators ?? []).map((indicator) =>
+        this.toWireTocIndicator(indicator),
+      ),
+    };
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-090
+   *
+   * Upstream `TocIndicator` → frozen wire shape: `unit_messurament` →
+   * `unit_of_measurement` (D-V2-4); `targets[]` resolved to the single
+   * `MAPPABLE_LIVE_VERSION` entry — `(target_value, 2026)` when an upstream
+   * target with `target_date == '2026'` exists, `(null, 2026)` otherwise.
+   * The raw targets array never reaches the wire (R-BIL-090 AC.3).
+   * `type_value` passes through unfiltered (OQ-V2-2).
+   */
+  private toWireTocIndicator(
+    indicator: TocIndicator,
+  ): BilateralTocCatalogIndicator {
+    const liveTarget = (indicator.targets ?? []).find(
+      (target) => target.target_date === String(MAPPABLE_LIVE_VERSION),
+    );
+
+    return {
+      indicator_id: indicator.indicator_id,
+      indicator_description: indicator.indicator_description,
+      unit_of_measurement: indicator.unit_messurament ?? '',
+      type_value: indicator.type_value ?? '',
+      target_value: liveTarget?.target_value ?? null,
+      target_year: MAPPABLE_LIVE_VERSION,
     };
   }
 

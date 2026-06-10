@@ -12,6 +12,10 @@ import { ClarisaScienceProgramsModule } from '../../tools/clarisa/entities/clari
 import { ClarisaProjectsModule } from '../../tools/clarisa/projects/clarisa-projects.module';
 import { ClarisaCgiarEntitiesModule } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.module';
 import { PrmsTocModule } from '../../tools/prms-toc/prms-toc.module';
+// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-090 —
+// lambda-toc client feeding the reshaped hlos-indicators read. PrmsTocModule
+// stays wired until the gated T-10 cleanup (R-BIL-098).
+import { TocIntegrationModule } from '../../tools/toc-integration/toc-integration.module';
 import { BilateralProjectMappingModule } from '../bilateral-project-mapping/bilateral-project-mapping.module';
 import { ResultsModule } from '../results/results.module';
 import { ResultReviewHistoryModule } from '../result-review-history/result-review-history.module';
@@ -43,6 +47,7 @@ import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-cha
     ClarisaProjectsModule,
     ClarisaCgiarEntitiesModule,
     PrmsTocModule,
+    TocIntegrationModule,
     BilateralProjectMappingModule,
     ResultsModule,
     ResultReviewHistoryModule,

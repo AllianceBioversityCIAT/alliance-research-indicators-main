@@ -75,3 +75,38 @@
 
 **Final verification:** scoped tests 12/12, lint clean, build clean; Reviewer re-ran independently.
 
+
+---
+
+### T-03 — Reshape `GET …/hlos-indicators` to the frozen FE envelope — **PASS** (attempt 1/3)
+
+- **Date:** 2026-06-10
+- **Requirements covered:** R-BIL-090, R-BIL-091, R-BIL-097 (read flag)
+- **Attempts:** 1 (Implementer → Reviewer PASS, no rework)
+
+**Attempt 1 — Implementer:**
+
+- Files modified:
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.ts` — `getHlosIndicatorsForResult` rewritten per design §6.1 (rules util → `version_locked` per D-V2-7 → unchanged SP chain → `getTocResultsForSps` fan-out → wire mapping); new private mappers `toWireTocResult`/`toWireTocIndicator`; `TocIntegrationService` injected; `PrmsTocService`/`ClarisaCgiarEntitiesService` left compilable-but-unused (T-10 gate); `deriveSciencePrograms` untouched; `@sdd-spec` T-03 traceability.
+  - `…/dto/bilateral-hlos-indicators.response.dto.ts` — full rewrite to the frozen §5 envelope (plain-interface style matching siblings; `@ApiProperty` classes deferred to T-04 per tasks.md).
+  - `…/bilateral.module.ts` — imports `TocIntegrationModule` (PrmsTocModule retained until T-10).
+  - `…/bilateral.controller.ts` — stale doc comment + `@ApiOperation` summary refreshed (referenced the dead `pairs`/`aow_status` shape; T-04 overlap accepted).
+  - `src/domain/entities/results/repositories/result.repository.ts` — **out-of-list minimal addition:** `r.indicator_id` added to the `findPoolFundingAlignmentContext` SELECT + `indicator_id?: number | null` on `PoolFundingAlignmentContext`; required by design §6.1 step 2 (context did not previously return the result-type linkage; design §3.2 corrected — see decisions).
+  - `…/bilateral.service.getHlosIndicatorsForResult.spec.ts` — rewritten (6 tests): 404; unmapped full-envelope equality + zero upstream calls; stale-project ref; mapped happy path (deep equality incl. empty-level retention AC.5, no `pairs`/`aow_status`/`targets`); `allowed_levels: []` zero-upstream; `version_locked: true`. Exhaustive AC matrix lands in T-04.
+  - 4 sibling bilateral service specs + `bilateral.controller.spec.ts` — `TocIntegrationService` stub provider (new constructor dep) / stale mock reshaped.
+- Files deleted:
+  - `…/dto/bilateral-hlos-indicators.response.dto 2.ts` — committed Finder-duplicate (recorded T-02 follow-up).
+- Verification (from `server/researchindicators/`): `npm run lint` exit 0 (quirk files restored); scoped `jest src/domain/entities/bilateral` 9 suites / 79 tests pass; full `npm test` 282 suites / 1611 tests pass; `npm run build` exit 0.
+
+**Attempt 1 — Reviewer verdict:**
+
+> STATUS: PASS — T-03 implements the frozen design-§5 envelope exactly (field names, AC.2/AC.3/AC.5 behaviors, zero-upstream short-circuits, version_locked per D-V2-7), keeps PrmsTocService compilable-but-unused, touches no migrations or auth/routing, and all verification evidence reproduces (lint 0; 9/79 bilateral tests; build 0). All six flagged deviations are justified minimal accommodations; one non-blocking follow-up — correct design §3.2's claim that findPoolFundingAlignmentContext "already returns" the result-type linkage, and relay the null→'' coercion note to FE with D-V2-5.
+
+**Decisions / issues encountered:**
+
+- **`indicator_id` context addition adjudicated as justified, not scope creep** (Reviewer): design §6.1 step 2 mandates deriving `result_type` from the context's indicator type; the addition is the minimal additive change (one SELECT column + optional interface field, no second query). Design §3.2 wording corrected by the Leader in this commit.
+- **Null coercion on the wire:** upstream `description`/`unit_messurament`/`type_value` are nullable; the frozen shape declares non-null `string` — nulls coerced to `''`. **Follow-up: relay to STAR FE alongside the D-V2-5 read-back relay.** Owner: Juanca.
+- `aow_code` forced `null` at `EOI` level regardless of upstream value (per §5 contract).
+- Manual smoke vs live testing env deferred to the T-04/FE-demo window (covered meanwhile by deep-equality fixtures mirroring handoff §2).
+
+**Final verification:** lint clean, 79/79 scoped bilateral tests, full suite 282/1611 green, build clean. Reviewer independently re-ran lint, scoped bilateral + toc-integration + repository tests (43 additional), and build.

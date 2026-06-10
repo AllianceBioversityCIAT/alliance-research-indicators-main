@@ -19,6 +19,7 @@ import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clar
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
+import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 
@@ -149,6 +150,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           useValue: { getAreasOfWorkBySp: jest.fn() },
         },
         { provide: PrmsTocService, useValue: {} },
+        { provide: TocIntegrationService, useValue: {} },
         { provide: BilateralProjectMappingService, useValue: {} },
       ],
     }).compile();

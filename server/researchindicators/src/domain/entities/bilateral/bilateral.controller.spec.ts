@@ -94,8 +94,7 @@ describe('BilateralController (T-15.6)', () => {
     it('GET /hlos-indicators → delegates to getHlosIndicatorsForResult', async () => {
       bilateral.getHlosIndicatorsForResult.mockResolvedValueOnce({
         mapping_status: 'mapped',
-        aow_status: 'has_aow',
-        pairs: [],
+        catalogs: [],
       });
 
       const response = await controller.getHlosIndicatorsForResult();

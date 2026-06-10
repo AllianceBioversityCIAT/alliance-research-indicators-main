@@ -94,18 +94,18 @@ export class BilateralController {
       );
   }
 
-  // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12 / R-BIL-077
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-090, R-BIL-091, R-BIL-097
   //
-  // No query params — pairs are derived from CLARISA's project_mappings_array
-  // (AOW entries with parent_id → SP). Always 200; see `aow_status` for the
-  // three valid empty-`pairs` states. PRMS unreachable + cold cache surfaces
-  // as 503 via the upstream service.
+  // No query params — per-SP, per-allowed-level ToC catalogs are sourced from
+  // lambda-toc for the mapped bilateral project (frozen FE envelope, design
+  // §5 / §6.1). Always 200 (empty catalogs included); 404 unknown result,
+  // 503 cold-cache upstream failure.
   @Get('hlos-indicators')
   @Version('1')
   @GetResultVersion()
   @ApiOperation({
     summary:
-      'Get PRMS HLOs/indicators for the (SP, AOW) pairs derived from the mapped bilateral project (R-BIL-077)',
+      'Get the per-SP, per-allowed-level ToC catalogs for the mapped bilateral project (R-BIL-090)',
   })
   async getHlosIndicatorsForResult() {
     return this.bilateralService

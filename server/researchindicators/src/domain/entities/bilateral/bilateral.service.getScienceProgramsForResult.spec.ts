@@ -15,6 +15,7 @@ import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clar
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
+import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.11
@@ -102,6 +103,7 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
           useValue: { findActiveByAgreementId },
         },
         { provide: PrmsTocService, useValue: {} },
+        { provide: TocIntegrationService, useValue: {} },
       ],
     }).compile();
 

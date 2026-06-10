@@ -75,7 +75,7 @@ Modified files:
 
 ### 3.2 Reuse
 
-`LoggerUtil`, `GlobalExceptions` envelope errors, `RolesGuard` + `ResultOwnerGuard` (unchanged), `AuditableEntity`, the generated-column partial-unique pattern (migration `1779190000014`), `findPoolFundingAlignmentContext` (already returns `report_year_id` and the result-type linkage context), existing socket event `POOL_FUNDING_ALIGNMENT_CHANGED` (payload unchanged — D-V2-6). `PrmsTocService` is reused as the *pattern* reference only; no shared code.
+`LoggerUtil`, `GlobalExceptions` envelope errors, `RolesGuard` + `ResultOwnerGuard` (unchanged), `AuditableEntity`, the generated-column partial-unique pattern (migration `1779190000014`), `findPoolFundingAlignmentContext` (returns `report_year_id`; the result-type linkage — `indicator_id` — was added to its SELECT in T-03, it was not previously returned), existing socket event `POOL_FUNDING_ALIGNMENT_CHANGED` (payload unchanged — D-V2-6). `PrmsTocService` is reused as the *pattern* reference only; no shared code.
 
 ---
 
