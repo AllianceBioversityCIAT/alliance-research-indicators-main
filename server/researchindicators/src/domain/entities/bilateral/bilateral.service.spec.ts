@@ -49,6 +49,11 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
   const findAllCatalog = jest.fn();
   const transaction = jest.fn();
   const emit = jest.fn();
+  // T-07 — read-back source (snapshot table) + upstream client, kept as
+  // named mocks so the drift test can assert zero upstream involvement.
+  const findActiveTocRows = jest.fn();
+  const getTocResults = jest.fn();
+  const getTocResultsForSps = jest.fn();
 
   // Mimic TypeORM's actual save: echo back the payload (merged with an id)
   // so `savedMapping` carries the lever_code / indicator_code / indicator_type
@@ -85,6 +90,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
 
   beforeEach(async () => {
     transaction.mockImplementation(async (cb) => cb(fakeManager));
+    findActiveTocRows.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -106,11 +112,11 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           },
         },
         {
-          // T-06 stub — new constructor dependency (per-SP ToC alignment
-          // persistence); not exercised by these canonical scenarios.
+          // T-07 — getAlignment now reads active ToC rows from here
+          // (snapshot-sourced read-back, R-BIL-096 / R-BIL-095).
           provide: ResultPoolFundingTocAlignmentRepository,
           useValue: {
-            findActiveByResultId: jest.fn().mockResolvedValue([]),
+            findActiveByResultId: findActiveTocRows,
             upsertForSp: jest.fn(),
             deactivateForSps: jest.fn(),
           },
@@ -161,7 +167,12 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           useValue: { getAreasOfWorkBySp: jest.fn() },
         },
         { provide: PrmsTocService, useValue: {} },
-        { provide: TocIntegrationService, useValue: {} },
+        {
+          // T-07 drift guard — methods are jest.fn()s so the read-back
+          // tests can assert the upstream client is NEVER touched.
+          provide: TocIntegrationService,
+          useValue: { getTocResults, getTocResultsForSps },
+        },
         { provide: BilateralProjectMappingService, useValue: {} },
       ],
     }).compile();
@@ -182,6 +193,9 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         is_pool_funding_contributor: true,
         is_synced_to_prms: false,
         platform_code: 'STAR',
+        // D-V2-7: literal report year. String on purpose — pins the
+        // Number(...) comparison (T-07 / R-BIL-096).
+        report_year_id: '2026',
       });
       findActiveAlignment.mockResolvedValueOnce({
         id: 1,
@@ -238,6 +252,9 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         ],
         is_synced_to_prms: false,
         is_read_only: false,
+        // T-07 (R-BIL-096): both fields ALWAYS present on the response.
+        version_locked: false,
+        toc_alignments: [],
       });
     });
 
@@ -254,6 +271,11 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         has_contribution: true,
         selected_levers: [{ lever_code: 'SP01', lever_name: 'SP01' }],
       });
+      // T-07: saved rows exist, but the eligibility gate hides them the
+      // same way it hides the rest of the alignment payload.
+      findActiveTocRows.mockResolvedValueOnce([
+        { sp_code: 'SP01', aligns_with_toc: true },
+      ]);
 
       const out = await service.getAlignment(19792, '19792', user);
 
@@ -261,6 +283,9 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       expect(out.has_contribution).toBeNull();
       expect(out.selected_levers).toEqual([]);
       expect(out.selected_science_programs).toEqual([]);
+      // T-07 (R-BIL-096): both fields present even on the ineligible state.
+      expect(out.toc_alignments).toEqual([]);
+      expect(out.version_locked).toBe(true); // no report_year_id ⇒ ≠ 2026
       // findAll on the catalog must NOT be called when there are no codes to enrich.
       expect(findAllCatalog).not.toHaveBeenCalled();
     });
@@ -270,6 +295,131 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       await expect(
         service.getAlignment(999, '999', user),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // -------------------------------------------------------------------------
+    // T-07 — toc_alignments[] + version_locked read-back
+    // (@sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 /
+    //  R-BIL-096, R-BIL-095)
+    // -------------------------------------------------------------------------
+    describe('toc_alignments read-back (T-07)', () => {
+      const eligibleContext = (reportYearId: number | string = 2026) => ({
+        result_id: 19792,
+        result_official_code: 19792,
+        is_pool_funding_contributor: true,
+        is_synced_to_prms: false,
+        platform_code: 'STAR',
+        report_year_id: reportYearId,
+      });
+
+      // Snapshot rows exactly as the MySQL driver hands them back: the
+      // decimal `quantitative_contribution` arrives as a STRING (no entity
+      // transformer) and the snapshot column keeps the upstream
+      // `unit_messurament` spelling (D-V2-4).
+      const yesRow = {
+        id: 10,
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5187,
+        indicator_id: 5972,
+        quantitative_contribution: '3.50',
+        toc_result_title: 'HLO title from snapshot',
+        indicator_description: 'Indicator description from snapshot',
+        unit_messurament: 'Number of policies',
+        target_value: '10',
+        target_year: 2026,
+      };
+      const noRow = {
+        id: 11,
+        sp_code: 'SP03',
+        aligns_with_toc: false,
+        level: null,
+        toc_result_id: null,
+        indicator_id: null,
+        quantitative_contribution: null,
+        toc_result_title: null,
+        indicator_description: null,
+        unit_messurament: null,
+        target_value: null,
+        target_year: null,
+      };
+
+      it('maps saved rows to the frozen §5 shape — rename + decimal coercion (R-BIL-096 AC.1)', async () => {
+        findContext.mockResolvedValueOnce(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce(null);
+        findActiveTocRows.mockResolvedValueOnce([yesRow, noRow]);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.version_locked).toBe(false);
+        expect(out.toc_alignments).toEqual([
+          {
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: 5972,
+            // Coerced decimal string → number so the wire type holds.
+            quantitative_contribution: 3.5,
+            toc_result_title: 'HLO title from snapshot',
+            indicator_description: 'Indicator description from snapshot',
+            // Stored `unit_messurament` renamed at the wire (D-V2-4).
+            unit_of_measurement: 'Number of policies',
+            target_value: '10',
+            target_year: 2026,
+          },
+          {
+            sp_code: 'SP03',
+            aligns_with_toc: false,
+            level: null,
+            toc_result_id: null,
+            indicator_id: null,
+            quantitative_contribution: null,
+            toc_result_title: null,
+            indicator_description: null,
+            unit_of_measurement: null,
+            target_value: null,
+            target_year: null,
+          },
+        ]);
+      });
+
+      it('returns toc_alignments: [] when there are no saved rows', async () => {
+        findContext.mockResolvedValueOnce(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce(null);
+        findActiveTocRows.mockResolvedValueOnce([]);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.toc_alignments).toEqual([]);
+        expect(out.version_locked).toBe(false);
+      });
+
+      it('version_locked: true when the live version ≠ 2026 (R-BIL-097 read signal)', async () => {
+        findContext.mockResolvedValueOnce(eligibleContext(2024));
+        findActiveAlignment.mockResolvedValueOnce(null);
+        findActiveTocRows.mockResolvedValueOnce([]);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.version_locked).toBe(true);
+        expect(out.toc_alignments).toEqual([]);
+      });
+
+      it('drift guard — read-back is snapshot-sourced with ZERO upstream involvement (R-BIL-095 AC.1)', async () => {
+        findContext.mockResolvedValueOnce(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce(null);
+        findActiveTocRows.mockResolvedValueOnce([yesRow, noRow]);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        // Saved snapshots come back even though the upstream client would
+        // return nothing — the lambda-toc client is NEVER touched here.
+        expect(out.toc_alignments).toHaveLength(2);
+        expect(getTocResults).not.toHaveBeenCalled();
+        expect(getTocResultsForSps).not.toHaveBeenCalled();
+      });
     });
   });
 

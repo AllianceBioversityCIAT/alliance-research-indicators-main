@@ -12,6 +12,7 @@ import {
   AlignmentResponse,
   SelectedScienceProgramResponse,
   TocAlignmentInputDto,
+  TocAlignmentReadbackResponse,
   UpdatePoolFundingAlignmentDto,
 } from './dto/update-pool-funding-alignment.dto';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
@@ -60,6 +61,7 @@ import {
   TocAlignmentUpsertInput,
 } from './repositories/result-pool-funding-toc-alignment.repository';
 import { ResultPoolFundingAlignment } from './entities/result-pool-funding-alignment.entity';
+import { ResultPoolFundingTocAlignment } from './entities/result-pool-funding-toc-alignment.entity';
 import { ResultPoolFundingAlignmentSp } from './entities/result-pool-funding-alignment-sp.entity';
 import { ResultReviewHistory } from '../result-review-history/entities/result-review-history.entity';
 import { ServerGateway } from '../../tools/socket/server.gateway';
@@ -483,9 +485,14 @@ export class BilateralService {
     resultCode: string,
     _user: User,
   ): Promise<AlignmentResponse> {
-    const [context, alignment] = await Promise.all([
+    const [context, alignment, tocAlignmentRows] = await Promise.all([
       this.resultRepository.findPoolFundingAlignmentContext(resultId),
       this.alignmentRepository.findActiveAlignmentByResultId(resultId),
+      // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-095
+      // Read-back rows come EXCLUSIVELY from the local snapshot table —
+      // zero TocIntegrationService / upstream involvement on this path,
+      // so saved mappings survive catalog drift (R-BIL-095 AC.1).
+      this.tocAlignmentRepository.findActiveByResultId(resultId),
     ]);
 
     if (!context) {
@@ -514,6 +521,47 @@ export class BilateralService {
       selected_science_programs: selectedSciencePrograms,
       is_synced_to_prms: isSyncedToPrms,
       is_read_only: isPrmsSourced || isSyncedToPrms,
+      // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-097
+      // Same Number(...) comparison as the hlos-indicators read (D-V2-7);
+      // `toc_alignments` follows the same eligibility visibility gate as
+      // the rest of the alignment payload (mirrors `visibleAlignment`).
+      version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
+      toc_alignments: (eligible ? tocAlignmentRows : []).map((row) =>
+        this.toTocAlignmentReadback(row),
+      ),
+    };
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-095
+   *
+   * Saved per-SP ToC alignment row → frozen §5 read-back shape (D-V2-5).
+   * Snapshot columns only — never live upstream data (R-BIL-095 AC.1):
+   * `unit_messurament` (verbatim upstream spelling at rest, D-V2-4) is
+   * renamed to `unit_of_measurement` at the wire, and
+   * `quantitative_contribution` (MySQL decimal — surfaced as a string by
+   * the driver, no entity transformer) is coerced back to a number so the
+   * wire type holds.
+   */
+  private toTocAlignmentReadback(
+    row: ResultPoolFundingTocAlignment,
+  ): TocAlignmentReadbackResponse {
+    return {
+      sp_code: row.sp_code,
+      aligns_with_toc: this.toBoolean(row.aligns_with_toc),
+      level: (row.level as TocLevel) ?? null,
+      toc_result_id: row.toc_result_id ?? null,
+      indicator_id: row.indicator_id ?? null,
+      quantitative_contribution:
+        row.quantitative_contribution === null ||
+        row.quantitative_contribution === undefined
+          ? null
+          : Number(row.quantitative_contribution),
+      toc_result_title: row.toc_result_title ?? null,
+      indicator_description: row.indicator_description ?? null,
+      unit_of_measurement: row.unit_messurament ?? null,
+      target_value: row.target_value ?? null,
+      target_year: row.target_year ?? null,
     };
   }
 

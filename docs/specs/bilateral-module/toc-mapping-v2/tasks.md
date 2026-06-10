@@ -167,12 +167,12 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - response interface/DTO + Swagger
 - **Description:** `getAlignment` (and the PATCH response, which reuses it) returns active ToC rows mapped to the frozen §5 read-back shape — snapshot columns only, `unit_messurament` exposed as `unit_of_measurement`, plus `version_locked`. Relay the frozen shape to the FE (comms note).
 - **Acceptance / done check:**
-  - [ ] R-BIL-096 AC.1–AC.2 hold (GET ≡ PATCH response).
-  - [ ] Read-back works with upstream mocked empty (R-BIL-095 AC.1).
-  - [ ] FE relay note recorded in §7 log.
+  - [x] R-BIL-096 AC.1–AC.2 hold (GET ≡ PATCH response — PATCH returns `getAlignment(...)` directly; pinned by mechanism test).
+  - [x] Read-back works with upstream mocked empty (R-BIL-095 AC.1 drift test — zero `TocIntegrationService` calls).
+  - [x] FE relay note recorded in §7 log (RB-4).
 - **Dependencies:** T-06
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** done — 2026-06-10, Reviewer PASS attempt 1 (see `execution.md`)
 - **Skills:** `nestjs-expert`
 
 ### T-08 — Write-path + read-back tests
@@ -263,6 +263,7 @@ Per template §5: lint + unit green per task; migration forward/revert verified 
 | RB-1 | 2026-06-09 | lambda-toc DNS resolution caveat (needed 8.8.8.8 locally) | Flag to infra before testing deploy; warm-cache resilience absorbs blips | Juanca | open |
 | RB-2 | 2026-06-09 | Sole-consumer assumption for in-place reshape | **Verified 2026-06-09 (T-02):** server-side, `hlos-indicators` + `aow_status`/`no_aow_mappings` are referenced only inside `src/domain/entities/bilateral/` (controller/service/DTO + specs); client-side, only STAR FE surfaces (`api.service.ts`, `hlo-selection-modal`, `pool-funding-alignment.interface.ts`, fixtures), all migrating in lockstep per the client's own toc-mapping-v2 spec. No third-party consumers. In-place reshape cleared. | Juanca | closed |
 | RB-3 | 2026-06-09 | FE demo deadline 2026-06-11 | **Resolved 2026-06-10:** T-01→T-04 all landed; read path FE-ready (handoff-parity fixtures, Swagger schema wired). Remaining: human smoke on testing env + `/swagger` eyeball during the demo window. | Juanca | closed |
+| RB-4 | 2026-06-10 | **FE relay (D-V2-5), pending send** — read-back + write contracts frozen at T-06/T-07 | Relay to STAR FE: (1) extended `AlignmentResponse` — `version_locked` + snapshot-sourced `toc_alignments[]` (11 fields, `unit_of_measurement` renamed from `unit_messurament`, `quantitative_contribution` as JSON number, active rows `sp_code` ASC, `[]` when result ineligible), PATCH response ≡ GET; (2) hlos read coerces upstream null `description`/`unit_of_measurement`/`type_value` to `''`; (3) PATCH errors — 400 `errors.toc_alignments[{sp_code,field,error}]` (six codes; `missing_required_fields` one entry per missing field), 409 keyed by `errors.code: 'toc_mapping_version_locked'`. Wire examples in `execution.md` T-06/T-07. | Juanca | open |
 | RB-4 | 2026-06-09 | OQ-V2-2/3/5/6 pending BA | Build assumptions recorded (requirements §11–12); none block build | BA via Juanca | open |
 
 ---

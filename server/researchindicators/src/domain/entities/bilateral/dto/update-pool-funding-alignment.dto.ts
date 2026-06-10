@@ -32,6 +32,28 @@ export interface SelectedScienceProgramResponse {
   allocation?: number | null;
 }
 
+// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-095
+//
+// One saved per-SP ToC alignment in the frozen §5 read-back shape (D-V2-5).
+// Snapshot-sourced EXCLUSIVELY from `result_pool_funding_toc_alignment` —
+// never live from lambda-toc (R-BIL-095 AC.1). The stored column
+// `unit_messurament` (verbatim upstream spelling, D-V2-4) is renamed to
+// `unit_of_measurement` at the wire. ToC refs + snapshot fields are null
+// for "No" rows (`aligns_with_toc: false`).
+export interface TocAlignmentReadbackResponse {
+  sp_code: string;
+  aligns_with_toc: boolean;
+  level: TocLevel | null;
+  toc_result_id: number | null;
+  indicator_id: number | null;
+  quantitative_contribution: number | null;
+  toc_result_title: string | null;
+  indicator_description: string | null;
+  unit_of_measurement: string | null;
+  target_value: string | null;
+  target_year: number | null;
+}
+
 export interface AlignmentResponse {
   result_code: string;
   eligible: boolean;
@@ -46,6 +68,14 @@ export interface AlignmentResponse {
   //   2. Synced to PRMS (`is_synced_to_prms === true`) — STAR-sourced result already pushed.
   // Writes against either condition return 409 even for SYSTEM_ADMIN.
   is_read_only: boolean;
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-097
+  // `report_year_id !== MAPPABLE_LIVE_VERSION (2026)` — same Number(...)
+  // comparison as the hlos-indicators read (D-V2-7).
+  version_locked: boolean;
+  // Active rows only, ordered sp_code ASC; snapshot-sourced (R-BIL-095).
+  // Always present — `[]` when there are no saved rows or the result is
+  // not pool-funding-eligible.
+  toc_alignments: TocAlignmentReadbackResponse[];
 }
 
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094

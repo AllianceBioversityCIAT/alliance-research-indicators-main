@@ -205,3 +205,32 @@
 - **FE relay notes (with D-V2-5):** 400 shape `errors: { description: 'Invalid ToC alignments', toc_alignments: [{ sp_code, field, error }] }`; 409 shape `errors: { description: '…', code: 'toc_mapping_version_locked' }` — FE should key off `errors.code`; `missing_required_fields` emits one entry per missing field (level/toc_result_id/indicator_id), not one per SP. Owner: Juanca.
 
 **Final verification:** lint clean, scoped 11/97, full suite 284/1629 green, build clean. Reviewer independently re-ran lint, scoped + full suite, and build; verified guards/routes zero-diff and legacy byte-identity.
+
+---
+
+### T-07 — Read-back: extend `AlignmentResponse` with `toc_alignments[]` + `version_locked` — **PASS** (attempt 1/3)
+
+- **Date:** 2026-06-10
+- **Requirements covered:** R-BIL-096 AC.1–AC.2, R-BIL-095 AC.1 (snapshot-sourced reads)
+- **Attempts:** 1 (Implementer → Reviewer PASS, no rework)
+
+**Attempt 1 — Implementer:**
+
+- Files modified (under `server/researchindicators/src/domain/entities/bilateral/`):
+  - `bilateral.service.ts` — `getAlignment` fetches active rows via `tocAlignmentRepository.findActiveByResultId` inside the existing `Promise.all`; private mapper `toTocAlignmentReadback` (wire rename `unit_messurament`→`unit_of_measurement`; decimal `quantitative_contribution` coerced string→number with null/zero guard); `version_locked` via the same `Number(report_year_id) !== MAPPABLE_LIVE_VERSION` comparison as the hlos read (byte-identical, D-V2-7); `toc_alignments` follows the existing `visibleAlignment` eligibility gate (`[]` when ineligible).
+  - `dto/update-pool-funding-alignment.dto.ts` — `TocAlignmentReadbackResponse` interface (11 frozen fields) + both fields added to `AlignmentResponse` (interface style per the file family).
+  - `bilateral.service.spec.ts` + `bilateral.service.updateAlignment.tocAlignments.spec.ts` — new tests: Yes+No rows mapped exactly (rename + `'3.50'`→3.5 coercion), empty → `[]`, `version_locked` true/false (string `'2026'` pins the Number coercion), ineligible state still carries both fields, drift test (R-BIL-095 AC.1: snapshots returned, `getTocResults`/`getTocResultsForSps` never called), PATCH≡GET mechanism test (`toBe` on a `getAlignment` spy sentinel).
+  - `bilateral.controller.ts` — untouched (no typed alignment `@ApiResponse` exists to go stale; zero diff verified).
+- Verification: lint green (quirk files restored); scoped bilateral 11 suites / 102 tests; full `npm test` 284 suites / 1634 tests pass; build green.
+
+**Attempt 1 — Reviewer verdict:**
+
+> STATUS: PASS — T-07 delivers the frozen §5 read-back exactly — 11-field snapshot-sourced `toc_alignments[]` with the wire rename and decimal coercion, `version_locked` via the same D-V2-7 comparison as the hlos read, and PATCH ≡ GET pinned by mechanism — with zero upstream involvement and all verification green (lint 0, 102/102 bilateral, 1634/1634 full, build 0). Non-blocking: record the D-V2-5 FE relay note when logging this task.
+
+**Decisions / issues encountered:**
+
+- **Eligibility gating adjudicated conformant:** `toc_alignments` is `[]` for ineligible results, mirroring how `visibleAlignment` already blanks `has_contribution`/`selected_levers`; exposing rows the rest of the payload hides would be the inconsistent reading of R-BIL-096.
+- **PATCH ≡ GET by construction:** `updateAlignment`'s sole success return is `await this.getAlignment(...)` — single mapping path, no parallel code to drift.
+- **FE relay note (D-V2-5) recorded as RB-4 in `tasks.md` §7** — extended read-back shape + `[]`-when-ineligible + decimal-as-number + the T-06 error payloads + the T-03 null→`''` coercion, with wire examples in this log (T-06 §5 / T-07 report). **Pending send to STAR FE.** Owner: Juanca.
+
+**Final verification:** lint clean, scoped 102/102, full suite 284/1634 green, build clean. Reviewer independently re-ran lint, scoped + full suite, and build.

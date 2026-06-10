@@ -359,6 +359,70 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     expect(upsertForSp).not.toHaveBeenCalled();
   });
 
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096 AC.2
+  //
+  // PATCH response ≡ GET is guaranteed by MECHANISM, not by parallel
+  // mapping code: updateAlignment's return value IS the post-commit
+  // `getAlignment` read-back. This test pins that reuse — if someone
+  // ever builds the PATCH response separately, it breaks.
+  it('PATCH response ≡ GET — updateAlignment returns the getAlignment read-back verbatim, toc_alignments + version_locked included (R-BIL-096 AC.2)', async () => {
+    findContext.mockResolvedValue(baseContext());
+    findActiveAlignment.mockResolvedValue(null);
+    getTocResults.mockResolvedValue(sp01OutputCatalog);
+
+    const readBack = {
+      result_code: '19792',
+      eligible: true,
+      has_pool_funding_alignment_eligible: true,
+      has_contribution: true,
+      selected_levers: [{ lever_code: 'SP01', lever_name: 'SP01' }],
+      selected_science_programs: [],
+      is_synced_to_prms: false,
+      is_read_only: false,
+      version_locked: false,
+      toc_alignments: [
+        {
+          sp_code: 'SP01',
+          aligns_with_toc: true,
+          level: 'OUTPUT',
+          toc_result_id: 5187,
+          indicator_id: 5972,
+          quantitative_contribution: 3,
+          toc_result_title: 'HLO title from catalog',
+          indicator_description: 'Indicator description from catalog',
+          unit_of_measurement: 'Number of policies',
+          target_value: '10',
+          target_year: 2026,
+        },
+      ],
+    };
+    (service.getAlignment as jest.Mock).mockResolvedValueOnce(readBack);
+
+    const dto: UpdatePoolFundingAlignmentDto = {
+      has_contribution: true,
+      sp_codes: ['SP01'],
+      toc_alignments: [
+        {
+          sp_code: 'SP01',
+          aligns_with_toc: true,
+          level: 'OUTPUT',
+          toc_result_id: 5187,
+          indicator_id: 5972,
+          quantitative_contribution: 3,
+        },
+      ],
+    };
+
+    const out = await service.updateAlignment(19792, '19792', dto, user);
+
+    // Same object the read path produced — single mapping path (D-V2-5).
+    expect(out).toBe(readBack);
+    expect(service.getAlignment).toHaveBeenCalledTimes(1);
+    expect(service.getAlignment).toHaveBeenCalledWith(19792, '19792', user);
+    expect(out.version_locked).toBe(false);
+    expect(out.toc_alignments).toHaveLength(1);
+  });
+
   it('cascade — dropping an SP from sp_codes deactivates its ToC row even on a legacy body (R-BIL-093 AC.1)', async () => {
     findContext.mockResolvedValue(baseContext());
     findActiveAlignment.mockResolvedValue(null);
