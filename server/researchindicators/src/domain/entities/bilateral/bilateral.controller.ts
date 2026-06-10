@@ -172,13 +172,40 @@ export class BilateralController {
       );
   }
 
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092..095, R-BIL-097
+  // (Swagger only — route, guards, and roles unchanged. Body gains the
+  // optional `toc_alignments[]` via the extended DTO; error statuses below
+  // mirror the design §5 PATCH contract.)
   @Patch()
   @Version('1')
   @GetResultVersion()
-  @ApiOperation({ summary: 'Update pool funding alignment' })
+  @ApiOperation({
+    summary:
+      'Update pool funding alignment (optionally with per-SP toc_alignments — R-BIL-092)',
+  })
   @ApiBody({
     type: UpdatePoolFundingAlignmentDto,
-    description: 'Pool funding alignment payload',
+    description:
+      'Pool funding alignment payload. Optional toc_alignments[] upserts one ToC answer per sp_code; omitted = saved ToC rows untouched.',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description:
+      'Validation failure — legacy errors.unknown_sp_codes (unchanged contract), or atomic per-alignment errors.toc_alignments[{ sp_code, field, error }] with error ∈ duplicate_sp_code | sp_not_selected | missing_required_fields | level_not_allowed | unknown_toc_result_id | unknown_indicator_id (R-BIL-094; nothing persisted, D-V2-8)',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Result not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description:
+      'Result is PRMS-sourced or already synced to PRMS (unchanged contracts); or errors.code = toc_mapping_version_locked when toc_alignments is present and the result’s live version ≠ 2026 (R-BIL-097)',
+  })
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description:
+      'lambda-toc unavailable with a cold catalog cache during toc_alignments validation — nothing persisted (NFR-BIL-090)',
   })
   @Roles(
     SecRolesEnum.CONTRIBUTOR,

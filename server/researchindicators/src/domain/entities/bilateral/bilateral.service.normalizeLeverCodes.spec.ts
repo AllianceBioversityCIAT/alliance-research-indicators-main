@@ -5,6 +5,7 @@ import { BilateralService } from './bilateral.service';
 import { ResultRepository } from '../results/repositories/result.repository';
 import { ResultPoolFundingAlignmentRepository } from './repositories/result-pool-funding-alignment.repository';
 import { ResultPoolFundingIndicatorMappingRepository } from './repositories/result-pool-funding-indicator-mapping.repository';
+import { ResultPoolFundingTocAlignmentRepository } from './repositories/result-pool-funding-toc-alignment.repository';
 import { ServerGateway } from '../../tools/socket/server.gateway';
 import { CapacitySharingBilateralIndicatorTypeHandler } from './handlers/capacity-sharing.handler';
 import { InnovationDevelopmentBilateralIndicatorTypeHandler } from './handlers/innovation-development.handler';
@@ -101,6 +102,16 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
         {
           provide: ResultPoolFundingIndicatorMappingRepository,
           useValue: {},
+        },
+        {
+          // T-06 stub — new constructor dependency; legacy-body PATCHes only
+          // hit the R-BIL-093 cascade pre-read (no active ToC rows here).
+          provide: ResultPoolFundingTocAlignmentRepository,
+          useValue: {
+            findActiveByResultId: jest.fn().mockResolvedValue([]),
+            upsertForSp: jest.fn(),
+            deactivateForSps: jest.fn(),
+          },
         },
         {
           provide: ServerGateway,

@@ -1,5 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
+import { TocLevel } from '../../../tools/toc-integration/dto/toc-integration.types';
 
 export interface SelectedLeverResponse {
   lever_code: string;
@@ -34,6 +46,70 @@ export interface AlignmentResponse {
   //   2. Synced to PRMS (`is_synced_to_prms === true`) — STAR-sourced result already pushed.
   // Writes against either condition return 409 even for SYSTEM_ADMIN.
   is_read_only: boolean;
+}
+
+// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094
+//
+// One per-SP ToC alignment answer (design §5 PATCH contract). Field-presence
+// rules conditioned on `aligns_with_toc` (level/toc_result_id/indicator_id
+// required when true) are enforced in BilateralService as structural
+// validation — the per-alignment `{ sp_code, field, error }` 400 contract
+// owns them (design §6.3 step 2b), NOT class-validator.
+export class TocAlignmentInputDto {
+  @ApiProperty({
+    type: String,
+    maxLength: 50,
+    example: 'SP01',
+    description:
+      'Science Program code. Must be present in the effective sp_codes of the same request.',
+  })
+  @IsString()
+  @MaxLength(50)
+  sp_code!: string;
+
+  @ApiProperty({
+    type: Boolean,
+    description:
+      "Per-SP answer: does this result align with this SP's Theory of Change?",
+  })
+  @IsBoolean()
+  aligns_with_toc!: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['OUTPUT', 'OUTCOME', 'EOI'],
+    description:
+      'ToC catalog level. Required when aligns_with_toc is true; must be in the result type’s allowed_levels (R-BIL-094).',
+  })
+  @IsOptional()
+  @IsIn(['OUTPUT', 'OUTCOME', 'EOI'])
+  level?: TocLevel;
+
+  @ApiPropertyOptional({
+    type: Number,
+    description:
+      'Upstream ToC result id. Required when aligns_with_toc is true; validated against the (SP, level) catalog.',
+  })
+  @IsOptional()
+  @IsInt()
+  toc_result_id?: number;
+
+  @ApiPropertyOptional({
+    type: Number,
+    description:
+      'Upstream indicator id. Required when aligns_with_toc is true; validated against the chosen ToC result’s indicators.',
+  })
+  @IsOptional()
+  @IsInt()
+  indicator_id?: number;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Quantitative contribution (numeric, nullable).',
+  })
+  @IsOptional()
+  @IsNumber()
+  quantitative_contribution?: number | null;
 }
 
 export class UpdatePoolFundingAlignmentDto {
@@ -71,4 +147,16 @@ export class UpdatePoolFundingAlignmentDto {
   @IsOptional()
   @IsString()
   justification?: string;
+
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-097
+  @ApiPropertyOptional({
+    type: [TocAlignmentInputDto],
+    description:
+      'Per-SP ToC alignments (independent upsert per sp_code). Omitted = saved ToC alignment rows are left untouched (R-BIL-092). When present, the request is gated to live version 2026 (R-BIL-097).',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TocAlignmentInputDto)
+  toc_alignments?: TocAlignmentInputDto[];
 }

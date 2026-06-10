@@ -174,3 +174,34 @@
 - Pre-existing flake in `star-results-metadata-workbook.handler.spec.ts` (failed once on a full run, passes in isolation and on re-run) — unrelated to this diff; backlog note.
 
 **Final verification:** lint clean, 8/8 scoped, full suite 283/1624 green, build clean, migration applied on dev DB. Reviewer independently re-ran lint, scoped + full suite, build, and verified the flake in isolation (20/20).
+
+---
+
+### T-06 — Write path: DTO + validation + per-SP upsert + cascade + version gate — **PASS** (attempt 1/3)
+
+- **Date:** 2026-06-10
+- **Requirements covered:** R-BIL-092, R-BIL-093, R-BIL-094, R-BIL-095 (persist side), R-BIL-097
+- **Attempts:** 1 (Implementer → Reviewer PASS, no rework)
+
+**Attempt 1 — Implementer:**
+
+- Files modified (under `server/researchindicators/src/domain/entities/bilateral/`):
+  - `dto/update-pool-funding-alignment.dto.ts` — `TocAlignmentInputDto` + optional `toc_alignments` (`@ValidateNested({each:true})`/`@Type`; conditional required-when-Yes is service-side per the per-alignment error contract).
+  - `bilateral.service.ts` — `ResultPoolFundingTocAlignmentRepository` injected; private `validateTocAlignments` (409 gate → structural → catalog validation → ready upsert inputs; runs **before** the transaction so 400/409/503 persist nothing); shared `resolveLiveTargetValue()` extracted (read + write snapshot target logic cannot drift); transaction extended: per-entry `upsertForSp(..., manager)` then `deactivateForSps` cascade; `payload_after.toc_alignments` summary only when submitted; existing gates/`_sp` recreate/socket payload untouched (D-V2-6).
+  - `bilateral.controller.ts` — PATCH Swagger only: `@ApiOperation`/`@ApiBody` + `@ApiResponse` 400/404/409/503 (T-04 precedent); routes/guards/roles zero-diff.
+  - 5 sibling service spec files — new repository provider stub only (stale-mock fix; zero assertion changes).
+  - NEW `bilateral.service.updateAlignment.tocAlignments.spec.ts` — 5 smoke tests: legacy-body regression (no gate/catalog/upsert), version-gate 409, happy-path upsert with exact snapshot payload, atomic 400 with two collected errors, legacy-body cascade.
+- Verification: lint green (quirk files restored); scoped 11 suites / 97 tests; full `npm test` 284 suites / 1629 tests pass; build green.
+
+**Attempt 1 — Reviewer verdict:**
+
+> STATUS: PASS — T-06 conforms to design §5/§6.3 and R-BIL-092…095/097 — gate and six-code atomic validation run pre-transaction via the shared level-rules util and cached catalog client, per-SP upsert/cascade execute inside the single transaction with snapshots from the validated catalog, and legacy bodies regress byte-identically (all pre-existing suites pass with provider-stub-only diffs). Adjudicated items (legacy-body cascade per R-BIL-093 wording, payload_after ToC summary in lieu of a nonexistent note field, 503-before-400 on cold cache) all resolve in the implementer's favor; lint/scoped jest (11/97)/full jest (284/1629)/build all green.
+
+**Decisions / issues encountered:**
+
+- **Cascade runs on EVERY PATCH including legacy bodies** (Reviewer-adjudicated): R-BIL-093 conditions the cascade on effective `sp_codes`, not `toc_alignments` presence; the no-dangling rationale requires it. Corollary: `has_contribution: false` ⇒ effective `sp_codes` `[]` ⇒ all active ToC rows deactivated. Version gate stays `toc_alignments`-only (R-BIL-097 AC.3).
+- **Review-history "note"**: `ResultReviewHistory` has no free-text note column; design §6.3 step 6 fulfilled as a `toc_alignments` summary in `payload_after`, emitted only when submitted (legacy payloads byte-identical).
+- **503-before-400 on cold cache**: catalog validation also runs when structural errors exist (all-errors-at-once per D-V2-8), so a cold cache surfaces 503 before the otherwise-guaranteed 400. Accepted per design §6.3 step 2c.
+- **FE relay notes (with D-V2-5):** 400 shape `errors: { description: 'Invalid ToC alignments', toc_alignments: [{ sp_code, field, error }] }`; 409 shape `errors: { description: '…', code: 'toc_mapping_version_locked' }` — FE should key off `errors.code`; `missing_required_fields` emits one entry per missing field (level/toc_result_id/indicator_id), not one per SP. Owner: Juanca.
+
+**Final verification:** lint clean, scoped 11/97, full suite 284/1629 green, build clean. Reviewer independently re-ran lint, scoped + full suite, and build; verified guards/routes zero-diff and legacy byte-identity.

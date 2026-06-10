@@ -11,6 +11,7 @@ import { ResultRepository } from '../results/repositories/result.repository';
 import {
   AlignmentResponse,
   SelectedScienceProgramResponse,
+  TocAlignmentInputDto,
   UpdatePoolFundingAlignmentDto,
 } from './dto/update-pool-funding-alignment.dto';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
@@ -54,6 +55,10 @@ import {
   PoolFundingAlignmentDetail,
   ResultPoolFundingAlignmentRepository,
 } from './repositories/result-pool-funding-alignment.repository';
+import {
+  ResultPoolFundingTocAlignmentRepository,
+  TocAlignmentUpsertInput,
+} from './repositories/result-pool-funding-toc-alignment.repository';
 import { ResultPoolFundingAlignment } from './entities/result-pool-funding-alignment.entity';
 import { ResultPoolFundingAlignmentSp } from './entities/result-pool-funding-alignment-sp.entity';
 import { ResultReviewHistory } from '../result-review-history/entities/result-review-history.entity';
@@ -72,6 +77,21 @@ import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-cha
 
 const POOL_FUNDING_ALIGNMENT_CHANGED = 'POOL_FUNDING_ALIGNMENT_CHANGED';
 const INDICATOR_MAPPING_CHANGED = 'INDICATOR_MAPPING_CHANGED';
+
+// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-094
+// Per-alignment validation error item surfaced as `errors.toc_alignments`
+// on the atomic 400 (design §5; D-V2-8).
+interface TocAlignmentValidationError {
+  sp_code: string;
+  field: string;
+  error:
+    | 'duplicate_sp_code'
+    | 'sp_not_selected'
+    | 'missing_required_fields'
+    | 'level_not_allowed'
+    | 'unknown_toc_result_id'
+    | 'unknown_indicator_id';
+}
 
 /**
  * SINGLETON-SCOPED BY DESIGN — see docs/specs/bilateral-module/design.md §3.4 Constraint A.
@@ -103,6 +123,8 @@ export class BilateralService {
     private readonly bilateralProjectMappingService: BilateralProjectMappingService,
     private readonly prmsTocService: PrmsTocService,
     private readonly tocIntegrationService: TocIntegrationService,
+    // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092
+    private readonly tocAlignmentRepository: ResultPoolFundingTocAlignmentRepository,
   ) {}
 
   /**
@@ -384,18 +406,29 @@ export class BilateralService {
   private toWireTocIndicator(
     indicator: TocIndicator,
   ): BilateralTocCatalogIndicator {
-    const liveTarget = (indicator.targets ?? []).find(
-      (target) => target.target_date === String(MAPPABLE_LIVE_VERSION),
-    );
-
     return {
       indicator_id: indicator.indicator_id,
       indicator_description: indicator.indicator_description,
       unit_of_measurement: indicator.unit_messurament ?? '',
       type_value: indicator.type_value ?? '',
-      target_value: liveTarget?.target_value ?? null,
+      target_value: this.resolveLiveTargetValue(indicator),
       target_year: MAPPABLE_LIVE_VERSION,
     };
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 + T-06 / R-BIL-090, R-BIL-095
+   *
+   * Shared target resolution for the live version: the upstream `targets[]`
+   * entry with `target_date == '2026'` wins, else null. Used by both the
+   * catalog read wire mapping and the write-path snapshot copy so saved
+   * snapshots always match what the FE was shown.
+   */
+  private resolveLiveTargetValue(indicator: TocIndicator): string | null {
+    const liveTarget = (indicator.targets ?? []).find(
+      (target) => target.target_date === String(MAPPABLE_LIVE_VERSION),
+    );
+    return liveTarget?.target_value ?? null;
   }
 
   /**
@@ -540,6 +573,36 @@ export class BilateralService {
       resultId,
       resultCode,
     );
+
+    // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092..094, R-BIL-097
+    //
+    // ToC alignment gate + validation run BEFORE the transaction so nothing
+    // is persisted on any 400/409/503 path (atomic — D-V2-8; a cold-cache
+    // catalog failure during validation propagates as 503 with zero writes).
+    // Legacy bodies (no `toc_alignments`) bypass the gate entirely
+    // (R-BIL-097 AC.3): `tocUpserts` stays null and no ToC row is touched
+    // beyond the R-BIL-093 cascade below.
+    const tocUpserts = dto.toc_alignments
+      ? await this.validateTocAlignments(
+          dto.toc_alignments,
+          leverCodes,
+          context,
+          resultId,
+        )
+      : null;
+
+    // R-BIL-093 cascade input: active ToC rows whose SP is no longer in the
+    // effective sp_codes are soft-deactivated in the same transaction. This
+    // runs for legacy bodies too — the cascade is keyed off `sp_codes`
+    // changes, not off `toc_alignments` presence, so dropping an SP never
+    // leaves its ToC alignment dangling (R-BIL-093 AC.1).
+    const effectiveSpCodes = new Set(leverCodes);
+    const tocSpCodesToDeactivate = (
+      await this.tocAlignmentRepository.findActiveByResultId(resultId)
+    )
+      .map((row) => row.sp_code)
+      .filter((spCode) => !effectiveSpCodes.has(spCode));
+
     const actorUserId = user.sec_user_id;
     const now = new Date();
 
@@ -591,6 +654,31 @@ export class BilateralService {
         );
       }
 
+      // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-093, R-BIL-095
+      //
+      // Independent per-SP upsert (design §6.3 step 4): each validated entry
+      // updates/creates ONLY its own (result, sp_code) row — SPs absent from
+      // `toc_alignments` are never touched (R-BIL-092 AC.1). Then the
+      // cascade (step 5) deactivates rows for deselected SPs.
+      if (tocUpserts) {
+        for (const upsert of tocUpserts) {
+          await this.tocAlignmentRepository.upsertForSp(
+            upsert,
+            actorUserId,
+            manager,
+          );
+        }
+      }
+
+      if (tocSpCodesToDeactivate.length) {
+        await this.tocAlignmentRepository.deactivateForSps(
+          resultId,
+          tocSpCodesToDeactivate,
+          actorUserId,
+          manager,
+        );
+      }
+
       await manager.getRepository(ResultReviewHistory).save({
         result_id: resultId,
         version_id: context.version_id,
@@ -601,6 +689,23 @@ export class BilateralService {
         payload_after: {
           has_contribution: dto.has_contribution,
           lever_codes: leverCodes,
+          // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06
+          // (design §6.3 step 6) — the history entry mentions the ToC
+          // alignment change ONLY when `toc_alignments` was submitted;
+          // legacy bodies keep the payload byte-identical to before.
+          ...(dto.toc_alignments
+            ? {
+                toc_alignments: dto.toc_alignments.map((entry) => ({
+                  sp_code: entry.sp_code,
+                  aligns_with_toc: entry.aligns_with_toc,
+                  level: entry.level ?? null,
+                  toc_result_id: entry.toc_result_id ?? null,
+                  indicator_id: entry.indicator_id ?? null,
+                  quantitative_contribution:
+                    entry.quantitative_contribution ?? null,
+                })),
+              }
+            : {}),
         },
         created_by: actorUserId,
         updated_by: actorUserId,
@@ -615,6 +720,203 @@ export class BilateralService {
     });
 
     return response;
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094, R-BIL-095, R-BIL-097
+   *
+   * Pre-transaction gate + validation for `toc_alignments[]` (design §6.3
+   * steps 2a–2d). Returns the per-SP upsert inputs with snapshots already
+   * resolved from the validated catalog entries, so the transaction only
+   * persists — it never re-reads upstream.
+   *
+   *   a. Version gate: live version (`report_year_id`, literal year per
+   *      D-V2-7) ≠ 2026 → 409 `toc_mapping_version_locked` (R-BIL-097).
+   *   b. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
+   *      `missing_required_fields` — collected per alignment.
+   *   c. Catalog validation per "Yes" entry — `level_not_allowed`, then
+   *      `(toc_result_id, indicator_id)` existence in the cached (sp, level)
+   *      catalog → `unknown_toc_result_id` / `unknown_indicator_id`.
+   *      Catalogs are fetched ONLY for the (sp, level) combos actually
+   *      referenced; a cold-cache upstream failure propagates as 503 with
+   *      nothing persisted (R-BIL-094).
+   *   d. ANY collected error → single 400 carrying ALL per-alignment errors
+   *      as `errors.toc_alignments` (atomic — D-V2-8). The legacy
+   *      `errors.unknown_sp_codes` contract is untouched (it fires earlier,
+   *      from `normalizeLeverCodes`).
+   *
+   * Snapshots (R-BIL-095): "Yes" rows copy `toc_result_title`,
+   * `indicator_description`, `unit_messurament` (verbatim upstream spelling,
+   * D-V2-4) and the 2026-resolved `(target_value, target_year)` from the
+   * validated catalog entry. "No" rows null every ToC/snapshot column.
+   */
+  private async validateTocAlignments(
+    alignments: TocAlignmentInputDto[],
+    effectiveSpCodes: string[],
+    context: { report_year_id?: number | string; indicator_id?: number },
+    resultId: number,
+  ): Promise<TocAlignmentUpsertInput[]> {
+    if (Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION) {
+      // GlobalExceptions surfaces `exception.response.message` into the
+      // envelope's `errors` field — same packing as the unknown_sp_codes 400.
+      throw new ConflictException({
+        message: {
+          description: `ToC mapping is locked to live version ${MAPPABLE_LIVE_VERSION}`,
+          code: 'toc_mapping_version_locked',
+        },
+      });
+    }
+
+    const errors: TocAlignmentValidationError[] = [];
+    const effective = new Set(effectiveSpCodes);
+    const allowedLevels = new Set(
+      allowedLevelsFor(resolveResultTypeKey(context.indicator_id)),
+    );
+
+    const occurrences = new Map<string, number>();
+    for (const entry of alignments) {
+      occurrences.set(entry.sp_code, (occurrences.get(entry.sp_code) ?? 0) + 1);
+    }
+    for (const [spCode, count] of occurrences) {
+      if (count > 1) {
+        errors.push({
+          sp_code: spCode,
+          field: 'sp_code',
+          error: 'duplicate_sp_code',
+        });
+      }
+    }
+
+    const catalogChecks: TocAlignmentInputDto[] = [];
+    for (const entry of alignments) {
+      if (!effective.has(entry.sp_code)) {
+        errors.push({
+          sp_code: entry.sp_code,
+          field: 'sp_code',
+          error: 'sp_not_selected',
+        });
+        continue;
+      }
+
+      if (!entry.aligns_with_toc) {
+        continue;
+      }
+
+      const missingFields = (
+        ['level', 'toc_result_id', 'indicator_id'] as const
+      ).filter((field) => entry[field] === undefined || entry[field] === null);
+      if (missingFields.length) {
+        for (const field of missingFields) {
+          errors.push({
+            sp_code: entry.sp_code,
+            field,
+            error: 'missing_required_fields',
+          });
+        }
+        continue;
+      }
+
+      if (!allowedLevels.has(entry.level)) {
+        errors.push({
+          sp_code: entry.sp_code,
+          field: 'level',
+          error: 'level_not_allowed',
+        });
+        continue;
+      }
+
+      catalogChecks.push(entry);
+    }
+
+    // Fetch ONLY the (sp, level) combos actually referenced by validated
+    // "Yes" entries — each through the cached client (NFR-BIL-090/091).
+    const combos = new Map<string, { sp: string; level: TocLevel }>();
+    for (const entry of catalogChecks) {
+      combos.set(`${entry.sp_code}:${entry.level}`, {
+        sp: entry.sp_code,
+        level: entry.level,
+      });
+    }
+    const comboKeys = [...combos.keys()];
+    const catalogs = await Promise.all(
+      comboKeys.map((key) => {
+        const combo = combos.get(key);
+        return this.tocIntegrationService.getTocResults(combo.sp, combo.level);
+      }),
+    );
+    const catalogByKey = new Map(
+      comboKeys.map((key, index) => [key, catalogs[index]]),
+    );
+
+    const validatedCatalogRefs = new Map<
+      string,
+      { tocResult: TocResult; indicator: TocIndicator }
+    >();
+    for (const entry of catalogChecks) {
+      const catalog = catalogByKey.get(`${entry.sp_code}:${entry.level}`) ?? [];
+      const tocResult = catalog.find(
+        (candidate) => candidate.toc_result_id === entry.toc_result_id,
+      );
+      if (!tocResult) {
+        errors.push({
+          sp_code: entry.sp_code,
+          field: 'toc_result_id',
+          error: 'unknown_toc_result_id',
+        });
+        continue;
+      }
+
+      const indicator = (tocResult.indicators ?? []).find(
+        (candidate) => candidate.indicator_id === entry.indicator_id,
+      );
+      if (!indicator) {
+        errors.push({
+          sp_code: entry.sp_code,
+          field: 'indicator_id',
+          error: 'unknown_indicator_id',
+        });
+        continue;
+      }
+
+      validatedCatalogRefs.set(entry.sp_code, { tocResult, indicator });
+    }
+
+    if (errors.length) {
+      throw new BadRequestException({
+        message: {
+          description: 'Invalid ToC alignments',
+          toc_alignments: errors,
+        },
+      });
+    }
+
+    return alignments.map((entry) => {
+      if (!entry.aligns_with_toc) {
+        // Explicit "No": ToC refs + snapshot columns are nulled
+        // (R-BIL-092 AC.2, R-BIL-095 AC.2).
+        return {
+          result_id: resultId,
+          sp_code: entry.sp_code,
+          aligns_with_toc: false,
+        };
+      }
+
+      const { tocResult, indicator } = validatedCatalogRefs.get(entry.sp_code);
+      return {
+        result_id: resultId,
+        sp_code: entry.sp_code,
+        aligns_with_toc: true,
+        level: entry.level,
+        toc_result_id: entry.toc_result_id,
+        indicator_id: entry.indicator_id,
+        quantitative_contribution: entry.quantitative_contribution ?? null,
+        toc_result_title: tocResult.title,
+        indicator_description: indicator.indicator_description,
+        unit_messurament: indicator.unit_messurament ?? null,
+        target_value: this.resolveLiveTargetValue(indicator),
+        target_year: MAPPABLE_LIVE_VERSION,
+      };
+    });
   }
 
   async listIndicators(

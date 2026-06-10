@@ -5,6 +5,7 @@ import { BilateralService } from './bilateral.service';
 import { ResultRepository } from '../results/repositories/result.repository';
 import { ResultPoolFundingAlignmentRepository } from './repositories/result-pool-funding-alignment.repository';
 import { ResultPoolFundingIndicatorMappingRepository } from './repositories/result-pool-funding-indicator-mapping.repository';
+import { ResultPoolFundingTocAlignmentRepository } from './repositories/result-pool-funding-toc-alignment.repository';
 import { ServerGateway } from '../../tools/socket/server.gateway';
 import { CapacitySharingBilateralIndicatorTypeHandler } from './handlers/capacity-sharing.handler';
 import { InnovationDevelopmentBilateralIndicatorTypeHandler } from './handlers/innovation-development.handler';
@@ -86,6 +87,16 @@ describe('BilateralService source-based read-only gate (T-15.2)', () => {
         {
           provide: ResultPoolFundingIndicatorMappingRepository,
           useValue: {},
+        },
+        {
+          // T-06 stub — new constructor dependency; gate scenarios either
+          // reject before reaching it or run a legacy body with no ToC rows.
+          provide: ResultPoolFundingTocAlignmentRepository,
+          useValue: {
+            findActiveByResultId: jest.fn().mockResolvedValue([]),
+            upsertForSp: jest.fn(),
+            deactivateForSps: jest.fn(),
+          },
         },
         {
           provide: ServerGateway,

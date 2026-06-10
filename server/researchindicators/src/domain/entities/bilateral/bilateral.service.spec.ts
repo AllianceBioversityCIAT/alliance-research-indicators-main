@@ -9,6 +9,7 @@ import { BilateralService } from './bilateral.service';
 import { ResultRepository } from '../results/repositories/result.repository';
 import { ResultPoolFundingAlignmentRepository } from './repositories/result-pool-funding-alignment.repository';
 import { ResultPoolFundingIndicatorMappingRepository } from './repositories/result-pool-funding-indicator-mapping.repository';
+import { ResultPoolFundingTocAlignmentRepository } from './repositories/result-pool-funding-toc-alignment.repository';
 import { ServerGateway } from '../../tools/socket/server.gateway';
 import { CapacitySharingBilateralIndicatorTypeHandler } from './handlers/capacity-sharing.handler';
 import { InnovationDevelopmentBilateralIndicatorTypeHandler } from './handlers/innovation-development.handler';
@@ -102,6 +103,16 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           useValue: {
             findActiveStaleMappingsByResultAndLevers: findStaleMappings,
             findActiveMappingByResultLeverIndicator: findActiveMapping,
+          },
+        },
+        {
+          // T-06 stub — new constructor dependency (per-SP ToC alignment
+          // persistence); not exercised by these canonical scenarios.
+          provide: ResultPoolFundingTocAlignmentRepository,
+          useValue: {
+            findActiveByResultId: jest.fn().mockResolvedValue([]),
+            upsertForSp: jest.fn(),
+            deactivateForSps: jest.fn(),
           },
         },
         {

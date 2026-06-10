@@ -151,11 +151,11 @@ Critical path for the 2026-06-11 testing demo: **T-01 → T-03 → T-04** (read 
   - `src/domain/entities/bilateral/bilateral.controller.ts` (Swagger body/errors)
 - **Description:** Implement design §6.3 inside the existing transaction: 409 gate on `report_year_id !== 2026` (only when `toc_alignments` present); structural + catalog validation collecting `errors.toc_alignments[{sp_code, field, error}]` with the six error codes; atomic 400; per-SP independent upsert with snapshots on "Yes" / nulls on "No"; cascade deactivation for deselected SPs; legacy body (no `toc_alignments`) bypasses all of it. Preserve existing `_sp` recreate behavior, review-history entry, socket emit.
 - **Acceptance / done check:**
-  - [ ] R-BIL-092 AC.1–AC.4, R-BIL-093 AC.1–AC.2, R-BIL-094 AC.1–AC.3, R-BIL-097 AC.1–AC.3 implementable and smoke-verified locally.
-  - [ ] Legacy PATCH bodies behave byte-identically to before (regression check via existing specs).
+  - [x] R-BIL-092 AC.1–AC.4, R-BIL-093 AC.1–AC.2, R-BIL-094 AC.1–AC.3, R-BIL-097 AC.1–AC.3 implementable and smoke-verified locally (5 smoke tests; exhaustive matrix in T-08).
+  - [x] Legacy PATCH bodies behave byte-identically to before (all pre-existing updateAlignment suites pass with provider-stub-only diffs).
 - **Dependencies:** T-05, T-02, T-01
 - **Estimated effort:** L
-- **Status:** todo
+- **Status:** done — 2026-06-10, Reviewer PASS attempt 1 (see `execution.md`)
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
 
 ### T-07 — Read-back: extend `AlignmentResponse` with `toc_alignments[]` + `version_locked`

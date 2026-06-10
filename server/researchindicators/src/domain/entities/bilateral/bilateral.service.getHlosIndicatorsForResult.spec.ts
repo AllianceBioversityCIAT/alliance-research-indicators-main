@@ -5,6 +5,7 @@ import { BilateralService } from './bilateral.service';
 import { ResultRepository } from '../results/repositories/result.repository';
 import { ResultPoolFundingAlignmentRepository } from './repositories/result-pool-funding-alignment.repository';
 import { ResultPoolFundingIndicatorMappingRepository } from './repositories/result-pool-funding-indicator-mapping.repository';
+import { ResultPoolFundingTocAlignmentRepository } from './repositories/result-pool-funding-toc-alignment.repository';
 import { ServerGateway } from '../../tools/socket/server.gateway';
 import { CapacitySharingBilateralIndicatorTypeHandler } from './handlers/capacity-sharing.handler';
 import { InnovationDevelopmentBilateralIndicatorTypeHandler } from './handlers/innovation-development.handler';
@@ -209,6 +210,13 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
           useValue: { findActiveAlignmentByResultId: jest.fn() },
         },
         { provide: ResultPoolFundingIndicatorMappingRepository, useValue: {} },
+        {
+          // T-06 stub — new constructor dependency; not exercised here.
+          provide: ResultPoolFundingTocAlignmentRepository,
+          useValue: {
+            findActiveByResultId: jest.fn().mockResolvedValue([]),
+          },
+        },
         { provide: ServerGateway, useValue: {} },
         { provide: CapacitySharingBilateralIndicatorTypeHandler, useValue: {} },
         {
