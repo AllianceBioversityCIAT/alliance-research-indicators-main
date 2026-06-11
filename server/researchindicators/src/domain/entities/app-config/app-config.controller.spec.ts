@@ -11,6 +11,7 @@ describe('AppConfigController', () => {
   let controller: AppConfigController;
   const mockService = {
     findConfigByKey: jest.fn(),
+    getAllConfigs: jest.fn(),
     updateConfig: jest.fn(),
   };
   const mockFormat = jest.fn();
@@ -30,6 +31,67 @@ describe('AppConfigController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('getAllConfigs', async () => {
+    const payload = {
+      data: [{ key: 'a' }],
+      pagination: {
+        total: 1,
+        page: 2,
+        limit: 10,
+        pageSize: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: true,
+      },
+    };
+    mockService.getAllConfigs.mockResolvedValue(payload);
+    mockFormat.mockReturnValue({});
+
+    await controller.getAllConfigs(
+      'email',
+      'EMAIL',
+      'READINESS_LEVEL_7',
+      '2',
+      '10',
+      'key' as any,
+      'DESC',
+    );
+
+    expect(mockService.getAllConfigs).toHaveBeenCalledWith(
+      { category: 'EMAIL', subcategory: 'READINESS_LEVEL_7' },
+      { field: 'key', order: 'DESC' },
+      { page: 2, limit: 10 },
+      'email',
+    );
+    expect(ResponseUtils.format).toHaveBeenCalledWith({
+      data: payload,
+      description: 'Configurations retrieved successfully',
+      status: HttpStatus.OK,
+    });
+  });
+
+  it('getAllConfigs without limit ignores page query param', async () => {
+    mockService.getAllConfigs.mockResolvedValue({ data: [], pagination: {} });
+    mockFormat.mockReturnValue({});
+
+    await controller.getAllConfigs(
+      undefined,
+      undefined,
+      undefined,
+      '3',
+      undefined,
+      'key' as any,
+      'ASC',
+    );
+
+    expect(mockService.getAllConfigs).toHaveBeenCalledWith(
+      { category: undefined, subcategory: undefined },
+      { field: 'key', order: 'ASC' },
+      undefined,
+      undefined,
+    );
   });
 
   it('getConfigByKey', async () => {

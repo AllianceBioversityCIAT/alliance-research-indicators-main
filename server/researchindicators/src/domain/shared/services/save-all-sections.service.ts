@@ -29,7 +29,7 @@ export class SaveResultService {
     private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
-  ) {}
+  ) { }
 
   public async bulkSaveAllSections(
     results: ExternalMappersDto[],
@@ -97,7 +97,7 @@ export class SaveResultService {
       } else {
         await this._resultsService.updateInactiveResult(
           findResult.result_id,
-          !isNewCode,
+          extraData?.appliedVersion ? !isNewCode : false,
         );
         this.logger.debug(
           `Updating result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}, ${snapshotMessage}`,
