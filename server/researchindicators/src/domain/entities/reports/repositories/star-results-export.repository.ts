@@ -96,6 +96,7 @@ export class StarResultsExportRepository {
         gl.regions AS regions,
         gl.sub_nationals AS sub_nationals,
         ev.evidences AS evidences,
+        ev.notable_references AS notable_references,
         ip.who_owns_ip_rights AS who_owns_ip_rights,
         ip.third_party AS third_party,
         ip.legal_restrictions_publication AS legal_restrictions_publication,
