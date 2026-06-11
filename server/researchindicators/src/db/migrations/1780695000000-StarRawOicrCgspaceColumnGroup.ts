@@ -4,7 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Extends OICR DETAILS (col 73) with CGSpace link after report_oicr view update.
  */
 export class StarRawOicrCgspaceColumnGroup1780695000000
-  implements MigrationInterface {
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `

@@ -172,7 +172,7 @@ export class PrmsOpenSearchService
     const size = 50;
     let page = 1;
     let keepGoing = true;
-    const currentCode: number = null;
+    const currentCode: { current: number } = { current: null };
     const resultSaved: number[] = [];
     const syncProcessLog = await this.syncProcessLogService.initiateSync(
       SyncProcessEnum.PRMS_INTEGRATION,

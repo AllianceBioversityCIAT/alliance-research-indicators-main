@@ -1,9 +1,8 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class UpdateReportView1780694172676 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
             SELECT
                 root.result_id,
                 report_field(ro.general_comment, TRUE, root.indicator_id = 5) general_comment,
@@ -85,7 +84,7 @@ export class UpdateReportView1780694172676 implements MigrationInterface {
                 AND root.is_snapshot = FALSE
             ORDER BY root.result_id ASC; `);
 
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_link_result AS
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_link_result AS
 SELECT 
 	root.result_id,
 	report_field(GROUP_CONCAT(CONCAT('', '• [',i.name ,'] ', r.result_official_code, ' - ', r.title ) SEPARATOR '\n'), FALSE, NULL) link_results
@@ -97,10 +96,10 @@ FROM results root
 WHERE root.is_active
 	AND NOT root.is_snapshot
 GROUP BY root.result_id;`);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_link_result AS
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_link_result AS
 SELECT 
 	root.result_id,
 	report_field(GROUP_CONCAT(CONCAT('', '• [',i.name ,']', r.result_official_code, ' - ', r.title ) SEPARATOR '\n'), FALSE, NULL) link_results
@@ -112,7 +111,7 @@ FROM results root
 WHERE root.is_active
 	AND NOT root.is_snapshot
 GROUP BY root.result_id;`);
-        await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
+    await queryRunner.query(`CREATE OR REPLACE VIEW report_oicr AS
             SELECT
                 root.result_id,
                 report_field(ro.general_comment, TRUE, root.indicator_id = 5) general_comment,
@@ -191,6 +190,5 @@ GROUP BY root.result_id;`);
             WHERE root.is_active = TRUE
                 AND root.is_snapshot = FALSE
             ORDER BY root.result_id ASC; `);
-    }
-
+  }
 }
