@@ -1,10 +1,9 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class UpdateOicrGreen1780519377343 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP FUNCTION IF EXISTS \`oicr_validation\`;`);
-        await queryRunner.query(`CREATE FUNCTION \`oicr_validation\`(result_code BIGINT) RETURNS tinyint(1)
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP FUNCTION IF EXISTS \`oicr_validation\`;`);
+    await queryRunner.query(`CREATE FUNCTION \`oicr_validation\`(result_code BIGINT) RETURNS tinyint(1)
     READS SQL DATA
 BEGIN
                                     DECLARE general_validation BOOLEAN DEFAULT FALSE;
@@ -86,8 +85,10 @@ BEGIN
                                     RETURN general_validation;     
                                 END;`);
 
-        await queryRunner.query(`DROP FUNCTION IF EXISTS \`evidences_validation\`;`);
-        await queryRunner.query(`CREATE FUNCTION \`evidences_validation\`(result_code BIGINT) RETURNS tinyint(1)
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS \`evidences_validation\`;`,
+    );
+    await queryRunner.query(`CREATE FUNCTION \`evidences_validation\`(result_code BIGINT) RETURNS tinyint(1)
     READS SQL DATA
 begin 
             
@@ -147,11 +148,11 @@ begin
             return reurn_validation;
             
         end;`);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP FUNCTION IF EXISTS \`oicr_validation\`;`);
-        await queryRunner.query(`CREATE FUNCTION \`oicr_validation\`(result_code BIGINT) RETURNS tinyint(1)
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP FUNCTION IF EXISTS \`oicr_validation\`;`);
+    await queryRunner.query(`CREATE FUNCTION \`oicr_validation\`(result_code BIGINT) RETURNS tinyint(1)
     READS SQL DATA
 BEGIN
                                     DECLARE general_validation BOOLEAN DEFAULT FALSE;
@@ -233,8 +234,10 @@ BEGIN
                                     RETURN general_validation;     
                                 END;`);
 
-        await queryRunner.query(`DROP FUNCTION IF EXISTS \`evidences_validation\`;`);
-        await queryRunner.query(`CREATE FUNCTION \`evidences_validation\`(result_code BIGINT) RETURNS tinyint(1)
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS \`evidences_validation\`;`,
+    );
+    await queryRunner.query(`CREATE FUNCTION \`evidences_validation\`(result_code BIGINT) RETURNS tinyint(1)
     READS SQL DATA
 begin 
             
@@ -271,7 +274,5 @@ begin
             return reurn_validation;
             
         end`);
-
-    }
-
+  }
 }

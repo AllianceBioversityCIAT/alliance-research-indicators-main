@@ -48,9 +48,9 @@ export class SaveResultService {
     let isNewCode = false;
     if (
       extraData?.appliedVersion &&
-      extraData?.currentCode !== result.official_code
+      extraData?.currentCode?.current !== result.official_code
     ) {
-      extraData.currentCode = result.official_code;
+      extraData.currentCode.current = result.official_code;
       isNewCode = true;
     }
 
@@ -185,7 +185,7 @@ export class SaveResultService {
 
 export type ExtraData = {
   resultSaved?: number[];
-  currentCode?: number;
+  currentCode?: { current: number };
   appliedVersion?: boolean;
   counters?: CounterResults;
   platformCode?: ReportingPlatformEnum;

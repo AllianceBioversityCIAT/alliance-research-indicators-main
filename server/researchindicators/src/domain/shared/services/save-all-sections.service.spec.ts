@@ -58,7 +58,7 @@ describe('SaveResultService', () => {
     appliedVersion: true,
     counters,
     resultSaved: [] as number[],
-    currentCode: null as number | null,
+    currentCode: { current: 0 },
   });
 
   const tipExtraData = (counters = new CounterResults()) => ({
@@ -66,7 +66,7 @@ describe('SaveResultService', () => {
     appliedVersion: false,
     counters,
     resultSaved: [] as number[],
-    currentCode: null as number | null,
+    currentCode: { current: 0 },
   });
 
   beforeEach(async () => {
@@ -172,6 +172,7 @@ describe('SaveResultService', () => {
       const secondCallOpts = resultsService.createResult.mock.calls[1][2];
       expect(firstCallOpts.isSnapshot).toBe(false);
       expect(secondCallOpts.isSnapshot).toBe(true);
+      expect(extraData.currentCode.current).toBe(7001);
     });
 
     it('should not mark snapshot when appliedVersion is false even if official code repeats', async () => {
