@@ -1,7 +1,7 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
 
 /**
- * Raw data sheet columns A–BU (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–BV (reference workbook "Raw data" header row).
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'result_code', header: 'Result Code', width: 14 },
@@ -90,6 +90,11 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
     width: 48,
   },
   { key: 'evidences', header: 'Evidences', width: 72 },
+  {
+    key: 'notable_references',
+    header: 'Notable references',
+    width: 72,
+  },
   { key: 'link_results', header: 'Link to Result', width: 72 },
   { key: 'who_owns_ip_rights', header: 'Who owns IP rights?', width: 28 },
   { key: 'third_party', header: 'Third party', width: 32 },
