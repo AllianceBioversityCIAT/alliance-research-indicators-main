@@ -93,4 +93,11 @@ export class AgressoContractService {
       limit,
     );
   }
+
+  async getTopPrimaryLeversReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getTopPrimaryLeversReport(
+      contractId,
+      limit,
+    );
+  }
 }

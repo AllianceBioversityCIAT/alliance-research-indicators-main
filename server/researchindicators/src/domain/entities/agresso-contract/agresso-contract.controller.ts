@@ -101,6 +101,40 @@ export class AgressoContractController {
       );
   }
 
+  @Get('reports/top-primary-levers')
+  @ApiOperation({
+    summary: 'Top primary levers for results linked to a primary contract',
+  })
+  @ApiQuery({
+    name: 'contract-id',
+    required: true,
+    type: String,
+    description: 'Contract agreement id to filter results (primary contract)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Top N primary levers',
+    example: 10,
+  })
+  async getTopPrimaryLeversReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getTopPrimaryLeversReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract top primary levers report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('reports/top-contributors-contracts')
   @ApiOperation({
     summary:

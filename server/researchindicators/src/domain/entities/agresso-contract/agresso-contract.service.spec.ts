@@ -38,6 +38,7 @@ describe('AgressoContractService', () => {
     getGeoScopeReport: jest.fn(),
     getTopPartnersReport: jest.fn(),
     getTopContributorsReport: jest.fn(),
+    getTopPrimaryLeversReport: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -387,6 +388,27 @@ describe('AgressoContractService', () => {
         undefined,
       );
       expect(result).toEqual(expectedContracts);
+    });
+  });
+
+  describe('getTopPrimaryLeversReport', () => {
+    it('should delegate top primary levers report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_primary_levers: [],
+      };
+      mockRepository.getTopPrimaryLeversReport.mockResolvedValue(
+        expectedReport,
+      );
+
+      const result = await service.getTopPrimaryLeversReport('A100', 10);
+
+      expect(repository.getTopPrimaryLeversReport).toHaveBeenCalledWith(
+        'A100',
+        10,
+      );
+      expect(result).toEqual(expectedReport);
     });
   });
 

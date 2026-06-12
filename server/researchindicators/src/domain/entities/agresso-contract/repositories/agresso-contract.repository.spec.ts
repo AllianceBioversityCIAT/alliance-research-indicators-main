@@ -781,6 +781,56 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getTopPrimaryLeversReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getTopPrimaryLeversReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should return top primary levers report with default limit', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([
+        {
+          lever_id: 3,
+          short_name: 'Lever 3',
+          full_name: 'Climate Action',
+          count: 6,
+        },
+      ]);
+
+      const result = await repository.getTopPrimaryLeversReport('A100');
+
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('result_lever.is_primary = TRUE'),
+        ['A100', 10],
+      );
+      expect(result).toEqual({
+        contract_id: 'A100',
+        limit: 10,
+        top_primary_levers: [
+          {
+            lever_id: 3,
+            short_name: 'Lever 3',
+            full_name: 'Climate Action',
+            count: 6,
+          },
+        ],
+      });
+    });
+
+    it('should cap limit to 100', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      const result = await repository.getTopPrimaryLeversReport('A100', 500);
+
+      expect(result.limit).toBe(100);
+      expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
+        'A100',
+        100,
+      ]);
+    });
+  });
+
   describe('getTopContributorsReport', () => {
     it('should throw BadRequestException when contract id is empty', async () => {
       await expect(repository.getTopContributorsReport('')).rejects.toThrow(
