@@ -30,6 +30,7 @@ describe('AgressoContractController', () => {
     findContratResultByContractId: jest.fn(),
     findAgressoContracts: jest.fn(),
     getGeoScopeReport: jest.fn(),
+    getTopPartnersReport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -53,6 +54,43 @@ describe('AgressoContractController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('getTopPartnersReport', () => {
+    it('should return top partners report for a contract', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_partners: [
+          {
+            institution_id: 101,
+            institution_name: 'Partner Org',
+            acronym: 'PO',
+            count: 5,
+          },
+        ],
+      };
+
+      mockAgressoContractService.getTopPartnersReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getTopPartnersReport('A100', '10');
+
+      expect(
+        mockAgressoContractService.getTopPartnersReport,
+      ).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract top partners report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract top partners report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
   });
 
   describe('getGeoScopeReport', () => {

@@ -79,4 +79,11 @@ export class AgressoContractService {
   async getGeoScopeReport(contractId: string, limit?: number) {
     return this._agressoContractRepository.getGeoScopeReport(contractId, limit);
   }
+
+  async getTopPartnersReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getTopPartnersReport(
+      contractId,
+      limit,
+    );
+  }
 }

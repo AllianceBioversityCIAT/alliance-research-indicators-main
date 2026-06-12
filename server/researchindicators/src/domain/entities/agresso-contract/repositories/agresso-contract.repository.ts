@@ -22,6 +22,11 @@ import {
   RegionByContractCountDto,
   SubNationalByContractCountDto,
 } from '../dto/reports-contracts.dto';
+import {
+  ContractTopPartnersReportDto,
+  PartnerByContractCountDto,
+} from '../dto/reports-partners.dto';
+import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -752,5 +757,59 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     }
 
     return Array.from(countriesMap.values());
+  }
+
+  async getTopPartnersReport(
+    contractId: string,
+    limit?: number,
+  ): Promise<ContractTopPartnersReportDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const safeLimit = this.normalizeReportLimit(limit);
+    const contractResultsSubquery = `
+      SELECT DISTINCT r.result_id
+      FROM results r
+      INNER JOIN result_contracts rc ON rc.result_id = r.result_id
+      WHERE rc.contract_id = ?
+        AND rc.is_primary = TRUE
+        AND rc.is_active = TRUE
+        AND r.is_active = TRUE
+        AND r.is_snapshot = FALSE
+    `;
+
+    const query = `
+      SELECT
+        clarisa_institution.code AS institution_id,
+        clarisa_institution.name AS institution_name,
+        clarisa_institution.acronym AS acronym,
+        COUNT(DISTINCT result_institution.result_id) AS count
+      FROM result_institutions result_institution
+      INNER JOIN (${contractResultsSubquery}) contract_results
+        ON contract_results.result_id = result_institution.result_id
+      INNER JOIN clarisa_institutions clarisa_institution
+        ON clarisa_institution.code = result_institution.institution_id
+      WHERE result_institution.institution_role_id = ?
+        AND result_institution.is_active = TRUE
+      GROUP BY
+        clarisa_institution.code,
+        clarisa_institution.name,
+        clarisa_institution.acronym
+      ORDER BY count DESC, clarisa_institution.code
+      LIMIT ?
+    `;
+
+    const rows = await this.query(query, [
+      contractId,
+      InstitutionRolesEnum.PARTNERS,
+      safeLimit,
+    ]);
+
+    return {
+      contract_id: contractId,
+      limit: safeLimit,
+      top_partners: rows as PartnerByContractCountDto[],
+    };
   }
 }

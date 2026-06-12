@@ -101,6 +101,41 @@ export class AgressoContractController {
       );
   }
 
+  @Get('reports/top-partners')
+  @ApiOperation({
+    summary:
+      'Top partner institutions for results linked to a primary contract',
+  })
+  @ApiQuery({
+    name: 'contract-id',
+    required: true,
+    type: String,
+    description: 'Contract agreement id to filter results (primary contract)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Top N partner institutions',
+    example: 10,
+  })
+  async getTopPartnersReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getTopPartnersReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract top partners report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('reports/geo-scope')
   @ApiOperation({
     summary: 'Geographic scope report for results linked to a primary contract',

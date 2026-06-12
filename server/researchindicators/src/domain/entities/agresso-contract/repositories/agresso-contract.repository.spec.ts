@@ -6,6 +6,7 @@ import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
+import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { AgressoContractStatus } from '../../../shared/enum/agresso-contract.enum';
 import {
   isValidText,
@@ -777,6 +778,57 @@ describe('AgressoContractRepository', () => {
       expect(result).toBe(
         "AND LOWER(ac.contract_status) in ('ongoing','completed','suspended')",
       );
+    });
+  });
+
+  describe('getTopPartnersReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getTopPartnersReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should return top partners report with default limit', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([
+        {
+          institution_id: 101,
+          institution_name: 'Partner Org',
+          acronym: 'PO',
+          count: 5,
+        },
+      ]);
+
+      const result = await repository.getTopPartnersReport('A100');
+
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('result_institutions'),
+        ['A100', InstitutionRolesEnum.PARTNERS, 10],
+      );
+      expect(result).toEqual({
+        contract_id: 'A100',
+        limit: 10,
+        top_partners: [
+          {
+            institution_id: 101,
+            institution_name: 'Partner Org',
+            acronym: 'PO',
+            count: 5,
+          },
+        ],
+      });
+    });
+
+    it('should cap limit to 100', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      const result = await repository.getTopPartnersReport('A100', 500);
+
+      expect(result.limit).toBe(100);
+      expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
+        'A100',
+        InstitutionRolesEnum.PARTNERS,
+        100,
+      ]);
     });
   });
 
