@@ -26,6 +26,10 @@ import {
   ContractTopPartnersReportDto,
   PartnerByContractCountDto,
 } from '../dto/reports-partners.dto';
+import {
+  ContractTopContributorsReportDto,
+  ContributorContractCountDto,
+} from '../dto/reports-contributors.dto';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 
 @Injectable()
@@ -810,6 +814,56 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       contract_id: contractId,
       limit: safeLimit,
       top_partners: rows as PartnerByContractCountDto[],
+    };
+  }
+
+  async getTopContributorsReport(
+    contractId: string,
+    limit?: number,
+  ): Promise<ContractTopContributorsReportDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const safeLimit = this.normalizeReportLimit(limit);
+    const primaryContractResultsSubquery = `
+      SELECT DISTINCT r.result_id
+      FROM results r
+      INNER JOIN result_contracts rc ON rc.result_id = r.result_id
+      WHERE rc.contract_id = ?
+        AND rc.is_primary = TRUE
+        AND rc.is_active = TRUE
+        AND r.is_active = TRUE
+        AND r.is_snapshot = FALSE
+    `;
+
+    const query = `
+      SELECT
+        secondary_contract.contract_id,
+        agresso_contract.description AS contract_description,
+        agresso_contract.projectDescription AS project_name,
+        COUNT(DISTINCT secondary_contract.result_id) AS count
+      FROM result_contracts secondary_contract
+      INNER JOIN (${primaryContractResultsSubquery}) primary_contract_results
+        ON primary_contract_results.result_id = secondary_contract.result_id
+      LEFT JOIN agresso_contracts agresso_contract
+        ON agresso_contract.agreement_id = secondary_contract.contract_id
+      WHERE secondary_contract.is_primary = FALSE
+        AND secondary_contract.is_active = TRUE
+      GROUP BY
+        secondary_contract.contract_id,
+        agresso_contract.description,
+        agresso_contract.projectDescription
+      ORDER BY count DESC, secondary_contract.contract_id
+      LIMIT ?
+    `;
+
+    const rows = await this.query(query, [contractId, safeLimit]);
+
+    return {
+      contract_id: contractId,
+      limit: safeLimit,
+      top_contributors: rows as ContributorContractCountDto[],
     };
   }
 }

@@ -86,4 +86,11 @@ export class AgressoContractService {
       limit,
     );
   }
+
+  async getTopContributorsReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getTopContributorsReport(
+      contractId,
+      limit,
+    );
+  }
 }

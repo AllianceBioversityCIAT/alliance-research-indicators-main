@@ -781,6 +781,56 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getTopContributorsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getTopContributorsReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should return top contributors report with default limit', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([
+        {
+          contract_id: 'B200',
+          contract_description: 'Secondary project',
+          project_name: 'Project B',
+          count: 4,
+        },
+      ]);
+
+      const result = await repository.getTopContributorsReport('A100');
+
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('secondary_contract.is_primary = FALSE'),
+        ['A100', 10],
+      );
+      expect(result).toEqual({
+        contract_id: 'A100',
+        limit: 10,
+        top_contributors: [
+          {
+            contract_id: 'B200',
+            contract_description: 'Secondary project',
+            project_name: 'Project B',
+            count: 4,
+          },
+        ],
+      });
+    });
+
+    it('should cap limit to 100', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      const result = await repository.getTopContributorsReport('A100', 500);
+
+      expect(result.limit).toBe(100);
+      expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
+        'A100',
+        100,
+      ]);
+    });
+  });
+
   describe('getTopPartnersReport', () => {
     it('should throw BadRequestException when contract id is empty', async () => {
       await expect(repository.getTopPartnersReport('')).rejects.toThrow(
