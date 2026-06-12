@@ -30,6 +30,10 @@ import {
   ContractTopContributorsReportDto,
   ContributorContractCountDto,
 } from '../dto/reports-contributors.dto';
+import {
+  ContractTopPrimaryLeversReportDto,
+  PrimaryLeverCountDto,
+} from '../dto/reports-primary-levers.dto';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 
 @Injectable()
@@ -864,6 +868,56 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       contract_id: contractId,
       limit: safeLimit,
       top_contributors: rows as ContributorContractCountDto[],
+    };
+  }
+
+  async getTopPrimaryLeversReport(
+    contractId: string,
+    limit?: number,
+  ): Promise<ContractTopPrimaryLeversReportDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const safeLimit = this.normalizeReportLimit(limit);
+    const primaryContractResultsSubquery = `
+      SELECT DISTINCT r.result_id
+      FROM results r
+      INNER JOIN result_contracts rc ON rc.result_id = r.result_id
+      WHERE rc.contract_id = ?
+        AND rc.is_primary = TRUE
+        AND rc.is_active = TRUE
+        AND r.is_active = TRUE
+        AND r.is_snapshot = FALSE
+    `;
+
+    const query = `
+      SELECT
+        clarisa_lever.id AS lever_id,
+        clarisa_lever.short_name AS short_name,
+        clarisa_lever.full_name AS full_name,
+        COUNT(DISTINCT result_lever.result_id) AS count
+      FROM result_levers result_lever
+      INNER JOIN (${primaryContractResultsSubquery}) primary_contract_results
+        ON primary_contract_results.result_id = result_lever.result_id
+      INNER JOIN clarisa_levers clarisa_lever
+        ON clarisa_lever.id = result_lever.lever_id
+      WHERE result_lever.is_primary = TRUE
+        AND result_lever.is_active = TRUE
+      GROUP BY
+        clarisa_lever.id,
+        clarisa_lever.short_name,
+        clarisa_lever.full_name
+      ORDER BY count DESC, clarisa_lever.id
+      LIMIT ?
+    `;
+
+    const rows = await this.query(query, [contractId, safeLimit]);
+
+    return {
+      contract_id: contractId,
+      limit: safeLimit,
+      top_primary_levers: rows as PrimaryLeverCountDto[],
     };
   }
 }

@@ -32,6 +32,7 @@ describe('AgressoContractController', () => {
     getGeoScopeReport: jest.fn(),
     getTopPartnersReport: jest.fn(),
     getTopContributorsReport: jest.fn(),
+    getTopPrimaryLeversReport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -55,6 +56,43 @@ describe('AgressoContractController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('getTopPrimaryLeversReport', () => {
+    it('should return top primary levers report', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_primary_levers: [
+          {
+            lever_id: 3,
+            short_name: 'Lever 3',
+            full_name: 'Climate Action',
+            count: 6,
+          },
+        ],
+      };
+
+      mockAgressoContractService.getTopPrimaryLeversReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getTopPrimaryLeversReport('A100', '10');
+
+      expect(
+        mockAgressoContractService.getTopPrimaryLeversReport,
+      ).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract top primary levers report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract top primary levers report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
   });
 
   describe('getTopContributorsReport', () => {
