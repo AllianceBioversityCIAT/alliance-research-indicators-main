@@ -36,6 +36,8 @@ describe('AgressoContractService', () => {
     findOneContract: jest.fn(),
     getContracts: jest.fn(),
     getGeoScopeReport: jest.fn(),
+    getTopPartnersReport: jest.fn(),
+    getTopContributorsReport: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -385,6 +387,41 @@ describe('AgressoContractService', () => {
         undefined,
       );
       expect(result).toEqual(expectedContracts);
+    });
+  });
+
+  describe('getTopContributorsReport', () => {
+    it('should delegate top contributors report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_contributors: [],
+      };
+      mockRepository.getTopContributorsReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getTopContributorsReport('A100', 10);
+
+      expect(repository.getTopContributorsReport).toHaveBeenCalledWith(
+        'A100',
+        10,
+      );
+      expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getTopPartnersReport', () => {
+    it('should delegate top partners report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_partners: [],
+      };
+      mockRepository.getTopPartnersReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getTopPartnersReport('A100', 10);
+
+      expect(repository.getTopPartnersReport).toHaveBeenCalledWith('A100', 10);
+      expect(result).toEqual(expectedReport);
     });
   });
 
