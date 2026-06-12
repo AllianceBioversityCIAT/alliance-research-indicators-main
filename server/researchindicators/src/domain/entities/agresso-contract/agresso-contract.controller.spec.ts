@@ -65,6 +65,7 @@ describe('AgressoContractController', () => {
           regional: 3,
           countries: 12,
           sub_national: 8,
+          yet_to_be_determined: 1,
         },
         top_regions: [],
         top_countries: [],

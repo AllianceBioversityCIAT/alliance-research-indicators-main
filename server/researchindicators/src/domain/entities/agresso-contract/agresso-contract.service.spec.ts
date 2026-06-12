@@ -396,8 +396,9 @@ describe('AgressoContractService', () => {
         geo_scope_summary: {
           global: 1,
           regional: 2,
-          countries: 3,
+          countries: 7,
           sub_national: 4,
+          yet_to_be_determined: 0,
         },
         top_regions: [],
         top_countries: [],

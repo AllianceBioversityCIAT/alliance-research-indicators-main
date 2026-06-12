@@ -593,7 +593,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         SUM(CASE WHEN cr.geo_scope_id = 1 THEN 1 ELSE 0 END) AS global_count,
         SUM(CASE WHEN cr.geo_scope_id = 2 THEN 1 ELSE 0 END) AS regional_count,
         SUM(CASE WHEN cr.geo_scope_id IN (3, 4) THEN 1 ELSE 0 END) AS countries_count,
-        SUM(CASE WHEN cr.geo_scope_id = 5 THEN 1 ELSE 0 END) AS sub_national_count
+        SUM(CASE WHEN cr.geo_scope_id = 5 THEN 1 ELSE 0 END) AS sub_national_count,
+        SUM(CASE WHEN cr.geo_scope_id = 50 THEN 1 ELSE 0 END) AS yet_to_be_determined_count
       FROM (${contractResultsSubquery}) cr
     `;
 
@@ -710,6 +711,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       regional: Number(summaryRow.regional_count ?? 0),
       countries: Number(summaryRow.countries_count ?? 0),
       sub_national: Number(summaryRow.sub_national_count ?? 0),
+      yet_to_be_determined: Number(summaryRow.yet_to_be_determined_count ?? 0),
     };
 
     const topCountries = this.mapCountriesWithSubNationals(countryMatrixRows);

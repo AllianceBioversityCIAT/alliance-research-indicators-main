@@ -795,6 +795,7 @@ describe('AgressoContractRepository', () => {
             regional_count: '3',
             countries_count: '12',
             sub_national_count: '8',
+            yet_to_be_determined_count: '1',
           },
         ])
         .mockResolvedValueOnce([
@@ -824,6 +825,7 @@ describe('AgressoContractRepository', () => {
           regional: 3,
           countries: 12,
           sub_national: 8,
+          yet_to_be_determined: 1,
         },
         top_regions: [{ region_id: 150, region_name: 'Africa', count: 4 }],
         top_countries: [
