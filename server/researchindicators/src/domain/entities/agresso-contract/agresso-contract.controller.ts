@@ -101,6 +101,40 @@ export class AgressoContractController {
       );
   }
 
+  @Get('reports/geo-scope')
+  @ApiOperation({
+    summary: 'Geographic scope report for results linked to a primary contract',
+  })
+  @ApiQuery({
+    name: 'contract-id',
+    required: true,
+    type: String,
+    description: 'Contract agreement id to filter results (primary contract)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Top N regions, countries and sub-nationals per country',
+    example: 10,
+  })
+  async getGeoScopeReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getGeoScopeReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract geographic scope report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('results/current-user')
   @ApiOperation({ summary: 'Find all contracts by current user' })
   async findContractsByCurrentUser() {

@@ -780,6 +780,85 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getGeoScopeReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getGeoScopeReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should build geographic scope report with default limit', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            global_count: '5',
+            regional_count: '3',
+            countries_count: '12',
+            sub_national_count: '8',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { region_id: 150, region_name: 'Africa', count: 4 },
+        ])
+        .mockResolvedValueOnce([
+          {
+            isoAlpha2: 'KE',
+            country_name: 'Kenya',
+            country_count: 10,
+            country_rank: 1,
+            sub_national_id: 1001,
+            sub_national_name: 'Nairobi',
+            sub_count: 6,
+            sub_rank: 1,
+          },
+        ]);
+
+      const result = await repository.getGeoScopeReport('A100');
+
+      expect(repository.query).toHaveBeenCalledTimes(3);
+      expect(result).toEqual({
+        contract_id: 'A100',
+        limit: 10,
+        geo_scope_summary: {
+          global: 5,
+          regional: 3,
+          countries: 12,
+          sub_national: 8,
+        },
+        top_regions: [{ region_id: 150, region_name: 'Africa', count: 4 }],
+        top_countries: [
+          {
+            iso_alpha_2: 'KE',
+            country_name: 'Kenya',
+            count: 10,
+            top_sub_nationals: [
+              {
+                sub_national_id: 1001,
+                sub_national_name: 'Nairobi',
+                count: 6,
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    it('should cap limit to 100', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{}])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository.getGeoScopeReport('A100', 500);
+
+      expect(result.limit).toBe(100);
+      expect((repository.query as jest.Mock).mock.calls[1][1]).toEqual([
+        'A100',
+        100,
+      ]);
+    });
+  });
+
   describe('buildDateFilterClause', () => {
     it('should build date range filter when both dates provided', () => {
       const filter = { start_date: '2023-01-01', end_date: '2023-12-31' };

@@ -29,7 +29,7 @@ export class SaveResultService {
     private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
-  ) { }
+  ) {}
 
   public async bulkSaveAllSections(
     results: ExternalMappersDto[],

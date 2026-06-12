@@ -29,6 +29,7 @@ describe('AgressoContractController', () => {
     findContractsResultByCurrentUser: jest.fn(),
     findContratResultByContractId: jest.fn(),
     findAgressoContracts: jest.fn(),
+    getGeoScopeReport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -52,6 +53,49 @@ describe('AgressoContractController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('getGeoScopeReport', () => {
+    it('should return geographic scope report for a contract', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        geo_scope_summary: {
+          global: 5,
+          regional: 3,
+          countries: 12,
+          sub_national: 8,
+        },
+        top_regions: [],
+        top_countries: [],
+      };
+
+      mockAgressoContractService.getGeoScopeReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getGeoScopeReport('A100', '10');
+
+      expect(service.getGeoScopeReport).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract geographic scope report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract geographic scope report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+
+    it('should use default limit when query param is not provided', async () => {
+      mockAgressoContractService.getGeoScopeReport.mockResolvedValue({});
+
+      await controller.getGeoScopeReport('A100', undefined);
+
+      expect(service.getGeoScopeReport).toHaveBeenCalledWith('A100', undefined);
+    });
   });
 
   describe('find', () => {
