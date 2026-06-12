@@ -75,4 +75,8 @@ export class AgressoContractService {
       query,
     );
   }
+
+  async getGeoScopeReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getGeoScopeReport(contractId, limit);
+  }
 }

@@ -35,6 +35,7 @@ describe('AgressoContractService', () => {
     findContractsByUser: jest.fn(),
     findOneContract: jest.fn(),
     getContracts: jest.fn(),
+    getGeoScopeReport: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -384,6 +385,29 @@ describe('AgressoContractService', () => {
         undefined,
       );
       expect(result).toEqual(expectedContracts);
+    });
+  });
+
+  describe('getGeoScopeReport', () => {
+    it('should delegate geographic scope report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        geo_scope_summary: {
+          global: 1,
+          regional: 2,
+          countries: 3,
+          sub_national: 4,
+        },
+        top_regions: [],
+        top_countries: [],
+      };
+      mockRepository.getGeoScopeReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getGeoScopeReport('A100', 10);
+
+      expect(repository.getGeoScopeReport).toHaveBeenCalledWith('A100', 10);
+      expect(result).toEqual(expectedReport);
     });
   });
 });
