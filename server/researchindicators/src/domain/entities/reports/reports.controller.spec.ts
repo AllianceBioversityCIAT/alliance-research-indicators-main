@@ -6,19 +6,26 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { ResultSortEnum } from '../results/enum/result-sort.enum';
 import { ReportsController } from './reports.controller';
 import { ReportsGenerationService } from './reports-generation.service';
+import { ResultPdfReportService } from './handlers/result-pdf-report/result-pdf-report.service';
 
 describe('ReportsController', () => {
   let controller: ReportsController;
   const buildWorkbookXlsxBuffer = jest.fn();
+  const buildReport = jest.fn();
 
   beforeEach(async () => {
     buildWorkbookXlsxBuffer.mockReset();
+    buildReport.mockReset();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ReportsController],
       providers: [
         {
           provide: ReportsGenerationService,
           useValue: { buildWorkbookXlsxBuffer },
+        },
+        {
+          provide: ResultPdfReportService,
+          useValue: { buildReport },
         },
         {
           provide: CurrentUserUtil,
@@ -35,7 +42,10 @@ describe('ReportsController', () => {
         },
         {
           provide: ResultsUtil,
-          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
+          useValue: {
+            setup: jest.fn().mockResolvedValue(undefined),
+            resultId: 321,
+          },
         },
         SetUpInterceptor,
       ],
@@ -110,5 +120,27 @@ describe('ReportsController', () => {
         false,
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('returns PDF report sections for the current result', async () => {
+    buildReport.mockResolvedValue({
+      general_information: { result_code: 8245 },
+      alliance_alignment: {},
+      results_partners: {},
+      geographic_scope: {},
+      evidence: {},
+      ip_rights: {},
+    });
+
+    const response = await controller.findPdfReportSections();
+
+    expect(buildReport).toHaveBeenCalledWith(321);
+    expect(response).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          general_information: { result_code: 8245 },
+        }),
+      }),
+    );
   });
 });

@@ -3,6 +3,7 @@ import {
   Controller,
   DefaultValuePipe,
   Get,
+  HttpStatus,
   Query,
   StreamableFile,
   UseGuards,
@@ -26,6 +27,10 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { FullFiltersReportDto } from './dto/filters-report.dto';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
+import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
+import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import { ResponseUtils } from '../../shared/utils/response.utils';
+import { ResultPdfReportService } from './handlers/result-pdf-report/result-pdf-report.service';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -37,8 +42,27 @@ export class ReportsController {
 
   constructor(
     private readonly reportsGeneration: ReportsGenerationService,
+    private readonly resultPdfReportService: ResultPdfReportService,
     private readonly currentUser: CurrentUserUtil,
+    private readonly _resultsUtil: ResultsUtil,
   ) {}
+
+  @Get(`${RESULT_CODE}/pdf-report`)
+  @GetResultVersion()
+  @ApiOperation({
+    summary: 'Build PDF report sections for a single result',
+  })
+  async findPdfReportSections() {
+    return this.resultPdfReportService
+      .buildReport(this._resultsUtil.resultId)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'PDF report sections were found correctly',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 
   @Get('resultCenter/xlsx')
   @ApiOperation({
