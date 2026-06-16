@@ -10,6 +10,7 @@ import { StringKeys } from '../../shared/global-dto/types-global';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
+import { AppConfig } from '../../shared/utils/app-config.util';
 
 // Mock the utility functions
 jest.mock('../../shared/utils/object.utils', () => ({
@@ -47,6 +48,10 @@ describe('AgressoContractService', () => {
     getUserId: jest.fn().mockReturnValue(123),
   };
 
+  const mockAppConfig = {
+    BUCKET_URL: 'https://bucket.example',
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -64,6 +69,10 @@ describe('AgressoContractService', () => {
         {
           provide: CurrentUserUtil,
           useValue: mockCurrentUser,
+        },
+        {
+          provide: AppConfig,
+          useValue: mockAppConfig,
         },
       ],
     }).compile();
@@ -392,11 +401,18 @@ describe('AgressoContractService', () => {
   });
 
   describe('getTopPrimaryLeversReport', () => {
-    it('should delegate top primary levers report to repository', async () => {
+    it('should enrich top primary levers with icon metadata', async () => {
       const expectedReport = {
         contract_id: 'A100',
         limit: 10,
-        top_primary_levers: [],
+        top_primary_levers: [
+          {
+            lever_id: 3,
+            short_name: 'Lever 3',
+            full_name: 'Lever 3: Climate Action',
+            count: 6,
+          },
+        ],
       };
       mockRepository.getTopPrimaryLeversReport.mockResolvedValue(
         expectedReport,
@@ -408,7 +424,13 @@ describe('AgressoContractService', () => {
         'A100',
         10,
       );
-      expect(result).toEqual(expectedReport);
+      expect(result.top_primary_levers[0]).toEqual({
+        lever_id: 3,
+        short_name: 'Lever 3',
+        full_name: 'Lever 3: Climate Action',
+        count: 6,
+        icon: 'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png',
+      });
     });
   });
 
