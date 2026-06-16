@@ -15,6 +15,14 @@ export class PrimaryLeverCountDto {
     description: 'Number of active results with this lever marked as primary',
   })
   count!: number;
+
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    description: 'Lever icon URL from Clarisa levers metadata',
+  })
+  icon?: string | null;
 }
 
 export class ContractTopPrimaryLeversReportDto {
