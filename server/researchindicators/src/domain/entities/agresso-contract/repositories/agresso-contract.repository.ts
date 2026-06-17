@@ -34,7 +34,12 @@ import {
   ContractTopPrimaryLeversReportDto,
   PrimaryLeverCountDto,
 } from '../dto/reports-primary-levers.dto';
+import {
+  ContractTopMainContactPersonsReportDto,
+  MainContactPersonByContractCountDto,
+} from '../dto/reports-main-contact-persons.dto';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
+import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 
 @Injectable()
 export class AgressoContractRepository extends Repository<AgressoContract> {
@@ -554,9 +559,15 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     return Math.min(parsedLimit, 100);
   }
 
-  private buildContractResultsSubquery(): string {
+  private buildPrimaryContractResultsSubquery(options?: {
+    includeGeoScope?: boolean;
+  }): string {
+    const selectColumns = options?.includeGeoScope
+      ? 'r.result_id, r.geo_scope_id'
+      : 'r.result_id';
+
     return `
-      SELECT DISTINCT r.result_id, r.geo_scope_id
+      SELECT DISTINCT ${selectColumns}
       FROM results r
       INNER JOIN result_contracts rc ON rc.result_id = r.result_id
       WHERE rc.contract_id = ?
@@ -565,6 +576,10 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         AND r.is_active = TRUE
         AND r.is_snapshot = FALSE
     `;
+  }
+
+  private buildContractResultsSubquery(): string {
+    return this.buildPrimaryContractResultsSubquery({ includeGeoScope: true });
   }
 
   async getRegionsByContract(
@@ -628,14 +643,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
 
     const countriesMatrixQuery = `
       WITH contract_results AS (
-        SELECT DISTINCT r.result_id
-        FROM results r
-        INNER JOIN result_contracts rc ON rc.result_id = r.result_id
-        WHERE rc.contract_id = ?
-          AND rc.is_primary = TRUE
-          AND rc.is_active = TRUE
-          AND r.is_active = TRUE
-          AND r.is_snapshot = FALSE
+        ${this.buildPrimaryContractResultsSubquery()}
       ),
       country_usage AS (
         SELECT
@@ -776,16 +784,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     }
 
     const safeLimit = this.normalizeReportLimit(limit);
-    const contractResultsSubquery = `
-      SELECT DISTINCT r.result_id
-      FROM results r
-      INNER JOIN result_contracts rc ON rc.result_id = r.result_id
-      WHERE rc.contract_id = ?
-        AND rc.is_primary = TRUE
-        AND rc.is_active = TRUE
-        AND r.is_active = TRUE
-        AND r.is_snapshot = FALSE
-    `;
+    const primaryContractResultsSubquery =
+      this.buildPrimaryContractResultsSubquery();
 
     const query = `
       SELECT
@@ -794,7 +794,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         clarisa_institution.acronym AS acronym,
         COUNT(DISTINCT result_institution.result_id) AS count
       FROM result_institutions result_institution
-      INNER JOIN (${contractResultsSubquery}) contract_results
+      INNER JOIN (${primaryContractResultsSubquery}) contract_results
         ON contract_results.result_id = result_institution.result_id
       INNER JOIN clarisa_institutions clarisa_institution
         ON clarisa_institution.code = result_institution.institution_id
@@ -830,16 +830,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     }
 
     const safeLimit = this.normalizeReportLimit(limit);
-    const primaryContractResultsSubquery = `
-      SELECT DISTINCT r.result_id
-      FROM results r
-      INNER JOIN result_contracts rc ON rc.result_id = r.result_id
-      WHERE rc.contract_id = ?
-        AND rc.is_primary = TRUE
-        AND rc.is_active = TRUE
-        AND r.is_active = TRUE
-        AND r.is_snapshot = FALSE
-    `;
+    const primaryContractResultsSubquery =
+      this.buildPrimaryContractResultsSubquery();
 
     const query = `
       SELECT
@@ -880,16 +872,8 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     }
 
     const safeLimit = this.normalizeReportLimit(limit);
-    const primaryContractResultsSubquery = `
-      SELECT DISTINCT r.result_id
-      FROM results r
-      INNER JOIN result_contracts rc ON rc.result_id = r.result_id
-      WHERE rc.contract_id = ?
-        AND rc.is_primary = TRUE
-        AND rc.is_active = TRUE
-        AND r.is_active = TRUE
-        AND r.is_snapshot = FALSE
-    `;
+    const primaryContractResultsSubquery =
+      this.buildPrimaryContractResultsSubquery();
 
     const query = `
       SELECT
@@ -918,6 +902,54 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       contract_id: contractId,
       limit: safeLimit,
       top_primary_levers: rows as PrimaryLeverCountDto[],
+    };
+  }
+
+  async getTopMainContactPersonsReport(
+    contractId: string,
+    limit?: number,
+  ): Promise<ContractTopMainContactPersonsReportDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const safeLimit = this.normalizeReportLimit(limit);
+    const primaryContractResultsSubquery =
+      this.buildPrimaryContractResultsSubquery();
+
+    const query = `
+      SELECT
+        alliance_user_staff.carnet AS user_id,
+        alliance_user_staff.first_name AS first_name,
+        alliance_user_staff.last_name AS last_name,
+        alliance_user_staff.email AS email,
+        COUNT(DISTINCT result_user.result_id) AS count
+      FROM result_users result_user
+      INNER JOIN (${primaryContractResultsSubquery}) primary_contract_results
+        ON primary_contract_results.result_id = result_user.result_id
+      INNER JOIN alliance_user_staff alliance_user_staff
+        ON alliance_user_staff.carnet = result_user.user_id
+      WHERE result_user.user_role_id = ?
+        AND result_user.is_active = TRUE
+      GROUP BY
+        alliance_user_staff.carnet,
+        alliance_user_staff.first_name,
+        alliance_user_staff.last_name,
+        alliance_user_staff.email
+      ORDER BY count DESC, alliance_user_staff.carnet
+      LIMIT ?
+    `;
+
+    const rows = await this.query(query, [
+      contractId,
+      UserRolesEnum.MAIN_CONTACT,
+      safeLimit,
+    ]);
+
+    return {
+      contract_id: contractId,
+      limit: safeLimit,
+      top_main_contact_persons: rows as MainContactPersonByContractCountDto[],
     };
   }
 }

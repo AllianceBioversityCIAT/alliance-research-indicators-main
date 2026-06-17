@@ -33,6 +33,7 @@ describe('AgressoContractController', () => {
     getTopPartnersReport: jest.fn(),
     getTopContributorsReport: jest.fn(),
     getTopPrimaryLeversReport: jest.fn(),
+    getTopMainContactPersonsReport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -126,6 +127,47 @@ describe('AgressoContractController', () => {
       });
       expect(result).toEqual({
         description: 'Contract top contributors report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+  });
+
+  describe('getTopMainContactPersonsReport', () => {
+    it('should return top main contact persons report for a contract', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_main_contact_persons: [
+          {
+            user_id: '12345',
+            first_name: 'Jane',
+            last_name: 'Doe',
+            email: 'jane.doe@example.org',
+            count: 5,
+          },
+        ],
+      };
+
+      mockAgressoContractService.getTopMainContactPersonsReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getTopMainContactPersonsReport(
+        'A100',
+        '10',
+      );
+
+      expect(
+        mockAgressoContractService.getTopMainContactPersonsReport,
+      ).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract top main contact persons report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract top main contact persons report generated',
         status: HttpStatus.OK,
         data: mockReport,
       });

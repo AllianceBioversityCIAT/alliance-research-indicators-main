@@ -7,6 +7,7 @@ import { AlianceManagementApp } from '../../../tools/broker/aliance-management.a
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
+import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 import { AgressoContractStatus } from '../../../shared/enum/agresso-contract.enum';
 import {
   isValidText,
@@ -876,6 +877,62 @@ describe('AgressoContractRepository', () => {
       expect(result.limit).toBe(100);
       expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
         'A100',
+        100,
+      ]);
+    });
+  });
+
+  describe('getTopMainContactPersonsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(
+        repository.getTopMainContactPersonsReport(''),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return top main contact persons report with default limit', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([
+        {
+          user_id: '12345',
+          first_name: 'Jane',
+          last_name: 'Doe',
+          email: 'jane.doe@example.org',
+          count: 5,
+        },
+      ]);
+
+      const result = await repository.getTopMainContactPersonsReport('A100');
+
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('result_users result_user'),
+        ['A100', UserRolesEnum.MAIN_CONTACT, 10],
+      );
+      expect(result).toEqual({
+        contract_id: 'A100',
+        limit: 10,
+        top_main_contact_persons: [
+          {
+            user_id: '12345',
+            first_name: 'Jane',
+            last_name: 'Doe',
+            email: 'jane.doe@example.org',
+            count: 5,
+          },
+        ],
+      });
+    });
+
+    it('should cap limit to 100', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      const result = await repository.getTopMainContactPersonsReport(
+        'A100',
+        500,
+      );
+
+      expect(result.limit).toBe(100);
+      expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
+        'A100',
+        UserRolesEnum.MAIN_CONTACT,
         100,
       ]);
     });

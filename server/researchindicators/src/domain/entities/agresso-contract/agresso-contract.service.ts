@@ -101,6 +101,13 @@ export class AgressoContractService {
     );
   }
 
+  async getTopMainContactPersonsReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getTopMainContactPersonsReport(
+      contractId,
+      limit,
+    );
+  }
+
   async getTopPrimaryLeversReport(
     contractId: string,
     limit?: number,
