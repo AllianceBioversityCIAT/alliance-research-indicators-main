@@ -41,6 +41,7 @@ describe('AgressoContractService', () => {
     getTopContributorsReport: jest.fn(),
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
+    getContractStaffReport: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -471,6 +472,21 @@ describe('AgressoContractService', () => {
         'A100',
         10,
       );
+      expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getContractStaffReport', () => {
+    it('should delegate contract staff report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        staff: [{ name: 'John Doe', role: 'Project Lead' }],
+      };
+      mockRepository.getContractStaffReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getContractStaffReport('A100');
+
+      expect(repository.getContractStaffReport).toHaveBeenCalledWith('A100');
       expect(result).toEqual(expectedReport);
     });
   });

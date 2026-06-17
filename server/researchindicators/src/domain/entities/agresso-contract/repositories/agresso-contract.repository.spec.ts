@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { AgressoContractRepository } from './agresso-contract.repository';
@@ -935,6 +935,64 @@ describe('AgressoContractRepository', () => {
         UserRolesEnum.MAIN_CONTACT,
         100,
       ]);
+    });
+  });
+
+  describe('getContractStaffReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getContractStaffReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw NotFoundException when contract does not exist', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await expect(repository.getContractStaffReport('A100')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should return all populated staff members', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([
+        {
+          project_lead_description: 'JOHN DOE',
+          programAssistantName: 'jane smith',
+          researchAssistantName: 'bob wilson',
+        },
+      ]);
+
+      const result = await repository.getContractStaffReport('A100');
+
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('agresso_contracts ac'),
+        ['A100'],
+      );
+      expect(result).toEqual({
+        contract_id: 'A100',
+        staff: [
+          { name: 'John Doe', role: 'Project Lead' },
+          { name: 'Jane Smith', role: 'Program Assistant' },
+          { name: 'Bob Wilson', role: 'Research Assistant' },
+        ],
+      });
+    });
+
+    it('should omit null or blank staff fields', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([
+        {
+          project_lead_description: 'john doe',
+          programAssistantName: null,
+          researchAssistantName: '   ',
+        },
+      ]);
+
+      const result = await repository.getContractStaffReport('A100');
+
+      expect(result).toEqual({
+        contract_id: 'A100',
+        staff: [{ name: 'John Doe', role: 'Project Lead' }],
+      });
     });
   });
 

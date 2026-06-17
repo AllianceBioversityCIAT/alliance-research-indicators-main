@@ -205,6 +205,28 @@ export class AgressoContractController {
       );
   }
 
+  @Get('reports/contract-staff')
+  @ApiOperation({
+    summary: 'Project staff members assigned to a contract',
+  })
+  @ApiQuery({
+    name: 'contract-id',
+    required: true,
+    type: String,
+    description: 'Contract agreement id',
+  })
+  async getContractStaffReport(@Query('contract-id') contractId: string) {
+    return this.agressoContractService
+      .getContractStaffReport(contractId)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract staff report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('reports/top-partners')
   @ApiOperation({
     summary:

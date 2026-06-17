@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
 import { AgressoContract } from '../entities/agresso-contract.entity';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
@@ -6,6 +10,7 @@ import { AlianceManagementApp } from '../../../tools/broker/aliance-management.a
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { ContractResultCountDto } from '../dto/contract-result-count.dto';
 import { isEmpty } from '../../../shared/utils/object.utils';
+import { formatPersonName } from '../../../shared/utils/name-format.util';
 import { StringKeys } from '../../../shared/global-dto/types-global';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
 import { Indicator } from '../../indicators/entities/indicator.entity';
@@ -38,6 +43,10 @@ import {
   ContractTopMainContactPersonsReportDto,
   MainContactPersonByContractCountDto,
 } from '../dto/reports-main-contact-persons.dto';
+import {
+  ContractStaffFieldsDto,
+  ContractStaffReportDto,
+} from '../dto/reports-contract-staff.dto';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 
@@ -951,5 +960,50 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       limit: safeLimit,
       top_main_contact_persons: rows as MainContactPersonByContractCountDto[],
     };
+  }
+
+  async getContractStaffReport(
+    contractId: string,
+  ): Promise<ContractStaffReportDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const query = `
+      SELECT
+        ac.project_lead_description AS project_lead_description,
+        ac.programAssistantName AS programAssistantName,
+        ac.researchAssistantName AS researchAssistantName
+      FROM agresso_contracts ac
+      WHERE ac.agreement_id = ?
+        AND ac.is_active = TRUE
+    `;
+
+    const rows = await this.query(query, [contractId]);
+    if (!rows?.length) {
+      throw new NotFoundException('Contract not found');
+    }
+
+    return {
+      contract_id: contractId,
+      staff: this.mapContractStaff(rows[0] as ContractStaffFieldsDto),
+    };
+  }
+
+  private mapContractStaff(
+    fields: ContractStaffFieldsDto,
+  ): ContractStaffReportDto['staff'] {
+    const staffMappings = [
+      { name: fields.project_lead_description, role: 'Project Lead' },
+      { name: fields.programAssistantName, role: 'Program Assistant' },
+      { name: fields.researchAssistantName, role: 'Research Assistant' },
+    ];
+
+    return staffMappings
+      .filter(({ name }) => !isEmpty(String(name ?? '').trim()))
+      .map(({ name, role }) => ({
+        name: formatPersonName(name),
+        role,
+      }));
   }
 }
