@@ -34,6 +34,7 @@ describe('AgressoContractController', () => {
     getTopContributorsReport: jest.fn(),
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
+    getContractStaffReport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -168,6 +169,38 @@ describe('AgressoContractController', () => {
       });
       expect(result).toEqual({
         description: 'Contract top main contact persons report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+  });
+
+  describe('getContractStaffReport', () => {
+    it('should return contract staff report', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        staff: [
+          { name: 'John Doe', role: 'Project Lead' },
+          { name: 'Jane Smith', role: 'Program Assistant' },
+        ],
+      };
+
+      mockAgressoContractService.getContractStaffReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getContractStaffReport('A100');
+
+      expect(
+        mockAgressoContractService.getContractStaffReport,
+      ).toHaveBeenCalledWith('A100');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract staff report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract staff report generated',
         status: HttpStatus.OK,
         data: mockReport,
       });

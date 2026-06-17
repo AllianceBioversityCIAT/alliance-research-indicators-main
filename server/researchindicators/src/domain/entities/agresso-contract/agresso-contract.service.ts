@@ -108,6 +108,10 @@ export class AgressoContractService {
     );
   }
 
+  async getContractStaffReport(contractId: string) {
+    return this._agressoContractRepository.getContractStaffReport(contractId);
+  }
+
   async getTopPrimaryLeversReport(
     contractId: string,
     limit?: number,
