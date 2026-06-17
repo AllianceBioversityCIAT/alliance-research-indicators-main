@@ -170,6 +170,41 @@ export class AgressoContractController {
       );
   }
 
+  @Get('reports/top-main-contact-persons')
+  @ApiOperation({
+    summary:
+      'Top main contact persons for results linked to a primary contract',
+  })
+  @ApiQuery({
+    name: 'contract-id',
+    required: true,
+    type: String,
+    description: 'Contract agreement id to filter results (primary contract)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Top N main contact persons',
+    example: 10,
+  })
+  async getTopMainContactPersonsReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getTopMainContactPersonsReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract top main contact persons report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('reports/top-partners')
   @ApiOperation({
     summary:
