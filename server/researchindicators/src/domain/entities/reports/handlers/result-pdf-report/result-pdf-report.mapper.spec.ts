@@ -1,4 +1,5 @@
 import {
+  mapCapSharingSection,
   mapGeneralInformationSection,
   mapGeographicScopeSection,
   mapPartnersSection,
@@ -93,5 +94,30 @@ describe('result-pdf-report.mapper', () => {
   it('formats generated_at with ordinal day suffix', () => {
     const formatted = formatPdfGeneratedAt(new Date('2025-02-18T20:18:00.000Z'));
     expect(formatted).toMatch(/18th, 2025/);
+  });
+
+  it('maps cap sharing section with individual data and labels', () => {
+    const result = mapCapSharingSection(
+      {
+        delivery_modality_id: 3,
+        session_format_id: 1,
+        individual: {
+          trainee_name: 'test',
+          gender_id: 3,
+        },
+      },
+      {
+        session_format_label: 'Individual training',
+        gender_label: 'Non-binary',
+      },
+    );
+
+    expect(result.individual).toEqual({
+      trainee_name: 'test',
+      gender_id: 3,
+    });
+    expect(result.session_format_label).toBe('Individual training');
+    expect(result.gender_label).toBe('Non-binary');
+    expect(result.group).toBeUndefined();
   });
 });

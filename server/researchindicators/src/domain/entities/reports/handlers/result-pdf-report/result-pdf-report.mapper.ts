@@ -9,13 +9,17 @@ import { CreateResultEvidenceDto } from '../../../result-evidences/dto/create-re
 import { UpdateIpRightDto } from '../../../result-ip-rights/dto/update-ip-right.dto';
 import { MetadataResultDto } from '../../../results/dto/metadata-result.dto';
 import { LeverIcon } from '../../../../tools/clarisa/entities/clarisa-levers/enum/LeversIcons.enum';
+import { UpdateResultCapacitySharingDto } from '../../../result-capacity-sharing/dto/update-result-capacity-sharing.dto';
 import {
   ResultPdfReportAllianceAlignmentSection,
+  ResultPdfReportCapSharingLabels,
+  ResultPdfReportCapSharingSection,
   ResultPdfReportContractLever,
   ResultPdfReportEvidenceSection,
   ResultPdfReportGeneralInformationSection,
   ResultPdfReportGeographicScopeSection,
   ResultPdfReportIpRightsSection,
+  ResultPdfReportPartnerInstitution,
   ResultPdfReportPartnersSection,
 } from './result-pdf-report.types';
 
@@ -233,20 +237,51 @@ const resolveHeadquarters = (
   return headquarters?.name ?? headquarters?.country?.name ?? null;
 };
 
-export const mapPartnersSection = (
+export const mapInstitutionItems = (
   institutions: ResultInstitution[],
-  isPartnerNotApplicable: boolean | null,
-): ResultPdfReportPartnersSection => ({
-  is_partner_not_applicable: isPartnerNotApplicable,
-  institutions: institutions.map((item) => ({
+): ResultPdfReportPartnerInstitution[] =>
+  institutions.map((item) => ({
     institution_id: item.institution_id,
     institution_role_id: item.institution_role_id,
     acronym: item.institution?.acronym,
     name: item.institution?.name,
     institution_type_name: item.institution?.institution_type?.name,
     headquarters: resolveHeadquarters(item.institution),
-  })),
+  }));
+
+export const mapPartnersSection = (
+  institutions: ResultInstitution[],
+  isPartnerNotApplicable: boolean | null,
+): ResultPdfReportPartnersSection => ({
+  is_partner_not_applicable: isPartnerNotApplicable,
+  institutions: mapInstitutionItems(institutions),
 });
+
+export const mapCapSharingSection = (
+  capSharing: Partial<UpdateResultCapacitySharingDto>,
+  labels: ResultPdfReportCapSharingLabels,
+): ResultPdfReportCapSharingSection =>
+  omitUndefined({
+    delivery_modality_id: capSharing.delivery_modality_id,
+    end_date: capSharing.end_date,
+    session_format_id: capSharing.session_format_id,
+    session_type_id: capSharing.session_type_id,
+    start_date: capSharing.start_date,
+    degree_id: capSharing.degree_id,
+    session_length_id: capSharing.session_length_id,
+    ...(capSharing.individual ? { individual: capSharing.individual } : {}),
+    ...(capSharing.group ? { group: capSharing.group } : {}),
+    ...(capSharing.training_supervisor !== undefined
+      ? { training_supervisor: capSharing.training_supervisor }
+      : {}),
+    ...(capSharing.training_supervisor_languages !== undefined
+      ? {
+          training_supervisor_languages:
+            capSharing.training_supervisor_languages,
+        }
+      : {}),
+    ...labels,
+  });
 
 export const mapIpRightsSection = (
   ipRights: UpdateIpRightDto | null | undefined,

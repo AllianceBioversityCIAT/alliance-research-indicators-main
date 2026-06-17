@@ -1,3 +1,11 @@
+import {
+  CapDevGroupDto,
+  CapDevIndividualDto,
+} from '../../../result-capacity-sharing/dto/update-result-capacity-sharing.dto';
+import { ResultUser } from '../../../result-users/entities/result-user.entity';
+import { ResultLanguage } from '../../../result-languages/entities/result-language.entity';
+import { ResultPdfIndicatorSections } from './indicator-sections/result-pdf-indicator-section.types';
+
 export type ResultPdfReportGeneralInformationSection = {
   title: string;
   description: string;
@@ -100,6 +108,45 @@ export type ResultPdfReportIpRightsSection = {
   formal_ip_rights_application_id?: number | null;
 };
 
+export type ResultPdfReportCapSharingLabels = {
+  session_format_label?: string;
+  session_type_label?: string;
+  session_length_label?: string;
+  degree_label?: string;
+  delivery_modality_label?: string;
+  gender_label?: string;
+  affiliation_label?: string;
+  nationality_label?: string;
+  session_purpose_label?: string;
+  attending_organization_label?: string;
+  organization_institutions?: ResultPdfReportPartnerInstitution[];
+};
+
+export type ResultPdfReportCapSharingSection = {
+  delivery_modality_id?: number;
+  end_date?: Date | string;
+  session_format_id?: number;
+  session_type_id?: number;
+  start_date?: Date | string;
+  degree_id?: number | null;
+  session_length_id?: number;
+  individual?: CapDevIndividualDto;
+  group?: CapDevGroupDto;
+  training_supervisor?: ResultUser | null;
+  training_supervisor_languages?: ResultLanguage | null;
+  session_format_label?: string;
+  session_type_label?: string;
+  session_length_label?: string;
+  degree_label?: string;
+  delivery_modality_label?: string;
+  affiliation_label?: string;
+  nationality_label?: string;
+  gender_label?: string;
+  session_purpose_label?: string;
+  attending_organization_label?: string;
+  organization_institutions?: ResultPdfReportPartnerInstitution[];
+};
+
 export type ResultPdfReportPayload = {
   general_information: ResultPdfReportGeneralInformationSection;
   alliance_alignment: ResultPdfReportAllianceAlignmentSection;
@@ -107,4 +154,4 @@ export type ResultPdfReportPayload = {
   geographic_scope: ResultPdfReportGeographicScopeSection;
   evidence: ResultPdfReportEvidenceSection;
   ip_rights: ResultPdfReportIpRightsSection;
-};
+} & ResultPdfIndicatorSections;

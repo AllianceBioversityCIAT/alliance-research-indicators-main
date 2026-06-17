@@ -21,6 +21,7 @@ import {
   mapPartnersSection,
 } from './result-pdf-report.mapper';
 import { ResultPdfReportPayload } from './result-pdf-report.types';
+import { ResultPdfIndicatorSectionRegistry } from './indicator-sections/result-pdf-indicator-section.registry';
 
 @Injectable()
 export class ResultPdfReportService {
@@ -28,6 +29,7 @@ export class ResultPdfReportService {
     private readonly resultsService: ResultsService,
     private readonly resultEvidencesService: ResultEvidencesService,
     private readonly resultIpRightsService: ResultIpRightsService,
+    private readonly indicatorSectionRegistry: ResultPdfIndicatorSectionRegistry,
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly dataSource: DataSource,
     private readonly appConfig: AppConfig,
@@ -58,8 +60,13 @@ export class ResultPdfReportService {
       this.findPartnerFlags(resultId),
     ]);
 
-    const leverByDepartmentId =
-      await this.buildLeverLookupByDepartment(contractsWithAgresso);
+    const [leverByDepartmentId, indicatorSections] = await Promise.all([
+      this.buildLeverLookupByDepartment(contractsWithAgresso),
+      this.indicatorSectionRegistry.buildSections(
+        resultId,
+        metadata.indicator_id,
+      ),
+    ]);
 
     return {
       general_information: mapGeneralInformationSection(
@@ -81,6 +88,7 @@ export class ResultPdfReportService {
       geographic_scope: mapGeographicScopeSection(geoLocation),
       evidence: mapEvidenceSection(evidence),
       ip_rights: mapIpRightsSection(ipRights),
+      ...indicatorSections,
     };
   }
 

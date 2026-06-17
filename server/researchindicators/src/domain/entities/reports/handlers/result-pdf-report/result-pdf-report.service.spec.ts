@@ -10,6 +10,7 @@ import { ResultContract } from '../../../result-contracts/entities/result-contra
 import { ResultLever } from '../../../result-levers/entities/result-lever.entity';
 import { ResultInstitution } from '../../../result-institutions/entities/result-institution.entity';
 import { Result } from '../../../results/entities/result.entity';
+import { ResultPdfIndicatorSectionRegistry } from './indicator-sections/result-pdf-indicator-section.registry';
 
 describe('ResultPdfReportService', () => {
   let service: ResultPdfReportService;
@@ -25,6 +26,9 @@ describe('ResultPdfReportService', () => {
   };
   const resultIpRightsService = {
     findByResultId: jest.fn(),
+  };
+  const indicatorSectionRegistry = {
+    buildSections: jest.fn(),
   };
   const clarisaLeversService = {
     homologatedData: jest.fn(),
@@ -43,6 +47,10 @@ describe('ResultPdfReportService', () => {
         { provide: ResultsService, useValue: resultsService },
         { provide: ResultEvidencesService, useValue: resultEvidencesService },
         { provide: ResultIpRightsService, useValue: resultIpRightsService },
+        {
+          provide: ResultPdfIndicatorSectionRegistry,
+          useValue: indicatorSectionRegistry,
+        },
         { provide: ClarisaLeversService, useValue: clarisaLeversService },
         {
           provide: DataSource,
@@ -103,15 +111,18 @@ describe('ResultPdfReportService', () => {
     leverRepo.find.mockResolvedValue([]);
     institutionRepo.find.mockResolvedValue([]);
     resultRepo.findOne.mockResolvedValue({ is_partner_not_applicable: false });
+    indicatorSectionRegistry.buildSections.mockResolvedValue({});
 
     const report = await service.buildReport(10);
 
+    expect(indicatorSectionRegistry.buildSections).toHaveBeenCalledWith(10, 4);
     expect(report.general_information.title).toBe('Title');
     expect(report.general_information.result_code).toBe(8245);
     expect(report.geographic_scope.geo_scope_id).toBe('1');
     expect(report.evidence.evidence).toEqual([]);
     expect(report.results_partners.is_partner_not_applicable).toBe(false);
     expect(report.ip_rights.potential_asset).toBe(true);
+    expect(report.cap_sharing).toBeUndefined();
     expect(Object.keys(report)).toEqual([
       'general_information',
       'alliance_alignment',
@@ -120,5 +131,61 @@ describe('ResultPdfReportService', () => {
       'evidence',
       'ip_rights',
     ]);
+  });
+
+  it('merges indicator-specific sections from the registry', async () => {
+    resultsService.findGeneralInfo.mockResolvedValue({
+      title: 'Cap sharing title',
+      description: 'Description',
+      year: 2026,
+      keywords: [],
+      main_contact_person: null,
+    });
+    resultsService.findMetadataResult.mockResolvedValue({
+      result_id: 17898,
+      result_official_code: 8245,
+      indicator_id: 1,
+      indicator_name: 'Capacity Sharing for Development',
+    });
+    resultsService.findResultAlignment.mockResolvedValue({
+      contracts: [],
+      primary_levers: [],
+      contributor_levers: [],
+      result_sdgs: [],
+    });
+    resultsService.findGeoLocation.mockResolvedValue({
+      geo_scope_id: 1,
+      regions: [],
+      countries: [],
+      comment_geo_scope: null,
+    });
+    resultEvidencesService.findPrincipalEvidence.mockResolvedValue({
+      evidence: [],
+      notable_references: [],
+    });
+    resultIpRightsService.findByResultId.mockResolvedValue({});
+    contractRepo.find.mockResolvedValue([]);
+    leverRepo.find.mockResolvedValue([]);
+    institutionRepo.find.mockResolvedValue([]);
+    resultRepo.findOne.mockResolvedValue({ is_partner_not_applicable: false });
+    indicatorSectionRegistry.buildSections.mockResolvedValue({
+      cap_sharing: {
+        session_format_id: 1,
+        individual: { trainee_name: 'test' },
+        session_format_label: 'Individual training',
+      },
+    });
+
+    const report = await service.buildReport(17898);
+
+    expect(indicatorSectionRegistry.buildSections).toHaveBeenCalledWith(
+      17898,
+      1,
+    );
+    expect(report.cap_sharing).toMatchObject({
+      session_format_id: 1,
+      individual: { trainee_name: 'test' },
+      session_format_label: 'Individual training',
+    });
   });
 });
