@@ -109,6 +109,12 @@ describe('StarResultsExportRepository', () => {
     );
     expect(sql).toContain('pc.policy_type AS policy_type');
     expect(sql).toContain(
+      'LEFT JOIN report_innovation_dev idv ON idv.result_id = gi.result_id',
+    );
+    expect(sql).toContain('idv.short_title AS short_title');
+    expect(sql).toContain('idv.link_to_results AS tools_often_used_together');
+    expect(sql).toContain('idv.expansion_potential AS expansion_potential');
+    expect(sql).toContain(
       'LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id',
     );
     expect(sql).toContain('oc.impact_area AS impact_area');
