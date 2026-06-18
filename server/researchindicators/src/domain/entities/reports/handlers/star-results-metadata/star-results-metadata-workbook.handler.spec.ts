@@ -157,7 +157,13 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(byKey.get('start_date')?.cellDataType).toBe('date');
     expect(byKey.get('end_date')?.cellDataType).toBe('date');
     expect(byKey.get('result_code')?.cellDataType).toBeUndefined();
-    expect(raw!.columns).toHaveLength(74);
+    expect(raw!.columns).toHaveLength(101);
+    expect(raw!.columns.find((c) => c.key === 'short_title')?.header).toBe(
+      'Short title',
+    );
+    expect(
+      raw!.columns.find((c) => c.key === 'tools_often_used_together')?.header,
+    ).toBe('Tools often used together');
     expect(
       raw!.columns.find((c) => c.key === 'training_engagement_report')?.header,
     ).toBe('Training type');
