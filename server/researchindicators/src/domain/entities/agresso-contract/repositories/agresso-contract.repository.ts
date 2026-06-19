@@ -210,14 +210,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
 
     const query = `
     SELECT 
-      ac.agreement_id, 
-      ac.projectDescription, 
-      ac.description,
-      ac.project_lead_description, 
-      ac.start_date, 
-      ac.end_date, 
-      ac.endDatefinance,
-      ac.contract_status,
+      ac.*,
       JSON_ARRAYAGG(
         JSON_OBJECT(
           'indicator', JSON_OBJECT(
