@@ -109,7 +109,9 @@ export class CapSharingPdfSectionHandler
         resultId,
         capSharing.individual?.affiliation?.result_institution_id,
       ),
-      this.findNationalityCountry(capSharing.individual?.nationality?.isoAlpha2),
+      this.findNationalityCountry(
+        capSharing.individual?.nationality?.isoAlpha2,
+      ),
       this.findOrganizationInstitutions(
         resultId,
         capSharing.group?.trainee_organization_representative ?? [],

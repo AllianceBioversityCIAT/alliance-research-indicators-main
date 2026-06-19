@@ -14,10 +14,9 @@ import { ReportsGenerationService } from './reports-generation.service';
 import { ReportsController } from './reports.controller';
 import { ResultPdfReportService } from './handlers/result-pdf-report/result-pdf-report.service';
 import { ResultPdfIndicatorSectionRegistry } from './handlers/result-pdf-report/indicator-sections/result-pdf-indicator-section.registry';
-import {
-  RESULT_PDF_INDICATOR_SECTION_HANDLERS,
-} from './handlers/result-pdf-report/indicator-sections/result-pdf-indicator-section.registry';
+import { RESULT_PDF_INDICATOR_SECTION_HANDLERS } from './handlers/result-pdf-report/indicator-sections/result-pdf-indicator-section.registry';
 import { CapSharingPdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/cap-sharing/cap-sharing-pdf-section.handler';
+import { PdfViewerModule } from '../../tools/pdf-viewer/pdf-viewer.module';
 
 @Module({
   imports: [
@@ -26,6 +25,7 @@ import { CapSharingPdfSectionHandler } from './handlers/result-pdf-report/indica
     ResultIpRightsModule,
     ResultCapacitySharingModule,
     ClarisaLeversModule,
+    PdfViewerModule,
   ],
   controllers: [ReportsController],
   providers: [

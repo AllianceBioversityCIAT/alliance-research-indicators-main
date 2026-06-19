@@ -1,8 +1,5 @@
 import { IndicatorsEnum } from '../../../../indicators/enum/indicators.enum';
-import {
-  ResultPdfIndicatorSectionRegistry,
-  RESULT_PDF_INDICATOR_SECTION_HANDLERS,
-} from './result-pdf-indicator-section.registry';
+import { ResultPdfIndicatorSectionRegistry } from './result-pdf-indicator-section.registry';
 import { ResultPdfIndicatorSectionHandler } from './result-pdf-indicator-section.types';
 
 describe('ResultPdfIndicatorSectionRegistry', () => {
@@ -19,9 +16,9 @@ describe('ResultPdfIndicatorSectionRegistry', () => {
   });
 
   it('returns an empty object for indicators without a handler', async () => {
-    await expect(registry.buildSections(10, IndicatorsEnum.POLICY_CHANGE)).resolves.toEqual(
-      {},
-    );
+    await expect(
+      registry.buildSections(10, IndicatorsEnum.POLICY_CHANGE),
+    ).resolves.toEqual({});
     expect(capSharingHandler.buildSections).not.toHaveBeenCalled();
   });
 
@@ -31,7 +28,10 @@ describe('ResultPdfIndicatorSectionRegistry', () => {
     });
 
     await expect(
-      registry.buildSections(17898, IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT),
+      registry.buildSections(
+        17898,
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      ),
     ).resolves.toEqual({
       cap_sharing: { session_format_id: 1 },
     });
@@ -44,7 +44,10 @@ describe('ResultPdfIndicatorSectionRegistry', () => {
     });
 
     await expect(
-      registry.buildSections(17898, IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT),
+      registry.buildSections(
+        17898,
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      ),
     ).resolves.toEqual({});
   });
 });

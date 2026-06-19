@@ -55,6 +55,14 @@ export type ResultPdfReportAlignmentContract = {
   levers: ResultPdfReportContractLever;
 };
 
+export type ResultPdfReportLeverSdgTarget = {
+  result_lever_sdg_target_id: number;
+  result_lever_id: number;
+  sdg_target_id: number;
+  name?: string;
+  description?: string;
+};
+
 export type ResultPdfReportAlignmentLever = {
   result_lever_id: number;
   result_id: number;
@@ -64,7 +72,7 @@ export type ResultPdfReportAlignmentLever = {
   short_name?: string;
   icon?: string | null;
   result_lever_strategic_outcomes?: unknown[];
-  result_lever_sdg_targets?: unknown[];
+  result_lever_sdg_targets?: ResultPdfReportLeverSdgTarget[];
 };
 
 export type ResultPdfReportAllianceAlignmentSection = {

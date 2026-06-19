@@ -1,4 +1,5 @@
 import {
+  mapAllianceAlignmentSection,
   mapCapSharingSection,
   mapGeneralInformationSection,
   mapGeographicScopeSection,
@@ -74,7 +75,9 @@ describe('result-pdf-report.mapper', () => {
             acronym: 'WUR',
             name: 'Wageningen University and Research Centre',
             institution_type: { name: 'Research organizations' },
-            institution_locations: [{ isHeadquarter: true, name: 'Netherlands' }],
+            institution_locations: [
+              { isHeadquarter: true, name: 'Netherlands' },
+            ],
           },
         } as any,
       ],
@@ -92,7 +95,9 @@ describe('result-pdf-report.mapper', () => {
   });
 
   it('formats generated_at with ordinal day suffix', () => {
-    const formatted = formatPdfGeneratedAt(new Date('2025-02-18T20:18:00.000Z'));
+    const formatted = formatPdfGeneratedAt(
+      new Date('2025-02-18T20:18:00.000Z'),
+    );
     expect(formatted).toMatch(/18th, 2025/);
   });
 
@@ -119,5 +124,81 @@ describe('result-pdf-report.mapper', () => {
     expect(result.session_format_label).toBe('Individual training');
     expect(result.gender_label).toBe('Non-binary');
     expect(result.group).toBeUndefined();
+  });
+
+  it('merges alignment lever metadata with sdg targets and strategic outcomes', () => {
+    const sdgTargets = [
+      {
+        result_lever_sdg_target_id: 1,
+        result_lever_id: 99,
+        sdg_target_id: 10,
+      },
+    ];
+    const strategicOutcomes = [
+      { result_lever_strategic_outcome_id: 2, strategic_outcome_id: 5 },
+    ];
+    const sdgTargetsWithRelations = [
+      {
+        result_lever_sdg_target_id: 1,
+        result_lever_id: 99,
+        sdg_target_id: 10,
+        sdg_target: {
+          id: 10,
+          sdg_target_code: '2.5',
+          sdg_target: 'By 2030, maintain genetic diversity',
+        },
+      },
+    ];
+
+    const result = mapAllianceAlignmentSection(
+      {
+        primary_levers: [
+          {
+            result_lever_id: 99,
+            result_id: 1,
+            lever_id: '3',
+            lever_role_id: 1,
+            is_primary: true,
+            result_lever_sdg_targets: sdgTargets,
+            result_lever_strategic_outcomes: strategicOutcomes,
+          },
+        ],
+        contributor_levers: [],
+        result_sdgs: [],
+        contracts: [],
+      } as any,
+      4,
+      [],
+      [
+        {
+          result_lever_id: 99,
+          result_id: 1,
+          lever_id: '3',
+          lever_role_id: 1,
+          is_primary: true,
+          lever: { short_name: 'GEN', full_name: 'Genetic Innovation' },
+        },
+      ] as any,
+      sdgTargetsWithRelations as any,
+      'https://bucket.example.com',
+      new Map(),
+    );
+
+    expect(result.primary_levers[0]).toEqual(
+      expect.objectContaining({
+        short_name: 'GEN',
+        full_name: 'Genetic Innovation',
+        result_lever_strategic_outcomes: strategicOutcomes,
+        result_lever_sdg_targets: [
+          {
+            result_lever_sdg_target_id: 1,
+            result_lever_id: 99,
+            sdg_target_id: 10,
+            name: '2.5',
+            description: 'By 2030, maintain genetic diversity',
+          },
+        ],
+      }),
+    );
   });
 });

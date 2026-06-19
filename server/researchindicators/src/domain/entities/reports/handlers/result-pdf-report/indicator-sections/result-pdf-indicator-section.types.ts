@@ -11,7 +11,5 @@ export type ResultPdfIndicatorSections = {
 
 export type ResultPdfIndicatorSectionHandler = {
   readonly indicatorId: IndicatorsEnum;
-  buildSections(
-    resultId: number,
-  ): Promise<Partial<ResultPdfIndicatorSections>>;
+  buildSections(resultId: number): Promise<Partial<ResultPdfIndicatorSections>>;
 };

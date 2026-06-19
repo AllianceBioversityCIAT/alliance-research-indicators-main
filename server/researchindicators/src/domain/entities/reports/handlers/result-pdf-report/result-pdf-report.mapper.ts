@@ -2,6 +2,7 @@ import { AgressoContract } from '../../../agresso-contract/entities/agresso-cont
 import { ResultContract } from '../../../result-contracts/entities/result-contract.entity';
 import { ResultInstitution } from '../../../result-institutions/entities/result-institution.entity';
 import { ResultLever } from '../../../result-levers/entities/result-lever.entity';
+import { ResultLeverSdgTarget } from '../../../result-lever-sdg-targets/entities/result-lever-sdg-target.entity';
 import { UpdateGeneralInformation } from '../../../results/dto/update-general-information.dto';
 import { SaveGeoLocationDto } from '../../../results/dto/save-geo-location.dto';
 import { ResultAlignmentDto } from '../../../results/dto/result-alignment.dto';
@@ -12,6 +13,7 @@ import { LeverIcon } from '../../../../tools/clarisa/entities/clarisa-levers/enu
 import { UpdateResultCapacitySharingDto } from '../../../result-capacity-sharing/dto/update-result-capacity-sharing.dto';
 import {
   ResultPdfReportAllianceAlignmentSection,
+  ResultPdfReportLeverSdgTarget,
   ResultPdfReportCapSharingLabels,
   ResultPdfReportCapSharingSection,
   ResultPdfReportContractLever,
@@ -146,13 +148,37 @@ export const mapGeographicScopeSection = (
   comment_geo_scope: geoLocation.comment_geo_scope,
 });
 
+const mapLeverSdgTarget = (
+  target: ResultLeverSdgTarget,
+  sdgTargetMap: Map<number, ResultLeverSdgTarget>,
+): ResultPdfReportLeverSdgTarget => {
+  const withRelations = sdgTargetMap.get(target.result_lever_sdg_target_id);
+  const merged = withRelations
+    ? {
+        ...withRelations,
+        ...target,
+        sdg_target: withRelations.sdg_target ?? target.sdg_target,
+      }
+    : target;
+
+  return omitUndefined({
+    result_lever_sdg_target_id: merged.result_lever_sdg_target_id,
+    result_lever_id: merged.result_lever_id,
+    sdg_target_id: merged.sdg_target_id,
+    name: merged.sdg_target?.sdg_target_code,
+    description: merged.sdg_target?.sdg_target,
+  });
+};
+
 const mapAlignmentLever = (
   lever: ResultLever,
   bucketUrl: string,
+  sdgTargetMap: Map<number, ResultLeverSdgTarget>,
 ): ResultPdfReportAllianceAlignmentSection['primary_levers'][number] => {
   const strategicOutcomes = lever.result_lever_strategic_outcomes ?? [];
-  const sdgTargets = lever.result_lever_sdg_targets ?? [];
-
+  const sdgTargets = (lever.result_lever_sdg_targets ?? []).map((target) =>
+    mapLeverSdgTarget(target, sdgTargetMap),
+  );
   return omitUndefined({
     result_lever_id: lever.result_lever_id,
     result_id: lever.result_id,
@@ -160,6 +186,7 @@ const mapAlignmentLever = (
     lever_role_id: lever.lever_role_id,
     is_primary: lever.is_primary,
     short_name: lever.lever?.short_name,
+    full_name: lever.lever?.full_name,
     icon: resolveLeverIcon(lever.lever?.short_name, bucketUrl) ?? null,
     ...(strategicOutcomes.length
       ? { result_lever_strategic_outcomes: strategicOutcomes }
@@ -173,15 +200,34 @@ export const mapAllianceAlignmentSection = (
   indicatorId: number,
   contractsWithAgresso: ResultContract[],
   leversWithRelations: ResultLever[],
+  sdgTargetsWithRelations: ResultLeverSdgTarget[],
   bucketUrl: string,
-  leverByDepartmentId: Map<string, { id: number; short_name: string; full_name?: string }>,
+  leverByDepartmentId: Map<
+    string,
+    { id: number; short_name: string; full_name?: string }
+  >,
 ): ResultPdfReportAllianceAlignmentSection => {
   const leverMap = new Map(
     leversWithRelations.map((lever) => [lever.result_lever_id, lever]),
   );
+  const sdgTargetMap = new Map(
+    sdgTargetsWithRelations.map((target) => [
+      target.result_lever_sdg_target_id,
+      target,
+    ]),
+  );
 
-  const enrichLever = (lever: ResultLever) =>
-    mapAlignmentLever(leverMap.get(lever.result_lever_id) ?? lever, bucketUrl);
+  const enrichLever = (lever: ResultLever) => {
+    const leverWithRelations = leverMap.get(lever.result_lever_id);
+    const mergedLever = leverWithRelations
+      ? {
+          ...leverWithRelations,
+          ...lever,
+          lever: leverWithRelations.lever ?? lever.lever,
+        }
+      : lever;
+    return mapAlignmentLever(mergedLever, bucketUrl, sdgTargetMap);
+  };
 
   const contracts = contractsWithAgresso.map((contract) => {
     const agresso = contract.agresso_contract;
@@ -189,7 +235,6 @@ export const mapAllianceAlignmentSection = (
     const leverFromDepartment = departmentKey
       ? leverByDepartmentId.get(departmentKey)
       : null;
-
     return omitUndefined({
       is_active: contract.is_active,
       result_contract_id: contract.result_contract_id,
@@ -207,7 +252,6 @@ export const mapAllianceAlignmentSection = (
       levers: mapContractLever(agresso, bucketUrl, leverFromDepartment),
     });
   });
-
   return {
     indicator_id: indicatorId,
     contracts,

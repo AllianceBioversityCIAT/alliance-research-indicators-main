@@ -6,6 +6,7 @@ import { ResultIpRightsService } from '../../../result-ip-rights/result-ip-right
 import { ResultContract } from '../../../result-contracts/entities/result-contract.entity';
 import { ContractRolesEnum } from '../../../result-contracts/enum/contract-roles.enum';
 import { ResultLever } from '../../../result-levers/entities/result-lever.entity';
+import { ResultLeverSdgTarget } from '../../../result-lever-sdg-targets/entities/result-lever-sdg-target.entity';
 import { LeverRolesEnum } from '../../../lever-roles/enum/lever-roles.enum';
 import { ResultInstitution } from '../../../result-institutions/entities/result-institution.entity';
 import { InstitutionRolesEnum } from '../../../institution-roles/enums/institution-roles.enum';
@@ -20,8 +21,9 @@ import {
   mapIpRightsSection,
   mapPartnersSection,
 } from './result-pdf-report.mapper';
-import { ResultPdfReportPayload } from './result-pdf-report.types';
 import { ResultPdfIndicatorSectionRegistry } from './indicator-sections/result-pdf-indicator-section.registry';
+import { PdfViewerService } from '../../../../tools/pdf-viewer/pdf-viewer.service';
+import { PdfTemplates } from '../../../../tools/pdf-viewer/enums/pdf-templates.enum';
 
 @Injectable()
 export class ResultPdfReportService {
@@ -33,9 +35,10 @@ export class ResultPdfReportService {
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly dataSource: DataSource,
     private readonly appConfig: AppConfig,
+    private readonly pdfViewerService: PdfViewerService,
   ) {}
 
-  async buildReport(resultId: number): Promise<ResultPdfReportPayload> {
+  async buildReport(resultId: number): Promise<string> {
     const [
       generalInformation,
       metadata,
@@ -45,6 +48,7 @@ export class ResultPdfReportService {
       ipRights,
       contractsWithAgresso,
       leversWithRelations,
+      sdgTargetsWithRelations,
       partnerInstitutions,
       partnerFlags,
     ] = await Promise.all([
@@ -56,6 +60,7 @@ export class ResultPdfReportService {
       this.resultIpRightsService.findByResultId(resultId),
       this.findAlignmentContracts(resultId),
       this.findAlignmentLevers(resultId),
+      this.findAlignmentLeverSdgTargets(resultId),
       this.findPartnerInstitutions(resultId),
       this.findPartnerFlags(resultId),
     ]);
@@ -67,8 +72,7 @@ export class ResultPdfReportService {
         metadata.indicator_id,
       ),
     ]);
-
-    return {
+    const reportData = {
       general_information: mapGeneralInformationSection(
         generalInformation,
         metadata,
@@ -78,6 +82,7 @@ export class ResultPdfReportService {
         metadata.indicator_id,
         contractsWithAgresso,
         leversWithRelations,
+        sdgTargetsWithRelations,
         this.appConfig.BUCKET_URL,
         leverByDepartmentId,
       ),
@@ -90,6 +95,13 @@ export class ResultPdfReportService {
       ip_rights: mapIpRightsSection(ipRights),
       ...indicatorSections,
     };
+
+    const uuid = await this.pdfViewerService.postData(reportData);
+    const pdf = await this.pdfViewerService.renderPdf(
+      PdfTemplates.CAP_SHARING,
+      uuid,
+    );
+    return pdf;
   }
 
   private findAlignmentContracts(resultId: number): Promise<ResultContract[]> {
@@ -114,6 +126,24 @@ export class ResultPdfReportService {
       },
       relations: {
         lever: true,
+      },
+    });
+  }
+
+  private findAlignmentLeverSdgTargets(
+    resultId: number,
+  ): Promise<ResultLeverSdgTarget[]> {
+    return this.dataSource.getRepository(ResultLeverSdgTarget).find({
+      where: {
+        is_active: true,
+        result_lever: {
+          result_id: resultId,
+          lever_role_id: LeverRolesEnum.ALIGNMENT,
+          is_active: true,
+        },
+      },
+      relations: {
+        sdg_target: true,
       },
     });
   }

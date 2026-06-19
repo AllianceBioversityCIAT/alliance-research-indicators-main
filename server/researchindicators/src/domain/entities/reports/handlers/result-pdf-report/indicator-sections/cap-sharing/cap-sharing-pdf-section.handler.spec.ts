@@ -106,8 +106,7 @@ describe('CapSharingPdfSectionHandler', () => {
       session_format_id: SessionFormatEnum.INDIVIDUAL,
       individual: expect.objectContaining({ trainee_name: 'test' }),
       session_format_label: 'Individual training',
-      affiliation_label:
-        'International Center for Tropical Agriculture (CIAT)',
+      affiliation_label: 'International Center for Tropical Agriculture (CIAT)',
       nationality_label: 'Albania',
     });
     expect(sections.cap_sharing?.group).toBeUndefined();
