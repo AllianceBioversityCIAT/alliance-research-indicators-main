@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ResultsService } from '../../../results/results.service';
 import { ResultEvidencesService } from '../../../result-evidences/result-evidences.service';
@@ -38,12 +38,25 @@ export class ResultPdfReportService {
     private readonly appConfig: AppConfig,
     private readonly pdfViewerService: PdfViewerService,
     private readonly reportMsApp: ReportMsApp,
-  ) { }
+  ) {}
 
   async buildReport(
     resultId: number,
+    reportName: PdfTemplates,
     isHtml: boolean = false,
+    options?: {
+      paperWidth?: string;
+      paperHeight?: string;
+    },
   ): Promise<string> {
+    const isSupportedReport = Object.values(PdfTemplates).includes(reportName);
+
+    if (!isSupportedReport) {
+      throw new BadRequestException(
+        `Report name ${reportName} is not supported`,
+      );
+    }
+
     const [
       generalInformation,
       metadata,
@@ -103,9 +116,10 @@ export class ResultPdfReportService {
 
     if (!isHtml) {
       const pdfUrl = await this.reportMsApp.getPdfReport(
-        PdfTemplates.CAP_SHARING,
+        reportName,
         resultId,
         reportData,
+        { paperWidth: options?.paperWidth, paperHeight: options?.paperHeight },
       );
 
       return pdfUrl;

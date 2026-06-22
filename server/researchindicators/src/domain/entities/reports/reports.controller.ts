@@ -31,6 +31,7 @@ import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ResultPdfReportService } from './handlers/result-pdf-report/result-pdf-report.service';
+import { PdfTemplates } from '../../tools/pdf-viewer/enums/pdf-templates.enum';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -47,14 +48,56 @@ export class ReportsController {
     private readonly _resultsUtil: ResultsUtil,
   ) {}
 
-  @Get(`${RESULT_CODE}/pdf-report`)
+  @Get(`${RESULT_CODE}/pdf`)
+  @ApiQuery({
+    name: 'is-html',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    default: TrueFalseEnum.FALSE,
+    description: 'Is a reference to the HTML report',
+  })
+  @ApiQuery({
+    name: 'paper-width',
+    required: false,
+    type: String,
+    description: 'Is a reference to the paper width',
+  })
+  @ApiQuery({
+    name: 'paper-height',
+    required: false,
+    type: String,
+    description: 'Is a reference to the paper height',
+  })
+  @ApiQuery({
+    name: 'report_name',
+    required: true,
+    type: String,
+    enum: PdfTemplates,
+    description: 'Is a reference to the report name',
+  })
   @GetResultVersion()
   @ApiOperation({
     summary: 'Build PDF report sections for a single result',
   })
-  async findPdfReportSections() {
+  async findPdfReportSections(
+    @Query('is-html', new DefaultValuePipe(TrueFalseEnum.FALSE))
+    isHtml: TrueFalseEnum,
+    @Query('paper-width', new DefaultValuePipe('600px')) paperWidth: string,
+    @Query('paper-height', new DefaultValuePipe('1000px')) paperHeight: string,
+    @Query('report_name', new DefaultValuePipe(PdfTemplates.CAP_SHARING))
+    reportName: PdfTemplates,
+  ) {
     return this.resultPdfReportService
-      .buildReport(this._resultsUtil.resultId)
+      .buildReport(
+        this._resultsUtil.resultId,
+        reportName,
+        isHtml === TrueFalseEnum.TRUE,
+        {
+          paperWidth: paperWidth,
+          paperHeight: paperHeight,
+        },
+      )
       .then((result) =>
         ResponseUtils.format({
           description: 'PDF report sections were found correctly',

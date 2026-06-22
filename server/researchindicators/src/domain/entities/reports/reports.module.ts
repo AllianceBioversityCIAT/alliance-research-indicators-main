@@ -45,8 +45,8 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
     },
     ResultPdfIndicatorSectionRegistry,
     ResultPdfReportService,
-    ReportMsApp
+    ReportMsApp,
   ],
   exports: [ReportsGenerationService, ReportHandlerRegistry],
 })
-export class ReportsModule { }
+export class ReportsModule {}

@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { ResultPdfReportService } from './result-pdf-report.service';
@@ -14,6 +15,7 @@ import { Result } from '../../../results/entities/result.entity';
 import { ResultPdfIndicatorSectionRegistry } from './indicator-sections/result-pdf-indicator-section.registry';
 import { PdfViewerService } from '../../../../tools/pdf-viewer/pdf-viewer.service';
 import { PdfTemplates } from '../../../../tools/pdf-viewer/enums/pdf-templates.enum';
+import { ReportMsApp } from '../../../../tools/broker/report-ms.app';
 
 describe('ResultPdfReportService', () => {
   let service: ResultPdfReportService;
@@ -46,45 +48,11 @@ describe('ResultPdfReportService', () => {
     postData: jest.fn(),
     renderPdf: jest.fn(),
   };
+  const reportMsApp = {
+    getPdfReport: jest.fn(),
+  };
 
-  beforeEach(async () => {
-    jest.clearAllMocks();
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ResultPdfReportService,
-        { provide: ResultsService, useValue: resultsService },
-        { provide: ResultEvidencesService, useValue: resultEvidencesService },
-        { provide: ResultIpRightsService, useValue: resultIpRightsService },
-        {
-          provide: ResultPdfIndicatorSectionRegistry,
-          useValue: indicatorSectionRegistry,
-        },
-        { provide: ClarisaLeversService, useValue: clarisaLeversService },
-        {
-          provide: DataSource,
-          useValue: {
-            getRepository: jest.fn((entity) => {
-              if (entity === ResultContract) return contractRepo;
-              if (entity === ResultLever) return leverRepo;
-              if (entity === ResultLeverSdgTarget) return sdgTargetRepo;
-              if (entity === ResultInstitution) return institutionRepo;
-              if (entity === Result) return resultRepo;
-              throw new Error(`Unexpected repository for ${entity?.name}`);
-            }),
-          },
-        },
-        {
-          provide: AppConfig,
-          useValue: { BUCKET_URL: 'https://bucket.example' },
-        },
-        { provide: PdfViewerService, useValue: pdfViewerService },
-      ],
-    }).compile();
-
-    service = module.get(ResultPdfReportService);
-  });
-
-  it('builds all PDF sections for a result', async () => {
+  const mockReportDependencies = () => {
     resultsService.findGeneralInfo.mockResolvedValue({
       title: 'Title',
       description: 'Description',
@@ -123,13 +91,56 @@ describe('ResultPdfReportService', () => {
     institutionRepo.find.mockResolvedValue([]);
     resultRepo.findOne.mockResolvedValue({ is_partner_not_applicable: false });
     indicatorSectionRegistry.buildSections.mockResolvedValue({});
-    pdfViewerService.postData.mockResolvedValue('uuid-123');
-    pdfViewerService.renderPdf.mockResolvedValue('pdf-base64-string');
+  };
 
-    const pdf = await service.buildReport(10);
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ResultPdfReportService,
+        { provide: ResultsService, useValue: resultsService },
+        { provide: ResultEvidencesService, useValue: resultEvidencesService },
+        { provide: ResultIpRightsService, useValue: resultIpRightsService },
+        {
+          provide: ResultPdfIndicatorSectionRegistry,
+          useValue: indicatorSectionRegistry,
+        },
+        { provide: ClarisaLeversService, useValue: clarisaLeversService },
+        {
+          provide: DataSource,
+          useValue: {
+            getRepository: jest.fn((entity) => {
+              if (entity === ResultContract) return contractRepo;
+              if (entity === ResultLever) return leverRepo;
+              if (entity === ResultLeverSdgTarget) return sdgTargetRepo;
+              if (entity === ResultInstitution) return institutionRepo;
+              if (entity === Result) return resultRepo;
+              throw new Error(`Unexpected repository for ${entity?.name}`);
+            }),
+          },
+        },
+        {
+          provide: AppConfig,
+          useValue: { BUCKET_URL: 'https://bucket.example' },
+        },
+        { provide: PdfViewerService, useValue: pdfViewerService },
+        { provide: ReportMsApp, useValue: reportMsApp },
+      ],
+    }).compile();
+
+    service = module.get(ResultPdfReportService);
+  });
+
+  it('builds all PDF sections and generates URL via report MS by default', async () => {
+    mockReportDependencies();
+    reportMsApp.getPdfReport.mockResolvedValue('https://s3.example/pdf');
+
+    const pdfUrl = await service.buildReport(10, PdfTemplates.CAP_SHARING);
 
     expect(indicatorSectionRegistry.buildSections).toHaveBeenCalledWith(10, 4);
-    expect(pdfViewerService.postData).toHaveBeenCalledWith(
+    expect(reportMsApp.getPdfReport).toHaveBeenCalledWith(
+      PdfTemplates.CAP_SHARING,
+      10,
       expect.objectContaining({
         general_information: expect.objectContaining({
           title: 'Title',
@@ -148,11 +159,12 @@ describe('ResultPdfReportService', () => {
           potential_asset: true,
         }),
       }),
+      { paperWidth: undefined, paperHeight: undefined },
     );
     expect(
-      pdfViewerService.postData.mock.calls[0][0].cap_sharing,
+      reportMsApp.getPdfReport.mock.calls[0][2].cap_sharing,
     ).toBeUndefined();
-    expect(Object.keys(pdfViewerService.postData.mock.calls[0][0])).toEqual([
+    expect(Object.keys(reportMsApp.getPdfReport.mock.calls[0][2])).toEqual([
       'general_information',
       'alliance_alignment',
       'results_partners',
@@ -160,49 +172,45 @@ describe('ResultPdfReportService', () => {
       'evidence',
       'ip_rights',
     ]);
+    expect(pdfViewerService.postData).not.toHaveBeenCalled();
+    expect(pdfViewerService.renderPdf).not.toHaveBeenCalled();
+    expect(pdfUrl).toBe('https://s3.example/pdf');
+  });
+
+  it('renders HTML via pdf viewer when isHtml is true', async () => {
+    mockReportDependencies();
+    pdfViewerService.postData.mockResolvedValue('uuid-123');
+    pdfViewerService.renderPdf.mockResolvedValue('<html>report</html>');
+
+    const html = await service.buildReport(10, PdfTemplates.CAP_SHARING, true, {
+      paperWidth: '600px',
+      paperHeight: '1000px',
+    });
+
+    expect(reportMsApp.getPdfReport).not.toHaveBeenCalled();
+    expect(pdfViewerService.postData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        general_information: expect.objectContaining({
+          title: 'Title',
+          result_code: 8245,
+        }),
+      }),
+    );
     expect(pdfViewerService.renderPdf).toHaveBeenCalledWith(
       PdfTemplates.CAP_SHARING,
       'uuid-123',
     );
-    expect(pdf).toBe('pdf-base64-string');
+    expect(html).toBe('<html>report</html>');
   });
 
   it('merges indicator-specific sections from the registry', async () => {
-    resultsService.findGeneralInfo.mockResolvedValue({
-      title: 'Cap sharing title',
-      description: 'Description',
-      year: 2026,
-      keywords: [],
-      main_contact_person: null,
-    });
+    mockReportDependencies();
     resultsService.findMetadataResult.mockResolvedValue({
       result_id: 17898,
       result_official_code: 8245,
       indicator_id: 1,
       indicator_name: 'Capacity Sharing for Development',
     });
-    resultsService.findResultAlignment.mockResolvedValue({
-      contracts: [],
-      primary_levers: [],
-      contributor_levers: [],
-      result_sdgs: [],
-    });
-    resultsService.findGeoLocation.mockResolvedValue({
-      geo_scope_id: 1,
-      regions: [],
-      countries: [],
-      comment_geo_scope: null,
-    });
-    resultEvidencesService.findPrincipalEvidence.mockResolvedValue({
-      evidence: [],
-      notable_references: [],
-    });
-    resultIpRightsService.findByResultId.mockResolvedValue({});
-    contractRepo.find.mockResolvedValue([]);
-    leverRepo.find.mockResolvedValue([]);
-    sdgTargetRepo.find.mockResolvedValue([]);
-    institutionRepo.find.mockResolvedValue([]);
-    resultRepo.findOne.mockResolvedValue({ is_partner_not_applicable: false });
     indicatorSectionRegistry.buildSections.mockResolvedValue({
       cap_sharing: {
         session_format_id: 1,
@@ -210,16 +218,19 @@ describe('ResultPdfReportService', () => {
         session_format_label: 'Individual training',
       },
     });
-    pdfViewerService.postData.mockResolvedValue('uuid-cap');
-    pdfViewerService.renderPdf.mockResolvedValue('pdf-cap-sharing');
+    reportMsApp.getPdfReport.mockResolvedValue(
+      'https://s3.example/cap-sharing',
+    );
 
-    const pdf = await service.buildReport(17898);
+    const pdfUrl = await service.buildReport(17898, PdfTemplates.CAP_SHARING);
 
     expect(indicatorSectionRegistry.buildSections).toHaveBeenCalledWith(
       17898,
       1,
     );
-    expect(pdfViewerService.postData).toHaveBeenCalledWith(
+    expect(reportMsApp.getPdfReport).toHaveBeenCalledWith(
+      PdfTemplates.CAP_SHARING,
+      17898,
       expect.objectContaining({
         cap_sharing: {
           session_format_id: 1,
@@ -227,11 +238,14 @@ describe('ResultPdfReportService', () => {
           session_format_label: 'Individual training',
         },
       }),
+      { paperWidth: undefined, paperHeight: undefined },
     );
-    expect(pdfViewerService.renderPdf).toHaveBeenCalledWith(
-      PdfTemplates.CAP_SHARING,
-      'uuid-cap',
-    );
-    expect(pdf).toBe('pdf-cap-sharing');
+    expect(pdfUrl).toBe('https://s3.example/cap-sharing');
+  });
+
+  it('throws BadRequestException for unsupported report names', async () => {
+    await expect(
+      service.buildReport(10, 'unknown_report' as PdfTemplates),
+    ).rejects.toThrow(BadRequestException);
   });
 });
