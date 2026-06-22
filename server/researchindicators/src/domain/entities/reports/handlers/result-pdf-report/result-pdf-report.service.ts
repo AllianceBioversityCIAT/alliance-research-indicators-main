@@ -24,6 +24,7 @@ import {
 import { ResultPdfIndicatorSectionRegistry } from './indicator-sections/result-pdf-indicator-section.registry';
 import { PdfViewerService } from '../../../../tools/pdf-viewer/pdf-viewer.service';
 import { PdfTemplates } from '../../../../tools/pdf-viewer/enums/pdf-templates.enum';
+import { ReportMsApp } from '../../../../tools/broker/report-ms.app';
 
 @Injectable()
 export class ResultPdfReportService {
@@ -36,9 +37,13 @@ export class ResultPdfReportService {
     private readonly dataSource: DataSource,
     private readonly appConfig: AppConfig,
     private readonly pdfViewerService: PdfViewerService,
-  ) {}
+    private readonly reportMsApp: ReportMsApp,
+  ) { }
 
-  async buildReport(resultId: number): Promise<string> {
+  async buildReport(
+    resultId: number,
+    isHtml: boolean = false,
+  ): Promise<string> {
     const [
       generalInformation,
       metadata,
@@ -95,6 +100,16 @@ export class ResultPdfReportService {
       ip_rights: mapIpRightsSection(ipRights),
       ...indicatorSections,
     };
+
+    if (!isHtml) {
+      const pdfUrl = await this.reportMsApp.getPdfReport(
+        PdfTemplates.CAP_SHARING,
+        resultId,
+        reportData,
+      );
+
+      return pdfUrl;
+    }
 
     const uuid = await this.pdfViewerService.postData(reportData);
     const pdf = await this.pdfViewerService.renderPdf(

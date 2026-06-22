@@ -17,6 +17,7 @@ import { ResultPdfIndicatorSectionRegistry } from './handlers/result-pdf-report/
 import { RESULT_PDF_INDICATOR_SECTION_HANDLERS } from './handlers/result-pdf-report/indicator-sections/result-pdf-indicator-section.registry';
 import { CapSharingPdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/cap-sharing/cap-sharing-pdf-section.handler';
 import { PdfViewerModule } from '../../tools/pdf-viewer/pdf-viewer.module';
+import { ReportMsApp } from '../../tools/broker/report-ms.app';
 
 @Module({
   imports: [
@@ -44,7 +45,8 @@ import { PdfViewerModule } from '../../tools/pdf-viewer/pdf-viewer.module';
     },
     ResultPdfIndicatorSectionRegistry,
     ResultPdfReportService,
+    ReportMsApp
   ],
   exports: [ReportsGenerationService, ReportHandlerRegistry],
 })
-export class ReportsModule {}
+export class ReportsModule { }
