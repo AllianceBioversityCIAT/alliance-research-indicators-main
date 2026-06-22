@@ -46,7 +46,7 @@ export class ReportsController {
     private readonly resultPdfReportService: ResultPdfReportService,
     private readonly currentUser: CurrentUserUtil,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+  ) { }
 
   @Get(`${RESULT_CODE}/pdf`)
   @ApiQuery({
@@ -83,8 +83,8 @@ export class ReportsController {
   async findPdfReportSections(
     @Query('is-html', new DefaultValuePipe(TrueFalseEnum.FALSE))
     isHtml: TrueFalseEnum,
-    @Query('paper-width', new DefaultValuePipe('600px')) paperWidth: string,
-    @Query('paper-height', new DefaultValuePipe('1000px')) paperHeight: string,
+    @Query('paper-width', new DefaultValuePipe('600')) paperWidth: string,
+    @Query('paper-height', new DefaultValuePipe('1000')) paperHeight: string,
     @Query('report_name', new DefaultValuePipe(PdfTemplates.CAP_SHARING))
     reportName: PdfTemplates,
   ) {
