@@ -90,6 +90,9 @@ import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.mod
 import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { ReportsModule } from './reports/reports.module';
 import { AiReportsModule } from './ai-reports/ai-reports.module';
+import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
+import { BilateralModule } from './bilateral/bilateral.module';
+import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
 
 @Module({
   imports: [
@@ -184,7 +187,17 @@ import { AiReportsModule } from './ai-reports/ai-reports.module';
     ResultLeverSdgTargetsModule,
     ReportsModule,
     AiReportsModule,
+    ResultReviewHistoryModule,
+    BilateralModule,
+    BilateralProjectMappingModule,
   ],
-  exports: [AgressoContractModule, AppSecretsModule, ReportsModule],
+  exports: [
+    AgressoContractModule,
+    AppSecretsModule,
+    ReportsModule,
+    ResultReviewHistoryModule,
+    BilateralModule,
+    BilateralProjectMappingModule,
+  ],
 })
 export class EntitiesModule {}

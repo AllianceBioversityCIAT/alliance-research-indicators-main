@@ -14,9 +14,13 @@ if (rootElement) {
   hydrateRoot(
     rootElement,
     <React.StrictMode>
-      <BrowserRouter>
+      {/* @sdd-spec docs/specs/bilateral-module/pending-items — T-15.15
+          basename="/api" pairs with the StaticRouter on the server so that
+          the hydrated tree matches the SSR'd HTML and routes resolve
+          correctly under the global Nest /api prefix. */}
+      <BrowserRouter basename="/api">
         <App initialData={initialData} />
       </BrowserRouter>
-    </React.StrictMode>
+    </React.StrictMode>,
   );
 }

@@ -63,6 +63,9 @@ import { ResultStatusTransitionsModule } from '../entities/result-status-transit
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
+import { BilateralModule } from '../entities/bilateral/bilateral.module';
+import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
+import { RESULT_CODE } from '../shared/utils/results.util';
 
 const capSharingChildren: Routes = [
   {
@@ -72,6 +75,10 @@ const capSharingChildren: Routes = [
 ];
 
 const ResultsChildren: Routes = [
+  {
+    path: `${RESULT_CODE}/pool-funding-alignment`,
+    module: BilateralModule,
+  },
   {
     path: 'intellectual-property',
     module: ResultIpRightsModule,
@@ -376,6 +383,15 @@ const children: Routes = [
   {
     path: 'reports',
     module: ReportsModule,
+  },
+  {
+    // NOTE: intentionally NOT under /admin — the existing JWT middleware exclude
+    // pattern `/admin(.*)` (see src/app.module.ts configure()) was crafted to
+    // skip JWT for the SSR admin pages, and would otherwise bypass auth on
+    // these admin-REST endpoints. Access is gated by @Roles(CENTER_ADMIN,
+    // SYSTEM_ADMIN) on the controller. See execution.md Pivot Record #1.
+    path: 'bilateral-project-mappings',
+    module: BilateralProjectMappingModule,
   },
 ];
 

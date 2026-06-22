@@ -3,6 +3,10 @@
 /node_modules
 /build
 
+# Node version managers
+/nvm
+/.nvm
+
 # Logs
 logs
 *.log
