@@ -777,9 +777,14 @@ export class ResultsService {
       }
 
       for (const lever of emergedLever) {
+        const saveSdgTargets =
+          this._resultsUtil.indicatorId == IndicatorsEnum.OICR
+            ? lever?.result_lever_sdg_targets
+            : [];
+
         await this._resultLeverSdgTargetsService.create(
           lever.result_lever_id,
-          lever?.result_lever_sdg_targets ?? [],
+          saveSdgTargets,
           'sdg_target_id',
           undefined,
           manager,
