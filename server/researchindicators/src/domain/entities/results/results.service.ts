@@ -714,6 +714,7 @@ export class ResultsService {
               result_lever_strategic_outcomes:
                 el?.result_lever_strategic_outcomes,
               result_lever_sdg_targets: el?.result_lever_sdg_targets,
+              custom_lever_name: el?.custom_lever_name,
             }))
           : [];
 
@@ -723,6 +724,7 @@ export class ResultsService {
               lever_id: el.lever_id,
               is_primary: false,
               result_lever_sdg_targets: el?.result_lever_sdg_targets,
+              custom_lever_name: el?.custom_lever_name,
             }))
           : [];
 
@@ -738,7 +740,7 @@ export class ResultsService {
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         manager,
-        ['is_primary'],
+        ['is_primary', 'custom_lever_name'],
         {
           is_primary: false,
         },
