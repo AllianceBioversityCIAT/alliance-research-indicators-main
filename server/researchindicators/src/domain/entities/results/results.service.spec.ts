@@ -35,7 +35,6 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { CreateResultDto } from './dto/create-result.dto';
 import { SetAuditEnum } from '../../shared/utils/current-user.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
-import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ContractRolesEnum } from '../result-contracts/enum/contract-roles.enum';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
@@ -730,24 +729,12 @@ describe('ResultsService', () => {
         grant_amount_usd: 2000,
       } as any;
 
-      const clarisaLever = {
-        id: 5,
-        name: 'Test Lever',
-        short_name: 'TL',
-        result_levers: [],
-      } as any;
-
       // Setup mocks
       mockMainRepo.findOne.mockResolvedValue(null); // No existing result
       (service as any).newOfficialCode.mockResolvedValue(newOfficialCode);
       mockRepository.save.mockResolvedValue(savedResult);
       (service as any).createResultType.mockResolvedValue(undefined);
       mockAgressoContractService.findOne.mockResolvedValue(agressoContract);
-      mockClarisaLeversService.homologatedData.mockReturnValue(
-        'Test Lever Name',
-      );
-      mockClarisaLeversService.findByName.mockResolvedValue(clarisaLever);
-      mockResultLeversService.create.mockResolvedValue(undefined);
       mockResultContractsService.create.mockResolvedValue(undefined);
       mockCurrentUser.audit.mockReturnValue({
         created_at: new Date(),
@@ -798,20 +785,6 @@ describe('ResultsService', () => {
       );
       expect(mockAgressoContractService.findOne).toHaveBeenCalledWith(
         createResult.contract_id,
-      );
-      expect(mockClarisaLeversService.homologatedData).toHaveBeenCalledWith(
-        agressoContract.departmentId,
-      );
-      expect(mockClarisaLeversService.findByName).toHaveBeenCalledWith(
-        'Test Lever Name',
-      );
-      expect(mockResultLeversService.create).toHaveBeenCalledWith(
-        savedResult.result_id,
-        { lever_id: String(clarisaLever.id), is_primary: true },
-        'lever_id',
-        LeverRolesEnum.ALIGNMENT,
-        mockEntityManager,
-        ['is_primary'],
       );
       expect(mockResultContractsService.create).toHaveBeenCalledWith(
         savedResult.result_id,
