@@ -2103,11 +2103,18 @@ describe('ResultsService', () => {
 
   describe('updateResultAlignment', () => {
     let mockEntityManager: jest.Mocked<EntityManager>;
+    let indicatorIdGetter: jest.Mock;
 
     beforeEach(() => {
       mockEntityManager = {
         getRepository: jest.fn(),
       } as any;
+
+      indicatorIdGetter = jest.fn(() => IndicatorsEnum.KNOWLEDGE_PRODUCT);
+      Object.defineProperty(mockResultsUtil, 'indicatorId', {
+        get: () => indicatorIdGetter(),
+        configurable: true,
+      });
 
       mockDataSource.transaction.mockImplementation(async (callback: any) => {
         return await callback(mockEntityManager);
@@ -2203,6 +2210,109 @@ describe('ResultsService', () => {
         mockEntityManager,
         ['is_primary', 'custom_lever_name'],
         { is_primary: false },
+      );
+    });
+
+    it('should not persist lever SDG targets when indicator is not OICR', async () => {
+      indicatorIdGetter.mockReturnValue(IndicatorsEnum.KNOWLEDGE_PRODUCT);
+
+      const resultId = 1;
+      const sdgTargets = [{ sdg_target_id: 1 }];
+      const updateResultAlignmentDto = {
+        contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
+        primary_levers: [
+          {
+            lever_id: '5',
+            is_primary: true,
+            result_lever_sdg_targets: sdgTargets,
+          },
+        ] as any,
+        contributor_levers: [],
+        result_sdgs: [{ clarisa_sdg_id: 1 }] as any,
+      };
+
+      const savedLevers = [
+        {
+          result_lever_id: 1,
+          lever_id: '5',
+          is_primary: true,
+          result_lever_sdg_targets: sdgTargets,
+        },
+      ];
+
+      mockResultContractsService.create.mockResolvedValue([]);
+      mockResultLeversService.create.mockResolvedValue(savedLevers as any);
+      mockResultLeversService.comparerClientToServer.mockResolvedValue(
+        savedLevers as any,
+      );
+      mockResultLeverStrategicOutcomeService.create.mockResolvedValue([]);
+      mockResultLeverSdgTargetsService.create.mockResolvedValue([]);
+      mockResultSdgsService.create.mockResolvedValue([]);
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      await service.updateResultAlignment(resultId, updateResultAlignmentDto);
+
+      expect(mockResultLeverSdgTargetsService.create).toHaveBeenCalledWith(
+        1,
+        [],
+        'sdg_target_id',
+        undefined,
+        mockEntityManager,
+      );
+      expect(mockResultSdgsService.create).toHaveBeenCalledWith(
+        resultId,
+        updateResultAlignmentDto.result_sdgs,
+        'clarisa_sdg_id',
+        undefined,
+        mockEntityManager,
+      );
+    });
+
+    it('should persist lever SDG targets when indicator is OICR', async () => {
+      indicatorIdGetter.mockReturnValue(IndicatorsEnum.OICR);
+
+      const resultId = 1;
+      const sdgTargets = [{ sdg_target_id: 1 }, { sdg_target_id: 2 }];
+      const updateResultAlignmentDto = {
+        contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
+        primary_levers: [
+          {
+            lever_id: '5',
+            is_primary: true,
+            result_lever_sdg_targets: sdgTargets,
+          },
+        ] as any,
+        contributor_levers: [],
+        result_sdgs: [],
+      };
+
+      const savedLevers = [
+        {
+          result_lever_id: 1,
+          lever_id: '5',
+          is_primary: true,
+          result_lever_sdg_targets: sdgTargets,
+        },
+      ];
+
+      mockResultContractsService.create.mockResolvedValue([]);
+      mockResultLeversService.create.mockResolvedValue(savedLevers as any);
+      mockResultLeversService.comparerClientToServer.mockResolvedValue(
+        savedLevers as any,
+      );
+      mockResultLeverStrategicOutcomeService.create.mockResolvedValue([]);
+      mockResultLeverSdgTargetsService.create.mockResolvedValue([]);
+      mockResultSdgsService.create.mockResolvedValue([]);
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      await service.updateResultAlignment(resultId, updateResultAlignmentDto);
+
+      expect(mockResultLeverSdgTargetsService.create).toHaveBeenCalledWith(
+        1,
+        sdgTargets,
+        'sdg_target_id',
+        undefined,
+        mockEntityManager,
       );
     });
   });

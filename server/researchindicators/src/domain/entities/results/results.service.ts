@@ -143,7 +143,7 @@ export class ResultsService {
     private readonly _resultsUtil: ResultsUtil,
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -709,23 +709,23 @@ export class ResultsService {
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
           ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-              custom_lever_name: el?.custom_lever_name,
-            }))
+            lever_id: el.lever_id,
+            is_primary: true,
+            result_lever_strategic_outcomes:
+              el?.result_lever_strategic_outcomes,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+            custom_lever_name: el?.custom_lever_name,
+          }))
           : [];
 
       const contributorLevers: Partial<ResultLever>[] =
         contributor_levers?.length > 0
           ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-              custom_lever_name: el?.custom_lever_name,
-            }))
+            lever_id: el.lever_id,
+            is_primary: false,
+            result_lever_sdg_targets: el?.result_lever_sdg_targets,
+            custom_lever_name: el?.custom_lever_name,
+          }))
           : [];
 
       const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
@@ -765,9 +765,14 @@ export class ResultsService {
       }
 
       for (const lever of emergedLever) {
+        const saveSdgTargets =
+          this._resultsUtil.indicatorId == IndicatorsEnum.OICR
+            ? lever?.result_lever_sdg_targets
+            : [];
+
         await this._resultLeverSdgTargetsService.create(
           lever.result_lever_id,
-          lever?.result_lever_sdg_targets ?? [],
+          saveSdgTargets,
           'sdg_target_id',
           undefined,
           manager,
@@ -1336,8 +1341,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },
