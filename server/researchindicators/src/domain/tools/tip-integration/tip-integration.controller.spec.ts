@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { TipIntegrationController } from './tip-integration.controller';
 import { TipIntegrationService } from './tip-integration.service';
@@ -28,6 +29,7 @@ describe('TipIntegrationController', () => {
           provide: ResultsUtil,
           useValue: { setup: jest.fn().mockResolvedValue(undefined) },
         },
+        mockPortfolioUtilProvider,
       ],
     }).compile();
     controller = module.get(TipIntegrationController);

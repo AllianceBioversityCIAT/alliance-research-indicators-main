@@ -5,7 +5,10 @@ import { PortfoliosRepository } from './repositories/portfolios.repository';
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 import { Portfolio } from './entities/portfolio.entity';
 import { validObject } from '../../shared/utils/object.utils';
-import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import {
+  CurrentUserUtil,
+  SetAuditEnum,
+} from '../../shared/utils/current-user.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 @Injectable()
@@ -17,7 +20,7 @@ export class PortfoliosService {
   constructor(
     private readonly mainRepo: PortfoliosRepository,
     private readonly currentUser: CurrentUserUtil,
-  ) { }
+  ) {}
 
   async create(createPortfolioDto: CreatePortfolioDto) {
     const { isValid, invalidFields } = validObject(createPortfolioDto, [
@@ -34,6 +37,7 @@ export class PortfoliosService {
       description: createPortfolioDto?.description,
       start_year: createPortfolioDto.start_year,
       end_year: createPortfolioDto.end_year,
+      ...this.currentUser.audit(SetAuditEnum.NEW),
     };
 
     return this.mainRepo.save(newPortfolio);
@@ -56,7 +60,12 @@ export class PortfoliosService {
     });
   }
 
-  update(id: number, updatePortfolioDto: UpdatePortfolioDto) {
+  async update(id: number, updatePortfolioDto: UpdatePortfolioDto) {
+    const portfolio = await this.mainRepo.findOne({ where: { id } });
+    if (!portfolio) {
+      throw new BadRequestException(`Portfolio not found`);
+    }
+
     const { isValid, invalidFields } = validObject(updatePortfolioDto, [
       'start_year',
       'end_year',
@@ -74,15 +83,21 @@ export class PortfoliosService {
       description: updatePortfolioDto?.description,
       ...(isSystemAdmin
         ? {
-          start_year: updatePortfolioDto.start_year,
-          end_year: updatePortfolioDto.end_year,
-        }
+            start_year: updatePortfolioDto.start_year,
+            end_year: updatePortfolioDto.end_year,
+          }
         : {}),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
     };
-    return this.mainRepo.update(id, updatePortfolio);
+    await this.mainRepo.update(id, updatePortfolio);
+    return this.mainRepo.findOne({ where: { id } });
   }
 
-  remove(id: number) {
-    return this.mainRepo.update(id, { is_active: false });
+  async remove(id: number): Promise<number> {
+    const response = await this.mainRepo.update(id, { is_active: false });
+    if (response.affected === 0) {
+      throw new BadRequestException(`Portfolio not found`);
+    }
+    return id;
   }
 }

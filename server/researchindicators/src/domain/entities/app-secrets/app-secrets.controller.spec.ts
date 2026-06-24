@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { AppSecretsController } from './app-secrets.controller';
 import { AppSecretsService } from './app-secrets.service';
@@ -26,6 +27,7 @@ describe('AppSecretsController', () => {
           provide: ResultsUtil,
           useValue: { setup: jest.fn().mockResolvedValue(undefined) },
         },
+        mockPortfolioUtilProvider,
       ],
     })
       .overrideGuard(RolesGuard)

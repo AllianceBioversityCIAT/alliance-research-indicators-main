@@ -8,4 +8,4 @@ import { PortfoliosRepository } from './repositories/portfolios.repository';
   providers: [PortfoliosService, PortfoliosRepository],
   exports: [PortfoliosService, PortfoliosRepository],
 })
-export class PortfoliosModule { }
+export class PortfoliosModule {}

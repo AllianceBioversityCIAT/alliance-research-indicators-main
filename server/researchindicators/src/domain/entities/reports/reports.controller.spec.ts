@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
@@ -37,6 +38,7 @@ describe('ReportsController', () => {
           provide: ResultsUtil,
           useValue: { setup: jest.fn().mockResolvedValue(undefined) },
         },
+        mockPortfolioUtilProvider,
         SetUpInterceptor,
       ],
     }).compile();

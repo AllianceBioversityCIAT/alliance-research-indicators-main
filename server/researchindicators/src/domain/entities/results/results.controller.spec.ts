@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ResultsController } from './results.controller';
@@ -89,6 +90,7 @@ describe('ResultsController', () => {
           provide: ResultsUtil,
           useValue: mockResultsUtil,
         },
+        mockPortfolioUtilProvider,
         {
           provide: DataSource,
           useValue: mockDataSource,

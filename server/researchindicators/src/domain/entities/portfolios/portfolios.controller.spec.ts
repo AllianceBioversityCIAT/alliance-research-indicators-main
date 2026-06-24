@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { PortfoliosController } from './portfolios.controller';
 import { PortfoliosService } from './portfolios.service';
@@ -6,6 +7,8 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { RolesGuard } from '../../shared/guards/roles.guard';
+import { CreatePortfolioDto } from './dto/create-portfolio.dto';
+import { UpdatePortfolioDto } from './dto/update-portfolio.dto';
 
 jest.mock('../../shared/utils/response.utils');
 
@@ -35,6 +38,7 @@ describe('PortfoliosController', () => {
           provide: ResultsUtil,
           useValue: { setup: jest.fn().mockResolvedValue(undefined) },
         },
+        mockPortfolioUtilProvider,
       ],
     })
       .overrideGuard(RolesGuard)
@@ -50,11 +54,12 @@ describe('PortfoliosController', () => {
 
   describe('create', () => {
     it('should create a portfolio and return formatted response', async () => {
-      const dto = {
+      const dto: CreatePortfolioDto = {
         name: 'Portfolio A',
         description: 'Description',
         start_year: 2024,
         end_year: 2024,
+        clarisa_levers: [],
       };
       const data = { id: 1, ...dto };
       mockService.create.mockResolvedValue(data);
@@ -107,10 +112,10 @@ describe('PortfoliosController', () => {
 
   describe('update', () => {
     it('should update a portfolio and return formatted response', async () => {
-      const dto = {
+      const dto: UpdatePortfolioDto = {
         name: 'Updated',
-        start_date: new Date('2024-01-01'),
-        end_date: new Date('2024-12-31'),
+        start_year: 2024,
+        end_year: 2024,
       };
       const data = { affected: 1 };
       mockService.update.mockResolvedValue(data);
@@ -129,7 +134,7 @@ describe('PortfoliosController', () => {
 
   describe('remove', () => {
     it('should delete a portfolio and return formatted response', async () => {
-      const data = { affected: 1 };
+      const data = 9;
       mockService.remove.mockResolvedValue(data);
       mockFormat.mockReturnValue({ ok: true });
 

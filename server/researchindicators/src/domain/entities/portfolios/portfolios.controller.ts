@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, UseInterceptors, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  UseInterceptors,
+  HttpStatus,
+} from '@nestjs/common';
 import { PortfoliosService } from './portfolios.service';
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { UpdatePortfolioDto } from './dto/update-portfolio.dto';
@@ -15,12 +26,16 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 @UseInterceptors(SetUpInterceptor)
 @UseGuards(RolesGuard)
 export class PortfoliosController {
-  constructor(private readonly portfoliosService: PortfoliosService) { }
+  constructor(private readonly portfoliosService: PortfoliosService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a portfolio' })
   @ApiBody({ type: CreatePortfolioDto, description: 'Create a portfolio' })
-  @Roles(SecRolesEnum.TECHNICAL_SUPPORT, SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.CENTER_ADMIN)
+  @Roles(
+    SecRolesEnum.TECHNICAL_SUPPORT,
+    SecRolesEnum.SYSTEM_ADMIN,
+    SecRolesEnum.CENTER_ADMIN,
+  )
   create(@Body() createPortfolioDto: CreatePortfolioDto) {
     return this.portfoliosService.create(createPortfolioDto).then((data) =>
       ResponseUtils.format({
@@ -58,8 +73,15 @@ export class PortfoliosController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a portfolio' })
   @ApiBody({ type: UpdatePortfolioDto, description: 'Update a portfolio' })
-  @Roles(SecRolesEnum.TECHNICAL_SUPPORT, SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.CENTER_ADMIN)
-  update(@Param('id') id: string, @Body() updatePortfolioDto: UpdatePortfolioDto) {
+  @Roles(
+    SecRolesEnum.TECHNICAL_SUPPORT,
+    SecRolesEnum.SYSTEM_ADMIN,
+    SecRolesEnum.CENTER_ADMIN,
+  )
+  update(
+    @Param('id') id: string,
+    @Body() updatePortfolioDto: UpdatePortfolioDto,
+  ) {
     return this.portfoliosService.update(+id, updatePortfolioDto).then((data) =>
       ResponseUtils.format({
         description: 'Portfolio updated successfully',

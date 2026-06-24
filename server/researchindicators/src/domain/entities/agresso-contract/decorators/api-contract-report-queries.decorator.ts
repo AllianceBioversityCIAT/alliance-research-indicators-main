@@ -17,7 +17,8 @@ export function ApiContractReportQueries(
       name: 'contract-id',
       required: true,
       type: String,
-      description: options.contractIdDescription ?? DEFAULT_CONTRACT_ID_DESCRIPTION,
+      description:
+        options.contractIdDescription ?? DEFAULT_CONTRACT_ID_DESCRIPTION,
     }),
   ];
 
