@@ -1,12 +1,8 @@
 import { Controller, Get, Query, HttpStatus, Param } from '@nestjs/common';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiContractReportQueries } from './decorators/api-contract-report-queries.decorator';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { AgressoFindNamePayload } from './dto/agresso-find-options.payload';
@@ -105,19 +101,7 @@ export class AgressoContractController {
   @ApiOperation({
     summary: 'Top primary levers for results linked to a primary contract',
   })
-  @ApiQuery({
-    name: 'contract-id',
-    required: true,
-    type: String,
-    description: 'Contract agreement id to filter results (primary contract)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Top N primary levers',
-    example: 10,
-  })
+  @ApiContractReportQueries({ limitDescription: 'Top N primary levers' })
   async getTopPrimaryLeversReport(
     @Query('contract-id') contractId: string,
     @Query('limit') limit?: string,
@@ -140,18 +124,10 @@ export class AgressoContractController {
     summary:
       'Top contributor contracts linked to results where the given contract is primary',
   })
-  @ApiQuery({
-    name: 'contract-id',
-    required: true,
-    type: String,
-    description: 'Primary contract agreement id used to filter results',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Top N contributor contracts',
-    example: 10,
+  @ApiContractReportQueries({
+    contractIdDescription:
+      'Primary contract agreement id used to filter results',
+    limitDescription: 'Top N contributor contracts',
   })
   async getTopContributorsReport(
     @Query('contract-id') contractId: string,
@@ -175,18 +151,8 @@ export class AgressoContractController {
     summary:
       'Top main contact persons for results linked to a primary contract',
   })
-  @ApiQuery({
-    name: 'contract-id',
-    required: true,
-    type: String,
-    description: 'Contract agreement id to filter results (primary contract)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Top N main contact persons',
-    example: 10,
+  @ApiContractReportQueries({
+    limitDescription: 'Top N main contact persons',
   })
   async getTopMainContactPersonsReport(
     @Query('contract-id') contractId: string,
@@ -209,11 +175,8 @@ export class AgressoContractController {
   @ApiOperation({
     summary: 'Project staff members assigned to a contract',
   })
-  @ApiQuery({
-    name: 'contract-id',
-    required: true,
-    type: String,
-    description: 'Contract agreement id',
+  @ApiContractReportQueries({
+    contractIdDescription: 'Contract agreement id',
   })
   async getContractStaffReport(@Query('contract-id') contractId: string) {
     return this.agressoContractService
@@ -232,18 +195,8 @@ export class AgressoContractController {
     summary:
       'Top partner institutions for results linked to a primary contract',
   })
-  @ApiQuery({
-    name: 'contract-id',
-    required: true,
-    type: String,
-    description: 'Contract agreement id to filter results (primary contract)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Top N partner institutions',
-    example: 10,
+  @ApiContractReportQueries({
+    limitDescription: 'Top N partner institutions',
   })
   async getTopPartnersReport(
     @Query('contract-id') contractId: string,
@@ -266,18 +219,9 @@ export class AgressoContractController {
   @ApiOperation({
     summary: 'Geographic scope report for results linked to a primary contract',
   })
-  @ApiQuery({
-    name: 'contract-id',
-    required: true,
-    type: String,
-    description: 'Contract agreement id to filter results (primary contract)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Top N regions, countries and sub-nationals per country',
-    example: 10,
+  @ApiContractReportQueries({
+    limitDescription:
+      'Top N regions, countries and sub-nationals per country',
   })
   async getGeoScopeReport(
     @Query('contract-id') contractId: string,
