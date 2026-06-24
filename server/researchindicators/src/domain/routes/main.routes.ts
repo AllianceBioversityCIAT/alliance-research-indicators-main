@@ -63,6 +63,7 @@ import { ResultStatusTransitionsModule } from '../entities/result-status-transit
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
+import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 
 const capSharingChildren: Routes = [
   {
@@ -233,6 +234,10 @@ const toolsChildren: Routes = [
 ];
 
 const children: Routes = [
+  {
+    path: 'portfolios',
+    module: PortfoliosModule,
+  },
   {
     path: 'configuration',
     module: AppConfigModule,
