@@ -66,6 +66,7 @@ import { ReportsModule } from '../entities/reports/reports.module';
 import { BilateralModule } from '../entities/bilateral/bilateral.module';
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
 import { RESULT_CODE } from '../shared/utils/results.util';
+import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 
 const capSharingChildren: Routes = [
   {
@@ -240,6 +241,10 @@ const toolsChildren: Routes = [
 ];
 
 const children: Routes = [
+  {
+    path: 'portfolios',
+    module: PortfoliosModule,
+  },
   {
     path: 'configuration',
     module: AppConfigModule,

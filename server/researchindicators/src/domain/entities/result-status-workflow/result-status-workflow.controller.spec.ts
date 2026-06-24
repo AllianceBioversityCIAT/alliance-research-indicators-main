@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { ResultStatusWorkflowController } from './result-status-workflow.controller';
 import { ResultStatusWorkflowService } from './result-status-workflow.service';
@@ -34,6 +35,7 @@ describe('ResultStatusWorkflowController', () => {
             setup: jest.fn().mockResolvedValue(undefined),
           },
         },
+        mockPortfolioUtilProvider,
       ],
     }).compile();
     controller = module.get(ResultStatusWorkflowController);

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { ResultCapacitySharingController } from './result-capacity-sharing.controller';
 import { ResultCapacitySharingService } from './result-capacity-sharing.service';
@@ -32,6 +33,7 @@ describe('ResultCapacitySharingController', () => {
             setup: jest.fn().mockResolvedValue(undefined),
           },
         },
+        mockPortfolioUtilProvider,
       ],
     })
       .overrideGuard(ResultStatusGuard)

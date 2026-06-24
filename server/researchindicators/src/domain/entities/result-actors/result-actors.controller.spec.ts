@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { ResultActorsController } from './result-actors.controller';
 import { ResultActorsService } from './result-actors.service';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
@@ -17,6 +18,7 @@ describe('ResultActorsController', () => {
           provide: ResultsUtil,
           useValue: { setup: jest.fn().mockResolvedValue(undefined) },
         },
+        mockPortfolioUtilProvider,
       ],
     }).compile();
     controller = module.get(ResultActorsController);

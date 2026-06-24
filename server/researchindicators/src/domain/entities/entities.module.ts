@@ -93,6 +93,7 @@ import { AiReportsModule } from './ai-reports/ai-reports.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 import { BilateralModule } from './bilateral/bilateral.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
+import { PortfoliosModule } from './portfolios/portfolios.module';
 
 @Module({
   imports: [
@@ -190,6 +191,7 @@ import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilat
     ResultReviewHistoryModule,
     BilateralModule,
     BilateralProjectMappingModule,
+    PortfoliosModule
   ],
   exports: [
     AgressoContractModule,
@@ -198,6 +200,7 @@ import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilat
     ResultReviewHistoryModule,
     BilateralModule,
     BilateralProjectMappingModule,
+    PortfoliosModule,
   ],
 })
-export class EntitiesModule {}
+export class EntitiesModule { }

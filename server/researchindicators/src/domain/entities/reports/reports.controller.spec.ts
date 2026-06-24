@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
@@ -49,6 +50,7 @@ describe('ReportsController', () => {
             resultId: 321,
           },
         },
+        mockPortfolioUtilProvider,
         SetUpInterceptor,
       ],
     }).compile();

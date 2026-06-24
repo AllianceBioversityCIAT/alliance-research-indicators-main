@@ -254,8 +254,7 @@ export class AgressoContractController {
     summary: 'Geographic scope report for results linked to a primary contract',
   })
   @ApiContractReportQueries({
-    limitDescription:
-      'Top N regions, countries and sub-nationals per country',
+    limitDescription: 'Top N regions, countries and sub-nationals per country',
   })
   async getGeoScopeReport(
     @Query('contract-id') contractId: string,
