@@ -94,6 +94,8 @@ import { ResultReviewHistoryModule } from './result-review-history/result-review
 import { BilateralModule } from './bilateral/bilateral.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
 import { PortfoliosModule } from './portfolios/portfolios.module';
+import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
+import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
 
 @Module({
   imports: [
@@ -201,6 +203,8 @@ import { PortfoliosModule } from './portfolios/portfolios.module';
     BilateralModule,
     BilateralProjectMappingModule,
     PortfoliosModule,
+    StrategicObjectivesModule,
+    ImpactOutcomesModule,
   ],
 })
 export class EntitiesModule { }

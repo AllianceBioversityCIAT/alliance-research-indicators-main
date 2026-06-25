@@ -36,7 +36,6 @@ describe('PortfoliosService', () => {
   const baseCreateDto: CreatePortfolioDto = {
     name: 'Portfolio A',
     description: 'Description',
-    clarisa_levers: [],
     ...validDates,
   };
 
@@ -190,7 +189,13 @@ describe('PortfoliosService', () => {
 
       const result = await service.remove(3);
 
-      expect(mockUpdate).toHaveBeenCalledWith(3, { is_active: false });
+      expect(mockUpdate).toHaveBeenCalledWith(
+        3,
+        expect.objectContaining({
+          is_active: false,
+          deleted_at: expect.any(Date),
+        }),
+      );
       expect(result).toBe(3);
     });
 

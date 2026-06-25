@@ -67,6 +67,8 @@ import { BilateralModule } from '../entities/bilateral/bilateral.module';
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
+import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
+import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
 
 const capSharingChildren: Routes = [
   {
@@ -263,6 +265,14 @@ const children: Routes = [
         module: UserSettingsModule,
       },
     ],
+  },
+  {
+    path: 'strategic-objectives',
+    module: StrategicObjectivesModule,
+  },
+  {
+    path: 'impact-outcomes',
+    module: ImpactOutcomesModule,
   },
   {
     path: 'results',

@@ -1,19 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
-import { PortfoliosController } from './portfolios.controller';
-import { PortfoliosService } from './portfolios.service';
+import { ImpactOutcomesController } from './impact-outcomes.controller';
+import { ImpactOutcomesService } from './impact-outcomes.service';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { RolesGuard } from '../../shared/guards/roles.guard';
-import { CreatePortfolioDto } from './dto/create-portfolio.dto';
-import { UpdatePortfolioDto } from './dto/update-portfolio.dto';
+import { CreateImpactOutcomeDto } from './dto/create-impact-outcome.dto';
+import { UpdateImpactOutcomeDto } from './dto/update-impact-outcome.dto';
 
 jest.mock('../../shared/utils/response.utils');
 
-describe('PortfoliosController', () => {
-  let controller: PortfoliosController;
+describe('ImpactOutcomesController', () => {
+  let controller: ImpactOutcomesController;
 
   const mockService = {
     create: jest.fn(),
@@ -30,9 +30,9 @@ describe('PortfoliosController', () => {
     (ResponseUtils.format as jest.Mock) = mockFormat;
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [PortfoliosController],
+      controllers: [ImpactOutcomesController],
       providers: [
-        { provide: PortfoliosService, useValue: mockService },
+        { provide: ImpactOutcomesService, useValue: mockService },
         SetUpInterceptor,
         {
           provide: ResultsUtil,
@@ -45,7 +45,7 @@ describe('PortfoliosController', () => {
       .useValue({ canActivate: () => true })
       .compile();
 
-    controller = module.get<PortfoliosController>(PortfoliosController);
+    controller = module.get<ImpactOutcomesController>(ImpactOutcomesController);
   });
 
   it('should be defined', () => {
@@ -53,12 +53,11 @@ describe('PortfoliosController', () => {
   });
 
   describe('create', () => {
-    it('should create a portfolio and return formatted response', async () => {
-      const dto: CreatePortfolioDto = {
-        name: 'Portfolio A',
+    it('should create an impact outcome and return formatted response', async () => {
+      const dto: CreateImpactOutcomeDto = {
+        name: 'Outcome A',
         description: 'Description',
-        start_year: 2024,
-        end_year: 2024,
+        portfolio_id: 1,
       };
       const data = { id: 1, ...dto };
       mockService.create.mockResolvedValue(data);
@@ -68,7 +67,7 @@ describe('PortfoliosController', () => {
 
       expect(mockService.create).toHaveBeenCalledWith(dto);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
-        description: 'Portfolio created successfully',
+        description: 'Impact outcome created successfully',
         data,
         status: HttpStatus.CREATED,
       });
@@ -76,16 +75,16 @@ describe('PortfoliosController', () => {
   });
 
   describe('findAll', () => {
-    it('should return all portfolios with formatted response', async () => {
+    it('should return impact outcomes filtered by portfolio with formatted response', async () => {
       const data = [{ id: 1, name: 'A' }];
       mockService.findAll.mockResolvedValue(data);
       mockFormat.mockReturnValue({ ok: true });
 
       await controller.findAll();
 
-      expect(mockService.findAll).toHaveBeenCalled();
+      expect(mockService.findAll).toHaveBeenCalledWith(null);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
-        description: 'Portfolios found',
+        description: 'Impact outcomes found',
         data,
         status: HttpStatus.OK,
       });
@@ -93,7 +92,7 @@ describe('PortfoliosController', () => {
   });
 
   describe('findOne', () => {
-    it('should return a portfolio by id with formatted response', async () => {
+    it('should return an impact outcome by id with formatted response', async () => {
       const data = { id: 7, name: 'B' };
       mockService.findOne.mockResolvedValue(data);
       mockFormat.mockReturnValue({ ok: true });
@@ -102,7 +101,7 @@ describe('PortfoliosController', () => {
 
       expect(mockService.findOne).toHaveBeenCalledWith(7);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
-        description: 'Portfolio found',
+        description: 'Impact outcome found',
         data,
         status: HttpStatus.OK,
       });
@@ -110,13 +109,12 @@ describe('PortfoliosController', () => {
   });
 
   describe('update', () => {
-    it('should update a portfolio and return formatted response', async () => {
-      const dto: UpdatePortfolioDto = {
+    it('should update an impact outcome and return formatted response', async () => {
+      const dto: UpdateImpactOutcomeDto = {
         name: 'Updated',
-        start_year: 2024,
-        end_year: 2024,
+        portfolio_id: 2,
       };
-      const data = { affected: 1 };
+      const data = { id: 4, ...dto };
       mockService.update.mockResolvedValue(data);
       mockFormat.mockReturnValue({ ok: true });
 
@@ -124,7 +122,7 @@ describe('PortfoliosController', () => {
 
       expect(mockService.update).toHaveBeenCalledWith(4, dto);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
-        description: 'Portfolio updated successfully',
+        description: 'Impact outcome updated successfully',
         data,
         status: HttpStatus.OK,
       });
@@ -132,7 +130,7 @@ describe('PortfoliosController', () => {
   });
 
   describe('remove', () => {
-    it('should delete a portfolio and return formatted response', async () => {
+    it('should delete an impact outcome and return formatted response', async () => {
       const data = 9;
       mockService.remove.mockResolvedValue(data);
       mockFormat.mockReturnValue({ ok: true });
@@ -141,7 +139,7 @@ describe('PortfoliosController', () => {
 
       expect(mockService.remove).toHaveBeenCalledWith(9);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
-        description: 'Portfolio id 9 was deleted successfully',
+        description: 'Impact outcome id 9 was deleted successfully',
         data,
         status: HttpStatus.OK,
       });

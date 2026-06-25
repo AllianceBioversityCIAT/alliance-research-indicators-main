@@ -8,7 +8,7 @@ import {
 } from '../../../../shared/utils/current-user.util';
 import { AppConfig } from '../../../../shared/utils/app-config.util';
 import { ClarisaLever } from './entities/clarisa-lever.entity';
-import { Portfolio } from '../../../../entities/portfolios/entities/portfolio.entity';
+import { PortfoliosService } from '../../../../entities/portfolios/portfolios.service';
 import { CreateClarisaLeverDto } from './dto/clarisa-levers-raw.dto';
 
 describe('ClarisaLeversService', () => {
@@ -17,7 +17,7 @@ describe('ClarisaLeversService', () => {
   const mockMainFindOne = jest.fn();
   const mockMainSave = jest.fn();
   const mockMainUpdate = jest.fn();
-  const mockPortfolioFindOne = jest.fn();
+  const mockValidatePortfolio = jest.fn();
   const mockAudit = jest.fn();
 
   const mockMainRepo = {
@@ -30,8 +30,8 @@ describe('ClarisaLeversService', () => {
     metadata: { columns: [], relations: [] },
   };
 
-  const mockPortfolioRepo = {
-    findOne: mockPortfolioFindOne,
+  const mockPortfoliosService = {
+    validatePortfolio: mockValidatePortfolio,
   };
 
   beforeEach(async () => {
@@ -46,10 +46,7 @@ describe('ClarisaLeversService', () => {
         {
           provide: DataSource,
           useValue: {
-            getRepository: jest.fn((entity) => {
-              if (entity === Portfolio) return mockPortfolioRepo;
-              return mockMainRepo;
-            }),
+            getRepository: jest.fn(() => mockMainRepo),
           },
         },
         {
@@ -59,6 +56,10 @@ describe('ClarisaLeversService', () => {
         {
           provide: AppConfig,
           useValue: { BUCKET_URL: 'https://bucket.example' },
+        },
+        {
+          provide: PortfoliosService,
+          useValue: mockPortfoliosService,
         },
       ],
     }).compile();
@@ -198,14 +199,12 @@ describe('ClarisaLeversService', () => {
 
     it('should save a lever when portfolio exists and name fields are present', async () => {
       const saved = { id: 10, ...dto } as ClarisaLever;
-      mockPortfolioFindOne.mockResolvedValue({ id: 1 });
+      mockValidatePortfolio.mockResolvedValue({ id: 1 });
       mockMainSave.mockResolvedValue(saved);
 
       const result = await service.create(dto);
 
-      expect(mockPortfolioFindOne).toHaveBeenCalledWith({
-        where: { id: dto.portfolio_id },
-      });
+      expect(mockValidatePortfolio).toHaveBeenCalledWith(dto.portfolio_id);
       expect(mockAudit).toHaveBeenCalledWith(SetAuditEnum.NEW);
       expect(mockMainSave).toHaveBeenCalledWith({
         full_name: dto.full_name,
@@ -218,7 +217,9 @@ describe('ClarisaLeversService', () => {
     });
 
     it('should throw BadRequestException when portfolio is not found', async () => {
-      mockPortfolioFindOne.mockResolvedValue(null);
+      mockValidatePortfolio.mockRejectedValue(
+        new BadRequestException('Portfolio not found'),
+      );
 
       await expect(service.create(dto)).rejects.toThrow(BadRequestException);
       await expect(service.create(dto)).rejects.toThrow('Portfolio not found');
@@ -226,7 +227,7 @@ describe('ClarisaLeversService', () => {
     });
 
     it('should throw BadRequestException when no name fields are provided', async () => {
-      mockPortfolioFindOne.mockResolvedValue({ id: 1 });
+      mockValidatePortfolio.mockResolvedValue({ id: 1 });
 
       await expect(
         service.create({ portfolio_id: 1 } as CreateClarisaLeverDto),
@@ -247,15 +248,13 @@ describe('ClarisaLeversService', () => {
       mockMainFindOne
         .mockResolvedValueOnce({ id: 5 })
         .mockResolvedValueOnce(updated);
-      mockPortfolioFindOne.mockResolvedValue({ id: 2 });
+      mockValidatePortfolio.mockResolvedValue({ id: 2 });
       mockMainUpdate.mockResolvedValue({ affected: 1 });
 
       const result = await service.update(5, dto);
 
       expect(mockMainFindOne).toHaveBeenNthCalledWith(1, { where: { id: 5 } });
-      expect(mockPortfolioFindOne).toHaveBeenCalledWith({
-        where: { id: dto.portfolio_id },
-      });
+      expect(mockValidatePortfolio).toHaveBeenCalledWith(dto.portfolio_id);
       expect(mockAudit).toHaveBeenCalledWith(SetAuditEnum.UPDATE);
       expect(mockMainUpdate).toHaveBeenCalledWith(5, {
         full_name: dto.full_name,
@@ -287,7 +286,9 @@ describe('ClarisaLeversService', () => {
 
     it('should throw BadRequestException when portfolio is not found', async () => {
       mockMainFindOne.mockResolvedValue({ id: 5 });
-      mockPortfolioFindOne.mockResolvedValue(null);
+      mockValidatePortfolio.mockRejectedValue(
+        new BadRequestException('Portfolio not found'),
+      );
 
       await expect(service.update(5, dto)).rejects.toThrow(
         'Portfolio not found',

@@ -30,7 +30,7 @@ export class ClarisaLeversController {
   constructor(
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly _portfolioUtil: PortfolioUtil,
-  ) { }
+  ) {}
 
   @Get()
   @getPortfolio(ParamOrQueryEnum.QUERY, true)

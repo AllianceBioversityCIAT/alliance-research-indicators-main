@@ -9,6 +9,8 @@ import {
   UseGuards,
   UseInterceptors,
   HttpStatus,
+  ValidationPipe,
+  UsePipes,
 } from '@nestjs/common';
 import { PortfoliosService } from './portfolios.service';
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
@@ -36,7 +38,14 @@ export class PortfoliosController {
     SecRolesEnum.SYSTEM_ADMIN,
     SecRolesEnum.CENTER_ADMIN,
   )
-  create(@Body() createPortfolioDto: CreatePortfolioDto) {
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async create(@Body() createPortfolioDto: CreatePortfolioDto) {
     return this.portfoliosService.create(createPortfolioDto).then((data) =>
       ResponseUtils.format({
         description: 'Portfolio created successfully',
@@ -48,7 +57,7 @@ export class PortfoliosController {
 
   @Get()
   @ApiOperation({ summary: 'Get all portfolios' })
-  findAll() {
+  async findAll() {
     return this.portfoliosService.findAll().then((data) =>
       ResponseUtils.format({
         description: 'Portfolios found',
@@ -60,7 +69,7 @@ export class PortfoliosController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a portfolio by id' })
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string) {
     return this.portfoliosService.findOne(+id).then((data) =>
       ResponseUtils.format({
         description: 'Portfolio found',
@@ -78,7 +87,14 @@ export class PortfoliosController {
     SecRolesEnum.SYSTEM_ADMIN,
     SecRolesEnum.CENTER_ADMIN,
   )
-  update(
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async update(
     @Param('id') id: string,
     @Body() updatePortfolioDto: UpdatePortfolioDto,
   ) {
@@ -94,10 +110,10 @@ export class PortfoliosController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a portfolio' })
   @Roles(SecRolesEnum.SYSTEM_ADMIN)
-  remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string) {
     return this.portfoliosService.remove(+id).then((data) =>
       ResponseUtils.format({
-        description: 'Portfolio deleted successfully',
+        description: 'Portfolio id ' + data + ' was deleted successfully',
         data: data,
         status: HttpStatus.OK,
       }),

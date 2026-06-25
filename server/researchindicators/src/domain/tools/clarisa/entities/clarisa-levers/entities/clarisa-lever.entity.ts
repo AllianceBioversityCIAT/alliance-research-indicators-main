@@ -4,7 +4,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 import { ResultLever } from '../../../../../entities/result-levers/entities/result-lever.entity';
 import { AuditableEntity } from '../../../../../shared/global-dto/auditable.entity';
@@ -18,11 +18,11 @@ export class ClarisaLever extends AuditableEntity {
     type: Number,
     name: 'id',
   })
-  @PrimaryColumn('bigint', {
+  @PrimaryGeneratedColumn({
+    type: 'bigint',
     name: 'id',
-    nullable: false,
   })
-  id!: number;
+  id: number;
 
   @ApiProperty({
     type: String,
@@ -30,9 +30,9 @@ export class ClarisaLever extends AuditableEntity {
   })
   @Column('text', {
     name: 'short_name',
-    nullable: false,
+    nullable: true,
   })
-  short_name!: string;
+  short_name?: string;
 
   @ApiProperty({
     type: String,
