@@ -52,12 +52,21 @@ export class PortfoliosService {
   }
 
   async findOne(id: number) {
+    if (!id) return null;
     return this.mainRepo.findOne({
       where: {
         id: id,
         is_active: true,
       },
     });
+  }
+
+  async validatePortfolio(portfolio_id: number) {
+    const portfolio = await this.findOne(portfolio_id);
+    if (!portfolio) {
+      throw new BadRequestException('Portfolio not found');
+    }
+    return portfolio;
   }
 
   async update(id: number, updatePortfolioDto: UpdatePortfolioDto) {
@@ -94,7 +103,11 @@ export class PortfoliosService {
   }
 
   async remove(id: number): Promise<number> {
-    const response = await this.mainRepo.update(id, { is_active: false });
+    const response = await this.mainRepo.update(id, {
+      is_active: false,
+      deleted_at: new Date(),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    });
     if (response.affected === 0) {
       throw new BadRequestException(`Portfolio not found`);
     }

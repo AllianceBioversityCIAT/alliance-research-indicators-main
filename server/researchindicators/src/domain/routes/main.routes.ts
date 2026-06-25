@@ -65,6 +65,7 @@ import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-t
 import { ReportsModule } from '../entities/reports/reports.module';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
+import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
 
 const capSharingChildren: Routes = [
   {
@@ -261,6 +262,10 @@ const children: Routes = [
   {
     path: 'strategic-objectives',
     module: StrategicObjectivesModule,
+  },
+  {
+    path: 'impact-outcomes',
+    module: ImpactOutcomesModule,
   },
   {
     path: 'results',

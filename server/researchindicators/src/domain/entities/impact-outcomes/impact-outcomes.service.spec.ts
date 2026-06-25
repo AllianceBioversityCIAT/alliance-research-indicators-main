@@ -1,14 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { StrategicObjectivesService } from './strategic-objectives.service';
+import { BadRequestException } from '@nestjs/common';
+import { ImpactOutcomesService } from './impact-outcomes.service';
 import { PortfoliosService } from '../portfolios/portfolios.service';
-import { StrategicObjectivesRepository } from './repositories/strategic-objectives.repository';
+import { ImpactOutcomesRepository } from './repositories/impact-outcomes.repository';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
-import { CreateStrategicObjectiveDto } from './dto/create-strategic-objective.dto';
-import { UpdateStrategicObjectiveDto } from './dto/update-strategic-objective.dto';
+import { CreateImpactOutcomeDto } from './dto/create-impact-outcome.dto';
+import { UpdateImpactOutcomeDto } from './dto/update-impact-outcome.dto';
 
-describe('StrategicObjectivesService', () => {
-  let service: StrategicObjectivesService;
+describe('ImpactOutcomesService', () => {
+  let service: ImpactOutcomesService;
 
   const mockSave = jest.fn();
   const mockFind = jest.fn();
@@ -27,31 +27,29 @@ describe('StrategicObjectivesService', () => {
   };
 
   const mockCurrentUser = {
-    audit: jest.fn().mockReturnValue({ created_by: 1 }),
+    audit: jest.fn().mockReturnValue({ created_by: 1, updated_by: 1 }),
   };
 
-  const baseCreateDto: CreateStrategicObjectiveDto = {
-    name: 'Objective A',
+  const baseCreateDto: CreateImpactOutcomeDto = {
+    name: 'Outcome A',
     description: 'Description',
     portfolio_id: 1,
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    mockCurrentUser.audit.mockReturnValue({ created_by: 1 });
+    mockCurrentUser.audit.mockReturnValue({ created_by: 1, updated_by: 1 });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        StrategicObjectivesService,
+        ImpactOutcomesService,
         { provide: PortfoliosService, useValue: mockPortfoliosService },
-        { provide: StrategicObjectivesRepository, useValue: mockRepository },
+        { provide: ImpactOutcomesRepository, useValue: mockRepository },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
       ],
     }).compile();
 
-    service = module.get<StrategicObjectivesService>(
-      StrategicObjectivesService,
-    );
+    service = module.get<ImpactOutcomesService>(ImpactOutcomesService);
   });
 
   it('should be defined', () => {
@@ -59,7 +57,7 @@ describe('StrategicObjectivesService', () => {
   });
 
   describe('create', () => {
-    it('should save a strategic objective when portfolio exists', async () => {
+    it('should save an impact outcome when portfolio exists', async () => {
       const portfolio = { id: 1, name: 'Portfolio A' };
       const saved = { id: 10, ...baseCreateDto };
       mockPortfoliosService.validatePortfolio.mockResolvedValue(portfolio);
@@ -69,15 +67,16 @@ describe('StrategicObjectivesService', () => {
 
       expect(mockPortfoliosService.validatePortfolio).toHaveBeenCalledWith(1);
       expect(mockSave).toHaveBeenCalledWith({
-        name: 'Objective A',
+        name: 'Outcome A',
         description: 'Description',
         portfolio_id: 1,
         created_by: 1,
+        updated_by: 1,
       });
       expect(result).toBe(saved);
     });
 
-    it('should throw BadRequestException when portfolio is not found', async () => {
+    it('should propagate BadRequestException when portfolio is not found', async () => {
       mockPortfoliosService.validatePortfolio.mockRejectedValue(
         new BadRequestException('Portfolio not found'),
       );
@@ -85,17 +84,14 @@ describe('StrategicObjectivesService', () => {
       await expect(service.create(baseCreateDto)).rejects.toThrow(
         BadRequestException,
       );
-      await expect(service.create(baseCreateDto)).rejects.toThrow(
-        'Portfolio not found',
-      );
       expect(mockSave).not.toHaveBeenCalled();
     });
   });
 
   describe('findAll', () => {
-    it('should return active strategic objectives ordered by name', async () => {
-      const objectives = [{ id: 1, name: 'A', is_active: true }];
-      mockFind.mockResolvedValue(objectives);
+    it('should return active impact outcomes ordered by name', async () => {
+      const outcomes = [{ id: 1, name: 'A', is_active: true }];
+      mockFind.mockResolvedValue(outcomes);
 
       const result = await service.findAll();
 
@@ -103,12 +99,12 @@ describe('StrategicObjectivesService', () => {
         where: { is_active: true },
         order: { name: 'ASC' },
       });
-      expect(result).toBe(objectives);
+      expect(result).toBe(outcomes);
     });
 
     it('should filter by portfolio id when provided', async () => {
-      const objectives = [{ id: 2, name: 'B', portfolio_id: 3 }];
-      mockFind.mockResolvedValue(objectives);
+      const outcomes = [{ id: 2, name: 'B', portfolio_id: 3 }];
+      mockFind.mockResolvedValue(outcomes);
 
       const result = await service.findAll(3);
 
@@ -116,52 +112,44 @@ describe('StrategicObjectivesService', () => {
         where: { is_active: true, portfolio_id: 3 },
         order: { name: 'ASC' },
       });
-      expect(result).toBe(objectives);
+      expect(result).toBe(outcomes);
     });
   });
 
   describe('findOne', () => {
-    it('should return an active strategic objective by id', async () => {
-      const objective = { id: 5, name: 'Objective', is_active: true };
-      mockFindOne.mockResolvedValue(objective);
+    it('should return an active impact outcome by id', async () => {
+      const outcome = { id: 5, name: 'Outcome', is_active: true };
+      mockFindOne.mockResolvedValue(outcome);
 
       const result = await service.findOne(5);
 
       expect(mockFindOne).toHaveBeenCalledWith({
         where: { id: 5, is_active: true },
+        order: { name: 'ASC' },
       });
-      expect(result).toBe(objective);
+      expect(result).toBe(outcome);
     });
 
-    it('should throw BadRequestException when id is missing', async () => {
-      await expect(service.findOne(0)).rejects.toThrow(BadRequestException);
-      await expect(service.findOne(0)).rejects.toThrow('Id is required');
+    it('should return null when id is missing', async () => {
+      const result = await service.findOne(0);
+
+      expect(result).toBeNull();
       expect(mockFindOne).not.toHaveBeenCalled();
-    });
-
-    it('should throw NotFoundException when strategic objective is not found', async () => {
-      mockFindOne.mockResolvedValue(null);
-
-      await expect(service.findOne(99)).rejects.toThrow(NotFoundException);
-      await expect(service.findOne(99)).rejects.toThrow(
-        'Strategic objective not found',
-      );
     });
   });
 
   describe('update', () => {
-    const updateDto: UpdateStrategicObjectiveDto = {
+    const updateDto: UpdateImpactOutcomeDto = {
       name: 'Updated',
+      description: 'New description',
       portfolio_id: 2,
     };
 
-    it('should update a strategic objective when portfolio and record exist', async () => {
-      const updated = { id: 1, name: 'Updated', portfolio_id: 2 };
+    it('should update an impact outcome when portfolio exists', async () => {
+      const updated = { id: 1, ...updateDto };
       mockPortfoliosService.validatePortfolio.mockResolvedValue({ id: 2 });
-      mockFindOne
-        .mockResolvedValueOnce({ id: 1, name: 'Old', portfolio_id: 1 })
-        .mockResolvedValueOnce(updated);
       mockUpdate.mockResolvedValue({ affected: 1 });
+      mockFindOne.mockResolvedValue(updated);
       mockCurrentUser.audit.mockReturnValue({ updated_by: 2 });
 
       const result = await service.update(1, updateDto);
@@ -169,14 +157,18 @@ describe('StrategicObjectivesService', () => {
       expect(mockPortfoliosService.validatePortfolio).toHaveBeenCalledWith(2);
       expect(mockUpdate).toHaveBeenCalledWith(1, {
         name: 'Updated',
-        description: undefined,
+        description: 'New description',
         portfolio_id: 2,
         updated_by: 2,
+      });
+      expect(mockFindOne).toHaveBeenCalledWith({
+        where: { id: 1, is_active: true },
+        order: { name: 'ASC' },
       });
       expect(result).toBe(updated);
     });
 
-    it('should throw BadRequestException when portfolio is not found', async () => {
+    it('should propagate BadRequestException when portfolio is not found', async () => {
       mockPortfoliosService.validatePortfolio.mockRejectedValue(
         new BadRequestException('Portfolio not found'),
       );
@@ -184,31 +176,14 @@ describe('StrategicObjectivesService', () => {
       await expect(service.update(1, updateDto)).rejects.toThrow(
         BadRequestException,
       );
-      await expect(service.update(1, updateDto)).rejects.toThrow(
-        'Portfolio not found',
-      );
-      expect(mockUpdate).not.toHaveBeenCalled();
-    });
-
-    it('should throw NotFoundException when strategic objective is not found', async () => {
-      mockPortfoliosService.validatePortfolio.mockResolvedValue({ id: 2 });
-      mockFindOne.mockResolvedValue(null);
-
-      await expect(service.update(1, updateDto)).rejects.toThrow(
-        NotFoundException,
-      );
       expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe('remove', () => {
-    it('should soft-delete a strategic objective and return the id', async () => {
-      mockFindOne.mockResolvedValue({
-        id: 3,
-        name: 'To remove',
-        is_active: true,
-      });
+    it('should soft-delete an impact outcome and return the id', async () => {
       mockUpdate.mockResolvedValue({ affected: 1 });
+      mockCurrentUser.audit.mockReturnValue({ updated_by: 2 });
 
       const result = await service.remove(3);
 
@@ -217,29 +192,18 @@ describe('StrategicObjectivesService', () => {
         expect.objectContaining({
           is_active: false,
           deleted_at: expect.any(Date),
+          updated_by: 2,
         }),
       );
       expect(result).toBe(3);
     });
 
-    it('should throw NotFoundException when strategic objective is not found', async () => {
-      mockFindOne.mockResolvedValue(null);
-
-      await expect(service.remove(3)).rejects.toThrow(NotFoundException);
-      expect(mockUpdate).not.toHaveBeenCalled();
-    });
-
     it('should throw BadRequestException when update affects no rows', async () => {
-      mockFindOne.mockResolvedValue({
-        id: 3,
-        name: 'To remove',
-        is_active: true,
-      });
       mockUpdate.mockResolvedValue({ affected: 0 });
 
       await expect(service.remove(3)).rejects.toThrow(BadRequestException);
       await expect(service.remove(3)).rejects.toThrow(
-        'Strategic objective not found',
+        'Impact outcome not found',
       );
     });
   });

@@ -24,15 +24,13 @@ export class StrategicObjectivesService {
 
   async create(data: CreateStrategicObjectiveDto) {
     const { name, description, portfolio_id } = data;
-    const portfolio = await this.portfoliosService.findOne(portfolio_id);
-    if (!portfolio) {
-      throw new BadRequestException('Portfolio not found');
-    }
+    const portfolio =
+      await this.portfoliosService.validatePortfolio(portfolio_id);
 
     const dataToSave: Partial<StrategicObjective> = {
       name,
       description,
-      portfolio_id,
+      portfolio_id: portfolio.id,
       ...this.currentUser.audit(SetAuditEnum.BOTH),
     };
 
@@ -74,20 +72,22 @@ export class StrategicObjectivesService {
     updateStrategicObjectiveDto: UpdateStrategicObjectiveDto,
   ) {
     const { portfolio_id } = updateStrategicObjectiveDto;
-    const portfolio = await this.portfoliosService.findOne(portfolio_id);
-    if (!portfolio) {
-      throw new BadRequestException(
-        `Portfolio by id ${portfolio_id} not found`,
-      );
-    }
+    const portfolio =
+      await this.portfoliosService.validatePortfolio(portfolio_id);
     const strategicObjective = await this.mainRepo.findOne({
       where: { id, is_active: true },
     });
     if (!strategicObjective) {
       throw new NotFoundException('Strategic objective not found');
     }
-    await this.mainRepo.update(id, updateStrategicObjectiveDto);
-    return { ...strategicObjective, ...updateStrategicObjectiveDto };
+    const dataToUpdate: Partial<StrategicObjective> = {
+      name: updateStrategicObjectiveDto.name,
+      description: updateStrategicObjectiveDto.description,
+      portfolio_id: portfolio.id,
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    };
+    await this.mainRepo.update(id, dataToUpdate);
+    return this.mainRepo.findOne({ where: { id, is_active: true } });
   }
 
   async remove(id: number) {
@@ -97,7 +97,11 @@ export class StrategicObjectivesService {
     if (!strategicObjective) {
       throw new NotFoundException('Strategic objective not found');
     }
-    const response = await this.mainRepo.update(id, { is_active: false });
+    const response = await this.mainRepo.update(id, {
+      is_active: false,
+      deleted_at: new Date(),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    });
     if (response.affected === 0) {
       throw new BadRequestException('Strategic objective not found');
     }

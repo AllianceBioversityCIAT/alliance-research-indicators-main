@@ -3,6 +3,7 @@ import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { ClarisaLever } from '../../../tools/clarisa/entities/clarisa-levers/entities/clarisa-lever.entity';
 import { StrategicObjective } from '../../strategic-objectives/entities/strategic-objective.entity';
+import { ImpactOutcome } from '../../impact-outcomes/entities/impact-outcome.entity';
 
 @Entity('portfolios')
 export class Portfolio extends AuditableEntity {
@@ -61,8 +62,11 @@ export class Portfolio extends AuditableEntity {
     () => StrategicObjective,
     (strategicObjective) => strategicObjective.portfolio,
   )
-  strategic_objectives!: StrategicObjective[];
+  strategic_objectives?: StrategicObjective[];
 
   @OneToMany(() => ClarisaLever, (clarisaLever) => clarisaLever.portfolio)
-  clarisa_levers!: ClarisaLever[];
+  clarisa_levers?: ClarisaLever[];
+
+  @OneToMany(() => ImpactOutcome, (impactOutcome) => impactOutcome.portfolio)
+  impact_outcomes?: ImpactOutcome[];
 }
