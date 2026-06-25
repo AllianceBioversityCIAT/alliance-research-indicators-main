@@ -1,12 +1,19 @@
-import { OmitType } from '@nestjs/swagger';
-import { Portfolio } from '../entities/portfolio.entity';
+import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
-export class CreatePortfolioDto extends OmitType(Portfolio, [
-  'id',
-  'created_at',
-  'updated_at',
-  'deleted_at',
-  'is_active',
-  'created_by',
-  'updated_by',
-]) {}
+export class CreatePortfolioDto {
+  @IsNotEmpty()
+  @IsString()
+  name!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  description!: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  start_year!: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  end_year!: number;
+}

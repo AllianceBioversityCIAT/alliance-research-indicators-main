@@ -90,6 +90,7 @@ import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.mod
 import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { ReportsModule } from './reports/reports.module';
 import { PortfoliosModule } from './portfolios/portfolios.module';
+import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
 
 @Module({
   imports: [
@@ -184,6 +185,7 @@ import { PortfoliosModule } from './portfolios/portfolios.module';
     ResultLeverSdgTargetsModule,
     ReportsModule,
     PortfoliosModule,
+    StrategicObjectivesModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule, ReportsModule],
 })

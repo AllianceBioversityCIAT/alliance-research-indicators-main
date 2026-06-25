@@ -64,6 +64,7 @@ import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/r
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
+import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 
 const capSharingChildren: Routes = [
   {
@@ -256,6 +257,10 @@ const children: Routes = [
         module: UserSettingsModule,
       },
     ],
+  },
+  {
+    path: 'strategic-objectives',
+    module: StrategicObjectivesModule,
   },
   {
     path: 'results',

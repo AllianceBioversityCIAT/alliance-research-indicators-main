@@ -36,7 +36,6 @@ describe('PortfoliosService', () => {
   const baseCreateDto: CreatePortfolioDto = {
     name: 'Portfolio A',
     description: 'Description',
-    clarisa_levers: [],
     ...validDates,
   };
 
