@@ -54,7 +54,7 @@ export class UpdateAligmentValidationSdgs1782243896432 implements MigrationInter
                 where rl.is_active = true 
                     and rl.lever_role_id = 1
                     and rl.result_id = result_code
-                    and rl.lever_id = 100
+                    and rl.lever_id = 9
                 limit 1;
 
                 if result_indicator <> 5 then
@@ -155,7 +155,7 @@ export class UpdateAligmentValidationSdgs1782243896432 implements MigrationInter
                 where rl.is_active = true 
                     and rl.lever_role_id = 1
                     and rl.result_id = result_code
-                    and rl.lever_id = 100
+                    and rl.lever_id = 9
                 limit 1;
                 
                 
