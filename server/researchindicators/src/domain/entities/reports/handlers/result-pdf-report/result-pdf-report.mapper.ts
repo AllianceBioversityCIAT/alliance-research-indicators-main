@@ -19,6 +19,7 @@ import {
   ResultPdfReportContractLever,
   ResultPdfReportEvidenceSection,
   ResultPdfReportGeneralInformationSection,
+  ResultPdfReportStatus,
   ResultPdfReportGeographicScopeSection,
   ResultPdfReportIpRightsSection,
   ResultPdfReportPartnerInstitution,
@@ -60,6 +61,15 @@ export const formatPdfGeneratedAt = (value: Date = new Date()): string => {
   });
   return `${weekday}, ${month} ${day}${suffix}, ${year}, at ${time}`;
 };
+
+const mapStatusSection = (
+  metadata: MetadataResultDto,
+): ResultPdfReportStatus => ({
+  status_name: metadata.status_name ?? metadata.result_status?.name ?? '',
+  status_description: metadata.result_status?.description ?? null,
+  status_border_color: metadata.result_status?.config?.color?.border ?? null,
+  status_text_color: metadata.result_status?.config?.color?.text ?? null,
+});
 
 const buildMainContactDisplay = (
   mainContact?: UpdateGeneralInformation['main_contact_person'],
@@ -128,6 +138,7 @@ export const mapGeneralInformationSection = (
     result_type: metadata.indicator_name,
     generated_at: formatPdfGeneratedAt(generatedAt),
     main_contact_display: buildMainContactDisplay(mainContact),
+    status: mapStatusSection(metadata),
   };
 };
 

@@ -46,7 +46,7 @@ export class ReportsController {
     private readonly resultPdfReportService: ResultPdfReportService,
     private readonly currentUser: CurrentUserUtil,
     private readonly _resultsUtil: ResultsUtil,
-  ) { }
+  ) {}
 
   @Get(`${RESULT_CODE}/pdf`)
   @ApiQuery({
