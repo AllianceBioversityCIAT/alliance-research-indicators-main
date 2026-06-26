@@ -41,6 +41,24 @@ describe('ClarisaLeversService', () => {
     jest.clearAllMocks();
   });
 
+  describe('resolveIconUrl', () => {
+    it('should resolve icon URL for a known short_name', () => {
+      expect(service.resolveIconUrl('Lever 3')).toBe(
+        'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png',
+      );
+    });
+
+    it('should resolve icon URL from a longer lever label prefix', () => {
+      expect(service.resolveIconUrl('Lever 3 - Climate Action')).toBe(
+        'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png',
+      );
+    });
+
+    it('should return null for unknown levers', () => {
+      expect(service.resolveIconUrl('UnknownLever')).toBeNull();
+    });
+  });
+
   // [CLAUDE/DONE] 183
   describe('iconMapper', () => {
     it('should add icon URL when short_name matches LeverIcon map', () => {

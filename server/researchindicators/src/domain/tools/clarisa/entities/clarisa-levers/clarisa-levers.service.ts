@@ -4,7 +4,7 @@ import { ClarisaLever } from './entities/clarisa-lever.entity';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
 import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
 import { AppConfig } from '../../../../shared/utils/app-config.util';
-import { LeverIcon } from './enum/LeversIcons.enum';
+import { resolveLeverIconUrl } from './lever-icon.util';
 @Injectable()
 export class ClarisaLeversService extends ControlListBaseService<
   ClarisaLever,
@@ -23,15 +23,23 @@ export class ClarisaLeversService extends ControlListBaseService<
     );
   }
 
-  iconMapper(clarisaLever: ClarisaLever[]) {
-    return clarisaLever.map((lever) => {
-      return {
-        ...lever,
-        icon: LeverIcon[lever.short_name]
-          ? `${this.appConfig.BUCKET_URL}/images/levers${LeverIcon[lever.short_name]}`
-          : null,
-      };
+  resolveIconUrl(
+    shortName?: string | null,
+    fullName?: string | null,
+    leverId?: number | null,
+  ): string | null {
+    return resolveLeverIconUrl(this.appConfig.BUCKET_URL, {
+      shortName,
+      fullName,
+      leverId,
     });
+  }
+
+  iconMapper(clarisaLever: ClarisaLever[]) {
+    return clarisaLever.map((lever) => ({
+      ...lever,
+      icon: this.resolveIconUrl(lever.short_name, lever.full_name, lever.id),
+    }));
   }
 
   async findByShortName(shortName: string): Promise<ClarisaLever> {
