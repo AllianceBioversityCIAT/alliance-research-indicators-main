@@ -28,6 +28,17 @@ describe('result-pdf-report.mapper', () => {
         indicator_id: 4,
         indicator_name: 'Capacity Sharing for Development',
         result_official_code: 8245,
+        status_name: 'Submitted',
+        result_status: {
+          name: 'Submitted',
+          description: 'Result submitted for review',
+          config: {
+            color: {
+              border: '#1E88E5',
+              text: '#1565C0',
+            },
+          },
+        },
       } as any,
       new Date('2025-02-18T20:18:00.000Z'),
     );
@@ -40,6 +51,12 @@ describe('result-pdf-report.mapper', () => {
       'Obilo Chinyere (o.chinyere@cgiar.org)',
     );
     expect(result.generated_at).toContain('2025');
+    expect(result.status).toEqual({
+      status_name: 'Submitted',
+      status_description: 'Result submitted for review',
+      status_border_color: '#1E88E5',
+      status_text_color: '#1565C0',
+    });
   });
 
   it('maps geographic scope with flattened region and country names', () => {

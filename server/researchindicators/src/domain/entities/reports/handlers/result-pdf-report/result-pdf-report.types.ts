@@ -6,6 +6,13 @@ import { ResultUser } from '../../../result-users/entities/result-user.entity';
 import { ResultLanguage } from '../../../result-languages/entities/result-language.entity';
 import { ResultPdfIndicatorSections } from './indicator-sections/result-pdf-indicator-section.types';
 
+export type ResultPdfReportStatus = {
+  status_name: string;
+  status_description: string | null;
+  status_border_color: string | null;
+  status_text_color: string | null;
+};
+
 export type ResultPdfReportGeneralInformationSection = {
   title: string;
   description: string;
@@ -18,6 +25,7 @@ export type ResultPdfReportGeneralInformationSection = {
   result_type: string;
   generated_at: string;
   main_contact_display: string | null;
+  status: ResultPdfReportStatus;
 };
 
 export type ResultPdfReportGeographicScopeSection = {
