@@ -193,7 +193,9 @@ import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
     ResultReviewHistoryModule,
     BilateralModule,
     BilateralProjectMappingModule,
-    PortfoliosModule
+    PortfoliosModule,
+    StrategicObjectivesModule,
+    ImpactOutcomesModule,
   ],
   exports: [
     AgressoContractModule,
