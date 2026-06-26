@@ -9,6 +9,7 @@ import { DataSource, EntityManager, In, Not } from 'typeorm';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ResultsService } from './results.service';
+import { ResultAlignmentOperationsService } from './portfolio-handlers/sections/alignment/shared/result-alignment-operations.service';
 import { ResultRepository } from './repositories/result.repository';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
 import { ResultLeversService } from '../result-levers/result-levers.service';
@@ -93,6 +94,9 @@ describe('ResultsService', () => {
   let mockResultsUtil: jest.Mocked<ResultsUtil>;
   let mockGreenChecksService: { findByResultId: jest.Mock };
   let mockGreenCheckRepository: { createSnapshot: jest.Mock };
+  let mockResultAlignmentOperationsService: jest.Mocked<
+    Pick<ResultAlignmentOperationsService, 'save' | 'find'>
+  >;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -271,6 +275,11 @@ describe('ResultsService', () => {
       createSnapshot: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockResultAlignmentOperationsService = {
+      save: jest.fn(),
+      find: jest.fn(),
+    };
+
     mockEntityManager = {
       getRepository: jest.fn(),
     } as any;
@@ -381,6 +390,10 @@ describe('ResultsService', () => {
         {
           provide: GreenCheckRepository,
           useValue: mockGreenCheckRepository,
+        },
+        {
+          provide: ResultAlignmentOperationsService,
+          useValue: mockResultAlignmentOperationsService,
         },
       ],
     }).compile();
@@ -2100,20 +2113,7 @@ describe('ResultsService', () => {
   });
 
   describe('updateResultAlignment', () => {
-    let mockEntityManager: jest.Mocked<EntityManager>;
-
-    beforeEach(() => {
-      mockEntityManager = {
-        getRepository: jest.fn(),
-      } as any;
-
-      mockDataSource.transaction.mockImplementation(async (callback: any) => {
-        return await callback(mockEntityManager);
-      });
-    });
-
     it('should handle errors during alignment update', async () => {
-      // Arrange
       const resultId = 1;
       const updateResultAlignmentDto = {
         contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
@@ -2121,17 +2121,19 @@ describe('ResultsService', () => {
         contributor_levers: [{ lever_id: '6', is_primary: false }] as any,
       };
 
-      const errorMessage = 'Contract service error';
-      mockResultContractsService.create.mockRejectedValue(
+      const errorMessage = 'Alignment operations error';
+      mockResultAlignmentOperationsService.save.mockRejectedValue(
         new Error(errorMessage),
       );
 
-      // Act & Assert
       await expect(
         service.updateResultAlignment(resultId, updateResultAlignmentDto),
       ).rejects.toThrow(errorMessage);
 
-      expect(mockResultContractsService.create).toHaveBeenCalled();
+      expect(mockResultAlignmentOperationsService.save).toHaveBeenCalledWith(
+        resultId,
+        updateResultAlignmentDto,
+      );
     });
   });
 

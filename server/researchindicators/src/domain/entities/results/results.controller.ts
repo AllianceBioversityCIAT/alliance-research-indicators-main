@@ -42,6 +42,7 @@ import { ResultSortEnum } from './enum/result-sort.enum';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultSectionOrchestratorService } from './portfolio-handlers/application/result-section-orchestrator.service';
 @ApiTags('Results')
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
@@ -51,7 +52,8 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
-  ) {}
+    private readonly _alignmentOrchestrator: ResultSectionOrchestratorService,
+  ) { }
 
   @ApiQuery({
     name: 'page',
@@ -487,6 +489,48 @@ export class ResultsController {
       .then((result) =>
         ResponseUtils.format({
           description: 'alignments was found correctly',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @ApiOperation({
+    summary: '[Test] Find alignments via portfolio handler orchestrator',
+    description:
+      'Runs resolvePortfolioId → AlignmentHandlerRegistry → handler.find and returns handler metadata.',
+  })
+  @GetResultVersion()
+  @Get(`${RESULT_CODE}/alignments/handler-flow`)
+  async findResultAlignmentsHandlerFlow() {
+    return this._alignmentOrchestrator
+      .findAlignmentFlow(this._resultsUtil.resultId)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'Alignment handler flow completed successfully',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @ApiOperation({
+    summary: '[Test] Update alignments via portfolio handler orchestrator',
+    description:
+      'Runs resolvePortfolioId → AlignmentHandlerRegistry → handler.save inside a transaction, then returns handler metadata and alignment data.',
+  })
+  @GetResultVersion()
+  @ApiBody({ type: ResultAlignmentDto })
+  @UseGuards(ResultStatusGuard)
+  @Patch(`${RESULT_CODE}/alignments/handler-flow`)
+  async updateResultAlignmentsHandlerFlow(
+    @Body() alignmentData: ResultAlignmentDto,
+  ) {
+    return this._alignmentOrchestrator
+      .saveAlignmentFlow(this._resultsUtil.resultId, alignmentData)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'Alignment handler flow saved successfully',
           data: result,
           status: HttpStatus.OK,
         }),

@@ -43,6 +43,8 @@ import { ResultQuantification } from '../../result-quantifications/entities/resu
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
 import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
 import { ResultKnowledgeProduct } from '../../result-knowledge-product/entities/result-knowledge-product.entity';
+import { ResultImpactOutcome } from '../../result-impact-outcomes/entities/result-impact-outcome.entity';
+import { ResultStrategicObjective } from '../../result-strategic-objectives/entities/result-strategic-objective.entity';
 
 @Entity('results')
 @Index('idx_results_snapshot_active_report_year', [
@@ -346,4 +348,10 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultKnowledgeProduct, (rkp) => rkp.result)
   knowledge_products?: ResultKnowledgeProduct[];
+
+  @OneToMany(() => ResultImpactOutcome, (resultImpactOutcome) => resultImpactOutcome.result)
+  resultImpactOutcomes?: ResultImpactOutcome[];
+
+  @OneToMany(() => ResultStrategicObjective, (resultStrategicObjective) => resultStrategicObjective.result)
+  resultStrategicObjectives?: ResultStrategicObjective[];
 }
