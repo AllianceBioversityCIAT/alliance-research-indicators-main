@@ -37,15 +37,21 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
   async save(
     context: PortfolioHandlerContext,
     payload: ResultAlignmentDto,
-  ): Promise<ResultAlignmentDto> {
+  ): Promise<Partial<ResultAlignmentDto>> {
     payload.primary_levers = [];
     payload.contributor_levers = [];
+    let responseData: Partial<ResultAlignmentDto> = {};
 
     const alignment = await this.alignmentOperations.save(
       context.resultId,
       payload,
       context.manager,
     );
+
+    delete alignment.primary_levers;
+    delete alignment.contributor_levers;
+
+    responseData = { ...alignment };
 
     const researchAreas = await this.resultLeversService.create(
       context.resultId,
@@ -54,6 +60,8 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
       LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
       context.manager,
     );
+
+    responseData.research_areas = researchAreas;
 
     const strategicObjectives =
       await this.resultStrategicObjectivesService.create(
@@ -66,21 +74,27 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
         context.manager,
       );
 
-    const impactOutcomes = await this.resultImpactOutcomesService.create(
-      context.resultId,
-      payload.impact_outcomes.map((impactOutcome) => ({
-        impact_outcome_id: impactOutcome.impact_outcome_id,
-      })),
-      'impact_outcome_id',
-      ResultImpactOutcomeRolesEnum.ALIGNMENT,
-      context.manager,
-    );
-    return {
-      ...alignment,
-      research_areas: researchAreas,
-      strategic_objectives: strategicObjectives,
-      impact_outcomes: impactOutcomes,
-    };
+    responseData.strategic_objectives = strategicObjectives;
+
+    if (
+      [IndicatorsEnum.OICR, IndicatorsEnum.POLICY_CHANGE].includes(
+        context.result?.indicator_id,
+      )
+    ) {
+      const impactOutcomes = await this.resultImpactOutcomesService.create(
+        context.resultId,
+        payload.impact_outcomes.map((impactOutcome) => ({
+          impact_outcome_id: impactOutcome.impact_outcome_id,
+        })),
+        'impact_outcome_id',
+        ResultImpactOutcomeRolesEnum.ALIGNMENT,
+        context.manager,
+      );
+
+      responseData.impact_outcomes = impactOutcomes;
+    }
+
+    return responseData;
   }
 
   async find(

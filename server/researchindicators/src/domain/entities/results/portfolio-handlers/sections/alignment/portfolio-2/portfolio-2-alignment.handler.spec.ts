@@ -55,30 +55,32 @@ describe('Portfolio2AlignmentHandler', () => {
   });
 
   describe('save', () => {
-    it('should clear legacy levers and persist portfolio 2 alignment fields', async () => {
-      const payload = {
-        contracts: [{ contract_id: 'C1' }],
-        primary_levers: [{ lever_id: '1' }],
-        contributor_levers: [{ lever_id: '2' }],
-        research_areas: [{ lever_id: 'RA1' }],
-        strategic_objectives: [{ strategic_objective_id: 1 }],
-        impact_outcomes: [{ impact_outcome_id: 2 }],
-        result_sdgs: [],
-      } as any;
+    const payload = {
+      contracts: [{ contract_id: 'C1' }],
+      primary_levers: [{ lever_id: '1' }],
+      contributor_levers: [{ lever_id: '2' }],
+      research_areas: [{ lever_id: 'RA1' }],
+      strategic_objectives: [{ strategic_objective_id: 1 }],
+      impact_outcomes: [{ impact_outcome_id: 2 }],
+      result_sdgs: [],
+    } as any;
 
-      const baseAlignment = {
-        contracts: payload.contracts,
-        result_sdgs: [],
-      };
-      const researchAreas = [{ lever_id: 'RA1', result_lever_id: 100 }];
-      const strategicObjectives = [
-        { strategic_objective_id: 1, result_strategic_objective_id: 200 },
-      ];
-      const impactOutcomes = [
-        { impact_outcome_id: 2, result_impact_outcome_id: 300 },
-      ];
+    const baseAlignment = {
+      contracts: payload.contracts,
+      primary_levers: [{ lever_id: 'legacy' }],
+      contributor_levers: [{ lever_id: 'legacy-2' }],
+      result_sdgs: [],
+    };
+    const researchAreas = [{ lever_id: 'RA1', result_lever_id: 100 }];
+    const strategicObjectives = [
+      { strategic_objective_id: 1, result_strategic_objective_id: 200 },
+    ];
+    const impactOutcomes = [
+      { impact_outcome_id: 2, result_impact_outcome_id: 300 },
+    ];
 
-      alignmentOperations.save.mockResolvedValue(baseAlignment as any);
+    beforeEach(() => {
+      alignmentOperations.save.mockResolvedValue({ ...baseAlignment } as any);
       resultLeversService.create.mockResolvedValue(researchAreas as any);
       resultStrategicObjectivesService.create.mockResolvedValue(
         strategicObjectives as any,
@@ -86,43 +88,82 @@ describe('Portfolio2AlignmentHandler', () => {
       resultImpactOutcomesService.create.mockResolvedValue(
         impactOutcomes as any,
       );
+    });
 
-      const result = await handler.save(baseContext, payload);
+    it('should clear legacy levers and persist portfolio 2 alignment fields', async () => {
+      const context: PortfolioHandlerContext = {
+        ...baseContext,
+        result: { indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT },
+      };
+
+      const result = await handler.save(context, payload);
 
       expect(payload.primary_levers).toEqual([]);
       expect(payload.contributor_levers).toEqual([]);
       expect(alignmentOperations.save).toHaveBeenCalledWith(
-        baseContext.resultId,
+        context.resultId,
         payload,
         manager,
       );
       expect(resultLeversService.create).toHaveBeenCalledWith(
-        baseContext.resultId,
+        context.resultId,
         payload.research_areas,
         'lever_id',
         LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
         manager,
       );
       expect(resultStrategicObjectivesService.create).toHaveBeenCalledWith(
-        baseContext.resultId,
+        context.resultId,
         [{ strategic_objective_id: 1 }],
         'strategic_objective_id',
         ResultStrategicObjectiveRolesEnum.ALIGNMENT,
         manager,
       );
+      expect(resultImpactOutcomesService.create).not.toHaveBeenCalled();
+      expect(result.primary_levers).toBeUndefined();
+      expect(result.contributor_levers).toBeUndefined();
+      expect(result).toEqual({
+        contracts: baseAlignment.contracts,
+        result_sdgs: baseAlignment.result_sdgs,
+        research_areas: researchAreas,
+        strategic_objectives: strategicObjectives,
+      });
+    });
+
+    it('should persist impact outcomes when indicator is OICR', async () => {
+      const context: PortfolioHandlerContext = {
+        ...baseContext,
+        result: { indicator_id: IndicatorsEnum.OICR },
+      };
+
+      const result = await handler.save(context, payload);
+
       expect(resultImpactOutcomesService.create).toHaveBeenCalledWith(
-        baseContext.resultId,
+        context.resultId,
         [{ impact_outcome_id: 2 }],
         'impact_outcome_id',
         ResultImpactOutcomeRolesEnum.ALIGNMENT,
         manager,
       );
-      expect(result).toEqual({
-        ...baseAlignment,
-        research_areas: researchAreas,
-        strategic_objectives: strategicObjectives,
-        impact_outcomes: impactOutcomes,
-      });
+      expect(result.impact_outcomes).toEqual(impactOutcomes);
+    });
+
+    it('should persist impact outcomes when indicator is POLICY_CHANGE', async () => {
+      const context: PortfolioHandlerContext = {
+        ...baseContext,
+        result: { indicator_id: IndicatorsEnum.POLICY_CHANGE },
+      };
+
+      const result = await handler.save(context, payload);
+
+      expect(resultImpactOutcomesService.create).toHaveBeenCalledWith(
+        context.resultId,
+        [{ impact_outcome_id: 2 }],
+        'impact_outcome_id',
+        ResultImpactOutcomeRolesEnum.ALIGNMENT,
+        manager,
+      );
+      expect(result.impact_outcomes).toEqual(impactOutcomes);
     });
   });
 
