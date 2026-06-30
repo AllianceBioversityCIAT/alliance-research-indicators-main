@@ -7,14 +7,14 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 @Controller()
 @ApiBearerAuth()
 export class ClarisaLeversController {
-  constructor(private readonly clarisaLeversService: ClarisaLeversService) {}
+  constructor(private readonly clarisaLeversService: ClarisaLeversService) { }
 
   @Get()
   async find() {
     return this.clarisaLeversService.findAll().then((levers) =>
       ResponseUtils.format({
         description: 'Levers found',
-        data: this.clarisaLeversService.iconMapper(levers),
+        data: levers,
         status: HttpStatus.OK,
       }),
     );

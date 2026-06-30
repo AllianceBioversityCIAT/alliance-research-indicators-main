@@ -29,6 +29,12 @@ export class ClarisaLever extends AuditableEntity {
   })
   other_names?: string;
 
+  @Column('text', {
+    name: 'icon',
+    nullable: true,
+  })
+  icon?: string;
+
   @OneToMany(() => ResultLever, (resultLever) => resultLever.lever)
   result_levers!: ResultLever[];
 
