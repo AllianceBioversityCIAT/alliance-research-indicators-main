@@ -198,6 +198,8 @@ import { ResultStrategicObjectivesModule } from './result-strategic-objectives/r
     PortfoliosModule,
     StrategicObjectivesModule,
     ImpactOutcomesModule,
+    ResultImpactOutcomesModule,
+    ResultStrategicObjectivesModule,
   ],
   exports: [
     AgressoContractModule,
