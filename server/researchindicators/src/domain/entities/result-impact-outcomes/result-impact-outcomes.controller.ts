@@ -3,5 +3,7 @@ import { ResultImpactOutcomesService } from './result-impact-outcomes.service';
 
 @Controller('result-impact-outcomes')
 export class ResultImpactOutcomesController {
-  constructor(private readonly resultImpactOutcomesService: ResultImpactOutcomesService) { }
+  constructor(
+    private readonly resultImpactOutcomesService: ResultImpactOutcomesService,
+  ) {}
 }

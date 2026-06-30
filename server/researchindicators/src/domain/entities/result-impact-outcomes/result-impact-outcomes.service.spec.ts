@@ -24,7 +24,9 @@ describe('ResultImpactOutcomesService', () => {
       ],
     }).compile();
 
-    service = module.get<ResultImpactOutcomesService>(ResultImpactOutcomesService);
+    service = module.get<ResultImpactOutcomesService>(
+      ResultImpactOutcomesService,
+    );
   });
 
   it('should be defined', () => {

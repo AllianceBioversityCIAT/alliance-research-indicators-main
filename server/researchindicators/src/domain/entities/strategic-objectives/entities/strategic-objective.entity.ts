@@ -43,6 +43,9 @@ export class StrategicObjective extends AuditableEntity {
   @JoinColumn({ name: 'portfolio_id' })
   portfolio!: Portfolio;
 
-  @OneToMany(() => ResultStrategicObjective, (resultStrategicObjective) => resultStrategicObjective.strategic_objective)
+  @OneToMany(
+    () => ResultStrategicObjective,
+    (resultStrategicObjective) => resultStrategicObjective.strategic_objective,
+  )
   resultStrategicObjectives?: ResultStrategicObjective[];
 }

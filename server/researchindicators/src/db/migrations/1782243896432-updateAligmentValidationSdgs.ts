@@ -1,10 +1,11 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class UpdateAligmentValidationSdgs1782243896432 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP FUNCTION IF EXISTS \`alignment_validation\``);
-        await queryRunner.query(`CREATE FUNCTION \`alignment_validation\`(result_code BIGINT) RETURNS tinyint(1)
+export class UpdateAligmentValidationSdgs1782243896432
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP FUNCTION IF EXISTS \`alignment_validation\``);
+    await queryRunner.query(`CREATE FUNCTION \`alignment_validation\`(result_code BIGINT) RETURNS tinyint(1)
         READS SQL DATA
     begin
                 declare temp_contract boolean default null;
@@ -101,11 +102,11 @@ export class UpdateAligmentValidationSdgs1782243896432 implements MigrationInter
                 return temp_contract and temp_lever_outcome and temp_lever;
                 
             end`);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP FUNCTION IF EXISTS \`alignment_validation\``);
-        await queryRunner.query(`CREATE FUNCTION \`alignment_validation\`(result_code BIGINT) RETURNS tinyint(1)
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP FUNCTION IF EXISTS \`alignment_validation\``);
+    await queryRunner.query(`CREATE FUNCTION \`alignment_validation\`(result_code BIGINT) RETURNS tinyint(1)
         READS SQL DATA
     begin
                 declare temp_contract boolean default null;
@@ -190,6 +191,5 @@ export class UpdateAligmentValidationSdgs1782243896432 implements MigrationInter
                 return temp_contract and temp_lever_outcome and temp_lever;
                 
             end`);
-    }
-
+  }
 }

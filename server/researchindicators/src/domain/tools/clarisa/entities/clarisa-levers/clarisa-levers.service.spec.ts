@@ -8,6 +8,7 @@ import {
 } from '../../../../shared/utils/current-user.util';
 import { ClarisaLever } from './entities/clarisa-lever.entity';
 import { PortfoliosService } from '../../../../entities/portfolios/portfolios.service';
+import { AppConfig } from '../../../../shared/utils/app-config.util';
 import { CreateClarisaLeverDto } from './dto/clarisa-levers-raw.dto';
 
 describe('ClarisaLeversService', () => {
@@ -55,6 +56,10 @@ describe('ClarisaLeversService', () => {
         {
           provide: PortfoliosService,
           useValue: mockPortfoliosService,
+        },
+        {
+          provide: AppConfig,
+          useValue: { BUCKET_URL: 'https://bucket.example' },
         },
       ],
     }).compile();

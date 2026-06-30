@@ -15,12 +15,13 @@ export class AlignmentHandlerRegistry extends AbstractSectionHandlerRegistry<
   AlignmentSectionView,
   AlignmentSectionHandler
 > {
-  protected readonly handlers = new Map<PortfolioIdEnum, AlignmentSectionHandler>(
-    [
-      [PortfolioIdEnum.PORTFOLIO_1, this.portfolio1Handler],
-      [PortfolioIdEnum.PORTFOLIO_2, this.portfolio2Handler],
-    ],
-  );
+  protected readonly handlers = new Map<
+    PortfolioIdEnum,
+    AlignmentSectionHandler
+  >([
+    [PortfolioIdEnum.PORTFOLIO_1, this.portfolio1Handler],
+    [PortfolioIdEnum.PORTFOLIO_2, this.portfolio2Handler],
+  ]);
 
   constructor(
     private readonly portfolio1Handler: Portfolio1AlignmentHandler,

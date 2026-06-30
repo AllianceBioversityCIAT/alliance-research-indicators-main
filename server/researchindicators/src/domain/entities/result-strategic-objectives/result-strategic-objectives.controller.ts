@@ -5,5 +5,5 @@ import { ResultStrategicObjectivesService } from './result-strategic-objectives.
 export class ResultStrategicObjectivesController {
   constructor(
     private readonly resultStrategicObjectivesService: ResultStrategicObjectivesService,
-  ) { }
+  ) {}
 }

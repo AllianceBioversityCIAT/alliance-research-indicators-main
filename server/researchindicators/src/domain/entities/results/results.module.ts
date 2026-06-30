@@ -41,6 +41,7 @@ import { GreenChecksModule } from '../green-checks/green-checks.module';
 import { ResultImpactOutcomesModule } from '../result-impact-outcomes/result-impact-outcomes.module';
 import { ResultStrategicObjectivesModule } from '../result-strategic-objectives/result-strategic-objectives.module';
 import { PortfolioHandlersModule } from './portfolio-handlers/portfolio-handlers.module';
+import { PortfoliosModule } from '../portfolios/portfolios.module';
 
 @Module({
   controllers: [ResultsController],
@@ -83,6 +84,7 @@ import { PortfolioHandlersModule } from './portfolio-handlers/portfolio-handlers
     GreenChecksModule,
     ResultImpactOutcomesModule,
     ResultStrategicObjectivesModule,
+    PortfoliosModule,
   ],
   providers: [
     ResultsService,
@@ -92,4 +94,4 @@ import { PortfolioHandlersModule } from './portfolio-handlers/portfolio-handlers
   ],
   exports: [ResultsService, ResultRepository],
 })
-export class ResultsModule { }
+export class ResultsModule {}

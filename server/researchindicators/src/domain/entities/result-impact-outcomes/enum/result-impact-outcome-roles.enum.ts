@@ -1,3 +1,3 @@
 export enum ResultImpactOutcomeRolesEnum {
-    ALIGNMENT = 1,
+  ALIGNMENT = 1,
 }

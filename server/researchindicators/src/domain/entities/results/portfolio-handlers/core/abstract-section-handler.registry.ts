@@ -11,10 +11,7 @@ export abstract class AbstractSectionHandlerRegistry<
   TView,
   THandler extends PortfolioSectionHandler<TSave, TView>,
 > {
-  protected abstract readonly handlers: ReadonlyMap<
-    PortfolioIdEnum,
-    THandler
-  >;
+  protected abstract readonly handlers: ReadonlyMap<PortfolioIdEnum, THandler>;
 
   get(portfolioId: PortfolioIdEnum): THandler {
     const handler = this.handlers.get(portfolioId);

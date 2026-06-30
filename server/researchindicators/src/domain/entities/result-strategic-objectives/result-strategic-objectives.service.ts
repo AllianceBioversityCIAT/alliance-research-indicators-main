@@ -9,7 +9,6 @@ export class ResultStrategicObjectivesService extends BaseServiceSimple<
   ResultStrategicObjective,
   Repository<ResultStrategicObjective>
 > {
-
   constructor(
     private dataSource: DataSource,
     currentUser: CurrentUserUtil,
@@ -19,7 +18,7 @@ export class ResultStrategicObjectivesService extends BaseServiceSimple<
       dataSource.getRepository(ResultStrategicObjective),
       'result_id',
       currentUser,
-      'role_id'
+      'role_id',
     );
   }
 }

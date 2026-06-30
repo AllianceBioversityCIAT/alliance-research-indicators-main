@@ -20,7 +20,7 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
 
   constructor(
     private readonly alignmentOperations: ResultAlignmentOperationsService,
-  ) { }
+  ) {}
 
   async save(
     context: PortfolioHandlerContext,

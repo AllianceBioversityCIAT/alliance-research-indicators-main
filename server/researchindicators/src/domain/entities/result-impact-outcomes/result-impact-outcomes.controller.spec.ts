@@ -11,7 +11,9 @@ describe('ResultImpactOutcomesController', () => {
       providers: [{ provide: ResultImpactOutcomesService, useValue: {} }],
     }).compile();
 
-    controller = module.get<ResultImpactOutcomesController>(ResultImpactOutcomesController);
+    controller = module.get<ResultImpactOutcomesController>(
+      ResultImpactOutcomesController,
+    );
   });
 
   it('should be defined', () => {

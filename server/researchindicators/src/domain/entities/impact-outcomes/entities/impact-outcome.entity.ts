@@ -43,6 +43,9 @@ export class ImpactOutcome extends AuditableEntity {
   @JoinColumn({ name: 'portfolio_id' })
   portfolio?: Portfolio;
 
-  @OneToMany(() => ResultImpactOutcome, (resultImpactOutcome) => resultImpactOutcome.impact_outcome)
+  @OneToMany(
+    () => ResultImpactOutcome,
+    (resultImpactOutcome) => resultImpactOutcome.impact_outcome,
+  )
   resultImpactOutcomes?: ResultImpactOutcome[];
 }

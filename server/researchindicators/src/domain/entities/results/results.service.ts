@@ -72,10 +72,7 @@ import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
 import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
-import {
-  filterByUniqueKeyWithPriority,
-  intersection,
-} from '../../shared/utils/array.util';
+import { intersection } from '../../shared/utils/array.util';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { CreateResultInstitutionDto } from '../result-institutions/dto/create-result-institution.dto';
@@ -103,6 +100,7 @@ import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result
 import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 import { ResultAlignmentOperationsService } from './portfolio-handlers/sections/alignment/shared/result-alignment-operations.service';
+import { PortfoliosService } from '../portfolios/portfolios.service';
 
 @Injectable()
 export class ResultsService {
@@ -145,7 +143,8 @@ export class ResultsService {
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
-  ) { }
+    private readonly _portfolioService: PortfoliosService,
+  ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -713,7 +712,13 @@ export class ResultsService {
     return this._alignmentOperations.find(resultId);
   }
 
-  async findMetadataResult(result_id: number): Promise<MetadataResultDto> {
+  async findMetadataResult(
+    result_id: number,
+    portfolioId?: number,
+  ): Promise<MetadataResultDto> {
+    const portfolio = portfolioId
+      ? await this._portfolioService.findOne(portfolioId)
+      : null;
     const result = await this.mainRepo.findOne({
       select: {
         indicator: {
@@ -772,6 +777,15 @@ export class ResultsService {
       report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
       result_status: result?.result_status,
+      portfolio: portfolio
+        ? {
+            id: portfolio.id,
+            name: portfolio.name,
+            description: portfolio.description,
+            start_year: portfolio.start_year,
+            end_year: portfolio.end_year,
+          }
+        : null,
     };
   }
 
@@ -1204,8 +1218,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-              (el) => el.isoAlpha2 === country.isoAlpha2,
-            )?.result_countries_sub_nationals
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
             : [];
           return country;
         },

@@ -7,4 +7,4 @@ import { ResultStrategicObjectivesController } from './result-strategic-objectiv
   providers: [ResultStrategicObjectivesService],
   exports: [ResultStrategicObjectivesService],
 })
-export class ResultStrategicObjectivesModule { }
+export class ResultStrategicObjectivesModule {}

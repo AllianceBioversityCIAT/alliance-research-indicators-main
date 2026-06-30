@@ -1,3 +1,3 @@
 export enum ResultStrategicObjectiveRolesEnum {
-    ALIGNMENT = 1,
+  ALIGNMENT = 1,
 }

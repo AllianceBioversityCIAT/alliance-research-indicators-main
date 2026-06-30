@@ -349,9 +349,15 @@ export class Result extends AuditableEntity {
   @OneToMany(() => ResultKnowledgeProduct, (rkp) => rkp.result)
   knowledge_products?: ResultKnowledgeProduct[];
 
-  @OneToMany(() => ResultImpactOutcome, (resultImpactOutcome) => resultImpactOutcome.result)
+  @OneToMany(
+    () => ResultImpactOutcome,
+    (resultImpactOutcome) => resultImpactOutcome.result,
+  )
   resultImpactOutcomes?: ResultImpactOutcome[];
 
-  @OneToMany(() => ResultStrategicObjective, (resultStrategicObjective) => resultStrategicObjective.result)
+  @OneToMany(
+    () => ResultStrategicObjective,
+    (resultStrategicObjective) => resultStrategicObjective.result,
+  )
   resultStrategicObjectives?: ResultStrategicObjective[];
 }

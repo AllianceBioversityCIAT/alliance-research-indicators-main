@@ -124,9 +124,7 @@ export class AgressoContractService {
 
     return {
       ...report,
-      top_primary_levers: report.top_primary_levers.map((lever) =>
-        this.mapPrimaryLeverWithIcon(lever),
-      ),
+      top_primary_levers: report.top_primary_levers,
     };
   }
 

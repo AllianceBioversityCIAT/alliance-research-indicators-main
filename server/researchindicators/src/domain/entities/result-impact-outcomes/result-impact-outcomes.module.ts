@@ -7,4 +7,4 @@ import { ResultImpactOutcomesController } from './result-impact-outcomes.control
   providers: [ResultImpactOutcomesService],
   exports: [ResultImpactOutcomesService],
 })
-export class ResultImpactOutcomesModule { }
+export class ResultImpactOutcomesModule {}
