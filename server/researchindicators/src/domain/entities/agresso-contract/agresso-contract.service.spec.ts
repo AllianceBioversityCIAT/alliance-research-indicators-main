@@ -403,7 +403,7 @@ describe('AgressoContractService', () => {
   });
 
   describe('getTopPrimaryLeversReport', () => {
-    it('should enrich top primary levers with icon metadata', async () => {
+    it('should return top primary levers with native icon from repository', async () => {
       const expectedReport = {
         contract_id: 'A100',
         limit: 10,
@@ -413,6 +413,7 @@ describe('AgressoContractService', () => {
             short_name: 'Lever 3',
             full_name: 'Lever 3: Climate Action',
             count: 6,
+            icon: 'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png',
           },
         ],
       };
@@ -426,13 +427,7 @@ describe('AgressoContractService', () => {
         'A100',
         10,
       );
-      expect(result.top_primary_levers[0]).toEqual({
-        lever_id: 3,
-        short_name: 'Lever 3',
-        full_name: 'Lever 3: Climate Action',
-        count: 6,
-        icon: 'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png',
-      });
+      expect(result).toEqual(expectedReport);
     });
   });
 

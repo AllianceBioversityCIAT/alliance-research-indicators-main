@@ -920,6 +920,7 @@ export class AgressoContractRepository
         clarisa_lever.id AS lever_id,
         clarisa_lever.short_name AS short_name,
         clarisa_lever.full_name AS full_name,
+        clarisa_lever.icon AS icon,
         COUNT(DISTINCT result_lever.result_id) AS count
       FROM result_levers result_lever
       INNER JOIN (${primaryContractResultsSubquery}) primary_contract_results
@@ -931,7 +932,8 @@ export class AgressoContractRepository
       GROUP BY
         clarisa_lever.id,
         clarisa_lever.short_name,
-        clarisa_lever.full_name
+        clarisa_lever.full_name,
+        clarisa_lever.icon
       ORDER BY count DESC, clarisa_lever.id
       LIMIT ?
     `;

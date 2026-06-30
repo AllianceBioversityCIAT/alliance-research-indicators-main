@@ -67,6 +67,11 @@ export class ClarisaLever extends AuditableEntity {
   @ManyToOne(() => Portfolio, (portfolio) => portfolio.clarisa_levers)
   @JoinColumn({ name: 'portfolio_id' })
   portfolio!: Portfolio;
+  @Column('text', {
+    name: 'icon',
+    nullable: true,
+  })
+  icon?: string;
 
   @OneToMany(() => ResultLever, (resultLever) => resultLever.lever)
   result_levers!: ResultLever[];

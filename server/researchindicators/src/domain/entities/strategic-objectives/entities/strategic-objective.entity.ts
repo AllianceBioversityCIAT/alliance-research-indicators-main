@@ -3,10 +3,12 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Portfolio } from '../../portfolios/entities/portfolio.entity';
+import { ResultStrategicObjective } from '../../result-strategic-objectives/entities/result-strategic-objective.entity';
 
 @Entity('strategic_objectives')
 export class StrategicObjective extends AuditableEntity {
@@ -40,4 +42,10 @@ export class StrategicObjective extends AuditableEntity {
   @ManyToOne(() => Portfolio, (portfolio) => portfolio.strategic_objectives)
   @JoinColumn({ name: 'portfolio_id' })
   portfolio!: Portfolio;
+
+  @OneToMany(
+    () => ResultStrategicObjective,
+    (resultStrategicObjective) => resultStrategicObjective.strategic_objective,
+  )
+  resultStrategicObjectives?: ResultStrategicObjective[];
 }

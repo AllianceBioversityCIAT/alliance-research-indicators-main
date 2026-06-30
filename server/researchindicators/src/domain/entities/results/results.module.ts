@@ -39,10 +39,17 @@ import { ResultKnowledgeProductModule } from '../result-knowledge-product/result
 import { ResultLeverSdgTargetsModule } from '../result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { GreenChecksModule } from '../green-checks/green-checks.module';
 import { AiReportsModule } from '../ai-reports/ai-reports.module';
+import { ResultImpactOutcomesModule } from '../result-impact-outcomes/result-impact-outcomes.module';
+import { ResultStrategicObjectivesModule } from '../result-strategic-objectives/result-strategic-objectives.module';
+import { PortfolioHandlersModule } from './portfolio-handlers/portfolio-handlers.module';
+import { PortfoliosModule } from '../portfolios/portfolios.module';
+import { StrategicObjectivesModule } from '../strategic-objectives/strategic-objectives.module';
+import { ImpactOutcomesModule } from '../impact-outcomes/impact-outcomes.module';
 
 @Module({
   controllers: [ResultsController],
   imports: [
+    PortfolioHandlersModule,
     ResultKeywordsModule,
     ResultLeversModule,
     ResultContractsModule,
@@ -79,6 +86,9 @@ import { AiReportsModule } from '../ai-reports/ai-reports.module';
     ResultLeverSdgTargetsModule,
     GreenChecksModule,
     AiReportsModule,
+    ResultImpactOutcomesModule,
+    ResultStrategicObjectivesModule,
+    PortfoliosModule,
   ],
   providers: [
     ResultsService,
@@ -88,4 +98,4 @@ import { AiReportsModule } from '../ai-reports/ai-reports.module';
   ],
   exports: [ResultsService, ResultRepository],
 })
-export class ResultsModule {}
+export class ResultsModule { }

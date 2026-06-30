@@ -11,22 +11,19 @@ jest.mock('../../../../shared/utils/response.utils');
 
 describe('ClarisaLeversController', () => {
   let controller: ClarisaLeversController;
-  const raw = [{ id: 1 }];
-  const mapped = [{ id: 1, icon: 'x' }];
+  const raw = [{ id: 1, icon: 'https://bucket.example/images/levers/L1.png' }];
   const mockService = {
     findAllWithPortfolio: jest.fn().mockResolvedValue(raw),
     findOne: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
-    iconMapper: jest.fn().mockReturnValue(mapped),
   };
   const mockFormat = jest.fn();
 
   beforeEach(async () => {
     jest.clearAllMocks();
     mockService.findAllWithPortfolio.mockResolvedValue(raw);
-    mockService.iconMapper.mockReturnValue(mapped);
     (ResponseUtils.format as jest.Mock) = mockFormat;
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ClarisaLeversController],
@@ -56,10 +53,9 @@ describe('ClarisaLeversController', () => {
       await controller.find();
 
       expect(mockService.findAllWithPortfolio).toHaveBeenCalledWith(null);
-      expect(mockService.iconMapper).toHaveBeenCalledWith(raw);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
         description: 'Levers found',
-        data: mapped,
+        data: raw,
         status: HttpStatus.OK,
       });
     });

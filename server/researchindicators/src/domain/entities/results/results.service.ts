@@ -77,10 +77,7 @@ import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
 import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
-import {
-  filterByUniqueKeyWithPriority,
-  intersection,
-} from '../../shared/utils/array.util';
+import { intersection } from '../../shared/utils/array.util';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { CreateResultInstitutionDto } from '../result-institutions/dto/create-result-institution.dto';
@@ -113,6 +110,8 @@ import {
   createBulkUploadProcessesDto,
   createBulkUploadResultsDto,
 } from '../ai-reports/dto/create-ai-report.dto';
+import { ResultAlignmentOperationsService } from './portfolio-handlers/sections/alignment/shared/result-alignment-operations.service';
+import { PortfoliosService } from '../portfolios/portfolios.service';
 
 @Injectable()
 export class ResultsService {
@@ -155,6 +154,8 @@ export class ResultsService {
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
     private readonly _aiReportsService: AiReportsService,
+    private readonly _alignmentOperations: ResultAlignmentOperationsService,
+    private readonly _portfolioService: PortfoliosService,
   ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -683,103 +684,7 @@ export class ResultsService {
     alignmentData: ResultAlignmentDto,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
-    const { contracts, primary_levers, contributor_levers } = alignmentData;
-    await this.dataSource.transaction(async (manager) => {
-      await this._resultContractsService.create<ContractRolesEnum>(
-        resultId,
-        contracts,
-        'contract_id',
-        ContractRolesEnum.ALIGNMENT,
-        manager,
-        ['is_primary'],
-        {
-          is_primary: false,
-        },
-      );
-
-      const primaryLevers: Partial<ResultLever>[] =
-        primary_levers?.length > 0
-          ? primary_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: true,
-            result_lever_strategic_outcomes:
-              el?.result_lever_strategic_outcomes,
-            result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            custom_lever_name: el?.custom_lever_name,
-          }))
-          : [];
-
-      const contributorLevers: Partial<ResultLever>[] =
-        contributor_levers?.length > 0
-          ? contributor_levers.map((el) => ({
-            lever_id: el.lever_id,
-            is_primary: false,
-            result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            custom_lever_name: el?.custom_lever_name,
-          }))
-          : [];
-
-      const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
-        [...primaryLevers, ...contributorLevers],
-        'lever_id',
-        'is_primary',
-      );
-
-      const newLevers = await this._resultLeversService.create<LeverRolesEnum>(
-        resultId,
-        fullLevers,
-        'lever_id',
-        LeverRolesEnum.ALIGNMENT,
-        manager,
-        ['is_primary', 'custom_lever_name'],
-        {
-          is_primary: false,
-        },
-      );
-
-      const emergedLever =
-        await this._resultLeversService.comparerClientToServer(
-          resultId,
-          fullLevers,
-          LeverRolesEnum.ALIGNMENT,
-          newLevers,
-        );
-
-      for (const lever of emergedLever) {
-        await this._resultLeverStrategicOutcomeService.create(
-          lever.result_lever_id,
-          lever?.result_lever_strategic_outcomes ?? [],
-          'lever_strategic_outcome_id',
-          undefined,
-          manager,
-        );
-      }
-
-      for (const lever of emergedLever) {
-        const saveSdgTargets =
-          this._resultsUtil.indicatorId == IndicatorsEnum.OICR
-            ? lever?.result_lever_sdg_targets
-            : [];
-
-        await this._resultLeverSdgTargetsService.create(
-          lever.result_lever_id,
-          saveSdgTargets,
-          'sdg_target_id',
-          undefined,
-          manager,
-        );
-      }
-
-      await this._resultSdgsService.create(
-        resultId,
-        alignmentData.result_sdgs,
-        'clarisa_sdg_id',
-        undefined,
-        manager,
-      );
-
-      await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
-    });
+    await this._alignmentOperations.save(resultId, alignmentData);
 
     if (returnData === TrueFalseEnum.TRUE) {
       return this.findResultAlignment(resultId);
@@ -795,53 +700,16 @@ export class ResultsService {
   }
 
   async findResultAlignment(resultId: number) {
-    const contracts = await this._resultContractsService.find(
-      resultId,
-      ContractRolesEnum.ALIGNMENT,
-    );
-
-    const levers = await this._resultLeversService.find(
-      resultId,
-      LeverRolesEnum.ALIGNMENT,
-    );
-
-    const sdgTargets =
-      await this._resultLeverSdgTargetsService.findByMultiplesResultLeverIds(
-        levers.map((el) => el.result_lever_id),
-      );
-
-    levers.forEach((lever) => {
-      lever.result_lever_sdg_targets = sdgTargets.filter(
-        (sdgTarget) => sdgTarget.result_lever_id === lever.result_lever_id,
-      );
-    });
-
-    const primaryLevers = levers.filter((el) => el.is_primary);
-
-    const strategicOutcomes =
-      await this._resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds(
-        primaryLevers.map((el) => el.result_lever_id),
-      );
-
-    primaryLevers.forEach((lever) => {
-      lever.result_lever_strategic_outcomes = strategicOutcomes.filter(
-        (so) => so.result_lever_id === lever.result_lever_id,
-      );
-    });
-
-    const result_sdgs = await this._resultSdgsService.find(resultId);
-
-    const resultAlignment: ResultAlignmentDto = {
-      contracts,
-      primary_levers: primaryLevers,
-      contributor_levers: levers.filter((el) => !el.is_primary),
-      result_sdgs,
-    };
-
-    return resultAlignment;
+    return this._alignmentOperations.find(resultId);
   }
 
-  async findMetadataResult(result_id: number): Promise<MetadataResultDto> {
+  async findMetadataResult(
+    result_id: number,
+    portfolioId?: number,
+  ): Promise<MetadataResultDto> {
+    const portfolio = portfolioId
+      ? await this._portfolioService.findOne(portfolioId)
+      : null;
     const result = await this.mainRepo.findOne({
       select: {
         indicator: {
@@ -900,6 +768,15 @@ export class ResultsService {
       report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
       result_status: result?.result_status,
+      portfolio: portfolio
+        ? {
+          id: portfolio.id,
+          name: portfolio.name,
+          description: portfolio.description,
+          start_year: portfolio.start_year,
+          end_year: portfolio.end_year,
+        }
+        : null,
     };
   }
 
