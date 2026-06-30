@@ -30,7 +30,7 @@ export class ClarisaLeversController {
   constructor(
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly _portfolioUtil: PortfolioUtil,
-  ) {}
+  ) { }
 
   @Get()
   @getPortfolio(ParamOrQueryEnum.QUERY, true)
@@ -40,7 +40,7 @@ export class ClarisaLeversController {
       .then((levers) =>
         ResponseUtils.format({
           description: 'Levers found',
-          data: this.clarisaLeversService.iconMapper(levers),
+          data: levers,
           status: HttpStatus.OK,
         }),
       );

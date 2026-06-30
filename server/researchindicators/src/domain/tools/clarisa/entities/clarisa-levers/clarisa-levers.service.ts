@@ -127,13 +127,6 @@ export class ClarisaLeversService extends ControlListBaseService<
     return id;
   }
 
-  iconMapper(clarisaLever: ClarisaLever[]) {
-    return clarisaLever.map((lever) => ({
-      ...lever,
-      icon: this.resolveIconUrl(lever.short_name, lever.full_name, lever.id),
-    }));
-  }
-
   async findByShortName(shortName: string): Promise<ClarisaLever> {
     return this.mainRepo.findOne({
       where: {

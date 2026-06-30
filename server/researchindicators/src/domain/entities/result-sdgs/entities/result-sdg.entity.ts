@@ -8,6 +8,7 @@ import {
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { ClarisaSdg } from '../../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('result_sdgs')
 export class ResultSdg extends AuditableEntity {
@@ -23,6 +24,10 @@ export class ResultSdg extends AuditableEntity {
   })
   result_id!: number;
 
+  @ApiProperty({
+    type: Number,
+    name: 'clarisa_sdg_id',
+  })
   @Column('bigint', {
     name: 'clarisa_sdg_id',
     nullable: false,

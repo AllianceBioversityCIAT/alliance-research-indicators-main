@@ -145,7 +145,7 @@ export class ResultsService {
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -1204,8 +1204,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },
