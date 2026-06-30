@@ -34,7 +34,8 @@ import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 import { ResultRawAi, RootAi } from './dto/result-ai.dto';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
-import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import { GetResultVersion, ParamOrQueryEnum } from '../../shared/decorators/versioning.decorator';
+import { getPortfolio } from '../../shared/decorators/portfolio.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
@@ -496,18 +497,19 @@ export class ResultsController {
   }
 
   @ApiOperation({
-    summary: '[Test] Find alignments via portfolio handler orchestrator',
+    summary: 'Find alignments via portfolio handler orchestrator',
     description:
-      'Runs resolvePortfolioId → AlignmentHandlerRegistry → handler.find and returns handler metadata.',
+      'Same response shape as GET /alignments. Routes through PortfolioUtil and AlignmentHandlerRegistry.',
   })
   @GetResultVersion()
+  @getPortfolio(ParamOrQueryEnum.QUERY, false)
   @Get(`${RESULT_CODE}/alignments/handler-flow`)
   async findResultAlignmentsHandlerFlow() {
     return this._alignmentOrchestrator
-      .findAlignmentFlow(this._resultsUtil.resultId)
+      .findAlignment(this._resultsUtil.resultId)
       .then((result) =>
         ResponseUtils.format({
-          description: 'Alignment handler flow completed successfully',
+          description: 'alignments was found correctly',
           data: result,
           status: HttpStatus.OK,
         }),
@@ -515,22 +517,35 @@ export class ResultsController {
   }
 
   @ApiOperation({
-    summary: '[Test] Update alignments via portfolio handler orchestrator',
+    summary: 'Update alignments via portfolio handler orchestrator',
     description:
-      'Runs resolvePortfolioId → AlignmentHandlerRegistry → handler.save inside a transaction, then returns handler metadata and alignment data.',
+      'Same response shape as PATCH /alignments. Routes through PortfolioUtil and AlignmentHandlerRegistry.',
   })
   @GetResultVersion()
+  @getPortfolio(ParamOrQueryEnum.QUERY, false)
+  @ApiQuery({
+    name: 'return',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description: 'Is a reference to return data',
+  })
   @ApiBody({ type: ResultAlignmentDto })
   @UseGuards(ResultStatusGuard)
   @Patch(`${RESULT_CODE}/alignments/handler-flow`)
   async updateResultAlignmentsHandlerFlow(
+    @Query('return') returnData: TrueFalseEnum,
     @Body() alignmentData: ResultAlignmentDto,
   ) {
     return this._alignmentOrchestrator
-      .saveAlignmentFlow(this._resultsUtil.resultId, alignmentData)
+      .saveAlignment(
+        this._resultsUtil.resultId,
+        alignmentData,
+        returnData,
+      )
       .then((result) =>
         ResponseUtils.format({
-          description: 'Alignment handler flow saved successfully',
+          description: 'Alignments was updated correctly',
           data: result,
           status: HttpStatus.OK,
         }),

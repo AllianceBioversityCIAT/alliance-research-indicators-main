@@ -20,12 +20,14 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
 
   constructor(
     private readonly alignmentOperations: ResultAlignmentOperationsService,
-  ) {}
+  ) { }
 
-  save(
+  async save(
     context: PortfolioHandlerContext,
     payload: ResultAlignmentDto,
   ): Promise<void> {
+    payload.primary_levers = [];
+    payload.contributor_levers = [];
     return this.alignmentOperations.save(
       context.resultId,
       payload,
@@ -33,7 +35,7 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     );
   }
 
-  find(context: PortfolioHandlerContext): Promise<AlignmentSectionView> {
+  async find(context: PortfolioHandlerContext): Promise<AlignmentSectionView> {
     return this.alignmentOperations.find(context.resultId);
   }
 }

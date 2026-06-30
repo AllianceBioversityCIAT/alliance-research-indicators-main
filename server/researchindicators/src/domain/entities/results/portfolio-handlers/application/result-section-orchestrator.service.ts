@@ -1,29 +1,24 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import {
-  DataSource,
-  EntityManager,
-  LessThanOrEqual,
-  MoreThanOrEqual,
-} from 'typeorm';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
 import { PortfolioIdEnum } from '../enum/portfolio-id.enum';
 import { PortfolioHandlerContext } from '../core/portfolio-handler-context.interface';
 import { ResultAlignmentDto } from '../../dto/result-alignment.dto';
 import { AlignmentHandlerRegistry } from '../sections/alignment/alignment-handler.registry';
-import {
-  AlignmentSectionHandler,
-} from '../sections/alignment/alignment-section-handler.interface';
-import { AlignmentHandlerFlowDto } from '../dto/alignment-handler-flow.dto';
-import { Result } from '../../entities/result.entity';
-import { Portfolio } from '../../../portfolios/entities/portfolio.entity';
+import { PortfolioUtil } from '../../../../shared/utils/portfolio.util';
+import { TrueFalseEnum } from '../../../../shared/enum/queries.enum';
 
 /**
  * Single delegation point from ResultsService / controller to alignment handlers.
+ *
+ * Portfolio resolution relies on PortfolioUtil, which is populated by SetUpInterceptor
+ * from portfolioId (query/param) or reportYear (result / query).
  */
 @Injectable()
 export class ResultSectionOrchestratorService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly alignmentRegistry: AlignmentHandlerRegistry,
+    private readonly portfolioUtil: PortfolioUtil,
   ) {}
 
   buildContext(
@@ -34,45 +29,28 @@ export class ResultSectionOrchestratorService {
     return { resultId, portfolioId, manager };
   }
 
-  async resolvePortfolioId(resultId: number): Promise<PortfolioIdEnum> {
-    const result = await this.dataSource.getRepository(Result).findOne({
-      where: { result_id: resultId, is_active: true },
-      select: { report_year_id: true },
-    });
+  resolvePortfolioId(): PortfolioIdEnum {
+    const portfolioId = this.portfolioUtil.nullPortfolioId;
 
-    if (!result?.report_year_id) {
-      return PortfolioIdEnum.PORTFOLIO_1;
+    if (!portfolioId) {
+      throw new BadRequestException('Portfolio not found');
     }
 
-    const portfolio = await this.dataSource.getRepository(Portfolio).findOne({
-      where: {
-        is_active: true,
-        start_year: LessThanOrEqual(result.report_year_id),
-        end_year: MoreThanOrEqual(result.report_year_id),
-      },
-      select: { id: true },
-    });
-
-    if (!portfolio?.id) {
-      throw new NotFoundException(
-        `No active portfolio found for report year ${result.report_year_id}`,
-      );
-    }
-
-    return portfolio.id as PortfolioIdEnum;
+    return portfolioId as PortfolioIdEnum;
   }
 
-  async findAlignmentFlow(resultId: number): Promise<AlignmentHandlerFlowDto> {
-    const portfolioId = await this.resolvePortfolioId(resultId);
+  async findAlignment(resultId: number): Promise<ResultAlignmentDto> {
+    const portfolioId = this.resolvePortfolioId();
     const handler = this.alignmentRegistry.get(portfolioId);
-    return this.buildFlowView(resultId, portfolioId, handler);
+    return handler.find(this.buildContext(resultId, portfolioId));
   }
 
-  async saveAlignmentFlow(
+  async saveAlignment(
     resultId: number,
     payload: ResultAlignmentDto,
-  ): Promise<AlignmentHandlerFlowDto> {
-    const portfolioId = await this.resolvePortfolioId(resultId);
+    returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
+  ): Promise<ResultAlignmentDto | void> {
+    const portfolioId = this.resolvePortfolioId();
     const handler = this.alignmentRegistry.get(portfolioId);
 
     await this.dataSource.transaction(async (manager) => {
@@ -82,23 +60,10 @@ export class ResultSectionOrchestratorService {
       );
     });
 
-    return this.buildFlowView(resultId, portfolioId, handler);
-  }
+    if (returnData === TrueFalseEnum.TRUE) {
+      return this.findAlignment(resultId);
+    }
 
-  private async buildFlowView(
-    resultId: number,
-    portfolioId: PortfolioIdEnum,
-    handler: AlignmentSectionHandler,
-  ): Promise<AlignmentHandlerFlowDto> {
-    const alignment = await handler.find(
-      this.buildContext(resultId, portfolioId),
-    );
-
-    return {
-      portfolio_id: portfolioId,
-      handler: handler.constructor.name,
-      section: handler.sectionKey,
-      alignment,
-    };
+    return undefined;
   }
 }

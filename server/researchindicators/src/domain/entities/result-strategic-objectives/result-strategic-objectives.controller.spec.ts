@@ -8,10 +8,12 @@ describe('ResultStrategicObjectivesController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultStrategicObjectivesController],
-      providers: [ResultStrategicObjectivesService],
+      providers: [{ provide: ResultStrategicObjectivesService, useValue: {} }],
     }).compile();
 
-    controller = module.get<ResultStrategicObjectivesController>(ResultStrategicObjectivesController);
+    controller = module.get<ResultStrategicObjectivesController>(
+      ResultStrategicObjectivesController,
+    );
   });
 
   it('should be defined', () => {

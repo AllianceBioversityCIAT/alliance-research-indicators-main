@@ -12,6 +12,8 @@ ResultsService.updateResultAlignment() / findResultAlignment()
         ↓
 ResultSectionOrchestratorService
         ↓
+PortfolioUtil.nullPortfolioId  ← SetUpInterceptor + getPortfolio decorator
+        ↓
 AlignmentHandlerRegistry.get(portfolioId)
         ↓
 Portfolio1AlignmentHandler | Portfolio2AlignmentHandler
@@ -50,7 +52,7 @@ portfolio-handlers/
 
 1. Move current `ResultsService.updateResultAlignment` / `findResultAlignment` logic into `Portfolio1AlignmentHandler` (or a shared operations service).
 2. Implement portfolio 2 differences in `Portfolio2AlignmentHandler`.
-3. Implement delegation in `ResultSectionOrchestratorService`.
+3. Implement delegation in `ResultSectionOrchestratorService` (uses `PortfolioUtil`, not a custom DB lookup).
 4. Import `PortfolioHandlersModule` in `ResultsModule`.
 5. Add specs per handler (`portfolio-1-alignment.handler.spec.ts`, etc.).
 

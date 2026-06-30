@@ -55,8 +55,8 @@ describe('ResultsController', () => {
   };
 
   const mockAlignmentOrchestrator = {
-    findAlignmentFlow: jest.fn(),
-    saveAlignmentFlow: jest.fn(),
+    findAlignment: jest.fn(),
+    saveAlignment: jest.fn(),
   };
 
   const mockResultsUtil = {
