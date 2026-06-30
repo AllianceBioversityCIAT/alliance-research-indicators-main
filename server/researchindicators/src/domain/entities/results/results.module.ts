@@ -43,8 +43,6 @@ import { ResultImpactOutcomesModule } from '../result-impact-outcomes/result-imp
 import { ResultStrategicObjectivesModule } from '../result-strategic-objectives/result-strategic-objectives.module';
 import { PortfolioHandlersModule } from './portfolio-handlers/portfolio-handlers.module';
 import { PortfoliosModule } from '../portfolios/portfolios.module';
-import { StrategicObjectivesModule } from '../strategic-objectives/strategic-objectives.module';
-import { ImpactOutcomesModule } from '../impact-outcomes/impact-outcomes.module';
 
 @Module({
   controllers: [ResultsController],
@@ -98,4 +96,4 @@ import { ImpactOutcomesModule } from '../impact-outcomes/impact-outcomes.module'
   ],
   exports: [ResultsService, ResultRepository],
 })
-export class ResultsModule { }
+export class ResultsModule {}

@@ -215,4 +215,4 @@ import { ResultStrategicObjectivesModule } from './result-strategic-objectives/r
     ResultStrategicObjectivesModule,
   ],
 })
-export class EntitiesModule { }
+export class EntitiesModule {}
