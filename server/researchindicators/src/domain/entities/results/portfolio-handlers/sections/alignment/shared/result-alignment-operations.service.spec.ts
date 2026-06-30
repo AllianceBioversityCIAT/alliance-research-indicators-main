@@ -116,6 +116,15 @@ describe('ResultAlignmentOperationsService', () => {
       resultLeversService.comparerClientToServer.mockResolvedValue(
         emergedLevers as any,
       );
+      resultContractsService.find.mockResolvedValue([]);
+      resultLeversService.find.mockResolvedValue([]);
+      resultLeverSdgTargetsService.findByMultiplesResultLeverIds.mockResolvedValue(
+        [],
+      );
+      resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds.mockResolvedValue(
+        [],
+      );
+      resultSdgsService.find.mockResolvedValue([]);
 
       await service.save(resultId, alignmentData, manager as any);
 
