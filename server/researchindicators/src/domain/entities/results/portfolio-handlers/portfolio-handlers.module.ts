@@ -9,6 +9,8 @@ import { ResultLeversModule } from '../../result-levers/result-levers.module';
 import { ResultLeverStrategicOutcomeModule } from '../../result-lever-strategic-outcome/result-lever-strategic-outcome.module';
 import { ResultLeverSdgTargetsModule } from '../../result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { ResultSdgsModule } from '../../result-sdgs/result-sdgs.module';
+import { ResultStrategicObjectivesModule } from '../../result-strategic-objectives/result-strategic-objectives.module';
+import { ResultImpactOutcomesModule } from '../../result-impact-outcomes/result-impact-outcomes.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { ResultSdgsModule } from '../../result-sdgs/result-sdgs.module';
     ResultLeverStrategicOutcomeModule,
     ResultLeverSdgTargetsModule,
     ResultSdgsModule,
+    ResultStrategicObjectivesModule,
+    ResultImpactOutcomesModule,
   ],
   providers: [
     ResultAlignmentOperationsService,

@@ -10,7 +10,10 @@ export interface PortfolioSectionHandler<TSave, TView> {
   readonly portfolioId: PortfolioIdEnum;
   readonly sectionKey: ResultSectionKeyEnum;
 
-  save(context: PortfolioHandlerContext, payload: TSave): Promise<TView | void>;
+  save(
+    context: PortfolioHandlerContext,
+    payload: TSave,
+  ): Promise<Partial<TView> | void>;
 
-  find(context: PortfolioHandlerContext): Promise<TView>;
+  find(context: PortfolioHandlerContext): Promise<Partial<TView>>;
 }

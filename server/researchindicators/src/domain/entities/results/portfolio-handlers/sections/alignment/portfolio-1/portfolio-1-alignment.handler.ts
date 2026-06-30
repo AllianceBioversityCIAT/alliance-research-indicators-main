@@ -22,7 +22,7 @@ export class Portfolio1AlignmentHandler implements AlignmentSectionHandler {
   save(
     context: PortfolioHandlerContext,
     payload: ResultAlignmentDto,
-  ): Promise<void> {
+  ): Promise<ResultAlignmentDto> {
     return this.alignmentOperations.save(
       context.resultId,
       payload,
