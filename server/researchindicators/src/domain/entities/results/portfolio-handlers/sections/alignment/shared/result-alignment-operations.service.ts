@@ -28,7 +28,7 @@ export class ResultAlignmentOperationsService {
     resultId: number,
     alignmentData: ResultAlignmentDto,
     manager?: EntityManager,
-  ): Promise<void> {
+  ): Promise<ResultAlignmentDto> {
     const run = async (entityManager: EntityManager) => {
       const { contracts, primary_levers, contributor_levers } = alignmentData;
 
@@ -123,6 +123,7 @@ export class ResultAlignmentOperationsService {
     }
 
     await this.dataSource.transaction(run);
+    return await this.find(resultId);
   }
 
   async find(resultId: number): Promise<ResultAlignmentDto> {

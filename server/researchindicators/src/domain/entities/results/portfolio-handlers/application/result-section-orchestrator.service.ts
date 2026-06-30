@@ -6,6 +6,9 @@ import { ResultAlignmentDto } from '../../dto/result-alignment.dto';
 import { AlignmentHandlerRegistry } from '../sections/alignment/alignment-handler.registry';
 import { PortfolioUtil } from '../../../../shared/utils/portfolio.util';
 import { TrueFalseEnum } from '../../../../shared/enum/queries.enum';
+import { Result } from '../../entities/result.entity';
+import { Portfolio } from '../../../portfolios/entities/portfolio.entity';
+import { ResultsUtil } from '../../../../shared/utils/results.util';
 
 /**
  * Single delegation point from ResultsService / controller to alignment handlers.
@@ -19,14 +22,17 @@ export class ResultSectionOrchestratorService {
     private readonly dataSource: DataSource,
     private readonly alignmentRegistry: AlignmentHandlerRegistry,
     private readonly portfolioUtil: PortfolioUtil,
+    private readonly resultsUtil: ResultsUtil,
   ) {}
 
   buildContext(
     resultId: number,
     portfolioId: PortfolioIdEnum,
     manager?: EntityManager,
+    result?: Partial<Result>,
+    portfolio?: Partial<Portfolio>,
   ): PortfolioHandlerContext {
-    return { resultId, portfolioId, manager };
+    return { resultId, portfolioId, manager, result, portfolio };
   }
 
   resolvePortfolioId(): PortfolioIdEnum {
@@ -39,23 +45,29 @@ export class ResultSectionOrchestratorService {
     return portfolioId as PortfolioIdEnum;
   }
 
-  async findAlignment(resultId: number): Promise<ResultAlignmentDto> {
+  async findAlignment(resultId: number): Promise<Partial<ResultAlignmentDto>> {
     const portfolioId = this.resolvePortfolioId();
     const handler = this.alignmentRegistry.get(portfolioId);
-    return handler.find(this.buildContext(resultId, portfolioId));
+    const result = { ...(await this.resultsUtil.result) };
+    const portfolio = { ...(await this.portfolioUtil.portfolio) };
+    return handler.find(
+      this.buildContext(resultId, portfolioId, undefined, result, portfolio),
+    );
   }
 
   async saveAlignment(
     resultId: number,
     payload: ResultAlignmentDto,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
-  ): Promise<ResultAlignmentDto | void> {
+  ): Promise<Partial<ResultAlignmentDto> | void> {
     const portfolioId = this.resolvePortfolioId();
     const handler = this.alignmentRegistry.get(portfolioId);
+    const result = { ...(await this.resultsUtil.result) };
+    const portfolio = { ...(await this.portfolioUtil.portfolio) };
 
     await this.dataSource.transaction(async (manager) => {
       await handler.save(
-        this.buildContext(resultId, portfolioId, manager),
+        this.buildContext(resultId, portfolioId, manager, result, portfolio),
         payload,
       );
     });
