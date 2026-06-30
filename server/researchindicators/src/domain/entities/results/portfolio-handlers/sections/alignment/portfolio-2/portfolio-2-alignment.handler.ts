@@ -45,11 +45,11 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     const alignment = await this.alignmentOperations.save(
       context.resultId,
       payload,
-      context.manager,
+      context?.manager,
     );
 
-    delete alignment.primary_levers;
-    delete alignment.contributor_levers;
+    delete alignment?.primary_levers;
+    delete alignment?.contributor_levers;
 
     responseData = { ...alignment };
 

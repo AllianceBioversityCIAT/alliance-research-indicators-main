@@ -119,11 +119,11 @@ export class ResultAlignmentOperationsService {
 
     if (manager) {
       await run(manager);
-      return;
+      return this.find(resultId);
     }
 
     await this.dataSource.transaction(run);
-    return await this.find(resultId);
+    return this.find(resultId);
   }
 
   async find(resultId: number): Promise<ResultAlignmentDto> {
@@ -166,7 +166,7 @@ export class ResultAlignmentOperationsService {
     return {
       contracts,
       primary_levers: primaryLevers,
-      contributor_levers: levers.filter((el) => !el.is_primary),
+      contributor_levers: levers?.filter((el) => !el.is_primary),
       result_sdgs,
     };
   }
