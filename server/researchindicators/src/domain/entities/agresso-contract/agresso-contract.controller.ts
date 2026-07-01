@@ -1,7 +1,12 @@
 import { Controller, Get, Query, HttpStatus, Param } from '@nestjs/common';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ApiContractReportQueries } from './decorators/api-contract-report-queries.decorator';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { MessagePattern, Payload } from '@nestjs/microservices';
@@ -220,8 +225,7 @@ export class AgressoContractController {
     summary: 'Geographic scope report for results linked to a primary contract',
   })
   @ApiContractReportQueries({
-    limitDescription:
-      'Top N regions, countries and sub-nationals per country',
+    limitDescription: 'Top N regions, countries and sub-nationals per country',
   })
   async getGeoScopeReport(
     @Query('contract-id') contractId: string,
