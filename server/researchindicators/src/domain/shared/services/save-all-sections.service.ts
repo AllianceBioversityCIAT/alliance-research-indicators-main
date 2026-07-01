@@ -29,7 +29,7 @@ export class SaveResultService {
     private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
-  ) { }
+  ) {}
 
   public async bulkSaveAllSections(
     results: ExternalMappersDto[],
@@ -62,7 +62,7 @@ export class SaveResultService {
       });
 
       const snapshotMessage =
-        (result?.is_version_applied ?? false
+        ((result?.is_version_applied ?? false)
           ? 'is a snapshot'
           : 'is a live version') +
         ' from year ' +

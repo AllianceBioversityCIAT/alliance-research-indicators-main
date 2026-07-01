@@ -43,7 +43,7 @@ import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 export class AgressoContractController {
   constructor(
     private readonly agressoContractService: AgressoContractService,
-  ) {}
+  ) { }
 
   @Get()
   @ApiQuery({ name: 'project', required: false, description: 'Project ID' })

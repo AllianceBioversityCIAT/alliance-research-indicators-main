@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import {
   PrmsKnowledgeProductDto,
   PrmsTemporalResponseMapper,
-  ResultResponseMapper,
   SearcherResponseDto,
 } from './dto/prms-response.dto';
 import { HttpService } from '@nestjs/axios';
@@ -49,7 +48,8 @@ import { PrmsRepository } from './repositories/prms.repository';
 
 @Injectable()
 export class PrmsOpenSearchService
-  implements ExternalMappersInterface<ExternalMappersDto> {
+  implements ExternalMappersInterface<ExternalMappersDto>
+{
   private readonly logger = new LoggerUtil({
     name: PrmsOpenSearchService.name,
   });
@@ -67,7 +67,7 @@ export class PrmsOpenSearchService
     private readonly syncProcessLogService: SyncProcessLogService,
     private readonly saveResultService: SaveResultService,
     private readonly prmsRepository: PrmsRepository,
-  ) { }
+  ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
     for (const result of res) {
@@ -196,13 +196,18 @@ export class PrmsOpenSearchService
           this.httpService.get<SearcherResponseDto>(prmsUrl),
         ).then((response) => response.data);
         response.data.forEach(async (item) => {
-          await this.dataSource.getRepository(PrmsTemporalResultsEntity).save({
-            code: parseInt(item.result_code),
-            year: parseInt(item.year),
-            data: item,
-          }).catch((error) => {
-            this.logger.error(`Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`);
-          });
+          await this.dataSource
+            .getRepository(PrmsTemporalResultsEntity)
+            .save({
+              code: parseInt(item.result_code),
+              year: parseInt(item.year),
+              data: item,
+            })
+            .catch((error) => {
+              this.logger.error(
+                `Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`,
+              );
+            });
         });
 
         if (page >= response.totalPages) {
@@ -225,8 +230,7 @@ export class PrmsOpenSearchService
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
       this.logger.error(`Error getting data from PRMS: ${error.message}`);
-    }
-    finally {
+    } finally {
       await this.prmsRepository.deleteTemporalResults();
     }
   }

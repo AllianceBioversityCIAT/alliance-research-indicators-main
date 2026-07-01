@@ -23,4 +23,4 @@ import { PrmsRepository } from './repositories/prms.repository';
     SyncProcessLogModule,
   ],
 })
-export class PrmsOpenSearchModule { }
+export class PrmsOpenSearchModule {}

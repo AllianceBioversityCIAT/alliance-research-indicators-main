@@ -14,7 +14,10 @@ import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clar
 import { SyncProcessLogService } from '../../../entities/sync-process-log/sync-process-log.service';
 import { ExternalMappersDto } from '../../../shared/global-dto/external-mappers.dto';
 import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
-import { ResultResponseMapper, PrmsTemporalResponseMapper } from './dto/prms-response.dto';
+import {
+  ResultResponseMapper,
+  PrmsTemporalResponseMapper,
+} from './dto/prms-response.dto';
 import { ResultTypeEnum } from './enum/rsult-type.enum';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
 import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
