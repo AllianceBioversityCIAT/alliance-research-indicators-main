@@ -340,6 +340,7 @@ export class AgressoContractRepository
       [OrderFieldsEnum.LEAD_CENTER]: 'ac.ubwClientDescription',
       [OrderFieldsEnum.LEVER]: 'cl.id',
       [OrderFieldsEnum.COUNT_RESULTS]: 'contract_total_results',
+      [OrderFieldsEnum.POOL_FUNDING_CONTRIBUTOR]: 'ac.is_pool_funding_contributor',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
