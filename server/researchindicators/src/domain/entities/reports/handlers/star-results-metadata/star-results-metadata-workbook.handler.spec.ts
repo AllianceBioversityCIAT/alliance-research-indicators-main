@@ -50,13 +50,13 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
     findActiveSheets.mockResolvedValue([
       {
-        sheet_key: STAR_RESULTS_METADATA_SHEET_KEYS.DATA_DICTIONARY,
-        sheet_name: 'Dict',
+        sheet_key: STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
+        sheet_name: 'Raw',
         sort_order: 1,
       },
       {
-        sheet_key: STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
-        sheet_name: 'Raw',
+        sheet_key: STAR_RESULTS_METADATA_SHEET_KEYS.DATA_DICTIONARY,
+        sheet_name: 'Dict',
         sort_order: 2,
       },
     ]);
@@ -119,6 +119,12 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     });
     const spec = await handler.buildWorkbookSpec(baseFilters);
     expect(spec.sheets).toHaveLength(2);
+    expect(spec.sheets[0].sheetKey).toBe(
+      STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
+    );
+    expect(spec.sheets[1].sheetKey).toBe(
+      STAR_RESULTS_METADATA_SHEET_KEYS.DATA_DICTIONARY,
+    );
     const raw = spec.sheets.find(
       (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
     );
@@ -151,7 +157,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(byKey.get('start_date')?.cellDataType).toBe('date');
     expect(byKey.get('end_date')?.cellDataType).toBe('date');
     expect(byKey.get('result_code')?.cellDataType).toBeUndefined();
-    expect(raw!.columns).toHaveLength(71);
+    expect(raw!.columns).toHaveLength(74);
     expect(
       raw!.columns.find((c) => c.key === 'training_engagement_report')?.header,
     ).toBe('Training type');

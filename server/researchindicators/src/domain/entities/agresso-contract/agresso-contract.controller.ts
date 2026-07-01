@@ -21,6 +21,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { ApiContractReportQueries } from './decorators/api-contract-report-queries.decorator';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { AgressoFindNamePayload } from './dto/agresso-find-options.payload';
@@ -124,6 +125,149 @@ export class AgressoContractController {
       .then((response) =>
         ResponseUtils.format({
           description: 'Contracts found',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get('reports/top-primary-levers')
+  @ApiOperation({
+    summary: 'Top primary levers for results linked to a primary contract',
+  })
+  @ApiContractReportQueries({ limitDescription: 'Top N primary levers' })
+  async getTopPrimaryLeversReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getTopPrimaryLeversReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract top primary levers report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get('reports/top-contributors-contracts')
+  @ApiOperation({
+    summary:
+      'Top contributor contracts linked to results where the given contract is primary',
+  })
+  @ApiContractReportQueries({
+    contractIdDescription:
+      'Primary contract agreement id used to filter results',
+    limitDescription: 'Top N contributor contracts',
+  })
+  async getTopContributorsReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getTopContributorsReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract top contributors report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get('reports/top-main-contact-persons')
+  @ApiOperation({
+    summary:
+      'Top main contact persons for results linked to a primary contract',
+  })
+  @ApiContractReportQueries({
+    limitDescription: 'Top N main contact persons',
+  })
+  async getTopMainContactPersonsReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getTopMainContactPersonsReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract top main contact persons report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get('reports/contract-staff')
+  @ApiOperation({
+    summary: 'Project staff members assigned to a contract',
+  })
+  @ApiContractReportQueries({
+    contractIdDescription: 'Contract agreement id',
+  })
+  async getContractStaffReport(@Query('contract-id') contractId: string) {
+    return this.agressoContractService
+      .getContractStaffReport(contractId)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract staff report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get('reports/top-partners')
+  @ApiOperation({
+    summary:
+      'Top partner institutions for results linked to a primary contract',
+  })
+  @ApiContractReportQueries({
+    limitDescription: 'Top N partner institutions',
+  })
+  async getTopPartnersReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getTopPartnersReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract top partners report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get('reports/geo-scope')
+  @ApiOperation({
+    summary: 'Geographic scope report for results linked to a primary contract',
+  })
+  @ApiContractReportQueries({
+    limitDescription:
+      'Top N regions, countries and sub-nationals per country',
+  })
+  async getGeoScopeReport(
+    @Query('contract-id') contractId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = isEmpty(limit) ? undefined : Number(limit);
+
+    return this.agressoContractService
+      .getGeoScopeReport(contractId, parsedLimit)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract geographic scope report generated',
           status: HttpStatus.OK,
           data: response,
         }),

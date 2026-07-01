@@ -58,7 +58,7 @@ describe('SaveResultService', () => {
     appliedVersion: true,
     counters,
     resultSaved: [] as number[],
-    currentCode: null as number | null,
+    currentCode: { current: 0 },
   });
 
   const tipExtraData = (counters = new CounterResults()) => ({
@@ -66,7 +66,7 @@ describe('SaveResultService', () => {
     appliedVersion: false,
     counters,
     resultSaved: [] as number[],
-    currentCode: null as number | null,
+    currentCode: { current: 0 },
   });
 
   beforeEach(async () => {
@@ -172,6 +172,7 @@ describe('SaveResultService', () => {
       const secondCallOpts = resultsService.createResult.mock.calls[1][2];
       expect(firstCallOpts.isSnapshot).toBe(false);
       expect(secondCallOpts.isSnapshot).toBe(true);
+      expect(extraData.currentCode.current).toBe(7001);
     });
 
     it('should not mark snapshot when appliedVersion is false even if official code repeats', async () => {
@@ -233,6 +234,49 @@ describe('SaveResultService', () => {
         false,
       );
       expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('should mark snapshot on update when PRMS official code repeats in bulk', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 9,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      const dtoSnapshot = minimalResultDto();
+      const counters = new CounterResults();
+      const extraData = prmsExtraData(counters);
+
+      await service.bulkSaveAllSections([dto, dtoSnapshot], extraData);
+
+      expect(resultsService.updateInactiveResult).toHaveBeenCalledTimes(2);
+      expect(resultsService.updateInactiveResult.mock.calls[0]).toEqual([
+        9,
+        false,
+      ]);
+      expect(resultsService.updateInactiveResult.mock.calls[1]).toEqual([
+        9,
+        true,
+      ]);
+    });
+
+    it('should not mark snapshot on update when appliedVersion is false', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 11,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      const dtoDuplicate = minimalResultDto();
+      const counters = new CounterResults();
+
+      await service.bulkSaveAllSections(
+        [dto, dtoDuplicate],
+        tipExtraData(counters),
+      );
+
+      expect(resultsService.updateInactiveResult).toHaveBeenCalledTimes(2);
+      for (const call of resultsService.updateInactiveResult.mock.calls) {
+        expect(call).toEqual([11, false]);
+      }
     });
 
     it('should increment error counter and rollback on failure after create', async () => {

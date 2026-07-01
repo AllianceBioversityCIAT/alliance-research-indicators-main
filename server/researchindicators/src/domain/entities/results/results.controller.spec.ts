@@ -93,10 +93,12 @@ describe('ResultsController', () => {
           provide: DataSource,
           useValue: mockDataSource,
         },
-        ResultStatusGuard,
         SetUpInterceptor,
       ],
-    }).compile();
+    })
+      .overrideGuard(ResultStatusGuard)
+      .useValue({ canActivate: jest.fn().mockResolvedValue(true) })
+      .compile();
 
     controller = module.get<ResultsController>(ResultsController);
     service = module.get(ResultsService);

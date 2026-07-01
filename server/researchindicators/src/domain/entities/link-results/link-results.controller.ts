@@ -4,6 +4,7 @@ import {
   Get,
   HttpStatus,
   Patch,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { LinkResultsService } from './link-results.service';
@@ -16,6 +17,7 @@ import { ServiceResponseDto } from '../../shared/global-dto/service-response.dto
 import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 @ApiTags('Results')
 @ApiBearerAuth()
@@ -49,6 +51,7 @@ export class LinkResultsController {
   }
 
   @Patch(`details/${RESULT_CODE}`)
+  @UseGuards(ResultStatusGuard)
   @ApiBody({ type: CreateLinkResultDto })
   @GetResultVersion()
   async patchLinkResultsDetails(@Body() body: CreateLinkResultDto) {

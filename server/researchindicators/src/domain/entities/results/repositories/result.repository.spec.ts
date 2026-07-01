@@ -4,6 +4,10 @@ import { AppConfig } from '../../../shared/utils/app-config.util';
 import { FindAllOptions } from '../../../shared/enum/find-all-options';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { ResultSortEnum } from '../enum/result-sort.enum';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
+import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
+import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 
 describe('ResultRepository', () => {
   let repository: ResultRepository;
@@ -357,6 +361,238 @@ describe('ResultRepository', () => {
         'UPDATE sec_users SET carnet = ? WHERE sec_user_id = ?',
         ['NEW', 4],
       );
+    });
+  });
+
+  const emptyFindResultsV2Filters = () => ({
+    status: [] as ResultStatusEnum[],
+    contracts: [] as string[],
+    years: [] as string[],
+    sources: [] as ReportingPlatformEnum[],
+    indicators: [] as IndicatorsEnum[],
+    currentUser: { onlyOwnResults: false, userId: 42 },
+  });
+
+  describe('findResultsV2 public link SQL helpers', () => {
+    it('buildFindResultsV2BuiltPublicLinkSqlExpression returns NULL until built URLs are defined', () => {
+      expect(
+        repository['buildFindResultsV2BuiltPublicLinkSqlExpression'](),
+      ).toBe('NULL');
+    });
+
+    it('buildFindResultsV2PublicLinkSqlExpression uses PRMS/TIP column and built branch', () => {
+      const expr = repository['buildFindResultsV2PublicLinkSqlExpression']();
+      expect(expr).toContain("r.platform_code IN ('PRMS', 'TIP')");
+      expect(expr).toContain('r.public_link');
+      expect(expr).toContain('NULL');
+    });
+
+    it('buildFindResultsV2SearchStaticWhereFragment matches on effective public_link and cgspace_link', () => {
+      const where = repository['buildFindResultsV2SearchStaticWhereFragment']();
+      expect(where).toContain('ro.cgspace_link LIKE CONCAT');
+      expect(where).toMatch(
+        /\(IF\([\s\S]*r\.public_link[\s\S]*NULL[\s\S]*\)\) LIKE CONCAT/,
+      );
+    });
+
+    it('buildFindResultsV2SearchRelevanceSelectFragment scores effective public_link and cgspace_link', () => {
+      const relevance = repository[
+        'buildFindResultsV2SearchRelevanceSelectFragment'
+      ](['anna']);
+      expect(relevance).toContain('ro.cgspace_link LIKE CONCAT');
+      expect(relevance).toMatch(
+        /CASE WHEN \(IF\([\s\S]*r\.public_link[\s\S]*\) LIKE CONCAT\('%', \?, '%'\) THEN 500/,
+      );
+      expect(relevance).toContain('_search_relevance');
+    });
+
+    it('splitFindResultsV2CreatorNameTokens splits on whitespace', () => {
+      expect(
+        repository['splitFindResultsV2CreatorNameTokens']('  david   casanas '),
+      ).toEqual(['david', 'casanas']);
+    });
+
+    it('splitFindResultsV2CreatorNameTokens falls back to full search when empty after trim', () => {
+      expect(repository['splitFindResultsV2CreatorNameTokens']('   ')).toEqual([
+        '   ',
+      ]);
+    });
+  });
+
+  describe('findResultsV2', () => {
+    it('joins result_oicrs and selects cgspace_link', async () => {
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
+      await repository.findResultsV2(
+        '',
+        undefined,
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
+      const mainSql = querySpy.mock.calls[1][0] as string;
+      expect(mainSql).toContain(
+        'LEFT JOIN result_oicrs ro ON ro.result_id = r.result_id',
+      );
+      expect(mainSql).toContain('ro.cgspace_link');
+      expect(mainSql).toMatch(/IF\([\s\S]*AS public_link/);
+    });
+
+    it('omits search fragments when search is empty', async () => {
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
+      await repository.findResultsV2(
+        '',
+        undefined,
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
+      const countSql = querySpy.mock.calls[0][0] as string;
+      const mainSql = querySpy.mock.calls[1][0] as string;
+      expect(countSql).not.toContain('ro.cgspace_link LIKE');
+      expect(mainSql).not.toContain('_search_relevance');
+      expect(querySpy.mock.calls[0][1]).toEqual([]);
+      expect(querySpy.mock.calls[1][1]).toEqual([100, 0]);
+    });
+
+    it('includes public_link and cgspace_link search with aligned placeholder counts', async () => {
+      const search = '10568/12345';
+      const staticWhereCount =
+        ResultRepository[
+          'FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT'
+        ];
+      const staticRelevanceCount =
+        ResultRepository[
+          'FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT'
+        ];
+      querySpy
+        .mockResolvedValueOnce([{ total: 1 }])
+        .mockResolvedValueOnce([{ result_id: 1, _search_relevance: 500 }]);
+      await repository.findResultsV2(
+        search,
+        { page: 1, limit: 10 },
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
+      const countParams = querySpy.mock.calls[0][1] as unknown[];
+      const mainParams = querySpy.mock.calls[1][1] as unknown[];
+      const countSql = querySpy.mock.calls[0][0] as string;
+      const mainSql = querySpy.mock.calls[1][0] as string;
+
+      expect(countSql).toContain('ro.cgspace_link LIKE CONCAT');
+      expect(mainSql).toContain('ORDER BY _search_relevance DESC');
+      expect(countParams).toHaveLength(staticWhereCount + 2);
+      expect(countParams.every((p) => p === search)).toBe(true);
+      expect(mainParams).toHaveLength(
+        staticRelevanceCount + staticWhereCount + 4 + 2,
+      );
+      expect(
+        mainParams.slice(0, staticRelevanceCount).every((p) => p === search),
+      ).toBe(true);
+      expect(
+        mainParams
+          .slice(staticRelevanceCount, staticRelevanceCount + staticWhereCount)
+          .every((p) => p === search),
+      ).toBe(true);
+      expect(mainParams.slice(-2)).toEqual([10, 0]);
+    });
+
+    it('binds creator-name tokens separately for multi-word search', async () => {
+      const staticWhereCount =
+        ResultRepository[
+          'FIND_RESULTS_V2_SEARCH_STATIC_WHERE_PLACEHOLDER_COUNT'
+        ];
+      const staticRelevanceCount =
+        ResultRepository[
+          'FIND_RESULTS_V2_SEARCH_STATIC_RELEVANCE_PLACEHOLDER_COUNT'
+        ];
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
+      await repository.findResultsV2(
+        'john doe',
+        undefined,
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
+      const countParams = querySpy.mock.calls[0][1] as unknown[];
+      const mainParams = querySpy.mock.calls[1][1] as unknown[];
+      const countSql = querySpy.mock.calls[0][0] as string;
+      const creatorWhereOffset = staticWhereCount;
+
+      expect(countSql).toContain('su.first_name LIKE');
+      expect(countParams).toHaveLength(staticWhereCount + 4);
+      expect(
+        countParams.slice(0, staticWhereCount).every((p) => p === 'john doe'),
+      ).toBe(true);
+      expect(countParams.slice(creatorWhereOffset)).toEqual([
+        'john',
+        'john',
+        'doe',
+        'doe',
+      ]);
+      const creatorRelevanceEnd = staticRelevanceCount + 4;
+      const creatorWhereStart = creatorRelevanceEnd + staticWhereCount;
+      expect(
+        mainParams.slice(staticRelevanceCount, creatorRelevanceEnd),
+      ).toEqual(['john', 'john', 'doe', 'doe']);
+      expect(
+        mainParams.slice(creatorWhereStart, creatorWhereStart + 4),
+      ).toEqual(['john', 'john', 'doe', 'doe']);
+    });
+
+    it('strips _search_relevance from returned rows when search is provided', async () => {
+      querySpy
+        .mockResolvedValueOnce([{ total: 1 }])
+        .mockResolvedValueOnce([
+          { result_id: 9, title: 'T', _search_relevance: 2000 },
+        ]);
+      const out = await repository.findResultsV2(
+        'STAR-1',
+        undefined,
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
+      expect(out.data[0]).toEqual({ result_id: 9, title: 'T' });
+      expect(out.data[0]).not.toHaveProperty('_search_relevance');
+    });
+
+    it('applies onlyOwnResults filter in SQL', async () => {
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
+      const filters = emptyFindResultsV2Filters();
+      filters.currentUser.onlyOwnResults = true;
+      await repository.findResultsV2('', undefined, undefined, filters);
+      const mainSql = querySpy.mock.calls[1][0] as string;
+      expect(mainSql).toContain('AND r.created_by = 42');
+    });
+
+    it('uses custom sort when search is absent', async () => {
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
+      await repository.findResultsV2(
+        '',
+        { page: 2, limit: 5 },
+        { field: ResultSortEnum.RESULT_TITLE, order: 'DESC' },
+        emptyFindResultsV2Filters(),
+      );
+      const mainSql = querySpy.mock.calls[1][0] as string;
+      expect(mainSql).toContain('ORDER BY r.title DESC');
+      expect(querySpy.mock.calls[1][1]).toEqual([5, 5]);
+    });
+
+    it('returns pagination metadata from count query', async () => {
+      querySpy
+        .mockResolvedValueOnce([{ total: 25 }])
+        .mockResolvedValueOnce([{ result_id: 1 }, { result_id: 2 }]);
+      const out = await repository.findResultsV2(
+        '',
+        { page: 2, limit: 10 },
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
+      expect(out.pagination).toEqual({
+        total: 25,
+        page: 2,
+        limit: 10,
+        pageSize: 2,
+        totalPages: 3,
+        hasNextPage: true,
+        hasPreviousPage: true,
+      });
     });
   });
 });

@@ -145,7 +145,13 @@ describe('ResultStatusWorkflowService', () => {
 
     it('should return enriched statuses with transition_direction when showOnlyWorkflow is false', async () => {
       mockWorkflowFind
-        .mockResolvedValueOnce([{ to_status_id: 2, is_active: true }])
+        .mockResolvedValueOnce([
+          {
+            to_status_id: 2,
+            is_active: true,
+            is_status_change_validation_required: true,
+          },
+        ])
         .mockResolvedValueOnce([]);
       mockStatusFind.mockResolvedValue([
         { result_status_id: 2, is_active: true },
@@ -156,7 +162,13 @@ describe('ResultStatusWorkflowService', () => {
         1,
       );
 
-      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual([
+        expect.objectContaining({
+          result_status_id: 2,
+          transition_direction: expect.any(String),
+          is_status_change_validation_required: true,
+        }),
+      ]);
     });
 
     it('should return empty array when no to-statuses are found', async () => {
@@ -171,6 +183,90 @@ describe('ResultStatusWorkflowService', () => {
       );
 
       expect(result).toEqual([]);
+    });
+
+    it('should default is_status_change_validation_required to false when absent on workflow', async () => {
+      mockWorkflowFind
+        .mockResolvedValueOnce([{ to_status_id: 2, is_active: true }])
+        .mockResolvedValueOnce([]);
+      mockStatusFind.mockResolvedValue([
+        { result_status_id: 2, is_active: true, name: 'Review' },
+      ]);
+
+      const result = await service.getConfigWorkflowByIndicatorAndFromStatus(
+        1,
+        1,
+      );
+
+      expect(result[0].is_status_change_validation_required).toBe(false);
+    });
+
+    it('should map is_status_change_validation_required per destination status', async () => {
+      mockWorkflowFind
+        .mockResolvedValueOnce([
+          {
+            to_status_id: 2,
+            is_status_change_validation_required: true,
+          },
+          {
+            to_status_id: 3,
+            is_status_change_validation_required: false,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+      mockStatusFind.mockResolvedValue([
+        { result_status_id: 2, is_active: true },
+        { result_status_id: 3, is_active: true },
+      ]);
+
+      const result = await service.getConfigWorkflowByIndicatorAndFromStatus(
+        1,
+        1,
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        result_status_id: 2,
+        is_status_change_validation_required: true,
+      });
+      expect(result[1]).toMatchObject({
+        result_status_id: 3,
+        is_status_change_validation_required: false,
+      });
+    });
+
+    it('should include is_status_change_validation_required on raw workflow when showOnlyWorkflow is true', async () => {
+      const mockStatuses = [
+        {
+          to_status_id: 2,
+          indicator_id: 1,
+          from_status_id: 1,
+          is_status_change_validation_required: true,
+        },
+      ];
+      mockWorkflowFind.mockResolvedValue(mockStatuses);
+
+      const result = await service.getConfigWorkflowByIndicatorAndFromStatus(
+        1,
+        1,
+        true,
+      );
+
+      expect(result[0].is_status_change_validation_required).toBe(true);
+    });
+
+    it('should query workflows by indicator and from status', async () => {
+      mockWorkflowFind.mockResolvedValue([]);
+
+      await service.getConfigWorkflowByIndicatorAndFromStatus(5, 10);
+
+      expect(mockWorkflowFind).toHaveBeenCalledWith({
+        where: {
+          indicator_id: 5,
+          is_active: true,
+          from_status_id: 10,
+        },
+      });
     });
   });
 
@@ -194,6 +290,33 @@ describe('ResultStatusWorkflowService', () => {
         expect.objectContaining({ where: { result_id: 10, is_active: true } }),
       );
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should propagate is_status_change_validation_required for next steps', async () => {
+      mockResultFindOne.mockResolvedValue({
+        indicator_id: 1,
+        result_status_id: 2,
+      });
+      mockWorkflowFind
+        .mockResolvedValueOnce([
+          {
+            to_status_id: 3,
+            is_status_change_validation_required: true,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+      mockStatusFind.mockResolvedValue([
+        { result_status_id: 3, is_active: true },
+      ]);
+
+      const result = await service.getNextStepsByResultId(10);
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          result_status_id: 3,
+          is_status_change_validation_required: true,
+        }),
+      ]);
     });
   });
 

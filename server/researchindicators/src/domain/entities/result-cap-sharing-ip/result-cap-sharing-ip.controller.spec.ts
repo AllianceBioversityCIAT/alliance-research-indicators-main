@@ -5,6 +5,7 @@ import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.serv
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 
 jest.mock('../../shared/utils/response.utils');
 
@@ -32,7 +33,10 @@ describe('ResultCapSharingIpController', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(ResultStatusGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
     controller = module.get(ResultCapSharingIpController);
   });
 

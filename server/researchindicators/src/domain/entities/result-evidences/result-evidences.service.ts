@@ -10,6 +10,7 @@ import { UpdateDataUtil } from '../../shared/utils/update-data.util';
 import { ResultNotableReferencesService } from '../result-notable-references/result-notable-references.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultOicr } from '../result-oicr/entities/result-oicr.entity';
 @Injectable()
 export class ResultEvidencesService extends BaseServiceSimple<
   ResultEvidence,
@@ -53,6 +54,10 @@ export class ResultEvidencesService extends BaseServiceSimple<
           filterNotableReferences ?? [],
           ['notable_reference_type_id', 'link'],
         );
+
+        await this.dataSource
+          .getRepository(ResultOicr)
+          .update(resultId, { cgspace_link: resultEvidences?.cgspace_link });
       }
 
       return await this.create(
@@ -83,9 +88,21 @@ export class ResultEvidencesService extends BaseServiceSimple<
     const returnEvidences = {
       evidence: resultEvidences,
       notable_references: null,
+      cgspace_link: null,
     };
 
     if (this._resultsUtil.indicatorId == IndicatorsEnum.OICR) {
+      const oicr = await this.dataSource.getRepository(ResultOicr).findOne({
+        select: {
+          cgspace_link: true,
+        },
+        where: {
+          result_id: resultId,
+          is_active: true,
+        },
+      });
+      returnEvidences.cgspace_link = oicr?.cgspace_link;
+
       const notableReferences =
         await this.resultNotableReferencesService.find(resultId);
       returnEvidences.notable_references = notableReferences;

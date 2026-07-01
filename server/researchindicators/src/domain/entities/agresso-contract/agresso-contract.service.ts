@@ -16,6 +16,12 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { OpenSearchAgressoContractApi } from '../../tools/open-search/agresso-contract/agresso-contract.opensearch.api';
+import { AppConfig } from '../../shared/utils/app-config.util';
+import {
+  ContractTopPrimaryLeversReportDto,
+  PrimaryLeverCountDto,
+} from './dto/reports-primary-levers.dto';
+import { resolveLeverIconUrl } from '../../tools/clarisa/entities/clarisa-levers/lever-icon.util';
 
 @Injectable()
 export class AgressoContractService {
@@ -30,6 +36,7 @@ export class AgressoContractService {
     // ResultOicrService forwardRef empty-shell cycle. Lazy-resolved at the
     // single usage site via moduleRef instead. See design.md §3.4.
     private readonly moduleRef: ModuleRef,
+    private readonly appConfig: AppConfig,
   ) {}
 
   async findContracts(
@@ -138,5 +145,68 @@ export class AgressoContractService {
       fundingType === 'BLR' || fundingType === 'BILATERAL';
 
     return isBilateralFunding && !hasActivePooledFundingContract;
+  }
+
+  async getGeoScopeReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getGeoScopeReport(contractId, limit);
+  }
+
+  async getTopPartnersReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getTopPartnersReport(
+      contractId,
+      limit,
+    );
+  }
+
+  async getTopContributorsReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getTopContributorsReport(
+      contractId,
+      limit,
+    );
+  }
+
+  async getTopMainContactPersonsReport(contractId: string, limit?: number) {
+    return this._agressoContractRepository.getTopMainContactPersonsReport(
+      contractId,
+      limit,
+    );
+  }
+
+  async getContractStaffReport(contractId: string) {
+    return this._agressoContractRepository.getContractStaffReport(contractId);
+  }
+
+  async getTopPrimaryLeversReport(
+    contractId: string,
+    limit?: number,
+  ): Promise<ContractTopPrimaryLeversReportDto> {
+    const report =
+      await this._agressoContractRepository.getTopPrimaryLeversReport(
+        contractId,
+        limit,
+      );
+
+    return {
+      ...report,
+      top_primary_levers: report.top_primary_levers.map((lever) =>
+        this.mapPrimaryLeverWithIcon(lever),
+      ),
+    };
+  }
+
+  private mapPrimaryLeverWithIcon(
+    lever: PrimaryLeverCountDto,
+  ): PrimaryLeverCountDto {
+    return {
+      lever_id: Number(lever.lever_id),
+      short_name: lever.short_name,
+      full_name: lever.full_name,
+      count: Number(lever.count),
+      icon: resolveLeverIconUrl(this.appConfig.BUCKET_URL, {
+        shortName: lever.short_name,
+        fullName: lever.full_name,
+        leverId: Number(lever.lever_id),
+      }),
+    };
   }
 }

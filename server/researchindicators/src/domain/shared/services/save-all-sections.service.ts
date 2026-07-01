@@ -48,9 +48,9 @@ export class SaveResultService {
     let isNewCode = false;
     if (
       extraData?.appliedVersion &&
-      extraData?.currentCode !== result.official_code
+      extraData?.currentCode?.current !== result.official_code
     ) {
-      extraData.currentCode = result.official_code;
+      extraData.currentCode.current = result.official_code;
       isNewCode = true;
     }
 
@@ -97,7 +97,7 @@ export class SaveResultService {
       } else {
         await this._resultsService.updateInactiveResult(
           findResult.result_id,
-          !isNewCode,
+          extraData?.appliedVersion ? !isNewCode : false,
         );
         this.logger.debug(
           `Updating result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}, ${snapshotMessage}`,
@@ -185,7 +185,7 @@ export class SaveResultService {
 
 export type ExtraData = {
   resultSaved?: number[];
-  currentCode?: number;
+  currentCode?: { current: number };
   appliedVersion?: boolean;
   counters?: CounterResults;
   platformCode?: ReportingPlatformEnum;

@@ -156,6 +156,9 @@ export class ResultStatusWorkflowService {
     if (showOnlyWorkflow) return statuses;
 
     const toStatusIds = statuses.map((el) => el.to_status_id);
+    const workflowByToStatusId = new Map(
+      statuses.map((w) => [w.to_status_id, w]),
+    );
     const [toStatuses, depthMap] = await Promise.all([
       this.getStatusesByIds(toStatusIds),
       this.getStatusDepthMapByIndicatorId(indicatorId),
@@ -175,6 +178,9 @@ export class ResultStatusWorkflowService {
           s.result_status_id,
           depthMap,
         ),
+        is_status_change_validation_required:
+          workflowByToStatusId.get(s.result_status_id)
+            ?.is_status_change_validation_required ?? false,
       }));
   }
 
