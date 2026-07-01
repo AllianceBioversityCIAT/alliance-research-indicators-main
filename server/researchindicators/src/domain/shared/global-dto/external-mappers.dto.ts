@@ -12,6 +12,7 @@ export abstract class ExternalMappersInterface<T> {
 }
 
 export class ExternalMappersDto {
+  is_version_applied?: boolean;
   official_code: number;
   resultOfficialCode: number;
   external_link: string;

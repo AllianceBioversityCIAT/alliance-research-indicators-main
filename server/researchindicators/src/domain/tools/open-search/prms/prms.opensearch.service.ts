@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   PrmsKnowledgeProductDto,
+  PrmsTemporalResponseMapper,
   ResultResponseMapper,
   SearcherResponseDto,
 } from './dto/prms-response.dto';
@@ -43,11 +44,12 @@ import { CounterResults } from '../../tip-integration/dto/response-year-tip.dto'
 import { SyncProcessLogService } from '../../../entities/sync-process-log/sync-process-log.service';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
+import { PrmsTemporalResultsEntity } from './entities/prms-temporal-results.entity';
+import { PrmsRepository } from './repositories/prms.repository';
 
 @Injectable()
 export class PrmsOpenSearchService
-  implements ExternalMappersInterface<ExternalMappersDto>
-{
+  implements ExternalMappersInterface<ExternalMappersDto> {
   private readonly logger = new LoggerUtil({
     name: PrmsOpenSearchService.name,
   });
@@ -64,7 +66,8 @@ export class PrmsOpenSearchService
     private readonly clarisaLeversService: ClarisaLeversService,
     private readonly syncProcessLogService: SyncProcessLogService,
     private readonly saveResultService: SaveResultService,
-  ) {}
+    private readonly prmsRepository: PrmsRepository,
+  ) { }
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
     for (const result of res) {
@@ -174,36 +177,58 @@ export class PrmsOpenSearchService
     let keepGoing = true;
     const currentCode: { current: number } = { current: null };
     const resultSaved: number[] = [];
-    const syncProcessLog = await this.syncProcessLogService.initiateSync(
-      SyncProcessEnum.PRMS_INTEGRATION,
-    );
-    while (keepGoing) {
-      const counters: CounterResults = new CounterResults();
-      const centerAcronym = ['ABC', 'ABC RH'];
-      let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&fundingType=Result&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
-      if (!isEmpty(year)) {
-        prmsUrl += `&year=${year}`;
+    const counters: CounterResults = {
+      createdRecords: 0,
+      updatedRecords: 0,
+      errorRecords: 0,
+    };
+    try {
+      const syncProcessLog = await this.syncProcessLogService.initiateSync(
+        SyncProcessEnum.PRMS_INTEGRATION,
+      );
+      while (keepGoing) {
+        const centerAcronym = ['ABC', 'ABC RH'];
+        let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&fundingType=Result&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
+        if (!isEmpty(year)) {
+          prmsUrl += `&year=${year}`;
+        }
+        const response = await firstValueFrom(
+          this.httpService.get<SearcherResponseDto>(prmsUrl),
+        ).then((response) => response.data);
+        response.data.forEach(async (item) => {
+          await this.dataSource.getRepository(PrmsTemporalResultsEntity).save({
+            code: parseInt(item.result_code),
+            year: parseInt(item.year),
+            data: item,
+          }).catch((error) => {
+            this.logger.error(`Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`);
+          });
+        });
+
+        if (page >= response.totalPages) {
+          keepGoing = false;
+        }
+
+        page++;
       }
-      const response = await firstValueFrom(
-        this.httpService.get<SearcherResponseDto>(prmsUrl),
-      ).then((response) => response.data);
-      const dataProcessed = await this.processData(response.data);
+      const prmsResults = await this.prmsRepository.findTemporalResults();
+
+      const dataProcessed = await this.processData(prmsResults);
+
       await this.saveResultService.bulkSaveAllSections(dataProcessed, {
         platformCode: ReportingPlatformEnum.PRMS,
         resultSaved,
         currentCode,
         counters,
-        appliedVersion: true,
       });
-
-      if (page >= response.totalPages) {
-        keepGoing = false;
-      }
-
-      page++;
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
+      await this.syncProcessLogService.endSync(syncProcessLog.id);
+    } catch (error) {
+      this.logger.error(`Error getting data from PRMS: ${error.message}`);
     }
-    await this.syncProcessLogService.endSync(syncProcessLog.id);
+    finally {
+      await this.prmsRepository.deleteTemporalResults();
+    }
   }
 
   private processKnowledgeProduct(
@@ -251,10 +276,12 @@ export class PrmsOpenSearchService
   }
 
   async processData(
-    data: ResultResponseMapper[],
+    prmsData: PrmsTemporalResponseMapper[],
   ): Promise<ExternalMappersDto[]> {
     const results: ExternalMappersDto[] = [];
-    for (const item of data) {
+    for (const data of prmsData) {
+      const isVersion = data.is_version ?? false;
+      const item = data.data;
       const indicator = IndicatorHomologation[item.indicator_category.code];
       if (!indicator) {
         this.logger.warn(
@@ -264,6 +291,7 @@ export class PrmsOpenSearchService
       }
       const result = new ExternalMappersDto();
       result.official_code = parseInt(item.result_code);
+      result.is_version_applied = isVersion;
       result.external_link = item?.prms_link;
       result.public_link = item?.pdf_link;
       result.created_at = item?.created_date;

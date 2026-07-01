@@ -29,7 +29,7 @@ export class SaveResultService {
     private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
-  ) {}
+  ) { }
 
   public async bulkSaveAllSections(
     results: ExternalMappersDto[],
@@ -45,14 +45,6 @@ export class SaveResultService {
     extraData?: ExtraData,
   ) {
     let typeCounter: CounterResultsEnum = null;
-    let isNewCode = false;
-    if (
-      extraData?.appliedVersion &&
-      extraData?.currentCode?.current !== result.official_code
-    ) {
-      extraData.currentCode.current = result.official_code;
-      isNewCode = true;
-    }
 
     this.logger.debug(
       `Processing result ${result.official_code} from ${this.platformCode(extraData?.platformCode)}.`,
@@ -70,7 +62,7 @@ export class SaveResultService {
       });
 
       const snapshotMessage =
-        (!isNewCode && extraData?.appliedVersion
+        (result?.is_version_applied ?? false
           ? 'is a snapshot'
           : 'is a live version') +
         ' from year ' +
@@ -85,7 +77,7 @@ export class SaveResultService {
             result_status_id:
               extraData?.statusMapper?.[result.status_id] ?? result.status_id,
             validateTitle: false,
-            isSnapshot: extraData?.appliedVersion ? !isNewCode : false,
+            isSnapshot: result?.is_version_applied ?? false,
           },
           result.official_code,
         );
@@ -97,7 +89,7 @@ export class SaveResultService {
       } else {
         await this._resultsService.updateInactiveResult(
           findResult.result_id,
-          extraData?.appliedVersion ? !isNewCode : false,
+          result?.is_version_applied ?? false,
         );
         this.logger.debug(
           `Updating result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}, ${snapshotMessage}`,
