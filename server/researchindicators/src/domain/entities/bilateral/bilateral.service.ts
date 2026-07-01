@@ -136,10 +136,9 @@ export class BilateralService {
    *   result → result_contracts (primary, active) → agresso_contracts.agreement_id
    *          → bilateral_project_mapping (active) → CLARISA project_mappings_array
    *
-   * Filters: only `status === "Confirmed"` AND `portfolio.acronym === activePortfolio`
-   * (env-driven, default `P25`). Display fields (color / icon_key) enriched from
-   * the local clarisa_science_programs catalog (now a display-only fallback,
-   * per D-PI-10).
+   * Filters: Confirmed + active portfolio + Science Program codes (prefix `SP`
+   * or `SPxx` smo_code). Same rules as `deriveSciencePrograms` so every picker
+   * SP has a matching ToC catalog branch in `getHlosIndicatorsForResult`.
    *
    * Always returns 200. `mapping_status === "unmapped"` covers both
    * "no AGRESSO contract" and "no active mapping row" — the FE renders the
@@ -204,33 +203,26 @@ export class BilateralService {
     }
 
     const activePortfolio = ENV.BILATERAL_ACTIVE_PORTFOLIO;
-    const filteredMappings = (project.project_mappings_array ?? []).filter(
-      (m) =>
-        m.status === 'Confirmed' &&
-        m.global_unit_object?.portfolio_object?.acronym === activePortfolio,
-    );
-
+    const derived = this.deriveSciencePrograms(project);
     const catalog = await this.clarisaScienceProgramsService.findAll();
     const catalogByCode = new Map(catalog.map((sp) => [sp.official_code, sp]));
+    const metaByCode = this.deriveScienceProgramMetaByCode(project);
 
-    const science_programs: BilateralScienceProgramItem[] = filteredMappings
-      .map((m) => {
-        const code = m.global_unit_object.smo_code;
+    const science_programs: BilateralScienceProgramItem[] = derived.map(
+      ({ code, name }) => {
         const fallback = catalogByCode.get(code);
+        const meta = metaByCode.get(code);
         return {
           code,
-          name: (m.global_unit_object.name ?? fallback?.name ?? code).trim(),
+          name,
           category:
-            m.global_unit_object.cgiar_entity_type_object?.name ??
-            fallback?.category ??
-            null,
+            meta?.category ?? fallback?.category ?? null,
           color: fallback?.color ?? null,
           icon_key: fallback?.icon_key ?? null,
-          allocation: typeof m.allocation === 'number' ? m.allocation : null,
+          allocation: meta?.allocation ?? null,
         };
-      })
-      // Stable order: by code so the FE picker is deterministic.
-      .sort((a, b) => a.code.localeCompare(b.code));
+      },
+    );
 
     return {
       ...baseResponse,
@@ -437,11 +429,10 @@ export class BilateralService {
    * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.12
    *
    * Extracts the Science Programs from a CLARISA project's
-   * `project_mappings_array[]`: Confirmed, level-1, prefix "SP", in the active
-   * portfolio. Returns code + display name (name falls back to code), deduped
-   * by code and sorted so derived pairs + PRMS cache keys land deterministically.
-   * AOWs are NOT read here — they come from the cgiar-entities catalog (see
-   * getHlosIndicatorsForResult).
+   * `project_mappings_array[]`: Confirmed, prefix "SP" (or `SPxx` smo_code when
+   * prefix is absent), in the active portfolio. Returns code + display name,
+   * deduped by code and sorted. AOW rows are excluded. Level is not required —
+   * lambda-toc is keyed by initiative code (e.g. SP09) regardless of mapping level.
    */
   private deriveSciencePrograms(project: {
     project_mappings_array?: Array<{
@@ -449,7 +440,6 @@ export class BilateralService {
       global_unit_object?: {
         smo_code?: string;
         name?: string;
-        level?: number;
         cgiar_entity_type_object?: { prefix?: string | null };
         portfolio_object?: { acronym?: string };
       };
@@ -461,16 +451,10 @@ export class BilateralService {
 
     for (const m of mappings) {
       const u = m.global_unit_object;
-      if (!u) continue;
-      const prefix = u.cgiar_entity_type_object?.prefix?.toUpperCase();
-      if (
-        m.status === 'Confirmed' &&
-        u.level === 1 &&
-        prefix === 'SP' &&
-        u.smo_code &&
-        u.portfolio_object?.acronym === activePortfolio &&
-        !nameByCode.has(u.smo_code)
-      ) {
+      if (!u?.smo_code || !this.isProjectScienceProgramMapping(m, activePortfolio)) {
+        continue;
+      }
+      if (!nameByCode.has(u.smo_code)) {
         nameByCode.set(u.smo_code, (u.name ?? u.smo_code).trim());
       }
     }
@@ -478,6 +462,67 @@ export class BilateralService {
     return [...nameByCode.entries()]
       .map(([code, name]) => ({ code, name }))
       .sort((a, b) => a.code.localeCompare(b.code));
+  }
+
+  /**
+   * True when a CLARISA project mapping row represents a Science Program for the
+   * bilateral picker / ToC catalog (not an Area of Work).
+   */
+  private isProjectScienceProgramMapping(
+    mapping: {
+      status?: string;
+      global_unit_object?: {
+        smo_code?: string;
+        cgiar_entity_type_object?: { prefix?: string | null };
+        portfolio_object?: { acronym?: string };
+      };
+    },
+    activePortfolio: string,
+  ): boolean {
+    const u = mapping.global_unit_object;
+    if (!u?.smo_code || mapping.status !== 'Confirmed') return false;
+    if (u.portfolio_object?.acronym !== activePortfolio) return false;
+
+    const prefix = u.cgiar_entity_type_object?.prefix?.toUpperCase();
+    if (prefix === 'AOW') return false;
+    return /^SP\d/i.test(u.smo_code.trim());
+  }
+
+  /**
+   * Display metadata (allocation, category) for SPs that pass deriveSciencePrograms.
+   * Uses the same four filters so the picker and ToC catalog always agree on SP codes.
+   */
+  private deriveScienceProgramMetaByCode(project: {
+    project_mappings_array?: Array<{
+      status?: string;
+      allocation?: number;
+      global_unit_object?: {
+        smo_code?: string;
+        cgiar_entity_type_object?: { prefix?: string | null; name?: string | null };
+        portfolio_object?: { acronym?: string };
+      };
+    }>;
+  }): Map<string, { allocation: number | null; category: string | null }> {
+    const activePortfolio = ENV.BILATERAL_ACTIVE_PORTFOLIO;
+    const metaByCode = new Map<
+      string,
+      { allocation: number | null; category: string | null }
+    >();
+
+    for (const m of project.project_mappings_array ?? []) {
+      const u = m.global_unit_object;
+      if (!u?.smo_code || !this.isProjectScienceProgramMapping(m, activePortfolio)) {
+        continue;
+      }
+      if (!metaByCode.has(u.smo_code)) {
+        metaByCode.set(u.smo_code, {
+          allocation: typeof m.allocation === 'number' ? m.allocation : null,
+          category: u.cgiar_entity_type_object?.name ?? null,
+        });
+      }
+    }
+
+    return metaByCode;
   }
 
   async getAlignment(
