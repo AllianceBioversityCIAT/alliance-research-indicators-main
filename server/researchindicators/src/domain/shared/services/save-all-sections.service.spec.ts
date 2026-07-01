@@ -155,7 +155,7 @@ describe('SaveResultService', () => {
       expect(currentUser.clearSystemUser).toHaveBeenCalled();
     });
 
-    it('should mark snapshot when official code repeats with appliedVersion', async () => {
+    it('should mark snapshot when is_version_applied is true on the DTO', async () => {
       resultRepoHandle.findOne.mockResolvedValue(null);
       resultsService.createResult.mockResolvedValue({
         result_id: 2,
@@ -163,6 +163,7 @@ describe('SaveResultService', () => {
       } as any);
       const dto = minimalResultDto();
       const dtoSnapshot = minimalResultDto();
+      dtoSnapshot.is_version_applied = true;
       const counters = new CounterResults();
       const extraData = prmsExtraData(counters);
 
@@ -172,7 +173,6 @@ describe('SaveResultService', () => {
       const secondCallOpts = resultsService.createResult.mock.calls[1][2];
       expect(firstCallOpts.isSnapshot).toBe(false);
       expect(secondCallOpts.isSnapshot).toBe(true);
-      expect(extraData.currentCode.current).toBe(7001);
     });
 
     it('should not mark snapshot when appliedVersion is false even if official code repeats', async () => {
@@ -236,13 +236,14 @@ describe('SaveResultService', () => {
       expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
     });
 
-    it('should mark snapshot on update when PRMS official code repeats in bulk', async () => {
+    it('should mark snapshot on update when is_version_applied is true', async () => {
       resultRepoHandle.findOne.mockResolvedValue({
         result_id: 9,
         result_official_code: 7001,
       } as any);
       const dto = minimalResultDto();
       const dtoSnapshot = minimalResultDto();
+      dtoSnapshot.is_version_applied = true;
       const counters = new CounterResults();
       const extraData = prmsExtraData(counters);
 
@@ -259,7 +260,7 @@ describe('SaveResultService', () => {
       ]);
     });
 
-    it('should not mark snapshot on update when appliedVersion is false', async () => {
+    it('should not mark snapshot on update when is_version_applied is false', async () => {
       resultRepoHandle.findOne.mockResolvedValue({
         result_id: 11,
         result_official_code: 7001,
