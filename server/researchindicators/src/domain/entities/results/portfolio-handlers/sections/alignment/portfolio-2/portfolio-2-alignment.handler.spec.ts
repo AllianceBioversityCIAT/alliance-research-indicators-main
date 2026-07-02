@@ -59,7 +59,7 @@ describe('Portfolio2AlignmentHandler', () => {
       contracts: [{ contract_id: 'C1' }],
       primary_levers: [{ lever_id: '1' }],
       contributor_levers: [{ lever_id: '2' }],
-      research_areas: [{ lever_id: 'RA1' }],
+      research_areas: [{ lever_id: '123', custom_lever_name: 'Custom RA' }],
       strategic_objectives: [{ strategic_objective_id: 1 }],
       impact_outcomes: [{ impact_outcome_id: 2 }],
       result_sdgs: [],
@@ -71,7 +71,7 @@ describe('Portfolio2AlignmentHandler', () => {
       contributor_levers: [{ lever_id: 'legacy-2' }],
       result_sdgs: [],
     };
-    const researchAreas = [{ lever_id: 'RA1', result_lever_id: 100 }];
+    const researchAreas = [{ lever_id: 123, result_lever_id: 100 }];
     const strategicObjectives = [
       { strategic_objective_id: 1, result_strategic_objective_id: 200 },
     ];
@@ -107,10 +107,17 @@ describe('Portfolio2AlignmentHandler', () => {
       );
       expect(resultLeversService.create).toHaveBeenCalledWith(
         context.resultId,
-        payload.research_areas,
+        [
+          {
+            lever_id: 123,
+            is_primary: true,
+            custom_lever_name: 'Custom RA',
+          },
+        ],
         'lever_id',
         LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
         manager,
+        ['is_primary', 'custom_lever_name'],
       );
       expect(resultStrategicObjectivesService.create).toHaveBeenCalledWith(
         context.resultId,
