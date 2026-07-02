@@ -188,6 +188,8 @@ export abstract class BaseServiceSimple<
 
     await entityManager.update(updateWhere, inactiveData);
 
+    console.log('newDataToSave ========', newDataToSave);
+
     const finalDataToSave = this.lastRefactoredAfterSave(
       newDataToSave,
       dataRole,

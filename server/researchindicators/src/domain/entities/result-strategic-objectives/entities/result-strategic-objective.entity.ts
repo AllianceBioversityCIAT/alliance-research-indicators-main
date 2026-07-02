@@ -32,7 +32,7 @@ export class ResultStrategicObjective extends AuditableEntity {
 
   @Column({
     type: 'bigint',
-    name: 'roles_id',
+    name: 'role_id',
   })
   role_id: number;
 

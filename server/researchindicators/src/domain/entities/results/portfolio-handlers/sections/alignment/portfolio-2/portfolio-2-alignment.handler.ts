@@ -16,6 +16,7 @@ import { ResultStrategicObjectiveRolesEnum } from '../../../../../result-strateg
 import { ResultImpactOutcomeRolesEnum } from '../../../../../result-impact-outcomes/enum/result-impact-outcome-roles.enum';
 import { DataSource } from 'typeorm';
 import { IndicatorsEnum } from '../../../../../indicators/enum/indicators.enum';
+import { ResultLever } from '../../../../../result-levers/entities/result-lever.entity';
 
 /**
  * Portfolio 2 (2026–2030) — test handler.
@@ -53,12 +54,20 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
 
     responseData = { ...alignment };
 
+    const saveResearchAreas: Partial<ResultLever>[] =
+      payload?.research_areas?.map((researchArea) => ({
+        lever_id: parseInt(researchArea?.lever_id) as unknown as string,
+        is_primary: true,
+        custom_lever_name: researchArea?.custom_lever_name,
+      }));
+
     const researchAreas = await this.resultLeversService.create(
       context.resultId,
-      payload.research_areas,
+      saveResearchAreas,
       'lever_id',
       LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
       context.manager,
+      ['is_primary', 'custom_lever_name'],
     );
 
     responseData.research_areas = researchAreas;
