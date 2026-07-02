@@ -47,6 +47,7 @@ export class ResultAlignmentOperationsService {
           ? primary_levers.map((el) => ({
               lever_id: el.lever_id,
               is_primary: true,
+              custom_lever_name: el?.custom_lever_name,
               result_lever_strategic_outcomes:
                 el?.result_lever_strategic_outcomes,
               result_lever_sdg_targets: el?.result_lever_sdg_targets,
@@ -58,6 +59,7 @@ export class ResultAlignmentOperationsService {
           ? contributor_levers.map((el) => ({
               lever_id: el.lever_id,
               is_primary: false,
+              custom_lever_name: el?.custom_lever_name,
               result_lever_sdg_targets: el?.result_lever_sdg_targets,
             }))
           : [];
@@ -74,7 +76,7 @@ export class ResultAlignmentOperationsService {
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         entityManager,
-        ['is_primary'],
+        ['is_primary', 'custom_lever_name'],
         { is_primary: false },
       );
 

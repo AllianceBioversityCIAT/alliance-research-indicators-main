@@ -146,7 +146,7 @@ describe('ResultAlignmentOperationsService', () => {
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         manager,
-        ['is_primary'],
+        ['is_primary', 'custom_lever_name'],
         { is_primary: false },
       );
       expect(resultLeverStrategicOutcomeService.create).toHaveBeenCalled();
