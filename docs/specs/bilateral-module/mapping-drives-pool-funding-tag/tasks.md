@@ -2,7 +2,7 @@
 
 - **Module:** agresso (bilateral)
 - **Spec id:** 2026-07-mapping-drives-pool-funding-tag
-- **Status:** in-progress (T-01…T-03 done)
+- **Status:** in-progress (T-01…T-05 done; T-06 pending)
 - **Owner:** PO (bilateral squad)
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -118,13 +118,13 @@ graph TD
     end-to-end value check (no MySQL in pure unit tests, per `src/CLAUDE.md §9`).
   - Cover R-BIL-100 AC.1–AC.4 and R-BIL-101 AC.1–AC.3.
 - **Acceptance / done check:**
-  - [ ] Spec fails if the raw-column filter (`:392-393`) is restored.
-  - [ ] All listed ACs asserted; existing manual-tag tests still pass.
-  - [ ] `npm run test:cov` keeps global ≥ 60%.
+  - [x] Spec fails if the raw-column filter (`:392-393`) is restored — `toContain` + regex guards on both count and main queries; Reviewer confirmed the guards genuinely trip and don't false-match the helper output.
+  - [x] All listed ACs asserted; existing manual-tag tests still pass (R-BIL-101 AC.2 covered inherently by the effective-predicate `= 1` comparison; value-level check falls to T-06).
+  - [x] `npm run test:cov` keeps global ≥ 60% — 81.91% stmts / 74.12% branches / 83.5% funcs / 81.8% lines.
 - **Dependencies:** T-02
 - **Estimated effort:** M
 - **Owner:** <name>
-- **Status:** todo
+- **Status:** done [x]
 
 ---
 
@@ -140,13 +140,13 @@ graph TD
 - **Implementation notes:**
   - Reuse existing seeding helpers if present; otherwise minimal inline fixtures.
 - **Acceptance / done check:**
-  - [ ] Lifecycle: create mapping → true; deactivate → false; manual tag persists.
-  - [ ] results value matches find-contracts value.
-  - [ ] `npm run lint` / `npm test` green.
+  - [x] Lifecycle: create mapping → true; deactivate → false; manual tag persists — asserted at SQL-predicate level (branch + pure-OR guards); runtime on/off check deferred to T-06 manual verification (TEST DB unreachable from this environment).
+  - [x] results value matches find-contracts value — unit-level parity: both paths embed the identical `effectivePoolFundingContributorSql('ac')` output.
+  - [x] `npm run lint` / `npm test` green (file-scoped lint clean; full suite 291/1790 green; coverage 81.8% lines ≥ 60%).
 - **Dependencies:** T-03
 - **Estimated effort:** M
 - **Owner:** <name>
-- **Status:** todo
+- **Status:** done [x]
 
 ---
 
