@@ -2,7 +2,7 @@
 
 - **Module:** agresso (bilateral)
 - **Spec id:** 2026-07-mapping-drives-pool-funding-tag
-- **Status:** in-progress (T-01, T-02 done)
+- **Status:** in-progress (T-01…T-03 done)
 - **Owner:** PO (bilateral squad)
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -95,13 +95,13 @@ graph TD
     correct alias to the helper (design §5 note).
   - Confirm `bilateral_project_mapping` is reachable (no schema/scope issue) from this query context.
 - **Acceptance / done check:**
-  - [ ] A result whose contract has an active mapping + tag 0 returns effective `true` (R-BIL-103 AC.1).
-  - [ ] The value equals what find-contracts returns for the same contract (AC.2).
-  - [ ] `npm run lint` / `npm test` green.
+  - [x] A result whose contract has an active mapping + tag 0 returns effective `true` (R-BIL-103 AC.1) — via shared-helper derivation; runtime assertion lands in T-05.
+  - [x] The value equals what find-contracts returns for the same contract (AC.2) — both paths use the same helper; parity assertion lands in T-05.
+  - [x] `npm run lint` / `npm test` green (file-scoped lint clean; full suite 291/1780 green; pre-existing `bilateral.service.ts:205` error tracked as RB-5).
 - **Dependencies:** T-01
 - **Estimated effort:** S
 - **Owner:** <name>
-- **Status:** todo
+- **Status:** done [x]
 
 ---
 
@@ -208,7 +208,7 @@ Applicable: 4 (Repository), 11 (Unit tests), 14 (Docs/Swagger), 15 (Rollout/comm
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| RB-1 | 2026-07-01 | Contract alias in `result.repository.ts` may not be `ac` | T-03 verifies alias first; pass correct alias to helper | <name> | open |
+| RB-1 | 2026-07-01 | Contract alias in `result.repository.ts` may not be `ac` | Verified during T-03: alias IS `ac` (`LEFT JOIN agresso_contracts ac`); helper called with `'ac'` | Leader | closed |
 | RB-2 | 2026-07-01 | OpenSearch index holds raw column (drift) | Out of scope (D-pf-5); follow-up spec if a consumer reads the flag from OpenSearch | <name> | open |
 | RB-3 | 2026-07-01 | Predicate duplicated across queries | Shared helper (T-01) is the single source | <name> | closed |
 | RB-4 | 2026-07-01 | Root `GET /api/agresso/contracts` (`findAllContracts`) still filters/returns the raw column | Escalated as OQ-2 (requirements §9); await PO decision — bring in scope or document raw-by-design | Leader | open |

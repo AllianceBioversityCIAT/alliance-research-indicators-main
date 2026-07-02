@@ -78,8 +78,37 @@
 
 ---
 
+### T-03 — results read path: derive the projection — ✅ PASS (attempt 1 of 3)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-103
+- **Implementer attempts:** 1
+
+#### Attempt 1
+
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/results/repositories/result.repository.ts` — helper import (`:18`) + single projection edit in `findPoolFundingAlignmentContext` (`:205-207`): `COALESCE(ac.is_pool_funding_contributor, FALSE)` → `${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor`, with an `-- @sdd-spec` SQL line comment as traceability marker. `?` binding, JOINs, and the `PoolFundingAlignmentContext` interface untouched.
+- **Implementer verification (from `server/researchindicators`):**
+  - `npx eslint` on the file → clean.
+  - `npx jest result.repository.spec.ts pool-funding.util.spec.ts` → 2 suites / 47 tests pass.
+  - Full `npm test` → 291 suites / 1780 tests pass.
+- **Reviewer verdict:** `STATUS: PASS` — exact application of design.md §5 step 4; alias `ac` correct (RB-1 closed); projected alias preserved; embedded `-- ` comment is valid, newline-terminated MySQL syntax that cannot swallow the next line; LEFT JOIN null-contract case evaluates to 0, identical to the old `COALESCE(..., FALSE)`. Reviewer independently re-ran eslint (clean) and both suites (47 tests + 1 snapshot pass).
+
+#### Decisions made
+
+- RB-1 (alias uncertainty) resolved during Leader pre-check and confirmed by Reviewer: alias is `ac`.
+- `result.repository.spec.ts` exists but does not cover `findPoolFundingAlignmentContext`; no assertion pinned the old SQL, so no test edits. Method-level/runtime coverage lands in T-05 (per dependency graph T-03 → T-05).
+
+#### Issues encountered
+
+- None. `bilateral.service.ts` untouched (RB-5 unchanged).
+
+- **Final verification result:** PASS — lint clean, suites green, Reviewer PASS on first attempt.
+
+---
+
 ## 3. Summary
 
-- T-01 ✅, T-02 ✅ complete. T-03…T-06 pending.
-- Next eligible task: T-03 (results read path projection — depends on T-01 only). T-04 unblocked by T-02; T-05 needs T-03; T-06 needs T-02+T-03.
-- Open items awaiting PO/user: OQ-2 (root endpoint raw-column filter), RB-5 (pre-existing lint error outside spec).
+- T-01 ✅, T-02 ✅, T-03 ✅ complete. T-04…T-06 pending.
+- Next eligible tasks: T-04 (Projects-table tests — depends on T-02) and T-05 (results parity/lifecycle tests — depends on T-03). T-06 needs T-02+T-03 (both now done).
+- Open items awaiting PO/user: OQ-2 (root endpoint raw-column filter, deferred by user 2026-07-01), RB-5 (pre-existing lint error outside spec).
