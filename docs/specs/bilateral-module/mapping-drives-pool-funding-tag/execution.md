@@ -157,7 +157,35 @@
 
 ---
 
+### T-06 — Swagger note, perf EXPLAIN, and manual verification — 🟡 PARTIAL (code ✅ PASS attempt 1; runtime checks pending user)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-101 (docs), NFR-BIL-100 (pending)
+- **Implementer attempts:** 1
+
+#### Attempt 1 — Part 1: Swagger description (COMPLETE)
+
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.ts` — the find-contracts `pool-funding-contributor` `@ApiQuery` description (`:398-404`) updated to: *"Filter by pool-funding contribution. Effective value: manual tag OR an active bilateral project mapping — contracts with an active bilateral mapping are included even without the manual tag."* Decorator structure (name/required/type) intact; text-only.
+  - The controller has TWO independent inline `pool-funding-contributor` `@ApiQuery` blocks (root `@Get()` at `:75-80` and find-contracts). Only find-contracts was edited; the root endpoint's text intentionally unchanged (OQ-2 raw-column semantics preserved).
+- **Implementer verification:** file-scoped eslint clean; `npx jest src/domain/entities/agresso-contract` → 102/102 pass (controller spec does not assert Swagger text).
+- **Reviewer verdict:** `STATUS: PASS` — exactly one description changed on the right endpoint; root block untouched; `@ApiTags`/`@ApiBearerAuth`/`@ApiOperation` undisturbed; no behavior change; independent eslint + jest re-runs green.
+
+#### Part 2: EXPLAIN + manual D504 verification (PENDING USER)
+
+- **Connectivity:** CORE MySQL (`ARI_MYSQL_HOST=192.168.20.210`, db `alliancereportingdb`) IS TCP-reachable from this machine (`nc -z` succeeded) — the earlier "unreachable" expectation applied to the TEST host only.
+- **Blocker:** executing queries against the shared CORE DB requires explicit user authorization; the Implementer's read-only mysql2 script was correctly denied by the permission layer, and the Leader declined to run it on a teammate's request (permission boundary). **Not an environmental failure — an authorization gate.**
+- **Ready for the user:**
+  1. Read-only EXPLAIN script prepared by the Implementer (session scratchpad, `explain.mjs`): `SHOW INDEX` on `bilateral_project_mapping` + `EXPLAIN` on the count and main-inner queries with the pool-funding filter. **Pass criterion (NFR-BIL-100):** the `bpm` row shows the `idx_bpm_agreement` key (typically `type=ref` / DEPENDENT SUBQUERY).
+  2. Manual D504 check against a running instance: `GET /api/agresso/contracts/find-contracts?contract-code=D504` → `is_pool_funding_contributor: true` (mapping id 11, no manual tag); deactivate mapping 11 → `false`; re-activate afterwards.
+  3. Swagger UI spot-check at `/swagger` for the updated description.
+- **These items also close out the runtime lifecycle checks deferred from T-04/T-05.**
+
+---
+
 ## 3. Summary
 
-- T-01 ✅ … T-05 ✅ complete (all on first attempt). Only **T-06** remains: Swagger description update, `EXPLAIN` index check, and manual verification (D504 badge on/off) against a running instance — T-06 also absorbs the runtime lifecycle checks deferred from T-04/T-05.
-- Open items awaiting PO/user: OQ-2 (root endpoint raw-column filter, deferred by user 2026-07-01), RB-5 (pre-existing lint error outside spec).
+- **T-01…T-05 ✅ complete — every task passed Reviewer audit on the first attempt.** T-06 is code-complete (Swagger, Reviewer PASS); its `EXPLAIN` + manual D504 runtime checks are **pending user authorization/environment** (see T-06 Part 2 above).
+- Commits: `ba4a7d12` (T-01), `85c3f663` (T-02), `44b8c57e` (T-03), `2a33e768` (T-05), `9fcccebf` (T-04), + T-06 Swagger commit.
+- Open items awaiting PO/user: **T-06 Part 2** (EXPLAIN + D504 manual verification), OQ-2 (root endpoint raw-column filter, deferred 2026-07-01), RB-5 (pre-existing `bilateral.service.ts:205` lint error outside spec).
+- Rollout reminder (design §11): code-only deploy; backout = git revert; notify STAR team + MEL/PO that mapped contracts now surface the badge automatically.

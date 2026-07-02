@@ -399,7 +399,8 @@ export class AgressoContractController {
     name: 'pool-funding-contributor',
     required: false,
     type: Boolean,
-    description: 'Filter by pool funding contributor tag',
+    description:
+      'Filter by pool-funding contribution. Effective value: manual tag OR an active bilateral project mapping — contracts with an active bilateral mapping are included even without the manual tag.',
   })
   async findContracts(
     @Query('current-user') currentUser: TrueFalseEnum,

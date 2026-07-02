@@ -162,15 +162,15 @@ graph TD
 - **Implementation notes:**
   - No behavior change in this task beyond docs; keep it in the same PR as T-02 if the team prefers.
 - **Acceptance / done check:**
-  - [ ] `EXPLAIN` shows index use on `bilateral_project_mapping.agresso_agreement_id` (NFR-BIL-100).
+  - [ ] `EXPLAIN` shows index use on `bilateral_project_mapping.agresso_agreement_id` (NFR-BIL-100). — **PENDING USER:** CORE DB reachable but querying it requires user authorization; ready-to-run read-only script prepared (see execution.md T-06).
   - [ ] Manual: `GET /api/agresso/contracts/find-contracts?contract-code=D504` returns
-        `is_pool_funding_contributor: true` (mapping id 11, no manual tag).
-  - [ ] Manual: deactivate D504's mapping → same query returns `false`.
-  - [ ] Swagger at `/swagger` shows the updated `pool-funding-contributor` description.
+        `is_pool_funding_contributor: true` (mapping id 11, no manual tag). — **PENDING USER** (needs running instance).
+  - [ ] Manual: deactivate D504's mapping → same query returns `false`. — **PENDING USER.**
+  - [x] Swagger at `/swagger` shows the updated `pool-funding-contributor` description — code change merged (Reviewer PASS); visual spot-check pending the manual session.
 - **Dependencies:** T-02, T-03
 - **Estimated effort:** S
 - **Owner:** <name>
-- **Status:** todo
+- **Status:** in-progress [~] — code complete; runtime verification pending user
 
 ---
 
