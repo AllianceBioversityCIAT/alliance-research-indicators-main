@@ -36,9 +36,14 @@ raw SQL. No controller, service, DTO, entity, route, or guard changes.
 
 ```
 GET /api/agresso/contracts/find-contracts
-  AgressoContractController.findContracts
-    → AgressoContractService.findContracts            (unchanged)
-      → AgressoContractRepository.getContracts / findAllContracts   ← EDIT (SQL)
+  AgressoContractController.findContracts (@Get('find-contracts'), :304)
+    → AgressoContractService.findAgressoContracts     (unchanged)
+      → AgressoContractRepository.getContracts        ← EDIT (SQL)
+
+(Erratum fixed 2026-07-01: an earlier draft named `service.findContracts →
+repository.findAllContracts` here; that chain actually backs the ROOT
+`GET /api/agresso/contracts` endpoint, which is NOT in scope — see execution.md
+T-02 notes and OQ-2 in requirements.md.)
 
 results read path
   → ResultRepository (result.repository.ts, pool-funding projection :205)          ← EDIT (SQL)
@@ -161,8 +166,8 @@ the field already); no `client/` edits from this spec.
 - **OpenSearch:** no files touched. **Risk:** the `agresso_contracts` OpenSearch document
   keeps the raw `is_pool_funding_contributor`. Any consumer filtering/reading the flag
   from OpenSearch (not SQL) will not see mapping-derived values. Verified in scope of this
-  spec that `find-contracts` is SQL-backed (`service.findContracts` →
-  `repository.findAllContracts`), so the Projects table is unaffected. Follow-up (not in
+  spec that `find-contracts` is SQL-backed (`service.findAgressoContracts` →
+  `repository.getContracts`), so the Projects table is unaffected. Follow-up (not in
   this spec): recompute the indexed value on mapping create/deactivate via
   `uploadSingleToOpenSearch`.
 - No CLARISA / AGRESSO / TIP / ROAR / RabbitMQ / Socket.IO / DynamoDB changes.

@@ -205,8 +205,8 @@ tracked as an optional risk in design).
 ## 7. Cross-system impact
 
 - **AGRESSO / CLARISA:** none (uses existing `bilateral_project_mapping` join by value).
-- **OpenSearch:** `find-contracts` is **SQL-backed** (`service.findContracts` →
-  `repository.findAllContracts`), so the Projects table is fully covered. **Risk:** any
+- **OpenSearch:** `find-contracts` is **SQL-backed** (`service.findAgressoContracts` →
+  `repository.getContracts`; erratum fixed 2026-07-01), so the Projects table is fully covered. **Risk:** any
   consumer that queries the pool-funding flag directly from the OpenSearch
   `agresso_contracts` index will see the raw column, not the derived value. Kept **out
   of scope**; see open question OQ-1.
@@ -234,7 +234,14 @@ tracked as an optional risk in design).
 - **OQ-1** — Is any production read path serving the pool-funding flag from
   **OpenSearch** rather than SQL? If yes, OpenSearch must be brought in scope (recompute
   the indexed value on mapping create/deactivate). *Owner:* PO + backend. *Target:*
-  before `/sdd-specify` design sign-off.
+  before `/sdd-specify` design sign-off. *(Resolved 2026-07-01: out of scope, D-pf-5.)*
+- **OQ-2** — (Discovered during T-02 execution, 2026-07-01.) The **root**
+  `GET /api/agresso/contracts` endpoint (`service.findContracts` →
+  `repository.findAllContracts`) also exposes an `is_pool_funding_contributor` filter
+  and returns `ac.*` — both still **raw-column** semantics, not the effective value.
+  R-BIL-100/101 target only `find-contracts` (the STAR Projects table path). Should the
+  root endpoint be brought in scope (same helper) or documented as raw-by-design?
+  *Owner:* PO + backend. *Target:* before spec close-out.
 
 ---
 

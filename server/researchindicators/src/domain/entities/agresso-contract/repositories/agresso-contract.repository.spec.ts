@@ -6,6 +6,7 @@ import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
+import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 import { AgressoContractStatus } from '../../../shared/enum/agresso-contract.enum';
@@ -490,7 +491,7 @@ describe('AgressoContractRepository', () => {
         },
         {
           field: OrderFieldsEnum.POOL_FUNDING_CONTRIBUTOR,
-          expected: 'ac.is_pool_funding_contributor ASC ',
+          expected: `${effectivePoolFundingContributorSql('ac')} ASC `,
         },
       ];
       testCases.forEach(({ field, expected }) => {

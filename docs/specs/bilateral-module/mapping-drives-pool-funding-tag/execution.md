@@ -46,7 +46,40 @@
 
 ---
 
+### T-02 — find-contracts: derive projection, filter, and ordering — ✅ PASS (attempt 1 of 3)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-100, R-BIL-101, R-BIL-102, R-BIL-105
+- **Implementer attempts:** 1
+
+#### Attempt 1
+
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.ts` — import of `effectivePoolFundingContributorSql` + three edits inside `getContracts`: (a) inner-subquery projection (`:497`) now `${helper('ac')} AS is_pool_funding_contributor` (outer select alias untouched); (b) `poolFundingContributorFilter` (`:394-397`) now `AND ${helper('ac')} = 0|1`, feeding both count (`:441`) and main (`:520`) queries; (c) order fieldMap entry (`:344-345`) now the helper. `@sdd-spec` traceability marker added at the filter builder.
+  - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts` — one `orderBy` assertion updated from the old raw column to `` `${effectivePoolFundingContributorSql('ac')} ASC ` `` (no coverage removed).
+- **Implementer verification (from `server/researchindicators`):**
+  - `npx eslint` on both touched files → exit 0.
+  - `npx jest src/domain/entities/agresso-contract src/domain/shared/utils/pool-funding.util.spec.ts` → 5 suites / 100 tests pass.
+  - Full `npm test` → 291 suites / 1780 tests pass (pre-existing Jest worker teardown warning only).
+- **Reviewer verdict:** `STATUS: PASS` — all three edits use the T-01 helper with the projected alias preserved (R-BIL-100), the single filter const derives both count and main queries with the boolean→0|1 mapping kept (R-BIL-101), ordering uses the helper (R-BIL-102), pure OR with correlated EXISTS and no LEFT JOIN / DISTINCT change (R-BIL-105, D-pf-1). Reviewer independently re-ran eslint (exit 0) and the agresso-contract suite (4 suites / 98 tests pass), verified the controller→service→repository chain, and confirmed the diff contains exactly the described edits.
+
+#### Decisions made
+
+- Live-DB behavioral ACs (D504 etc.) are validated by the SQL construction here and get runtime assertions in T-04 (per design §10).
+- Spec assertion for ordering now pins the helper output instead of hardcoding the predicate — stays in sync with the single source of truth.
+
+#### Issues encountered / discoveries
+
+1. **Doc erratum (fixed 2026-07-01):** design.md §2/§7 and requirements.md §7 labeled the find-contracts chain as `service.findContracts → repository.findAllContracts`. The real chain is `AgressoContractController.findContracts` (`@Get('find-contracts')`, `:304`) → `service.findAgressoContracts` → `repository.getContracts`. The `service.findContracts → repository.findAllContracts` chain backs the ROOT `GET /api/agresso/contracts` endpoint instead. Docs corrected (constitution rule: fix the wrong doc, don't drift). The task's edit sites (`:343`, `:392-394`, projection) were correct for the real find-contracts path.
+2. **Scope gap escalated (OQ-2 / RB-4):** the root `GET /api/agresso/contracts` endpoint (`findAllContracts`) also exposes an `is_pool_funding_contributor` filter (`:107-108`) and returns `ac.*` — both still raw-column semantics. R-BIL-100/101 literally target `find-contracts` only, so this was NOT changed; escalated to PO as requirements.md OQ-2 (bring in scope vs. document raw-by-design).
+3. Pre-existing `bilateral.service.ts:205` lint error unchanged (RB-5); `bilateral.service.ts` was not touched.
+
+- **Final verification result:** PASS — file-scoped lint clean, module suite green, full suite 291/1780 green, Reviewer PASS on first attempt.
+
+---
+
 ## 3. Summary
 
-- T-01 ✅ complete (this entry). T-02…T-06 pending.
-- Next eligible tasks: T-02 (find-contracts projection/filter/order) and T-03 (results projection), both depending only on T-01.
+- T-01 ✅, T-02 ✅ complete. T-03…T-06 pending.
+- Next eligible task: T-03 (results read path projection — depends on T-01 only). T-04 unblocked by T-02; T-05 needs T-03; T-06 needs T-02+T-03.
+- Open items awaiting PO/user: OQ-2 (root endpoint raw-column filter), RB-5 (pre-existing lint error outside spec).

@@ -2,7 +2,7 @@
 
 - **Module:** agresso (bilateral)
 - **Spec id:** 2026-07-mapping-drives-pool-funding-tag
-- **Status:** in-progress (T-01 done)
+- **Status:** in-progress (T-01, T-02 done)
 - **Owner:** PO (bilateral squad)
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -71,15 +71,15 @@ graph TD
     the response DTO/mapper is unchanged.
   - `EXISTS`, not `LEFT JOIN` (D-pf-1) — do not alter the existing `GROUP BY`.
 - **Acceptance / done check:**
-  - [ ] A contract with active mapping + tag 0 returns `is_pool_funding_contributor: true` (R-BIL-100 AC.1).
-  - [ ] Neither tag nor active mapping → `false` (AC.3); inactive-only mapping → tag-only (AC.4).
-  - [ ] `pool-funding-contributor=true` includes the mapping-derived contract; `=false` excludes it (R-BIL-101).
-  - [ ] Manual PATCH to `false` on a mapped contract still returns `true` (R-BIL-105 AC.1).
-  - [ ] `npm run lint` / `npm test` green.
+  - [x] A contract with active mapping + tag 0 returns `is_pool_funding_contributor: true` (R-BIL-100 AC.1) — via SQL derivation; runtime assertion lands in T-04.
+  - [x] Neither tag nor active mapping → `false` (AC.3); inactive-only mapping → tag-only (AC.4) — same note.
+  - [x] `pool-funding-contributor=true` includes the mapping-derived contract; `=false` excludes it (R-BIL-101) — filter predicate derived in both count + main queries.
+  - [x] Manual PATCH to `false` on a mapped contract still returns `true` (R-BIL-105 AC.1) — pure OR predicate, no override path.
+  - [x] `npm run lint` / `npm test` green (file-scoped lint clean; full suite 291/1780 green; pre-existing `bilateral.service.ts:205` lint error noted in execution.md).
 - **Dependencies:** T-01
 - **Estimated effort:** M
 - **Owner:** <name>
-- **Status:** todo
+- **Status:** done [x]
 
 ---
 
@@ -211,6 +211,8 @@ Applicable: 4 (Repository), 11 (Unit tests), 14 (Docs/Swagger), 15 (Rollout/comm
 | RB-1 | 2026-07-01 | Contract alias in `result.repository.ts` may not be `ac` | T-03 verifies alias first; pass correct alias to helper | <name> | open |
 | RB-2 | 2026-07-01 | OpenSearch index holds raw column (drift) | Out of scope (D-pf-5); follow-up spec if a consumer reads the flag from OpenSearch | <name> | open |
 | RB-3 | 2026-07-01 | Predicate duplicated across queries | Shared helper (T-01) is the single source | <name> | closed |
+| RB-4 | 2026-07-01 | Root `GET /api/agresso/contracts` (`findAllContracts`) still filters/returns the raw column | Escalated as OQ-2 (requirements §9); await PO decision — bring in scope or document raw-by-design | Leader | open |
+| RB-5 | 2026-07-01 | Pre-existing lint error `bilateral.service.ts:205` (unused `activePortfolio`, committed at `ff4b7e78`) blocks repo-wide `npm run lint` | Outside spec scope; bilateral squad to fix; task verification uses file-scoped lint | Leader | open |
 
 ---
 
