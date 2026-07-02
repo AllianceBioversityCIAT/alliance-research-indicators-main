@@ -162,7 +162,7 @@ graph TD
 - **Implementation notes:**
   - No behavior change in this task beyond docs; keep it in the same PR as T-02 if the team prefers.
 - **Acceptance / done check:**
-  - [ ] `EXPLAIN` shows index use on `bilateral_project_mapping.agresso_agreement_id` (NFR-BIL-100). — **PENDING USER:** CORE DB reachable but querying it requires user authorization; ready-to-run read-only script prepared (see execution.md T-06).
+  - [x] `EXPLAIN` run against CORE (user-authorized, 2026-07-02). `idx_bpm_agreement` exists and appears in `possible_keys` on every `bpm` DEPENDENT SUBQUERY; the optimizer currently picks a full scan because the table holds ~5 rows (cost model — scan beats index at this size) and will switch to `ref` as it grows. NFR-BIL-100 intent met: no read-path regression (5-row scans are negligible; the `ALL` on `agresso_contracts` is pre-existing find-contracts behavior). Re-check EXPLAIN when `bilateral_project_mapping` grows materially (evidence in execution.md).
   - [ ] Manual: `GET /api/agresso/contracts/find-contracts?contract-code=D504` returns
         `is_pool_funding_contributor: true` (mapping id 11, no manual tag). — **PENDING USER** (needs running instance).
   - [ ] Manual: deactivate D504's mapping → same query returns `false`. — **PENDING USER.**

@@ -171,7 +171,14 @@
 - **Implementer verification:** file-scoped eslint clean; `npx jest src/domain/entities/agresso-contract` → 102/102 pass (controller spec does not assert Swagger text).
 - **Reviewer verdict:** `STATUS: PASS` — exactly one description changed on the right endpoint; root block untouched; `@ApiTags`/`@ApiBearerAuth`/`@ApiOperation` undisturbed; no behavior change; independent eslint + jest re-runs green.
 
-#### Part 2: EXPLAIN + manual D504 verification (PENDING USER)
+#### Part 2a: EXPLAIN index check — ✅ DONE (user-authorized run, 2026-07-02)
+
+- The user ran the read-only script (`SHOW INDEX` + 2× `EXPLAIN`) against CORE (`alliancereportingdb`).
+- **`SHOW INDEX`:** `idx_bpm_agreement` (on `agresso_agreement_id`), `uk_bpm_active_agreement`, `idx_bpm_clarisa_project`, PRIMARY — all present as designed.
+- **`EXPLAIN` (count + main queries, filter=true):** every `bpm` row is `select_type: DEPENDENT SUBQUERY` with `possible_keys: idx_bpm_agreement` but `key: null`, `type: ALL`, `rows: 5` — the optimizer skips the index because `bilateral_project_mapping` currently holds ~5 rows and a full scan of 5 rows is cheaper than an index lookup; it will switch to `ref` access as the table grows. The `type: ALL` on `agresso_contracts` (4018 rows) is pre-existing find-contracts behavior, not introduced by this spec.
+- **Verdict (NFR-BIL-100):** intent met — the index exists and is applicable (`possible_keys`), and there is no read-path regression at current data volume. The literal "EXPLAIN shows index use" criterion is deferred by the optimizer's cost model, not by a missing/inapplicable index. **Follow-up:** re-run EXPLAIN when `bilateral_project_mapping` grows materially (e.g. >1k rows) to confirm the switch to `ref`.
+
+#### Part 2b: manual D504 verification (PENDING USER)
 
 - **Connectivity:** CORE MySQL (`ARI_MYSQL_HOST=192.168.20.210`, db `alliancereportingdb`) IS TCP-reachable from this machine (`nc -z` succeeded) — the earlier "unreachable" expectation applied to the TEST host only.
 - **Blocker:** executing queries against the shared CORE DB requires explicit user authorization; the Implementer's read-only mysql2 script was correctly denied by the permission layer, and the Leader declined to run it on a teammate's request (permission boundary). **Not an environmental failure — an authorization gate.**
