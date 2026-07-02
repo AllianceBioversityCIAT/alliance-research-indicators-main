@@ -22,6 +22,11 @@ import { ClarisaProject } from './dto/clarisa-project.types';
 // the cached payload + log a warn line. On COLD cache, throw
 // ServiceUnavailableException so the response envelope is a clean 503
 // instead of leaking an upstream stack trace.
+// CLARISA acronym for the Alliance of Bioversity and CIAT. The picker only
+// offers Alliance-led bilateral projects; other centers' projects stay
+// resolvable by id (findProjectById) so existing mappings keep rendering.
+const ALLIANCE_LEAD_ACRONYM = 'ABC';
+
 @Injectable()
 export class ClarisaProjectsService {
   private readonly logger = new Logger(ClarisaProjectsService.name);
@@ -36,7 +41,11 @@ export class ClarisaProjectsService {
 
   async listBilateralProjects(): Promise<ClarisaProject[]> {
     const all = await this.getCachedAll();
-    return all.filter((p) => p.source_of_funding === 'Bilateral');
+    return all.filter(
+      (p) =>
+        p.source_of_funding === 'Bilateral' &&
+        p.lead_institution_object?.acronym === ALLIANCE_LEAD_ACRONYM,
+    );
   }
 
   async findProjectById(id: number): Promise<ClarisaProject | null> {
