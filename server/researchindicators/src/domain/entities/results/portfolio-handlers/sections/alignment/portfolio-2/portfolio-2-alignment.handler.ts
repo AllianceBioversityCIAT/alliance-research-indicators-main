@@ -76,7 +76,9 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
       await this.resultStrategicObjectivesService.create(
         context.resultId,
         payload.strategic_objectives.map((strategicObjective) => ({
-          strategic_objective_id: strategicObjective.strategic_objective_id,
+          strategic_objective_id: parseInt(
+            strategicObjective?.strategic_objective_id as unknown as string,
+          ),
         })),
         'strategic_objective_id',
         ResultStrategicObjectiveRolesEnum.ALIGNMENT,
