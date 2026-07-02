@@ -215,8 +215,7 @@ export class BilateralService {
         return {
           code,
           name,
-          category:
-            meta?.category ?? fallback?.category ?? null,
+          category: meta?.category ?? fallback?.category ?? null,
           color: fallback?.color ?? null,
           icon_key: fallback?.icon_key ?? null,
           allocation: meta?.allocation ?? null,
@@ -451,7 +450,10 @@ export class BilateralService {
 
     for (const m of mappings) {
       const u = m.global_unit_object;
-      if (!u?.smo_code || !this.isProjectScienceProgramMapping(m, activePortfolio)) {
+      if (
+        !u?.smo_code ||
+        !this.isProjectScienceProgramMapping(m, activePortfolio)
+      ) {
         continue;
       }
       if (!nameByCode.has(u.smo_code)) {
@@ -498,7 +500,10 @@ export class BilateralService {
       allocation?: number;
       global_unit_object?: {
         smo_code?: string;
-        cgiar_entity_type_object?: { prefix?: string | null; name?: string | null };
+        cgiar_entity_type_object?: {
+          prefix?: string | null;
+          name?: string | null;
+        };
         portfolio_object?: { acronym?: string };
       };
     }>;
@@ -511,7 +516,10 @@ export class BilateralService {
 
     for (const m of project.project_mappings_array ?? []) {
       const u = m.global_unit_object;
-      if (!u?.smo_code || !this.isProjectScienceProgramMapping(m, activePortfolio)) {
+      if (
+        !u?.smo_code ||
+        !this.isProjectScienceProgramMapping(m, activePortfolio)
+      ) {
         continue;
       }
       if (!metaByCode.has(u.smo_code)) {
