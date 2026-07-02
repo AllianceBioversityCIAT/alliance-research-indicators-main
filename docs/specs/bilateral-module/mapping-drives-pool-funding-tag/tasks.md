@@ -2,7 +2,7 @@
 
 - **Module:** agresso (bilateral)
 - **Spec id:** 2026-07-mapping-drives-pool-funding-tag
-- **Status:** in-progress (T-01…T-05 done; T-06 pending)
+- **Status:** complete (T-01…T-06 done, 2026-07-02)
 - **Owner:** PO (bilateral squad)
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -163,14 +163,14 @@ graph TD
   - No behavior change in this task beyond docs; keep it in the same PR as T-02 if the team prefers.
 - **Acceptance / done check:**
   - [x] `EXPLAIN` run against CORE (user-authorized, 2026-07-02). `idx_bpm_agreement` exists and appears in `possible_keys` on every `bpm` DEPENDENT SUBQUERY; the optimizer currently picks a full scan because the table holds ~5 rows (cost model — scan beats index at this size) and will switch to `ref` as it grows. NFR-BIL-100 intent met: no read-path regression (5-row scans are negligible; the `ALL` on `agresso_contracts` is pre-existing find-contracts behavior). Re-check EXPLAIN when `bilateral_project_mapping` grows materially (evidence in execution.md).
-  - [ ] Manual: `GET /api/agresso/contracts/find-contracts?contract-code=D504` returns
-        `is_pool_funding_contributor: true` (mapping id 11, no manual tag). — **PENDING USER** (needs running instance).
-  - [ ] Manual: deactivate D504's mapping → same query returns `false`. — **PENDING USER.**
-  - [x] Swagger at `/swagger` shows the updated `pool-funding-contributor` description — code change merged (Reviewer PASS); visual spot-check pending the manual session.
+  - [x] Manual: `GET /api/agresso/contracts/find-contracts?contract-code=D504` returned
+        `is_pool_funding_contributor: true` (active mapping, no manual tag) — verified 2026-07-02 against local instance on :3001 (CORE DB). Filter checks: `pool-funding-contributor=true` includes D504; `=false` excludes it.
+  - [x] Manual: deactivated D504's mapping (id 11) → same query returned `false`; mapping re-created (new id 12) → `true` again. Lifecycle round-trip complete; data restored.
+  - [x] Swagger: `/swagger-json` shows the updated description on find-contracts and the unchanged raw-tag text on the root endpoint (OQ-2 intact).
 - **Dependencies:** T-02, T-03
 - **Estimated effort:** S
 - **Owner:** <name>
-- **Status:** in-progress [~] — code complete; runtime verification pending user
+- **Status:** done [x]
 
 ---
 
@@ -218,9 +218,9 @@ Applicable: 4 (Repository), 11 (Unit tests), 14 (Docs/Swagger), 15 (Rollout/comm
 
 ## 8. Done definition
 
-- [ ] T-01…T-06 done.
-- [ ] R-BIL-100…105 ACs and NFR-BIL-100 checked.
-- [ ] `npm run test:cov` ≥ 60%.
-- [ ] Swagger `pool-funding-contributor` description updated.
-- [ ] Manual verification (D504 badge on/off) passes.
-- [ ] Rollout note in place (code-only deploy; backout = git revert; STAR team notified).
+- [x] T-01…T-06 done.
+- [x] R-BIL-100…105 ACs and NFR-BIL-100 checked (NFR: index present/applicable; optimizer full-scans the ~5-row table by cost — re-check as it grows; see execution.md).
+- [x] `npm run test:cov` ≥ 60% (81.8% lines).
+- [x] Swagger `pool-funding-contributor` description updated (find-contracts only; root endpoint raw text intact per OQ-2).
+- [x] Manual verification (D504 badge on/off) passes — 2026-07-02, local instance :3001; mapping restored as id 12.
+- [ ] Rollout note in place (code-only deploy; backout = git revert; STAR team notified). — **PENDING:** notify STAR team + MEL/PO on deploy.

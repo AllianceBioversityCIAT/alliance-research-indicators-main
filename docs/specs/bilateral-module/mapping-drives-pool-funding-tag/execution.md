@@ -178,7 +178,16 @@
 - **`EXPLAIN` (count + main queries, filter=true):** every `bpm` row is `select_type: DEPENDENT SUBQUERY` with `possible_keys: idx_bpm_agreement` but `key: null`, `type: ALL`, `rows: 5` — the optimizer skips the index because `bilateral_project_mapping` currently holds ~5 rows and a full scan of 5 rows is cheaper than an index lookup; it will switch to `ref` access as the table grows. The `type: ALL` on `agresso_contracts` (4018 rows) is pre-existing find-contracts behavior, not introduced by this spec.
 - **Verdict (NFR-BIL-100):** intent met — the index exists and is applicable (`possible_keys`), and there is no read-path regression at current data volume. The literal "EXPLAIN shows index use" criterion is deferred by the optimizer's cost model, not by a missing/inapplicable index. **Follow-up:** re-run EXPLAIN when `bilateral_project_mapping` grows materially (e.g. >1k rows) to confirm the switch to `ref`.
 
-#### Part 2b: manual D504 verification (PENDING USER)
+#### Part 2b: manual D504 verification — ✅ DONE (2026-07-02, user-authorized, local instance :3001 → CORE DB)
+
+All checks executed by the Leader with explicit user approval; server running locally on port 3001:
+
+1. `GET /api/agresso/contracts/find-contracts?contract-code=D504` → `is_pool_funding_contributor: true` (active mapping, no manual tag) — R-BIL-100 AC.1 / the originating D504 scenario. ✅
+2. Filter checks (read-only): `pool-funding-contributor=true&contract-code=D504` → 1 row (D504, true); `pool-funding-contributor=false&contract-code=D504` → 0 rows — R-BIL-101 AC.1/AC.3 live. ✅
+3. Lifecycle round-trip (user approved mutation of shared CORE data): `PATCH /api/bilateral-project-mappings/11/deactivate` → 200, `is_active: false`; find-contracts then returned `is_pool_funding_contributor: false` (R-BIL-104 AC.1) ✅. Mapping re-created via `POST /api/bilateral-project-mappings` (D504 → CLARISA 22, DESIRA) → 201, **new id 12**; find-contracts returned `true` again ✅. Net data state: D504 badge restored; old mapping 11 remains soft-deleted history.
+4. Swagger: `/swagger-json` shows the new description on find-contracts' `pool-funding-contributor` and the unchanged raw-tag text on the root endpoint (OQ-2 intact). ✅
+
+**T-06 status: COMPLETE.** These checks also close the runtime lifecycle items deferred from T-04/T-05.
 
 - **Connectivity:** CORE MySQL (`ARI_MYSQL_HOST=192.168.20.210`, db `alliancereportingdb`) IS TCP-reachable from this machine (`nc -z` succeeded) — the earlier "unreachable" expectation applied to the TEST host only.
 - **Blocker:** executing queries against the shared CORE DB requires explicit user authorization; the Implementer's read-only mysql2 script was correctly denied by the permission layer, and the Leader declined to run it on a teammate's request (permission boundary). **Not an environmental failure — an authorization gate.**
@@ -190,9 +199,14 @@
 
 ---
 
-## 3. Summary
+## 3. Summary — SPEC COMPLETE (2026-07-02)
 
-- **T-01…T-05 ✅ complete — every task passed Reviewer audit on the first attempt.** T-06 is code-complete (Swagger, Reviewer PASS); its `EXPLAIN` + manual D504 runtime checks are **pending user authorization/environment** (see T-06 Part 2 above).
-- Commits: `ba4a7d12` (T-01), `85c3f663` (T-02), `44b8c57e` (T-03), `2a33e768` (T-05), `9fcccebf` (T-04), + T-06 Swagger commit.
-- Open items awaiting PO/user: **T-06 Part 2** (EXPLAIN + D504 manual verification), OQ-2 (root endpoint raw-column filter, deferred 2026-07-01), RB-5 (pre-existing `bilateral.service.ts:205` lint error outside spec).
-- Rollout reminder (design §11): code-only deploy; backout = git revert; notify STAR team + MEL/PO that mapped contracts now surface the badge automatically.
+- **T-01…T-06 ✅ all complete.** Every Reviewer audit passed on the first attempt (zero rework loops). Runtime verification (EXPLAIN + D504 lifecycle + Swagger) executed 2026-07-02 with user authorization.
+- Commits: `ba4a7d12` (T-01), `85c3f663` (T-02), `44b8c57e` (T-03), `2a33e768` (T-05), `9fcccebf` (T-04), `983c03aa` (T-06 Swagger), `e9a9c1f1` (EXPLAIN evidence), + final close-out commit.
+- Requirements: R-BIL-100…105 verified (unit + live); NFR-BIL-100 verified with the small-table caveat (re-check EXPLAIN as `bilateral_project_mapping` grows).
+- **Remaining follow-ups (outside execution):**
+  - Rollout comms (design §11): notify STAR team + MEL/PO on deploy that mapped contracts now surface the badge automatically; code-only deploy, backout = git revert.
+  - OQ-2 (PO decision): root `GET /api/agresso/contracts` still serves raw-column pool-funding semantics.
+  - RB-5: pre-existing `bilateral.service.ts:205` unused `activePortfolio` lint error (outside spec; bilateral squad).
+  - D-pf-5 drift note: OpenSearch document still indexes the raw column (out of scope by decision).
+  - Data note: D504's active mapping is now **id 12** (id 11 soft-deleted during lifecycle verification).
