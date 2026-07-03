@@ -310,6 +310,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       [OrderFieldsEnum.LEAD_CENTER]: 'ac.ubwClientDescription',
       [OrderFieldsEnum.LEVER]: 'cl.id',
       [OrderFieldsEnum.COUNT_RESULTS]: 'contract_total_results',
+      [OrderFieldsEnum.FUNDING_TYPE]: 'ac.funding_type',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
@@ -476,6 +477,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter?.project_name}%'`)}
         ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter?.principal_investigator}%'`)}
         ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
+        ${validFilter(filter?.funding_type, `AND ac.funding_type = '${filter?.funding_type}'`)}
         ${dateFilterClause}
         ${validFilter(filter?.status, this.buildStatusFilterClause(filter?.status))}
         ${orderBy}
@@ -998,5 +1000,16 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         name: formatPersonName(name),
         role,
       }));
+  }
+
+  async getFundingTypes() {
+    const query = `
+      SELECT DISTINCT funding_type FROM agresso_contracts
+    `;
+
+    const rows = await this.query(query).then((rows) =>
+      rows.filter((row) => row.funding_type),
+    );
+    return rows as string[];
   }
 }
