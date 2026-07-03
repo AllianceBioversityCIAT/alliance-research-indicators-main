@@ -670,7 +670,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
    */
   private buildFindResultsV2PublicLinkSqlExpression(): string {
     return `IF(
-      r.platform_code IN ('PRMS', 'TIP'),
+      r.platform_code NOT IN ('STAR'),
       r.public_link,
       ${this.buildFindResultsV2BuiltPublicLinkSqlExpression()}
     )`;
