@@ -33,13 +33,13 @@ describe('AgressoContractController', () => {
     findContractsResultByCurrentUser: jest.fn(),
     findContratResultByContractId: jest.fn(),
     findAgressoContracts: jest.fn(),
+    setPoolFundingTag: jest.fn(),
     getGeoScopeReport: jest.fn(),
     getTopPartnersReport: jest.fn(),
     getTopContributorsReport: jest.fn(),
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
-    setPoolFundingTag: jest.fn(),
   };
 
   beforeEach(async () => {

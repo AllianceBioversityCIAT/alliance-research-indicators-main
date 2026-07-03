@@ -8,6 +8,7 @@ import { ResultSortEnum } from '../enum/result-sort.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
+import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 
 describe('ResultRepository', () => {
   let repository: ResultRepository;
@@ -593,6 +594,85 @@ describe('ResultRepository', () => {
         hasNextPage: true,
         hasPreviousPage: true,
       });
+    });
+  });
+
+  describe('findPoolFundingAlignmentContext', () => {
+    // The effective pool-funding predicate is derived from the single shared
+    // helper; tests compare against its output rather than hardcoding the SQL so
+    // the assertions never drift from the source of truth.
+    const effectivePredicate = effectivePoolFundingContributorSql('ac');
+
+    // R-BIL-103 AC.1 — the results read path projects the effective flag.
+    it('projects the effective pool-funding predicate, not the raw column', async () => {
+      await repository.findPoolFundingAlignmentContext(123);
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toContain(
+        `${effectivePredicate} AS is_pool_funding_contributor`,
+      );
+      // The pre-change raw projection must be gone.
+      expect(sql).not.toContain(
+        'COALESCE(ac.is_pool_funding_contributor, FALSE)',
+      );
+    });
+
+    it('binds the result id as the sole positional parameter', async () => {
+      await repository.findPoolFundingAlignmentContext(123);
+      expect(querySpy.mock.calls[0][1]).toEqual([123]);
+    });
+
+    it('returns the first row when present', async () => {
+      const row = {
+        result_id: 123,
+        is_pool_funding_contributor: true,
+      };
+      querySpy.mockResolvedValueOnce([row]);
+      await expect(
+        repository.findPoolFundingAlignmentContext(123),
+      ).resolves.toBe(row);
+    });
+
+    it('returns null when the query yields no rows', async () => {
+      querySpy.mockResolvedValueOnce([]);
+      await expect(
+        repository.findPoolFundingAlignmentContext(123),
+      ).resolves.toBeNull();
+    });
+
+    // R-BIL-103 AC.2 — unit-level parity guarantee: because both the results
+    // repository and agresso-contract.repository import the same
+    // effectivePoolFundingContributorSql('ac') helper, the fragment embedded in
+    // this query is string-identical to the one the find-contracts projection,
+    // filter, and ordering use. Asserting containment of the helper's exact
+    // output proves the two read paths derive the flag identically.
+    it('embeds the shared effective predicate string-identically to find-contracts', async () => {
+      await repository.findPoolFundingAlignmentContext(123);
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toContain(effectivePredicate);
+    });
+
+    // R-BIL-104 / R-BIL-105 — lifecycle semantics live in the predicate itself.
+    // The predicate is a pure OR of two branches with no suppress path, so:
+    // - the manual-tag branch keeps the badge when tag = 1 (R-BIL-104 AC.2 /
+    //   R-BIL-105 AC.2: manual tag persists after a mapping is deactivated);
+    // - the active-mapping branch (gated on bpm.is_active = 1) lights the badge
+    //   while a mapping is active and drops it once deactivated (R-BIL-104 AC.1);
+    // - because the two branches are OR-ed with no override, an active mapping
+    //   forces the flag true even over a manual false (R-BIL-105 AC.1).
+    it('derives the effective flag as a pure OR of the manual-tag and active-mapping branches', async () => {
+      await repository.findPoolFundingAlignmentContext(123);
+      const sql = querySpy.mock.calls[0][0] as string;
+      // Manual-tag branch — persists the badge for hand-tagged contracts.
+      expect(sql).toContain('COALESCE(ac.is_pool_funding_contributor, 0) = 1');
+      // Active-mapping branch — correlated on the contract's agreement id and
+      // gated on is_active, so deactivation removes the derived badge.
+      expect(sql).toContain('bpm.agresso_agreement_id = ac.agreement_id');
+      expect(sql).toContain('bpm.is_active = 1');
+      // The two branches are OR-ed (no AND / suppress column): pure OR means an
+      // active mapping wins over a manual false.
+      expect(sql).toMatch(
+        /COALESCE\([\s\S]*OR EXISTS[\s\S]*bpm\.is_active = 1/,
+      );
     });
   });
 });

@@ -41,6 +41,8 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
     allocation = 50,
     portfolio = 'P25',
     status = 'Confirmed',
+    level = 1,
+    prefix = 'SP',
   ) => ({
     id: smoCode.charCodeAt(2),
     project_id: 1,
@@ -51,7 +53,8 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
       id: 200 + smoCode.charCodeAt(2),
       smo_code: smoCode,
       name: `name-of-${smoCode}`,
-      cgiar_entity_type_object: { code: 22, name: 'Science programs' },
+      level,
+      cgiar_entity_type_object: { code: 22, name: 'Science programs', prefix },
       portfolio_object: { id: 3, acronym: portfolio },
     },
   });
@@ -316,5 +319,82 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
       'SP09',
       'SP10',
     ]);
+  });
+
+  it('excludes non-SP / non-level-1 mappings so picker SPs match the ToC catalog (SP09 vs AOW06)', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 1,
+      result_official_code: 1001,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 1,
+      clarisa_project_short_name: 'p',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 1,
+      short_name: 'p',
+      project_mappings_array: [
+        baseProjectMapping('SP09', 25, 'P25', 'Confirmed'),
+        baseProjectMapping('AOW06', 75, 'P25', 'Confirmed', 2, 'AOW'),
+      ],
+    });
+
+    const out = await service.getScienceProgramsForResult(1, '1001');
+
+    expect(out.science_programs.map((p) => p.code)).toEqual(['SP09']);
+  });
+
+  it('includes SP mappings regardless of CLARISA level when prefix/code is SPxx', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 1,
+      result_official_code: 1001,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 1,
+      clarisa_project_short_name: 'p',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 1,
+      short_name: 'p',
+      project_mappings_array: [
+        baseProjectMapping('SP09', 25, 'P25', 'Confirmed', 2, 'SP'),
+        baseProjectMapping('SP10', 75, 'P25', 'Confirmed'),
+      ],
+    });
+
+    const out = await service.getScienceProgramsForResult(1, '1001');
+
+    expect(out.science_programs.map((p) => p.code)).toEqual(['SP09', 'SP10']);
+  });
+
+  it('includes SPxx when CLARISA omits prefix but smo_code is SPxx', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 1,
+      result_official_code: 1001,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 1,
+      clarisa_project_short_name: 'p',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 1,
+      short_name: 'p',
+      project_mappings_array: [
+        {
+          ...baseProjectMapping('SP09', 25, 'P25', 'Confirmed'),
+          global_unit_object: {
+            ...baseProjectMapping('SP09').global_unit_object,
+            cgiar_entity_type_object: { code: 22, name: 'Science programs' },
+          },
+        },
+      ],
+    });
+
+    const out = await service.getScienceProgramsForResult(1, '1001');
+
+    expect(out.science_programs.map((p) => p.code)).toEqual(['SP09']);
   });
 });

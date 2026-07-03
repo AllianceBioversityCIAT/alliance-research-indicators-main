@@ -13,11 +13,23 @@ import { ClarisaProject } from './dto/clarisa-project.types';
 // the whole HttpService — keeps the test focused on caching + resilience
 // rather than HTTP wire details.
 
-const bilateralProject = (id: number, shortName: string): ClarisaProject => ({
+const bilateralProject = (
+  id: number,
+  shortName: string,
+  leadAcronym: string | null = 'ABC',
+): ClarisaProject => ({
   id,
   short_name: shortName,
   source_of_funding: 'Bilateral',
   project_mappings_array: [],
+  lead_institution_object:
+    leadAcronym === null
+      ? null
+      : {
+          id: 49,
+          name: 'Alliance of Bioversity and CIAT',
+          acronym: leadAcronym,
+        },
 });
 
 const window3Project = (id: number, shortName: string): ClarisaProject => ({
@@ -54,7 +66,7 @@ describe('ClarisaProjectsService', () => {
   afterEach(() => jest.clearAllMocks());
 
   describe('listBilateralProjects', () => {
-    it('filters to source_of_funding === "Bilateral"', async () => {
+    it('filters to source_of_funding === "Bilateral" led by the Alliance (ABC)', async () => {
       connectionGet.mockResolvedValueOnce([
         bilateralProject(1, 'T-PJ-003262'),
         window3Project(2, 'N-303008'),
@@ -66,6 +78,29 @@ describe('ClarisaProjectsService', () => {
       expect(out.map((p) => p.id)).toEqual([1, 3]);
       expect(connectionGet).toHaveBeenCalledTimes(1);
       expect(connectionGet).toHaveBeenCalledWith('api/projects');
+    });
+
+    it('excludes bilateral projects led by other centers or without lead', async () => {
+      connectionGet.mockResolvedValueOnce([
+        bilateralProject(1, '3S-ASEAN'),
+        bilateralProject(22, '1414-EC00 DESIRA', 'CIP'),
+        bilateralProject(30, 'NO-LEAD', null),
+      ]);
+
+      const out = await service.listBilateralProjects();
+
+      expect(out.map((p) => p.id)).toEqual([1]);
+    });
+
+    it('still resolves non-Alliance projects by id (existing mappings keep rendering)', async () => {
+      connectionGet.mockResolvedValueOnce([
+        bilateralProject(1, '3S-ASEAN'),
+        bilateralProject(22, '1414-EC00 DESIRA', 'CIP'),
+      ]);
+
+      expect((await service.findProjectById(22))?.short_name).toBe(
+        '1414-EC00 DESIRA',
+      );
     });
 
     it('serves from cache on second call within TTL', async () => {

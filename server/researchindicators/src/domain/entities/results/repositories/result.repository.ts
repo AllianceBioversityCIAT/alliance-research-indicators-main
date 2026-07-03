@@ -15,6 +15,7 @@ import { ResultSortEnum, ResultSortFields } from '../enum/result-sort.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
+import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 
 export interface PoolFundingAlignmentContext {
   result_id: number;
@@ -202,7 +203,8 @@ export class ResultRepository
         r.platform_code,
         r.indicator_id,
         ac.agreement_id AS agresso_agreement_id,
-        COALESCE(ac.is_pool_funding_contributor, FALSE) AS is_pool_funding_contributor
+        -- @sdd-spec bilateral-module/mapping-drives-pool-funding-tag
+        ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor
       FROM results r
       LEFT JOIN result_contracts rc
         ON rc.result_id = r.result_id

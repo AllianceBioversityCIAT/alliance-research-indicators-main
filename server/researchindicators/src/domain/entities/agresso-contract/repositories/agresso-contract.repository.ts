@@ -20,6 +20,10 @@ import {
   isValidText,
 } from '../../../shared/utils/query-sanitizer.util';
 import { User } from '../../../complementary-entities/secondary/user/user.entity';
+import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
+import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
+import { AgressoContractOpensearchDto } from '../../../tools/open-search/agresso-contract/dto/agresso-contract.opensearch.dto';
+import { FindAllOptions } from '../../../shared/enum/find-all-options';
 import {
   ContractGeoScopeReportDto,
   CountryWithSubNationalsDto,
@@ -49,9 +53,6 @@ import {
 } from '../dto/reports-contract-staff.dto';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
-import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
-import { AgressoContractOpensearchDto } from '../../../tools/open-search/agresso-contract/dto/agresso-contract.opensearch.dto';
-import { FindAllOptions } from '../../../shared/enum/find-all-options';
 
 @Injectable()
 export class AgressoContractRepository
@@ -340,6 +341,8 @@ export class AgressoContractRepository
       [OrderFieldsEnum.LEAD_CENTER]: 'ac.ubwClientDescription',
       [OrderFieldsEnum.LEVER]: 'cl.id',
       [OrderFieldsEnum.COUNT_RESULTS]: 'contract_total_results',
+      [OrderFieldsEnum.POOL_FUNDING_CONTRIBUTOR]:
+        effectivePoolFundingContributorSql('ac'),
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
@@ -387,9 +390,10 @@ export class AgressoContractRepository
       if (isEmpty(attr)) return '';
       return filter;
     };
+    // @sdd-spec bilateral-module/mapping-drives-pool-funding-tag
     const poolFundingContributorFilter =
       typeof filter?.is_pool_funding_contributor === 'boolean'
-        ? `AND ac.is_pool_funding_contributor = ${filter.is_pool_funding_contributor ? 1 : 0}`
+        ? `AND ${effectivePoolFundingContributorSql('ac')} = ${filter.is_pool_funding_contributor ? 1 : 0}`
         : '';
 
     const dateFilterClause = this.buildDateFilterClause(filter);
@@ -490,7 +494,7 @@ export class AgressoContractRepository
             cl.full_name as lever_full_name,
             cl.other_names as lever_other_names,
             IF(pfc.id IS NOT NULL, TRUE, FALSE) AS is_science_program,
-            ac.is_pool_funding_contributor,
+            ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
             ac.funding_type,
             CASE 
                 WHEN ac.ubwClientDescription = 'ExCIAT' THEN 'CIAT'
