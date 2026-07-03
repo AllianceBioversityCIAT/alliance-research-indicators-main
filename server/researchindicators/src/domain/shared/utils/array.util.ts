@@ -82,7 +82,7 @@ export const filterPersistKey = <T extends AuditableEntity>(
 
 export const validTypeOfArray = (array: any[]): string[] => {
   return array.map((item) => {
-    return `${item}`.replace(/[^a-zA-Z0-9]/g, '');
+    return `${item}`.replace(/[^a-zA-Z0-9/]/g, '');
   });
 };
 

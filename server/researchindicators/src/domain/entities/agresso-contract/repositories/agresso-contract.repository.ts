@@ -455,6 +455,13 @@ export class AgressoContractRepository
       };
     }
 
+    console.log(
+      validFilter(
+        filter?.funding_type,
+        `AND ac.funding_type in (${filter?.funding_type?.join(',')})`,
+      ),
+    );
+
     const newQuery = `
     SELECT 
         paginated_contracts.agreement_id,
@@ -517,7 +524,7 @@ export class AgressoContractRepository
         ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter?.principal_investigator}%'`)}
         ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
         ${poolFundingContributorFilter}
-        ${validFilter(filter?.funding_type, `AND ac.funding_type = '${filter?.funding_type}'`)}
+        ${validFilter(filter?.funding_type, `AND ac.funding_type in (${filter?.funding_type?.map((fundingType) => `'${fundingType}'`).join(',')})`)}
         ${dateFilterClause}
         ${validFilter(filter?.status, this.buildStatusFilterClause(filter?.status))}
         ${orderBy}
