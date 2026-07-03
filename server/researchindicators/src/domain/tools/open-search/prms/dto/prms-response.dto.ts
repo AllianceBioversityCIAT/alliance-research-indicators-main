@@ -202,3 +202,10 @@ export class ResultResponseMapper {
   public primary_entity: PrimaryEntityMapper;
   public created_by: CreatedByMapper;
 }
+
+export class PrmsTemporalResponseMapper {
+  public code: number;
+  public year: number;
+  public is_version: boolean;
+  public data: ResultResponseMapper;
+}
