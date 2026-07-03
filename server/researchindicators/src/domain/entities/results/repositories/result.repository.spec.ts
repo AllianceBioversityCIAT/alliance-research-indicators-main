@@ -385,7 +385,7 @@ describe('ResultRepository', () => {
 
     it('buildFindResultsV2PublicLinkSqlExpression uses PRMS/TIP column and built branch', () => {
       const expr = repository['buildFindResultsV2PublicLinkSqlExpression']();
-      expect(expr).toContain("r.platform_code IN ('PRMS', 'TIP')");
+      expect(expr).toContain("r.platform_code NOT IN ('STAR')");
       expect(expr).toContain('r.public_link');
       expect(expr).toContain('NULL');
     });
