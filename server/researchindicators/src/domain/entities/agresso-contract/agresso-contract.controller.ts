@@ -376,7 +376,7 @@ export class AgressoContractController {
     @Query('current-user') currentUser: TrueFalseEnum,
     @Query('contract-code') contractCode: string,
     @Query('project-name') projectName: string,
-    @Query('funding-type') fundingType: string,
+    @Query('funding-type', ListParseToArrayPipe) fundingType: string[],
     @Query('principal-investigator') principalInvestigator: string,
     @Query('lever', ListParseToArrayPipe) lever: string[],
     @Query('status', ListParseToArrayPipe) status: AgressoContractStatus[],
