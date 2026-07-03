@@ -202,7 +202,6 @@ export class BilateralService {
       };
     }
 
-    const activePortfolio = ENV.BILATERAL_ACTIVE_PORTFOLIO;
     const derived = this.deriveSciencePrograms(project);
     const catalog = await this.clarisaScienceProgramsService.findAll();
     const catalogByCode = new Map(catalog.map((sp) => [sp.official_code, sp]));
