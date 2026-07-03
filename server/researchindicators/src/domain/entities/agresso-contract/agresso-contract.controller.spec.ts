@@ -802,3 +802,4 @@ describe('AgressoContractController', () => {
       });
     });
   });
+});

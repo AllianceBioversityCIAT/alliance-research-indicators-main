@@ -57,7 +57,8 @@ import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 @Injectable()
 export class AgressoContractRepository
   extends Repository<AgressoContract>
-  implements ElasticFindEntity<AgressoContractOpensearchDto> {
+  implements ElasticFindEntity<AgressoContractOpensearchDto>
+{
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUser: CurrentUserUtil,
@@ -102,18 +103,19 @@ export class AgressoContractRepository
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
-        .map(([key, value]) =>
-          key === 'is_pool_funding_contributor'
-            ? `ac.${key} = ${value ? 1 : 0}`
-            : `ac.${key} like '%${value}%'`,
-        )
-        .join(' AND ')}`
+          .map(([key, value]) =>
+            key === 'is_pool_funding_contributor'
+              ? `ac.${key} = ${value ? 1 : 0}`
+              : `ac.${key} like '%${value}%'`,
+          )
+          .join(' AND ')}`
       : '';
     const query = `
     select ac.*,
     ifnull(cl.full_name, 'Not available' ) as lever,
     cl.id as lever_id
-    ${relations?.countries
+    ${
+      relations?.countries
         ? `,JSON_ARRAYAGG(
             JSON_OBJECT(
                 'agreement_id', acc.agreement_id,
@@ -122,7 +124,7 @@ export class AgressoContractRepository
             )
         ) AS countries`
         : ''
-      }
+    }
     from agresso_contracts ac 
     LEFT JOIN 
         agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
