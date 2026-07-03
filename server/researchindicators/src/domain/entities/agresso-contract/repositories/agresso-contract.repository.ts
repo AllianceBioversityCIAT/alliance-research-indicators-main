@@ -57,8 +57,7 @@ import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 @Injectable()
 export class AgressoContractRepository
   extends Repository<AgressoContract>
-  implements ElasticFindEntity<AgressoContractOpensearchDto>
-{
+  implements ElasticFindEntity<AgressoContractOpensearchDto> {
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUser: CurrentUserUtil,
@@ -103,19 +102,18 @@ export class AgressoContractRepository
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
-          .map(([key, value]) =>
-            key === 'is_pool_funding_contributor'
-              ? `ac.${key} = ${value ? 1 : 0}`
-              : `ac.${key} like '%${value}%'`,
-          )
-          .join(' AND ')}`
+        .map(([key, value]) =>
+          key === 'is_pool_funding_contributor'
+            ? `ac.${key} = ${value ? 1 : 0}`
+            : `ac.${key} like '%${value}%'`,
+        )
+        .join(' AND ')}`
       : '';
     const query = `
     select ac.*,
     ifnull(cl.full_name, 'Not available' ) as lever,
     cl.id as lever_id
-    ${
-      relations?.countries
+    ${relations?.countries
         ? `,JSON_ARRAYAGG(
             JSON_OBJECT(
                 'agreement_id', acc.agreement_id,
@@ -124,7 +122,7 @@ export class AgressoContractRepository
             )
         ) AS countries`
         : ''
-    }
+      }
     from agresso_contracts ac 
     LEFT JOIN 
         agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
@@ -343,6 +341,7 @@ export class AgressoContractRepository
       [OrderFieldsEnum.COUNT_RESULTS]: 'contract_total_results',
       [OrderFieldsEnum.POOL_FUNDING_CONTRIBUTOR]:
         effectivePoolFundingContributorSql('ac'),
+      [OrderFieldsEnum.FUNDING_TYPE]: 'ac.funding_type',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
@@ -518,6 +517,7 @@ export class AgressoContractRepository
         ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter?.principal_investigator}%'`)}
         ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
         ${poolFundingContributorFilter}
+        ${validFilter(filter?.funding_type, `AND ac.funding_type = '${filter?.funding_type}'`)}
         ${dateFilterClause}
         ${validFilter(filter?.status, this.buildStatusFilterClause(filter?.status))}
         ${orderBy}
@@ -1042,5 +1042,16 @@ export class AgressoContractRepository
         name: formatPersonName(name),
         role,
       }));
+  }
+
+  async getFundingTypes() {
+    const query = `
+      SELECT DISTINCT funding_type FROM agresso_contracts
+    `;
+
+    const rows = await this.query(query).then((rows) =>
+      rows.filter((row) => row.funding_type),
+    );
+    return rows as string[];
   }
 }

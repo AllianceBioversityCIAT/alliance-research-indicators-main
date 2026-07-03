@@ -42,6 +42,7 @@ describe('AgressoContractService', () => {
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
+    getFundingTypes: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -523,6 +524,21 @@ describe('AgressoContractService', () => {
 
       expect(repository.getGeoScopeReport).toHaveBeenCalledWith('A100', 10);
       expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getFundingTypes', () => {
+    it('should delegate funding types lookup to repository', async () => {
+      const expectedFundingTypes = [
+        { funding_type: 'BILATERAL' },
+        { funding_type: 'MULTILATERAL' },
+      ];
+      mockRepository.getFundingTypes.mockResolvedValue(expectedFundingTypes);
+
+      const result = await service.getFundingTypes();
+
+      expect(repository.getFundingTypes).toHaveBeenCalled();
+      expect(result).toEqual(expectedFundingTypes);
     });
   });
 });

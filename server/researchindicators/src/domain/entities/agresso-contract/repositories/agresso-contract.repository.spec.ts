@@ -1089,6 +1089,29 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getFundingTypes', () => {
+    it('should return distinct funding types excluding empty values', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([
+        { funding_type: 'BILATERAL' },
+        { funding_type: null },
+        { funding_type: 'MULTILATERAL' },
+        { funding_type: '' },
+      ]);
+
+      const result = await repository.getFundingTypes();
+
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'SELECT DISTINCT funding_type FROM agresso_contracts',
+        ),
+      );
+      expect(result).toEqual([
+        { funding_type: 'BILATERAL' },
+        { funding_type: 'MULTILATERAL' },
+      ]);
+    });
+  });
+
   describe('getTopPartnersReport', () => {
     it('should throw BadRequestException when contract id is empty', async () => {
       await expect(repository.getTopPartnersReport('')).rejects.toThrow(

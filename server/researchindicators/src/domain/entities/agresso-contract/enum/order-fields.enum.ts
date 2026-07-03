@@ -11,4 +11,5 @@ export enum OrderFieldsEnum {
   LEVER = 'lever',
   COUNT_RESULTS = 'count-results',
   POOL_FUNDING_CONTRIBUTOR = 'pool-funding-contributor',
+  FUNDING_TYPE = 'funding-type',
 }
