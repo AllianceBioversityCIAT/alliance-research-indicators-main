@@ -14,11 +14,16 @@ import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clar
 import { SyncProcessLogService } from '../../../entities/sync-process-log/sync-process-log.service';
 import { ExternalMappersDto } from '../../../shared/global-dto/external-mappers.dto';
 import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
-import { ResultResponseMapper } from './dto/prms-response.dto';
+import {
+  ResultResponseMapper,
+  PrmsTemporalResponseMapper,
+} from './dto/prms-response.dto';
 import { ResultTypeEnum } from './enum/rsult-type.enum';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
 import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
+import { PrmsRepository } from './repositories/prms.repository';
+import { PrmsTemporalResultsEntity } from './entities/prms-temporal-results.entity';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual('typeorm');
@@ -41,6 +46,8 @@ describe('PrmsOpenSearchService', () => {
   let clarisaLeversService: jest.Mocked<ClarisaLeversService>;
   let syncProcessLogService: jest.Mocked<SyncProcessLogService>;
   let saveResultService: jest.Mocked<SaveResultService>;
+  let prmsRepository: jest.Mocked<PrmsRepository>;
+  let temporalRepoHandle: { save: jest.Mock };
 
   const buildResultMapper = (
     overrides: Partial<ResultResponseMapper> = {},
@@ -77,6 +84,22 @@ describe('PrmsOpenSearchService', () => {
     return Object.assign(base, overrides);
   };
 
+  const buildTemporalMapper = (
+    dataOverrides: Partial<ResultResponseMapper> = {},
+    temporalOverrides: Partial<
+      Pick<PrmsTemporalResponseMapper, 'code' | 'year' | 'is_version'>
+    > = {},
+  ): PrmsTemporalResponseMapper => {
+    const data = buildResultMapper(dataOverrides);
+    return {
+      code: parseInt(data.result_code),
+      year: parseInt(data.year),
+      is_version: false,
+      data,
+      ...temporalOverrides,
+    };
+  };
+
   beforeEach(async () => {
     resultRepoHandle = {
       findOne: jest.fn(),
@@ -85,10 +108,16 @@ describe('PrmsOpenSearchService', () => {
     allianceStaffRepoHandle = {
       findOne: jest.fn(),
     };
+    temporalRepoHandle = {
+      save: jest.fn().mockResolvedValue(undefined),
+    };
     dataSource = {
       getRepository: jest.fn().mockImplementation((entity) => {
         if (entity === AllianceUserStaff) {
           return allianceStaffRepoHandle;
+        }
+        if (entity === PrmsTemporalResultsEntity) {
+          return temporalRepoHandle;
         }
         return resultRepoHandle;
       }),
@@ -183,6 +212,13 @@ describe('PrmsOpenSearchService', () => {
             bulkSaveAllSections: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: PrmsRepository,
+          useValue: {
+            findTemporalResults: jest.fn().mockResolvedValue([]),
+            deleteTemporalResults: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -195,6 +231,7 @@ describe('PrmsOpenSearchService', () => {
     clarisaLeversService = module.get(ClarisaLeversService);
     syncProcessLogService = module.get(SyncProcessLogService);
     saveResultService = module.get(SaveResultService);
+    prmsRepository = module.get(PrmsRepository);
   });
 
   afterEach(() => {
@@ -202,7 +239,9 @@ describe('PrmsOpenSearchService', () => {
   });
 
   describe('getData', () => {
-    it('should paginate PRMS search, process rows, and close sync log', async () => {
+    it('should paginate PRMS search, process temporal rows, and close sync log', async () => {
+      const temporalRow = buildTemporalMapper();
+      prmsRepository.findTemporalResults.mockResolvedValue([temporalRow]);
       httpService.get.mockReturnValue(
         of({
           data: {
@@ -210,7 +249,7 @@ describe('PrmsOpenSearchService', () => {
             page: 1,
             size: 50,
             totalPages: 2,
-            data: [],
+            data: [temporalRow.data],
           },
         }) as any,
       );
@@ -223,9 +262,21 @@ describe('PrmsOpenSearchService', () => {
       expect(httpService.get).toHaveBeenCalledTimes(2);
       const firstUrl = httpService.get.mock.calls[0][0] as string;
       expect(firstUrl).toContain('year=2024');
+      expect(prmsRepository.findTemporalResults).toHaveBeenCalled();
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalled();
       expect(syncProcessLogService.update).toHaveBeenCalled();
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
-      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalled();
+      expect(prmsRepository.deleteTemporalResults).toHaveBeenCalled();
+    });
+
+    it('should always delete temporal results even when sync fails', async () => {
+      syncProcessLogService.initiateSync.mockRejectedValueOnce(
+        new Error('sync failed'),
+      );
+
+      await service.getData(2024);
+
+      expect(prmsRepository.deleteTemporalResults).toHaveBeenCalled();
     });
 
     it('should omit year query param when year is empty', async () => {
@@ -246,7 +297,7 @@ describe('PrmsOpenSearchService', () => {
     it('should skip items whose indicator is not homologated', async () => {
       const warnSpy = jest.spyOn((service as any).logger, 'warn');
       const data = [
-        buildResultMapper({
+        buildTemporalMapper({
           indicator_category: {
             code: String(ResultTypeEnum.CAPACITY_CHANGE),
             name: 'X',
@@ -259,8 +310,15 @@ describe('PrmsOpenSearchService', () => {
       warnSpy.mockRestore();
     });
 
+    it('should map is_version_applied from temporal row', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({}, { is_version: true }),
+      ]);
+      expect(out[0].is_version_applied).toBe(true);
+    });
+
     it('should map a valid row without created_by', async () => {
-      const row = buildResultMapper({
+      const row = buildTemporalMapper({
         result_level: { code: 'L9', name: '', description: '' },
       });
       const out = await service.processData([row]);
@@ -278,7 +336,7 @@ describe('PrmsOpenSearchService', () => {
       clarisaLeversService.findByShortName.mockResolvedValueOnce({
         id: 1,
       } as any);
-      const out = await service.processData([buildResultMapper()]);
+      const out = await service.processData([buildTemporalMapper()]);
       expect(out[0].alignments.primary_levers[0].lever_id).toBe(999);
     });
 
@@ -293,7 +351,7 @@ describe('PrmsOpenSearchService', () => {
       } as any);
 
       const out = await service.processData([
-        buildResultMapper({
+        buildTemporalMapper({
           created_by: {
             first_name: 'A',
             last_name: 'B',
@@ -324,7 +382,7 @@ describe('PrmsOpenSearchService', () => {
       } as any);
 
       const out = await service.processData([
-        buildResultMapper({
+        buildTemporalMapper({
           created_by: {
             first_name: 'A',
             last_name: 'B',
@@ -346,7 +404,7 @@ describe('PrmsOpenSearchService', () => {
       allianceStaffRepoHandle.findOne.mockResolvedValue(null);
 
       const out = await service.processData([
-        buildResultMapper({
+        buildTemporalMapper({
           created_by: {
             first_name: 'A',
             last_name: 'B',
@@ -364,7 +422,7 @@ describe('PrmsOpenSearchService', () => {
       allianceStaffRepoHandle.findOne.mockResolvedValue(null);
 
       const out = await service.processData([
-        buildResultMapper({
+        buildTemporalMapper({
           created_by: {
             first_name: 'X',
             last_name: 'Y',
@@ -388,14 +446,14 @@ describe('PrmsOpenSearchService', () => {
         ] as any,
       );
 
-      const out = await service.processData([buildResultMapper()]);
+      const out = await service.processData([buildTemporalMapper()]);
       expect(out[0].alignments.contracts).toEqual([]);
     });
 
     it('should tolerate missing clarisa lever id', async () => {
       clarisaLeversService.findOne.mockResolvedValueOnce(null as any);
       clarisaLeversService.findByShortName.mockResolvedValueOnce(null as any);
-      const out = await service.processData([buildResultMapper()]);
+      const out = await service.processData([buildTemporalMapper()]);
       expect(out[0].alignments.primary_levers[0].lever_id).toBeUndefined();
     });
 
@@ -404,7 +462,7 @@ describe('PrmsOpenSearchService', () => {
       clarisaLeversService.findByShortName.mockResolvedValueOnce({
         id: 42,
       } as any);
-      const out = await service.processData([buildResultMapper()]);
+      const out = await service.processData([buildTemporalMapper()]);
       expect(out[0].alignments.primary_levers[0].lever_id).toBe(42);
     });
 
@@ -419,7 +477,7 @@ describe('PrmsOpenSearchService', () => {
         ] as any,
       );
 
-      const out = await service.processData([buildResultMapper()]);
+      const out = await service.processData([buildTemporalMapper()]);
       expect(out[0].alignments.contracts).toEqual([]);
       expect(out[0].createResult.contract_id).toBe('');
     });
