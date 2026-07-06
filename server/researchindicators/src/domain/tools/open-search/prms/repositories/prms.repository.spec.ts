@@ -45,13 +45,15 @@ describe('PrmsRepository', () => {
   });
 
   describe('deleteTemporalResults', () => {
-    it('should truncate the temporal table', async () => {
+    it('should delete staging records for the given execution code', async () => {
       dataSource.query.mockResolvedValue(undefined);
+      const executionCode = 'abc-123';
 
-      await repository.deleteTemporalResults();
+      await repository.deleteTemporalResults(executionCode);
 
       expect(dataSource.query).toHaveBeenCalledWith(
-        'DELETE FROM prms_temporal_results;',
+        'DELETE FROM sync_staging_records WHERE execution_code = ?;',
+        [executionCode],
       );
     });
   });

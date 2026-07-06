@@ -25,8 +25,8 @@ export class PrmsRepository {
     return this.dataSource.query(query);
   }
 
-  async deleteTemporalResults(): Promise<void> {
-    const query = `DELETE FROM prms_temporal_results;`;
-    await this.dataSource.query(query);
+  async deleteTemporalResults(executionCode: string): Promise<void> {
+    const query = `DELETE FROM sync_staging_records WHERE execution_code = ?;`;
+    await this.dataSource.query(query, [executionCode]);
   }
 }
