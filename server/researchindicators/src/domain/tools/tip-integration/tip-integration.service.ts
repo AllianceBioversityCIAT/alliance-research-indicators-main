@@ -107,6 +107,7 @@ export class TipIntegrationService extends BaseApi {
     const syncProcessLog = await this.syncProcessLogService.initiateSync(
       SyncProcessEnum.TIP_INTEGRATION,
     );
+    console.log('Bearer ' + this.token);
     while (pendingData) {
       const counters: CounterResults = new CounterResults();
       const response = await firstValueFrom(
