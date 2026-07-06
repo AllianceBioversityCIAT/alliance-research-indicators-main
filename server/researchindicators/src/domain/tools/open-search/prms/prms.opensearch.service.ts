@@ -43,8 +43,9 @@ import { CounterResults } from '../../tip-integration/dto/response-year-tip.dto'
 import { SyncProcessLogService } from '../../../entities/sync-process-log/sync-process-log.service';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
-import { PrmsTemporalResultsEntity } from './entities/prms-temporal-results.entity';
+import { SyncStagingRecordsEntity } from './entities/sync-staging-records.entity';
 import { PrmsRepository } from './repositories/prms.repository';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -175,6 +176,7 @@ export class PrmsOpenSearchService
     const size = 50;
     let page = 1;
     let keepGoing = true;
+    const executionCode = uuidv4();
     const currentCode: { current: number } = { current: null };
     const resultSaved: number[] = [];
     const counters: CounterResults = {
@@ -197,8 +199,9 @@ export class PrmsOpenSearchService
         ).then((response) => response.data);
         response.data.forEach(async (item) => {
           await this.dataSource
-            .getRepository(PrmsTemporalResultsEntity)
+            .getRepository(SyncStagingRecordsEntity)
             .save({
+              execution_code: executionCode,
               code: parseInt(item.result_code),
               year: parseInt(item.year),
               data: item,
@@ -231,7 +234,7 @@ export class PrmsOpenSearchService
     } catch (error) {
       this.logger.error(`Error getting data from PRMS: ${error.message}`);
     } finally {
-      await this.prmsRepository.deleteTemporalResults();
+      await this.prmsRepository.deleteTemporalResults(executionCode);
     }
   }
 
