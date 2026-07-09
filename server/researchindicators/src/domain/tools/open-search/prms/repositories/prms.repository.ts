@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { PrmsTemporalResponseMapper } from '../dto/prms-response.dto';
+import { PrmsTemporalResponseMapper, TemportalDataResponse } from '../dto/prms-response.dto';
 
 @Injectable()
 export class PrmsRepository {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(private readonly dataSource: DataSource) { }
 
-  async findTemporalResults(): Promise<PrmsTemporalResponseMapper[]> {
+  async findTemporalResults<T>(executionCode: string): Promise<TemportalDataResponse<T>[]> {
     const query = `SELECT
                     ptr.code,
                     ptr.\`year\`,
@@ -21,8 +21,9 @@ export class PrmsRepository {
                     FROM prms_temporal_results
                     GROUP BY code
                     ) m ON m.code = ptr.code
+                WHERE ptr.execution_code = ?
                 ORDER BY ptr.code, ptr.\`year\`;`;
-    return this.dataSource.query(query);
+    return this.dataSource.query(query, [executionCode]);
   }
 
   async deleteTemporalResults(executionCode: string): Promise<void> {
