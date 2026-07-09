@@ -110,7 +110,7 @@ import { GreenCheckRepository } from '../green-checks/repository/green-checks.re
 import { AiReportsService } from '../ai-reports/ai-reports.service';
 import {
   CreateAiReportDto,
-  createBulkUploadProcessesDto,
+  CreateBulkUploadProcessesDto,
   CreateBulkUploadResultsDto,
 } from '../ai-reports/dto/create-ai-report.dto';
 
@@ -1109,7 +1109,7 @@ export class ResultsService {
     const { results, metadata } = data;
 
     const iaMetadataReport = new CreateAiReportDto();
-    const iaMetadataReportProcess = new createBulkUploadProcessesDto();
+    const iaMetadataReportProcess = new CreateBulkUploadProcessesDto();
     const iaMetadataReportResults: CreateBulkUploadResultsDto[] = [];
 
     iaMetadataReportProcess.ai_interaction_id = metadata.ai_interaction_id;

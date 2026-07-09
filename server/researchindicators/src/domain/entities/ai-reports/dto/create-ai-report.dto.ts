@@ -2,7 +2,7 @@ import { OmitType, PartialType } from '@nestjs/swagger';
 import { BulkUploadProcesses } from '../entities/bulk-upload-processes.entity';
 import { BulkUploadResults } from '../entities/bulk-upload-results.entity';
 
-export class createBulkUploadProcessesDto extends PartialType(
+export class CreateBulkUploadProcessesDto extends PartialType(
   OmitType(BulkUploadProcesses, ['id', 'bulkUploadResults']),
 ) { }
 export class CreateBulkUploadResultsDto extends PartialType(
@@ -14,6 +14,6 @@ export class CreateBulkUploadResultsDto extends PartialType(
 ) { }
 
 export class CreateAiReportDto {
-  bulkUploadProcesses: createBulkUploadProcessesDto;
+  bulkUploadProcesses: CreateBulkUploadProcessesDto;
   bulkUploadResults: CreateBulkUploadResultsDto[];
 }
