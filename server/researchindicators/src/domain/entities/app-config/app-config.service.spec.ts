@@ -4,6 +4,8 @@ import { DataSource } from 'typeorm';
 import { AppConfigService } from './app-config.service';
 import { AppConfig } from './entities/app-config.entity';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { AppConfigRepository } from './repositories/app-config.repository';
+import { AppConfigSorting } from './enum/app-config-forting.enum';
 
 describe('AppConfigService', () => {
   let service: AppConfigService;
@@ -19,7 +21,14 @@ describe('AppConfigService', () => {
     getRepository: jest.fn().mockReturnValue(mockRepository),
   };
 
-  const mockCurrentUser = { user: { id: 1 }, audit: jest.fn() };
+  const mockCurrentUser = {
+    user: { id: 1 },
+    audit: jest.fn().mockReturnValue({ updated_by: 1 }),
+  };
+  const mockAppConfigRepository = {
+    findAll: jest.fn(),
+    findAllCategoriesAndSubcategories: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -29,6 +38,7 @@ describe('AppConfigService', () => {
         AppConfigService,
         { provide: DataSource, useValue: mockDataSource },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
+        { provide: AppConfigRepository, useValue: mockAppConfigRepository },
       ],
     }).compile();
 
@@ -51,6 +61,71 @@ describe('AppConfigService', () => {
         where: { key: 'feature.x', is_active: true },
       });
       expect(result).toBe(row);
+    });
+  });
+
+  describe('getAllConfigs', () => {
+    it('should delegate to AppConfigRepository.findAll', async () => {
+      const payload = {
+        data: [{ key: 'k1' }] as AppConfig[],
+        pagination: {
+          total: 1,
+          page: 1,
+          limit: 20,
+          pageSize: 1,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
+      mockAppConfigRepository.findAll.mockResolvedValue(payload);
+
+      const result = await service.getAllConfigs(
+        { category: 'EMAIL' },
+        { field: AppConfigSorting.KEY, order: 'DESC' },
+        { page: 1, limit: 20 },
+        'test',
+      );
+
+      expect(mockAppConfigRepository.findAll).toHaveBeenCalledWith(
+        { category: 'EMAIL' },
+        { field: AppConfigSorting.KEY, order: 'DESC' },
+        { page: 1, limit: 20 },
+        'test',
+      );
+      expect(result).toBe(payload);
+    });
+
+    it('should default sorting to empty object when omitted', async () => {
+      mockAppConfigRepository.findAll.mockResolvedValue([]);
+
+      await service.getAllConfigs({ category: 'EMAIL' });
+
+      expect(mockAppConfigRepository.findAll).toHaveBeenCalledWith(
+        { category: 'EMAIL' },
+        {},
+        undefined,
+        undefined,
+      );
+    });
+  });
+
+  describe('getCategoriesAndSubcategories', () => {
+    it('should delegate to AppConfigRepository.findAllCategoriesAndSubcategories', async () => {
+      const lists = {
+        categories: ['EMAIL'],
+        subcategories: ['READINESS_LEVEL_7'],
+      };
+      mockAppConfigRepository.findAllCategoriesAndSubcategories.mockResolvedValue(
+        lists,
+      );
+
+      const result = await service.getCategoriesAndSubcategories();
+
+      expect(
+        mockAppConfigRepository.findAllCategoriesAndSubcategories,
+      ).toHaveBeenCalled();
+      expect(result).toBe(lists);
     });
   });
 
@@ -82,9 +157,13 @@ describe('AppConfigService', () => {
       expect(update).toHaveBeenCalledWith('k1', {
         description: 'new desc',
         simple_value: 'v',
+        json_value: undefined,
+        category: undefined,
+        subcategory: undefined,
+        updated_by: 1,
       });
-      expect(result).toEqual({
-        ...existing,
+      expect(result).toMatchObject({
+        key: 'k1',
         description: 'new desc',
         simple_value: 'v',
       });

@@ -29,6 +29,13 @@ describe('AgressoContractController', () => {
     findContractsResultByCurrentUser: jest.fn(),
     findContratResultByContractId: jest.fn(),
     findAgressoContracts: jest.fn(),
+    getGeoScopeReport: jest.fn(),
+    getTopPartnersReport: jest.fn(),
+    getTopContributorsReport: jest.fn(),
+    getTopPrimaryLeversReport: jest.fn(),
+    getTopMainContactPersonsReport: jest.fn(),
+    getContractStaffReport: jest.fn(),
+    getFundingTypes: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -52,6 +59,234 @@ describe('AgressoContractController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('getTopPrimaryLeversReport', () => {
+    it('should return top primary levers report', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_primary_levers: [
+          {
+            lever_id: 3,
+            short_name: 'Lever 3',
+            full_name: 'Climate Action',
+            count: 6,
+          },
+        ],
+      };
+
+      mockAgressoContractService.getTopPrimaryLeversReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getTopPrimaryLeversReport('A100', '10');
+
+      expect(
+        mockAgressoContractService.getTopPrimaryLeversReport,
+      ).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract top primary levers report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract top primary levers report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+  });
+
+  describe('getTopContributorsReport', () => {
+    it('should return top contributors report', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_contributors: [
+          {
+            contract_id: 'B200',
+            contract_description: 'Secondary project',
+            project_name: 'Project B',
+            count: 4,
+          },
+        ],
+      };
+
+      mockAgressoContractService.getTopContributorsReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getTopContributorsReport('A100', '10');
+
+      expect(
+        mockAgressoContractService.getTopContributorsReport,
+      ).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract top contributors report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract top contributors report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+  });
+
+  describe('getTopMainContactPersonsReport', () => {
+    it('should return top main contact persons report for a contract', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_main_contact_persons: [
+          {
+            user_id: '12345',
+            first_name: 'Jane',
+            last_name: 'Doe',
+            email: 'jane.doe@example.org',
+            count: 5,
+          },
+        ],
+      };
+
+      mockAgressoContractService.getTopMainContactPersonsReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getTopMainContactPersonsReport(
+        'A100',
+        '10',
+      );
+
+      expect(
+        mockAgressoContractService.getTopMainContactPersonsReport,
+      ).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract top main contact persons report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract top main contact persons report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+  });
+
+  describe('getContractStaffReport', () => {
+    it('should return contract staff report', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        staff: [
+          { name: 'John Doe', role: 'Project Lead' },
+          { name: 'Jane Smith', role: 'Program Assistant' },
+        ],
+      };
+
+      mockAgressoContractService.getContractStaffReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getContractStaffReport('A100');
+
+      expect(
+        mockAgressoContractService.getContractStaffReport,
+      ).toHaveBeenCalledWith('A100');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract staff report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract staff report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+  });
+
+  describe('getTopPartnersReport', () => {
+    it('should return top partners report for a contract', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_partners: [
+          {
+            institution_id: 101,
+            institution_name: 'Partner Org',
+            acronym: 'PO',
+            count: 5,
+          },
+        ],
+      };
+
+      mockAgressoContractService.getTopPartnersReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getTopPartnersReport('A100', '10');
+
+      expect(
+        mockAgressoContractService.getTopPartnersReport,
+      ).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract top partners report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract top partners report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+  });
+
+  describe('getGeoScopeReport', () => {
+    it('should return geographic scope report for a contract', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        limit: 10,
+        geo_scope_summary: {
+          global: 5,
+          regional: 3,
+          countries: 12,
+          sub_national: 8,
+          yet_to_be_determined: 1,
+        },
+        top_regions: [],
+        top_countries: [],
+      };
+
+      mockAgressoContractService.getGeoScopeReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getGeoScopeReport('A100', '10');
+
+      expect(service.getGeoScopeReport).toHaveBeenCalledWith('A100', 10);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract geographic scope report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract geographic scope report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+
+    it('should use default limit when query param is not provided', async () => {
+      mockAgressoContractService.getGeoScopeReport.mockResolvedValue({});
+
+      await controller.getGeoScopeReport('A100', undefined);
+
+      expect(service.getGeoScopeReport).toHaveBeenCalledWith('A100', undefined);
+    });
   });
 
   describe('find', () => {
@@ -250,6 +485,7 @@ describe('AgressoContractController', () => {
         TrueFalseEnum.TRUE,
         'CONTRACT001',
         'Test Project',
+        ['BILATERAL'],
         'John Doe',
         ['1', '2'],
         [AgressoContractStatus.ONGOING, AgressoContractStatus.COMPLETED],
@@ -261,6 +497,7 @@ describe('AgressoContractController', () => {
         'test query',
         'DESC',
         undefined,
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -268,6 +505,7 @@ describe('AgressoContractController', () => {
         {
           contract_code: 'CONTRACT001',
           project_name: 'Test Project',
+          funding_type: ['BILATERAL'],
           principal_investigator: 'John Doe',
           lever: ['1', '2'],
           start_date: '2023-01-01',
@@ -302,6 +540,7 @@ describe('AgressoContractController', () => {
         undefined,
         undefined,
         undefined,
+        [],
         undefined,
         [],
         [],
@@ -313,6 +552,7 @@ describe('AgressoContractController', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -320,6 +560,7 @@ describe('AgressoContractController', () => {
         {
           contract_code: undefined,
           project_name: undefined,
+          funding_type: [],
           principal_investigator: undefined,
           lever: [],
           start_date: undefined,
@@ -351,6 +592,7 @@ describe('AgressoContractController', () => {
         TrueFalseEnum.FALSE,
         undefined,
         undefined,
+        [],
         undefined,
         [],
         ['ongoing', 'completed'] as AgressoContractStatus[],
@@ -361,6 +603,7 @@ describe('AgressoContractController', () => {
         '10',
         undefined,
         'ASC',
+        undefined,
         undefined,
       );
 
@@ -377,6 +620,67 @@ describe('AgressoContractController', () => {
         { limit: 10, page: 1 },
         undefined,
       );
+    });
+
+    it('should exclude pooled funding contracts when flag is true', async () => {
+      mockAgressoContractService.findAgressoContracts.mockResolvedValue([]);
+
+      await controller.findContracts(
+        undefined,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        [],
+        [],
+        undefined,
+        undefined,
+        undefined,
+        '1',
+        '10',
+        undefined,
+        'ASC',
+        TrueFalseEnum.TRUE,
+        undefined,
+      );
+
+      expect(service.findAgressoContracts).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          exclude_pooled_funding: true,
+        }),
+        undefined,
+        'ASC',
+        { limit: 10, page: 1 },
+        undefined,
+      );
+    });
+  });
+
+  describe('getFundingTypes', () => {
+    it('should return all funding types', async () => {
+      const mockFundingTypes = [
+        { funding_type: 'BILATERAL' },
+        { funding_type: 'MULTILATERAL' },
+      ];
+
+      mockAgressoContractService.getFundingTypes.mockResolvedValue(
+        mockFundingTypes,
+      );
+
+      const result = await controller.getFundingTypes();
+
+      expect(service.getFundingTypes).toHaveBeenCalled();
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Funding types found',
+        status: HttpStatus.OK,
+        data: mockFundingTypes,
+      });
+      expect(result).toEqual({
+        description: 'Funding types found',
+        status: HttpStatus.OK,
+        data: mockFundingTypes,
+      });
     });
   });
 });

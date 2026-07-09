@@ -10,6 +10,7 @@ import { StringKeys } from '../../shared/global-dto/types-global';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
+import { AppConfig } from '../../shared/utils/app-config.util';
 
 // Mock the utility functions
 jest.mock('../../shared/utils/object.utils', () => ({
@@ -35,12 +36,23 @@ describe('AgressoContractService', () => {
     findContractsByUser: jest.fn(),
     findOneContract: jest.fn(),
     getContracts: jest.fn(),
+    getGeoScopeReport: jest.fn(),
+    getTopPartnersReport: jest.fn(),
+    getTopContributorsReport: jest.fn(),
+    getTopPrimaryLeversReport: jest.fn(),
+    getTopMainContactPersonsReport: jest.fn(),
+    getContractStaffReport: jest.fn(),
+    getFundingTypes: jest.fn(),
   };
 
   const mockCurrentUser = {
     user_id: 123,
     user: { sec_user_id: 123 } as any,
     getUserId: jest.fn().mockReturnValue(123),
+  };
+
+  const mockAppConfig = {
+    BUCKET_URL: 'https://bucket.example',
   };
 
   beforeEach(async () => {
@@ -60,6 +72,10 @@ describe('AgressoContractService', () => {
         {
           provide: CurrentUserUtil,
           useValue: mockCurrentUser,
+        },
+        {
+          provide: AppConfig,
+          useValue: mockAppConfig,
         },
       ],
     }).compile();
@@ -384,6 +400,150 @@ describe('AgressoContractService', () => {
         undefined,
       );
       expect(result).toEqual(expectedContracts);
+    });
+  });
+
+  describe('getTopPrimaryLeversReport', () => {
+    it('should enrich top primary levers with icon metadata', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_primary_levers: [
+          {
+            lever_id: 3,
+            short_name: 'Lever 3',
+            full_name: 'Lever 3: Climate Action',
+            count: 6,
+          },
+        ],
+      };
+      mockRepository.getTopPrimaryLeversReport.mockResolvedValue(
+        expectedReport,
+      );
+
+      const result = await service.getTopPrimaryLeversReport('A100', 10);
+
+      expect(repository.getTopPrimaryLeversReport).toHaveBeenCalledWith(
+        'A100',
+        10,
+      );
+      expect(result.top_primary_levers[0]).toEqual({
+        lever_id: 3,
+        short_name: 'Lever 3',
+        full_name: 'Lever 3: Climate Action',
+        count: 6,
+        icon: 'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png',
+      });
+    });
+  });
+
+  describe('getTopContributorsReport', () => {
+    it('should delegate top contributors report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_contributors: [],
+      };
+      mockRepository.getTopContributorsReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getTopContributorsReport('A100', 10);
+
+      expect(repository.getTopContributorsReport).toHaveBeenCalledWith(
+        'A100',
+        10,
+      );
+      expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getTopMainContactPersonsReport', () => {
+    it('should delegate top main contact persons report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_main_contact_persons: [],
+      };
+      mockRepository.getTopMainContactPersonsReport.mockResolvedValue(
+        expectedReport,
+      );
+
+      const result = await service.getTopMainContactPersonsReport('A100', 10);
+
+      expect(repository.getTopMainContactPersonsReport).toHaveBeenCalledWith(
+        'A100',
+        10,
+      );
+      expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getContractStaffReport', () => {
+    it('should delegate contract staff report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        staff: [{ name: 'John Doe', role: 'Project Lead' }],
+      };
+      mockRepository.getContractStaffReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getContractStaffReport('A100');
+
+      expect(repository.getContractStaffReport).toHaveBeenCalledWith('A100');
+      expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getTopPartnersReport', () => {
+    it('should delegate top partners report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        top_partners: [],
+      };
+      mockRepository.getTopPartnersReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getTopPartnersReport('A100', 10);
+
+      expect(repository.getTopPartnersReport).toHaveBeenCalledWith('A100', 10);
+      expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getGeoScopeReport', () => {
+    it('should delegate geographic scope report to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        limit: 10,
+        geo_scope_summary: {
+          global: 1,
+          regional: 2,
+          countries: 7,
+          sub_national: 4,
+          yet_to_be_determined: 0,
+        },
+        top_regions: [],
+        top_countries: [],
+      };
+      mockRepository.getGeoScopeReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getGeoScopeReport('A100', 10);
+
+      expect(repository.getGeoScopeReport).toHaveBeenCalledWith('A100', 10);
+      expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getFundingTypes', () => {
+    it('should delegate funding types lookup to repository', async () => {
+      const expectedFundingTypes = [
+        { funding_type: 'BILATERAL' },
+        { funding_type: 'MULTILATERAL' },
+      ];
+      mockRepository.getFundingTypes.mockResolvedValue(expectedFundingTypes);
+
+      const result = await service.getFundingTypes();
+
+      expect(repository.getFundingTypes).toHaveBeenCalled();
+      expect(result).toEqual(expectedFundingTypes);
     });
   });
 });

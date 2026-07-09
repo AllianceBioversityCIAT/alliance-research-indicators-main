@@ -36,6 +36,7 @@ export class AppConfig extends AuditableEntity {
     type: 'text',
     nullable: true,
     name: 'field',
+    select: false,
   })
   field: string;
 
