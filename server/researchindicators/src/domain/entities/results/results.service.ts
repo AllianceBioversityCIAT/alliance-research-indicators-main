@@ -111,7 +111,7 @@ import { AiReportsService } from '../ai-reports/ai-reports.service';
 import {
   CreateAiReportDto,
   createBulkUploadProcessesDto,
-  createBulkUploadResultsDto,
+  CreateBulkUploadResultsDto,
 } from '../ai-reports/dto/create-ai-report.dto';
 
 @Injectable()
@@ -950,11 +950,11 @@ export class ResultsService {
   async formalizeResult(
     result: ResultRawAi,
     isbulk: boolean = false,
-    resultMetadata?: createBulkUploadResultsDto[],
+    resultMetadata?: CreateBulkUploadResultsDto[],
   ) {
     let resultExists: Result = null;
-    const elementResultMetadata: createBulkUploadResultsDto =
-      new createBulkUploadResultsDto();
+    const elementResultMetadata: CreateBulkUploadResultsDto =
+      new CreateBulkUploadResultsDto();
     try {
       const processedResult = await this.createResultFromAiRoar(result);
 
@@ -1110,7 +1110,7 @@ export class ResultsService {
 
     const iaMetadataReport = new CreateAiReportDto();
     const iaMetadataReportProcess = new createBulkUploadProcessesDto();
-    const iaMetadataReportResults: createBulkUploadResultsDto[] = [];
+    const iaMetadataReportResults: CreateBulkUploadResultsDto[] = [];
 
     iaMetadataReportProcess.ai_interaction_id = metadata.ai_interaction_id;
     iaMetadataReportProcess.file_name = metadata.file_name;
