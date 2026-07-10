@@ -23,7 +23,7 @@ import { ClarisaSdgsModule } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs
     ResultKnowledgeProductModule,
     SyncProcessLogModule,
     PrmsOpenSearchModule,
-    ClarisaSdgsModule
+    ClarisaSdgsModule,
   ],
   controllers: [TipIntegrationController],
   providers: [
@@ -33,4 +33,4 @@ import { ClarisaSdgsModule } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs
   ],
   exports: [TipIntegrationRepository, TipIntegrationService],
 })
-export class TipIntegrationModule { }
+export class TipIntegrationModule {}

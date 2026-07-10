@@ -376,7 +376,10 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map a product with project as object and return one mapping', async () => {
-      const results = await service.processing([wrapTemporal(baseProduct)], 2025);
+      const results = await service.processing(
+        [wrapTemporal(baseProduct)],
+        2025,
+      );
 
       expect(results).toHaveLength(1);
       expect(results[0].createResult.contract_id).toBe('AGR-001');
@@ -407,7 +410,10 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map evidence with link and doi', async () => {
-      const results = await service.processing([wrapTemporal(baseProduct)], 2025);
+      const results = await service.processing(
+        [wrapTemporal(baseProduct)],
+        2025,
+      );
       const evidences = results[0].evidence.evidence as any[];
 
       expect(evidences[0].evidence_url).toBe('http://link.example');
@@ -415,7 +421,10 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map knowledge product fields correctly', async () => {
-      const results = await service.processing([wrapTemporal(baseProduct)], 2025);
+      const results = await service.processing(
+        [wrapTemporal(baseProduct)],
+        2025,
+      );
 
       expect(results[0].knowledgeProduct.citation).toBe('Test Citation');
       expect(results[0].knowledgeProduct.open_access).toBe(true);
