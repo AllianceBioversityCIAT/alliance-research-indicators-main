@@ -153,9 +153,9 @@ export class ResultsService {
     private readonly _resultsUtil: ResultsUtil,
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
-    private readonly _aiReportsService: AiReportsService,
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
     private readonly _portfolioService: PortfoliosService,
+    private readonly _aiReportsService: AiReportsService,
   ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {

@@ -55,8 +55,8 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
-import { AiReportsService } from '../ai-reports/ai-reports.service';
 import { PortfoliosService } from '../portfolios/portfolios.service';
+import { AiReportsService } from '../ai-reports/ai-reports.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -95,11 +95,11 @@ describe('ResultsService', () => {
   let mockResultsUtil: jest.Mocked<ResultsUtil>;
   let mockGreenChecksService: { findByResultId: jest.Mock };
   let mockGreenCheckRepository: { createSnapshot: jest.Mock };
-  let mockAiReportsService: { create: jest.Mock };
   let mockResultAlignmentOperationsService: jest.Mocked<
     Pick<ResultAlignmentOperationsService, 'save' | 'find'>
   >;
   let mockPortfoliosService: jest.Mocked<Pick<PortfoliosService, 'findOne'>>;
+  let mockAiReportsService: { create: jest.Mock };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -292,6 +292,9 @@ describe('ResultsService', () => {
     mockPortfoliosService = {
       findOne: jest.fn(),
     };
+    mockAiReportsService = {
+      create: jest.fn().mockResolvedValue({ id: 1 }),
+    };
 
     mockEntityManager = {
       getRepository: jest.fn(),
@@ -415,6 +418,10 @@ describe('ResultsService', () => {
         {
           provide: PortfoliosService,
           useValue: mockPortfoliosService,
+        },
+        {
+          provide: AiReportsService,
+          useValue: mockAiReportsService,
         },
       ],
     }).compile();

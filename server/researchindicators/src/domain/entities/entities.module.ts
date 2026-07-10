@@ -89,7 +89,6 @@ import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module
 import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.module';
 import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { ReportsModule } from './reports/reports.module';
-import { AiReportsModule } from './ai-reports/ai-reports.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 import { BilateralModule } from './bilateral/bilateral.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
@@ -98,6 +97,7 @@ import { StrategicObjectivesModule } from './strategic-objectives/strategic-obje
 import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
 import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impact-outcomes.module';
 import { ResultStrategicObjectivesModule } from './result-strategic-objectives/result-strategic-objectives.module';
+import { AiReportsModule } from './ai-reports/ai-reports.module';
 
 @Module({
   imports: [
@@ -213,6 +213,7 @@ import { ResultStrategicObjectivesModule } from './result-strategic-objectives/r
     ImpactOutcomesModule,
     ResultImpactOutcomesModule,
     ResultStrategicObjectivesModule,
+    AiReportsModule,
   ],
 })
-export class EntitiesModule {}
+export class EntitiesModule { }

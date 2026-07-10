@@ -539,14 +539,26 @@ describe('ResultOicrService', () => {
       expect(mockResultLeversService.create).toHaveBeenCalledWith(
         resultId,
         [
-          { lever_id: '1', is_primary: true },
-          { lever_id: '2', is_primary: false },
-          { lever_id: '3', is_primary: false },
+          {
+            lever_id: '1',
+            is_primary: true,
+            custom_lever_name: undefined,
+          },
+          {
+            lever_id: '2',
+            is_primary: false,
+            custom_lever_name: undefined,
+          },
+          {
+            lever_id: '3',
+            is_primary: false,
+            custom_lever_name: undefined,
+          },
         ],
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         undefined,
-        ['is_primary'],
+        ['is_primary', 'custom_lever_name'],
       );
     });
 
@@ -571,7 +583,7 @@ describe('ResultOicrService', () => {
         'lever_id',
         LeverRolesEnum.ALIGNMENT,
         undefined,
-        ['is_primary'],
+        ['is_primary', 'custom_lever_name'],
       );
     });
   });
