@@ -26,20 +26,23 @@ describe('PrmsRepository', () => {
   });
 
   describe('findTemporalResults', () => {
-    it('should run the version-detection query and return rows', async () => {
+    it('should run the version-detection query filtered by execution code and return rows', async () => {
+      const executionCode = 'exec-abc-123';
       const rows = [
         { code: 9001, year: 2023, is_version: true, data: {} },
         { code: 9001, year: 2024, is_version: false, data: {} },
       ];
       dataSource.query.mockResolvedValue(rows);
 
-      const result = await repository.findTemporalResults();
+      const result = await repository.findTemporalResults(executionCode);
 
       expect(dataSource.query).toHaveBeenCalledTimes(1);
       expect(dataSource.query.mock.calls[0][0]).toContain(
-        'FROM prms_temporal_results',
+        'FROM sync_staging_records',
       );
       expect(dataSource.query.mock.calls[0][0]).toContain('is_version');
+      expect(dataSource.query.mock.calls[0][0]).toContain('execution_code');
+      expect(dataSource.query.mock.calls[0][1]).toEqual([executionCode, executionCode]);
       expect(result).toEqual(rows);
     });
   });

@@ -28,13 +28,14 @@ export class TipRegionDto {
 }
 
 export class TipKnowledgeProductDto {
-  id: number;
+  created_at: string;
+  updated_at: string;
   name: string;
   link: string;
   doi: string;
   citation: string;
-  openAccess: boolean;
-  peerReview: number;
+  access_status: string;
+  review_status: string;
   publication_date: string;
   project: TipProjectDto | TipProjectDto[];
   collection: string[];
@@ -43,8 +44,10 @@ export class TipKnowledgeProductDto {
   region: TipRegionDto[];
   submitter: TipSubmitterDto | null;
   type: string[];
+  sdgs: string[];
+  keywords: string[];
+  programs_and_accelerators: string[];
   abstract: string;
-  created_at: Date;
 }
 
 export class TipKnowledgeProductsResponseDto {

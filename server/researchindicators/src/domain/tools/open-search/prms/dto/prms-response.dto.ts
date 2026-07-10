@@ -1,3 +1,5 @@
+import { OmitType } from "@nestjs/swagger";
+
 export class PrmsKnowledgeProductDto {
   result_knowledge_product_id: number;
   results_id: number;
@@ -208,4 +210,11 @@ export class PrmsTemporalResponseMapper {
   public year: number;
   public is_version: boolean;
   public data: ResultResponseMapper;
+}
+
+export class TemportalDataResponse<T> extends OmitType(PrmsTemporalResponseMapper, ['data']) {
+  public code: number;
+  public year: number;
+  public is_version: boolean;
+  public data: T;
 }
