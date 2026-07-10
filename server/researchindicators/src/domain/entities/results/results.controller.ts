@@ -644,15 +644,13 @@ export class ResultsController {
     @Body()
     data: RootAi,
   ) {
-    return this.resultsService
-      .createResultFromAiBulk(data.results)
-      .then((data) =>
-        ResponseUtils.format({
-          data: data,
-          description: 'AI Results created',
-          status: HttpStatus.CREATED,
-        }),
-      );
+    return this.resultsService.createResultFromAiBulk(data).then((data) =>
+      ResponseUtils.format({
+        data: data,
+        description: 'AI Results created',
+        status: HttpStatus.CREATED,
+      }),
+    );
   }
 
   @ApiOperation({ summary: 'Save data for Geo Location' })

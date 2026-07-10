@@ -42,6 +42,7 @@ import { ResultImpactOutcomesModule } from '../result-impact-outcomes/result-imp
 import { ResultStrategicObjectivesModule } from '../result-strategic-objectives/result-strategic-objectives.module';
 import { PortfolioHandlersModule } from './portfolio-handlers/portfolio-handlers.module';
 import { PortfoliosModule } from '../portfolios/portfolios.module';
+import { AiReportsModule } from '../ai-reports/ai-reports.module';
 
 @Module({
   controllers: [ResultsController],
@@ -85,6 +86,7 @@ import { PortfoliosModule } from '../portfolios/portfolios.module';
     ResultImpactOutcomesModule,
     ResultStrategicObjectivesModule,
     PortfoliosModule,
+    AiReportsModule,
   ],
   providers: [
     ResultsService,
@@ -94,4 +96,4 @@ import { PortfoliosModule } from '../portfolios/portfolios.module';
   ],
   exports: [ResultsService, ResultRepository],
 })
-export class ResultsModule {}
+export class ResultsModule { }

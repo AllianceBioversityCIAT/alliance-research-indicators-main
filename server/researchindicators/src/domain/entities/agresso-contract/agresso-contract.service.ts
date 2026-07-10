@@ -143,4 +143,8 @@ export class AgressoContractService {
       }),
     };
   }
+
+  async getFundingTypes() {
+    return this._agressoContractRepository.getFundingTypes();
+  }
 }

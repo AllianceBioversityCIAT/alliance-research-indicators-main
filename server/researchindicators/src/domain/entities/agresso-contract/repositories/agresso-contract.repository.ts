@@ -76,15 +76,14 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
-          .map(([key, value]) => `ac.${key} like '%${value}%'`)
-          .join(' AND ')}`
+        .map(([key, value]) => `ac.${key} like '%${value}%'`)
+        .join(' AND ')}`
       : '';
     const query = `
     select ac.*,
     ifnull(cl.full_name, 'Not available' ) as lever,
     cl.id as lever_id
-    ${
-      relations?.countries
+    ${relations?.countries
         ? `,JSON_ARRAYAGG(
             JSON_OBJECT(
                 'agreement_id', acc.agreement_id,
@@ -93,7 +92,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
             )
         ) AS countries`
         : ''
-    }
+      }
     from agresso_contracts ac 
     LEFT JOIN 
         agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
@@ -310,6 +309,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       [OrderFieldsEnum.LEAD_CENTER]: 'ac.ubwClientDescription',
       [OrderFieldsEnum.LEVER]: 'cl.id',
       [OrderFieldsEnum.COUNT_RESULTS]: 'contract_total_results',
+      [OrderFieldsEnum.FUNDING_TYPE]: 'ac.funding_type',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
@@ -400,6 +400,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
     ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter.project_name}%'`)}
     ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'`)}
     ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
+    ${validFilter(filter?.funding_type, this.buildFundingTypeFilterClause(filter?.funding_type))}
     ${dateFilterClause}
     ${validFilter(filter?.status, this.buildStatusFilterClause(filter.status))}
   `;
@@ -416,6 +417,13 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         hasPreviousPage: (pagination?.page || 1) > 1,
       };
     }
+
+    console.log(
+      validFilter(
+        filter?.funding_type,
+        `AND ac.funding_type in (${filter?.funding_type?.join(',')})`,
+      ),
+    );
 
     const newQuery = `
     SELECT 
@@ -476,6 +484,7 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter?.project_name}%'`)}
         ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter?.principal_investigator}%'`)}
         ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
+        ${validFilter(filter?.funding_type, this.buildFundingTypeFilterClause(filter?.funding_type))}
         ${dateFilterClause}
         ${validFilter(filter?.status, this.buildStatusFilterClause(filter?.status))}
         ${orderBy}
@@ -535,6 +544,18 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       .map((status) => `'${status.toLowerCase()}'`)
       .join(',');
     return `AND LOWER(ac.contract_status) in (${statusList})`;
+  }
+
+  private buildFundingTypeFilterClause(fundingTypes?: string[]): string {
+    if (!fundingTypes?.length) {
+      return '';
+    }
+
+    const fundingTypeList = fundingTypes
+      .map((fundingType) => `'${fundingType}'`)
+      .join(',');
+
+    return `AND ac.funding_type in (${fundingTypeList})`;
   }
 
   private buildDateFilterClause(filter?: Record<string, any>): string {
@@ -1000,5 +1021,16 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
         name: formatPersonName(name),
         role,
       }));
+  }
+
+  async getFundingTypes() {
+    const query = `
+      SELECT DISTINCT funding_type FROM agresso_contracts
+    `;
+
+    const rows = await this.query(query).then((rows) =>
+      rows.filter((row) => row.funding_type),
+    );
+    return rows as string[];
   }
 }

@@ -94,6 +94,7 @@ import { StrategicObjectivesModule } from './strategic-objectives/strategic-obje
 import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
 import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impact-outcomes.module';
 import { ResultStrategicObjectivesModule } from './result-strategic-objectives/result-strategic-objectives.module';
+import { AiReportsModule } from './ai-reports/ai-reports.module';
 
 @Module({
   imports: [
@@ -192,7 +193,8 @@ import { ResultStrategicObjectivesModule } from './result-strategic-objectives/r
     ImpactOutcomesModule,
     ResultImpactOutcomesModule,
     ResultStrategicObjectivesModule,
+    AiReportsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule, ReportsModule],
 })
-export class EntitiesModule {}
+export class EntitiesModule { }

@@ -10,4 +10,5 @@ export enum OrderFieldsEnum {
   LEAD_CENTER = 'lead-center',
   LEVER = 'lever',
   COUNT_RESULTS = 'count-results',
+  FUNDING_TYPE = 'funding-type',
 }
