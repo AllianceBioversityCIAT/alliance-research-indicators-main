@@ -107,8 +107,8 @@ import { GreenCheckRepository } from '../green-checks/repository/green-checks.re
 import { AiReportsService } from '../ai-reports/ai-reports.service';
 import {
   CreateAiReportDto,
-  createBulkUploadProcessesDto,
-  createBulkUploadResultsDto,
+  CreateBulkUploadProcessesDto,
+  CreateBulkUploadResultsDto,
 } from '../ai-reports/dto/create-ai-report.dto';
 import { ResultAlignmentOperationsService } from './portfolio-handlers/sections/alignment/shared/result-alignment-operations.service';
 import { PortfoliosService } from '../portfolios/portfolios.service';
@@ -156,7 +156,7 @@ export class ResultsService {
     private readonly _aiReportsService: AiReportsService,
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
     private readonly _portfolioService: PortfoliosService,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -770,12 +770,12 @@ export class ResultsService {
       result_status: result?.result_status,
       portfolio: portfolio
         ? {
-            id: portfolio.id,
-            name: portfolio.name,
-            description: portfolio.description,
-            start_year: portfolio.start_year,
-            end_year: portfolio.end_year,
-          }
+          id: portfolio.id,
+          name: portfolio.name,
+          description: portfolio.description,
+          start_year: portfolio.start_year,
+          end_year: portfolio.end_year,
+        }
         : null,
     };
   }
@@ -813,11 +813,11 @@ export class ResultsService {
   async formalizeResult(
     result: ResultRawAi,
     isbulk: boolean = false,
-    resultMetadata?: createBulkUploadResultsDto[],
+    resultMetadata?: CreateBulkUploadResultsDto[],
   ) {
     let resultExists: Result = null;
-    const elementResultMetadata: createBulkUploadResultsDto =
-      new createBulkUploadResultsDto();
+    const elementResultMetadata: CreateBulkUploadResultsDto =
+      new CreateBulkUploadResultsDto();
     try {
       const processedResult = await this.createResultFromAiRoar(result);
 
@@ -972,8 +972,8 @@ export class ResultsService {
     const { results, metadata } = data;
 
     const iaMetadataReport = new CreateAiReportDto();
-    const iaMetadataReportProcess = new createBulkUploadProcessesDto();
-    const iaMetadataReportResults: createBulkUploadResultsDto[] = [];
+    const iaMetadataReportProcess = new CreateBulkUploadProcessesDto();
+    const iaMetadataReportResults: CreateBulkUploadResultsDto[] = [];
 
     iaMetadataReportProcess.ai_interaction_id = metadata.ai_interaction_id;
     iaMetadataReportProcess.file_name = metadata.file_name;
@@ -1251,8 +1251,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },
