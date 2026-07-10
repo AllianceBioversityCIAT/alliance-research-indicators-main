@@ -38,11 +38,11 @@ describe('PrmsRepository', () => {
 
       expect(dataSource.query).toHaveBeenCalledTimes(1);
       expect(dataSource.query.mock.calls[0][0]).toContain(
-        'FROM prms_temporal_results',
+        'FROM sync_staging_records',
       );
       expect(dataSource.query.mock.calls[0][0]).toContain('is_version');
       expect(dataSource.query.mock.calls[0][0]).toContain('execution_code');
-      expect(dataSource.query.mock.calls[0][1]).toEqual([executionCode]);
+      expect(dataSource.query.mock.calls[0][1]).toEqual([executionCode, executionCode]);
       expect(result).toEqual(rows);
     });
   });

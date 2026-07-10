@@ -15,15 +15,16 @@ export class PrmsRepository {
                         WHEN ptr.\`year\`  < m.max_agno THEN 1
                         ELSE 0
                     END AS is_version
-                 FROM prms_temporal_results ptr
+                 FROM sync_staging_records ptr
                     INNER JOIN (
                     SELECT code, MAX(\`year\`) AS max_agno
-                    FROM prms_temporal_results
+                    FROM sync_staging_records
+                    WHERE execution_code = ?
                     GROUP BY code
                     ) m ON m.code = ptr.code
                 WHERE ptr.execution_code = ?
                 ORDER BY ptr.code, ptr.\`year\`;`;
-    return this.dataSource.query(query, [executionCode]);
+    return this.dataSource.query(query, [executionCode, executionCode]);
   }
 
   async deleteTemporalResults(executionCode: string): Promise<void> {
