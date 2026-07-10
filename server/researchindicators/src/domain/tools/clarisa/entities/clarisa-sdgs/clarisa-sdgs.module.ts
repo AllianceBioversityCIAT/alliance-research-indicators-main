@@ -7,4 +7,4 @@ import { ClarisaSdgsController } from './clarisa-sdgs.controller';
   providers: [ClarisaSdgsService],
   exports: [ClarisaSdgsService],
 })
-export class ClarisaSdgsModule { }
+export class ClarisaSdgsModule {}

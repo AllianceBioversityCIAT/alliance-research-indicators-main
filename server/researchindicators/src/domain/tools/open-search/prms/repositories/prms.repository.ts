@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { PrmsTemporalResponseMapper, TemportalDataResponse } from '../dto/prms-response.dto';
+import {
+  TemportalDataResponse,
+} from '../dto/prms-response.dto';
 
 @Injectable()
 export class PrmsRepository {
   constructor(private readonly dataSource: DataSource) { }
 
-  async findTemporalResults<T>(executionCode: string): Promise<TemportalDataResponse<T>[]> {
+  async findTemporalResults<T>(
+    executionCode: string,
+  ): Promise<TemportalDataResponse<T>[]> {
     const query = `SELECT
                     ptr.code,
                     ptr.\`year\`,

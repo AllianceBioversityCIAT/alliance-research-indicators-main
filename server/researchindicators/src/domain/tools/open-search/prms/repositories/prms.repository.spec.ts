@@ -42,7 +42,10 @@ describe('PrmsRepository', () => {
       );
       expect(dataSource.query.mock.calls[0][0]).toContain('is_version');
       expect(dataSource.query.mock.calls[0][0]).toContain('execution_code');
-      expect(dataSource.query.mock.calls[0][1]).toEqual([executionCode, executionCode]);
+      expect(dataSource.query.mock.calls[0][1]).toEqual([
+        executionCode,
+        executionCode,
+      ]);
       expect(result).toEqual(rows);
     });
   });

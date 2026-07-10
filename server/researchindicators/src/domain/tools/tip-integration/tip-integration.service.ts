@@ -107,7 +107,7 @@ export class TipIntegrationService extends BaseApi {
   private async saveTemporalData(year: number, executionCode: string) {
     let pendingData = true;
     let offset = 0;
-    let limit = 50;
+    const limit = 50;
     while (pendingData) {
       const response = await firstValueFrom(
         this.getRequest<TipKnowledgeProductsResponseDto>(
@@ -166,7 +166,10 @@ export class TipIntegrationService extends BaseApi {
       await this.saveTemporalData(currentYear, executionCode);
     }
 
-    const tipResults = await this.prmsRepository.findTemporalResults<TipKnowledgeProductDto>(executionCode);
+    const tipResults =
+      await this.prmsRepository.findTemporalResults<TipKnowledgeProductDto>(
+        executionCode,
+      );
     const dataProcessed = await this.processing(tipResults, year);
     await this.saveResultService.bulkSaveAllSections(dataProcessed, {
       platformCode: ReportingPlatformEnum.TIP,
@@ -178,7 +181,10 @@ export class TipIntegrationService extends BaseApi {
     await this.syncProcessLogService.endSync(syncProcessLog.id);
   }
 
-  async processing(results: TemportalDataResponse<TipKnowledgeProductDto>[], year: number) {
+  async processing(
+    results: TemportalDataResponse<TipKnowledgeProductDto>[],
+    year: number,
+  ) {
     const resultsMapped: ExternalMappersDto[] = [];
     for (const data of results) {
       const result = data.data;
@@ -259,14 +265,15 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-            user_id: carnet,
-          } as ResultUser)
+              user_id: carnet,
+            } as ResultUser)
           : null,
         keywords: keywords,
       };
 
-
-      const saveSdgs = await this.clarisaSdgsService.findSdgByTipFormat(result.sdgs);
+      const saveSdgs = await this.clarisaSdgsService.findSdgByTipFormat(
+        result.sdgs,
+      );
       const sdgs: Partial<ResultSdg>[] = saveSdgs.map((sdg) => ({
         clarisa_sdg_id: sdg.id,
       }));
@@ -330,7 +337,7 @@ export class TipIntegrationService extends BaseApi {
         open_access: result.access_status === 'Open Access',
         access_status: result.access_status,
         publication_date: result.publication_date,
-        collection
+        collection,
       } as ResultKnowledgeProduct;
 
       resultsMapped.push(resultMapped);
