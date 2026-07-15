@@ -41,18 +41,19 @@ const formatPdfDate = (value?: Date | string | null): string | undefined => {
   return `${day}/${month}/${year}`;
 };
 
+export const getOrdinalDaySuffix = (day: number): string => {
+  const lastDigit = day % 10;
+  if (lastDigit === 1 && day !== 11) return 'st';
+  if (lastDigit === 2 && day !== 12) return 'nd';
+  if (lastDigit === 3 && day !== 13) return 'rd';
+  return 'th';
+};
+
 export const formatPdfGeneratedAt = (value: Date = new Date()): string => {
   const weekday = value.toLocaleDateString('en-US', { weekday: 'long' });
   const month = value.toLocaleDateString('en-US', { month: 'long' });
   const day = value.getDate();
-  const suffix =
-    day % 10 === 1 && day !== 11
-      ? 'st'
-      : day % 10 === 2 && day !== 12
-        ? 'nd'
-        : day % 10 === 3 && day !== 13
-          ? 'rd'
-          : 'th';
+  const suffix = getOrdinalDaySuffix(day);
   const year = value.getFullYear();
   const time = value.toLocaleTimeString('en-GB', {
     hour: '2-digit',

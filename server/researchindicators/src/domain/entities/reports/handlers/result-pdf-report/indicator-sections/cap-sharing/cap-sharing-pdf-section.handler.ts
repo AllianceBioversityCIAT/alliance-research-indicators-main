@@ -23,14 +23,13 @@ import { ResultPdfIndicatorSectionHandler } from '../result-pdf-indicator-sectio
 
 @Injectable()
 export class CapSharingPdfSectionHandler
-  implements ResultPdfIndicatorSectionHandler
-{
+  implements ResultPdfIndicatorSectionHandler {
   readonly indicatorId = IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT;
 
   constructor(
     private readonly resultCapacitySharingService: ResultCapacitySharingService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async buildSections(resultId: number) {
     const section = await this.buildCapSharingSection(resultId);
@@ -153,7 +152,7 @@ export class CapSharingPdfSectionHandler
         where: {
           [key]: id,
           is_active: true,
-        } as object,
+        },
         select: {
           name: true,
         },
