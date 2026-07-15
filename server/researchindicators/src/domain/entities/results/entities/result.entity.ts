@@ -43,6 +43,7 @@ import { ResultQuantification } from '../../result-quantifications/entities/resu
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
 import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
 import { ResultKnowledgeProduct } from '../../result-knowledge-product/entities/result-knowledge-product.entity';
+import { BulkUploadResults } from '../../ai-reports/entities/bulk-upload-results.entity';
 
 @Entity('results')
 @Index('idx_results_snapshot_active_report_year', [
@@ -346,4 +347,10 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultKnowledgeProduct, (rkp) => rkp.result)
   knowledge_products?: ResultKnowledgeProduct[];
+
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResult) => bulkUploadResult.result,
+  )
+  bulkUploadResults?: BulkUploadResults[];
 }

@@ -47,6 +47,7 @@ describe('ResultsController', () => {
     findResultAlignment: jest.fn(),
     findMetadataResult: jest.fn(),
     formalizeResult: jest.fn(),
+    createResultFromAiBulk: jest.fn(),
     saveGeoLocation: jest.fn(),
     findGeoLocation: jest.fn(),
     findLastUpdatedResultByCurrentUser: jest.fn(),
@@ -561,6 +562,42 @@ describe('ResultsController', () => {
       await expect(controller.formalizeAIResult(aiResultDto)).rejects.toThrow(
         'AI formalization failed',
       );
+    });
+  });
+
+  describe('createResultFromAiBulk', () => {
+    it('should create AI results in bulk and return formatted response', async () => {
+      const bulkPayload: any = {
+        results: [{ title: 'AI Result 1' }],
+        metadata: {
+          ai_interaction_id: 'ai-bulk-1',
+          file_name: 'bulk-upload.xlsx',
+        },
+      };
+      const bulkServiceResponse = {
+        results_created: [{ result_id: 1 }],
+        results_errors: [],
+      };
+      const expectedResponse = {
+        data: bulkServiceResponse,
+        description: 'AI Results created',
+        status: HttpStatus.CREATED,
+      };
+
+      service.createResultFromAiBulk.mockResolvedValue(
+        bulkServiceResponse as any,
+      );
+      mockResponseUtils.format.mockReturnValue(expectedResponse);
+
+      const result = await controller.createResultFromAiBulk(bulkPayload);
+
+      expect(service.createResultFromAiBulk).toHaveBeenCalledWith(bulkPayload);
+      expect(mockResponseUtils.format).toHaveBeenCalledWith({
+        data: bulkServiceResponse,
+        description: 'AI Results created',
+        status: HttpStatus.CREATED,
+      });
+      expect(result).toEqual(expectedResponse);
     });
   });
 

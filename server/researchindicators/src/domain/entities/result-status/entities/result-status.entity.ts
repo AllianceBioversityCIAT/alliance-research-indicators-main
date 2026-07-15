@@ -4,6 +4,7 @@ import { Result } from '../../results/entities/result.entity';
 import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
 import { SubmissionHistory } from '../../green-checks/entities/submission-history.entity';
 import { ResultStatusWorkflow } from '../../result-status-workflow/entities/result-status-workflow.entity';
+import { BulkUploadResults } from '../../ai-reports/entities/bulk-upload-results.entity';
 
 @Entity('result_status')
 export class ResultStatus extends AuditableEntity {
@@ -78,6 +79,18 @@ export class ResultStatus extends AuditableEntity {
     (resultStatusWorkflow) => resultStatusWorkflow.to_status,
   )
   result_status_workflows_to!: ResultStatusWorkflow[];
+
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResults) => bulkUploadResults.final_status_result,
+  )
+  final_status_results!: BulkUploadResults[];
+
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResults) => bulkUploadResults.suggested_status_result,
+  )
+  suggested_status_results!: BulkUploadResults[];
 }
 export class ResultStatusConfig {
   color: {

@@ -11,6 +11,7 @@ import { Result } from '../../results/entities/result.entity';
 import { IndicatorType } from '../../indicator-types/entities/indicator-type.entity';
 import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
 import { ResultStatusWorkflow } from '../../result-status-workflow/entities/result-status-workflow.entity';
+import { BulkUploadResults } from '../../ai-reports/entities/bulk-upload-results.entity';
 
 @Entity('indicators')
 export class Indicator extends AuditableEntity {
@@ -98,4 +99,10 @@ export class Indicator extends AuditableEntity {
     (resultStatusWorkflow) => resultStatusWorkflow.indicator,
   )
   result_status_workflows!: ResultStatusWorkflow[];
+
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResults) => bulkUploadResults.indicator,
+  )
+  bulkUploadResults!: BulkUploadResults[];
 }

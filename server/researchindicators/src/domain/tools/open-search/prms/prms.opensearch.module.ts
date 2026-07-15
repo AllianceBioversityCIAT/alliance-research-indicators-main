@@ -8,11 +8,12 @@ import { PooledFundingContractsModule } from '../../../entities/pooled-funding-c
 import { ClarisaLeversModule } from '../../clarisa/entities/clarisa-levers/clarisa-levers.module';
 import { SyncProcessLogModule } from '../../../entities/sync-process-log/sync-process-log.module';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
+import { PrmsRepository } from './repositories/prms.repository';
 
 @Module({
   controllers: [PrmsOpenSearchController],
-  providers: [PrmsOpenSearchService, SaveResultService],
-  exports: [PrmsOpenSearchService],
+  providers: [PrmsOpenSearchService, SaveResultService, PrmsRepository],
+  exports: [PrmsOpenSearchService, PrmsRepository],
   imports: [
     HttpModule,
     ResultsModule,

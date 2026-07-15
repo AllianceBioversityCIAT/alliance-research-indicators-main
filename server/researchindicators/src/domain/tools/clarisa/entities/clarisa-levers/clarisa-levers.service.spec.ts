@@ -7,8 +7,11 @@ import { ClarisaLever } from './entities/clarisa-lever.entity';
 
 describe('ClarisaLeversService', () => {
   let service: ClarisaLeversService;
+  const mockFindOne = jest.fn();
 
   beforeEach(async () => {
+    mockFindOne.mockReset();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClarisaLeversService,
@@ -17,7 +20,7 @@ describe('ClarisaLeversService', () => {
           useValue: {
             getRepository: jest.fn().mockReturnValue({
               find: jest.fn(),
-              findOne: jest.fn(),
+              findOne: mockFindOne,
               save: jest.fn(),
               update: jest.fn(),
               delete: jest.fn(),
@@ -39,6 +42,24 @@ describe('ClarisaLeversService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('resolveIconUrl', () => {
+    it('should resolve icon URL for a known short_name', () => {
+      expect(service.resolveIconUrl('Lever 3')).toBe(
+        'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png',
+      );
+    });
+
+    it('should resolve icon URL from a longer lever label prefix', () => {
+      expect(service.resolveIconUrl('Lever 3 - Climate Action')).toBe(
+        'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png',
+      );
+    });
+
+    it('should return null for unknown levers', () => {
+      expect(service.resolveIconUrl('UnknownLever')).toBeNull();
+    });
   });
 
   // [CLAUDE/DONE] 183
@@ -95,7 +116,7 @@ describe('ClarisaLeversService', () => {
       ['L6', 'Lever 6'],
       ['L7', 'Lever 7'],
       ['L8', 'Lever 8'],
-    ])('should return "%s" for input "%s"', (input, expected) => {
+    ])('should map "%s" to "%s"', (input, expected) => {
       expect(service.homologatedData(input)).toBe(expected);
     });
 
@@ -116,6 +137,35 @@ describe('ClarisaLeversService', () => {
     it('should return null when input is null or undefined', () => {
       expect(service.homologatedData(null)).toBeNull();
       expect(service.homologatedData(undefined)).toBeNull();
+    });
+  });
+
+  describe('findByShortName', () => {
+    it('should find a lever by short_name', async () => {
+      const lever = {
+        id: 3,
+        short_name: 'Lever 3',
+        full_name: 'Lever 3: Climate Action',
+      } as ClarisaLever;
+      mockFindOne.mockResolvedValue(lever);
+
+      const result = await service.findByShortName('Lever 3');
+
+      expect(mockFindOne).toHaveBeenCalledWith({
+        where: { short_name: 'Lever 3' },
+      });
+      expect(result).toEqual(lever);
+    });
+
+    it('should return null when no lever matches short_name', async () => {
+      mockFindOne.mockResolvedValue(null);
+
+      const result = await service.findByShortName('Unknown');
+
+      expect(mockFindOne).toHaveBeenCalledWith({
+        where: { short_name: 'Unknown' },
+      });
+      expect(result).toBeNull();
     });
   });
 });

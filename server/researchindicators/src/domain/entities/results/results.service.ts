@@ -55,7 +55,12 @@ import {
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
-import { AiRawCountry, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
+import {
+  AiRawCountry,
+  ResultAiDto,
+  ResultRawAi,
+  RootAi,
+} from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
@@ -102,6 +107,12 @@ import { ResultSortEnum } from './enum/result-sort.enum';
 import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
 import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
+import { AiReportsService } from '../ai-reports/ai-reports.service';
+import {
+  CreateAiReportDto,
+  CreateBulkUploadProcessesDto,
+  CreateBulkUploadResultsDto,
+} from '../ai-reports/dto/create-ai-report.dto';
 
 @Injectable()
 export class ResultsService {
@@ -143,6 +154,7 @@ export class ResultsService {
     private readonly _resultsUtil: ResultsUtil,
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
+    private readonly _aiReportsService: AiReportsService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -935,10 +947,26 @@ export class ResultsService {
     return results.map((el) => el.result_id);
   }
 
-  async formalizeResult(result: ResultRawAi, isbulk: boolean = false) {
+  async formalizeResult(
+    result: ResultRawAi,
+    isbulk: boolean = false,
+    resultMetadata?: CreateBulkUploadResultsDto[],
+  ) {
     let resultExists: Result = null;
+    const elementResultMetadata: CreateBulkUploadResultsDto =
+      new CreateBulkUploadResultsDto();
     try {
       const processedResult = await this.createResultFromAiRoar(result);
+
+      elementResultMetadata.missing_fields =
+        result?.metadata?.missing_fields?.map((el) => el?.trim()) ?? [];
+      elementResultMetadata.manual_intervention_occurred =
+        result?.metadata?.manually_edited ?? false;
+      elementResultMetadata.suggested_status = result?.status;
+      elementResultMetadata.title = result?.title;
+      elementResultMetadata.indicator_id =
+        processedResult?.result?.indicator_id;
+
       const newResult = await this.createResult(processedResult.result);
       resultExists = newResult;
       await this._resultsUtil.setCurrentResult(newResult.result_id);
@@ -989,12 +1017,16 @@ export class ResultsService {
           break;
       }
 
-      await this.customStatus(
+      const finalStatus = await this.customStatus(
         result.status,
         newResult.result_id,
         processedResult?.result?.year,
       );
 
+      elementResultMetadata.final_status =
+        finalStatus ?? newResult?.result_status_id;
+      elementResultMetadata.result_id = newResult.result_id;
+      resultMetadata.push(elementResultMetadata);
       return { ...newResult, error: false };
     } catch (error) {
       if (resultExists) {
@@ -1003,10 +1035,9 @@ export class ResultsService {
         );
         await this._queryService.deleteFullResultById(resultExists.result_id);
       }
-
-      this.logger.error(
-        `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`,
-      );
+      const errorMessage = `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`;
+      this.logger.error(errorMessage);
+      elementResultMetadata.error_message = errorMessage;
       const tempExistsResult = await this.dataSource
         .getRepository(Result)
         .findOne({
@@ -1019,6 +1050,8 @@ export class ResultsService {
       if (!isbulk) {
         throw error;
       }
+
+      resultMetadata.push(elementResultMetadata);
 
       return {
         ...result,
@@ -1035,7 +1068,7 @@ export class ResultsService {
     status: ResultStatusEnum,
     resultId: number,
     reportYear: number,
-  ): Promise<void> {
+  ): Promise<number> {
     if (isEmpty(status) || !ResultStatusNameEnum?.[status]) return;
 
     const greenChecks = await this._greenChecksService.findByResultId(resultId);
@@ -1065,19 +1098,40 @@ export class ResultsService {
           resultrCode,
           reportYear,
         );
+
+        return status;
       }
     }
+    return null;
   }
 
-  async createResultFromAiBulk(results: ResultRawAi[]) {
+  async createResultFromAiBulk(data: RootAi) {
+    const { results, metadata } = data;
+
+    const iaMetadataReport = new CreateAiReportDto();
+    const iaMetadataReportProcess = new CreateBulkUploadProcessesDto();
+    const iaMetadataReportResults: CreateBulkUploadResultsDto[] = [];
+
+    iaMetadataReportProcess.ai_interaction_id = metadata.ai_interaction_id;
+    iaMetadataReportProcess.file_name = metadata.file_name;
+    iaMetadataReportProcess.created_by = this.currentUser.user_id;
+
+    iaMetadataReport.bulkUploadProcesses = iaMetadataReportProcess;
+
     const resultsCreated: (
       | Result
       | { error?: boolean; message_error?: string }
     )[] = [];
     for (const result of results) {
-      const newResult = await this.formalizeResult(result, true);
+      const newResult = await this.formalizeResult(
+        result,
+        true,
+        iaMetadataReportResults,
+      );
       resultsCreated.push(newResult);
     }
+    iaMetadataReport.bulkUploadResults = iaMetadataReportResults;
+    await this._aiReportsService.create(iaMetadataReport);
     return {
       results_errors: resultsCreated.filter((el) => (el as any).error),
       results_created: resultsCreated.filter((el) => !(el as any).error),

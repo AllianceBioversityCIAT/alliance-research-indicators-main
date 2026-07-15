@@ -20,6 +20,7 @@ export const getDataSource = (
     `${__dirname}/../../../domain/entities/**/*.entity{.ts,.js}`,
     `${__dirname}/../../../domain/tools/clarisa/entities/**/*.entity{.ts,.js}`,
     `${__dirname}/../../../domain/shared/auxiliar/**/*.entity{.ts,.js}`,
+    `${__dirname}/../../../domain/tools/open-search/prms/entities/*.entity{.ts,.js}`,
   ];
   let name: string;
 
