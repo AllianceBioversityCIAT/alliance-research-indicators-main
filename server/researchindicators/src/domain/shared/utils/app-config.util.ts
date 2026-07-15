@@ -394,4 +394,8 @@ export class AppConfig {
       });
     return appConfig?.simple_value;
   }
+
+  get PDF_VIEWER_URL(): string {
+    return process.env.ARI_PDF_VIEWER_URL;
+  }
 }

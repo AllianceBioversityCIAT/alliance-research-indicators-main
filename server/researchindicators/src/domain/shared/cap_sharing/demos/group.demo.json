@@ -1,0 +1,74 @@
+{
+  "delivery_modality_id": 3,
+  "end_date": "2026-05-22T05:00:00.000Z",
+  "session_format_id": 2,
+  "session_type_id": 2,
+  "start_date": "2026-05-14T05:00:00.000Z",
+  "degree_id": 4,
+  "session_length_id": 2,
+  "group": {
+    "is_attending_organization": 1,
+    "session_participants_female": 1,
+    "session_participants_male": 1,
+    "session_participants_non_binary": 0,
+    "session_participants_total": 2,
+    "session_purpose_description": "other",
+    "session_purpose_id": 4,
+    "trainee_organization_representative": [
+      {
+        "created_at": "2026-06-01T23:10:11.530Z",
+        "updated_at": "2026-06-01T23:30:19.000Z",
+        "is_active": true,
+        "result_institution_id": 13008,
+        "result_id": 17898,
+        "institution_id": 7,
+        "institution_role_id": 2
+      }
+    ]
+  },
+  "training_supervisor": {
+    "is_active": true,
+    "result_user_id": 7789,
+    "result_id": 17898,
+    "user_id": "01906",
+    "user_role_id": 2,
+    "user": {
+      "is_active": true,
+      "carnet": "01906",
+      "first_name": "FERNANDO",
+      "last_name": "ARANGO SUELTO",
+      "email": "f.arango@cgiar.org",
+      "center": "CIAT"
+    }
+  },
+  "training_supervisor_languages": {
+    "is_active": true,
+    "result_language_id": 1333,
+    "result_id": 17898,
+    "language_id": 2,
+    "language_role_id": 1,
+    "language": {
+      "is_active": true,
+      "id": 2,
+      "name": "Afrikaans",
+      "iso_alpha_2": "af",
+      "iso_alpha_3": "afr"
+    }
+  },
+  "session_format_label": "Group training",
+  "session_type_label": "Engagement",
+  "session_length_label": "Long-term (3 months and more)",
+  "degree_label": "Other",
+  "delivery_modality_label": "Hybrid",
+  "session_purpose_label": "Other",
+  "attending_organization_label": "Yes",
+  "organization_institutions": [
+    {
+      "institution_id": 7,
+      "acronym": "AfricaRice",
+      "name": "Africa Rice Center",
+      "institution_type_name": "CGIAR Center",
+      "headquarters": "Côte d'Ivoire"
+    }
+  ]
+}

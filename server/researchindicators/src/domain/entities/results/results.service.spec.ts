@@ -9,6 +9,7 @@ import { DataSource, EntityManager, In, Not } from 'typeorm';
 import { ResultContract } from '../result-contracts/entities/result-contract.entity';
 import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ResultsService } from './results.service';
+import { ResultAlignmentOperationsService } from './portfolio-handlers/sections/alignment/shared/result-alignment-operations.service';
 import { ResultRepository } from './repositories/result.repository';
 import { ResultContractsService } from '../result-contracts/result-contracts.service';
 import { ResultLeversService } from '../result-levers/result-levers.service';
@@ -35,7 +36,6 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { CreateResultDto } from './dto/create-result.dto';
 import { SetAuditEnum } from '../../shared/utils/current-user.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
-import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ContractRolesEnum } from '../result-contracts/enum/contract-roles.enum';
 import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
@@ -55,6 +55,7 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
+import { PortfoliosService } from '../portfolios/portfolios.service';
 import { AiReportsService } from '../ai-reports/ai-reports.service';
 
 describe('ResultsService', () => {
@@ -94,6 +95,10 @@ describe('ResultsService', () => {
   let mockResultsUtil: jest.Mocked<ResultsUtil>;
   let mockGreenChecksService: { findByResultId: jest.Mock };
   let mockGreenCheckRepository: { createSnapshot: jest.Mock };
+  let mockResultAlignmentOperationsService: jest.Mocked<
+    Pick<ResultAlignmentOperationsService, 'save' | 'find'>
+  >;
+  let mockPortfoliosService: jest.Mocked<Pick<PortfoliosService, 'findOne'>>;
   let mockAiReportsService: { create: jest.Mock };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
@@ -126,6 +131,7 @@ describe('ResultsService', () => {
     mockResultLeversService = {
       find: jest.fn(),
       create: jest.fn(),
+      comparerClientToServer: jest.fn(),
     } as any;
 
     mockResultKeywordsService = {
@@ -250,6 +256,7 @@ describe('ResultsService', () => {
 
     mockResultLeverStrategicOutcomeService = {
       create: jest.fn(),
+      findByMultiplesResultLeverIds: jest.fn(),
     } as any;
 
     mockResultLeverSdgTargetsService = {
@@ -273,6 +280,14 @@ describe('ResultsService', () => {
       createSnapshot: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockResultAlignmentOperationsService = {
+      save: jest.fn(),
+      find: jest.fn(),
+    };
+
+    mockPortfoliosService = {
+      findOne: jest.fn(),
+    };
     mockAiReportsService = {
       create: jest.fn().mockResolvedValue({ id: 1 }),
     };
@@ -387,6 +402,14 @@ describe('ResultsService', () => {
         {
           provide: GreenCheckRepository,
           useValue: mockGreenCheckRepository,
+        },
+        {
+          provide: ResultAlignmentOperationsService,
+          useValue: mockResultAlignmentOperationsService,
+        },
+        {
+          provide: PortfoliosService,
+          useValue: mockPortfoliosService,
         },
         {
           provide: AiReportsService,
@@ -728,24 +751,12 @@ describe('ResultsService', () => {
         grant_amount_usd: 2000,
       } as any;
 
-      const clarisaLever = {
-        id: 5,
-        name: 'Test Lever',
-        short_name: 'TL',
-        result_levers: [],
-      } as any;
-
       // Setup mocks
       mockMainRepo.findOne.mockResolvedValue(null); // No existing result
       (service as any).newOfficialCode.mockResolvedValue(newOfficialCode);
       mockRepository.save.mockResolvedValue(savedResult);
       (service as any).createResultType.mockResolvedValue(undefined);
       mockAgressoContractService.findOne.mockResolvedValue(agressoContract);
-      mockClarisaLeversService.homologatedData.mockReturnValue(
-        'Test Lever Name',
-      );
-      mockClarisaLeversService.findByName.mockResolvedValue(clarisaLever);
-      mockResultLeversService.create.mockResolvedValue(undefined);
       mockResultContractsService.create.mockResolvedValue(undefined);
       mockCurrentUser.audit.mockReturnValue({
         created_at: new Date(),
@@ -796,20 +807,6 @@ describe('ResultsService', () => {
       );
       expect(mockAgressoContractService.findOne).toHaveBeenCalledWith(
         createResult.contract_id,
-      );
-      expect(mockClarisaLeversService.homologatedData).toHaveBeenCalledWith(
-        agressoContract.departmentId,
-      );
-      expect(mockClarisaLeversService.findByName).toHaveBeenCalledWith(
-        'Test Lever Name',
-      );
-      expect(mockResultLeversService.create).toHaveBeenCalledWith(
-        savedResult.result_id,
-        { lever_id: String(clarisaLever.id), is_primary: true },
-        'lever_id',
-        LeverRolesEnum.ALIGNMENT,
-        mockEntityManager,
-        ['is_primary'],
       );
       expect(mockResultContractsService.create).toHaveBeenCalledWith(
         savedResult.result_id,
@@ -2111,11 +2108,18 @@ describe('ResultsService', () => {
 
   describe('updateResultAlignment', () => {
     let mockEntityManager: jest.Mocked<EntityManager>;
+    let indicatorIdGetter: jest.Mock;
 
     beforeEach(() => {
       mockEntityManager = {
         getRepository: jest.fn(),
       } as any;
+
+      indicatorIdGetter = jest.fn(() => IndicatorsEnum.KNOWLEDGE_PRODUCT);
+      Object.defineProperty(mockResultsUtil, 'indicatorId', {
+        get: () => indicatorIdGetter(),
+        configurable: true,
+      });
 
       mockDataSource.transaction.mockImplementation(async (callback: any) => {
         return await callback(mockEntityManager);
@@ -2123,7 +2127,6 @@ describe('ResultsService', () => {
     });
 
     it('should handle errors during alignment update', async () => {
-      // Arrange
       const resultId = 1;
       const updateResultAlignmentDto = {
         contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
@@ -2131,40 +2134,148 @@ describe('ResultsService', () => {
         contributor_levers: [{ lever_id: '6', is_primary: false }] as any,
       };
 
-      const errorMessage = 'Contract service error';
-      mockResultContractsService.create.mockRejectedValue(
+      const errorMessage = 'Alignment operations error';
+      mockResultAlignmentOperationsService.save.mockRejectedValue(
         new Error(errorMessage),
       );
 
-      // Act & Assert
       await expect(
         service.updateResultAlignment(resultId, updateResultAlignmentDto),
       ).rejects.toThrow(errorMessage);
 
-      expect(mockResultContractsService.create).toHaveBeenCalled();
+      expect(mockResultAlignmentOperationsService.save).toHaveBeenCalledWith(
+        resultId,
+        updateResultAlignmentDto,
+      );
+    });
+
+    it('should delegate alignment save to ResultAlignmentOperationsService', async () => {
+      const resultId = 1;
+      const updateResultAlignmentDto = {
+        contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
+        primary_levers: [
+          {
+            lever_id: '100',
+            is_primary: true,
+            custom_lever_name: 'My custom primary lever',
+          },
+        ] as any,
+        contributor_levers: [
+          {
+            lever_id: '6',
+            is_primary: false,
+            custom_lever_name: 'My custom contributor lever',
+          },
+        ] as any,
+        result_sdgs: [],
+      };
+
+      mockResultAlignmentOperationsService.save.mockResolvedValue(undefined);
+
+      await service.updateResultAlignment(resultId, updateResultAlignmentDto);
+
+      expect(mockResultAlignmentOperationsService.save).toHaveBeenCalledWith(
+        resultId,
+        updateResultAlignmentDto,
+      );
+    });
+
+    it('should delegate alignment save when indicator is not OICR', async () => {
+      indicatorIdGetter.mockReturnValue(IndicatorsEnum.KNOWLEDGE_PRODUCT);
+
+      const resultId = 1;
+      const sdgTargets = [{ sdg_target_id: 1 }];
+      const updateResultAlignmentDto = {
+        contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
+        primary_levers: [
+          {
+            lever_id: '5',
+            is_primary: true,
+            result_lever_sdg_targets: sdgTargets,
+          },
+        ] as any,
+        contributor_levers: [],
+        result_sdgs: [{ clarisa_sdg_id: 1 }] as any,
+      };
+
+      mockResultAlignmentOperationsService.save.mockResolvedValue(undefined);
+
+      await service.updateResultAlignment(resultId, updateResultAlignmentDto);
+
+      expect(mockResultAlignmentOperationsService.save).toHaveBeenCalledWith(
+        resultId,
+        updateResultAlignmentDto,
+      );
+    });
+
+    it('should delegate alignment save when indicator is OICR', async () => {
+      indicatorIdGetter.mockReturnValue(IndicatorsEnum.OICR);
+
+      const resultId = 1;
+      const sdgTargets = [{ sdg_target_id: 1 }, { sdg_target_id: 2 }];
+      const updateResultAlignmentDto = {
+        contracts: [{ contract_id: 'CONTRACT123', is_primary: true }] as any,
+        primary_levers: [
+          {
+            lever_id: '5',
+            is_primary: true,
+            result_lever_sdg_targets: sdgTargets,
+          },
+        ] as any,
+        contributor_levers: [],
+        result_sdgs: [],
+      };
+
+      mockResultAlignmentOperationsService.save.mockResolvedValue(undefined);
+
+      await service.updateResultAlignment(resultId, updateResultAlignmentDto);
+
+      expect(mockResultAlignmentOperationsService.save).toHaveBeenCalledWith(
+        resultId,
+        updateResultAlignmentDto,
+      );
     });
   });
 
   describe('findResultAlignment', () => {
-    it('should call mainRepo.findOne and return result', async () => {
-      // Arrange
+    it('should return alignment from ResultAlignmentOperationsService', async () => {
       const resultId = 1;
-      const mockAlignment = {
-        contracts: undefined,
-        levers: undefined,
-        result_sdgs: undefined,
+      const expectedAlignment = {
+        contracts: [{ contract_id: 'CONTRACT123' }],
+        primary_levers: [
+          {
+            result_lever_id: 1,
+            lever_id: '100',
+            is_primary: true,
+            custom_lever_name: 'My custom Other lever',
+          },
+        ],
+        contributor_levers: [
+          {
+            result_lever_id: 2,
+            lever_id: '6',
+            is_primary: false,
+            custom_lever_name: null,
+          },
+        ],
+        result_sdgs: [],
       };
 
-      // Mock the method that's actually called
-      jest
-        .spyOn(service, 'findResultAlignment')
-        .mockResolvedValue(mockAlignment as any);
+      mockResultAlignmentOperationsService.find.mockResolvedValue(
+        expectedAlignment as any,
+      );
 
-      // Act
       const result = await service.findResultAlignment(resultId);
 
-      // Assert
-      expect(result).toEqual(mockAlignment);
+      expect(mockResultAlignmentOperationsService.find).toHaveBeenCalledWith(
+        resultId,
+      );
+      expect(result.primary_levers).toHaveLength(1);
+      expect(result.primary_levers[0].custom_lever_name).toBe(
+        'My custom Other lever',
+      );
+      expect(result.contributor_levers).toHaveLength(1);
+      expect(result.contributor_levers[0].custom_lever_name).toBeNull();
     });
   });
 
@@ -2217,6 +2328,7 @@ describe('ResultsService', () => {
         is_principal_investigator: mockPrincipalData.is_principal === 1,
         result_contract_id: mockPrimaryContract.contract_id,
         result_status: mockResult.result_status,
+        portfolio: null,
       });
       expect(mockMainRepo.isMainContactPerson).toHaveBeenCalledWith(
         resultId,

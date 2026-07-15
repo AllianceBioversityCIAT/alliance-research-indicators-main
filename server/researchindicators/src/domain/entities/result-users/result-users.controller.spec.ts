@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { ResultUsersController } from './result-users.controller';
 import { ResultUsersService } from './result-users.service';
@@ -33,6 +34,7 @@ describe('ResultUsersController', () => {
             setup: jest.fn().mockResolvedValue(undefined),
           },
         },
+        mockPortfolioUtilProvider,
         { provide: CurrentUserUtil, useValue: {} },
       ],
     }).compile();
