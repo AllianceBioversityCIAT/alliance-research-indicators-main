@@ -369,9 +369,6 @@ describe('ResultOicrService', () => {
         'STAR',
         {
           leverEnum: 1,
-          notMap: {
-            lever: true,
-          },
           result_status_id: 9,
         },
       );
@@ -414,9 +411,6 @@ describe('ResultOicrService', () => {
         'STAR',
         {
           leverEnum: 1,
-          notMap: {
-            lever: true,
-          },
           result_status_id: 9,
         },
       );

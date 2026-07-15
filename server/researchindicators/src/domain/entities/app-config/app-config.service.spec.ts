@@ -6,6 +6,8 @@ import { AppConfig } from './entities/app-config.entity';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { AppConfigRepository } from './repositories/app-config.repository';
 import { AppConfigSorting } from './enum/app-config-forting.enum';
+import { AppConfigKey } from './enum/app-config-key.enum';
+import { AppConfigTypesDto } from './dtos/app-config-types.dto';
 
 describe('AppConfigService', () => {
   let service: AppConfigService;
@@ -126,6 +128,40 @@ describe('AppConfigService', () => {
         mockAppConfigRepository.findAllCategoriesAndSubcategories,
       ).toHaveBeenCalled();
       expect(result).toBe(lists);
+    });
+  });
+
+  describe('getEnv', () => {
+    it('should return typed config values when key exists', async () => {
+      const row = {
+        key: AppConfigKey.ARI_CLARISA_API_KEY,
+        simple_value: 'secret-key',
+        json_value: { enabled: true },
+      } as AppConfig;
+      findOne.mockResolvedValue(row);
+
+      const result = await service.getEnv(AppConfigKey.ARI_CLARISA_API_KEY);
+
+      expect(findOne).toHaveBeenCalledWith({
+        where: {
+          key: AppConfigKey.ARI_CLARISA_API_KEY,
+          is_active: true,
+        },
+      });
+      expect(result).toEqual(
+        new AppConfigTypesDto({
+          simple_value: 'secret-key',
+          json_value: { enabled: true },
+        } as AppConfig),
+      );
+    });
+
+    it('should throw when config key is missing', async () => {
+      findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getEnv(AppConfigKey.ARI_CLARISA_API_KEY),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

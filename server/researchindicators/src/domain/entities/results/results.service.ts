@@ -299,7 +299,6 @@ export class ResultsService {
     newConfig.leverEnum = configuration?.leverEnum ?? LeverRolesEnum.ALIGNMENT;
     newConfig.notMap = {
       sdg: configuration?.notMap?.sdg ?? false,
-      lever: configuration?.notMap?.lever ?? false,
     };
     newConfig.result_status_id =
       configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
@@ -395,26 +394,6 @@ export class ResultsService {
 
       const agressoContract =
         await this._agressoContractService.findOne(contract_id);
-      const lever = this._clarisaLeversService.homologatedData(
-        agressoContract?.departmentId,
-      );
-      const clarisaLever = await this._clarisaLeversService.findByName(lever);
-
-      if (clarisaLever && !config.notMap.lever) {
-        const primaryLever: Partial<ResultLever> = {
-          lever_id: String(clarisaLever.id),
-          is_primary: true,
-        };
-
-        await this._resultLeversService.create<LeverRolesEnum>(
-          result.result_id,
-          primaryLever,
-          'lever_id',
-          config.leverEnum,
-          manager,
-          ['is_primary'],
-        );
-      }
 
       const primaryContract: Partial<ResultContract> = {
         contract_id: contract_id,

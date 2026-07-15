@@ -114,7 +114,6 @@ export class ResultOicrService {
         {
           leverEnum: LeverRolesEnum.ALIGNMENT,
           result_status_id: ResultStatusEnum.REQUESTED,
-          notMap: { lever: true },
         },
       );
       const lever = await this.resultLeversService.find(
