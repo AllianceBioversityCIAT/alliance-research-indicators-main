@@ -21,6 +21,13 @@ import {
 import { ResultPdfReportCapSharingLabels } from '../../result-pdf-report.types';
 import { ResultPdfIndicatorSectionHandler } from '../result-pdf-indicator-section.types';
 
+export const mapAttendingOrganizationLabel = (
+  value?: boolean | null,
+): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  return value ? 'Yes' : 'No';
+};
+
 @Injectable()
 export class CapSharingPdfSectionHandler
   implements ResultPdfIndicatorSectionHandler {
@@ -118,6 +125,9 @@ export class CapSharingPdfSectionHandler
     ]);
 
     const attendingOrganization = capSharing.group?.is_attending_organization;
+    const attendingOrganizationLabel = mapAttendingOrganizationLabel(
+      attendingOrganization,
+    );
 
     return {
       session_format_label: sessionFormat,
@@ -129,12 +139,7 @@ export class CapSharingPdfSectionHandler
       affiliation_label: affiliationInstitution?.institution?.name,
       nationality_label: nationalityCountry?.name,
       session_purpose_label: sessionPurpose,
-      attending_organization_label:
-        attendingOrganization === undefined || attendingOrganization === null
-          ? undefined
-          : attendingOrganization
-            ? 'Yes'
-            : 'No',
+      attending_organization_label: attendingOrganizationLabel,
       organization_institutions: organizationInstitutions,
     };
   }

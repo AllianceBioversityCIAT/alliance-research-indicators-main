@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { CapSharingPdfSectionHandler } from './cap-sharing-pdf-section.handler';
+import { CapSharingPdfSectionHandler, mapAttendingOrganizationLabel } from './cap-sharing-pdf-section.handler';
 import { ResultCapacitySharingService } from '../../../../../result-capacity-sharing/result-capacity-sharing.service';
 import { ResultCapacitySharing } from '../../../../../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { ResultInstitution } from '../../../../../result-institutions/entities/result-institution.entity';
@@ -110,5 +110,59 @@ describe('CapSharingPdfSectionHandler', () => {
       nationality_label: 'Albania',
     });
     expect(sections.cap_sharing?.group).toBeUndefined();
+  });
+
+  describe('mapAttendingOrganizationLabel', () => {
+    it.each([
+      [undefined, undefined],
+      [null, undefined],
+      [true, 'Yes'],
+      [false, 'No'],
+    ])('value %s returns %s', (value, expected) => {
+      expect(mapAttendingOrganizationLabel(value)).toBe(expected);
+    });
+  });
+
+  it.each([
+    [true, 'Yes'],
+    [false, 'No'],
+  ])(
+    'maps is_attending_organization %s to label %s',
+    async (isAttendingOrganization, expectedLabel) => {
+      capSharingRepo.findOne.mockResolvedValue({ result_id: 17898 });
+      resultCapacitySharingService.findByResultId.mockResolvedValue({
+        session_format_id: SessionFormatEnum.GROUP,
+        group: {
+          session_purpose_id: 1,
+          is_attending_organization: isAttendingOrganization,
+          trainee_organization_representative: [],
+        },
+      });
+      controlListRepo.findOne.mockResolvedValue({ name: 'Workshop' });
+
+      const sections = await handler.buildSections(17898);
+
+      expect(sections.cap_sharing?.attending_organization_label).toBe(
+        expectedLabel,
+      );
+    },
+  );
+
+  it('omits attending_organization_label when is_attending_organization is not set', async () => {
+    capSharingRepo.findOne.mockResolvedValue({ result_id: 17898 });
+    resultCapacitySharingService.findByResultId.mockResolvedValue({
+      session_format_id: SessionFormatEnum.GROUP,
+      group: {
+        session_purpose_id: 1,
+        trainee_organization_representative: [],
+      },
+    });
+    controlListRepo.findOne.mockResolvedValue({ name: 'Workshop' });
+
+    const sections = await handler.buildSections(17898);
+
+    expect(sections.cap_sharing).not.toHaveProperty(
+      'attending_organization_label',
+    );
   });
 });
