@@ -77,4 +77,13 @@ describe('TipIntegrationController', () => {
     await controller.syncIprData('2026');
     expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(2026);
   });
+
+  it('syncIprData passes undefined when year is not provided', async () => {
+    mockService.getKnowledgeProductsByYear.mockResolvedValue([]);
+    mockFormat.mockReturnValue({});
+    await controller.syncIprData(undefined);
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(
+      undefined,
+    );
+  });
 });

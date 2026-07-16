@@ -23,7 +23,7 @@ export class ResultSectionOrchestratorService {
     private readonly alignmentRegistry: AlignmentHandlerRegistry,
     private readonly portfolioUtil: PortfolioUtil,
     private readonly resultsUtil: ResultsUtil,
-  ) { }
+  ) {}
 
   buildContext(
     resultId: number,

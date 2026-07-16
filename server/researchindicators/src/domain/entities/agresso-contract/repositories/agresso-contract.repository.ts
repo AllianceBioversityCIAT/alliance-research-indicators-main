@@ -419,13 +419,6 @@ export class AgressoContractRepository extends Repository<AgressoContract> {
       };
     }
 
-    console.log(
-      validFilter(
-        filter?.funding_type,
-        `AND ac.funding_type in (${filter?.funding_type?.join(',')})`,
-      ),
-    );
-
     const newQuery = `
     SELECT 
         paginated_contracts.agreement_id,

@@ -52,6 +52,13 @@ export class ResultKnowledgeProduct extends AuditableEntity {
   })
   publication_date: string;
 
+  @Column({
+    type: 'bigint',
+    name: 'tip_id',
+    nullable: true,
+  })
+  tip_id: number;
+
   @ManyToOne(() => Result, (result) => result.knowledge_products)
   @JoinColumn({ name: 'result_id' })
   result: Result;

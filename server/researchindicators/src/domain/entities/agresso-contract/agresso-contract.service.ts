@@ -25,7 +25,7 @@ export class AgressoContractService {
     private readonly currentUser: CurrentUserUtil,
     private readonly appConfig: AppConfig,
     private readonly clarisaLeversService: ClarisaLeversService,
-  ) { }
+  ) {}
 
   async findContracts(
     where: AgressoContractWhere,
@@ -85,10 +85,12 @@ export class AgressoContractService {
 
     return {
       ...contract,
-      lever: leverShortName ? {
-        ...lever,
-        icon,
-      } : null,
+      lever: leverShortName
+        ? {
+            ...lever,
+            icon,
+          }
+        : null,
     };
   }
 

@@ -197,4 +197,4 @@ import { AiReportsModule } from './ai-reports/ai-reports.module';
   ],
   exports: [AgressoContractModule, AppSecretsModule, ReportsModule],
 })
-export class EntitiesModule { }
+export class EntitiesModule {}

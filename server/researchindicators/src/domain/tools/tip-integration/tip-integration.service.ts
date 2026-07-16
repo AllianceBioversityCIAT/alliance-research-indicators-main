@@ -104,14 +104,20 @@ export class TipIntegrationService extends BaseApi {
     }
   }
 
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   private async saveTemporalData(year: number, executionCode: string) {
     let pendingData = true;
     let offset = 0;
     const limit = 50;
+    // TIP throttles repeated calls ("Too Many Attempts."), so pace the pagination
+    const delayBetweenRequestsMs = 1000;
     while (pendingData) {
       const response = await firstValueFrom(
         this.getRequest<TipKnowledgeProductsResponseDto>(
-          `/publications/year/${year}?limit=${limit}&offset=${offset}`,
+          `/publications?year=${year}&limit=${limit}&offset=${offset}`,
           {
             headers: {
               Authorization: 'Bearer ' + this.token,
@@ -120,21 +126,22 @@ export class TipIntegrationService extends BaseApi {
         ),
       )
         .then(({ data }) => data)
-        .catch((error) => {
+        .catch(async (error) => {
           this.logger.error(
             `Error fetching knowledge products from TIP: ${error.message}`,
           );
+          await this.prmsRepository.deleteTemporalResults(executionCode);
           throw new BadRequestException(
             'Error fetching knowledge products from TIP',
           );
         });
 
-      response.data.forEach(async (item, index) => {
+      response.data.forEach(async (item) => {
         await this.dataSource
           .getRepository(SyncStagingRecordsEntity)
           .save({
             execution_code: executionCode,
-            code: offset + index,
+            code: item.id,
             year,
             data: item,
           })
@@ -149,6 +156,7 @@ export class TipIntegrationService extends BaseApi {
         pendingData = false;
       } else {
         offset += limit;
+        await this.sleep(delayBetweenRequestsMs);
       }
     }
   }
@@ -163,6 +171,7 @@ export class TipIntegrationService extends BaseApi {
     const endYeard = year ?? new Date().getFullYear();
     let currentYear = year ?? 2021;
     for (currentYear; currentYear <= endYeard; currentYear++) {
+      this.logger.log(`Saving temporal data for year ${currentYear}`);
       await this.saveTemporalData(currentYear, executionCode);
     }
 
@@ -175,10 +184,14 @@ export class TipIntegrationService extends BaseApi {
       platformCode: ReportingPlatformEnum.TIP,
       resultSaved,
       counters,
-      appliedVersion: true,
+      manageOfficialCode: true,
+      findOptions: {
+        public_link: 'public_link',
+      },
     });
     await this.syncProcessLogService.update(syncProcessLog.id, counters);
     await this.syncProcessLogService.endSync(syncProcessLog.id);
+    await this.prmsRepository.deleteTemporalResults(executionCode);
   }
 
   async processing(
@@ -191,6 +204,9 @@ export class TipIntegrationService extends BaseApi {
       const resultMapped: ExternalMappersDto = new ExternalMappersDto();
       // TIP API no longer returns id — blocked until TIP restores the field
       resultMapped.official_code = undefined as unknown as number;
+      resultMapped.is_version_applied = data.is_version ?? false;
+      resultMapped.public_link = result.link;
+      resultMapped.created_at = new Date(result.created_at);
 
       let projectId: string = null;
       if (Array.isArray(result.project)) {
@@ -327,9 +343,6 @@ export class TipIntegrationService extends BaseApi {
         notable_references: [],
       };
 
-      resultMapped.public_link = result.link;
-      resultMapped.created_at = new Date(result.created_at);
-
       const collection = result.collection?.join('; ');
       resultMapped.knowledgeProduct = {
         type: result.type.join(', '),
@@ -338,6 +351,7 @@ export class TipIntegrationService extends BaseApi {
         access_status: result.access_status,
         publication_date: result.publication_date,
         collection,
+        tip_id: result.id,
       } as ResultKnowledgeProduct;
 
       resultsMapped.push(resultMapped);
