@@ -22,6 +22,7 @@ import {
   PrimaryLeverCountDto,
 } from './dto/reports-primary-levers.dto';
 import { resolveLeverIconUrl } from '../../tools/clarisa/entities/clarisa-levers/lever-icon.util';
+import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 
 @Injectable()
 export class AgressoContractService {
@@ -37,6 +38,7 @@ export class AgressoContractService {
     // single usage site via moduleRef instead. See design.md §3.4.
     private readonly moduleRef: ModuleRef,
     private readonly appConfig: AppConfig,
+    private readonly clarisaLeversService: ClarisaLeversService,
   ) {}
 
   async findContracts(
@@ -76,7 +78,34 @@ export class AgressoContractService {
   }
 
   async findContratResultByContractId(contract_id: string) {
-    return this._agressoContractRepository.findOneContract(contract_id);
+    const contract =
+      await this._agressoContractRepository.findOneContract(contract_id);
+    if (!contract) {
+      return null;
+    }
+
+    const leverShortName = this.clarisaLeversService.homologatedData(
+      (contract as unknown as { departmentId: string }).departmentId,
+    );
+
+    const lever =
+      await this.clarisaLeversService.findByShortName(leverShortName);
+
+    const icon = this.clarisaLeversService.resolveIconUrl(
+      lever.short_name,
+      lever.full_name,
+      lever.id,
+    );
+
+    return {
+      ...contract,
+      lever: leverShortName
+        ? {
+            ...lever,
+            icon,
+          }
+        : null,
+    };
   }
 
   async findAgressoContracts(

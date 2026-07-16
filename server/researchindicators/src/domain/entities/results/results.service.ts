@@ -156,7 +156,7 @@ export class ResultsService {
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
     private readonly _portfolioService: PortfoliosService,
     private readonly _aiReportsService: AiReportsService,
-  ) { }
+  ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -436,13 +436,15 @@ export class ResultsService {
     return result;
   }
 
-  private async newOfficialCode() {
+  public async newOfficialCode(
+    platformCode: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
+  ) {
     const firstInsertion: number = 1;
     const lastCode: number = await this.mainRepo
       .findOne({
         where: {
           is_active: In([true, false]),
-          platform_code: ReportingPlatformEnum.STAR,
+          platform_code: platformCode,
         },
         order: { result_official_code: 'DESC' },
       })
@@ -770,12 +772,12 @@ export class ResultsService {
       result_status: result?.result_status,
       portfolio: portfolio
         ? {
-          id: portfolio.id,
-          name: portfolio.name,
-          description: portfolio.description,
-          start_year: portfolio.start_year,
-          end_year: portfolio.end_year,
-        }
+            id: portfolio.id,
+            name: portfolio.name,
+            description: portfolio.description,
+            start_year: portfolio.start_year,
+            end_year: portfolio.end_year,
+          }
         : null,
     };
   }
@@ -1251,8 +1253,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-              (el) => el.isoAlpha2 === country.isoAlpha2,
-            )?.result_countries_sub_nationals
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
             : [];
           return country;
         },

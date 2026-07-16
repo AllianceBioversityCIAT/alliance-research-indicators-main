@@ -5,6 +5,7 @@ import {
   mapGeographicScopeSection,
   mapPartnersSection,
   formatPdfGeneratedAt,
+  getOrdinalDaySuffix,
 } from './result-pdf-report.mapper';
 
 describe('result-pdf-report.mapper', () => {
@@ -111,11 +112,34 @@ describe('result-pdf-report.mapper', () => {
     });
   });
 
+  describe('getOrdinalDaySuffix', () => {
+    it.each([
+      [1, 'st'],
+      [2, 'nd'],
+      [3, 'rd'],
+      [4, 'th'],
+      [10, 'th'],
+      [11, 'th'],
+      [12, 'th'],
+      [13, 'th'],
+      [18, 'th'],
+      [21, 'st'],
+      [22, 'nd'],
+      [23, 'rd'],
+      [31, 'st'],
+    ])('day %i returns %s suffix', (day, suffix) => {
+      expect(getOrdinalDaySuffix(day)).toBe(suffix);
+    });
+  });
+
   it('formats generated_at with ordinal day suffix', () => {
     const formatted = formatPdfGeneratedAt(
       new Date('2025-02-18T20:18:00.000Z'),
     );
-    expect(formatted).toMatch(/18th, 2025/);
+    const day = new Date('2025-02-18T20:18:00.000Z').getDate();
+    expect(formatted).toMatch(
+      new RegExp(`${day}${getOrdinalDaySuffix(day)}, 2025`),
+    );
   });
 
   it('maps cap sharing section with individual data and labels', () => {

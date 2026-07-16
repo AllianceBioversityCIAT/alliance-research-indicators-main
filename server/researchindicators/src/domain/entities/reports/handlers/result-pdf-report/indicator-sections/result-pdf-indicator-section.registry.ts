@@ -31,7 +31,7 @@ export class ResultPdfIndicatorSectionRegistry {
     resultId: number,
     indicatorId: number,
   ): Promise<Partial<ResultPdfIndicatorSections>> {
-    const handler = this.handlers.get(indicatorId as IndicatorsEnum);
+    const handler = this.handlers.get(indicatorId);
     if (!handler) return {};
 
     const sections = await handler.buildSections(resultId);

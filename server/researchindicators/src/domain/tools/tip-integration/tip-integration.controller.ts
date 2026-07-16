@@ -88,7 +88,7 @@ export class TipIntegrationController {
   @ApiOperation({ summary: 'Sync IPR data with TIP' })
   async syncIprData(@Query('year') year?: string) {
     return this.tipIntegrationService
-      .getKnowledgeProductsByYear(Number(year))
+      .getKnowledgeProductsByYear(year ? +year : undefined)
       .then((data) =>
         ResponseUtils.format({
           description: 'IPR data synced successfully',

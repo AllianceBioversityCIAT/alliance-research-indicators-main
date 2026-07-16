@@ -58,6 +58,7 @@ describe('TipIntegrationService', () => {
   });
 
   const baseProduct: TipKnowledgeProductDto = {
+    id: 555,
     created_at: '2025-01-01',
     updated_at: '2025-01-02',
     name: 'Test KP',
@@ -300,6 +301,10 @@ describe('TipIntegrationService', () => {
 
   // [CLAUDE/DONE] 192
   describe('getKnowledgeProductsByYear', () => {
+    beforeEach(() => {
+      jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    });
+
     it('should fetch TIP data, load temporal results, process and end sync', async () => {
       const mockResponse = { data: [], data_count: 0 };
       jest
@@ -319,7 +324,8 @@ describe('TipIntegrationService', () => {
         platformCode: ReportingPlatformEnum.TIP,
         resultSaved: expect.any(Array),
         counters: expect.any(Object),
-        appliedVersion: true,
+        manageOfficialCode: true,
+        findOptions: { public_link: 'public_link' },
       });
       expect(syncProcessLogService.update).toHaveBeenCalledWith(
         1,
@@ -328,13 +334,27 @@ describe('TipIntegrationService', () => {
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
     });
 
+    it('should clean temporal results after a successful sync', async () => {
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: { data: [], data_count: 0 } }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+
+      await service.getKnowledgeProductsByYear(2025);
+
+      expect(prmsRepository.deleteTemporalResults).toHaveBeenCalledWith(
+        expect.any(String),
+      );
+    });
+
     it('should paginate TIP API requests when data_count equals limit', async () => {
       const page1 = {
-        data: [{ name: 'KP 1' }],
+        data: [{ id: 1, name: 'KP 1' }],
         data_count: 50,
       };
       const page2 = {
-        data: [{ name: 'KP 2' }],
+        data: [{ id: 2, name: 'KP 2' }],
         data_count: 10,
       };
       const getRequestSpy = jest
@@ -352,17 +372,42 @@ describe('TipIntegrationService', () => {
 
       expect(getRequestSpy).toHaveBeenCalledTimes(2);
       expect(getRequestSpy.mock.calls[1][0]).toContain('offset=50');
+      expect((service as any).sleep).toHaveBeenCalledTimes(1);
       expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
       expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledTimes(1);
     });
 
-    it('should throw BadRequestException when TIP API request fails', async () => {
+    it('should stage each record using the TIP product id as code', async () => {
+      const page = {
+        data: [{ id: 987, name: 'KP with id' }],
+        data_count: 1,
+      };
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: page }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+
+      await service.getKnowledgeProductsByYear(2025);
+
+      expect(mockStagingRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 987,
+          year: 2025,
+        }),
+      );
+    });
+
+    it('should throw BadRequestException and clean temporal data when TIP API request fails', async () => {
       jest
         .spyOn(service as any, 'getRequest')
         .mockReturnValue(throwError(() => new Error('Network error')));
 
       await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
         BadRequestException,
+      );
+      expect(prmsRepository.deleteTemporalResults).toHaveBeenCalledWith(
+        expect.any(String),
       );
     });
   });
@@ -429,6 +474,35 @@ describe('TipIntegrationService', () => {
       expect(results[0].knowledgeProduct.citation).toBe('Test Citation');
       expect(results[0].knowledgeProduct.open_access).toBe(true);
       expect(results[0].knowledgeProduct.type).toBe('Journal article');
+    });
+
+    it('should map tip_id from the TIP product id', async () => {
+      const results = await service.processing(
+        [wrapTemporal(baseProduct)],
+        2025,
+      );
+
+      expect(results[0].knowledgeProduct.tip_id).toBe(555);
+    });
+
+    it('should map public_link, created_at and is_version_applied from temporal data', async () => {
+      const results = await service.processing(
+        [wrapTemporal(baseProduct, { is_version: true })],
+        2025,
+      );
+
+      expect(results[0].public_link).toBe('http://link.example');
+      expect(results[0].created_at).toEqual(new Date('2025-01-01'));
+      expect(results[0].is_version_applied).toBe(true);
+    });
+
+    it('should default is_version_applied to false when is_version is missing', async () => {
+      const results = await service.processing(
+        [wrapTemporal(baseProduct, { is_version: undefined })],
+        2025,
+      );
+
+      expect(results[0].is_version_applied).toBe(false);
     });
 
     it('should map SDGs from TIP format into alignments', async () => {

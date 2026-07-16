@@ -42,14 +42,14 @@ export class ResultSectionOrchestratorService {
       throw new BadRequestException('Portfolio not found');
     }
 
-    return portfolioId as PortfolioIdEnum;
+    return portfolioId;
   }
 
   async findAlignment(resultId: number): Promise<Partial<ResultAlignmentDto>> {
     const portfolioId = this.resolvePortfolioId();
     const handler = this.alignmentRegistry.get(portfolioId);
-    const result = { ...(await this.resultsUtil.result) };
-    const portfolio = { ...(await this.portfolioUtil.portfolio) };
+    const result = { ...this.resultsUtil.result };
+    const portfolio = { ...this.portfolioUtil.portfolio };
     return handler.find(
       this.buildContext(resultId, portfolioId, undefined, result, portfolio),
     );
@@ -62,8 +62,8 @@ export class ResultSectionOrchestratorService {
   ): Promise<Partial<ResultAlignmentDto> | void> {
     const portfolioId = this.resolvePortfolioId();
     const handler = this.alignmentRegistry.get(portfolioId);
-    const result = { ...(await this.resultsUtil.result) };
-    const portfolio = { ...(await this.portfolioUtil.portfolio) };
+    const result = { ...this.resultsUtil.result };
+    const portfolio = { ...this.portfolioUtil.portfolio };
 
     await this.dataSource.transaction(async (manager) => {
       await handler.save(

@@ -216,4 +216,4 @@ import { AiReportsModule } from './ai-reports/ai-reports.module';
     AiReportsModule,
   ],
 })
-export class EntitiesModule { }
+export class EntitiesModule {}

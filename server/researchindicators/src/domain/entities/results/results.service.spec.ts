@@ -633,6 +633,51 @@ describe('ResultsService', () => {
     });
   });
 
+  describe('newOfficialCode', () => {
+    it('should default to STAR platform and return last code + 1', async () => {
+      mockMainRepo.findOne.mockResolvedValue({
+        result_official_code: 100,
+      } as any);
+
+      const code = await service.newOfficialCode();
+
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            platform_code: ReportingPlatformEnum.STAR,
+          }),
+          order: { result_official_code: 'DESC' },
+        }),
+      );
+      expect(code).toBe(101);
+    });
+
+    it('should use the provided platform code', async () => {
+      mockMainRepo.findOne.mockResolvedValue({
+        result_official_code: 55,
+      } as any);
+
+      const code = await service.newOfficialCode(ReportingPlatformEnum.TIP);
+
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            platform_code: ReportingPlatformEnum.TIP,
+          }),
+        }),
+      );
+      expect(code).toBe(56);
+    });
+
+    it('should return 1 when no previous result exists for the platform', async () => {
+      mockMainRepo.findOne.mockResolvedValue(null);
+
+      const code = await service.newOfficialCode(ReportingPlatformEnum.TIP);
+
+      expect(code).toBe(1);
+    });
+  });
+
   describe('createResult', () => {
     let mockEntityManager: jest.Mocked<EntityManager>;
     let mockRepository: any;

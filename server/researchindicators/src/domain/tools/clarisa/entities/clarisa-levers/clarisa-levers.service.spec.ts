@@ -13,6 +13,7 @@ import { CreateClarisaLeverDto } from './dto/clarisa-levers-raw.dto';
 
 describe('ClarisaLeversService', () => {
   let service: ClarisaLeversService;
+  const mockFindOne = jest.fn();
 
   const mockMainFindOne = jest.fn();
   const mockMainSave = jest.fn();
@@ -39,6 +40,7 @@ describe('ClarisaLeversService', () => {
     mockAudit.mockImplementation((set: SetAuditEnum) =>
       set === SetAuditEnum.UPDATE ? { updated_by: 42 } : { created_by: 42 },
     );
+    mockFindOne.mockReset();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -123,7 +125,7 @@ describe('ClarisaLeversService', () => {
       ['L6', 'Lever 6'],
       ['L7', 'Lever 7'],
       ['L8', 'Lever 8'],
-    ])('should return "%s" for input "%s"', (input, expected) => {
+    ])('should map "%s" to "%s"', (input, expected) => {
       expect(service.homologatedData(input)).toBe(expected);
     });
 

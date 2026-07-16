@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import {
-  TemportalDataResponse,
-} from '../dto/prms-response.dto';
+import { TemportalDataResponse } from '../dto/prms-response.dto';
 
 @Injectable()
 export class PrmsRepository {
-  constructor(private readonly dataSource: DataSource) { }
+  constructor(private readonly dataSource: DataSource) {}
 
   async findTemporalResults<T>(
     executionCode: string,

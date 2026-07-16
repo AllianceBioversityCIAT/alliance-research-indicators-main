@@ -91,6 +91,7 @@ describe('SaveResultService', () => {
             updateGeneralInfo: jest.fn(),
             updateResultAlignment: jest.fn(),
             updateInactiveResult: jest.fn(),
+            newOfficialCode: jest.fn(),
             findResultAlignment: jest
               .fn()
               .mockResolvedValue({ primary_levers: [] }),
@@ -215,6 +216,105 @@ describe('SaveResultService', () => {
       expect(resultsService.createResult.mock.calls[1][2].isSnapshot).toBe(
         false,
       );
+    });
+
+    it('should create result with the platform code from extraData', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 20,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+      expect(resultsService.createResult).toHaveBeenCalledWith(
+        expect.anything(),
+        ReportingPlatformEnum.TIP,
+        expect.anything(),
+        7001,
+      );
+    });
+
+    it('should generate a new official code when manageOfficialCode is enabled', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.newOfficialCode.mockResolvedValue(9999);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 21,
+        result_official_code: 9999,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), {
+        ...tipExtraData(),
+        manageOfficialCode: true,
+      });
+
+      expect(resultsService.newOfficialCode).toHaveBeenCalledWith(
+        ReportingPlatformEnum.TIP,
+      );
+      expect(resultsService.createResult).toHaveBeenCalledWith(
+        expect.anything(),
+        ReportingPlatformEnum.TIP,
+        expect.anything(),
+        9999,
+      );
+    });
+
+    it('should use the DTO official code when manageOfficialCode is disabled', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 22,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+      expect(resultsService.newOfficialCode).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalledWith(
+        expect.anything(),
+        ReportingPlatformEnum.TIP,
+        expect.anything(),
+        7001,
+      );
+    });
+
+    it('should search existing result by findOptions instead of official code', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 30,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/kp';
+
+      await service.saveAllSections(dto, {
+        ...tipExtraData(),
+        findOptions: { public_link: 'public_link' },
+      });
+
+      expect(resultRepoHandle.findOne).toHaveBeenCalledWith({
+        where: {
+          platform_code: ReportingPlatformEnum.TIP,
+          report_year_id: 2024,
+          public_link: 'https://example.org/kp',
+        },
+      });
+    });
+
+    it('should search by official code when findOptions is not provided', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 31,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+      expect(resultRepoHandle.findOne).toHaveBeenCalledWith({
+        where: {
+          result_official_code: 7001,
+          platform_code: ReportingPlatformEnum.TIP,
+          report_year_id: 2024,
+        },
+      });
     });
 
     it('should update inactive result when PRMS row already exists', async () => {

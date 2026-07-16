@@ -11,6 +11,7 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
 import { AppConfig } from '../../shared/utils/app-config.util';
+import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 
 // Mock the utility functions
 jest.mock('../../shared/utils/object.utils', () => ({
@@ -23,6 +24,7 @@ describe('AgressoContractService', () => {
   let dataSource: DataSource; // eslint-disable-line @typescript-eslint/no-unused-vars
   let repository: AgressoContractRepository;
   let currentUser: CurrentUserUtil;
+  let clarisaLeversService: ClarisaLeversService;
 
   const mockDataSource = {
     getRepository: jest.fn(),
@@ -55,6 +57,12 @@ describe('AgressoContractService', () => {
     BUCKET_URL: 'https://bucket.example',
   };
 
+  const mockClarisaLeversService = {
+    homologatedData: jest.fn(),
+    findByShortName: jest.fn(),
+    resolveIconUrl: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -77,6 +85,10 @@ describe('AgressoContractService', () => {
           provide: AppConfig,
           useValue: mockAppConfig,
         },
+        {
+          provide: ClarisaLeversService,
+          useValue: mockClarisaLeversService,
+        },
       ],
     }).compile();
 
@@ -86,6 +98,8 @@ describe('AgressoContractService', () => {
       AgressoContractRepository,
     );
     currentUser = module.get<CurrentUserUtil>(CurrentUserUtil);
+    clarisaLeversService =
+      module.get<ClarisaLeversService>(ClarisaLeversService);
   });
 
   it('should be defined', () => {
@@ -253,11 +267,12 @@ describe('AgressoContractService', () => {
   });
 
   describe('findContratResultByContractId', () => {
-    it('should find contract result by contract id', async () => {
+    it('should find contract result enriched with lever data', async () => {
       const contractId = 'CONTRACT123';
-      const expectedContract = {
+      const contract = {
         agreement_id: contractId,
         projectDescription: 'Contract with Results',
+        departmentId: 'L3',
         indicators: [
           {
             indicator: { indicator_id: 1, name: 'Indicator 1' },
@@ -265,13 +280,38 @@ describe('AgressoContractService', () => {
           },
         ],
       };
+      const lever = {
+        id: 3,
+        short_name: 'Lever 3',
+        full_name: 'Lever 3: Climate Action',
+      };
+      const icon =
+        'https://bucket.example/images/levers/L3-Climate-Action_COLOR.png';
 
-      mockRepository.findOneContract.mockResolvedValue(expectedContract);
+      mockRepository.findOneContract.mockResolvedValue(contract);
+      mockClarisaLeversService.homologatedData.mockReturnValue('Lever 3');
+      mockClarisaLeversService.findByShortName.mockResolvedValue(lever);
+      mockClarisaLeversService.resolveIconUrl.mockReturnValue(icon);
 
       const result = await service.findContratResultByContractId(contractId);
 
       expect(repository.findOneContract).toHaveBeenCalledWith(contractId);
-      expect(result).toEqual(expectedContract);
+      expect(clarisaLeversService.homologatedData).toHaveBeenCalledWith('L3');
+      expect(clarisaLeversService.findByShortName).toHaveBeenCalledWith(
+        'Lever 3',
+      );
+      expect(clarisaLeversService.resolveIconUrl).toHaveBeenCalledWith(
+        lever.short_name,
+        lever.full_name,
+        lever.id,
+      );
+      expect(result).toEqual({
+        ...contract,
+        lever: {
+          ...lever,
+          icon,
+        },
+      });
     });
 
     it('should return null when contract not found', async () => {
@@ -281,6 +321,8 @@ describe('AgressoContractService', () => {
       const result = await service.findContratResultByContractId(contractId);
 
       expect(repository.findOneContract).toHaveBeenCalledWith(contractId);
+      expect(clarisaLeversService.homologatedData).not.toHaveBeenCalled();
+      expect(clarisaLeversService.findByShortName).not.toHaveBeenCalled();
       expect(result).toBeNull();
     });
   });

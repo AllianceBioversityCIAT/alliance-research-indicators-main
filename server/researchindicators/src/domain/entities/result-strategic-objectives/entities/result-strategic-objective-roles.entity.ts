@@ -1,7 +1,6 @@
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { ResultStrategicObjective } from './result-strategic-objective.entity';
-import { PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('result_strategic_objective_roles')
 export class ResultStrategicObjectiveRoles extends AuditableEntity {
