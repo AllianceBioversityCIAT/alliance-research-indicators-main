@@ -34,7 +34,11 @@ import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 import { ResultRawAi, RootAi } from './dto/result-ai.dto';
 import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
-import { GetResultVersion } from '../../shared/decorators/versioning.decorator';
+import {
+  GetResultVersion,
+  ParamOrQueryEnum,
+} from '../../shared/decorators/versioning.decorator';
+import { getPortfolio } from '../../shared/decorators/portfolio.decorator';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
@@ -42,6 +46,8 @@ import { ResultSortEnum } from './enum/result-sort.enum';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultSectionOrchestratorService } from './portfolio-handlers/application/result-section-orchestrator.service';
+import { PortfolioUtil } from '../../shared/utils/portfolio.util';
 @ApiTags('Results')
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
@@ -51,6 +57,8 @@ export class ResultsController {
   constructor(
     private readonly resultsService: ResultsService,
     private readonly _resultsUtil: ResultsUtil,
+    private readonly _alignmentOrchestrator: ResultSectionOrchestratorService,
+    private readonly portfolioUtil: PortfolioUtil,
   ) {}
 
   @ApiQuery({
@@ -448,7 +456,8 @@ export class ResultsController {
       );
   }
 
-  @ApiOperation({ summary: 'Update alignments' })
+  //TODO: This post will remain open for comments while you review the new one related to the portfolio.
+  /*@ApiOperation({ summary: 'Update alignments' })
   @GetResultVersion()
   @ApiQuery({
     name: 'return',
@@ -476,9 +485,10 @@ export class ResultsController {
           status: HttpStatus.OK,
         }),
       );
-  }
+  }*/
 
-  @ApiOperation({ summary: 'Find alignments' })
+  //TODO: This post will remain open for comments while you review the new one related to the portfolio.
+  /*@ApiOperation({ summary: 'Find alignments' })
   @GetResultVersion()
   @Get(`${RESULT_CODE}/alignments`)
   async findResultAlignments() {
@@ -487,6 +497,60 @@ export class ResultsController {
       .then((result) =>
         ResponseUtils.format({
           description: 'alignments was found correctly',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }*/
+
+  //TODO: This endpoint remains under observation until we decide to use it or not
+  @ApiOperation({
+    summary: 'Find alignments via portfolio handler orchestrator',
+    description:
+      'Same response shape as GET /alignments. Routes through PortfolioUtil and AlignmentHandlerRegistry.',
+  })
+  @GetResultVersion()
+  @getPortfolio(ParamOrQueryEnum.QUERY, false)
+  @Get(`${RESULT_CODE}/alignments`)
+  async findResultAlignmentsHandlerFlow() {
+    return this._alignmentOrchestrator
+      .findAlignment(this._resultsUtil.resultId)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'alignments was found correctly',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  //TODO: This endpoint remains under observation until we decide to use it or not
+  @ApiOperation({
+    summary: 'Update alignments via portfolio handler orchestrator',
+    description:
+      'Same response shape as PATCH /alignments. Routes through PortfolioUtil and AlignmentHandlerRegistry.',
+  })
+  @GetResultVersion()
+  @getPortfolio(ParamOrQueryEnum.QUERY, false)
+  @ApiQuery({
+    name: 'return',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+    description: 'Is a reference to return data',
+  })
+  @ApiBody({ type: ResultAlignmentDto })
+  @UseGuards(ResultStatusGuard)
+  @Patch(`${RESULT_CODE}/alignments`)
+  async updateResultAlignmentsHandlerFlow(
+    @Query('return') returnData: TrueFalseEnum,
+    @Body() alignmentData: ResultAlignmentDto,
+  ) {
+    return this._alignmentOrchestrator
+      .saveAlignment(this._resultsUtil.resultId, alignmentData, returnData)
+      .then((result) =>
+        ResponseUtils.format({
+          description: 'Alignments was updated correctly',
           data: result,
           status: HttpStatus.OK,
         }),
@@ -515,7 +579,10 @@ export class ResultsController {
   @Get(`${RESULT_CODE}/metadata`)
   async findMetadata() {
     return this.resultsService
-      .findMetadataResult(this._resultsUtil.resultId)
+      .findMetadataResult(
+        this._resultsUtil.resultId,
+        this.portfolioUtil.portfolioId,
+      )
       .then((result) =>
         ResponseUtils.format({
           description: 'Metadata was found correctly',
@@ -577,15 +644,13 @@ export class ResultsController {
     @Body()
     data: RootAi,
   ) {
-    return this.resultsService
-      .createResultFromAiBulk(data.results)
-      .then((data) =>
-        ResponseUtils.format({
-          data: data,
-          description: 'AI Results created',
-          status: HttpStatus.CREATED,
-        }),
-      );
+    return this.resultsService.createResultFromAiBulk(data).then((data) =>
+      ResponseUtils.format({
+        data: data,
+        description: 'AI Results created',
+        status: HttpStatus.CREATED,
+      }),
+    );
   }
 
   @ApiOperation({ summary: 'Save data for Geo Location' })

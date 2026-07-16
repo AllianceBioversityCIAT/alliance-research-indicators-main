@@ -29,6 +29,7 @@ import { AllianceStaffOpenSearchModule } from './domain/tools/open-search/allian
 import { AdminModule } from './admin/admin.module';
 import { PrmsOpenSearchModule } from './domain/tools/open-search/prms/prms.opensearch.module';
 import { CronModule } from './domain/tools/cron-jobs/cron.module';
+import { RESULT_CODE } from './domain/shared/utils/results.util';
 
 @Module({
   imports: [
@@ -74,7 +75,7 @@ export class AppModule implements NestModule {
       .apply(JwtMiddleware)
       .exclude(
         {
-          path: '/api/configuration/:key',
+          path: 'configuration/:key',
           method: RequestMethod.GET,
         },
         {
@@ -95,6 +96,10 @@ export class AppModule implements NestModule {
         },
         {
           path: '/favicon.ico',
+          method: RequestMethod.GET,
+        },
+        {
+          path: `reports/${RESULT_CODE}/pdf`,
           method: RequestMethod.GET,
         },
       )

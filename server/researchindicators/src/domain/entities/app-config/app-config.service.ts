@@ -12,6 +12,8 @@ import {
   AppConfigRepository,
 } from './repositories/app-config.repository';
 import { AppConfigSorting } from './enum/app-config-forting.enum';
+import { AppConfigKey } from './enum/app-config-key.enum';
+import { AppConfigTypesDto } from './dtos/app-config-types.dto';
 
 @Injectable()
 export class AppConfigService {
@@ -71,5 +73,14 @@ export class AppConfigService {
     subcategories: string[];
   }> {
     return this.appConfigRepository.findAllCategoriesAndSubcategories();
+  }
+
+  async getEnv<T = unknown>(key: AppConfigKey): Promise<AppConfigTypesDto<T>> {
+    const config = await this.findConfigByKey(key);
+    if (!config) {
+      throw new NotFoundException(`Config with key ${key} not found`);
+    }
+
+    return new AppConfigTypesDto<T>(config);
   }
 }

@@ -89,6 +89,12 @@ import { SyncProcessLogModule } from './sync-process-log/sync-process-log.module
 import { LeverSdgTargetsModule } from './lever-sdg-targets/lever-sdg-targets.module';
 import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-lever-sdg-targets.module';
 import { ReportsModule } from './reports/reports.module';
+import { PortfoliosModule } from './portfolios/portfolios.module';
+import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
+import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
+import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impact-outcomes.module';
+import { ResultStrategicObjectivesModule } from './result-strategic-objectives/result-strategic-objectives.module';
+import { AiReportsModule } from './ai-reports/ai-reports.module';
 
 @Module({
   imports: [
@@ -182,7 +188,13 @@ import { ReportsModule } from './reports/reports.module';
     LeverSdgTargetsModule,
     ResultLeverSdgTargetsModule,
     ReportsModule,
+    PortfoliosModule,
+    StrategicObjectivesModule,
+    ImpactOutcomesModule,
+    ResultImpactOutcomesModule,
+    ResultStrategicObjectivesModule,
+    AiReportsModule,
   ],
   exports: [AgressoContractModule, AppSecretsModule, ReportsModule],
 })
-export class EntitiesModule {}
+export class EntitiesModule { }

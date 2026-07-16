@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ResultStatus } from '../../result-status/entities/result-status.entity';
+import { Portfolio } from '../../portfolios/entities/portfolio.entity';
 
 export class MetadataResultDto {
   @ApiProperty({
@@ -92,4 +93,11 @@ export class MetadataResultDto {
     required: true,
   })
   is_main_contact_person: boolean;
+
+  @ApiProperty({
+    type: Portfolio,
+    description: 'The portfolio',
+    required: false,
+  })
+  portfolio: Partial<Portfolio>;
 }

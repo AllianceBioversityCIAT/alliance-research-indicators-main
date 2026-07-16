@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { GreenChecksController } from './green-checks.controller';
 import { GreenChecksService } from './green-checks.service';
@@ -33,6 +34,7 @@ describe('GreenChecksController', () => {
       providers: [
         { provide: GreenChecksService, useValue: mockService },
         { provide: ResultsUtil, useValue: mockResultsUtil },
+        mockPortfolioUtilProvider,
         SetUpInterceptor,
       ],
     }).compile();

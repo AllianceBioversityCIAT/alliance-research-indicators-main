@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { ResultInnovationDevController } from './result-innovation-dev.controller';
 import { ResultInnovationDevService } from './result-innovation-dev.service';
@@ -32,6 +33,7 @@ describe('ResultInnovationDevController', () => {
             setup: jest.fn().mockResolvedValue(undefined),
           },
         },
+        mockPortfolioUtilProvider,
       ],
     })
       .overrideGuard(ResultStatusGuard)

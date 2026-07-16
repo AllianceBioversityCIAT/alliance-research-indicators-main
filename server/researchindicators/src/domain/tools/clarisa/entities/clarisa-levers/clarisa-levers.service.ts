@@ -1,19 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { ClarisaLever } from './entities/clarisa-lever.entity';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
-import { CurrentUserUtil } from '../../../../shared/utils/current-user.util';
+import {
+  CurrentUserUtil,
+  SetAuditEnum,
+} from '../../../../shared/utils/current-user.util';
 import { AppConfig } from '../../../../shared/utils/app-config.util';
 import { resolveLeverIconUrl } from './lever-icon.util';
+import { CreateClarisaLeverDto } from './dto/clarisa-levers-raw.dto';
+import { validObjectAnyOf } from '../../../../shared/utils/object.utils';
+import { PortfoliosService } from '../../../../entities/portfolios/portfolios.service';
 @Injectable()
 export class ClarisaLeversService extends ControlListBaseService<
   ClarisaLever,
   Repository<ClarisaLever>
 > {
   constructor(
-    dataSource: DataSource,
+    public readonly dataSource: DataSource,
     currentUser: CurrentUserUtil,
     private readonly appConfig: AppConfig,
+    private readonly portfoliosService: PortfoliosService,
   ) {
     super(
       ClarisaLever,
@@ -35,11 +42,89 @@ export class ClarisaLeversService extends ControlListBaseService<
     });
   }
 
-  iconMapper(clarisaLever: ClarisaLever[]) {
-    return clarisaLever.map((lever) => ({
-      ...lever,
-      icon: this.resolveIconUrl(lever.short_name, lever.full_name, lever.id),
-    }));
+  async findAllWithPortfolio(portfolioId?: number): Promise<ClarisaLever[]> {
+    return this.mainRepo.find({
+      where: {
+        portfolio_id: portfolioId,
+        is_active: true,
+      },
+    });
+  }
+  async create(
+    createClarisaLeverDto: CreateClarisaLeverDto,
+  ): Promise<ClarisaLever> {
+    const portfolio = await this.portfoliosService.validatePortfolio(
+      createClarisaLeverDto?.portfolio_id,
+    );
+
+    const validation = validObjectAnyOf(createClarisaLeverDto, [
+      'full_name',
+      'full_name',
+      'other_names',
+    ]);
+    if (!validation.isValid) {
+      throw new BadRequestException(
+        `Required some of the following fields: ${validation.invalidFields.join(', ')}`,
+      );
+    }
+
+    const clarisaLever: Partial<ClarisaLever> = {
+      full_name: createClarisaLeverDto?.full_name,
+      other_names: createClarisaLeverDto?.other_names,
+      short_name: createClarisaLeverDto?.short_name,
+      portfolio_id: portfolio.id,
+      ...this.currentUser.audit(SetAuditEnum.NEW),
+    };
+    return this.mainRepo.save(clarisaLever);
+  }
+
+  async update(
+    id: number,
+    updateClarisaLeverDto: CreateClarisaLeverDto,
+  ): Promise<ClarisaLever> {
+    const clarisaLever = await this.mainRepo.findOne({ where: { id } });
+    if (!clarisaLever) {
+      throw new BadRequestException(`Clarisa lever not found`);
+    }
+
+    const validation = validObjectAnyOf(updateClarisaLeverDto, [
+      'full_name',
+      'full_name',
+      'other_names',
+    ]);
+
+    if (!validation.isValid) {
+      throw new BadRequestException(
+        `Required some of the following fields: ${validation.invalidFields.join(', ')}`,
+      );
+    }
+
+    const portfolio = await this.portfoliosService.validatePortfolio(
+      updateClarisaLeverDto?.portfolio_id,
+    );
+
+    const clarisaLeverToUpdate: Partial<ClarisaLever> = {
+      full_name: updateClarisaLeverDto?.full_name,
+      other_names: updateClarisaLeverDto?.other_names,
+      short_name: updateClarisaLeverDto?.short_name,
+      portfolio_id: portfolio.id,
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    };
+
+    await this.mainRepo.update(id, clarisaLeverToUpdate);
+    return this.mainRepo.findOne({ where: { id } });
+  }
+
+  async remove(id: number): Promise<number> {
+    const clarisaLever = await this.mainRepo.findOne({ where: { id } });
+    if (!clarisaLever) {
+      throw new BadRequestException(`Clarisa lever not found`);
+    }
+    const response = await this.mainRepo.update(id, { is_active: false });
+    if (response.affected === 0) {
+      throw new BadRequestException(`Clarisa lever not found`);
+    }
+    return id;
   }
 
   async findByShortName(shortName: string): Promise<ClarisaLever> {
