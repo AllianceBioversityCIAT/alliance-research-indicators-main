@@ -203,7 +203,7 @@ export class TipIntegrationService extends BaseApi {
       const result = data.data;
       const resultMapped: ExternalMappersDto = new ExternalMappersDto();
       // TIP API no longer returns id — blocked until TIP restores the field
-      resultMapped.official_code = undefined as unknown as number;
+      resultMapped.official_code = null;
       resultMapped.is_version_applied = data.is_version ?? false;
       resultMapped.public_link = result.link;
       resultMapped.created_at = new Date(result.created_at);
@@ -282,8 +282,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-              user_id: carnet,
-            } as ResultUser)
+            user_id: carnet,
+          } as ResultUser)
           : null,
         keywords: keywords,
       };
