@@ -29,7 +29,7 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
 export class TipIntegrationController {
-  constructor(private readonly tipIntegrationService: TipIntegrationService) { }
+  constructor(private readonly tipIntegrationService: TipIntegrationService) {}
 
   @MessagePattern('tip.get-ipr-data')
   async handleGetIprData(): Promise<TipIprDataDto[]> {
@@ -92,9 +92,10 @@ export class TipIntegrationController {
     @Query('async', new DefaultValuePipe(TrueFalseEnum.FALSE))
     asyncProcess?: TrueFalseEnum,
   ) {
-
     if (asyncProcess == TrueFalseEnum.TRUE) {
-      this.tipIntegrationService.getKnowledgeProductsByYear(year ? +year : undefined);
+      this.tipIntegrationService.getKnowledgeProductsByYear(
+        year ? +year : undefined,
+      );
       return ResponseUtils.format({
         data: 'IPR data synced asynchronously',
         description: 'IPR data synced asynchronously',
@@ -111,6 +112,5 @@ export class TipIntegrationController {
           data: data,
         }),
       );
-
   }
 }

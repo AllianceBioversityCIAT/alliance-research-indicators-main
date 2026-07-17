@@ -116,7 +116,7 @@ export const STAR_RESULTS_METADATA_DICTIONARY_SEED = [
   {
     sortOrder: 19,
     section: '',
-    fieldLabel: 'Contibution to SDG targets',
+    fieldLabel: 'Contribution to SDG targets',
     explanation: '',
   },
   {

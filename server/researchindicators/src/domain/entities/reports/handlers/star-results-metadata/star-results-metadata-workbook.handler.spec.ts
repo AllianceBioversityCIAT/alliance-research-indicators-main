@@ -180,6 +180,9 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       raw!.columns.find((c) => c.key === 'for_external_use_description')
         ?.header,
     ).toBe('Further communication opportunities description');
+    expect(raw!.columns.find((c) => c.key === 'sdg_targets')?.header).toBe(
+      'Contribution to SDG targets',
+    );
   });
 
   it('renders typed reporting_year and creation_date cells in exported xlsx', async () => {

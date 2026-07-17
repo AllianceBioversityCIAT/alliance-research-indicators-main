@@ -7,7 +7,14 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, EntityManager, FindOneOptions, In, Not } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  FindOneOptions,
+  FindOptionsWhere,
+  In,
+  Not,
+} from 'typeorm';
 import {
   ResultFiltersInterface,
   ResultRepository,
@@ -112,6 +119,7 @@ import {
 } from '../ai-reports/dto/create-ai-report.dto';
 import { ResultAlignmentOperationsService } from './portfolio-handlers/sections/alignment/shared/result-alignment-operations.service';
 import { PortfoliosService } from '../portfolios/portfolios.service';
+import { DeleteResultsByParametersDto } from './dto/delete-results-params.dto';
 
 @Injectable()
 export class ResultsService {
@@ -321,6 +329,42 @@ export class ResultsService {
       result_status_id: statusId,
       ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
+  }
+
+  async deleteResultsByParameters(
+    deleteResultsByParameters: DeleteResultsByParametersDto,
+  ) {
+    const { resultIds, platformCode, statusCode } = deleteResultsByParameters;
+    const where: FindOptionsWhere<Result> = {};
+    if (!isEmpty(resultIds)) where.result_id = In(resultIds);
+    if (!isEmpty(platformCode)) where.platform_code = platformCode;
+    if (!isEmpty(statusCode)) where.result_status_id = statusCode;
+    const results = await this.mainRepo.find({
+      where,
+      select: {
+        result_id: true,
+        platform_code: true,
+        result_status: {
+          result_status_id: true,
+          name: true,
+        },
+      },
+      relations: { result_status: true },
+    });
+    if (isEmpty(results)) throw new NotFoundException('No results found');
+    for (const {
+      result_id,
+      platform_code,
+      result_status: { result_status_id, name },
+    } of results) {
+      this.logger.warn(
+        `Deleting result ${result_id} from ${platform_code} with status [${result_status_id}] ${name}`,
+      );
+      if (!deleteResultsByParameters.testing) {
+        await this._queryService.deleteFullResultById(result_id);
+      }
+    }
+    return results;
   }
 
   async createResult(

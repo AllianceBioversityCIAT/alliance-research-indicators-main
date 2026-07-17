@@ -48,6 +48,7 @@ import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultSectionOrchestratorService } from './portfolio-handlers/application/result-section-orchestrator.service';
 import { PortfolioUtil } from '../../shared/utils/portfolio.util';
+import { DeleteResultsByParametersDto } from './dto/delete-results-params.dto';
 @ApiTags('Results')
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
@@ -551,6 +552,33 @@ export class ResultsController {
       .then((result) =>
         ResponseUtils.format({
           description: 'Alignments was updated correctly',
+          data: result,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  @ApiOperation({ summary: 'Delete results by parameters' })
+  @Post('delete-results-by-parameters')
+  @Roles(SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  @ApiBody({ type: DeleteResultsByParametersDto })
+  async deleteResultsByParameters(
+    @Body() deleteResultsByParameters: DeleteResultsByParametersDto,
+  ) {
+    return this.resultsService
+      .deleteResultsByParameters(deleteResultsByParameters)
+      .then((result) =>
+        ResponseUtils.format({
+          description: deleteResultsByParameters.testing
+            ? 'Results not deleted, only showing the results that would be deleted'
+            : 'Results deleted',
           data: result,
           status: HttpStatus.OK,
         }),
