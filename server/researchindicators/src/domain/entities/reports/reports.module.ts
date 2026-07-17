@@ -13,7 +13,10 @@ import { ReportHandlerRegistry } from './report-handler.registry';
 import { ReportsGenerationService } from './reports-generation.service';
 import { ReportsController } from './reports.controller';
 import { ResultPdfReportService } from './handlers/result-pdf-report/result-pdf-report.service';
-import { RESULT_PDF_INDICATOR_SECTION_HANDLERS, ResultPdfIndicatorSectionRegistry } from './handlers/result-pdf-report/indicator-sections/result-pdf-indicator-section.registry';
+import {
+  RESULT_PDF_INDICATOR_SECTION_HANDLERS,
+  ResultPdfIndicatorSectionRegistry,
+} from './handlers/result-pdf-report/indicator-sections/result-pdf-indicator-section.registry';
 import { CapSharingPdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/cap-sharing/cap-sharing-pdf-section.handler';
 import { PdfViewerModule } from '../../tools/pdf-viewer/pdf-viewer.module';
 import { ReportMsApp } from '../../tools/broker/report-ms.app';
@@ -48,4 +51,4 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
   ],
   exports: [ReportsGenerationService, ReportHandlerRegistry],
 })
-export class ReportsModule { }
+export class ReportsModule {}

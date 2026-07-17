@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { CapSharingPdfSectionHandler, mapAttendingOrganizationLabel } from './cap-sharing-pdf-section.handler';
+import {
+  CapSharingPdfSectionHandler,
+  mapAttendingOrganizationLabel,
+} from './cap-sharing-pdf-section.handler';
 import { ResultCapacitySharingService } from '../../../../../result-capacity-sharing/result-capacity-sharing.service';
 import { ResultCapacitySharing } from '../../../../../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { ResultInstitution } from '../../../../../result-institutions/entities/result-institution.entity';

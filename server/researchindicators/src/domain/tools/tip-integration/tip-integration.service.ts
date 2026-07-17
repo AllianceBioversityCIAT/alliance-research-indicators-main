@@ -40,6 +40,13 @@ import { SyncProcessLogService } from '../../entities/sync-process-log/sync-proc
 import { SyncProcessEnum } from '../../entities/sync-process-log/enum/sync-process.enum';
 import { SaveResultService } from '../../shared/services/save-all-sections.service';
 import { ExternalMappersDto } from '../../shared/global-dto/external-mappers.dto';
+import { v4 as uuidv4 } from 'uuid';
+import { SyncStagingRecordsEntity } from '../open-search/prms/entities/sync-staging-records.entity';
+import { PrmsRepository } from '../open-search/prms/repositories/prms.repository';
+import { TemportalDataResponse } from '../open-search/prms/dto/prms-response.dto';
+import { ResultSdg } from '../../entities/result-sdgs/entities/result-sdg.entity';
+import { ClarisaSdgsService } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.service';
+import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -58,6 +65,8 @@ export class TipIntegrationService extends BaseApi {
     private readonly tipIntegrationRepository: TipIntegrationRepository,
     private readonly syncProcessLogService: SyncProcessLogService,
     private readonly saveResultService: SaveResultService,
+    private readonly prmsRepository: PrmsRepository,
+    private readonly clarisaSdgsService: ClarisaSdgsService,
   ) {
     super(
       httpService,
@@ -96,22 +105,20 @@ export class TipIntegrationService extends BaseApi {
     }
   }
 
-  async getKnowledgeProductsByYear(year: number) {
-    if (isEmpty(year) || ![2025, 2026].includes(year)) {
-      throw new BadRequestException('Only year 2025 and 2026 are supported');
-    }
-    const limit = 50;
-    let offset = 0;
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async saveTemporalData(year: number, executionCode: string) {
     let pendingData = true;
-    const resultSaved: number[] = [];
-    const syncProcessLog = await this.syncProcessLogService.initiateSync(
-      SyncProcessEnum.TIP_INTEGRATION,
-    );
+    let offset = 0;
+    const limit = 50;
+    // TIP throttles repeated calls ("Too Many Attempts."), so pace the pagination
+    const delayBetweenRequestsMs = 1000;
     while (pendingData) {
-      const counters: CounterResults = new CounterResults();
       const response = await firstValueFrom(
         this.getRequest<TipKnowledgeProductsResponseDto>(
-          `/publications/year/${year}?limit=${limit}&offset=${offset}`,
+          `/publications?year=${year}&limit=${limit}&offset=${offset}`,
           {
             headers: {
               Authorization: 'Bearer ' + this.token,
@@ -120,37 +127,87 @@ export class TipIntegrationService extends BaseApi {
         ),
       )
         .then(({ data }) => data)
-        .catch((error) => {
+        .catch(async (error) => {
           this.logger.error(
             `Error fetching knowledge products from TIP: ${error.message}`,
           );
+          await this.prmsRepository.deleteTemporalResults(executionCode);
           throw new BadRequestException(
             'Error fetching knowledge products from TIP',
           );
         });
-      const mappedData = await this.processing(response.data, year);
-      await this.saveResultService.bulkSaveAllSections(mappedData, {
-        platformCode: ReportingPlatformEnum.TIP,
-        resultSaved,
-        counters,
-        appliedVersion: false,
+
+      response.data.forEach(async (item) => {
+        await this.dataSource
+          .getRepository(SyncStagingRecordsEntity)
+          .save({
+            execution_code: executionCode,
+            code: item.id,
+            year,
+            data: item,
+          })
+          .catch((error) => {
+            this.logger.error(
+              `Error saving temporal result ${item.name}: ${error.message} \n ${error.stack}`,
+            );
+          });
       });
+
       if (response.data_count < limit) {
         pendingData = false;
-        await this.inactiveAllTipResults(resultSaved, year);
       } else {
         offset += limit;
+        await this.sleep(delayBetweenRequestsMs);
       }
-      await this.syncProcessLogService.update(syncProcessLog.id, counters);
     }
-    await this.syncProcessLogService.endSync(syncProcessLog.id);
   }
 
-  async processing(results: TipKnowledgeProductDto[], year: number) {
+  async getKnowledgeProductsByYear(year?: number) {
+    const executionCode = uuidv4();
+    const counters: CounterResults = new CounterResults();
+    const resultSaved: number[] = [];
+    const syncProcessLog = await this.syncProcessLogService.initiateSync(
+      SyncProcessEnum.TIP_INTEGRATION,
+    );
+    const endYeard = year ?? new Date().getFullYear();
+    let currentYear = year ?? 2021;
+    for (currentYear; currentYear <= endYeard; currentYear++) {
+      this.logger.log(`Saving temporal data for year ${currentYear}`);
+      await this.saveTemporalData(currentYear, executionCode);
+    }
+
+    const tipResults =
+      await this.prmsRepository.findTemporalResults<TipKnowledgeProductDto>(
+        executionCode,
+      );
+    const dataProcessed = await this.processing(tipResults);
+    await this.saveResultService.bulkSaveAllSections(dataProcessed, {
+      platformCode: ReportingPlatformEnum.TIP,
+      resultSaved,
+      counters,
+      manageOfficialCode: true,
+      findOptions: {
+        public_link: 'public_link',
+      },
+    });
+    await this.syncProcessLogService.update(syncProcessLog.id, counters);
+    await this.syncProcessLogService.endSync(syncProcessLog.id);
+    await this.prmsRepository.deleteTemporalResults(executionCode);
+  }
+
+  async processing(results: TemportalDataResponse<TipKnowledgeProductDto>[]) {
     const resultsMapped: ExternalMappersDto[] = [];
-    for (const result of results) {
+    for (const data of results) {
+      const year = data?.year;
+      if (isEmpty(data?.data)) continue;
+      const result = data.data;
       const resultMapped: ExternalMappersDto = new ExternalMappersDto();
-      resultMapped.official_code = result.id;
+      // TIP API no longer returns id — blocked until TIP restores the field
+      resultMapped.official_code = null;
+      resultMapped.is_version_applied = data.is_version ?? false;
+      resultMapped.public_link = result.link;
+      resultMapped.created_at = new Date(result.created_at);
+      resultMapped.status_id = ResultStatusEnum.COMPLETED_IN_TIP;
 
       let projectId: string = null;
       if (Array.isArray(result.project)) {
@@ -217,16 +274,26 @@ export class TipIntegrationService extends BaseApi {
         );
       }
 
+      const keywords = result.keywords?.map((keyword) => keyword?.trim());
+
       resultMapped.generalInformation = {
         title: result.name,
         year: year,
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-              user_id: carnet,
-            } as ResultUser)
+            user_id: carnet,
+          } as ResultUser)
           : null,
+        keywords: keywords,
       };
+
+      const saveSdgs = await this.clarisaSdgsService.findSdgByTipFormat(
+        result.sdgs,
+      );
+      const sdgs: Partial<ResultSdg>[] = saveSdgs.map((sdg) => ({
+        clarisa_sdg_id: sdg.id,
+      }));
 
       const primaryLever = await this.mapLevers(result.levers);
       resultMapped.alignments = {
@@ -243,7 +310,7 @@ export class TipIntegrationService extends BaseApi {
           },
         ] as ResultContract[],
         contributor_levers: [],
-        result_sdgs: [],
+        result_sdgs: sdgs as ResultSdg[],
       };
 
       const regions = await this.mapRegions(result.region);
@@ -277,14 +344,15 @@ export class TipIntegrationService extends BaseApi {
         notable_references: [],
       };
 
-      resultMapped.public_link = result.link;
-      resultMapped.created_at = result.created_at;
-
+      const collection = result.collection?.join('; ');
       resultMapped.knowledgeProduct = {
         type: result.type.join(', '),
         citation: result.citation,
-        open_access: result.openAccess,
+        open_access: result.access_status === 'Open Access',
+        access_status: result.access_status,
         publication_date: result.publication_date,
+        collection,
+        tip_id: result.id,
       } as ResultKnowledgeProduct;
 
       resultsMapped.push(resultMapped);

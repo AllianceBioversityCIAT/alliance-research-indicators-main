@@ -1,7 +1,14 @@
 import { Column, Entity, PrimaryColumn } from 'typeorm';
 
-@Entity('prms_temporal_results')
-export class PrmsTemporalResultsEntity {
+@Entity('sync_staging_records')
+export class SyncStagingRecordsEntity {
+  @PrimaryColumn({
+    type: 'varchar',
+    length: 36,
+    name: 'execution_code',
+  })
+  execution_code: string;
+
   @PrimaryColumn({
     type: 'bigint',
     name: 'code',

@@ -96,4 +96,4 @@ import { AiReportsModule } from '../ai-reports/ai-reports.module';
   ],
   exports: [ResultsService, ResultRepository],
 })
-export class ResultsModule { }
+export class ResultsModule {}

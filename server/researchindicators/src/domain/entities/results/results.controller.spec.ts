@@ -43,6 +43,7 @@ describe('ResultsController', () => {
     findResultVersions: jest.fn(),
     createResult: jest.fn(),
     deleteResult: jest.fn(),
+    deleteResultsByParameters: jest.fn(),
     updateGeneralInfo: jest.fn(),
     findGeneralInfo: jest.fn(),
     updateResultAlignment: jest.fn(),
@@ -400,6 +401,79 @@ describe('ResultsController', () => {
 
       await expect(controller.deleteResult()).rejects.toThrow(
         'Result not found',
+      );
+    });
+  });
+
+  describe('deleteResultsByParameters', () => {
+    const matchedResults = [
+      {
+        result_id: 10,
+        platform_code: 'STAR',
+        result_status: { result_status_id: 4, name: 'Draft' },
+      },
+    ] as any[];
+
+    it('should delete results and return formatted response when testing is false', async () => {
+      const dto: any = {
+        resultIds: [10],
+        platformCode: 'STAR',
+        testing: false,
+      };
+      const expectedResponse = {
+        description: 'Results deleted',
+        data: matchedResults,
+        status: HttpStatus.OK,
+      };
+
+      service.deleteResultsByParameters.mockResolvedValue(matchedResults);
+      mockResponseUtils.format.mockReturnValue(expectedResponse);
+
+      const result = await controller.deleteResultsByParameters(dto);
+
+      expect(service.deleteResultsByParameters).toHaveBeenCalledWith(dto);
+      expect(mockResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Results deleted',
+        data: matchedResults,
+        status: HttpStatus.OK,
+      });
+      expect(result).toEqual(expectedResponse);
+    });
+
+    it('should return dry-run description when testing is true', async () => {
+      const dto: any = {
+        resultIds: [10],
+        testing: true,
+      };
+      const expectedResponse = {
+        description:
+          'Results not deleted, only showing the results that would be deleted',
+        data: matchedResults,
+        status: HttpStatus.OK,
+      };
+
+      service.deleteResultsByParameters.mockResolvedValue(matchedResults);
+      mockResponseUtils.format.mockReturnValue(expectedResponse);
+
+      const result = await controller.deleteResultsByParameters(dto);
+
+      expect(mockResponseUtils.format).toHaveBeenCalledWith({
+        description:
+          'Results not deleted, only showing the results that would be deleted',
+        data: matchedResults,
+        status: HttpStatus.OK,
+      });
+      expect(result).toEqual(expectedResponse);
+    });
+
+    it('should propagate service errors', async () => {
+      const dto: any = { resultIds: [999], testing: false };
+      service.deleteResultsByParameters.mockRejectedValue(
+        new Error('No results found'),
+      );
+
+      await expect(controller.deleteResultsByParameters(dto)).rejects.toThrow(
+        'No results found',
       );
     });
   });

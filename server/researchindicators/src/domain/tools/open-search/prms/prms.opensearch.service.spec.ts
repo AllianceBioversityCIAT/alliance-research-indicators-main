@@ -23,7 +23,7 @@ import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-pr
 import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 import { PrmsRepository } from './repositories/prms.repository';
-import { PrmsTemporalResultsEntity } from './entities/prms-temporal-results.entity';
+import { SyncStagingRecordsEntity } from './entities/sync-staging-records.entity';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual('typeorm');
@@ -116,7 +116,7 @@ describe('PrmsOpenSearchService', () => {
         if (entity === AllianceUserStaff) {
           return allianceStaffRepoHandle;
         }
-        if (entity === PrmsTemporalResultsEntity) {
+        if (entity === SyncStagingRecordsEntity) {
           return temporalRepoHandle;
         }
         return resultRepoHandle;

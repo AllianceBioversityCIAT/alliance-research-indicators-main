@@ -30,13 +30,14 @@ export const mapAttendingOrganizationLabel = (
 
 @Injectable()
 export class CapSharingPdfSectionHandler
-  implements ResultPdfIndicatorSectionHandler {
+  implements ResultPdfIndicatorSectionHandler
+{
   readonly indicatorId = IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT;
 
   constructor(
     private readonly resultCapacitySharingService: ResultCapacitySharingService,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
   async buildSections(resultId: number) {
     const section = await this.buildCapSharingSection(resultId);

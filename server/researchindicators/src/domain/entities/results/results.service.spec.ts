@@ -625,6 +625,51 @@ describe('ResultsService', () => {
     });
   });
 
+  describe('newOfficialCode', () => {
+    it('should default to STAR platform and return last code + 1', async () => {
+      mockMainRepo.findOne.mockResolvedValue({
+        result_official_code: 100,
+      } as any);
+
+      const code = await service.newOfficialCode();
+
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            platform_code: ReportingPlatformEnum.STAR,
+          }),
+          order: { result_official_code: 'DESC' },
+        }),
+      );
+      expect(code).toBe(101);
+    });
+
+    it('should use the provided platform code', async () => {
+      mockMainRepo.findOne.mockResolvedValue({
+        result_official_code: 55,
+      } as any);
+
+      const code = await service.newOfficialCode(ReportingPlatformEnum.TIP);
+
+      expect(mockMainRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            platform_code: ReportingPlatformEnum.TIP,
+          }),
+        }),
+      );
+      expect(code).toBe(56);
+    });
+
+    it('should return 1 when no previous result exists for the platform', async () => {
+      mockMainRepo.findOne.mockResolvedValue(null);
+
+      const code = await service.newOfficialCode(ReportingPlatformEnum.TIP);
+
+      expect(code).toBe(1);
+    });
+  });
+
   describe('createResult', () => {
     let mockEntityManager: jest.Mocked<EntityManager>;
     let mockRepository: any;
@@ -1481,6 +1526,113 @@ describe('ResultsService', () => {
         // Clear mocks for next iteration
         jest.clearAllMocks();
       }
+    });
+  });
+
+  describe('deleteResultsByParameters', () => {
+    const mockResults = [
+      {
+        result_id: 10,
+        platform_code: ReportingPlatformEnum.STAR,
+        result_status: {
+          result_status_id: ResultStatusEnum.DRAFT,
+          name: 'Draft',
+        },
+      },
+      {
+        result_id: 20,
+        platform_code: ReportingPlatformEnum.STAR,
+        result_status: {
+          result_status_id: ResultStatusEnum.DRAFT,
+          name: 'Draft',
+        },
+      },
+    ] as any[];
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockQueryService.deleteFullResultById.mockResolvedValue(undefined);
+    });
+
+    it('should throw NotFoundException when no results match the filters', async () => {
+      mockMainRepo.find.mockResolvedValue([]);
+
+      await expect(
+        service.deleteResultsByParameters({
+          resultIds: [999],
+          testing: false,
+        } as any),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockQueryService.deleteFullResultById).not.toHaveBeenCalled();
+    });
+
+    it('should build where clause with resultIds, platformCode and statusCode', async () => {
+      mockMainRepo.find.mockResolvedValue(mockResults);
+
+      await service.deleteResultsByParameters({
+        resultIds: [10, 20],
+        platformCode: ReportingPlatformEnum.STAR,
+        statusCode: ResultStatusEnum.DRAFT,
+        testing: false,
+      } as any);
+
+      expect(mockMainRepo.find).toHaveBeenCalledWith({
+        where: {
+          result_id: In([10, 20]),
+          platform_code: ReportingPlatformEnum.STAR,
+          result_status_id: ResultStatusEnum.DRAFT,
+        },
+        select: {
+          result_id: true,
+          platform_code: true,
+          result_status: {
+            result_status_id: true,
+            name: true,
+          },
+        },
+        relations: { result_status: true },
+      });
+    });
+
+    it('should omit empty filters from the where clause', async () => {
+      mockMainRepo.find.mockResolvedValue([mockResults[0]]);
+
+      await service.deleteResultsByParameters({
+        testing: true,
+      } as any);
+
+      expect(mockMainRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {},
+        }),
+      );
+    });
+
+    it('should delete each matched result when testing is false', async () => {
+      mockMainRepo.find.mockResolvedValue(mockResults);
+
+      const result = await service.deleteResultsByParameters({
+        resultIds: [10, 20],
+        testing: false,
+      } as any);
+
+      expect(result).toEqual(mockResults);
+      expect(mockQueryService.deleteFullResultById).toHaveBeenCalledTimes(2);
+      expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(10);
+      expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(20);
+    });
+
+    it('should not delete results when testing is true', async () => {
+      mockMainRepo.find.mockResolvedValue(mockResults);
+
+      const result = await service.deleteResultsByParameters({
+        resultIds: [10, 20],
+        testing: true,
+      } as any);
+
+      expect(result).toEqual(mockResults);
+      expect(mockQueryService.deleteFullResultById).not.toHaveBeenCalled();
     });
   });
 

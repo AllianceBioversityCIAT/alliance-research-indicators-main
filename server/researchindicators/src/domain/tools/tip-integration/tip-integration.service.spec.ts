@@ -18,7 +18,11 @@ import { SaveResultService } from '../../shared/services/save-all-sections.servi
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { BadRequestException } from '@nestjs/common';
 import { TipKnowledgeProductDto } from './dto/response-year-tip.dto';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { PrmsRepository } from '../open-search/prms/repositories/prms.repository';
+import { ClarisaSdgsService } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.service';
+import { TemportalDataResponse } from '../open-search/prms/dto/prms-response.dto';
+import { SyncStagingRecordsEntity } from '../open-search/prms/entities/sync-staging-records.entity';
 
 describe('TipIntegrationService', () => {
   let service: TipIntegrationService;
@@ -30,10 +34,51 @@ describe('TipIntegrationService', () => {
   let resultRepository: jest.Mocked<ResultRepository>;
   let syncProcessLogService: jest.Mocked<SyncProcessLogService>;
   let saveResultService: jest.Mocked<SaveResultService>;
+  let prmsRepository: jest.Mocked<PrmsRepository>;
+  let clarisaSdgsService: jest.Mocked<ClarisaSdgsService>;
 
   const mockResultRepo = {
     findOne: jest.fn(),
     update: jest.fn(),
+  };
+
+  const mockStagingRepo = {
+    save: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const wrapTemporal = (
+    product: TipKnowledgeProductDto,
+    overrides: Partial<TemportalDataResponse<TipKnowledgeProductDto>> = {},
+  ): TemportalDataResponse<TipKnowledgeProductDto> => ({
+    code: 1,
+    year: 2025,
+    is_version: false,
+    data: product,
+    ...overrides,
+  });
+
+  const baseProduct: TipKnowledgeProductDto = {
+    id: 555,
+    created_at: '2025-01-01',
+    updated_at: '2025-01-02',
+    name: 'Test KP',
+    link: 'http://link.example',
+    doi: '10.1234/test',
+    citation: 'Test Citation',
+    access_status: 'Open Access',
+    review_status: 'Peer Review',
+    publication_date: '2025-01-01',
+    project: { agreement_id: 'AGR-001', description: 'Project 1' },
+    collection: [],
+    levers: ['Lever1', 'Lever2'],
+    countries: [{ name: 'Colombia', un_code: 170 }],
+    region: [{ name: 'LAC', un_code: 419 }],
+    submitter: null,
+    type: ['Journal article'],
+    sdgs: [],
+    keywords: [],
+    programs_and_accelerators: [],
+    abstract: 'Test abstract',
   };
 
   beforeEach(async () => {
@@ -79,7 +124,12 @@ describe('TipIntegrationService', () => {
         {
           provide: DataSource,
           useValue: {
-            getRepository: jest.fn().mockReturnValue(mockResultRepo),
+            getRepository: jest.fn().mockImplementation((entity) => {
+              if (entity === SyncStagingRecordsEntity) {
+                return mockStagingRepo;
+              }
+              return mockResultRepo;
+            }),
           },
         },
         {
@@ -125,6 +175,19 @@ describe('TipIntegrationService', () => {
             bulkSaveAllSections: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: PrmsRepository,
+          useValue: {
+            findTemporalResults: jest.fn().mockResolvedValue([]),
+            deleteTemporalResults: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ClarisaSdgsService,
+          useValue: {
+            findSdgByTipFormat: jest.fn().mockResolvedValue([]),
+          },
+        },
       ],
     }).compile();
 
@@ -137,6 +200,8 @@ describe('TipIntegrationService', () => {
     resultRepository = module.get(ResultRepository);
     syncProcessLogService = module.get(SyncProcessLogService);
     saveResultService = module.get(SaveResultService);
+    prmsRepository = module.get(PrmsRepository);
+    clarisaSdgsService = module.get(ClarisaSdgsService);
 
     jest
       .spyOn(mapperModule, 'tipIntegrationMapper')
@@ -236,50 +301,60 @@ describe('TipIntegrationService', () => {
 
   // [CLAUDE/DONE] 192
   describe('getKnowledgeProductsByYear', () => {
-    it('should throw BadRequestException for an unsupported year (2024)', async () => {
-      await expect(service.getKnowledgeProductsByYear(2024)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.getKnowledgeProductsByYear(2024)).rejects.toThrow(
-        'Only year 2025 and 2026 are supported',
-      );
+    beforeEach(() => {
+      jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
     });
 
-    it('should throw BadRequestException when year is null', async () => {
-      await expect(
-        service.getKnowledgeProductsByYear(null as any),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('should initiate sync, process products and end sync for a supported year', async () => {
+    it('should fetch TIP data, load temporal results, process and end sync', async () => {
       const mockResponse = { data: [], data_count: 0 };
       jest
         .spyOn(service as any, 'getRequest')
         .mockReturnValue(of({ data: mockResponse }));
       jest.spyOn(service, 'processing').mockResolvedValue([]);
-      jest.spyOn(service, 'inactiveAllTipResults').mockResolvedValue(undefined);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
 
       await service.getKnowledgeProductsByYear(2025);
 
       expect(syncProcessLogService.initiateSync).toHaveBeenCalled();
-      expect(service.processing).toHaveBeenCalledWith([], 2025);
+      expect(prmsRepository.findTemporalResults).toHaveBeenCalledWith(
+        expect.any(String),
+      );
+      expect(service.processing).toHaveBeenCalledWith([]);
       expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledWith([], {
         platformCode: ReportingPlatformEnum.TIP,
         resultSaved: expect.any(Array),
         counters: expect.any(Object),
-        appliedVersion: false,
+        manageOfficialCode: true,
+        findOptions: { public_link: 'public_link' },
       });
-      expect(service.inactiveAllTipResults).toHaveBeenCalledWith([], 2025);
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        1,
+        expect.any(Object),
+      );
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
     });
 
-    it('should paginate when data_count equals limit', async () => {
+    it('should clean temporal results after a successful sync', async () => {
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: { data: [], data_count: 0 } }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+
+      await service.getKnowledgeProductsByYear(2025);
+
+      expect(prmsRepository.deleteTemporalResults).toHaveBeenCalledWith(
+        expect.any(String),
+      );
+    });
+
+    it('should paginate TIP API requests when data_count equals limit', async () => {
       const page1 = {
-        data: [{ id: 1 }],
+        data: [{ id: 1, name: 'KP 1' }],
         data_count: 50,
       };
       const page2 = {
-        data: [{ id: 2 }],
+        data: [{ id: 2, name: 'KP 2' }],
         data_count: 10,
       };
       const getRequestSpy = jest
@@ -288,45 +363,57 @@ describe('TipIntegrationService', () => {
         .mockReturnValueOnce(of({ data: page2 }));
       jest
         .spyOn(service, 'processing')
-        .mockResolvedValueOnce([{ official_code: 1 }] as any)
-        .mockResolvedValueOnce([{ official_code: 2 }] as any);
-      jest.spyOn(service, 'inactiveAllTipResults').mockResolvedValue(undefined);
+        .mockResolvedValue([{ official_code: 1 }] as any);
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        wrapTemporal({ ...baseProduct, name: 'KP 1' }),
+      ] as any);
 
       await service.getKnowledgeProductsByYear(2026);
 
       expect(getRequestSpy).toHaveBeenCalledTimes(2);
       expect(getRequestSpy.mock.calls[1][0]).toContain('offset=50');
-      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledTimes(2);
-      expect(syncProcessLogService.update).toHaveBeenCalledTimes(2);
-      expect(service.inactiveAllTipResults).toHaveBeenCalledWith(
-        expect.any(Array),
-        2026,
+      expect((service as any).sleep).toHaveBeenCalledTimes(1);
+      expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledTimes(1);
+    });
+
+    it('should stage each record using the TIP product id as code', async () => {
+      const page = {
+        data: [{ id: 987, name: 'KP with id' }],
+        data_count: 1,
+      };
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: page }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+
+      await service.getKnowledgeProductsByYear(2025);
+
+      expect(mockStagingRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 987,
+          year: 2025,
+        }),
+      );
+    });
+
+    it('should throw BadRequestException and clean temporal data when TIP API request fails', async () => {
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(throwError(() => new Error('Network error')));
+
+      await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prmsRepository.deleteTemporalResults).toHaveBeenCalledWith(
+        expect.any(String),
       );
     });
   });
 
   // [CLAUDE/DONE] 193
   describe('processing', () => {
-    const baseProduct: TipKnowledgeProductDto = {
-      id: 42,
-      name: 'Test KP',
-      link: 'http://link.example',
-      doi: '10.1234/test',
-      citation: 'Test Citation',
-      openAccess: true,
-      peerReview: 1,
-      publication_date: '2025-01-01',
-      project: { agreement_id: 'AGR-001', description: 'Project 1' },
-      collection: [],
-      levers: ['Lever1', 'Lever2'],
-      countries: [{ name: 'Colombia', un_code: 170 }],
-      region: [{ name: 'LAC', un_code: 419 }],
-      submitter: null,
-      type: ['Journal article'],
-      abstract: 'Test abstract',
-      created_at: new Date('2025-01-01'),
-    };
-
     beforeEach(() => {
       clarisaRegionsService.findByUm49Codes.mockResolvedValue([]);
       clarisaCountriesService.findByUm49Codes.mockResolvedValue([]);
@@ -334,39 +421,38 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map a product with project as object and return one mapping', async () => {
-      const results = await service.processing([baseProduct], 2025);
+      const results = await service.processing([wrapTemporal(baseProduct)]);
 
       expect(results).toHaveLength(1);
-      expect(results[0].official_code).toBe(42);
       expect(results[0].createResult.contract_id).toBe('AGR-001');
       expect(results[0].createResult.year).toBe(2025);
     });
 
     it('should map a product with project as non-empty array', async () => {
-      const product = {
+      const product = wrapTemporal({
         ...baseProduct,
         project: [{ agreement_id: 'AGR-002', description: 'P2' }],
-      };
-      const results = await service.processing([product], 2025);
+      });
+      const results = await service.processing([product]);
 
       expect(results[0].createResult.contract_id).toBe('AGR-002');
     });
 
     it('should use null contract_id when project is empty array', async () => {
-      const product = { ...baseProduct, project: [] };
-      const results = await service.processing([product], 2025);
+      const product = wrapTemporal({ ...baseProduct, project: [] });
+      const results = await service.processing([product]);
 
       expect(results[0].createResult.contract_id).toBeNull();
     });
 
     it('should not call user lookup when submitter is null', async () => {
-      await service.processing([baseProduct], 2025);
+      await service.processing([wrapTemporal(baseProduct)]);
 
       expect(resultRepository.findUserByEmailOrCarnet).not.toHaveBeenCalled();
     });
 
     it('should map evidence with link and doi', async () => {
-      const results = await service.processing([baseProduct], 2025);
+      const results = await service.processing([wrapTemporal(baseProduct)]);
       const evidences = results[0].evidence.evidence as any[];
 
       expect(evidences[0].evidence_url).toBe('http://link.example');
@@ -374,15 +460,66 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map knowledge product fields correctly', async () => {
-      const results = await service.processing([baseProduct], 2025);
+      const results = await service.processing([wrapTemporal(baseProduct)]);
 
       expect(results[0].knowledgeProduct.citation).toBe('Test Citation');
       expect(results[0].knowledgeProduct.open_access).toBe(true);
       expect(results[0].knowledgeProduct.type).toBe('Journal article');
     });
 
+    it('should map tip_id from the TIP product id', async () => {
+      const results = await service.processing([wrapTemporal(baseProduct)]);
+
+      expect(results[0].knowledgeProduct.tip_id).toBe(555);
+    });
+
+    it('should map public_link, created_at and is_version_applied from temporal data', async () => {
+      const results = await service.processing([
+        wrapTemporal(baseProduct, { is_version: true }),
+      ]);
+
+      expect(results[0].public_link).toBe('http://link.example');
+      expect(results[0].created_at).toEqual(new Date('2025-01-01'));
+      expect(results[0].is_version_applied).toBe(true);
+    });
+
+    it('should default is_version_applied to false when is_version is missing', async () => {
+      const results = await service.processing([
+        wrapTemporal(baseProduct, { is_version: undefined }),
+      ]);
+
+      expect(results[0].is_version_applied).toBe(false);
+    });
+
+    it('should map SDGs from TIP format into alignments', async () => {
+      clarisaSdgsService.findSdgByTipFormat.mockResolvedValue([
+        { id: 7 },
+      ] as any);
+      const product = wrapTemporal({
+        ...baseProduct,
+        sdgs: ['SDG 7 - Affordable Energy'],
+      });
+
+      const results = await service.processing([product]);
+
+      expect(clarisaSdgsService.findSdgByTipFormat).toHaveBeenCalledWith([
+        'SDG 7 - Affordable Energy',
+      ]);
+      expect(results[0].alignments.result_sdgs).toEqual([
+        { clarisa_sdg_id: 7 },
+      ]);
+    });
+
     it('should return empty array when input is empty', async () => {
-      const results = await service.processing([], 2025);
+      const results = await service.processing([]);
+
+      expect(results).toEqual([]);
+    });
+
+    it('should skip temporal records with empty data', async () => {
+      const results = await service.processing([
+        wrapTemporal(baseProduct, { data: null as any }),
+      ]);
 
       expect(results).toEqual([]);
     });
