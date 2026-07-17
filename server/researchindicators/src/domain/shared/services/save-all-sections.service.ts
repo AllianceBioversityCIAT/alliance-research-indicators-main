@@ -30,7 +30,7 @@ export class SaveResultService {
     private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
-  ) {}
+  ) { }
 
   public async bulkSaveAllSections(
     results: ExternalMappersDto[],
@@ -46,7 +46,12 @@ export class SaveResultService {
     extraData?: ExtraData<ExternalMappersDto>,
   ) {
     let typeCounter: CounterResultsEnum = null;
-
+    if (isEmpty(result.createResult.year)) {
+      this.logger.error('===============================================');
+      this.logger.error(`Result ${result.public_link} has no year`);
+      this.logger.error(JSON.stringify(result, null, 2));
+      return;
+    }
     this.logger.debug(
       `Processing result ${result.official_code} from ${this.platformCode(extraData?.platformCode)}.`,
     );
@@ -208,8 +213,8 @@ export type ExtraData<T extends object> = {
 export type FindOptionsKeyMap<
   T extends object,
   ExcludedKeys extends keyof FindOptionsWhere<Result> =
-    | 'platform_code'
-    | 'report_year_id',
+  | 'platform_code'
+  | 'report_year_id',
 > = {
-  [K in Exclude<keyof FindOptionsWhere<Result>, ExcludedKeys>]?: keyof T;
-};
+    [K in Exclude<keyof FindOptionsWhere<Result>, ExcludedKeys>]?: keyof T;
+  };

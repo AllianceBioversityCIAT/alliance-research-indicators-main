@@ -136,7 +136,7 @@ export class TipIntegrationService extends BaseApi {
           );
         });
 
-      response.data.forEach(async (item) => {
+      response?.data?.forEach(async (item) => {
         await this.dataSource
           .getRepository(SyncStagingRecordsEntity)
           .save({
