@@ -179,7 +179,7 @@ export class TipIntegrationService extends BaseApi {
       await this.prmsRepository.findTemporalResults<TipKnowledgeProductDto>(
         executionCode,
       );
-    const dataProcessed = await this.processing(tipResults, year);
+    const dataProcessed = await this.processing(tipResults);
     await this.saveResultService.bulkSaveAllSections(dataProcessed, {
       platformCode: ReportingPlatformEnum.TIP,
       resultSaved,
@@ -196,10 +196,10 @@ export class TipIntegrationService extends BaseApi {
 
   async processing(
     results: TemportalDataResponse<TipKnowledgeProductDto>[],
-    year: number,
   ) {
     const resultsMapped: ExternalMappersDto[] = [];
     for (const data of results) {
+      const year = data?.year;
       if (isEmpty(data?.data)) continue;
       const result = data.data;
       const resultMapped: ExternalMappersDto = new ExternalMappersDto();
