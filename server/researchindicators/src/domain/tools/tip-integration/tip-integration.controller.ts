@@ -5,6 +5,7 @@ import {
   UseInterceptors,
   HttpStatus,
   Patch,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { TipIntegrationService } from './tip-integration.service';
@@ -21,13 +22,14 @@ import {
   QueryIndicators,
   QueryIndicatorsEnum,
 } from '../../entities/indicators/enum/indicators.enum';
+import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 
 @ApiTags('TIP Integration')
 @Controller()
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
 export class TipIntegrationController {
-  constructor(private readonly tipIntegrationService: TipIntegrationService) {}
+  constructor(private readonly tipIntegrationService: TipIntegrationService) { }
 
   @MessagePattern('tip.get-ipr-data')
   async handleGetIprData(): Promise<TipIprDataDto[]> {
@@ -35,15 +37,8 @@ export class TipIntegrationController {
   }
 
   @MessagePattern('tip-clone-knowledge-products')
-  async handleTipCloneKnowledgeProducts(
-    payload: { years?: number[] } | string,
-  ): Promise<{ description: string; status: number }> {
-    const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
-    const years = data?.years ?? [2025, 2026];
-    for (const year of years) {
-      await this.tipIntegrationService.getKnowledgeProductsByYear(year);
-    }
-    return { description: 'TIP clone knowledge products started', status: 200 };
+  async handleTipCloneKnowledgeProducts() {
+    await this.tipIntegrationService.getKnowledgeProductsByYear();
   }
 
   @ApiOperation({ summary: 'Get all IPR data for TIP integration' })
@@ -85,8 +80,28 @@ export class TipIntegrationController {
     required: false,
     type: Number,
   })
+  @ApiQuery({
+    name: 'async',
+    required: false,
+    type: String,
+    enum: TrueFalseEnum,
+  })
   @ApiOperation({ summary: 'Sync IPR data with TIP' })
-  async syncIprData(@Query('year') year?: string) {
+  async syncIprData(
+    @Query('year') year?: string,
+    @Query('async', new DefaultValuePipe(TrueFalseEnum.FALSE))
+    asyncProcess?: TrueFalseEnum,
+  ) {
+
+    if (asyncProcess == TrueFalseEnum.TRUE) {
+      this.tipIntegrationService.getKnowledgeProductsByYear(year ? +year : undefined);
+      return ResponseUtils.format({
+        data: 'IPR data synced asynchronously',
+        description: 'IPR data synced asynchronously',
+        status: HttpStatus.OK,
+      });
+    }
+
     return this.tipIntegrationService
       .getKnowledgeProductsByYear(year ? +year : undefined)
       .then((data) =>
@@ -96,5 +111,6 @@ export class TipIntegrationController {
           data: data,
         }),
       );
+
   }
 }
