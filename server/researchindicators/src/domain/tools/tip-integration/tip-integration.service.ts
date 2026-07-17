@@ -46,6 +46,7 @@ import { PrmsRepository } from '../open-search/prms/repositories/prms.repository
 import { TemportalDataResponse } from '../open-search/prms/dto/prms-response.dto';
 import { ResultSdg } from '../../entities/result-sdgs/entities/result-sdg.entity';
 import { ClarisaSdgsService } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.service';
+import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -208,6 +209,7 @@ export class TipIntegrationService extends BaseApi {
       resultMapped.is_version_applied = data.is_version ?? false;
       resultMapped.public_link = result.link;
       resultMapped.created_at = new Date(result.created_at);
+      resultMapped.status_id = ResultStatusEnum.COMPLETED_IN_TIP;
 
       let projectId: string = null;
       if (Array.isArray(result.project)) {
