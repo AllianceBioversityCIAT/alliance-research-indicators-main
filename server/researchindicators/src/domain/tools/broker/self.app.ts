@@ -13,7 +13,7 @@ export class SelfApp extends BrokerConnectionBase {
     this.emitToPattern('clone-normal-entities', {});
   }
 
-  executeTipCloneKnowledgeProducts(years: number[]): void {
-    this.emitToPattern('tip-clone-knowledge-products', { years });
+  executeTipCloneKnowledgeProducts(): void {
+    this.emitToPattern('tip-clone-knowledge-products', {});
   }
 }

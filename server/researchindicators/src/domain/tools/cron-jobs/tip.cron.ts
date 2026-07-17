@@ -3,8 +3,6 @@ import { Cron } from '@nestjs/schedule';
 import { SelfApp } from '../broker/self.app';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 
-const TIP_SYNC_YEARS = [2025, 2026];
-
 @Injectable()
 export class TipCron {
   private readonly logger: LoggerUtil = new LoggerUtil({
@@ -16,6 +14,6 @@ export class TipCron {
 
   @Cron('0 0 * * 0') // Every Sunday at midnight
   cloneNormalEntities(): void {
-    this._selfApp.executeTipCloneKnowledgeProducts(TIP_SYNC_YEARS);
+    this._selfApp.executeTipCloneKnowledgeProducts();
   }
 }
