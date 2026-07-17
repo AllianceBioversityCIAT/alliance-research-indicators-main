@@ -216,18 +216,6 @@ export class TipIntegrationService extends BaseApi {
       } else {
         projectId = result.project ? result.project.agreement_id : null;
       }
-      if (isEmpty(year)) {
-        this.logger.error('===============================================');
-        this.logger.error(`Result ${result.link} has no year`);
-        this.logger.error(JSON.stringify({
-          title: result.name,
-          year: year,
-          description: result.abstract,
-          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-          contract_id: projectId,
-        }, null, 2));
-        return;
-      }
 
       resultMapped.createResult = {
         title: result.name,
