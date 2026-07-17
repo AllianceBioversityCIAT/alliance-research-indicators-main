@@ -91,6 +91,7 @@ describe('SaveResultService', () => {
             updateGeneralInfo: jest.fn(),
             updateResultAlignment: jest.fn(),
             updateInactiveResult: jest.fn(),
+            updateResultStatus: jest.fn().mockResolvedValue(undefined),
             newOfficialCode: jest.fn(),
             findResultAlignment: jest
               .fn()
@@ -150,6 +151,10 @@ describe('SaveResultService', () => {
           isSnapshot: false,
         }),
         7001,
+      );
+      expect(resultsService.updateResultStatus).toHaveBeenCalledWith(
+        1,
+        ResultStatusEnum.SUBMITTED_IN_PRMS,
       );
       expect(counters[CounterResultsEnum.CREATED]).toBe(1);
       expect(currentUser.setSystemUser).toHaveBeenCalled();
@@ -333,7 +338,32 @@ describe('SaveResultService', () => {
         9,
         false,
       );
+      expect(resultsService.updateResultStatus).toHaveBeenCalledWith(
+        9,
+        ResultStatusEnum.SUBMITTED_IN_PRMS,
+      );
       expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('should apply statusMapper when provided in extraData', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 15,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.status_id = 99 as ResultStatusEnum;
+
+      await service.saveAllSections(dto, {
+        ...prmsExtraData(),
+        statusMapper: {
+          99: ResultStatusEnum.APPROVED,
+        },
+      });
+
+      expect(resultsService.updateResultStatus).toHaveBeenCalledWith(
+        15,
+        ResultStatusEnum.APPROVED,
+      );
     });
 
     it('should mark snapshot on update when is_version_applied is true', async () => {

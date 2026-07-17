@@ -60,6 +60,11 @@ export class SaveResultService {
         report_year_id: result.createResult.year,
       };
 
+      const statusId =
+        extraData?.statusMapper?.[result.status_id] ??
+        result?.status_id ??
+        ResultStatusEnum.DRAFT;
+
       if (!isEmpty(extraData?.findOptions)) {
         delete findOptions.result_official_code;
 
@@ -92,8 +97,7 @@ export class SaveResultService {
           extraData?.platformCode,
           {
             notContract: true,
-            result_status_id:
-              extraData?.statusMapper?.[result.status_id] ?? result.status_id,
+            result_status_id: statusId,
             validateTitle: false,
             isSnapshot: isAppliedVersion,
           },
@@ -114,6 +118,11 @@ export class SaveResultService {
         );
         typeCounter = CounterResultsEnum.UPDATED;
       }
+
+      await this._resultsService.updateResultStatus(
+        findResult.result_id,
+        statusId,
+      );
 
       await this.dataSource.getRepository(Result).update(findResult.result_id, {
         external_link: result?.external_link,

@@ -156,7 +156,7 @@ export class ResultsService {
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
     private readonly _portfolioService: PortfoliosService,
     private readonly _aiReportsService: AiReportsService,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -312,6 +312,13 @@ export class ResultsService {
     await this.mainRepo.update(resultId, {
       is_active: true,
       is_snapshot: isSnapshot,
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    });
+  }
+
+  async updateResultStatus(resultId: number, statusId: ResultStatusEnum) {
+    await this.mainRepo.update(resultId, {
+      result_status_id: statusId,
       ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
   }
@@ -772,12 +779,12 @@ export class ResultsService {
       result_status: result?.result_status,
       portfolio: portfolio
         ? {
-            id: portfolio.id,
-            name: portfolio.name,
-            description: portfolio.description,
-            start_year: portfolio.start_year,
-            end_year: portfolio.end_year,
-          }
+          id: portfolio.id,
+          name: portfolio.name,
+          description: portfolio.description,
+          start_year: portfolio.start_year,
+          end_year: portfolio.end_year,
+        }
         : null,
     };
   }
@@ -1253,8 +1260,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },

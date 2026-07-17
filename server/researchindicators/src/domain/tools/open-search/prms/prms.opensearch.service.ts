@@ -231,6 +231,7 @@ export class PrmsOpenSearchService
         resultSaved,
         currentCode,
         counters,
+        statusMapper: ResultPrmsStatusMapper,
       });
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
