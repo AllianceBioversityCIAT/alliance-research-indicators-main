@@ -319,7 +319,7 @@ describe('TipIntegrationService', () => {
       expect(prmsRepository.findTemporalResults).toHaveBeenCalledWith(
         expect.any(String),
       );
-      expect(service.processing).toHaveBeenCalledWith([], 2025);
+      expect(service.processing).toHaveBeenCalledWith([]);
       expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledWith([], {
         platformCode: ReportingPlatformEnum.TIP,
         resultSaved: expect.any(Array),
@@ -423,7 +423,6 @@ describe('TipIntegrationService', () => {
     it('should map a product with project as object and return one mapping', async () => {
       const results = await service.processing(
         [wrapTemporal(baseProduct)],
-        2025,
       );
 
       expect(results).toHaveLength(1);
@@ -436,20 +435,20 @@ describe('TipIntegrationService', () => {
         ...baseProduct,
         project: [{ agreement_id: 'AGR-002', description: 'P2' }],
       });
-      const results = await service.processing([product], 2025);
+      const results = await service.processing([product]);
 
       expect(results[0].createResult.contract_id).toBe('AGR-002');
     });
 
     it('should use null contract_id when project is empty array', async () => {
       const product = wrapTemporal({ ...baseProduct, project: [] });
-      const results = await service.processing([product], 2025);
+      const results = await service.processing([product]);
 
       expect(results[0].createResult.contract_id).toBeNull();
     });
 
     it('should not call user lookup when submitter is null', async () => {
-      await service.processing([wrapTemporal(baseProduct)], 2025);
+      await service.processing([wrapTemporal(baseProduct)]);
 
       expect(resultRepository.findUserByEmailOrCarnet).not.toHaveBeenCalled();
     });
@@ -457,7 +456,6 @@ describe('TipIntegrationService', () => {
     it('should map evidence with link and doi', async () => {
       const results = await service.processing(
         [wrapTemporal(baseProduct)],
-        2025,
       );
       const evidences = results[0].evidence.evidence as any[];
 
@@ -468,7 +466,6 @@ describe('TipIntegrationService', () => {
     it('should map knowledge product fields correctly', async () => {
       const results = await service.processing(
         [wrapTemporal(baseProduct)],
-        2025,
       );
 
       expect(results[0].knowledgeProduct.citation).toBe('Test Citation');
@@ -479,7 +476,6 @@ describe('TipIntegrationService', () => {
     it('should map tip_id from the TIP product id', async () => {
       const results = await service.processing(
         [wrapTemporal(baseProduct)],
-        2025,
       );
 
       expect(results[0].knowledgeProduct.tip_id).toBe(555);
@@ -488,7 +484,6 @@ describe('TipIntegrationService', () => {
     it('should map public_link, created_at and is_version_applied from temporal data', async () => {
       const results = await service.processing(
         [wrapTemporal(baseProduct, { is_version: true })],
-        2025,
       );
 
       expect(results[0].public_link).toBe('http://link.example');
@@ -499,7 +494,6 @@ describe('TipIntegrationService', () => {
     it('should default is_version_applied to false when is_version is missing', async () => {
       const results = await service.processing(
         [wrapTemporal(baseProduct, { is_version: undefined })],
-        2025,
       );
 
       expect(results[0].is_version_applied).toBe(false);
@@ -514,7 +508,7 @@ describe('TipIntegrationService', () => {
         sdgs: ['SDG 7 - Affordable Energy'],
       });
 
-      const results = await service.processing([product], 2025);
+      const results = await service.processing([product]);
 
       expect(clarisaSdgsService.findSdgByTipFormat).toHaveBeenCalledWith([
         'SDG 7 - Affordable Energy',
@@ -525,7 +519,15 @@ describe('TipIntegrationService', () => {
     });
 
     it('should return empty array when input is empty', async () => {
-      const results = await service.processing([], 2025);
+      const results = await service.processing([]);
+
+      expect(results).toEqual([]);
+    });
+
+    it('should skip temporal records with empty data', async () => {
+      const results = await service.processing([
+        wrapTemporal(baseProduct, { data: null as any }),
+      ]);
 
       expect(results).toEqual([]);
     });
