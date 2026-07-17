@@ -46,12 +46,6 @@ export class SaveResultService {
     extraData?: ExtraData<ExternalMappersDto>,
   ) {
     let typeCounter: CounterResultsEnum = null;
-    if (isEmpty(result.createResult.year)) {
-      this.logger.error('===============================================');
-      this.logger.error(`Result ${result.public_link} has no year`);
-      this.logger.error(JSON.stringify(result, null, 2));
-      return;
-    }
     this.logger.debug(
       `Processing result ${result.official_code} from ${this.platformCode(extraData?.platformCode)}.`,
     );
