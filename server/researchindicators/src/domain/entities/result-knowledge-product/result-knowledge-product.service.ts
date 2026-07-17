@@ -39,6 +39,9 @@ export class ResultKnowledgeProductService {
       citation: data?.citation,
       publication_date: data?.publication_date,
       type: data?.type,
+      tip_id: data?.tip_id,
+      access_status: data?.access_status,
+      collection: data?.collection,
       ...this._currentUser.audit(SetAuditEnum.UPDATE),
     });
     return this.mainRepo.findOne({ where: { result_id: resultId } });
