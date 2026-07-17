@@ -7,7 +7,14 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, EntityManager, FindOneOptions, In, Not } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  FindOneOptions,
+  FindOptionsWhere,
+  In,
+  Not,
+} from 'typeorm';
 import {
   ResultFiltersInterface,
   ResultRepository,
@@ -112,6 +119,7 @@ import {
   CreateBulkUploadProcessesDto,
   CreateBulkUploadResultsDto,
 } from '../ai-reports/dto/create-ai-report.dto';
+import { DeleteResultsByParametersDto } from './dto/delete-results-params.dto';
 
 @Injectable()
 export class ResultsService {
@@ -156,7 +164,7 @@ export class ResultsService {
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
     private readonly _portfolioService: PortfoliosService,
     private readonly _aiReportsService: AiReportsService,
-  ) { }
+  ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -321,6 +329,42 @@ export class ResultsService {
       result_status_id: statusId,
       ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
+  }
+
+  async deleteResultsByParameters(
+    deleteResultsByParameters: DeleteResultsByParametersDto,
+  ) {
+    const { resultIds, platformCode, statusCode } = deleteResultsByParameters;
+    const where: FindOptionsWhere<Result> = {};
+    if (!isEmpty(resultIds)) where.result_id = In(resultIds);
+    if (!isEmpty(platformCode)) where.platform_code = platformCode;
+    if (!isEmpty(statusCode)) where.result_status_id = statusCode;
+    const results = await this.mainRepo.find({
+      where,
+      select: {
+        result_id: true,
+        platform_code: true,
+        result_status: {
+          result_status_id: true,
+          name: true,
+        },
+      },
+      relations: { result_status: true },
+    });
+    if (isEmpty(results)) throw new NotFoundException('No results found');
+    for (const {
+      result_id,
+      platform_code,
+      result_status: { result_status_id, name },
+    } of results) {
+      this.logger.warn(
+        `Deleting result ${result_id} from ${platform_code} with status [${result_status_id}] ${name}`,
+      );
+      if (!deleteResultsByParameters.testing) {
+        await this._queryService.deleteFullResultById(result_id);
+      }
+    }
+    return results;
   }
 
   async createResult(
@@ -779,12 +823,12 @@ export class ResultsService {
       result_status: result?.result_status,
       portfolio: portfolio
         ? {
-          id: portfolio.id,
-          name: portfolio.name,
-          description: portfolio.description,
-          start_year: portfolio.start_year,
-          end_year: portfolio.end_year,
-        }
+            id: portfolio.id,
+            name: portfolio.name,
+            description: portfolio.description,
+            start_year: portfolio.start_year,
+            end_year: portfolio.end_year,
+          }
         : null,
     };
   }
@@ -1260,8 +1304,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-              (el) => el.isoAlpha2 === country.isoAlpha2,
-            )?.result_countries_sub_nationals
+                (el) => el.isoAlpha2 === country.isoAlpha2,
+              )?.result_countries_sub_nationals
             : [];
           return country;
         },

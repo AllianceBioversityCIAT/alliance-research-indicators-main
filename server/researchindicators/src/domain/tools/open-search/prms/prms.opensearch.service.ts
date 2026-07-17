@@ -50,7 +50,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PrmsOpenSearchService
-  implements ExternalMappersInterface<ExternalMappersDto> {
+  implements ExternalMappersInterface<ExternalMappersDto>
+{
   private readonly logger = new LoggerUtil({
     name: PrmsOpenSearchService.name,
   });
@@ -68,7 +69,7 @@ export class PrmsOpenSearchService
     private readonly syncProcessLogService: SyncProcessLogService,
     private readonly saveResultService: SaveResultService,
     private readonly prmsRepository: PrmsRepository,
-  ) { }
+  ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
     for (const result of res) {

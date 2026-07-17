@@ -421,9 +421,7 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map a product with project as object and return one mapping', async () => {
-      const results = await service.processing(
-        [wrapTemporal(baseProduct)],
-      );
+      const results = await service.processing([wrapTemporal(baseProduct)]);
 
       expect(results).toHaveLength(1);
       expect(results[0].createResult.contract_id).toBe('AGR-001');
@@ -454,9 +452,7 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map evidence with link and doi', async () => {
-      const results = await service.processing(
-        [wrapTemporal(baseProduct)],
-      );
+      const results = await service.processing([wrapTemporal(baseProduct)]);
       const evidences = results[0].evidence.evidence as any[];
 
       expect(evidences[0].evidence_url).toBe('http://link.example');
@@ -464,9 +460,7 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map knowledge product fields correctly', async () => {
-      const results = await service.processing(
-        [wrapTemporal(baseProduct)],
-      );
+      const results = await service.processing([wrapTemporal(baseProduct)]);
 
       expect(results[0].knowledgeProduct.citation).toBe('Test Citation');
       expect(results[0].knowledgeProduct.open_access).toBe(true);
@@ -474,17 +468,15 @@ describe('TipIntegrationService', () => {
     });
 
     it('should map tip_id from the TIP product id', async () => {
-      const results = await service.processing(
-        [wrapTemporal(baseProduct)],
-      );
+      const results = await service.processing([wrapTemporal(baseProduct)]);
 
       expect(results[0].knowledgeProduct.tip_id).toBe(555);
     });
 
     it('should map public_link, created_at and is_version_applied from temporal data', async () => {
-      const results = await service.processing(
-        [wrapTemporal(baseProduct, { is_version: true })],
-      );
+      const results = await service.processing([
+        wrapTemporal(baseProduct, { is_version: true }),
+      ]);
 
       expect(results[0].public_link).toBe('http://link.example');
       expect(results[0].created_at).toEqual(new Date('2025-01-01'));
@@ -492,9 +484,9 @@ describe('TipIntegrationService', () => {
     });
 
     it('should default is_version_applied to false when is_version is missing', async () => {
-      const results = await service.processing(
-        [wrapTemporal(baseProduct, { is_version: undefined })],
-      );
+      const results = await service.processing([
+        wrapTemporal(baseProduct, { is_version: undefined }),
+      ]);
 
       expect(results[0].is_version_applied).toBe(false);
     });

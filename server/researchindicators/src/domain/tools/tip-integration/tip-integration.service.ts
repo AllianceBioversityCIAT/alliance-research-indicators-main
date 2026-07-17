@@ -195,9 +195,7 @@ export class TipIntegrationService extends BaseApi {
     await this.prmsRepository.deleteTemporalResults(executionCode);
   }
 
-  async processing(
-    results: TemportalDataResponse<TipKnowledgeProductDto>[],
-  ) {
+  async processing(results: TemportalDataResponse<TipKnowledgeProductDto>[]) {
     const resultsMapped: ExternalMappersDto[] = [];
     for (const data of results) {
       const year = data?.year;
@@ -284,8 +282,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-            user_id: carnet,
-          } as ResultUser)
+              user_id: carnet,
+            } as ResultUser)
           : null,
         keywords: keywords,
       };
