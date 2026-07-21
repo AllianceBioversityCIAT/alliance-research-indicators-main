@@ -126,12 +126,11 @@ export class TipIntegrationService extends BaseApi {
           },
         ),
       )
-        .then(({ data }) => data)
+        .then((response) => response?.data)
         .catch(async (error) => {
           this.logger.error(
             `Error fetching knowledge products from TIP: ${error.message}`,
           );
-          await this.prmsRepository.deleteTemporalResults(executionCode);
           throw new BadRequestException(
             'Error fetching knowledge products from TIP',
           );
@@ -153,7 +152,7 @@ export class TipIntegrationService extends BaseApi {
           });
       });
 
-      if (response.data_count < limit) {
+      if (response?.data_count < limit || isEmpty(response?.data_count)) {
         pendingData = false;
       } else {
         offset += limit;
@@ -164,35 +163,43 @@ export class TipIntegrationService extends BaseApi {
 
   async getKnowledgeProductsByYear(year?: number) {
     const executionCode = uuidv4();
-    const counters: CounterResults = new CounterResults();
-    const resultSaved: number[] = [];
-    const syncProcessLog = await this.syncProcessLogService.initiateSync(
-      SyncProcessEnum.TIP_INTEGRATION,
-    );
-    const endYeard = year ?? new Date().getFullYear();
-    let currentYear = year ?? 2021;
-    for (currentYear; currentYear <= endYeard; currentYear++) {
-      this.logger.log(`Saving temporal data for year ${currentYear}`);
-      await this.saveTemporalData(currentYear, executionCode);
-    }
-
-    const tipResults =
-      await this.prmsRepository.findTemporalResults<TipKnowledgeProductDto>(
-        executionCode,
+    try {
+      const counters: CounterResults = new CounterResults();
+      const resultSaved: number[] = [];
+      const syncProcessLog = await this.syncProcessLogService.initiateSync(
+        SyncProcessEnum.TIP_INTEGRATION,
       );
-    const dataProcessed = await this.processing(tipResults);
-    await this.saveResultService.bulkSaveAllSections(dataProcessed, {
-      platformCode: ReportingPlatformEnum.TIP,
-      resultSaved,
-      counters,
-      manageOfficialCode: true,
-      findOptions: {
-        public_link: 'public_link',
-      },
-    });
-    await this.syncProcessLogService.update(syncProcessLog.id, counters);
-    await this.syncProcessLogService.endSync(syncProcessLog.id);
-    await this.prmsRepository.deleteTemporalResults(executionCode);
+      const endYeard = year ?? new Date().getFullYear();
+      let currentYear = year ?? 2021;
+      for (currentYear; currentYear <= endYeard; currentYear++) {
+        this.logger.log(`Saving temporal data for year ${currentYear}`);
+        await this.saveTemporalData(currentYear, executionCode);
+      }
+
+      const tipResults =
+        await this.prmsRepository.findTemporalResults<TipKnowledgeProductDto>(
+          executionCode,
+        );
+      const dataProcessed = await this.processing(tipResults);
+      await this.saveResultService.bulkSaveAllSections(dataProcessed, {
+        platformCode: ReportingPlatformEnum.TIP,
+        resultSaved,
+        counters,
+        manageOfficialCode: true,
+        findOptions: {
+          public_link: 'public_link',
+        },
+      });
+      await this.syncProcessLogService.update(syncProcessLog.id, counters);
+      await this.syncProcessLogService.endSync(syncProcessLog.id);
+    } catch (error) {
+      this.logger.error(
+        `Error saving temporal data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      throw new BadRequestException('Error saving temporal data');
+    } finally {
+      await this.prmsRepository.deleteTemporalResults(executionCode);
+    }
   }
 
   async processing(results: TemportalDataResponse<TipKnowledgeProductDto>[]) {
@@ -203,7 +210,7 @@ export class TipIntegrationService extends BaseApi {
       const result = data.data;
       const resultMapped: ExternalMappersDto = new ExternalMappersDto();
       // TIP API no longer returns id — blocked until TIP restores the field
-      resultMapped.official_code = undefined as unknown as number;
+      resultMapped.official_code = null;
       resultMapped.is_version_applied = data.is_version ?? false;
       resultMapped.public_link = result.link;
       resultMapped.created_at = new Date(result.created_at);
@@ -282,8 +289,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-              user_id: carnet,
-            } as ResultUser)
+            user_id: carnet,
+          } as ResultUser)
           : null,
         keywords: keywords,
       };
