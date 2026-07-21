@@ -45,7 +45,7 @@ export class SaveResultService {
     private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
-  ) { }
+  ) {}
 
   public async bulkSaveAllSections(
     results: ExternalMappersDto[],
@@ -61,7 +61,7 @@ export class SaveResultService {
     extraData?: ExtraData<ExternalMappersDto>,
   ) {
     let typeCounter: CounterResultsEnum = null;
-
+    let findResult: Result = null;
     this.logger.debug(
       `Processing result ${result.official_code} from ${this.platformCode(extraData?.platformCode)}.`,
     );
@@ -88,7 +88,7 @@ export class SaveResultService {
         }
       }
 
-      let findResult = await this.dataSource.getRepository(Result).findOne({
+      findResult = await this.dataSource.getRepository(Result).findOne({
         where: findOptions,
       });
 
@@ -233,7 +233,7 @@ export class SaveResultService {
     extraData.counters[typeCounter]++;
     this._currentUser.clearSystemUser();
     this.logger.debug(
-      `Finished processing result ${result.official_code} from ${this.platformCode(extraData?.platformCode)}.`,
+      `Finished processing result ${result.official_code ?? findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}.`,
     );
   }
 
@@ -389,8 +389,8 @@ export type ExtraData<T extends object> = {
 export type FindOptionsKeyMap<
   T extends object,
   ExcludedKeys extends keyof FindOptionsWhere<Result> =
-  | 'platform_code'
-  | 'report_year_id',
+    | 'platform_code'
+    | 'report_year_id',
 > = {
-    [K in Exclude<keyof FindOptionsWhere<Result>, ExcludedKeys>]?: keyof T;
-  };
+  [K in Exclude<keyof FindOptionsWhere<Result>, ExcludedKeys>]?: keyof T;
+};

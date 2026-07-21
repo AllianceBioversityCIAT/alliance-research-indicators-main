@@ -86,7 +86,6 @@ export abstract class BaseApi {
     config?: AxiosRequestConfig,
   ): Observable<AxiosResponse<R>> {
     const url = `${this.externalAppEndpoint}/${endpoint}`;
-    console.log('url', url);
     const requestConfig = config ?? this._defaultConfig;
 
     let requestObservable: Observable<AxiosResponse<R>>;
