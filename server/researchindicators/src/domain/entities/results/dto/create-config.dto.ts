@@ -5,7 +5,6 @@ export class CreateResultConfigDto {
   result_status_id?: ResultStatusEnum;
   leverEnum?: LeverRolesEnum;
   notMap?: {
-    lever?: boolean;
     sdg?: boolean;
   };
   notContract?: boolean;

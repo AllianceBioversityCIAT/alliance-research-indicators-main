@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { ResultCapSharingIpController } from './result-cap-sharing-ip.controller';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
@@ -32,6 +33,7 @@ describe('ResultCapSharingIpController', () => {
             setup: jest.fn().mockResolvedValue(undefined),
           },
         },
+        mockPortfolioUtilProvider,
       ],
     })
       .overrideGuard(ResultStatusGuard)

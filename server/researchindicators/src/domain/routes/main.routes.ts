@@ -63,6 +63,9 @@ import { ResultStatusTransitionsModule } from '../entities/result-status-transit
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
+import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
+import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
+import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
 
 const capSharingChildren: Routes = [
   {
@@ -234,6 +237,10 @@ const toolsChildren: Routes = [
 
 const children: Routes = [
   {
+    path: 'portfolios',
+    module: PortfoliosModule,
+  },
+  {
     path: 'configuration',
     module: AppConfigModule,
     children: [
@@ -251,6 +258,14 @@ const children: Routes = [
         module: UserSettingsModule,
       },
     ],
+  },
+  {
+    path: 'strategic-objectives',
+    module: StrategicObjectivesModule,
+  },
+  {
+    path: 'impact-outcomes',
+    module: ImpactOutcomesModule,
   },
   {
     path: 'results',

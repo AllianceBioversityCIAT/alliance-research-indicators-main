@@ -22,6 +22,7 @@ export abstract class BaseApi {
     protected user?: string,
     protected pass?: string,
     protected token?: string,
+    protected customHeaders?: Record<string, string>,
   ) {
     this.logger = new Logger(loggerContext);
   }
@@ -40,6 +41,7 @@ export abstract class BaseApi {
       }),
       headers: {
         Authorization: 'Bearer ' + this.token,
+        ...this.customHeaders,
       },
     };
   }
@@ -124,6 +126,16 @@ export abstract class BaseApi {
     config?: AxiosRequestConfig,
   ): Observable<AxiosResponse<T>> {
     return this.request('get', endpoint, undefined, config);
+  }
+
+  ensureHeaders(headers: Record<string, string>): void {
+    if (!this.customHeaders) {
+      this.customHeaders = {};
+    }
+    this.customHeaders = {
+      ...this.customHeaders,
+      ...headers,
+    };
   }
 
   /**

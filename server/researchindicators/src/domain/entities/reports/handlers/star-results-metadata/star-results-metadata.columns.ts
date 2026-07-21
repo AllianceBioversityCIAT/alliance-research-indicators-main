@@ -77,7 +77,7 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'contributor_lever', header: 'Contributing lever(s)', width: 28 },
   {
     key: 'sdg_targets',
-    header: 'Contibution to SDG targets',
+    header: 'Contribution to SDG targets',
     width: 72,
   },
   { key: 'partners', header: 'Partners involved', width: 56 },

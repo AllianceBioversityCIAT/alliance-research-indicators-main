@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, In } from 'typeorm';
+import { DataSource, FindOptionsWhere, In } from 'typeorm';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
 import {
   CounterResults,
@@ -27,6 +27,7 @@ import {
   evaluateDuplicateResults,
   normalizePublicLink,
 } from '../utils/duplicate-result-priority.util';
+import { isEmpty } from '../utils/object.utils';
 
 /**
  * Persists externally-synced result sections (PRMS, TIP) into the `results` table.
@@ -44,11 +45,11 @@ export class SaveResultService {
     private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
-  ) {}
+  ) { }
 
   public async bulkSaveAllSections(
     results: ExternalMappersDto[],
-    extraData?: ExtraData,
+    extraData?: ExtraData<ExternalMappersDto>,
   ) {
     for (const result of results) {
       await this.saveAllSections(result, extraData);
@@ -57,7 +58,7 @@ export class SaveResultService {
 
   public async saveAllSections(
     result: ExternalMappersDto,
-    extraData?: ExtraData,
+    extraData?: ExtraData<ExternalMappersDto>,
   ) {
     let typeCounter: CounterResultsEnum = null;
 
@@ -67,12 +68,28 @@ export class SaveResultService {
     this._currentUser.setSystemUser(result.userData, true);
     let createNewResult: Result = null;
     try {
+      const isAppliedVersion = result?.is_version_applied ?? false;
+      const findOptions: FindOptionsWhere<Result> = {
+        result_official_code: result.official_code,
+        platform_code: extraData?.platformCode,
+        report_year_id: result.createResult.year,
+      };
+
+      const statusId =
+        extraData?.statusMapper?.[result.status_id] ??
+        result?.status_id ??
+        ResultStatusEnum.DRAFT;
+
+      if (!isEmpty(extraData?.findOptions)) {
+        delete findOptions.result_official_code;
+
+        for (const key in extraData?.findOptions) {
+          findOptions[key] = result[extraData?.findOptions[key]];
+        }
+      }
+
       let findResult = await this.dataSource.getRepository(Result).findOne({
-        where: {
-          result_official_code: result.official_code,
-          platform_code: extraData?.platformCode,
-          report_year_id: result.createResult.year,
-        },
+        where: findOptions,
       });
 
       // Cross-platform duplicate check (Rules 1–4).
@@ -100,24 +117,30 @@ export class SaveResultService {
       extraData.resultSaved?.push(result.official_code);
 
       const snapshotMessage =
-        ((result?.is_version_applied ?? false)
-          ? 'is a snapshot'
-          : 'is a live version') +
+        (isAppliedVersion ? 'is a snapshot' : 'is a live version') +
         ' from year ' +
         result.createResult.year;
 
       if (!findResult) {
+        let officialCode: number;
+        if (extraData?.manageOfficialCode) {
+          officialCode = await this._resultsService.newOfficialCode(
+            extraData?.platformCode,
+          );
+        } else {
+          officialCode = result.official_code;
+        }
+
         createNewResult = await this._resultsService.createResult(
           result.createResult,
-          ReportingPlatformEnum.PRMS,
+          extraData?.platformCode,
           {
             notContract: true,
-            result_status_id:
-              extraData?.statusMapper?.[result.status_id] ?? result.status_id,
+            result_status_id: statusId,
             validateTitle: false,
-            isSnapshot: result?.is_version_applied ?? false,
+            isSnapshot: isAppliedVersion,
           },
-          result.official_code,
+          officialCode,
         );
         findResult = createNewResult;
         this.logger.debug(
@@ -127,13 +150,18 @@ export class SaveResultService {
       } else {
         await this._resultsService.updateInactiveResult(
           findResult.result_id,
-          result?.is_version_applied ?? false,
+          isAppliedVersion,
         );
         this.logger.debug(
           `Updating result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}, ${snapshotMessage}`,
         );
         typeCounter = CounterResultsEnum.UPDATED;
       }
+
+      await this._resultsService.updateResultStatus(
+        findResult.result_id,
+        statusId,
+      );
 
       await this.dataSource.getRepository(Result).update(findResult.result_id, {
         external_link: result?.external_link,
@@ -188,16 +216,17 @@ export class SaveResultService {
       // Rows protected by link_results (Rule 4) are logged but not deleted.
       await this.deleteDuplicateResults(duplicateValidation);
     } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
       if (createNewResult) {
         this.logger.error(
-          `Error processing result ${createNewResult.result_id}, rolling back. Error: ${error.message}`,
+          `Error processing result ${createNewResult.result_id}, rolling back. Error: ${errorMessage}`,
         );
         await this._queryService.deleteFullResultById(
           createNewResult.result_id,
         );
       }
       this.logger.error(
-        `Error processing ${this.platformCode(extraData?.platformCode)} result: ${error.message}`,
+        `Error processing ${this.platformCode(extraData?.platformCode)} result: ${errorMessage}`,
       );
       typeCounter = CounterResultsEnum.ERROR;
     }
@@ -346,11 +375,22 @@ export class SaveResultService {
   }
 }
 
-export type ExtraData = {
+export type ExtraData<T extends object> = {
   resultSaved?: number[];
   currentCode?: { current: number };
   appliedVersion?: boolean;
   counters?: CounterResults;
   platformCode?: ReportingPlatformEnum;
   statusMapper?: Record<number, ResultStatusEnum>;
+  findOptions?: FindOptionsKeyMap<T>;
+  manageOfficialCode?: boolean;
 };
+
+export type FindOptionsKeyMap<
+  T extends object,
+  ExcludedKeys extends keyof FindOptionsWhere<Result> =
+  | 'platform_code'
+  | 'report_year_id',
+> = {
+    [K in Exclude<keyof FindOptionsWhere<Result>, ExcludedKeys>]?: keyof T;
+  };

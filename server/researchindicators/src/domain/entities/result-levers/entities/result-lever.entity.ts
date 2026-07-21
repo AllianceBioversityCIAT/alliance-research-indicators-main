@@ -67,6 +67,16 @@ export class ResultLever extends AuditableEntity {
   })
   is_primary!: boolean;
 
+  @ApiProperty({
+    type: String,
+    name: 'custom_lever_name',
+  })
+  @Column('text', {
+    name: 'custom_lever_name',
+    nullable: true,
+  })
+  custom_lever_name?: string;
+
   @ManyToOne(() => LeverRole, (leverRole) => leverRole.result_levers)
   @JoinColumn({ name: 'lever_role_id' })
   lever_role!: LeverRole;

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { ResultOicrController } from './result-oicr.controller';
 import { ResultOicrService } from './result-oicr.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
@@ -28,6 +29,7 @@ describe('ResultOicrController', () => {
       providers: [
         { provide: ResultOicrService, useValue: mockResultOicrService },
         { provide: ResultsUtil, useValue: mockResultUtil },
+        mockPortfolioUtilProvider,
       ],
     }).compile();
 

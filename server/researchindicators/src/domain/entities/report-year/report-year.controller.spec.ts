@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { ReportYearController } from './report-year.controller';
 import { ReportYearService } from './report-year.service';
@@ -25,6 +26,7 @@ describe('ReportYearController', () => {
           provide: ResultsUtil,
           useValue: { setup: jest.fn().mockResolvedValue(undefined) },
         },
+        mockPortfolioUtilProvider,
       ],
     }).compile();
     controller = module.get(ReportYearController);
