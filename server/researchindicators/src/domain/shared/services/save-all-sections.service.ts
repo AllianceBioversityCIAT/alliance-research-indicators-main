@@ -28,6 +28,9 @@ import {
   normalizePublicLink,
 } from '../utils/duplicate-result-priority.util';
 import { isEmpty } from '../utils/object.utils';
+import { ResultInstitutionsService } from '../../entities/result-institutions/result-institutions.service';
+import { ResultEvidencesService } from '../../entities/result-evidences/result-evidences.service';
+import { ResultsUtil } from '../utils/results.util';
 
 /**
  * Persists externally-synced result sections (PRMS, TIP) into the `results` table.
@@ -40,11 +43,14 @@ import { isEmpty } from '../utils/object.utils';
 export class SaveResultService {
   private readonly logger = new CgiarLogger(SaveResultService.name);
   constructor(
+    private readonly _resultsUtil: ResultsUtil,
     private readonly dataSource: DataSource,
     private readonly _currentUser: CurrentUserUtil,
     private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
+    private readonly _resultInstitutionsService: ResultInstitutionsService,
+    private readonly _resultEvidencesService: ResultEvidencesService,
   ) { }
 
   public async bulkSaveAllSections(
@@ -158,6 +164,8 @@ export class SaveResultService {
         typeCounter = CounterResultsEnum.UPDATED;
       }
 
+      await this._resultsUtil.setCurrentResult(findResult.result_id);
+
       await this._resultsService.updateResultStatus(
         findResult.result_id,
         statusId,
@@ -192,7 +200,7 @@ export class SaveResultService {
 
       await this._resultsService.updateResultAlignment(
         findResult.result_id,
-        result.alignments,
+        result?.alignments,
       );
 
       await this._resultsService.saveGeoLocation(
@@ -200,9 +208,19 @@ export class SaveResultService {
         result?.geoScope,
       );
 
+      await this._resultInstitutionsService.updatePartners(
+        findResult.result_id,
+        result?.partners,
+      );
+
+      await this._resultEvidencesService.updateResultEvidences(
+        findResult.result_id,
+        result?.evidence,
+      );
+
       await this._resultKnowledgeProductService.update(
         findResult.result_id,
-        result.knowledgeProduct,
+        result?.knowledgeProduct,
       );
 
       this.logger.log(
@@ -217,6 +235,7 @@ export class SaveResultService {
       await this.deleteDuplicateResults(duplicateValidation);
     } catch (error) {
       const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(error);
       if (createNewResult) {
         this.logger.error(
           `Error processing result ${createNewResult.result_id}, rolling back. Error: ${errorMessage}`,
@@ -229,6 +248,8 @@ export class SaveResultService {
         `Error processing ${this.platformCode(extraData?.platformCode)} result: ${errorMessage}`,
       );
       typeCounter = CounterResultsEnum.ERROR;
+    } finally {
+      this._resultsUtil.clearManually();
     }
     extraData.counters[typeCounter]++;
     this._currentUser.clearSystemUser();

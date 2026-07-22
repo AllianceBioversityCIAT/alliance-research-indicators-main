@@ -1,5 +1,6 @@
 import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { CreateResultEvidenceDto } from '../../entities/result-evidences/dto/create-result-evidence.dto';
+import { CreateResultInstitutionDto } from '../../entities/result-institutions/dto/create-result-institution.dto';
 import { ResultKnowledgeProduct } from '../../entities/result-knowledge-product/entities/result-knowledge-product.entity';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
 import { CreateResultDto } from '../../entities/results/dto/create-result.dto';
@@ -26,4 +27,5 @@ export class ExternalMappersDto {
   knowledgeProduct: ResultKnowledgeProduct;
   geoScope: SaveGeoLocationDto;
   alignments: ResultAlignmentDto;
+  partners: CreateResultInstitutionDto;
 }
