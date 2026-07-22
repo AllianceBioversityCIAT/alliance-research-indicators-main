@@ -347,6 +347,12 @@ export class AgressoContractController {
     description: 'Filter by contract status',
   })
   @ApiQuery({
+    name: 'funding-type',
+    required: false,
+    type: String,
+    description: 'Filter by funding type',
+  })
+  @ApiQuery({
     name: 'start-date',
     required: false,
     type: String,
@@ -406,6 +412,7 @@ export class AgressoContractController {
     @Query('current-user') currentUser: TrueFalseEnum,
     @Query('contract-code') contractCode: string,
     @Query('project-name') projectName: string,
+    @Query('funding-type', ListParseToArrayPipe) fundingType: string[],
     @Query('principal-investigator') principalInvestigator: string,
     @Query('lever', ListParseToArrayPipe) lever: string[],
     @Query('status', ListParseToArrayPipe) status: AgressoContractStatus[],
@@ -433,6 +440,7 @@ export class AgressoContractController {
           lever: lever,
           start_date: startDate,
           end_date: endDate,
+          funding_type: fundingType,
           status: status.map((s) => AgressoContractStatus[s?.toUpperCase()]),
           exclude_pooled_funding: excludePooledFunding == TrueFalseEnum.TRUE,
           is_pool_funding_contributor: this.parseOptionalBoolean(
@@ -491,5 +499,17 @@ export class AgressoContractController {
           data: response,
         }),
       );
+  }
+
+  @Get('funding-types')
+  @ApiOperation({ summary: 'Get all funding types' })
+  async getFundingTypes() {
+    return this.agressoContractService.getFundingTypes().then((response) =>
+      ResponseUtils.format({
+        description: 'Funding types found',
+        status: HttpStatus.OK,
+        data: response,
+      }),
+    );
   }
 }

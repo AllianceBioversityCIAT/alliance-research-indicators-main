@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { HttpStatus } from '@nestjs/common';
 import { LeverSdgTargetsController } from './lever-sdg-targets.controller';
 import { LeverSdgTargetsService } from './lever-sdg-targets.service';
@@ -32,6 +33,7 @@ describe('LeverSdgTargetsController', () => {
           provide: ResultsUtil,
           useValue: { setup: jest.fn().mockResolvedValue(undefined) },
         },
+        mockPortfolioUtilProvider,
       ],
     })
       .overrideGuard(RolesGuard)

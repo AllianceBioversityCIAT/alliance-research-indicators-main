@@ -39,6 +39,12 @@ export const validObject = <T>(
   };
 };
 
+/**
+ * Validates if any of the keys in the object are present
+ * @param obj
+ * @param valid
+ * @returns
+ */
 export const validObjectAnyOf = <T>(
   obj: Partial<T>,
   valid: (keyof T)[],

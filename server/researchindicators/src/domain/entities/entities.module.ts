@@ -92,6 +92,12 @@ import { ReportsModule } from './reports/reports.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 import { BilateralModule } from './bilateral/bilateral.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
+import { PortfoliosModule } from './portfolios/portfolios.module';
+import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
+import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
+import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impact-outcomes.module';
+import { ResultStrategicObjectivesModule } from './result-strategic-objectives/result-strategic-objectives.module';
+import { AiReportsModule } from './ai-reports/ai-reports.module';
 
 @Module({
   imports: [
@@ -188,6 +194,12 @@ import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilat
     ResultReviewHistoryModule,
     BilateralModule,
     BilateralProjectMappingModule,
+    PortfoliosModule,
+    StrategicObjectivesModule,
+    ImpactOutcomesModule,
+    ResultImpactOutcomesModule,
+    ResultStrategicObjectivesModule,
+    AiReportsModule,
   ],
   exports: [
     AgressoContractModule,

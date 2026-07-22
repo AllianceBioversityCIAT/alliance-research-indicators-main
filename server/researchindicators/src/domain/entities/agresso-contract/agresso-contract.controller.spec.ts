@@ -40,6 +40,7 @@ describe('AgressoContractController', () => {
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
+    getFundingTypes: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -493,6 +494,7 @@ describe('AgressoContractController', () => {
         TrueFalseEnum.TRUE,
         'CONTRACT001',
         'Test Project',
+        ['BILATERAL'],
         'John Doe',
         ['1', '2'],
         [AgressoContractStatus.ONGOING, AgressoContractStatus.COMPLETED],
@@ -513,6 +515,7 @@ describe('AgressoContractController', () => {
         {
           contract_code: 'CONTRACT001',
           project_name: 'Test Project',
+          funding_type: ['BILATERAL'],
           principal_investigator: 'John Doe',
           lever: ['1', '2'],
           start_date: '2023-01-01',
@@ -548,6 +551,7 @@ describe('AgressoContractController', () => {
         undefined,
         undefined,
         undefined,
+        [],
         undefined,
         [],
         [],
@@ -568,6 +572,7 @@ describe('AgressoContractController', () => {
         {
           contract_code: undefined,
           project_name: undefined,
+          funding_type: [],
           principal_investigator: undefined,
           lever: [],
           start_date: undefined,
@@ -600,6 +605,7 @@ describe('AgressoContractController', () => {
         TrueFalseEnum.FALSE,
         undefined,
         undefined,
+        [],
         undefined,
         [],
         ['ongoing', 'completed'] as AgressoContractStatus[],
@@ -645,6 +651,41 @@ describe('AgressoContractController', () => {
             type: Boolean,
           }),
         ]),
+      );
+    });
+
+    it('should exclude pooled funding contracts when flag is true', async () => {
+      mockAgressoContractService.findAgressoContracts.mockResolvedValue([]);
+
+      await controller.findContracts(
+        undefined,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        [],
+        [],
+        undefined,
+        undefined,
+        undefined,
+        '1',
+        '10',
+        undefined,
+        'ASC',
+        TrueFalseEnum.TRUE,
+        undefined,
+        undefined,
+      );
+
+      expect(service.findAgressoContracts).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          exclude_pooled_funding: true,
+        }),
+        undefined,
+        'ASC',
+        { limit: 10, page: 1 },
+        undefined,
       );
     });
   });
@@ -732,6 +773,33 @@ describe('AgressoContractController', () => {
           }),
         ]),
       );
+    });
+  });
+
+  describe('getFundingTypes', () => {
+    it('should return all funding types', async () => {
+      const mockFundingTypes = [
+        { funding_type: 'BILATERAL' },
+        { funding_type: 'MULTILATERAL' },
+      ];
+
+      mockAgressoContractService.getFundingTypes.mockResolvedValue(
+        mockFundingTypes,
+      );
+
+      const result = await controller.getFundingTypes();
+
+      expect(service.getFundingTypes).toHaveBeenCalled();
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Funding types found',
+        status: HttpStatus.OK,
+        data: mockFundingTypes,
+      });
+      expect(result).toEqual({
+        description: 'Funding types found',
+        status: HttpStatus.OK,
+        data: mockFundingTypes,
+      });
     });
   });
 });

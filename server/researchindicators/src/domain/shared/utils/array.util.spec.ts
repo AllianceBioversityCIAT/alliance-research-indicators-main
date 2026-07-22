@@ -74,8 +74,12 @@ describe('array.util', () => {
   });
 
   describe('validTypeOfArray', () => {
-    it('should strip non-alphanumeric from stringified items', () => {
-      expect(validTypeOfArray(['a-b', '12#'])).toEqual(['ab', '12']);
+    it('should strip non-alphanumeric from stringified items except slash', () => {
+      expect(validTypeOfArray(['a-b', '12#', 'foo/bar'])).toEqual([
+        'ab',
+        '12',
+        'foo/bar',
+      ]);
     });
   });
 

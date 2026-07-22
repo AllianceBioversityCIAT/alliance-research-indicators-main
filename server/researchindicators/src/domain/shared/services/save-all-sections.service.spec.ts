@@ -9,14 +9,22 @@ import { CurrentUserUtil } from '../utils/current-user.util';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
+import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
 import {
   CounterResults,
   CounterResultsEnum,
 } from '../../tools/tip-integration/dto/response-year-tip.dto';
+import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
-  let resultRepoHandle: { findOne: jest.Mock; update: jest.Mock };
+  let resultRepoHandle: {
+    findOne: jest.Mock;
+    find: jest.Mock;
+    update: jest.Mock;
+  };
+  let linkResultRepoHandle: { find: jest.Mock };
+  let getRepository: jest.Mock;
   let resultsService: jest.Mocked<ResultsService>;
   let knowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
   let queryService: jest.Mocked<QueryService>;
@@ -72,8 +80,16 @@ describe('SaveResultService', () => {
   beforeEach(async () => {
     resultRepoHandle = {
       findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue(undefined),
     };
+    linkResultRepoHandle = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+    getRepository = jest.fn((entity) => {
+      if (entity === LinkResult) return linkResultRepoHandle;
+      return resultRepoHandle;
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -81,7 +97,7 @@ describe('SaveResultService', () => {
         {
           provide: DataSource,
           useValue: {
-            getRepository: jest.fn().mockReturnValue(resultRepoHandle),
+            getRepository,
           },
         },
         {
@@ -91,6 +107,8 @@ describe('SaveResultService', () => {
             updateGeneralInfo: jest.fn(),
             updateResultAlignment: jest.fn(),
             updateInactiveResult: jest.fn(),
+            updateResultStatus: jest.fn().mockResolvedValue(undefined),
+            newOfficialCode: jest.fn(),
             findResultAlignment: jest
               .fn()
               .mockResolvedValue({ primary_levers: [] }),
@@ -149,6 +167,10 @@ describe('SaveResultService', () => {
           isSnapshot: false,
         }),
         7001,
+      );
+      expect(resultsService.updateResultStatus).toHaveBeenCalledWith(
+        1,
+        ResultStatusEnum.SUBMITTED_IN_PRMS,
       );
       expect(counters[CounterResultsEnum.CREATED]).toBe(1);
       expect(currentUser.setSystemUser).toHaveBeenCalled();
@@ -217,6 +239,105 @@ describe('SaveResultService', () => {
       );
     });
 
+    it('should create result with the platform code from extraData', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 20,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+      expect(resultsService.createResult).toHaveBeenCalledWith(
+        expect.anything(),
+        ReportingPlatformEnum.TIP,
+        expect.anything(),
+        7001,
+      );
+    });
+
+    it('should generate a new official code when manageOfficialCode is enabled', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.newOfficialCode.mockResolvedValue(9999);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 21,
+        result_official_code: 9999,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), {
+        ...tipExtraData(),
+        manageOfficialCode: true,
+      });
+
+      expect(resultsService.newOfficialCode).toHaveBeenCalledWith(
+        ReportingPlatformEnum.TIP,
+      );
+      expect(resultsService.createResult).toHaveBeenCalledWith(
+        expect.anything(),
+        ReportingPlatformEnum.TIP,
+        expect.anything(),
+        9999,
+      );
+    });
+
+    it('should use the DTO official code when manageOfficialCode is disabled', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 22,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+      expect(resultsService.newOfficialCode).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalledWith(
+        expect.anything(),
+        ReportingPlatformEnum.TIP,
+        expect.anything(),
+        7001,
+      );
+    });
+
+    it('should search existing result by findOptions instead of official code', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 30,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/kp';
+
+      await service.saveAllSections(dto, {
+        ...tipExtraData(),
+        findOptions: { public_link: 'public_link' },
+      });
+
+      expect(resultRepoHandle.findOne).toHaveBeenCalledWith({
+        where: {
+          platform_code: ReportingPlatformEnum.TIP,
+          report_year_id: 2024,
+          public_link: 'https://example.org/kp',
+        },
+      });
+    });
+
+    it('should search by official code when findOptions is not provided', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 31,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+      expect(resultRepoHandle.findOne).toHaveBeenCalledWith({
+        where: {
+          result_official_code: 7001,
+          platform_code: ReportingPlatformEnum.TIP,
+          report_year_id: 2024,
+        },
+      });
+    });
+
     it('should update inactive result when PRMS row already exists', async () => {
       resultRepoHandle.findOne.mockResolvedValue({
         result_id: 9,
@@ -233,7 +354,32 @@ describe('SaveResultService', () => {
         9,
         false,
       );
+      expect(resultsService.updateResultStatus).toHaveBeenCalledWith(
+        9,
+        ResultStatusEnum.SUBMITTED_IN_PRMS,
+      );
       expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('should apply statusMapper when provided in extraData', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 15,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.status_id = 99 as ResultStatusEnum;
+
+      await service.saveAllSections(dto, {
+        ...prmsExtraData(),
+        statusMapper: {
+          99: ResultStatusEnum.APPROVED,
+        },
+      });
+
+      expect(resultsService.updateResultStatus).toHaveBeenCalledWith(
+        15,
+        ResultStatusEnum.APPROVED,
+      );
     });
 
     it('should mark snapshot on update when is_version_applied is true', async () => {
@@ -361,6 +507,131 @@ describe('SaveResultService', () => {
           expect.objectContaining({ lever_id: 2, is_primary: false }),
         ]),
       );
+    });
+  });
+
+  describe('duplicateResultValidation', () => {
+    it('should omit PRMS when TIP duplicate exists for the same public link', async () => {
+      resultRepoHandle.find.mockResolvedValue([
+        {
+          result_id: 99,
+          platform_code: ReportingPlatformEnum.TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        },
+      ]);
+
+      const result = await service.duplicateResultValidation({
+        platformCode: ReportingPlatformEnum.PRMS,
+        publicLink: 'https://example.org/doc',
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        reportYearId: 2024,
+      });
+
+      expect(result.shouldOmit).toBe(true);
+      expect(result.resultsToDelete).toEqual([]);
+      expect(resultRepoHandle.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            public_link: 'https://example.org/doc',
+          }),
+        }),
+      );
+    });
+
+    it('should mark PRMS duplicate for deletion when incoming TIP wins', async () => {
+      resultRepoHandle.find.mockResolvedValue([
+        {
+          result_id: 88,
+          platform_code: ReportingPlatformEnum.PRMS,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        },
+      ]);
+
+      const result = await service.duplicateResultValidation({
+        platformCode: ReportingPlatformEnum.TIP,
+        publicLink: 'https://example.org/doc',
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        reportYearId: 2024,
+      });
+
+      expect(result.shouldOmit).toBe(false);
+      expect(result.resultsToDelete).toEqual([88]);
+    });
+
+    it('should skip deduplication when only external_link would match', async () => {
+      const result = await service.duplicateResultValidation({
+        platformCode: ReportingPlatformEnum.TIP,
+        publicLink: null,
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        reportYearId: 2024,
+      });
+
+      expect(result).toEqual({
+        shouldOmit: false,
+        resultsToDelete: [],
+        protectedFromDeletion: [],
+      });
+      expect(resultRepoHandle.find).not.toHaveBeenCalled();
+    });
+
+    it('should protect duplicates referenced in link_results.other_result_id', async () => {
+      resultRepoHandle.find.mockResolvedValue([
+        {
+          result_id: 77,
+          platform_code: ReportingPlatformEnum.PRMS,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        },
+      ]);
+      linkResultRepoHandle.find.mockResolvedValue([{ other_result_id: 77 }]);
+
+      const result = await service.duplicateResultValidation({
+        platformCode: ReportingPlatformEnum.TIP,
+        publicLink: 'https://example.org/doc',
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        reportYearId: 2024,
+      });
+
+      expect(result.resultsToDelete).toEqual([]);
+      expect(result.protectedFromDeletion).toEqual([77]);
+    });
+  });
+
+  describe('saveAllSections duplicate handling', () => {
+    it('should skip PRMS save when a higher-priority duplicate exists', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultRepoHandle.find.mockResolvedValue([
+        {
+          result_id: 55,
+          platform_code: ReportingPlatformEnum.TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        },
+      ]);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, prmsExtraData(counters));
+
+      expect(resultsService.createResult).not.toHaveBeenCalled();
+      expect(counters[CounterResultsEnum.CREATED]).toBe(0);
+      expect(currentUser.clearSystemUser).toHaveBeenCalled();
+    });
+
+    it('should not deduplicate when incoming row has only external_link', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = null;
+      dto.external_link = 'https://tip-platform.org/result/1';
+      resultsService.createResult.mockResolvedValue({
+        result_id: 1,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(dto, tipExtraData(counters));
+
+      expect(resultRepoHandle.find).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalled();
     });
   });
 

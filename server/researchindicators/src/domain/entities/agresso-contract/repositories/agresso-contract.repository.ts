@@ -343,6 +343,7 @@ export class AgressoContractRepository
       [OrderFieldsEnum.COUNT_RESULTS]: 'contract_total_results',
       [OrderFieldsEnum.POOL_FUNDING_CONTRIBUTOR]:
         effectivePoolFundingContributorSql('ac'),
+      [OrderFieldsEnum.FUNDING_TYPE]: 'ac.funding_type',
     };
     return `${fieldMap[field] || 'ac.start_date'} ${direction} `;
   }
@@ -439,6 +440,7 @@ export class AgressoContractRepository
     ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter.principal_investigator}%'`)}
     ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
     ${poolFundingContributorFilter}
+    ${validFilter(filter?.funding_type, this.buildFundingTypeFilterClause(filter?.funding_type))}
     ${dateFilterClause}
     ${validFilter(filter?.status, this.buildStatusFilterClause(filter.status))}
   `;
@@ -518,6 +520,7 @@ export class AgressoContractRepository
         ${validFilter(filter?.principal_investigator, `AND ac.project_lead_description LIKE '%${filter?.principal_investigator}%'`)}
         ${validFilter(filter?.lever, `AND cl.id in (${filter?.lever?.join(',')})`)}
         ${poolFundingContributorFilter}
+        ${validFilter(filter?.funding_type, this.buildFundingTypeFilterClause(filter?.funding_type))}
         ${dateFilterClause}
         ${validFilter(filter?.status, this.buildStatusFilterClause(filter?.status))}
         ${orderBy}
@@ -577,6 +580,18 @@ export class AgressoContractRepository
       .map((status) => `'${status.toLowerCase()}'`)
       .join(',');
     return `AND LOWER(ac.contract_status) in (${statusList})`;
+  }
+
+  private buildFundingTypeFilterClause(fundingTypes?: string[]): string {
+    if (!fundingTypes?.length) {
+      return '';
+    }
+
+    const fundingTypeList = fundingTypes
+      .map((fundingType) => `'${fundingType}'`)
+      .join(',');
+
+    return `AND ac.funding_type in (${fundingTypeList})`;
   }
 
   private buildDateFilterClause(filter?: Record<string, any>): string {
@@ -924,6 +939,7 @@ export class AgressoContractRepository
         clarisa_lever.id AS lever_id,
         clarisa_lever.short_name AS short_name,
         clarisa_lever.full_name AS full_name,
+        clarisa_lever.icon AS icon,
         COUNT(DISTINCT result_lever.result_id) AS count
       FROM result_levers result_lever
       INNER JOIN (${primaryContractResultsSubquery}) primary_contract_results
@@ -935,7 +951,8 @@ export class AgressoContractRepository
       GROUP BY
         clarisa_lever.id,
         clarisa_lever.short_name,
-        clarisa_lever.full_name
+        clarisa_lever.full_name,
+        clarisa_lever.icon
       ORDER BY count DESC, clarisa_lever.id
       LIMIT ?
     `;
@@ -1040,5 +1057,16 @@ export class AgressoContractRepository
         name: formatPersonName(name),
         role,
       }));
+  }
+
+  async getFundingTypes() {
+    const query = `
+      SELECT DISTINCT funding_type FROM agresso_contracts
+    `;
+
+    const rows = await this.query(query).then((rows) =>
+      rows.filter((row) => row.funding_type),
+    );
+    return rows as string[];
   }
 }

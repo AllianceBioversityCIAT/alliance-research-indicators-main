@@ -1,13 +1,23 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { Request } from 'express';
 import { REQUEST } from '@nestjs/core';
-import { DataSource, FindOptionsWhere } from 'typeorm';
+import { DataSource, FindOptionsSelect, FindOptionsWhere } from 'typeorm';
 import { Result } from '../../entities/results/entities/result.entity';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 
 @Injectable()
 export class ResultsUtil {
   private currentResult: Result;
+  private readonly resultSelect: FindOptionsSelect<Result> = {
+    report_year_id: true,
+    result_official_code: true,
+    result_id: true,
+    indicator_id: true,
+    result_status_id: true,
+    platform_code: true,
+    is_snapshot: true,
+  };
+
   constructor(
     private readonly dataSource: DataSource,
     @Inject(REQUEST) private readonly request: Request,
@@ -41,14 +51,7 @@ export class ResultsUtil {
     return this.dataSource
       .getRepository(Result)
       .findOne({
-        select: {
-          report_year_id: true,
-          result_official_code: true,
-          result_id: true,
-          indicator_id: true,
-          result_status_id: true,
-          platform_code: true,
-        },
+        select: this.resultSelect,
         where,
       })
       .then((result) => {
@@ -61,14 +64,7 @@ export class ResultsUtil {
     const tempResult = await this.dataSource
       .getRepository(Result)
       .findOne({
-        select: {
-          report_year_id: true,
-          result_official_code: true,
-          result_id: true,
-          indicator_id: true,
-          result_status_id: true,
-          platform_code: true,
-        },
+        select: this.resultSelect,
         where: { result_id: resultId, is_active: true },
       })
       .then((result) => {

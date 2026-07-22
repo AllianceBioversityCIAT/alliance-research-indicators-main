@@ -41,10 +41,31 @@ export class ResultKnowledgeProduct extends AuditableEntity {
 
   @Column({
     type: 'text',
+    name: 'access_status',
+    nullable: true,
+  })
+  access_status: string;
+
+  @Column({
+    type: 'text',
+    name: 'collection',
+    nullable: true,
+  })
+  collection: string;
+
+  @Column({
+    type: 'text',
     name: 'publication_date',
     nullable: true,
   })
   publication_date: string;
+
+  @Column({
+    type: 'bigint',
+    name: 'tip_id',
+    nullable: true,
+  })
+  tip_id: number;
 
   @ManyToOne(() => Result, (result) => result.knowledge_products)
   @JoinColumn({ name: 'result_id' })

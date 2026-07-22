@@ -7,7 +7,14 @@ import {
   Inject,
   forwardRef,
 } from '@nestjs/common';
-import { DataSource, EntityManager, FindOneOptions, In, Not } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  FindOneOptions,
+  FindOptionsWhere,
+  In,
+  Not,
+} from 'typeorm';
 import {
   ResultFiltersInterface,
   ResultRepository,
@@ -55,7 +62,12 @@ import {
 import { IndicatorsService } from '../indicators/indicators.service';
 import { Indicator } from '../indicators/entities/indicator.entity';
 import { ClarisaGeoScope } from '../../tools/clarisa/entities/clarisa-geo-scope/entities/clarisa-geo-scope.entity';
-import { AiRawCountry, ResultAiDto, ResultRawAi } from './dto/result-ai.dto';
+import {
+  AiRawCountry,
+  ResultAiDto,
+  ResultRawAi,
+  RootAi,
+} from './dto/result-ai.dto';
 import { TempResultAi } from './entities/temp-result-ai.entity';
 import { ClarisaSubNationalsService } from '../../tools/clarisa/entities/clarisa-sub-nationals/clarisa-sub-nationals.service';
 import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-staff.service';
@@ -72,10 +84,7 @@ import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { nextToProcessAiRaw } from '../../shared/utils/validations.utils';
 import { ClarisaCountriesService } from '../../tools/clarisa/entities/clarisa-countries/clarisa-countries.service';
-import {
-  filterByUniqueKeyWithPriority,
-  intersection,
-} from '../../shared/utils/array.util';
+import { intersection } from '../../shared/utils/array.util';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
 import { CreateResultInstitutionDto } from '../result-institutions/dto/create-result-institution.dto';
@@ -102,6 +111,15 @@ import { ResultSortEnum } from './enum/result-sort.enum';
 import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
 import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
+import { ResultAlignmentOperationsService } from './portfolio-handlers/sections/alignment/shared/result-alignment-operations.service';
+import { PortfoliosService } from '../portfolios/portfolios.service';
+import { AiReportsService } from '../ai-reports/ai-reports.service';
+import {
+  CreateAiReportDto,
+  CreateBulkUploadProcessesDto,
+  CreateBulkUploadResultsDto,
+} from '../ai-reports/dto/create-ai-report.dto';
+import { DeleteResultsByParametersDto } from './dto/delete-results-params.dto';
 
 @Injectable()
 export class ResultsService {
@@ -143,6 +161,9 @@ export class ResultsService {
     private readonly _resultsUtil: ResultsUtil,
     private readonly _greenChecksService: GreenChecksService,
     private readonly _greenCheckRepository: GreenCheckRepository,
+    private readonly _alignmentOperations: ResultAlignmentOperationsService,
+    private readonly _portfolioService: PortfoliosService,
+    private readonly _aiReportsService: AiReportsService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -286,7 +307,6 @@ export class ResultsService {
     newConfig.leverEnum = configuration?.leverEnum ?? LeverRolesEnum.ALIGNMENT;
     newConfig.notMap = {
       sdg: configuration?.notMap?.sdg ?? false,
-      lever: configuration?.notMap?.lever ?? false,
     };
     newConfig.result_status_id =
       configuration?.result_status_id ?? ResultStatusEnum.DRAFT;
@@ -302,6 +322,49 @@ export class ResultsService {
       is_snapshot: isSnapshot,
       ...this.currentUser.audit(SetAuditEnum.UPDATE),
     });
+  }
+
+  async updateResultStatus(resultId: number, statusId: ResultStatusEnum) {
+    await this.mainRepo.update(resultId, {
+      result_status_id: statusId,
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    });
+  }
+
+  async deleteResultsByParameters(
+    deleteResultsByParameters: DeleteResultsByParametersDto,
+  ) {
+    const { resultIds, platformCode, statusCode } = deleteResultsByParameters;
+    const where: FindOptionsWhere<Result> = {};
+    if (!isEmpty(resultIds)) where.result_id = In(resultIds);
+    if (!isEmpty(platformCode)) where.platform_code = platformCode;
+    if (!isEmpty(statusCode)) where.result_status_id = statusCode;
+    const results = await this.mainRepo.find({
+      where,
+      select: {
+        result_id: true,
+        platform_code: true,
+        result_status: {
+          result_status_id: true,
+          name: true,
+        },
+      },
+      relations: { result_status: true },
+    });
+    if (isEmpty(results)) throw new NotFoundException('No results found');
+    for (const {
+      result_id,
+      platform_code,
+      result_status: { result_status_id, name },
+    } of results) {
+      this.logger.warn(
+        `Deleting result ${result_id} from ${platform_code} with status [${result_status_id}] ${name}`,
+      );
+      if (!deleteResultsByParameters.testing) {
+        await this._queryService.deleteFullResultById(result_id);
+      }
+    }
+    return results;
   }
 
   async createResult(
@@ -382,26 +445,6 @@ export class ResultsService {
 
       const agressoContract =
         await this._agressoContractService.findOne(contract_id);
-      const lever = this._clarisaLeversService.homologatedData(
-        agressoContract?.departmentId,
-      );
-      const clarisaLever = await this._clarisaLeversService.findByName(lever);
-
-      if (clarisaLever && !config.notMap.lever) {
-        const primaryLever: Partial<ResultLever> = {
-          lever_id: String(clarisaLever.id),
-          is_primary: true,
-        };
-
-        await this._resultLeversService.create<LeverRolesEnum>(
-          result.result_id,
-          primaryLever,
-          'lever_id',
-          config.leverEnum,
-          manager,
-          ['is_primary'],
-        );
-      }
 
       const primaryContract: Partial<ResultContract> = {
         contract_id: contract_id,
@@ -444,13 +487,15 @@ export class ResultsService {
     return result;
   }
 
-  private async newOfficialCode() {
+  public async newOfficialCode(
+    platformCode: ReportingPlatformEnum = ReportingPlatformEnum.STAR,
+  ) {
     const firstInsertion: number = 1;
     const lastCode: number = await this.mainRepo
       .findOne({
         where: {
           is_active: In([true, false]),
-          platform_code: ReportingPlatformEnum.STAR,
+          platform_code: platformCode,
         },
         order: { result_official_code: 'DESC' },
       })
@@ -692,96 +737,7 @@ export class ResultsService {
     alignmentData: ResultAlignmentDto,
     returnData: TrueFalseEnum = TrueFalseEnum.FALSE,
   ) {
-    const { contracts, primary_levers, contributor_levers } = alignmentData;
-    await this.dataSource.transaction(async (manager) => {
-      await this._resultContractsService.create<ContractRolesEnum>(
-        resultId,
-        contracts,
-        'contract_id',
-        ContractRolesEnum.ALIGNMENT,
-        manager,
-        ['is_primary'],
-        {
-          is_primary: false,
-        },
-      );
-
-      const primaryLevers: Partial<ResultLever>[] =
-        primary_levers?.length > 0
-          ? primary_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: true,
-              result_lever_strategic_outcomes:
-                el?.result_lever_strategic_outcomes,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
-          : [];
-
-      const contributorLevers: Partial<ResultLever>[] =
-        contributor_levers?.length > 0
-          ? contributor_levers.map((el) => ({
-              lever_id: el.lever_id,
-              is_primary: false,
-              result_lever_sdg_targets: el?.result_lever_sdg_targets,
-            }))
-          : [];
-
-      const fullLevers = filterByUniqueKeyWithPriority<Partial<ResultLever>>(
-        [...primaryLevers, ...contributorLevers],
-        'lever_id',
-        'is_primary',
-      );
-
-      const newLevers = await this._resultLeversService.create<LeverRolesEnum>(
-        resultId,
-        fullLevers,
-        'lever_id',
-        LeverRolesEnum.ALIGNMENT,
-        manager,
-        ['is_primary'],
-        {
-          is_primary: false,
-        },
-      );
-
-      const emergedLever =
-        await this._resultLeversService.comparerClientToServer(
-          resultId,
-          fullLevers,
-          LeverRolesEnum.ALIGNMENT,
-          newLevers,
-        );
-
-      for (const lever of emergedLever) {
-        await this._resultLeverStrategicOutcomeService.create(
-          lever.result_lever_id,
-          lever?.result_lever_strategic_outcomes ?? [],
-          'lever_strategic_outcome_id',
-          undefined,
-          manager,
-        );
-      }
-
-      for (const lever of emergedLever) {
-        await this._resultLeverSdgTargetsService.create(
-          lever.result_lever_id,
-          lever?.result_lever_sdg_targets ?? [],
-          'sdg_target_id',
-          undefined,
-          manager,
-        );
-      }
-
-      await this._resultSdgsService.create(
-        resultId,
-        alignmentData.result_sdgs,
-        'clarisa_sdg_id',
-        undefined,
-        manager,
-      );
-
-      await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
-    });
+    await this._alignmentOperations.save(resultId, alignmentData);
 
     if (returnData === TrueFalseEnum.TRUE) {
       return this.findResultAlignment(resultId);
@@ -797,53 +753,16 @@ export class ResultsService {
   }
 
   async findResultAlignment(resultId: number) {
-    const contracts = await this._resultContractsService.find(
-      resultId,
-      ContractRolesEnum.ALIGNMENT,
-    );
-
-    const levers = await this._resultLeversService.find(
-      resultId,
-      LeverRolesEnum.ALIGNMENT,
-    );
-
-    const sdgTargets =
-      await this._resultLeverSdgTargetsService.findByMultiplesResultLeverIds(
-        levers.map((el) => el.result_lever_id),
-      );
-
-    levers.forEach((lever) => {
-      lever.result_lever_sdg_targets = sdgTargets.filter(
-        (sdgTarget) => sdgTarget.result_lever_id === lever.result_lever_id,
-      );
-    });
-
-    const primaryLevers = levers.filter((el) => el.is_primary);
-
-    const strategicOutcomes =
-      await this._resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds(
-        primaryLevers.map((el) => el.result_lever_id),
-      );
-
-    primaryLevers.forEach((lever) => {
-      lever.result_lever_strategic_outcomes = strategicOutcomes.filter(
-        (so) => so.result_lever_id === lever.result_lever_id,
-      );
-    });
-
-    const result_sdgs = await this._resultSdgsService.find(resultId);
-
-    const resultAlignment: ResultAlignmentDto = {
-      contracts,
-      primary_levers: primaryLevers,
-      contributor_levers: levers.filter((el) => !el.is_primary),
-      result_sdgs,
-    };
-
-    return resultAlignment;
+    return this._alignmentOperations.find(resultId);
   }
 
-  async findMetadataResult(result_id: number): Promise<MetadataResultDto> {
+  async findMetadataResult(
+    result_id: number,
+    portfolioId?: number,
+  ): Promise<MetadataResultDto> {
+    const portfolio = portfolioId
+      ? await this._portfolioService.findOne(portfolioId)
+      : null;
     const result = await this.mainRepo.findOne({
       select: {
         indicator: {
@@ -902,6 +821,15 @@ export class ResultsService {
       report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
       result_status: result?.result_status,
+      portfolio: portfolio
+        ? {
+            id: portfolio.id,
+            name: portfolio.name,
+            description: portfolio.description,
+            start_year: portfolio.start_year,
+            end_year: portfolio.end_year,
+          }
+        : null,
     };
   }
 
@@ -935,10 +863,26 @@ export class ResultsService {
     return results.map((el) => el.result_id);
   }
 
-  async formalizeResult(result: ResultRawAi, isbulk: boolean = false) {
+  async formalizeResult(
+    result: ResultRawAi,
+    isbulk: boolean = false,
+    resultMetadata?: CreateBulkUploadResultsDto[],
+  ) {
     let resultExists: Result = null;
+    const elementResultMetadata: CreateBulkUploadResultsDto =
+      new CreateBulkUploadResultsDto();
     try {
       const processedResult = await this.createResultFromAiRoar(result);
+
+      elementResultMetadata.missing_fields =
+        result?.metadata?.missing_fields?.map((el) => el?.trim()) ?? [];
+      elementResultMetadata.manual_intervention_occurred =
+        result?.metadata?.manually_edited ?? false;
+      elementResultMetadata.suggested_status = result?.status;
+      elementResultMetadata.title = result?.title;
+      elementResultMetadata.indicator_id =
+        processedResult?.result?.indicator_id;
+
       const newResult = await this.createResult(processedResult.result);
       resultExists = newResult;
       await this._resultsUtil.setCurrentResult(newResult.result_id);
@@ -989,12 +933,16 @@ export class ResultsService {
           break;
       }
 
-      await this.customStatus(
+      const finalStatus = await this.customStatus(
         result.status,
         newResult.result_id,
         processedResult?.result?.year,
       );
 
+      elementResultMetadata.final_status =
+        finalStatus ?? newResult?.result_status_id;
+      elementResultMetadata.result_id = newResult.result_id;
+      resultMetadata.push(elementResultMetadata);
       return { ...newResult, error: false };
     } catch (error) {
       if (resultExists) {
@@ -1003,10 +951,9 @@ export class ResultsService {
         );
         await this._queryService.deleteFullResultById(resultExists.result_id);
       }
-
-      this.logger.error(
-        `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`,
-      );
+      const errorMessage = `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`;
+      this.logger.error(errorMessage);
+      elementResultMetadata.error_message = errorMessage;
       const tempExistsResult = await this.dataSource
         .getRepository(Result)
         .findOne({
@@ -1019,6 +966,8 @@ export class ResultsService {
       if (!isbulk) {
         throw error;
       }
+
+      resultMetadata.push(elementResultMetadata);
 
       return {
         ...result,
@@ -1035,7 +984,7 @@ export class ResultsService {
     status: ResultStatusEnum,
     resultId: number,
     reportYear: number,
-  ): Promise<void> {
+  ): Promise<number> {
     if (isEmpty(status) || !ResultStatusNameEnum?.[status]) return;
 
     const greenChecks = await this._greenChecksService.findByResultId(resultId);
@@ -1065,19 +1014,40 @@ export class ResultsService {
           resultrCode,
           reportYear,
         );
+
+        return status;
       }
     }
+    return null;
   }
 
-  async createResultFromAiBulk(results: ResultRawAi[]) {
+  async createResultFromAiBulk(data: RootAi) {
+    const { results, metadata } = data;
+
+    const iaMetadataReport = new CreateAiReportDto();
+    const iaMetadataReportProcess = new CreateBulkUploadProcessesDto();
+    const iaMetadataReportResults: CreateBulkUploadResultsDto[] = [];
+
+    iaMetadataReportProcess.ai_interaction_id = metadata.ai_interaction_id;
+    iaMetadataReportProcess.file_name = metadata.file_name;
+    iaMetadataReportProcess.created_by = this.currentUser.user_id;
+
+    iaMetadataReport.bulkUploadProcesses = iaMetadataReportProcess;
+
     const resultsCreated: (
       | Result
       | { error?: boolean; message_error?: string }
     )[] = [];
     for (const result of results) {
-      const newResult = await this.formalizeResult(result, true);
+      const newResult = await this.formalizeResult(
+        result,
+        true,
+        iaMetadataReportResults,
+      );
       resultsCreated.push(newResult);
     }
+    iaMetadataReport.bulkUploadResults = iaMetadataReportResults;
+    await this._aiReportsService.create(iaMetadataReport);
     return {
       results_errors: resultsCreated.filter((el) => (el as any).error),
       results_created: resultsCreated.filter((el) => !(el as any).error),

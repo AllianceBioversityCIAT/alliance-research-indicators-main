@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   PrmsKnowledgeProductDto,
   PrmsTemporalResponseMapper,
+  ResultResponseMapper,
   SearcherResponseDto,
 } from './dto/prms-response.dto';
 import { HttpService } from '@nestjs/axios';
@@ -43,8 +44,9 @@ import { CounterResults } from '../../tip-integration/dto/response-year-tip.dto'
 import { SyncProcessLogService } from '../../../entities/sync-process-log/sync-process-log.service';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
-import { PrmsTemporalResultsEntity } from './entities/prms-temporal-results.entity';
+import { SyncStagingRecordsEntity } from './entities/sync-staging-records.entity';
 import { PrmsRepository } from './repositories/prms.repository';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -153,15 +155,16 @@ export class PrmsOpenSearchService
           `Successfully processed result ${findResult.result_id} from TIP.`,
         );
       } catch (error) {
+        const errorMessage = (error as Error).message ?? 'Unknown error';
         if (createNewResult) {
           this.logger.error(
-            `Error processing result ${createNewResult.result_id}, rolling back. Error: ${error.message}`,
+            `Error processing result ${createNewResult.result_id}, rolling back. Error: ${errorMessage}`,
           );
           await this._queryService.deleteFullResultById(
             createNewResult.result_id,
           );
         }
-        this.logger.error(`Error processing tip result: ${error.message}`);
+        this.logger.error(`Error processing tip result: ${errorMessage}`);
       }
       this._currentUser.clearSystemUser();
       this.logger.debug(
@@ -175,6 +178,7 @@ export class PrmsOpenSearchService
     const size = 50;
     let page = 1;
     let keepGoing = true;
+    const executionCode = uuidv4();
     const currentCode: { current: number } = { current: null };
     const resultSaved: number[] = [];
     const counters: CounterResults = {
@@ -197,8 +201,9 @@ export class PrmsOpenSearchService
         ).then((response) => response.data);
         response.data.forEach(async (item) => {
           await this.dataSource
-            .getRepository(PrmsTemporalResultsEntity)
+            .getRepository(SyncStagingRecordsEntity)
             .save({
+              execution_code: executionCode,
               code: parseInt(item.result_code),
               year: parseInt(item.year),
               data: item,
@@ -216,7 +221,10 @@ export class PrmsOpenSearchService
 
         page++;
       }
-      const prmsResults = await this.prmsRepository.findTemporalResults();
+      const prmsResults =
+        await this.prmsRepository.findTemporalResults<ResultResponseMapper>(
+          executionCode,
+        );
 
       const dataProcessed = await this.processData(prmsResults);
 
@@ -225,13 +233,15 @@ export class PrmsOpenSearchService
         resultSaved,
         currentCode,
         counters,
+        statusMapper: ResultPrmsStatusMapper,
       });
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
-      this.logger.error(`Error getting data from PRMS: ${error.message}`);
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(`Error getting data from PRMS: ${errorMessage}`);
     } finally {
-      await this.prmsRepository.deleteTemporalResults();
+      await this.prmsRepository.deleteTemporalResults(executionCode);
     }
   }
 
@@ -284,6 +294,7 @@ export class PrmsOpenSearchService
   ): Promise<ExternalMappersDto[]> {
     const results: ExternalMappersDto[] = [];
     for (const data of prmsData) {
+      if (isEmpty(data?.data)) continue;
       const isVersion = data.is_version ?? false;
       const item = data.data;
       const indicator = IndicatorHomologation[item.indicator_category.code];

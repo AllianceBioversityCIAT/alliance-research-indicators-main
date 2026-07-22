@@ -114,7 +114,6 @@ export class ResultOicrService {
         {
           leverEnum: LeverRolesEnum.ALIGNMENT,
           result_status_id: ResultStatusEnum.REQUESTED,
-          notMap: { lever: true },
         },
       );
       const lever = await this.resultLeversService.find(
@@ -404,6 +403,7 @@ export class ResultOicrService {
       (lever) => ({
         lever_id: lever?.lever_id,
         is_primary: true,
+        custom_lever_name: lever?.custom_lever_name,
       }),
     );
 
@@ -411,6 +411,7 @@ export class ResultOicrService {
       data.contributor_lever.map((lever) => ({
         lever_id: lever?.lever_id,
         is_primary: false,
+        custom_lever_name: lever?.custom_lever_name,
       }));
 
     const allLevers = [...savePrimaryLevers, ...saveContributorLevers];
@@ -427,7 +428,7 @@ export class ResultOicrService {
       'lever_id',
       LeverRolesEnum.ALIGNMENT,
       manager,
-      ['is_primary'],
+      ['is_primary', 'custom_lever_name'],
     );
   }
 

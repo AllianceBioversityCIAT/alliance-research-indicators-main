@@ -46,6 +46,9 @@ import { ResultKnowledgeProduct } from '../../result-knowledge-product/entities/
 import { ResultPoolFundingAlignment } from '../../bilateral/entities/result-pool-funding-alignment.entity';
 import { ResultPoolFundingIndicatorMapping } from '../../bilateral/entities/result-pool-funding-indicator-mapping.entity';
 import { ResultReviewHistory } from '../../result-review-history/entities/result-review-history.entity';
+import { ResultImpactOutcome } from '../../result-impact-outcomes/entities/result-impact-outcome.entity';
+import { ResultStrategicObjective } from '../../result-strategic-objectives/entities/result-strategic-objective.entity';
+import { BulkUploadResults } from '../../ai-reports/entities/bulk-upload-results.entity';
 
 @Entity('results')
 @Index('idx_results_snapshot_active_report_year', [
@@ -381,4 +384,22 @@ export class Result extends AuditableEntity {
 
   @OneToMany(() => ResultReviewHistory, (history) => history.result)
   review_history?: ResultReviewHistory[];
+
+  @OneToMany(
+    () => ResultImpactOutcome,
+    (resultImpactOutcome) => resultImpactOutcome.result,
+  )
+  resultImpactOutcomes?: ResultImpactOutcome[];
+
+  @OneToMany(
+    () => ResultStrategicObjective,
+    (resultStrategicObjective) => resultStrategicObjective.result,
+  )
+  resultStrategicObjectives?: ResultStrategicObjective[];
+
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResult) => bulkUploadResult.result,
+  )
+  bulkUploadResults?: BulkUploadResults[];
 }

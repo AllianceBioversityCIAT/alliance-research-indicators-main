@@ -1,0 +1,64 @@
+{
+  "delivery_modality_id": 3,
+  "end_date": "2026-05-22T05:00:00.000Z",
+  "session_format_id": 1,
+  "session_type_id": 1,
+  "start_date": "2026-05-14T05:00:00.000Z",
+  "degree_id": 4,
+  "session_length_id": 2,
+  "individual": {
+    "gender_id": 3,
+    "trainee_name": "test",
+    "affiliation": {
+      "is_active": true,
+      "result_institution_id": 13006,
+      "result_id": 17898,
+      "institution_id": 1,
+      "institution_role_id": 1
+    },
+    "nationality": {
+      "is_active": true,
+      "result_country_id": 3427,
+      "result_id": 17898,
+      "isoAlpha2": "AL",
+      "country_role_id": 1
+    }
+  },
+  "training_supervisor": {
+    "is_active": true,
+    "result_user_id": 7789,
+    "result_id": 17898,
+    "user_id": "01906",
+    "user_role_id": 2,
+    "user": {
+      "is_active": true,
+      "carnet": "01906",
+      "first_name": "FERNANDO",
+      "last_name": "ARANGO SUELTO",
+      "email": "f.arango@cgiar.org",
+      "center": "CIAT"
+    }
+  },
+  "training_supervisor_languages": {
+    "is_active": true,
+    "result_language_id": 1333,
+    "result_id": 17898,
+    "language_id": 2,
+    "language_role_id": 1,
+    "language": {
+      "is_active": true,
+      "id": 2,
+      "name": "Afrikaans",
+      "iso_alpha_2": "af",
+      "iso_alpha_3": "afr"
+    }
+  },
+  "session_format_label": "Individual training",
+  "session_type_label": "Training",
+  "session_length_label": "Long-term (3 months and more)",
+  "degree_label": "Other",
+  "delivery_modality_label": "Hybrid",
+  "affiliation_label": "International Center for Tropical Agriculture (CIAT)",
+  "nationality_label": "Albania",
+  "gender_label": "Non-binary"
+}

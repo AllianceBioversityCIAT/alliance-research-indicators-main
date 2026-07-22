@@ -1,0 +1,249 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+export class UpdateAlignmentValidation1783021729548
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS \`alignment_validation\`;`,
+    );
+    await queryRunner.query(`CREATE FUNCTION \`alignment_validation\`(result_code BIGINT) RETURNS tinyint(1)
+    READS SQL DATA
+begin
+                declare temp_contract boolean default true;
+                declare temp_lever boolean default true;
+                declare temp_lever_outcome boolean default true;
+                declare count_lever int default null;
+                declare result_indicator bigint default null;
+				declare portfolio_id bigint default null;
+    
+                select 
+                    r.indicator_id,
+                    get_portfolio_id_by_result(r.result_id)
+                    into
+                    result_indicator,
+                    portfolio_id
+                from results r 
+                where r.result_id = result_code;
+                
+                select 
+                    if(count(rc.contract_id) > 0, true, false)
+                    into
+                    temp_contract
+                from result_contracts rc 
+                where rc.is_active = true 
+                    and rc.is_primary = true 
+                    and rc.contract_role_id = 1
+                    and rc.result_id = result_code
+                    and rc.contract_id is not null
+                limit 1;
+                
+                select 
+                    if(count(rl.lever_id) > 0, true, false),
+                    count(rl.lever_id)
+                    into 
+                    temp_lever,
+                    count_lever
+                from result_levers rl 
+                where rl.is_active = true 
+                    and rl.is_primary = true 
+                    and rl.lever_role_id = CASE 
+	                    						WHEN portfolio_id = 1 THEN 1
+	                    						WHEN portfolio_id = 2 THEN 3
+	                    						ELSE NULL
+	                    					END
+                    and rl.result_id = result_code
+                    and rl.lever_id is not null
+                limit 1;
+                
+                if (portfolio_id = 1) then 
+                
+                	select 
+	                    IF(COUNT(rl.result_id) > 0, COUNT(rl.lever_id ) = SUM(valid_text(rl.custom_lever_name)), TRUE) and temp_lever
+	                    into 
+	                    temp_lever
+	                from result_levers rl 
+	                where rl.is_active = true 
+	                    and rl.lever_role_id = 1
+	                    and rl.result_id = result_code
+	                    and rl.lever_id = 9
+	                limit 1;
+                	
+                	if result_indicator = 5 then
+                
+	                    SELECT 
+	                        COUNT(DISTINCT rlst.result_lever_id ) = count_lever 
+	                        INTO
+	                        temp_lever_outcome
+	                    FROM result_lever_sdg_targets rlst  
+	                        INNER JOIN result_levers rl ON rl.result_lever_id = rlst.result_lever_id 
+	                                                    AND rl.is_active = TRUE
+	                                                    AND rl.is_primary = TRUE
+	                    WHERE rl.result_id = result_code
+	                        AND rlst.is_active = TRUE
+	                    LIMIT 1;
+	                
+	                    SELECT 
+	                        COUNT(DISTINCT rlso.result_lever_id) = count_lever AND temp_lever_outcome
+	                        INTO
+	                        temp_lever_outcome
+	                    FROM result_lever_strategic_outcome rlso 
+	                        INNER JOIN result_levers rl ON rl.result_lever_id = rlso.result_lever_id 
+	                                                    AND rl.is_active = TRUE
+	                                                    AND rl.is_primary = TRUE
+	                    WHERE rl.result_id = result_code
+	                        AND rlso.is_active = TRUE
+	                    LIMIT 1;
+	                
+	                END IF;
+                	
+	            elseif (portfolio_id = 2) then
+	            
+	            	select
+						if(count(rso.strategic_objective_id) > 0, true, false) and temp_lever
+						into
+						temp_lever
+					from result_strategic_objectives rso 
+					where rso.is_active 
+						and rso.role_id = 1
+						and rso.result_id = result_code;
+	            	
+	            	if result_indicator = 5 then
+	            	
+		            	select
+							if(count(rio.impact_outcome_id ) > 0, true, false) and temp_lever
+							into
+							temp_lever
+						from result_impact_outcomes rio 
+						where rio.is_active 
+							and rio.role_id = 1
+							and rio.result_id = result_code;
+		            	
+	            	end if;
+	           
+                end if;
+                
+
+                if result_indicator <> 5 then
+            
+                    select
+                        COUNT(rs.result_sdg_id) > 0 and temp_lever
+                        into
+                        temp_lever
+                    from result_sdgs rs 
+                    where rs.result_id = result_code
+                        and rs.is_active = TRUE
+                        and rs.clarisa_sdg_id is not null;
+                
+                end if;
+                
+                
+                
+                return temp_contract and temp_lever_outcome and temp_lever;
+                
+            end`);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS \`alignment_validation\`;`,
+    );
+    await queryRunner.query(`CREATE FUNCTION \`alignment_validation\`(result_code BIGINT) RETURNS tinyint(1)
+    READS SQL DATA
+begin
+                declare temp_contract boolean default null;
+                declare temp_lever boolean default true;
+                declare temp_lever_outcome boolean default true;
+                declare count_lever int default null;
+                declare result_indicator bigint default null;
+    
+                select 
+                    r.indicator_id
+                    into
+                    result_indicator
+                from results r 
+                where r.result_id = result_code;
+                
+                select 
+                    if(count(rc.contract_id) > 0, true, false)
+                    into
+                    temp_contract
+                from result_contracts rc 
+                where rc.is_active = true 
+                    and rc.is_primary = true 
+                    and rc.contract_role_id = 1
+                    and rc.result_id = result_code
+                    and rc.contract_id is not null
+                limit 1;
+                
+                select 
+                    if(count(rl.lever_id) > 0, true, false),
+                    count(rl.lever_id)
+                    into 
+                    temp_lever,
+                    count_lever
+                from result_levers rl 
+                where rl.is_active = true 
+                    and rl.is_primary = true 
+                    and rl.lever_role_id = 1
+                    and rl.result_id = result_code
+                    and rl.lever_id is not null
+                limit 1;
+                
+                select 
+                    IF(COUNT(rl.result_id) > 0, COUNT(rl.lever_id ) = SUM(valid_text(rl.custom_lever_name)), TRUE) and temp_lever
+                    into 
+                    temp_lever
+                from result_levers rl 
+                where rl.is_active = true 
+                    and rl.lever_role_id = 1
+                    and rl.result_id = result_code
+                    and rl.lever_id = 9
+                limit 1;
+
+                if result_indicator <> 5 then
+            
+                    select
+                        COUNT(rs.result_sdg_id) > 0 and temp_lever
+                        into
+                        temp_lever
+                    from result_sdgs rs 
+                    where rs.result_id = result_code
+                        and rs.is_active = TRUE
+                        and rs.clarisa_sdg_id is not null;
+                
+                end if;
+                
+                if result_indicator = 5 then
+                
+                    SELECT 
+                        COUNT(DISTINCT rlst.result_lever_id ) = count_lever 
+                        INTO
+                        temp_lever_outcome
+                    FROM result_lever_sdg_targets rlst  
+                        INNER JOIN result_levers rl ON rl.result_lever_id = rlst.result_lever_id 
+                                                    AND rl.is_active = TRUE
+                                                    AND rl.is_primary = TRUE
+                    WHERE rl.result_id = result_code
+                        AND rlst.is_active = TRUE
+                    LIMIT 1;
+                
+                    SELECT 
+                        COUNT(DISTINCT rlso.result_lever_id) = count_lever AND temp_lever_outcome
+                        INTO
+                        temp_lever_outcome
+                    FROM result_lever_strategic_outcome rlso 
+                        INNER JOIN result_levers rl ON rl.result_lever_id = rlso.result_lever_id 
+                                                    AND rl.is_active = TRUE
+                                                    AND rl.is_primary = TRUE
+                    WHERE rl.result_id = result_code
+                        AND rlso.is_active = TRUE
+                    LIMIT 1;
+                
+                END IF;
+                
+                return temp_contract and temp_lever_outcome and temp_lever;
+                
+            end`);
+  }
+}
