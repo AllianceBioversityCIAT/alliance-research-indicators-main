@@ -651,7 +651,7 @@ describe('AgressoContractController', () => {
             type: Boolean,
           }),
         ]),
-      )
+      );
     });
 
     it('should exclude pooled funding contracts when flag is true', async () => {
@@ -774,31 +774,31 @@ describe('AgressoContractController', () => {
         ]),
       );
     });
+  });
 
-    describe('getFundingTypes', () => {
-      it('should return all funding types', async () => {
-        const mockFundingTypes = [
-          { funding_type: 'BILATERAL' },
-          { funding_type: 'MULTILATERAL' },
-        ];
+  describe('getFundingTypes', () => {
+    it('should return all funding types', async () => {
+      const mockFundingTypes = [
+        { funding_type: 'BILATERAL' },
+        { funding_type: 'MULTILATERAL' },
+      ];
 
-        mockAgressoContractService.getFundingTypes.mockResolvedValue(
-          mockFundingTypes,
-        );
+      mockAgressoContractService.getFundingTypes.mockResolvedValue(
+        mockFundingTypes,
+      );
 
-        const result = await controller.getFundingTypes();
+      const result = await controller.getFundingTypes();
 
-        expect(service.getFundingTypes).toHaveBeenCalled();
-        expect(ResponseUtils.format).toHaveBeenCalledWith({
-          description: 'Funding types found',
-          status: HttpStatus.OK,
-          data: mockFundingTypes,
-        });
-        expect(result).toEqual({
-          description: 'Funding types found',
-          status: HttpStatus.OK,
-          data: mockFundingTypes,
-        });
+      expect(service.getFundingTypes).toHaveBeenCalled();
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Funding types found',
+        status: HttpStatus.OK,
+        data: mockFundingTypes,
+      });
+      expect(result).toEqual({
+        description: 'Funding types found',
+        status: HttpStatus.OK,
+        data: mockFundingTypes,
       });
     });
   });
