@@ -24,6 +24,9 @@ import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 import { PrmsRepository } from './repositories/prms.repository';
 import { SyncStagingRecordsEntity } from './entities/sync-staging-records.entity';
+import { ClarisaCountriesService } from '../../clarisa/entities/clarisa-countries/clarisa-countries.service';
+import { ClarisaRegionsService } from '../../clarisa/entities/clarisa-regions/clarisa-regions.service';
+import { ClarisaInstitutionsService } from '../../clarisa/entities/clarisa-institutions/clarisa-institutions.service';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual('typeorm');
@@ -47,6 +50,9 @@ describe('PrmsOpenSearchService', () => {
   let syncProcessLogService: jest.Mocked<SyncProcessLogService>;
   let saveResultService: jest.Mocked<SaveResultService>;
   let prmsRepository: jest.Mocked<PrmsRepository>;
+  let clarisaCountriesService: jest.Mocked<ClarisaCountriesService>;
+  let clarisaRegionsService: jest.Mocked<ClarisaRegionsService>;
+  let clarisaInstitutionsService: jest.Mocked<ClarisaInstitutionsService>;
   let temporalRepoHandle: { save: jest.Mock };
 
   const buildResultMapper = (
@@ -219,6 +225,24 @@ describe('PrmsOpenSearchService', () => {
             deleteTemporalResults: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: ClarisaCountriesService,
+          useValue: {
+            findByIso2: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ClarisaRegionsService,
+          useValue: {
+            findByUm49Codes: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ClarisaInstitutionsService,
+          useValue: {
+            findByCodes: jest.fn().mockResolvedValue([]),
+          },
+        },
       ],
     }).compile();
 
@@ -232,6 +256,9 @@ describe('PrmsOpenSearchService', () => {
     syncProcessLogService = module.get(SyncProcessLogService);
     saveResultService = module.get(SaveResultService);
     prmsRepository = module.get(PrmsRepository);
+    clarisaCountriesService = module.get(ClarisaCountriesService);
+    clarisaRegionsService = module.get(ClarisaRegionsService);
+    clarisaInstitutionsService = module.get(ClarisaInstitutionsService);
   });
 
   afterEach(() => {
@@ -481,6 +508,100 @@ describe('PrmsOpenSearchService', () => {
       expect(out[0].alignments.contracts).toEqual([]);
       expect(out[0].createResult.contract_id).toBe('');
     });
+
+    it('should map an empty geoScope and partners when PRMS sends no geo or partner data', async () => {
+      const out = await service.processData([buildTemporalMapper()]);
+      expect(clarisaCountriesService.findByIso2).not.toHaveBeenCalled();
+      expect(clarisaRegionsService.findByUm49Codes).not.toHaveBeenCalled();
+      expect(clarisaInstitutionsService.findByCodes).not.toHaveBeenCalled();
+      expect(out[0].geoScope.countries).toEqual([]);
+      expect(out[0].geoScope.regions).toEqual([]);
+      expect(out[0].partners.institutions).toEqual([]);
+    });
+
+    it('should map geoScope from PRMS geographic_focus, regions and countries', async () => {
+      clarisaCountriesService.findByIso2.mockResolvedValueOnce([
+        { isoAlpha2: 'AX' } as any,
+        { isoAlpha2: 'AF' } as any,
+      ]);
+      clarisaRegionsService.findByUm49Codes.mockResolvedValueOnce([
+        { um49Code: 150 } as any,
+      ]);
+
+      const out = await service.processData([
+        buildTemporalMapper({
+          geographic_focus: { code: '3', description: 'Multi-national' },
+          regions: [{ code: '150', name: 'Europe' }],
+          countries: [
+            { code: 'AX', name: 'Aland Islands' },
+            { code: 'AF', name: 'Afghanistan' },
+          ],
+        }),
+      ]);
+
+      expect(clarisaCountriesService.findByIso2).toHaveBeenCalledWith([
+        'AX',
+        'AF',
+      ]);
+      expect(clarisaRegionsService.findByUm49Codes).toHaveBeenCalledWith([150]);
+      expect(out[0].geoScope.geo_scope_id).toBe(3);
+      expect(out[0].geoScope.countries).toEqual([
+        { isoAlpha2: 'AX' },
+        { isoAlpha2: 'AF' },
+      ]);
+      expect(out[0].geoScope.regions).toEqual([{ region_id: 150 }]);
+    });
+
+    it('should map partners from PRMS contributing_partners via Clarisa institution codes', async () => {
+      clarisaInstitutionsService.findByCodes.mockResolvedValueOnce([
+        { code: 1 } as any,
+        { code: 70 } as any,
+      ]);
+
+      const out = await service.processData([
+        buildTemporalMapper({
+          contributing_partners: [
+            { code: '1', name: 'WUR', acronym: 'WUR' },
+            { code: '70', name: 'ULBS', acronym: 'ULBS' },
+          ],
+        }),
+      ]);
+
+      expect(clarisaInstitutionsService.findByCodes).toHaveBeenCalledWith([
+        1, 70,
+      ]);
+      expect(out[0].partners.institutions).toEqual([
+        { institution_id: 1 },
+        { institution_id: 70 },
+      ]);
+    });
+
+    it('should map an empty evidence list when PRMS sends no evidences', async () => {
+      const out = await service.processData([buildTemporalMapper()]);
+      expect(out[0].evidence.evidence).toEqual([]);
+    });
+
+    it('should map evidence from PRMS evidences', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          evidences: [{ link: 'link.com', description: 'gender 1' }],
+        }),
+      ]);
+
+      expect(out[0].evidence.evidence).toEqual([
+        { evidence_url: 'link.com', evidence_description: 'gender 1' },
+      ]);
+    });
+
+    it('should skip evidences without a link', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          evidences: [{ link: '', description: 'no link' }],
+        }),
+      ]);
+
+      expect(out[0].evidence.evidence).toEqual([]);
+    });
   });
 
   describe('processKnowledgeProduct (private)', () => {
@@ -517,6 +638,32 @@ describe('PrmsOpenSearchService', () => {
       (service as any).processKnowledgeProduct(kpList, body);
 
       expect(body.evidence.evidence.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('does not duplicate an evidence entry whose url already exists', () => {
+      const body = new ExternalMappersDto();
+      body.evidence = {
+        evidence: [
+          { evidence_url: 'http://handle', evidence_description: 'gender 1' },
+        ] as any,
+      } as any;
+      const kp = {
+        knowledge_product_type: 'JOURNAL',
+        handle: 'http://handle',
+        doi: '10.1000/xyz',
+      } as PrmsKnowledgeProductDto;
+
+      (service as any).processKnowledgeProduct(kp, body);
+
+      expect(body.evidence.evidence).toHaveLength(2);
+      expect(
+        body.evidence.evidence.filter(
+          (el) => el.evidence_url === 'http://handle',
+        ),
+      ).toHaveLength(1);
+      expect(
+        body.evidence.evidence.find((el) => el.evidence_url === '10.1000/xyz'),
+      ).toBeDefined();
     });
   });
 

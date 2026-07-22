@@ -7,12 +7,15 @@ import { ResultKnowledgeProductModule } from '../../../entities/result-knowledge
 import { PooledFundingContractsModule } from '../../../entities/pooled-funding-contracts/pooled-funding-contracts.module';
 import { ClarisaLeversModule } from '../../clarisa/entities/clarisa-levers/clarisa-levers.module';
 import { SyncProcessLogModule } from '../../../entities/sync-process-log/sync-process-log.module';
-import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 import { PrmsRepository } from './repositories/prms.repository';
+import { ClarisaCountriesModule } from '../../clarisa/entities/clarisa-countries/clarisa-countries.module';
+import { ClarisaRegionsModule } from '../../clarisa/entities/clarisa-regions/clarisa-regions.module';
+import { ClarisaInstitutionsModule } from '../../clarisa/entities/clarisa-institutions/clarisa-institutions.module';
+import { SaveAllSectionsModule } from '../../../shared/services/save-all-sections.module';
 
 @Module({
   controllers: [PrmsOpenSearchController],
-  providers: [PrmsOpenSearchService, SaveResultService, PrmsRepository],
+  providers: [PrmsOpenSearchService, PrmsRepository],
   exports: [PrmsOpenSearchService, PrmsRepository],
   imports: [
     HttpModule,
@@ -21,6 +24,10 @@ import { PrmsRepository } from './repositories/prms.repository';
     PooledFundingContractsModule,
     ClarisaLeversModule,
     SyncProcessLogModule,
+    ClarisaCountriesModule,
+    ClarisaRegionsModule,
+    ClarisaInstitutionsModule,
+    SaveAllSectionsModule,
   ],
 })
 export class PrmsOpenSearchModule {}

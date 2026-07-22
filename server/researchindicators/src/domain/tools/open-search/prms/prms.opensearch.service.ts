@@ -47,6 +47,16 @@ import { SaveResultService } from '../../../shared/services/save-all-sections.se
 import { SyncStagingRecordsEntity } from './entities/sync-staging-records.entity';
 import { PrmsRepository } from './repositories/prms.repository';
 import { v4 as uuidv4 } from 'uuid';
+import { ClarisaCountriesService } from '../../clarisa/entities/clarisa-countries/clarisa-countries.service';
+import { ClarisaRegionsService } from '../../clarisa/entities/clarisa-regions/clarisa-regions.service';
+import { ClarisaInstitutionsService } from '../../clarisa/entities/clarisa-institutions/clarisa-institutions.service';
+import { ClarisaGeoScopeEnum } from '../../clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { ResultCountry } from '../../../entities/result-countries/entities/result-country.entity';
+import { ResultRegion } from '../../../entities/result-regions/entities/result-region.entity';
+import { ResultInstitution } from '../../../entities/result-institutions/entities/result-institution.entity';
+import { SaveGeoLocationDto } from '../../../entities/results/dto/save-geo-location.dto';
+import { CreateResultInstitutionDto } from '../../../entities/result-institutions/dto/create-result-institution.dto';
+import { CreateResultEvidenceDto } from '../../../entities/result-evidences/dto/create-result-evidence.dto';
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -69,6 +79,9 @@ export class PrmsOpenSearchService
     private readonly syncProcessLogService: SyncProcessLogService,
     private readonly saveResultService: SaveResultService,
     private readonly prmsRepository: PrmsRepository,
+    private readonly clarisaCountriesService: ClarisaCountriesService,
+    private readonly clarisaRegionsService: ClarisaRegionsService,
+    private readonly clarisaInstitutionsService: ClarisaInstitutionsService,
   ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
@@ -281,11 +294,84 @@ export class PrmsOpenSearchService
     const tempEvidence = body?.evidence?.evidence
       ? [...body.evidence.evidence]
       : [];
-    tempEvidence.push(...(evidence as ResultEvidence[]));
+    const existingEvidenceUrls = new Set(
+      tempEvidence.map((el) => el.evidence_url),
+    );
+    const newEvidence = evidence.filter(
+      (el) => !existingEvidenceUrls.has(el.evidence_url),
+    );
+    tempEvidence.push(...(newEvidence as ResultEvidence[]));
 
     body.evidence = {
       ...body.evidence,
       evidence: tempEvidence as ResultEvidence[],
+    };
+  }
+
+  private mapEvidence(item: ResultResponseMapper): CreateResultEvidenceDto {
+    const evidence = (item?.evidences ?? [])
+      .filter((el) => !isEmpty(el?.link))
+      .map(
+        (el) =>
+          ({
+            evidence_url: el.link,
+            evidence_description: el.description ?? 'Not Provided by PRMS',
+          }) as ResultEvidence,
+      );
+
+    return { evidence } as CreateResultEvidenceDto;
+  }
+
+  private async mapGeoScope(
+    item: ResultResponseMapper,
+  ): Promise<SaveGeoLocationDto> {
+    const countryCodes = (item?.countries ?? []).map((country) => country.code);
+    const regionCodes = (item?.regions ?? []).map((region) =>
+      parseInt(region.code),
+    );
+
+    const [countries, regions] = await Promise.all([
+      isEmpty(countryCodes)
+        ? Promise.resolve([])
+        : this.clarisaCountriesService.findByIso2(countryCodes),
+      isEmpty(regionCodes)
+        ? Promise.resolve([])
+        : this.clarisaRegionsService.findByUm49Codes(regionCodes),
+    ]);
+
+    return {
+      geo_scope_id: parseInt(
+        item?.geographic_focus?.code,
+      ) as ClarisaGeoScopeEnum,
+      countries: countries.map(
+        (country) => ({ isoAlpha2: country.isoAlpha2 }) as ResultCountry,
+      ),
+      regions: regions.map(
+        (region) => ({ region_id: region.um49Code }) as ResultRegion,
+      ),
+      comment_geo_scope: null,
+    };
+  }
+
+  private async mapPartners(
+    item: ResultResponseMapper,
+  ): Promise<CreateResultInstitutionDto> {
+    const partnerCodes = (item?.contributing_partners ?? []).map((partner) =>
+      parseInt(partner.code),
+    );
+
+    if (isEmpty(partnerCodes)) {
+      return { institutions: [] };
+    }
+
+    const institutions =
+      await this.clarisaInstitutionsService.findByCodes(partnerCodes);
+
+    return {
+      institutions: institutions.map(
+        (institution) =>
+          ({ institution_id: institution.code }) as ResultInstitution,
+      ),
     };
   }
 
@@ -424,6 +510,10 @@ export class PrmsOpenSearchService
         main_contact_person_ai: null,
         year: parseInt(item.year),
       };
+
+      result.geoScope = await this.mapGeoScope(item);
+      result.partners = await this.mapPartners(item);
+      result.evidence = this.mapEvidence(item);
 
       results.push(result);
     }
