@@ -203,6 +203,42 @@ export class ResultResponseMapper {
   public evidences: EvidencesMapper[];
   public primary_entity: PrimaryEntityMapper;
   public created_by: CreatedByMapper;
+  public policy_change_summary: PolicyChangeSummaryMapper;
+}
+
+export class PolicyChangeSummaryMapper {
+  public amount: number;
+  public amount_status_label: string;
+  public policy_type: PolicyTypeMapper;
+  public policy_stage: PolicyStageMapper;
+  public linked_innovation_dev: boolean;
+  public linked_innovation_use: boolean;
+  public result_related_to: ResultRelatedToMapper[];
+  public policy_implementing_organizations: PolicyImplementingOrganizationsMapper[];
+}
+
+export class ResultRelatedToMapper {
+  public parent_question: string;
+  public option_text: string;
+}
+
+export class PolicyImplementingOrganizationsMapper {
+  public id: number;
+  public name: string;
+  public acronym: string;
+  public institution_type_name: string;
+}
+
+export class PolicyTypeMapper {
+  public id: number;
+  public name: string;
+  public definition: string;
+}
+
+export class PolicyStageMapper {
+  public id: number;
+  public name: string;
+  public definition: string;
 }
 
 export class PrmsTemporalResponseMapper {

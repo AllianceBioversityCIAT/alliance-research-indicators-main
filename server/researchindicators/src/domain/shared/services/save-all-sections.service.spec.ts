@@ -18,6 +18,7 @@ import {
   CounterResultsEnum,
 } from '../../tools/tip-integration/dto/response-year-tip.dto';
 import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
+import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
@@ -35,6 +36,9 @@ describe('SaveResultService', () => {
   >;
   let resultEvidencesService: jest.Mocked<
     Pick<ResultEvidencesService, 'updateResultEvidences'>
+  >;
+  let resultPolicyChangeService: jest.Mocked<
+    Pick<ResultPolicyChangeService, 'update'>
   >;
   let queryService: jest.Mocked<QueryService>;
   let currentUser: jest.Mocked<CurrentUserUtil>;
@@ -164,6 +168,12 @@ describe('SaveResultService', () => {
             updateResultEvidences: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: ResultPolicyChangeService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -172,6 +182,7 @@ describe('SaveResultService', () => {
     knowledgeProductService = module.get(ResultKnowledgeProductService);
     resultInstitutionsService = module.get(ResultInstitutionsService);
     resultEvidencesService = module.get(ResultEvidencesService);
+    resultPolicyChangeService = module.get(ResultPolicyChangeService);
     queryService = module.get(QueryService);
     currentUser = module.get(CurrentUserUtil);
     resultsUtil = module.get(ResultsUtil);
@@ -555,6 +566,44 @@ describe('SaveResultService', () => {
 
       expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(61);
       expect(resultsUtil.clearManually).toHaveBeenCalled();
+    });
+
+    it('should save policy change section when indicator is POLICY_CHANGE', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 70,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
+      dto.policyChange = {
+        policy_type_id: 1,
+        policy_stage_id: 6,
+        evidence_stage: undefined,
+        implementing_organization: [{ institution_id: 8064 }] as any,
+        innovation_development: undefined,
+        innovation_use: undefined,
+      };
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultPolicyChangeService.update).toHaveBeenCalledWith(
+        70,
+        dto.policyChange,
+      );
+    });
+
+    it('should not save policy change section when policyChange payload is empty', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 71,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
+      dto.policyChange = undefined;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultPolicyChangeService.update).not.toHaveBeenCalled();
     });
 
     it('should merge STAR primary levers before updating alignment', async () => {

@@ -86,6 +86,7 @@ describe('PrmsOpenSearchService', () => {
       evidences: [],
       primary_entity: { official_code: 'PFUND', name: 'Entity' },
       created_by: undefined,
+      policy_change_summary: null,
     };
     return Object.assign(base, overrides);
   };
@@ -601,6 +602,136 @@ describe('PrmsOpenSearchService', () => {
       ]);
 
       expect(out[0].evidence.evidence).toEqual([]);
+    });
+
+    it('should map policy_change_summary for POLICY_CHANGE indicators', async () => {
+      clarisaInstitutionsService.findByCodes.mockResolvedValueOnce([
+        { code: 8064 } as any,
+        { code: 2714 } as any,
+      ]);
+
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.POLICY_CHANGE),
+            name: 'Policy Change',
+          },
+          policy_change_summary: {
+            amount: 500000,
+            amount_status_label: 'Estimated',
+            policy_type: {
+              id: 1,
+              name: 'Program, budget or investment',
+              definition: 'def',
+            },
+            policy_stage: {
+              id: 6,
+              name: 'Stage 1',
+              definition: 'def',
+            },
+            linked_innovation_dev: false,
+            linked_innovation_use: false,
+            result_related_to: [],
+            policy_implementing_organizations: [
+              {
+                id: 8064,
+                name: 'Papalotla - Grupo Nandi',
+                acronym: null,
+                institution_type_name: 'Private company',
+              },
+              {
+                id: 2714,
+                name: 'Semillas Papalotla SA de DV',
+                acronym: 'Papalotla',
+                institution_type_name: 'Private company',
+              },
+            ],
+          },
+        }),
+      ]);
+
+      expect(clarisaInstitutionsService.findByCodes).toHaveBeenCalledWith([
+        8064, 2714,
+      ]);
+      // PRMS policy_type 1 (Program…) → STAR policy_type_id 3
+      expect(out[0].policyChange).toEqual({
+        policy_type_id: 3,
+        policy_stage_id: 6,
+        evidence_stage: undefined,
+        implementing_organization: [
+          { institution_id: 8064 },
+          { institution_id: 2714 },
+        ],
+        innovation_development: undefined,
+        innovation_use: undefined,
+      });
+    });
+
+    it('should homologate PRMS policy_type ids to STAR policy_type_id', async () => {
+      const cases = [
+        { prmsId: 1, starId: 3 },
+        { prmsId: 2, starId: 2 },
+        { prmsId: 3, starId: 1 },
+      ];
+
+      for (const { prmsId, starId } of cases) {
+        const out = await service.processData([
+          buildTemporalMapper({
+            indicator_category: {
+              code: String(ResultTypeEnum.POLICY_CHANGE),
+              name: 'Policy Change',
+            },
+            policy_change_summary: {
+              amount: 0,
+              amount_status_label: '',
+              policy_type: { id: prmsId, name: '', definition: '' },
+              policy_stage: { id: 6, name: '', definition: '' },
+              linked_innovation_dev: false,
+              linked_innovation_use: false,
+              result_related_to: [],
+              policy_implementing_organizations: [],
+            },
+          }),
+        ]);
+
+        expect(out[0].policyChange.policy_type_id).toBe(starId);
+      }
+    });
+
+    it('should leave policyChange undefined when policy_change_summary is null', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.POLICY_CHANGE),
+            name: 'Policy Change',
+          },
+          policy_change_summary: null,
+        }),
+      ]);
+
+      expect(out[0].policyChange).toBeUndefined();
+      expect(clarisaInstitutionsService.findByCodes).not.toHaveBeenCalled();
+    });
+
+    it('should not map policyChange for non policy-change indicators', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          policy_change_summary: {
+            amount: 1,
+            amount_status_label: 'Estimated',
+            policy_type: { id: 1, name: 't', definition: 'd' },
+            policy_stage: { id: 6, name: 's', definition: 'd' },
+            linked_innovation_dev: false,
+            linked_innovation_use: false,
+            result_related_to: [],
+            policy_implementing_organizations: [
+              { id: 1, name: 'a', acronym: null, institution_type_name: 'x' },
+            ],
+          },
+        }),
+      ]);
+
+      expect(out[0].policyChange).toBeUndefined();
     });
   });
 

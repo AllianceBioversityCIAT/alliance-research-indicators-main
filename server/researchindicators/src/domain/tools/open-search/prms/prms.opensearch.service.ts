@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   PrmsKnowledgeProductDto,
   PrmsTemporalResponseMapper,
+  PolicyChangeSummaryMapper,
   ResultResponseMapper,
   SearcherResponseDto,
 } from './dto/prms-response.dto';
@@ -57,6 +58,9 @@ import { ResultInstitution } from '../../../entities/result-institutions/entitie
 import { SaveGeoLocationDto } from '../../../entities/results/dto/save-geo-location.dto';
 import { CreateResultInstitutionDto } from '../../../entities/result-institutions/dto/create-result-institution.dto';
 import { CreateResultEvidenceDto } from '../../../entities/result-evidences/dto/create-result-evidence.dto';
+import { CreateResultPolicyChangeDto } from '../../../entities/result-policy-change/dto/create-result-policy-change.dto';
+import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
+import { PolicyTypeHomologation } from './homologation/policy-type.homologation';
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -375,6 +379,38 @@ export class PrmsOpenSearchService
     };
   }
 
+  /**
+   * Maps PRMS `policy_change_summary` into the STAR policy-change section DTO.
+   *
+   * PRMS only exposes boolean flags for linked innovation results (not result
+   * IDs), so `innovation_development` / `innovation_use` stay unset here.
+   */
+  private async mapPolicyChange(
+    summary?: PolicyChangeSummaryMapper | null,
+  ): Promise<CreateResultPolicyChangeDto | undefined> {
+    if (isEmpty(summary)) return undefined;
+
+    const orgIds = (summary.policy_implementing_organizations ?? [])
+      .map((org) => org?.id)
+      .filter((id) => !isEmpty(id));
+
+    const institutions = isEmpty(orgIds)
+      ? []
+      : await this.clarisaInstitutionsService.findByCodes(orgIds);
+
+    return {
+      policy_type_id: PolicyTypeHomologation[summary.policy_type?.id],
+      policy_stage_id: summary.policy_stage?.id,
+      evidence_stage: undefined,
+      implementing_organization: institutions.map(
+        (institution) =>
+          ({ institution_id: institution.code }) as ResultInstitution,
+      ),
+      innovation_development: undefined,
+      innovation_use: undefined,
+    };
+  }
+
   async processData(
     prmsData: PrmsTemporalResponseMapper[],
   ): Promise<ExternalMappersDto[]> {
@@ -514,6 +550,12 @@ export class PrmsOpenSearchService
       result.geoScope = await this.mapGeoScope(item);
       result.partners = await this.mapPartners(item);
       result.evidence = this.mapEvidence(item);
+
+      if (indicator === IndicatorsEnum.POLICY_CHANGE) {
+        result.policyChange = await this.mapPolicyChange(
+          item.policy_change_summary,
+        );
+      }
 
       results.push(result);
     }

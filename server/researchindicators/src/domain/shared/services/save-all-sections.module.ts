@@ -4,6 +4,7 @@ import { SaveResultService } from './save-all-sections.service';
 import { ResultKnowledgeProductModule } from '../../entities/result-knowledge-product/result-knowledge-product.module';
 import { ResultEvidencesModule } from '../../entities/result-evidences/result-evidences.module';
 import { ResultsModule } from '../../entities/results/results.module';
+import { ResultPolicyChangeModule } from '../../entities/result-policy-change/result-policy-change.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { ResultsModule } from '../../entities/results/results.module';
     ResultKnowledgeProductModule,
     ResultEvidencesModule,
     ResultsModule,
+    ResultPolicyChangeModule,
   ],
   providers: [SaveResultService],
   exports: [SaveResultService],
