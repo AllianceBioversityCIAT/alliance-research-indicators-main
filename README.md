@@ -5,7 +5,7 @@ The **Alliance Research Indicators (ARI)** platform is the system of record for 
 This monorepo contains:
 
 - **`server/researchindicators/`** — the NestJS backend API, RabbitMQ microservice listener, Socket.IO gateway, and embedded `/admin` SSR panel. Fully documented in [`docs/`](./docs/).
-- **`client/research-indicators/`** — the **STAR** frontend (sibling app). Owned independently; out of scope of this README.
+- **`client/research-indicators/`** — the **STAR** frontend (Angular 19 + PrimeNG 19 SPA), the primary human UI. Part of this monorepo; see its code-level manual at [`client/research-indicators/src/CLAUDE.md`](./client/research-indicators/src/CLAUDE.md).
 
 > 📚 **New here? Start with the documentation map below**, not with this README's tech-stack section.
 
@@ -42,13 +42,16 @@ The full SDD constitutional baseline lives under [`docs/`](./docs/). Always read
 | --- | --- | --- |
 | [`docs/prd.md`](./docs/prd.md) | Product Requirements — problem, personas, goals, scope, user stories, acceptance criteria, open questions. | Scope, audience, or business intent questions. |
 | [`docs/ux-ui/design.md`](./docs/ux-ui/design.md) | System / UX-of-the-platform blueprint — IA, API consumer flows, response envelope, admin panel, design tokens, a11y, decisions log, open gaps. | Changes affecting how humans or machines experience the platform. |
-| [`docs/trd/trd.md`](./docs/trd/trd.md) | Technical implementation blueprint — module layout, data model, API rules, workflows, integrations, security, observability, testing. | Changes that touch code, schema, integrations, or infra-adjacent settings. |
+| [`docs/trd/trd.md`](./docs/trd/trd.md) | Technical implementation blueprint (both tiers) — module layout, data model, API rules, workflows, integrations, security, observability, testing. | Changes that touch code, schema, integrations, or infra-adjacent settings. |
+| [`docs/infrastructure.md`](./docs/infrastructure.md) | Deployment & hosting blueprint — AWS target, cloud components, CI/CD, network & security, infra rules. | Changes touching deployment, hosting, secrets, or environment topology. |
+| [`docs/model-routing.md`](./docs/model-routing.md) | Model-selection registry — capability tiers, phase→tier mapping, editable model table. | When choosing which model to run an AKILI phase or agent on. |
 | [`docs/specs/general-setup/`](./docs/specs/general-setup/) | Methodology templates every module-level spec MUST follow (`requirements.md`, `design.md`, `task.md`). | Whenever you create a new spec under `docs/specs/<module>/<feature>/`. |
 
 Agent-facing working manuals:
 
-- [`CLAUDE.md`](./CLAUDE.md) — root agent guide, links the constitutional baseline.
-- [`server/researchindicators/src/CLAUDE.md`](./server/researchindicators/src/CLAUDE.md) — code-level manual for working inside the NestJS source tree.
+- [`CLAUDE.md`](./CLAUDE.md) — root agent guide, links the constitutional baseline (covers the whole monorepo).
+- [`server/researchindicators/src/CLAUDE.md`](./server/researchindicators/src/CLAUDE.md) — code-level manual for the NestJS server source tree.
+- [`client/research-indicators/src/CLAUDE.md`](./client/research-indicators/src/CLAUDE.md) — code-level manual for the Angular 19 + PrimeNG 19 client source tree.
 
 ---
 
@@ -131,15 +134,18 @@ alliance-research-indicators-main/
 │   ├── prd.md
 │   ├── ux-ui/design.md
 │   ├── trd/trd.md
+│   ├── infrastructure.md
+│   ├── model-routing.md
 │   └── specs/general-setup/{requirements,design,task}.md
 ├── server/
-│   └── researchindicators/                # NestJS backend (this repo's focus)
+│   └── researchindicators/                # NestJS backend (API + microservice + admin SSR)
 │       ├── src/                           # see "Project structure"
 │       │   └── CLAUDE.md                  # Code-level working manual
 │       ├── test/                          # Jest e2e suite
 │       └── package.json
 ├── client/
-│   └── research-indicators/               # STAR frontend (sibling, out of scope)
+│   └── research-indicators/               # STAR frontend (Angular 19 + PrimeNG 19 SPA)
+│       └── src/CLAUDE.md                  # Code-level working manual
 ├── .husky/                                # Git hooks
 └── package.json                           # Husky management at repo root
 ```
