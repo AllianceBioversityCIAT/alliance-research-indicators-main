@@ -1,0 +1,162 @@
+@let isAdmin = this.rolesService.isAdmin();
+<div class="app-page-wrapper">
+  <app-form-header />
+  <p-accordion [value]="['0','1','2']" multiple="true">
+    <ng-template #globalToggleIcon let-active="active">
+      @if (active) {
+      <i class="pi pi-angle-down text-[#112F5C] bg-[#E8EBED] rounded-full p-1 !text-[18px]"></i>
+      } @else {
+      <i class="pi pi-angle-up text-[#112F5C] bg-[#E8EBED] rounded-full p-1 !text-[18px]"></i>
+      }
+    </ng-template>
+
+    <p-accordion-panel value="0" class="!border-none !pb-8">
+      <p-accordion-header
+        class="!font-['Space_Grotesk'] !text-[14px] !p-7 !rounded-[16px] !font-medium !text-[#8d9299] !uppercase !mt-0">
+        <div class="flex items-center gap-3">
+          <ng-template #toggleicon let-active="active">
+            <ng-container [ngTemplateOutlet]="globalToggleIcon"
+              [ngTemplateOutletContext]="{ active: active }"></ng-container>
+          </ng-template>
+          <div class="section-title !mb-0">OICR DETAILS</div>
+        </div>
+      </p-accordion-header>
+      <p-accordion-content class="!-mt-4 !rounded-b-[16px]">
+        <div class="flex flex-col bg-white rounded-[10px] p-[10px] pt-5">
+          <div class="flex flex-col xl:flex-row gap-4 justify-between pb-4">
+
+            <div class="flex-1 xl:max-w-[428px]">
+              <app-select class="!text-[16px]" label="MEL Regional Expert" [isRequired]="true" [signal]="body"
+                [disabled]="!isAdmin" [optionValue]="{ body: 'mel_regional_expert_id', option: 'user_id' }"
+                optionLabel="full_name" scrollHeight="220px" serviceName="allianceStaffByGroup"
+                helperText="Select the MEL Regional Expert" placeholder="Select the MEL Regional Expert"></app-select>
+            </div>
+
+            <div class="flex-1">
+              <app-input label="SharePoint Folder Link" helperText="SPRM SharePoint Folder Link" pattern="url"
+                [disabled]="!isAdmin" [optionValue]="'sharepoint_link'" [signal]="body"
+                placeholder="Paste the SharePoint folder link">
+              </app-input>
+            </div>
+          </div>
+
+          <app-oicr-form-fields [body]="body" [oicrNoOptionValue]="'oicr_internal_code'"
+            [taggingOptionValue]="{ body: 'tagging.tag_id', option: 'id' }"
+            [oicrOptionValue]="{ body: 'link_result.external_oicr_id', option: 'id' }"
+            [maturityLevelOptionValue]="{ body: 'maturity_level_id', option: 'id' }"
+            [outcomeImpactOptionValue]="'outcome_impact_statement'"
+            [shortOutcomeOptionValue]="'short_outcome_impact_statement'" [generalCommentOptionValue]="'general_comment'"
+            [showMaturityLevel]="true" [showGeneralComment]="false" [showShortOutcome]="true" [showOicrNo]="true"
+            [isOicrNoDisabled]="!submission.isEditableStatus() || !isAdmin"
+            [clearOicrSelection]="clearOicrSelection.bind(this)">
+          </app-oicr-form-fields>
+
+          <div class="flex flex-col">
+            <span class=" text-[16px] font-semibold text-[#112F5C] py-4">Quantification</span>
+            <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold pb-4">Actual count</span>
+
+            @for (q of quantifications(); track $index) {
+            <app-quantification-item [quantification]="q" [quantNumber]="$index + 1"
+              (update)="updateQuantification($index, $event)" (delete)="removeQuantification($index)">
+            </app-quantification-item>
+            }
+
+            @if (submission.isEditableStatus()) {
+            <div class="flex w-full">
+              <button type="button" (click)="addQuantification()"
+                class="flex cursor-pointer w-full items-center gap-2 border-2 justify-center font-medium border-[#1689CA] text-[#1689CA] px-4 py-3 rounded-[7px] text-[15px]">
+                Add other actual count
+                <i class="pi pi-plus !text-[12px]"></i>
+              </button>
+            </div>
+            }
+          </div>
+
+          <div class="flex flex-col pt-4">
+            <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold py-4">Extrapolated estimates</span>
+
+            @for (est of extrapolatedEstimates(); track $index) {
+            <app-quantification-item [quantification]="est" [quantNumber]="$index + 1"
+              [headerLabel]="'EXTRAPOLATED ESTIMATES'" (update)="updateExtrapolatedEstimate($index, $event)"
+              (delete)="removeExtrapolatedEstimate($index)">
+            </app-quantification-item>
+            }
+
+            @if (submission.isEditableStatus()) {
+            <div class="flex w-full">
+              <button type="button" (click)="addExtrapolatedEstimate()"
+                class="flex cursor-pointer w-full items-center gap-2 border-2 justify-center font-medium border-[#1689CA] text-[#1689CA] px-4 py-3 rounded-[7px] text-[15px]">
+                Add other extrapolated estimates
+                <i class="pi pi-plus !text-[12px]"></i>
+              </button>
+            </div>
+            }
+          </div>
+        </div>
+      </p-accordion-content>
+    </p-accordion-panel>
+
+    <p-accordion-panel value="1" class="!border-none !pb-8">
+      <p-accordion-header
+        class="!font-['Space_Grotesk'] !text-[14px] !p-7 !rounded-[16px] !font-medium !text-[#8d9299] !uppercase !mt-0">
+        <div class="flex items-center gap-3">
+          <ng-template #toggleicon let-active="active">
+            <ng-container [ngTemplateOutlet]="globalToggleIcon"
+              [ngTemplateOutletContext]="{ active: active }"></ng-container>
+          </ng-template>
+          <div class="section-title !mb-0">VISIBILITY AND OUTREACH</div>
+        </div>
+      </p-accordion-header>
+      <p-accordion-content class="!-mt-4 !rounded-b-[16px]">
+        <div class="flex flex-col bg-white rounded-[10px] p-[10px]">
+          <div class="flex flex-col py-2">
+            <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold pb-4">Authors and Contact
+              Persons</span>
+            <app-authors-contact-persons-table [rows]="contactPersons()" (addClicked)="onAddContactPerson()"
+              (deleteClicked)="onDeleteContactPerson($event)"></app-authors-contact-persons-table>
+          </div>
+
+          <span class="label py-4">Further communication opportunities</span>
+          <div class="flex items-center gap-2">
+            <p-checkbox id="external_use" [disabled]="!submission.isEditableStatus()"
+              [(ngModel)]="body().for_external_use" binary="true" styleClass="w-4 h-4" />
+            <label for="external_use" class="text-[15px] text-[#4B5563] leading-5"> Check this box if you would like
+              this case study to be considered for adaptation in external-facing stories or other institutional
+              outreach. For the Alliance Communications team's reference, please indicate the best target audience (who
+              this would be of most interest to / partners or others you would most like to reach), being as specific as
+              possible. </label>
+          </div>
+
+          @if(body().for_external_use){
+          <app-input class="mt-3" [disabled]="!submission.isEditableStatus()" [signal]="body"
+            optionValue="for_external_use_description" placeholder="Write the text"></app-input>
+          }
+
+        </div>
+      </p-accordion-content>
+    </p-accordion-panel>
+
+    <p-accordion-panel value="2" class="!border-none !pb-8">
+      <p-accordion-header
+        class="!font-['Space_Grotesk'] !text-[14px] !p-7 !rounded-[16px] !font-medium !text-[#8d9299] !uppercase !mt-0">
+        <div class="flex items-center gap-3">
+          <ng-template #toggleicon let-active="active">
+            <ng-container [ngTemplateOutlet]="globalToggleIcon"
+              [ngTemplateOutletContext]="{ active: active }"></ng-container>
+          </ng-template>
+          <div class="section-title !mb-0">IMPACT AREAS AND GLOBAL TARGETS</div>
+        </div>
+      </p-accordion-header>
+      <p-accordion-content class="!-mt-4 !rounded-b-[16px] mb-8">
+        <div class="flex flex-col bg-white rounded-[10px] p-[10px] pt-5">
+          <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold pb-4">Link to impact areas and global
+            targets</span>
+
+          <app-impact-areas [body]="body" [disabled]="!submission.isEditableStatus()">
+          </app-impact-areas>
+        </div>
+      </p-accordion-content>
+    </p-accordion-panel>
+  </p-accordion>
+  <app-navigation-buttons (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
+</div>

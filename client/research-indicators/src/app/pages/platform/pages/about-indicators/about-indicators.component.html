@@ -1,0 +1,36 @@
+<div class="my-8 mx-10 min-[1686px]:container min-[1686px]:mx-10" [class.summary-mode]="summaryMode">
+  @for (item of indicatorsSE.indicators(); track $index) {
+    <div class="bg-[#FCFCFC] px-[25px] py-[23px] rounded-[12px] mb-7 border-[0.6px] border-[#E5E5E5]">
+      @if (summaryMode === false) {
+        <p class="description-text" [innerHTML]="item.long_description"></p>
+      }
+
+      <div class="options" [attr.data-index]="$index">
+        @for (indicator of item.indicators; track $index) {
+          <div class="card-container" styleClass="card-container" [routerLink]="['/indicator', indicator.indicator_id]">
+            <div class="card-panel">
+              <div class="card-content">
+                <div class="icon-background">
+                  <i class="pi {{ indicator.icon_src }} !text-[35px] output-icon outcome-icon"></i>
+                </div>
+
+                <div class="card-header">
+                  <div class="type-text">{{ item.name }}</div>
+                  <div class="title-text-indicator">{{ indicator.name }}</div>
+                </div>
+              </div>
+
+              <div class="card-description">
+                <div class="card-description-text">{{ indicator.description }}</div>
+
+                <div class="learn-more-content">
+                  <span class="learn-more-text">Learn more <span class="material-symbols-rounded">arrow_forward</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

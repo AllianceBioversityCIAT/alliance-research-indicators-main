@@ -1,0 +1,155 @@
+@if (variant() === 'list') {
+<ng-container *ngTemplateOutlet="rankedList"></ng-container>
+} @else {
+<section class="box-border flex h-full flex-col rounded-xl border border-[#e8ebed] bg-white p-5 shadow-xs"
+  [class.min-h-0]="compact()" [class.min-h-[280px]]="!compact()">
+  <header class="mb-4 flex items-start justify-between gap-3">
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <h2 class="m-0 font-['Barlow'] text-[15px] font-[550] leading-tight text-[#112f5c]">{{ title() }}</h2>
+      @if (description()) {
+      <p class="m-0 font-['Barlow'] text-[14px] leading-4 text-[#777C83]">{{ description() }}</p>
+      }
+    </div>
+  </header>
+
+  <div class="flex min-h-0 flex-1 flex-col">
+    @if (loading()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-2.5 px-3 py-6 text-center">
+      <app-custom-progress-bar></app-custom-progress-bar>
+      <span class="font-['Barlow'] text-[13px] text-[#777C83]">Loading chart…</span>
+    </div>
+    } @else if (error()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-3 px-3 py-6 text-center">
+      <i class="pi pi-exclamation-triangle text-[28px] text-[#b42318]" aria-hidden="true"></i>
+      <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[#777C83]">{{ errorMessage() }}</p>
+      <button pButton type="button" severity="secondary" size="small" (click)="retry.emit()">Try again</button>
+    </div>
+    } @else if (empty()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-2.5 px-3 py-6 text-center">
+      <i class="pi pi-chart-bar text-[28px] text-[#1689CA]" aria-hidden="true"></i>
+      <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[#777C83]">{{ emptyMessage() }}</p>
+    </div>
+    } @else if (items().length) {
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
+      <ng-container *ngTemplateOutlet="rankedList"></ng-container>
+    </div>
+    } @else {
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
+      <ng-content></ng-content>
+    </div>
+    }
+  </div>
+</section>
+}
+
+<ng-template #rankedList>
+  @if (layout() === 'columns') {
+  <ul
+    class="m-0 grid w-full max-w-full list-none box-border items-end gap-1.5 overflow-hidden rounded-[10px] bg-[#f4f7f9] px-2 pb-2.5 pt-3 p-0"
+    [style.min-height.px]="largeColumns() ? 200 : 140" [class.justify-center]="items().length <= 3"
+    [style.grid-template-columns]="
+      items().length <= 3
+        ? 'repeat(' + items().length + ', minmax(0, ' + (largeColumns() ? '72px' : '52px') + '))'
+        : 'repeat(' + items().length + ', minmax(0, 1fr))'
+    ">
+    @for (item of items(); track item.id; let index = $index) {
+    <li class="flex w-full min-w-0 flex-col items-center gap-1.5">
+      <span class="font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[#112F5C]">{{ item.count }}</span>
+      <div class="relative mx-auto w-full overflow-hidden" [style.height.rem]="largeColumns() ? 9 : 6"
+        [style.max-width.rem]="4.2" aria-hidden="true">
+        <div
+          class="absolute inset-x-0 bottom-0 min-h-1 w-full rounded-t-lg transition-[height] duration-300 ease-in-out"
+          [style.background-color]="barColor(index)" [style.height.%]="fillPercent(item.count)"></div>
+      </div>
+      <span
+        class="w-full cursor-default overflow-hidden break-words text-center font-['Barlow'] leading-tight line-clamp-2"
+        [class.text-xs]="largeColumns()" [class.text-[10px]]="!largeColumns()"
+        [style.color]="largeColumns() ? '#777C83' : '#4c5158'" [pTooltip]="item.label" tooltipPosition="bottom">{{
+        item.label }}</span>
+    </li>
+    }
+  </ul>
+  } @else if (layout() === 'rows-partners') {
+  <ul class="m-0 flex list-none flex-col gap-3 justify-center pt-1">
+    @for (item of items(); track item.id; let index = $index) {
+    <li class="grid items-center gap-2.5" style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)"
+      [style.height.px]="itemHeightPx()">
+      <span
+        class="min-w-0 cursor-default overflow-hidden font-['Barlow'] text-[12.5px] leading-tight text-[#4c5158] font-semibold line-clamp-2"
+        [appTruncatedTooltip]="item.label" tooltipPosition="top">{{ item.label }}</span>
+      <div class="flex min-w-0 w-full items-center overflow-visible">
+        <div [class]="'shrink-0 rounded-md transition-[width] duration-300 ease-in-out ' + barHeightClass()"
+          [style.background-color]="barColor(index)" [style.width.%]="partnerBarWidthPercent(item.count)"
+          [style.min-width.px]="item.count > 0 ? 8 : 0" aria-hidden="true"></div>
+        <span class="ml-1.5 shrink-0 font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[#112F5C]">{{
+          item.count }}</span>
+      </div>
+    </li>
+    }
+  </ul>
+  } @else if (layout() === 'rows-stacked-lever') {
+  <div class="flex w-full flex-1 flex-col min-h-0 justify-start pt-1">
+    <ul class="m-0 flex w-full list-none flex-col gap-3 p-0">
+      @for (item of items(); track item.id; let index = $index) {
+      <li
+        class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-b-[#e8ebed] pb-2 last:border-b-0 last:pb-0"
+        [style.height.px]="itemHeightPx()">
+        <span
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E8F0F7] font-['Barlow'] text-[13px] font-bold tabular-nums text-[#345B8F]">{{
+          index + 1 }}</span>
+        <div class="flex min-w-0 items-center gap-2.5">
+          @if (item.iconUrl) {
+          <img [src]="item.iconUrl" alt="" class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]"
+            aria-hidden="true" />
+          }
+          <span class="flex min-w-0 flex-col gap-0.5">
+            <span
+              class="min-w-0 cursor-default overflow-hidden break-words font-['Barlow'] text-[11px] font-semibold uppercase leading-snug tracking-wide text-[#4c5158] line-clamp-2"
+              [appTruncatedTooltip]="item.label" tooltipPosition="top">{{ item.label }}</span>
+            @if (item.description) {
+            <span class="min-w-0 truncate font-['Barlow'] text-[11px] font-normal normal-case tracking-normal text-[#777C83]"
+              [appTruncatedTooltip]="item.description" tooltipPosition="top">{{ item.description }}</span>
+            }
+          </span>
+        </div>
+        <span class="shrink-0 font-['Barlow'] text-[13px] font-semibold tabular-nums text-[#112F5C]">{{
+          linkedResultsLabel(item.count) }}</span>
+      </li>
+      }
+    </ul>
+  </div>
+  } @else if (layout() === 'rows-stacked') {
+  <div class="flex w-full flex-1 flex-col min-h-0 justify-start">
+    <ul class="m-0 flex w-full list-none flex-col gap-3 p-0">
+      @for (item of items(); track item.id; let index = $index) {
+      <li
+        class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-[#e8ebed] bg-white/80 px-4 py-3">
+        <span
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E8F0F7] font-['Barlow'] text-[13px] font-bold tabular-nums text-[#345B8F]">{{
+          index + 1 }}</span>
+        <span
+          class="min-w-0 cursor-default overflow-hidden break-words font-['Barlow'] text-sm font-semibold leading-snug text-[#4c5158] line-clamp-2"
+          [appTruncatedTooltip]="item.label" tooltipPosition="top">{{ item.label }}</span>
+        <span class="shrink-0 font-['Barlow'] text-[13px] font-semibold tabular-nums text-[#112F5C]">{{
+          linkedResultsLabel(item.count) }}</span>
+      </li>
+      }
+    </ul>
+  </div>
+  } @else {
+  <ul class="m-0 flex list-none flex-col gap-2.5 p-0">
+    @for (item of items(); track item.id; let index = $index) {
+    <li class="grid grid-cols-[minmax(0,1fr)_minmax(64px,1.6fr)_auto] items-center gap-2.5">
+      <span class="cursor-default truncate font-['Barlow'] text-xs text-[#4c5158]" [pTooltip]="item.label"
+        tooltipPosition="top">{{ item.label }}</span>
+      <div class="h-2.5 overflow-hidden rounded-full bg-[#e8ebed]" aria-hidden="true">
+        <div class="h-full min-w-1 rounded-[inherit] transition-[width] duration-300 ease-in-out"
+          [style.background-color]="barColor(index)" [style.width.%]="fillPercent(item.count)"></div>
+      </div>
+      <span class="min-w-7 text-right font-['Barlow'] text-[13px] font-bold tabular-nums text-[#112F5C]">{{ item.count
+        }}</span>
+    </li>
+    }
+  </ul>
+  }
+</ng-template>

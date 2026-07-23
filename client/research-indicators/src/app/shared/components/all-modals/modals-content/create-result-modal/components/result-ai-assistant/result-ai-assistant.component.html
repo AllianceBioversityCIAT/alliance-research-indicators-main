@@ -1,0 +1,249 @@
+<div class="h-[calc(100%-60px)]"
+  [class]="allModalsService.modalConfig()['createResult'].isWide ? 'flex flex-col w-[90vw] max-w-[2000px]' : 'flex flex-col w-[70vw] max-w-[1300px]'">
+  @if (documentAnalyzed() && selectedFile) {
+  <div class="document-analyzed-container border-[#E8EBED] border-1">
+    <i class="pi pi-file upload-icon" style="font-size: 28px; margin: 0"></i>
+    <p class="upload-text" style="font-weight: 500; margin: 0">{{ selectedFile.name }}</p>
+  </div>
+  }
+
+  <section
+    class="mx-auto w-full result-ai-container flex flex-col gap-6 justify-start rounded-b-[27px] px-14 py-6 lg:py-10 xl:py-10">
+    @if (!analyzingDocument() && !documentAnalyzed() && !noResults()) {
+    <div class="flex-col flex gap-[10px] bg-white border-[#E8EBED] border-1 rounded-[15px] p-6">
+      <p class="text-[14px] font-[700] flex text-[#112F5C]">
+        UPLOAD YOUR FILE
+        <img [src]="'icons/star-blue-icon.svg' | s3ImageUrl" alt="upload-ai" class="w-4.5 pl-1" />
+      </p>
+
+      <app-shared-result-form [contracts]="getContractsService.aiAssistantList()" [showWarning]="true"
+        [getContractStatusClasses]="getContractStatusClasses" title="Reporting Project" [maxLength]="100"
+        [contractId]="body().contract_id"
+        helperText="Select the project under which you are reporting the result. Please note: for all indicators except Outcome Impact Case Reports (OICRs), only Alliance non-pooled-funded projects (Window 3 and Bilaterals) may be selected. Pooled-funded projects can be selected only for OICRs."
+        (validityChanged)="sharedFormValid = $event" (contractIdChange)="onContractIdChange($event)">
+      </app-shared-result-form>
+
+      <div class="file-upload-container pt-2">
+        @if (!selectedFile) {
+        <div class="upload-area" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)" [class.dragging]="isDragging" (keydown.enter)="fileInput.click()"
+          (click)="fileInput.click()">
+          <label class="sr-only" for="result-ai-file-input">Upload file for AI assistant</label>
+          <input id="result-ai-file-input" #fileInput type="file" [accept]="acceptedFormats.join(',')"
+            (change)="onFileSelected($event)" style="display: none" />
+          <i class="material-symbols-rounded upload-icon">add_circle</i>
+          <p class="text-[14px] font-[600] text-[#112F5C]">Drag and drop your file here or click to upload.</p>
+          <p class="text-[11px] font-[400] text-[#112F5C] pt-1">Accepted file formats: {{ acceptedFormats.join(', ') }}
+          </p>
+        </div>
+        } @else {
+        <div class="upload-area justify-center" style="cursor: default">
+          <div class="border-[#DBDBDB] border-1 w-auto rounded-[15px] p-4">
+            <i class="pi pi-file upload-icon" style="font-size: 50px; margin-bottom: 15px"></i>
+            <div class="upload-area-content flex flex-col items-center">
+              <p class="text-[12px] font-[600] leading-5 text-[#112F5C]">{{ selectedFile.name }}</p>
+              <p class="text-[10px] font-[400] pb-3 leading-4 text-[#112F5C]">{{ (selectedFile.size / (1024 *
+                1024)).toFixed(2) }} MB</p>
+
+              <i class="pi pi-file pi-times-circle" style="font-size: 16px; cursor: pointer; color: #cf0808"
+                (keydown.enter)="selectedFile = null" (click)="selectedFile = null"></i>
+            </div>
+          </div>
+        </div>
+        }
+        <p class="text-[#8D9299] pt-2 text-[11px]">Each file can be up to {{ maxSizeMB }} MB. Ensure uploads comply with
+          this limit.</p>
+      </div>
+      <div class="w-full flex justify-end">
+        <button type="button"
+          class="font-medium cursor-pointer disabled:cursor-default disabled:bg-[#E8EBED] disabled:text-[#A2A9AF] text-[12px] bg-[#035BA9] text-white px-8 py-2.5 rounded-xl"
+          [disabled]="!selectedFile || !sharedFormValid" [ngClass]="{ disabled: !selectedFile || !sharedFormValid }"
+          (click)="handleAnalyzingDocument()">
+          Analyze file
+          <i class="pi pi-arrow-right !text-[10px] pl-1" [class.text-white]="selectedFile && sharedFormValid"
+            [class.text-[#A2A9AF]]="!selectedFile || !sharedFormValid">
+          </i>
+        </button>
+      </div>
+    </div>
+    }
+    @if (analyzingDocument() && !documentAnalyzed()) {
+    <div class="flex-col flex gap-[20px] bg-white border-[#E8EBED] border-1 rounded-[15px] p-6 lg:py-6 xl:py-6">
+      <p class="text-[14px] font-[700] flex text-[#112F5C]">
+        UPLOAD YOUR FILE
+        <img [src]="'icons/star-blue-icon.svg' | s3ImageUrl" alt="upload-ai" class="w-4.5 pl-1" />
+      </p>
+
+      <div class="w-full flex place-content-center">
+        <img [src]="'gifs/robot.gif' | s3ImageUrl" alt="Robot animado" class="w-1/3 h-auto" />
+      </div>
+
+      @if (steps()[activeIndex()]) {
+      @if (steps()[activeIndex()]) {
+      <div class="w-full flex items-start space-x-4 px-2">
+        <div class="w-8 h-8 rounded-full bg-[#1689ca82] flex items-center justify-center text-white mt-1">
+          <i class="pi pi-spinner animate-spin !text-[12px]"></i>
+        </div>
+
+        <div class="flex-1 space-y-2">
+          <span class="block text-[14px] font-[400] text-[#8D9299]">
+            {{ steps()[activeIndex()].label }}
+          </span>
+
+          <div class="w-full h-2 bg-[#E8EBED] rounded">
+            <div class="h-full bg-[#00B6FF] rounded transition-all duration-300"
+              [style.width.%]="steps()[activeIndex()].progress"></div>
+          </div>
+        </div>
+      </div>
+      }
+      }
+    </div>
+    }
+    @if (documentAnalyzed()) {
+    <section class="analyze-result-container">
+      <div class="flex w-full justify-between items-center">
+        <div class="-mt-4 pb-6 flex flex-col">
+          <h1 class="text-[16px] font-[700] text-[#112F5C]">
+            THE AI IDENTIFIED
+            <span class="analyze-result-title-number">{{ createResultManagementService.items().length }}</span>
+            RESULTS
+          </h1>
+          <p class="text-[14px] font-[400] text-[#4C5158]">Select the ones you want to create.</p>
+        </div>
+        <div class="flex items-center gap-2 mb-4 relative">
+          @if (feedbackSent) {
+          <div class="flex items-center gap-2 relative">
+            <span class="text-[12px] font-[400] text-[#8D9299]">Feedback sent successfully.</span>
+            <i class="pi" [ngClass]="{
+                    'pi-thumbs-up-fill': lastFeedbackType === 'positive',
+                    'pi-thumbs-down-fill': lastFeedbackType === 'negative'
+                  }" style="
+                    font-size: 16px;
+                    color: #035ba9;
+                    text-shadow:
+                      2px 2px 0 #fff,
+                      -2px 2px 0 #fff,
+                      2px -2px 0 #fff,
+                      -2px -2px 0 #fff,
+                      0 2px 0 #fff,
+                      2px 0 0 #fff,
+                      0 -2px 0 #fff,
+                      -2px 0 0 #fff;
+                  "></i>
+          </div>
+          } @else {
+          <span class="text-[12px] font-[400] px-2 text-[#8D9299]">Was this response helpful?</span>
+          <button dropdown-button
+            class="text-[#035BA9] !text-[16px] rounded-[6px] p-2 pi pi-thumbs-up {{ feedbackType() === 'positive' ? 'bg-[#D9E1EB]' : '' }}"
+            aria-label="Like" (click)="toggleFeedback('positive')" #feedbackBtn></button>
+          <button dropdown-button
+            class="text-[#035BA9] !text-[16px] rounded-[6px] p-2 pi pi-thumbs-down {{ feedbackType() === 'negative' ? 'bg-[#D9E1EB]' : '' }}"
+            aria-label="Dislike" (click)="toggleFeedback('negative')" #feedbackBtn></button>
+          @if (showFeedbackPanel()) {
+          <div #dropdownRef
+            class="absolute right-0 top-full mt-2 z-[9999] bg-white shadow-lg rounded-[4px] w-[400px] p-5"
+            (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+            <div dropdown-content>
+              <h2 class="text-[14px] font-[space_grotesk] mb-6" [ngClass]="{
+                        'text-[#CF0808]': feedbackType() === 'negative',
+                        'text-[#509C55]': feedbackType() === 'positive'
+                      }">
+                {{ feedbackType() === 'positive' ? 'What Is Working Well?' : 'What Is Not Working Well?' }}
+              </h2>
+              @if (feedbackType() === 'negative') {
+              <div class="mb-5">
+                <span class="block text-[12px] text-[#153C71] font-[500] font-[space_grotesk] mb-1">Type of issue</span>
+                <div class="flex flex-wrap gap-2">
+                  <button class="bg-[#F4F7F9] border-1 px-2 py-1 !rounded-[10px] text-[#1689CA] text-[13px] font-[400] {{
+                              selectedType.includes(type.id.toString()) ? ' font-[500] border-[#1689CA]' : 'border-[#E8EBED]'
+                            }}" *ngFor="let type of badTypes" (click)="selectType(type.id.toString())">
+                    {{ type.name }}
+                  </button>
+                </div>
+              </div>
+              }
+              <div class="mb-4">
+                <span class="block text-[12px] text-[#153C71] font-[500] font-[space_grotesk] mb-1">Feedback details
+                  @if (isRequired()) {
+                  <span class="text-red-500">*</span>
+                  }
+                </span>
+                <app-textarea [styleClass]="'!text-[12px]'" [isRequired]="isRequired()" [rows]="3"
+                  [size]="'!text-[12.5px]'" [signal]="this.body" [optionValue]="'feedbackText'"></app-textarea>
+              </div>
+              <div class="flex gap-2">
+                <p-button label="Cancel" styleClass="!rounded-[12px] !text-[12px] !px-4" [outlined]="true"
+                  (onClick)="closeFeedbackPanel()"></p-button>
+                <p-button label="Confirm" styleClass="!rounded-[12px] !text-[12px] !px-4" (onClick)="submitFeedback()"
+                  [disabled]="(feedbackType() === 'negative' && (!selectedType || !body().feedbackText)) || loading()"></p-button>
+              </div>
+            </div>
+          </div>
+          }
+          }
+        </div>
+      </div>
+
+      @if (createResultManagementService.items().length === 0) {
+      <div class="w-full analyze-result-content flex !justify-center">
+        <div class="flex flex-col items-center justify-center bg-white py-12 px-10 w-full h-full">
+          <h1 class="text-[20px] font-[700] text-[#112F5C] flex gap-4 py-4">ALL RESULTS DISCARDED</h1>
+          <p class="text-[#4C5158] text-[16px]">You've discarded all the generated results. What would you like to do
+            next?</p>
+
+          <div class="text-[16px] font-[500] text-[#112F5C] flex items-center justify-center gap-4 pt-6">
+            <p-button label="Return to Create Result" styleClass="!rounded-[12px] !text-[12px]" [outlined]="true"
+              (onClick)="goBackToCreateResult()"></p-button>
+            <p-button label="Upload a new file" styleClass="!rounded-[12px] !text-[12px]"
+              (onClick)="goBackToUploadNewFile()"></p-button>
+          </div>
+        </div>
+      </div>
+      } @else {
+      <div class="w-full analyze-result-content flex">
+        @for (item of createResultManagementService.items() | slice: first() : first() + rows(); track item) {
+        <app-result-ai-item [item]="item" [isFirstItem]="$index === 0"
+          [isLastItem]="$index === rows() - 1 || $index === createResultManagementService.items().length - 1 - first()"
+          style="width: 100%">
+        </app-result-ai-item>
+        }
+      </div>
+      }
+      @if (createResultManagementService.items().length > 0) {
+      <div
+        class="flex justify-end w-full bg-white border-left border-right border-bottom border-[#E8EBED] border-b-[1px] border-l-[1px] border-r-[1px] rounded-b-[4px]">
+        <p-paginator (onPageChange)="onPageChange($event)" [first]="first()" [rows]="rows()"
+          [totalRecords]="createResultManagementService.items().length" [showCurrentPageReport]="true"
+          [showJumpToPageDropdown]="false" currentPageReportTemplate="Showing {first} to {last} of {totalRecords}" />
+      </div>
+      }
+    </section>
+    }
+
+    @if (noResults()) {
+    <div class="flex-col flex gap-[20px] bg-white border-[#E8EBED] border-1 rounded-[15px] p-6">
+      <p class="text-[14px] font-[700] flex text-[#112F5C]">
+        UPLOAD YOUR FILE
+        <img [src]="'icons/star-blue-icon.svg' | s3ImageUrl" alt="upload-ai" class="w-4.5 pl-1" />
+      </p>
+
+      <div class="w-full flex place-content-center">
+        <img [src]="'images/upload-ai-2.svg' | s3ImageUrl" alt="upload-ai" class="w-1/4 h-auto" />
+      </div>
+
+      <div class="flex flex-col items-center justify-center w-full h-full">
+        <h1 class="text-[17px] font-[700] text-[#112F5C] flex">NO RESULTS IDENTIFIED</h1>
+        <p class="text-[#4C5158] text-[14px]">The AI didn't identify any results. What would you like to do next?</p>
+
+        <div class="text-[16px] font-[500] text-[#112F5C] flex items-center justify-center gap-4 py-6">
+          <p-button label="Return to Create Result" styleClass="!rounded-[12px] !text-[12px]" [outlined]="true"
+            (onClick)="goBackToCreateResult()"></p-button>
+          <p-button label="Upload a new file" styleClass="!rounded-[12px] !text-[12px]"
+            (onClick)="goBackToUploadNewFile()"></p-button>
+        </div>
+      </div>
+    </div>
+    }
+  </section>
+</div>

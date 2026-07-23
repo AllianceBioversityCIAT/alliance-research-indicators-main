@@ -1,0 +1,10 @@
+@for (history of historyList(); track $index) {
+<app-submission-history-item [historyItem]="history"></app-submission-history-item>
+}
+@if (historyList().length === 0) {
+<div class="text-center p-4 pt-8">
+  <img [src]="'images/icon-no-activity.svg' | s3ImageUrl" alt="No submission activity yet" class="mx-auto mb-4" />
+  <span class="text-[16px] font-bold text-[#112F5C]">NO SUBMISSION ACTIVITY YET</span>
+  <p class="text-[#4C5158] text-[14px]">Once submissions are made, their history will appear here.</p>
+</div>
+}

@@ -1,0 +1,250 @@
+@let expandedItem = createResultManagementService.expandedItem();
+
+<div class="result-item" [class.expanded]="expandedItem === item" [class.last-item]="isLastItem" [class.first-item]="isFirstItem">
+  @if (
+    isAIAssistantResult(item) &&
+    (item.training_type !== undefined || item.indicator === 'Policy Change' || item.indicator === 'Innovation Development')
+  ) {
+    <div class="result-item-expand-icon" (keydown.enter)="toggleExpand(item)" (click)="toggleExpand(item)">
+      <i class="pi" [ngClass]="expandedItem === item ? 'pi-angle-down' : 'pi-angle-right'" style="font-size: 10px"></i>
+    </div>
+  } @else {
+    <div></div>
+  }
+
+  <div class="result-item-main-content">
+    <div class="result-item-header">
+      <i
+        class="material-symbols-rounded"
+        [class]="getIndicatorTypeIcon(isAIAssistantResult(item) ? item.indicator : item.indicator.name).class"
+        style="font-size: 22px"
+        >{{ getIndicatorTypeIcon(isAIAssistantResult(item) ? item.indicator : item.indicator.name).icon }}</i
+      >
+      <p class="result-item-category">{{ (isAIAssistantResult(item) ? item.indicator : item.indicator.name) | uppercase }}</p>
+    </div>
+
+    <div class="result-item-title-container">
+      @if (!isEditingTitle()) {
+        <div class="result-item-title-flex">
+          <p class="result-item-title" #titleText>
+            {{ item.title }}
+            <i class="pi pi-pencil edit-pencil" (click)="startEditingTitle()" (keydown.enter)="startEditingTitle()"></i>
+          </p>
+        </div>
+      } @else {
+        <div class="edit-title-container" #editTitleContainer>
+          <textarea class="result-item-title-input" [(ngModel)]="tempTitle" #titleInput (input)="autoGrow()" rows="1"></textarea>
+          <div class="flex">
+            <i
+              class="pi pi-check save-icon"
+              pTooltip="Save title"
+              tooltipPosition="top"
+              style="font-size: 14px; cursor: pointer"
+              (click)="finishEditingTitle()"
+              (keydown.enter)="finishEditingTitle()"></i>
+            <i
+              class="pi pi-times cancel-icon"
+              pTooltip="Cancel"
+              tooltipPosition="top"
+              style="font-size: 14px; cursor: pointer; margin-left: 5px"
+              (click)="cancelEditingTitle()"
+              (keydown.enter)="cancelEditingTitle()"></i>
+          </div>
+        </div>
+      }
+    </div>
+    <p class="result-item-description">{{ item.description }}</p>
+
+    <div class="result-item-keywords">
+      <div class="flex items-center flex-wrap gap-[10px]">
+        <p class="result-item-keywords-title">Keywords</p>
+        <p class="result-item-keywords-arrow">&rarr;</p>
+        @for (keyword of item.keywords; track $index) {
+          <span class="keyword">{{ keyword }}</span>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (!hideButtons && isAIAssistantResult(item)) {
+    <div class="result-item-actions flex gap-2">
+      @if (!isCreated()) {
+        <p-button
+          type="button"
+          label="Discard"
+          styleClass="discard-button !text-[12px] !h-10 !px-3 !border-[1.5px] !border-[#CF0808] !text-[#CF0808] !rounded-[12px]"
+          size="small"
+          [outlined]="true"
+          severity="danger"
+          (keydown.enter)="discardResult(item)"
+          (click)="discardResult(item)">
+        </p-button>
+
+        <p-button
+          type="button"
+          label="Create"
+          iconPos="right"
+          icon="pi pi-plus"
+          styleClass="create-button !text-[12px] !h-10 !px-3 !bg-[#035BA9] !rounded-[12px]"
+          size="small"
+          (keydown.enter)="createResult(item)"
+          (click)="createResult(item)">
+        </p-button>
+      } @else {
+        <p-button
+          type="button"
+          label="Open Result"
+          iconPos="right"
+          icon="pi pi-arrow-right"
+          styleClass="create-button !text-[12px] !h-10 !px-3 !border-[#1689CA] !bg-[#1689CA] !rounded-[12px]"
+          size="small"
+          (keydown.enter)="openResult(item)"
+          (click)="openResult(item)">
+        </p-button>
+      }
+    </div>
+  }
+
+  @if (expandedItem === item) {
+    <div class="result-item-expanded-content">
+      @if (item.total_participants !== undefined) {
+        <div class="result-item-details">
+          @for (detail of expandedItemDetails; track $index) {
+            <div class="result-item-details-item">
+              <p class="result-item-details-value">{{ item[detail.value] }}</p>
+              <p class="result-item-keywords-title">{{ detail.title }}</p>
+              @if (detail.title === 'Total participants') {
+                <p class="result-item-keywords-arrow">&rarr;</p>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      @if (isAIAssistantResult(item) && item.training_type !== undefined) {
+        <div class="flex gap-6">
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Training type</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.training_type }}</p>
+          </div>
+
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Length of training</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.length_of_training || 'NOT COLLECTED' }}</p>
+          </div>
+
+          @if (item.length_of_training === 'long-term') {
+            <div class="result-item-keywords">
+              <p class="result-item-keywords-title">Degree</p>
+              <p class="result-item-keywords-arrow">&rarr;</p>
+              <p class="result-item-details-value-training-type">{{ item.degree || 'NOT COLLECTED' }}</p>
+            </div>
+          }
+
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Delivery modality</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.delivery_modality || 'NOT COLLECTED' }}</p>
+          </div>
+
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Start date</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.start_date }}</p>
+          </div>
+
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">End date</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.end_date }}</p>
+          </div>
+        </div>
+      }
+
+      @if (isAIAssistantResult(item) && item.indicator === 'Policy Change') {
+        <div class="flex gap-6">
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Policy type</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.policy_type || 'NOT COLLECTED' }}</p>
+          </div>
+
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Stage in policy process</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.stage_in_policy_process || 'NOT COLLECTED' }}</p>
+          </div>
+        </div>
+        <div class="result-item-keywords">
+          <p class="result-item-keywords-title">Evidence for stage</p>
+          <p class="result-item-keywords-arrow">&rarr;</p>
+          <p class="result-item-details-value-training-type">{{ item.evidence_for_stage || 'NOT COLLECTED' }}</p>
+        </div>
+      }
+
+      @if (isAIAssistantResult(item) && item.indicator === 'Innovation Development') {
+        <div class="flex gap-[10px] flex-wrap">
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Innovation nature</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.innovation_nature || 'NOT COLLECTED' }}</p>
+          </div>
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Innovation type</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.innovation_type || 'NOT COLLECTED' }}</p>
+          </div>
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Readiness assessment</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.assess_readiness || 'NOT COLLECTED' }}</p>
+          </div>
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Anticipated users</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">{{ item.anticipated_users || 'NOT COLLECTED' }}</p>
+          </div>
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Organizations</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">
+              @if (getOrganizations(item).length > 0) {
+                {{ getOrganizations(item).join(', ') }}
+              } @else {
+                NOT COLLECTED
+              }
+            </p>
+          </div>
+          <div class="result-item-keywords">
+            <p class="result-item-keywords-title">Main contact</p>
+            <p class="result-item-keywords-arrow">&rarr;</p>
+            <p class="result-item-details-value-training-type">
+              {{ item.main_contact_person.name || 'NOT COLLECTED' }}
+            </p>
+          </div>
+        </div>
+        <div class="result-item-keywords">
+          <p class="result-item-keywords-title">Innovation actors detailed</p>
+          <p class="result-item-keywords-arrow">&rarr;</p>
+          <div class="result-item-details-value-training-type">
+            @if (getInnovationActorsDetailed(item).length > 0) {
+              @for (actor of getInnovationActorsDetailed(item); track $index) {
+                <div>
+                  <strong>{{ actor.type }}</strong
+                  >:
+                  @for (g of actor.gender_age; track $index) {
+                    {{ g }}
+                  }
+                </div>
+              }
+            } @else {
+              NOT COLLECTED
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>

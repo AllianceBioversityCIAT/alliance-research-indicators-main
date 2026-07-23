@@ -1,0 +1,24 @@
+<div class="oicr-workflow-status flex items-center gap-2 ">
+    @for (step of workflowSteps; track step.id; let isFirst = $first; let isLast = $last) {
+    <div class="flex items-center gap-2">
+        @if (!isFirst) {
+        <i class="pi pi-arrow-right !text-[8px] text-[#8D9299]"></i>
+        }
+        <div class="workflow-step-container" [class.current-step]="isCurrentStep(step.id)">
+            @if (isCurrentStep(step.id)) {
+            <div class="current-step-indicator">
+                <div class="triangle"></div>
+            </div>
+            }
+            <div class="workflow-step flex items-center gap-1" [class.active]="isCurrentStep(step.id)">
+                @if (isCurrentStep(step.id) && iconName) {
+                <i class="pi {{iconName}}  !text-[10px] text-[#777C83]" [style.transform]="'rotate(180deg)'"
+                    [pTooltip]="statusDescription ?? ''" tooltipPosition="bottom"></i>
+                }
+                <span [pTooltip]="isCurrentStep(step.id) && !iconName ? (statusDescription ?? '') : ''"
+                    tooltipPosition="bottom">{{ step.name }}</span>
+            </div>
+        </div>
+    </div>
+    }
+</div>

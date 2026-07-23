@@ -1,0 +1,63 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+  <div class="flex flex-col bg-[#fcfcfc] rounded-[13px] p-[30px] mb-10 border border-[#e8ebed] bg-[#ffffff]">
+    @if (cache.currentMetadata().indicator_id === 5) {
+    <div class="flex flex-col gap-3 mb-8">
+      <div class="section-title">CGSPACE LINK</div>
+
+      <div class="flex flex-col">
+        <app-input label="CGspace link"
+          helperText="This field corresponds to the link published in cgspace where the pdf for this work is located."
+          [isRequired]="true" [disabled]="!submission.isEditableStatus()" [validateEmpty]="true" [signal]="body"
+          optionValue="cgspace_link" pattern="handle-url" placeholder="Provide the CGspace link"
+          [maxLength]="400"></app-input>
+      </div>
+    </div>
+    }
+    <div class="section-title">EVIDENCE</div>
+    <div class="flex flex-col gap-5">
+      @for (evidence of body().evidence; track $index) {
+      <div class="bg-[#F4F7F9] px-[25px] py-[25px] border-1 border-[#E8EBED]">
+        <app-evidence-item [evidence]="evidence" [bodySignal]="body" [index]="$index" [evidenceNumber]="$index + 1"
+          (deleteEvidenceEvent)="deleteEvidence($index)"></app-evidence-item>
+      </div>
+      }
+      @if (submission.isEditableStatus()) {
+      <div class="flex w-full">
+        <button type="button" (click)="addEvidence()"
+          class="flex cursor-pointer w-full items-center gap-2 border-2 justify-center font-medium border-[#1689CA] text-[#1689CA] px-4 py-3 rounded-[7px] text-[15px]">
+          Add other evidence
+          <i class="pi pi-plus !text-[12px]"></i>
+        </button>
+      </div>
+      }
+    </div>
+
+    @if (cache.currentMetadata().indicator_id === 5) {
+    <div class="flex flex-col bg-white rounded-[10px] px-[10px] pt-8">
+      <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold pb-4">Other Notable References, Promotional
+        Products and Communication materials</span>
+
+      @for (item of otherReferences(); track $index) {
+      <app-other-reference-item [item]="item" [itemNumber]="$index + 1" (update)="updateOtherReference($index, $event)"
+        (delete)="removeOtherReference($index)">
+      </app-other-reference-item>
+      }
+
+      @if (submission.isEditableStatus()) {
+      <div class="flex w-full">
+        <button type="button" (click)="addOtherReference()"
+          class="flex cursor-pointer w-full items-center gap-2 border-2 justify-center font-medium border-[#1689CA] text-[#1689CA] px-4 py-3 rounded-[7px] text-[15px]">
+          Add other item
+          <i class="pi pi-plus !text-[12px]"></i>
+        </button>
+      </div>
+      }
+    </div>
+    }
+  </div>
+
+  <app-navigation-buttons
+    [showNext]="cache.currentMetadata().indicator_id === 1 || cache.currentMetadata().indicator_id === 2"
+    (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
+</div>

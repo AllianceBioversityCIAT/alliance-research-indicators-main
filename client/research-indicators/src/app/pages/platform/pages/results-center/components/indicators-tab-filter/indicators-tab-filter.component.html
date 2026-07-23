@@ -1,0 +1,22 @@
+@let hss = this.cache.hasSmallScreen();
+<div class="local-container">
+  @if (showLeftArrow()) {
+  <div class="scroll-button left" (keydown.enter)="scrollLeft()" (click)="scrollLeft()">
+    <span class="material-symbols-rounded">chevron_left</span>
+  </div>
+  }
+  <div class="filters-content" #filtersContainer>
+    @for (filter of indicatorTabs.list(); track $index) {
+    <div class="filters {{ hss ? 'py-[5px] px-[10px]' : 'py-[10px] px-[15px]' }}" [class.active]="filter.active"
+      [class.able]="filter.able" (keydown.enter)="resultsCenterService.onSelectFilterTab(filter.indicator_id)"
+      (click)="resultsCenterService.onSelectFilterTab(filter.indicator_id)">
+      {{ filter.name }}
+    </div>
+    }
+  </div>
+  @if (showRightArrow()) {
+  <div class="scroll-button right" (keydown.enter)="scrollRight()" (click)="scrollRight()">
+    <span class="material-symbols-rounded">chevron_right</span>
+  </div>
+  }
+</div>

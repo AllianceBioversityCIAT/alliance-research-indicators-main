@@ -1,0 +1,52 @@
+@mixin generate-typography($family, $weight, $size, $letter-spacing: 0, $case: normal-case) {
+  font-family: $family;
+  font-weight: $weight;
+  font-size: $size;
+  letter-spacing: $letter-spacing;
+  text-transform: $case;
+}
+
+// H1 - Principal Title
+.h1 {
+  @include generate-typography('Space Grotesk', 700, 3em, -1.5px);
+}
+
+// H2 - Subtitle
+.h2 {
+  @include generate-typography('Space Grotesk', 700, 2.25em, 0.5px);
+}
+
+// H3 - Context Title
+.h3 {
+  @include generate-typography('Space Grotesk', 600, 1.19em, 0.15px);
+}
+
+// H4 - Action Title
+.h4 {
+  @include generate-typography('Space Grotesk', 700, 1em, 0.25px);
+}
+
+// Body 1 - Principal Text
+.body-1 {
+  @include generate-typography('Barlow', 400, 1.19em, 0.5px);
+}
+
+// Body 2 - Secondary Text
+.body-2 {
+  @include generate-typography('Barlow', 400, 1em, 0.25px);
+}
+
+// Caption - Annotations
+.caption {
+  @include generate-typography('Barlow', 400, 0.875em, 0.2px);
+}
+
+// Label - Card Title
+.label {
+  @include generate-typography('Space Grotesk', 500, 1.5em, 0.15px);
+}
+
+// Medium Label - Context Title
+.medium-label {
+  @include generate-typography('Space Grotesk', 500, 0.75em, 0);
+}

@@ -2,7 +2,7 @@
 name: leader
 role: JCSPECS Software Leader (Orchestrator)
 project: Alliance Research Indicators (ARI) — server package
-stack: NestJS 11 + TypeORM/MySQL + RabbitMQ microservice + Vite/React 19 admin SSR
+stack: NestJS 10.4 + TypeORM/MySQL + RabbitMQ microservice + Vite/React 19 admin SSR
 verify: from server/researchindicators → npm test • npm run lint • npm run build (e2e: npm run test:e2e)
 rework_ceiling: 3
 commit_standard: "[SPEC:<spec-path>] <message>"
@@ -21,7 +21,7 @@ Your sole responsibility is to coordinate execution of an approved spec by orche
 1. **Source-of-truth Alignment:**
    * Read the project constitution: root `CLAUDE.md` and `AGENTS.md`, plus the child guide `server/researchindicators/src/CLAUDE.md`.
    * Read the active spec under `docs/specs/<module>/<feature>/` (`requirements.md`, `design.md`, `tasks.md`, and `execution.md` if it exists).
-   * Read the constitutional baseline (`docs/prd.md`, `docs/system-design/design.md`, `docs/detailed-design/detailed-design.md`).
+   * Read the constitutional baseline (`docs/prd.md`, `docs/ux-ui/design.md`, `docs/trd/trd.md`, `docs/infrastructure.md`).
 
 2. **Task Selection:**
    * Parse `tasks.md` and pick the next eligible task by document order where the status is `[ ]` or `[~]` and dependencies are all `[x]`.
@@ -76,3 +76,15 @@ After each task completes (whether on first pass or after self-correction), repo
 6. **Next step:** the next eligible task and a prompt to continue, pause, or skip.
 
 Keep this report concise. The full audit trail belongs in `execution.md`, not in chat.
+
+---
+
+## 🧪 Testing Harness (`/akili-test`)
+
+When orchestrating the QA phase instead of the execution loop, you run a **Leader → Tester(s)** harness using `.agents/tester.md`:
+
+1. Split the spec's verification surface into single suites (`backend-unit`, `backend-e2e`, `frontend-unit`) and spawn one **Tester** per suite with only its slice of `requirements.md` scenarios.
+2. Prefer a **Tester model different from the Implementer** that wrote the code (author ≠ tester). See the `## Model Routing` registry.
+3. Collect each Tester's structured `PASS` / `FAIL` / `PRODUCT_BUG` report and the per-scenario coverage slice; assemble the requirement-to-test matrix.
+4. On `PRODUCT_BUG`, do **not** loop the Tester — the failing test stays red; hand the defect back through the execution loop (spawn an Implementer with the bug context) or escalate to the user.
+5. Record the coverage matrix and outcomes in `execution.md` (or the spec's `test-report.md`).

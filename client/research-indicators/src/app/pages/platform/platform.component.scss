@@ -1,0 +1,94 @@
+.grid-container {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+.navbar {
+  grid-column: 1 / span 2;
+}
+
+.sidebar {
+  grid-row: 2;
+  z-index: 1000;
+}
+
+.content {
+  grid-column: 2;
+  grid-row: 2;
+  overflow-y: auto;
+}
+
+.spinner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--ac-primary-blue-500);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  .loader-container {
+    color: rgb(255 255 255);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+}
+
+.loader {
+  width: 55px;
+  aspect-ratio: 1;
+
+  --g1: conic-gradient(from 90deg at 3px 3px, #0000 90deg, #fff 0);
+  --g2: conic-gradient(from -90deg at 22px 22px, #0000 90deg, #fff 0);
+
+  background: var(--g1), var(--g1), var(--g1), var(--g2), var(--g2), var(--g2);
+  background-size: 25px 25px;
+  background-repeat: no-repeat;
+  animation: l7 1.5s infinite;
+}
+
+@keyframes l7 {
+  0% {
+    background-position:
+      0 0,
+      0 100%,
+      100% 100%;
+  }
+
+  25% {
+    background-position:
+      100% 0,
+      0 100%,
+      100% 100%;
+  }
+
+  50% {
+    background-position:
+      100% 0,
+      0 0,
+      100% 100%;
+  }
+
+  75% {
+    background-position:
+      100% 0,
+      0 0,
+      0 100%;
+  }
+
+  100% {
+    background-position:
+      100% 100%,
+      0 0,
+      0 100%;
+  }
+}

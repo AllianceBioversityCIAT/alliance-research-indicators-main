@@ -1,0 +1,44 @@
+<main class="relative min-h-screen overflow-hidden bg-[#112F5C] text-[var(--ac-white-1)]">
+  <header class="fixed left-5 z-20 flex items-center gap-2.5 transition-all duration-300"
+    [class.top-4]="loading() || !safePdfUrl()" [class.bottom-5]="!loading() && safePdfUrl()">
+    <img [src]="'STAR.png' | s3ImageUrl" alt="STAR" class="h-[54px] w-auto object-contain" />
+    @if (!isProductionEnvironment) {
+    <div
+      class="shrink-0 whitespace-nowrap rounded-lg bg-[var(--ac-red-1)] px-2 py-1.5 text-[10px] font-[450] leading-tight text-[var(--ac-white-1)] shadow-lg sm:px-2.5 sm:py-[7px] sm:text-xs md:px-3 md:py-2 md:text-[13px]"
+      aria-label="Testing Environment">
+      <span class="hidden xl:inline">Testing Environment</span>
+      <span class="hidden md:inline xl:hidden">Testing</span>
+      <span class="md:hidden">Test</span>
+    </div>
+    }
+  </header>
+
+  @if (loading()) {
+  <section class="relative z-10 flex min-h-screen flex-col items-center justify-center gap-7 p-6 text-center"
+    aria-live="polite">
+    <div class="grid max-w-[420px] items-center gap-1 text-center">
+      <i class="pi pi-sync pi-spin !text-[48px] text-white" aria-hidden="true"></i>
+      <span
+        class="m-0 !pt-4 !text-[28px] !font-['Space_Grotesk'] text-[clamp(24px,4vw,36px)] font-semibold text-[var(--ac-white-1)]">
+        Preparing your report
+      </span>
+      <p class="m-0 !text-sm font-medium text-white/80">Generating pdf, please wait...</p>
+    </div>
+  </section>
+  } @else if (safePdfUrl()) {
+  <iframe class="block h-screen w-full border-0 bg-[var(--ac-white-1)]" [src]="safePdfUrl()"
+    title="STAR PDF report"></iframe>
+  } @else {
+  <section class="relative z-10 flex min-h-screen flex-col items-center justify-center gap-7 p-6 text-center"
+    aria-live="polite">
+    <div class="grid max-w-[420px] items-center gap-1 text-center">
+      <i class="pi pi-exclamation-triangle !text-[48px] text-[var(--ac-orange-1)]" aria-hidden="true"></i>
+      <span
+        class="m-0 !text-[28px] !pt-4 !font-['Space_Grotesk'] text-[clamp(24px,4vw,36px)] font-semibold text-[var(--ac-white-1)]">
+        Report unavailable
+      </span>
+      <p class="m-0 !text-sm font-medium text-white/80">{{ errorMessage() }}</p>
+    </div>
+  </section>
+  }
+</main>
