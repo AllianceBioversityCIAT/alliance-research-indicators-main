@@ -1,0 +1,24 @@
+<div class="container z-2" [class.show-sidebar]="this.showSignal()"
+  [style.height]="customHeight || 'calc(100vh - ' + (this.cache.navbarHeight() + this.cache.headerHeight() - (subtractExtraOffset ? 4 : 0)) + 'px)'"
+  [style.top]="customTopOffset || '103px'" [style.bottom]="customBottomOffset || '0px'">
+  <div class="content">
+    <div class="header">
+      <div class="title-container">
+        <span class="title">{{ title }}</span>
+        <span class="pi pi-times !text-[14px] text-[#777C83] cursor-pointer" (click)="hideSidebar()"
+          (keydown)="hideSidebar()"></span>
+      </div>
+      <div class="description">{{ description }}</div>
+    </div>
+    <div class="scrollable-content">
+      <ng-content></ng-content>
+    </div>
+
+    @if (hideActions === false) {
+    <div class="button-container">
+      <p-button label="Cancel" (onClick)="hideSidebar()" [outlined]="true" styleClass="w-full !rounded-[14px]" />
+      <p-button [label]="confirmText" (onClick)="confirmSidebar()" styleClass="w-full !rounded-[14px] !bg-[#035BA9]" />
+    </div>
+    }
+  </div>
+</div>

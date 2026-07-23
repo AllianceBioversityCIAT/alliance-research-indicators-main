@@ -1,0 +1,93 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+  <div class="flex flex-col bg-[#fcfcfc] rounded-[13px] p-[30px] pb-[24px] mb-10 border border-[#e8ebed] bg-[#ffffff]">
+    <div class="section-title">IP RIGHTS</div>
+    <div class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074B86] gap-[7px] px-2.5 mb-[30px]">
+      <span class="!text-[#074b86] !font-[300] material-symbols-rounded rotate-180">info</span>
+      <h3 class="text-[#777C83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+        In case of doubt, please contact the Alliance’s IP Lawyer at the legal office.
+      </h3>
+    </div>
+
+    @if (this.cache.currentMetadata().indicator_id === 2) {
+    <div class="flex flex-col">
+      <div class="flex-1 pb-5">
+        <app-radio-button label="Do you expect private sector engagement in innovation development and/or scaling?"
+          [isRequired]="true" [disabled]="!submission.isEditableStatus()" [signal]="body"
+          [serviceName]="'applicationOptions'" direction="horizontal" [optionLabel]="'name'"
+          [optionValue]="{ body: 'private_sector_engagement_id', option: 'id' }"></app-radio-button>
+      </div>
+    </div>
+
+    <div class="flex flex-col">
+      <div class="flex-1 pb-5">
+        <app-radio-button label="Do you consider applying for formal Intellectual Property Rights?" [isRequired]="true"
+          [disabled]="!submission.isEditableStatus()" [signal]="body" [serviceName]="'applicationOptions'"
+          direction="horizontal" [optionLabel]="'name'"
+          [optionValue]="{ body: 'formal_ip_rights_application_id', option: 'id' }"></app-radio-button>
+      </div>
+    </div>
+    }
+
+    <div class="flex flex-col pb-5">
+      <div class="flex-1 pb-5">
+        <app-radio-button label="Who owns the intellectual property rights to this asset?" [isRequired]="true"
+          [signal]="body" [disabled]="!submission.isEditableStatus()" serviceName="ipOwners" [optionLabel]="'name'"
+          [optionValue]="{ body: 'asset_ip_owner', option: 'id' }">
+        </app-radio-button>
+
+        @if (body().asset_ip_owner === 4) {
+        <div class="flex w-full pt-1">
+          <app-input class="w-full" [signal]="body" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+            placeholder="Name of third party" optionValue="asset_ip_owner_description"></app-input>
+        </div>
+        }
+      </div>
+
+      <div class="flex-1">
+        <app-radio-button
+          label="Are there any legal restrictions for the publication of the work? (confidential information or embargo periods)?"
+          [isRequired]="true" [signal]="body" [serviceName]="'yesOrNo'" [disabled]="!submission.isEditableStatus()"
+          direction="horizontal" [optionLabel]="'name'"
+          [optionValue]="{ body: 'publicity_restriction', option: 'value' }">
+        </app-radio-button>
+        @if (body().publicity_restriction) {
+        <div class="flex w-full pt-1">
+          <app-input class="w-full" [signal]="body" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+            placeholder="When and where?" optionValue="publicity_restriction_description"></app-input>
+        </div>
+        }
+      </div>
+    </div>
+
+    <div class="flex flex-col">
+      <div class="flex-1 pb-5">
+        <app-radio-button label="Is there any potential for commercialization/release/making avaiable this asset?"
+          [isRequired]="true" [disabled]="!submission.isEditableStatus()" [signal]="body" [serviceName]="'yesOrNo'"
+          direction="horizontal" [optionLabel]="'name'"
+          [optionValue]="{ body: 'potential_asset', option: 'value' }"></app-radio-button>
+        @if (body().potential_asset) {
+        <div class="flex w-full pt-1">
+          <app-input class="w-full" [signal]="body" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+            placeholder="Your answer" optionValue="potential_asset_description"></app-input>
+        </div>
+        }
+      </div>
+
+      <div class="flex-1">
+        <app-radio-button label="Does this asset require further development or refinement?" [isRequired]="true"
+          [disabled]="!submission.isEditableStatus()" [signal]="body" direction="horizontal" [optionLabel]="'name'"
+          [serviceName]="'yesOrNo'"
+          [optionValue]="{ body: 'requires_futher_development', option: 'value' }"></app-radio-button>
+        @if (body().requires_futher_development) {
+        <div class="flex w-full pt-1">
+          <app-input class="w-full" [signal]="body" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+            placeholder="Describe the next steps" optionValue="requires_futher_development_description"></app-input>
+        </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <app-navigation-buttons [showNext]="false" (back)="saveData('back')" (save)="saveData()" />
+</div>

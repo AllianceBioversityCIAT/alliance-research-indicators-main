@@ -1,0 +1,111 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-5">
+    <div class="content-section w-full">
+      <div class="sdg-management flex w-full min-w-0 flex-col bg-[#fcfcfc] p-[30px] mb-10 rounded-[10px]">
+        <div class="font-['Inter'] text-[17px] font-bold leading-[18px] text-[#112F5C] mb-0 break-all px-2 pb-8">SDG
+          management</div>
+
+
+        @if (saveSuccess()) {
+        <p class="mb-4 rounded border border-[#B8E0C8] bg-[#EEF8F1] px-3 py-2 text-sm text-[#1B5E20]">Your changes have
+          been saved.</p>
+        }
+        @if (saveError()) {
+        <p class="mb-4 rounded border border-[#F5C6CB] bg-[#FCE8E8] px-3 py-2 text-sm text-[#721C24]">
+          {{ saveError() }}
+        </p>
+        }
+
+        @if (loading()) {
+        <p class="text-sm text-[#4C5158]">Loading levers…</p>
+        } @else if (loadError()) {
+        <p class="text-sm text-[#B00020]">We could not load levers or existing SDG links. Please refresh the page.</p>
+        } @else if (levers().length === 0) {
+        <p class="text-sm text-[#4C5158]">No levers are available.</p>
+        } @else {
+        <div class="w-full min-w-0 pb-2 px-2">
+
+          <div class="flex w-full min-w-0 flex-col gap-4">
+            @for (lever of levers(); track leverNumericId(lever)) {
+            <div class="sdg-lever-card flex min-h-0 min-w-0 flex-col rounded-lg border border-[#E0E4E8] bg-[#E8EBED]">
+              <button type="button"
+                class="sdg-lever-header flex w-full min-w-0 items-center gap-2.5 bg-[#F7F8FA] px-4 py-2.5 text-left cursor-pointer"
+                [class.rounded-t-lg]="isExpanded(lever)" [class.rounded-lg]="!isExpanded(lever)"
+                (click)="toggleRow(lever)" [attr.aria-expanded]="isExpanded(lever)">
+                <i class="sdg-lever-chevron pi shrink-0 text-[#1e4a7a] {{ isExpanded(lever) ? 'pi-chevron-up' : 'pi-chevron-down' }}"
+                  aria-hidden="true"></i>
+                @if (leverImageSrc(lever)) {
+                <img [src]="leverImageSrc(lever)" [alt]="lever.short_name || 'Lever icon'"
+                  class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]" />
+                }
+                <span
+                  class="min-w-0 flex-1 text-left text-[14px] font-[600] leading-[1.35] tracking-wide text-[#14314F]">
+                  {{ lever.short_name }}{{ lever.other_names ? ' - ' + lever.other_names : '' }}
+                </span>
+              </button>
+
+              @if (isExpanded(lever)) {
+              <div class="min-h-0 min-w-0 border-t border-[#EEF1F3] bg-white p-6 rounded-b-lg">
+                <app-multiselect class="block w-full min-w-0" label="SDG target(s)" [signal]="sdgSignalFor(lever)"
+                  optionLabel="select_label" optionLabel2="sdg_target" optionValue="sdg_target_id"
+                  signalOptionValue="result_lever_sdg_targets" [disabled]="false" [removeCondition]="allowRemoveSdg"
+                  [columnsOnXl]="true" [selectedItemsSurfaceColor]="selectedItemsSurfaceColor" [isRequired]="false"
+                  serviceName="clarisaSdgTargets" filterBy="sdg_target_code,sdg_target,select_label"
+                  [enableVirtualScroll]="false" [scrollHeight]="'200px'" placeholder="Select the SDG targets">
+                  <ng-template #selectedItems let-value>
+                    @if (value?.length > 0) {
+                    <div class="flex items-center gap-2">
+                      <span>{{ value?.length }} target{{ value?.length === 1 ? '' : 's' }} selected</span>
+                    </div>
+                    }
+                  </ng-template>
+                  <ng-template #item let-item>
+                    <div class="flex w-full min-w-0 items-center gap-3">
+                      @if (item?.clarisa_sdg?.icon) {
+                      <img [src]="item.clarisa_sdg.icon" [alt]="item.clarisa_sdg.short_name || 'SDG'" loading="lazy"
+                        class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+                      }
+                      <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
+                        <span class="font-[600]">{{ item?.sdg_target_code }}</span><span class="font-normal"> -
+                          {{ item?.sdg_target }}</span>
+                      </p>
+                    </div>
+                  </ng-template>
+                  <ng-template #rows let-tgt>
+                    <div class="flex w-full min-w-0 items-center gap-3">
+                      @if (tgt?.clarisa_sdg?.icon) {
+                      <img [src]="tgt.clarisa_sdg.icon" [alt]="tgt.clarisa_sdg.short_name || 'SDG'" loading="lazy"
+                        class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+                      }
+                      <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
+                        <span class="font-[600]">{{ tgt?.sdg_target_code }}</span><span class="font-normal"> - {{
+                          tgt?.sdg_target }}</span>
+                      </p>
+                    </div>
+                  </ng-template>
+                </app-multiselect>
+
+                <div class="mt-6 flex justify-end ">
+                  <button type="button" (click)="saveForLever(lever)"
+                    [disabled]="loading() || loadError() || savingLeverId() !== null"
+                    class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] bg-[#509C55] px-5 py-2 text-[15px] text-white disabled:cursor-default disabled:bg-[#E8EBED] disabled:text-[#A2A9AF]">
+                    @if (savingLeverId() === leverNumericId(lever)) {
+                    <i class="pi pi-spinner pi-spin !text-[12px]" aria-hidden="true"></i>
+                    <span>Saving…</span>
+                    } @else {
+                    <i class="pi pi-save -scale-x-100 !text-[12px]" aria-hidden="true"></i>
+                    <span>Save</span>
+                    }
+                  </button>
+                </div>
+              </div>
+              }
+            </div>
+            }
+          </div>
+        </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

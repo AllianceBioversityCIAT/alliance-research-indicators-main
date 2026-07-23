@@ -1,0 +1,22 @@
+<div class="banner">
+  <div class="banner-gradient"></div>
+  <img [src]="'images/landing/banner-photo.png' | s3ImageUrl" alt="Banner" class="banner-image" />
+
+  <div class="banner-logos">
+    <img [src]="'images/landing/STAR.svg' | s3ImageUrl" alt="STAR logo" />
+  </div>
+
+  <div class="banner-content">
+    <h1 class="banner-title">Simplifying reporting for impact and clarity</h1>
+    <p class="banner-description">
+      Improve performance reporting with efficient collaboration and streamlined result management for easier tracking and enhancement
+    </p>
+    <p-button
+      styleClass="xl:h-14 lg:h-13 h-12 xl:w-38 lg:w-36 w-32 !bg-[#1689CA] xl:!text-[18px] lg:!text-[16px] !text-[14px] !border-[#1689CA] !gap-x-4 !rounded-[16px]"
+      label="Sign in"
+      size="small"
+      icon="pi pi-arrow-right"
+      [iconPos]="'right'"
+      [routerLink]="['/login']" />
+  </div>
+</div>

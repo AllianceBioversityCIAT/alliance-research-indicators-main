@@ -1,0 +1,19 @@
+.items {
+  display: flex;
+  flex-direction: column;
+
+  .item {
+    border: 0.7px solid #e8ebed;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f4f7f9;
+    gap: 20px;
+
+    i {
+      cursor: pointer;
+      color: rgb(187 0 50);
+    }
+  }
+}

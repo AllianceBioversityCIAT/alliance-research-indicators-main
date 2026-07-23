@@ -1,0 +1,19 @@
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title-cell {
+  max-width: 200px;
+}
+
+.title-content {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  max-height: 2.4em; /* 2 lines * 1.2 line-height */
+}

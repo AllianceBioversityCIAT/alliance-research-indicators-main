@@ -1,0 +1,53 @@
+@if (getConfig().isOpen) {
+<div class="local-container" [@fadeIn] (keydown)="onKeydown($event)"
+  [style.zIndex]="modalName === 'resultInformation' ? 1100 : 1000">
+  <div [@scaleIn]>
+    <div #modalRoot aria-modal="true" class="bg-[#f5f5f5] max-h-[97vh] rounded-[27px] flex flex-col no-scrollbar"
+      [class]="getConfig().isWide ? 'max-w-[99vw]' : 'max-w-[80vw]'" tabindex="-1">
+      <header class="px-10 py-4 flex items-center bg-white rounded-t-[27px] atc-primary-blue-500">
+        @if (getConfig().icon) {
+        <i class="material-symbols-rounded cursor-pointer pr-2 !text-[22px]"
+          (click)="getConfig().iconAction?.(); clearModal()" (keydown)="getConfig().iconAction?.()">{{ getConfig().icon
+          }}</i>
+        }
+        @if (modalName === 'submitResult') {
+        <i class="material-symbols-rounded cursor-pointer pr-2 !text-[22px]" (click)="getConfig().cancelAction?.()"
+          (keydown.enter)="getConfig().cancelAction?.()" title="Go back">arrow_back</i>
+        }
+        <p class="font-[500] text-[16px]">{{ getModalTitle() }}</p>
+      </header>
+      <div class="absolute top-5 right-6 text-[#777c83] cursor-pointer"
+        (click)="allModalsService.toggleModal(modalName)" (keydown.enter)="allModalsService.toggleModal(modalName)">
+        <i class="material-symbols-rounded !text-[22px]" (click)="clearModal()" (keydown.enter)="clearModal()">close</i>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <ng-content></ng-content>
+      </div>
+
+      @if (getConfig().cancelAction || getConfig().confirmAction) {
+      <div
+        class="flex space-x-5 {{modalName === 'submitResult' ? 'mt-6  mb-8' : 'mt-12  mb-10'}} {{modalName === 'addContactPerson' || modalName === 'portfolioManagement' ? 'justify-end' : ''}} m-12">
+        @if (getConfig().cancelAction) {
+        <button
+          class="border-[1.5px] text-[15px] font-medium border-[#035BA9] text-[#035BA9] px-5 py-2 rounded-[14px] cursor-pointer disabled:cursor-not-allowed"
+          (click)="getConfig().cancelAction?.()">
+          {{ getConfig().cancelText }}
+        </button>
+        }
+        @if (getConfig().confirmAction) {
+        <button
+          class="bg-[#035BA9] text-[15px] text-white disabled:bg-[#E8EBED] disabled:text-[#A2A9AF] px-5 py-2 rounded-[14px] cursor-pointer disabled:cursor-not-allowed flex items-center gap-2"
+          (click)="getConfig().confirmAction?.()" [disabled]="getConfig().disabledConfirmAction?.()">
+          {{ getConfig().confirmText }}
+          @if (getConfig().confirmIcon) {
+          <i [class]="getConfig().confirmIcon"></i>
+          }
+        </button>
+        }
+      </div>
+      }
+    </div>
+  </div>
+</div>
+}

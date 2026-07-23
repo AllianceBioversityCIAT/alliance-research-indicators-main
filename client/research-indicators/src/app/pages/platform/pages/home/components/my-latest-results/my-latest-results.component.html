@@ -1,0 +1,79 @@
+<div class="relative w-full">
+  @if (latestResultList().length) {
+  <div class="header">
+    <div class="header-text ">
+      <span class="title-text">My latest results</span>
+      <span class="description-text">View and track your most recent results.</span>
+    </div>
+    <div class="submmit-button">
+      <button type="button" class="create-result-btn !text-white" (click)="allModalsService.openModal('createResult')">
+        <span class="material-symbols-rounded create-result-btn__icon" aria-hidden="true">add_circle_outline</span>
+        <span class="create-result-btn__label !text-white">Create Result</span>
+      </button>
+    </div>
+  </div>
+  <div class="card-container">
+    @for (result of latestResultList(); track result.result_id + '-' + result.platform_code) {
+    <a class="card cursor-pointer"
+      [attr.href]="opensResultInformationModal(result) ? '#' : null"
+      [routerLink]="opensResultInformationModal(result) ? null : getStarResultRouterLink(result)"
+      [queryParams]="opensResultInformationModal(result) ? null : getStarResultQueryParams(result)"
+      (click)="onResultCardClick(result, $event)">
+      <div class="card-content">
+        <div class="project-indicators">
+          <div class="indicator">
+            <div class="indicator-container">
+              @if (result.indicators?.icon_src; as iconSrc) {
+              <i class="pi {{ iconSrc }} icon-color-{{ iconSrc }}"></i>
+              }
+            </div>
+            <label class="indicator-type" for="username">{{ result.indicators?.name ?? '' }}</label>
+            <div class="more-vert">
+              <span class="material-symbols-rounded more-vert__icon">more_vert</span>
+            </div>
+          </div>
+          <div class="organization-identifier">
+            <div class="project">
+              <label class="project-name" for="username">{{ truncateTitle(result.title) }}</label>
+            </div>
+          </div>
+          <div class="project-info">
+            <div class="project-name">
+              <span class="project-title">Project</span>
+              <span class="material-symbols-rounded"> arrow_forward </span>
+              @if (result.contract_id) {
+              <label class="project" for="username">
+                {{ result.contract_id }}
+                @if (result.contract_description; as contractDesc) {
+                <span> - {{ contractDesc }}</span>
+                }
+              </label>
+              }
+            </div>
+          </div>
+          <div class="progress-bar">
+            @if (result.result_status; as rs) {
+            <app-custom-tag class="progress-status-tag" [statusId]="rs.result_status_id ?? 0"
+              [statusName]="rs.name ?? ''" [statusColor]="rs.config?.color?.text || undefined"
+              [statusBackground]="rs.config?.color?.background ?? undefined"
+              [statusBorder]="rs.config?.color?.border ?? undefined" [icon]="true"
+              [iconName]="rs.config?.icon?.name || undefined" [iconColor]="rs.config?.icon?.color || undefined"
+              [tooltip]="rs.description ?? ''" [textSizePx]="10" maxWidth="100px" [multiline]="false">
+            </app-custom-tag>
+            }
+            <div class="progress-bar-content">
+              <div class="progress" [style.width.%]="calculateProgressFor(result)"
+                [style.background-color]="getStatusProgressColor(result)"></div>
+            </div>
+          </div>
+          @if (lastUpdatedAt(result); as updated) {
+          <label class="last-update" for="username"> Last update on {{ updated |
+            formatDate:dateFormatConfig.config() }} </label>
+          }
+        </div>
+      </div>
+    </a>
+    }
+  </div>
+  }
+</div>

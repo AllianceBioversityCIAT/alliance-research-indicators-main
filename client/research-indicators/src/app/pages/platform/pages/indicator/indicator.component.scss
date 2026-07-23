@@ -1,0 +1,9 @@
+.content {
+  padding: 25px 23px;
+  margin: 20px 30px;
+  padding-bottom: 200px;
+}
+
+:host ::ng-deep .indicator-title {
+  margin-bottom: 12px !important;
+}

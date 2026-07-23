@@ -1,0 +1,114 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+  <div class="flex flex-col bg-[#fcfcfc] rounded-[13px] p-[30px] mb-10 border border-[#e8ebed] bg-[#ffffff]">
+    <div class="section-title">GEOGRAPHIC SCOPE</div>
+    <div class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074b86] gap-3 px-3 mb-[30px]">
+      <i class="text-[#074b86] !text-[18px] pi pi-exclamation-circle"></i>
+      <h3 class="text-[#777c83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+        Select the geographic location/s where this result is taking place.
+      </h3>
+    </div>
+
+    <div class="flex justify-between items-start w-full">
+      <div class="information"></div>
+    </div>
+
+    <div class="grid gap-[15px]">
+      <div class="flex flex-col">
+        <app-radio-button [isRequired]="true" label="What is the main geographic focus of the Impact?"
+          helperText="This should reflect where the Impact has taken place/contributed to benefit." [signal]="body"
+          [optionLabel]="'label'" direction="horizontal" spaceX="gap-10" serviceName="geoFocus"
+          [disabled]="!submission.isEditableStatus()" (selectEvent)="onSelect()"
+          [optionValue]="{ body: 'geo_scope_id', option: 'value' }"></app-radio-button>
+      </div>
+      <div class="flex flex-col gap-[25px]">
+        @if (getMultiselectLabel().region.label) {
+        <app-multiselect [signal]="body" [optionLabel]="'name'" [optionValue]="'region_id'"
+          [signalOptionValue]="'regions'" [removeCondition]="canRemove" [isRequired]="isRegionsRequired()"
+          [disabled]="!submission.isEditableStatus()" serviceName="regions"
+          label="{{ getMultiselectLabel().region.label }}" helperText="{{ getMultiselectLabel().region.description }}"
+          placeholder="Select the regions">
+        </app-multiselect>
+        }
+        @if (getMultiselectLabel().country.label) {
+        @if (body().geo_scope_id === 5 || body().geo_scope_id === '5') {
+        <app-multiselect (selectEvent)="onSelect()" [signal]="body"
+          [flagAttributes]="{ isoAlpha2: 'isoAlpha2', institution_location_name: 'name' }"
+          [disabledSelectedScroll]="body().geo_scope_id === 5 || body().geo_scope_id === '5'" [optionLabel]="'name'"
+          [isRequired]="isCountriesRequired()" [disabled]="!submission.isEditableStatus()" [optionValue]="'isoAlpha2'"
+          [removeCondition]="canRemove" [signalOptionValue]="'countries'" serviceName="countriesWithSubnational"
+          label="{{ getMultiselectLabel().country.label }}" helperText="{{ getMultiselectLabel().country.description }}"
+          placeholder="Select the countries">
+          <ng-template #rows let-country>
+            @for (c of [country]; track c.isoAlpha2) {
+            <div class="flex justify-between items-start w-full">
+              <div class="flex flex-col gap-3 max-w-[70%]">
+                <div class="flex items-center gap-3">
+                  <img [src]="environment.flagsUrl + c.isoAlpha2 + '.svg'" [alt]="c.name"
+                    class="w-6 h-4 object-cover" />
+                  <span class="font-medium text-[var(--text-color)]">{{ c.name }}</span>
+                </div>
+                <div class="sub-national-section">
+                  <div class="flex flex-wrap gap-2 items-center">
+                    <span class="text-[#777c83] text-[13px]">Sub-national levels</span>
+                    <i class="pi pi-arrow-right !text-[12px] text-[#8d9299] cursor-pointer"></i>
+                    @if (c.result_countries_sub_nationals_signal()?.regions?.length > 0) {
+                    @for (region of c.result_countries_sub_nationals_signal().regions; track region.sub_national_id) {
+                    <div class="bg-[#e5e7eb] rounded-full px-3 py-1 flex items-center gap-2 text-[13px] text-[#4c5158]">
+                      {{ region.name }}
+                      @if (submission.isEditableStatus()) {
+                      <i class="pi pi-times !text-[12px] text-[#8d9299] hover:text-[#4c5158] cursor-pointer"
+                        (keydown.enter)="removeSubnationalRegion(c, region)"
+                        (click)="removeSubnationalRegion(c, region)">
+                      </i>
+                      }
+                    </div>
+                    }
+                    }
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right column: Multiselect -->
+              <div class="w-[300px]">
+                <app-multiselect-instance [signal]="c.result_countries_sub_nationals_signal" [optionLabel]="'name'"
+                  (valueChange)="updateCountryRegions(c.isoAlpha2, $event)" [optionValue]="'sub_national_id'"
+                  [signalOptionValue]="'regions'" [disabled]="!submission.isEditableStatus()"
+                  serviceName="GetSubnationalByIsoAlpha" [hideSelected]="true"
+                  [endpointParams]="{ isoAlpha2: c.isoAlpha2 }">
+                </app-multiselect-instance>
+              </div>
+            </div>
+            }
+          </ng-template>
+        </app-multiselect>
+
+        @if (showSubnationalError()) {
+        <div class="flex items-center gap-1 -mt-4 text-[#E69F00] text-sm">
+          <i class="material-symbols-rounded !text-base">warning</i>
+          <span>Please select at least one sub-national level per country.</span>
+        </div>
+        }
+        } @else {
+        <app-multiselect (selectEvent)="onSelect()" [signal]="body"
+          [flagAttributes]="{ isoAlpha2: 'isoAlpha2', institution_location_name: 'name' }"
+          [disabledSelectedScroll]="body().geo_scope_id === 5 || body().geo_scope_id === '5'" [optionLabel]="'name'"
+          [isRequired]="isCountriesRequired()" [disabled]="!submission.isEditableStatus()" [optionValue]="'isoAlpha2'"
+          [removeCondition]="canRemove" [signalOptionValue]="'countries'" serviceName="countriesWithoutSubnational"
+          label="{{ getMultiselectLabel().country.label }}" helperText="{{ getMultiselectLabel().country.description }}"
+          placeholder="Select the countries">
+        </app-multiselect>
+        }
+        }
+
+        <div class="flex flex-col">
+          <app-textarea [rows]="5" label="Comments Geographic Scope"
+            helperText="Provide additional information about the geographic scope, if necessary." [maxLength]="1000"
+            [disabled]="!submission.isEditableStatus()" [signal]="body" [optionValue]="'comment_geo_scope'"
+            placeholder="Write the comments"></app-textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+  <app-navigation-buttons (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
+</div>

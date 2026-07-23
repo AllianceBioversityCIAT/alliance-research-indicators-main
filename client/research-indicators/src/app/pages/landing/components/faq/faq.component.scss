@@ -1,0 +1,117 @@
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 100px 75px;
+  gap: 50px;
+  min-width: 100%;
+
+  @media (min-width: 1024px) and (max-width: 1280px) {
+    padding: 100px 65px;
+    gap: 40px;
+  }
+  @media (max-width: 1024px) {
+    padding: 100px 45px;
+    gap: 35px;
+  }
+
+  @media (max-width: 768px) {
+    padding: 40px;
+  }
+
+  .content {
+    width: 100%;
+
+    .accordions {
+      display: grid;
+      width: 100%;
+
+      .custom-panel {
+        margin: 0;
+        height: 100%;
+      }
+
+      .custom-header {
+        border-radius: 0px;
+        border: none;
+        background-color: #ffffff;
+        padding: 32px 24px;
+        color: #112f5c;
+        font-weight: 500;
+        font-size: 16px;
+        text-transform: uppercase;
+
+        @media (min-width: 1024px) and (max-width: 1280px) {
+          font-size: 15px;
+          padding: 30px 22px;
+        }
+        @media (max-width: 1024px) {
+          font-size: 14px;
+          padding: 28px 20px;
+        }
+      }
+
+      @media (max-width: 1024px) {
+        grid-template-columns: 1fr;
+      }
+    }
+  }
+}
+
+.faq-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.faq-header-subtitle {
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 24px;
+  letter-spacing: 0.24em;
+  padding-bottom: 10px;
+  text-transform: uppercase;
+  color: #8d9299;
+
+  @media (min-width: 1024px) and (max-width: 1280px) {
+    font-size: 17px;
+    line-height: 22px;
+  }
+  @media (max-width: 1024px) {
+    font-size: 15px;
+    line-height: 20px;
+  }
+}
+
+.faq-header-title {
+  font-size: 45px;
+  font-weight: 700;
+  line-height: 50.42px;
+  text-align: left;
+  color: #112f5c;
+
+  @media (min-width: 1024px) and (max-width: 1280px) {
+    font-size: 35px;
+    line-height: 40px;
+  }
+  @media (max-width: 1024px) {
+    font-size: 28px;
+    line-height: 30px;
+  }
+}
+
+::ng-deep .p-accordion-header {
+  height: 100%;
+}
+
+::ng-deep .p-disabled {
+  opacity: 1;
+}

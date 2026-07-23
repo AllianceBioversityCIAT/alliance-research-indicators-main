@@ -1,0 +1,97 @@
+<div class="input-container">
+  @if (label) {
+    <div class="flex items-center justify-between w-full">
+      <label class="label inline-block flex items-center" for="username">
+        {{ label }}
+        @if (isRequired) {
+          <span class="text-red-500">*</span>
+        }
+      </label>
+      @if (maxLength) {
+        <app-word-counter [value]="'' + (value || '')" [maxWords]="maxLength"></app-word-counter>
+      }
+    </div>
+  }
+  @if (description) {
+    <small class="description" for="username">{{ description }}</small>
+  }
+
+  @if (currentResultIsLoading()) {
+    <p-skeleton width="100%" height="7rem" styleClass="mb-2" />
+  } @else {
+    <div>
+      <textarea
+        appSaveOnWriting
+        [rows]="rows"
+        pTextarea
+        [class]="styleClass"
+        [autoResize]="false"
+        [disabled]="disabled || isAiLoading"
+        [(ngModel)]="value"
+        (ngModelChange)="setValue($event)"
+        (keydown)="
+          shouldPreventInput($event, body().value || null) ? $event.preventDefault() : shouldPreventTextInput($event) ? $event.preventDefault() : null
+        "
+        [style]="isInvalid() || showMaxReachedMessage() ? { border: '2px solid #E69F00', resize: 'none' } : { resize: 'none' }"
+        [placeholder]="placeholder">
+      </textarea>
+      @if (helperText) {
+        <div class="flex gap-1 text-[#8D9299] text-[14px] justify-between w-full items-start">
+          <div class="flex-1">
+            <span class="leading-4" [innerHTML]="helperText"></span>
+            @if (isInvalid()) {
+              <div class="flex items-center gap-1 text-[#E69F00] {{ size || 'text-sm' }} mt-1">
+                <i class="material-symbols-rounded !text-base">warning</i>
+                <span>This field is required</span>
+              </div>
+            }
+          </div>
+
+          @if (aiAssistantFunction) {
+            <div class="flex flex-col gap-2">
+              <button
+                class="font-medium max-w-[180px] max-h-[42px] font-[500] text-[13px] px-6 py-3 gap-2 justify-center w-full flex rounded-[16px] {{
+                  isAiDisabled || isAiLoading
+                    ? 'cursor-not-allowed bg-[#E8EBED] text-[#8D9299]'
+                    : 'cursor-pointer bg-gradient-to-r from-[#035BA9] to-[#039CE0] text-white'
+                }}"
+                [disabled]="isAiDisabled || isAiLoading"
+                [attr.aria-busy]="isAiLoading"
+                [attr.aria-label]="isAiLoading ? 'Generating with AI, please wait' : 'Generate with AI'"
+                (click)="!isAiDisabled && !isAiLoading && aiAssistantFunction()">
+                @if (isAiLoading) {
+                  <i class="pi pi-spinner pi-spin text-[#8D9299] text-xs"></i>
+                  Generating...
+                } @else {
+                  Generate with AI
+                  <img
+                    [src]="'images/spark-white.svg' | s3ImageUrl"
+                    alt="upload-ai"
+                    class="h-4.5"
+                    [style.filter]="
+                      isAiDisabled
+                        ? 'brightness(0) saturate(100%) invert(54%) sepia(8%) saturate(464%) hue-rotate(202deg) brightness(95%) contrast(89%)'
+                        : 'none'
+                    " />
+                }
+              </button>
+            </div>
+          }
+        </div>
+      } @else {
+        @if (isInvalid()) {
+          <div class="flex items-center gap-1 text-[#E69F00] {{ size || 'text-sm' }}">
+            <i class="material-symbols-rounded !text-base">warning</i>
+            <span>This field is required</span>
+          </div>
+        }
+      }
+      @if (showMaxReachedMessage()) {
+        <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+          <i class="material-symbols-rounded !text-base">warning</i>
+          <span>Maximum reached</span>
+        </div>
+      }
+    </div>
+  }
+</div>

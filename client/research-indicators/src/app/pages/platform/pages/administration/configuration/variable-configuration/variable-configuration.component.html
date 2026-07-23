@@ -1,0 +1,225 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-[18px]">
+    <div class="content-section w-full">
+      <div class="variable-configuration flex w-full min-w-0 flex-col gap-[18px]">
+        <div class="flex flex-col gap-[2px]">
+          <h1 class="font-['Barlow'] text-[17px] font-bold leading-normal text-[#112F5C] m-0">Configuration variables
+          </h1>
+          <p class="font-['Barlow'] text-[14px] leading-[1.2] text-[#777C83] m-0">Manage environment variables across
+            the system.</p>
+        </div>
+
+        <div class="flex items-center gap-2 border-l-[5px] border-[#074B86] bg-[#F4F7F9] px-4 py-3">
+          <i class="pi pi-info-circle shrink-0 text-[15px] text-[#074B86] rotate-180" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] leading-normal text-[#777C83]">
+            <span class="font-semibold text-[#777C83]">Advanced settings:</span>
+            If you are not a developer, please refrain from making any changes in this section.
+          </p>
+        </div>
+
+        <div class="flex flex-col mb-3">
+          <div class="flex flex-col px-5 py-4 bg-white">
+            <div class="flex items-center justify-between w-full">
+              <div class="flex gap-3 items-center justify-between w-full">
+                <div class="relative w-[25rem]">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <i class="pi pi-search text-[#6B7280] !text-[12px]" aria-hidden="true"></i>
+                  </span>
+                  <input pInputText type="text" id="config-table-search" [ngModel]="tableSearch()"
+                    (ngModelChange)="setTableSearch($event)"
+                    placeholder="Find a variable by category, subcategory, name, description or value"
+                    aria-label="Search configuration variables"
+                    class="w-full !pl-9 !rounded-[8px] py-2 border !max-h-[27px] !text-[12px] !py-1 !border-[#B9C0C5] !text-[#6B7280] rounded-lg" />
+                </div>
+
+                <div class="flex gap-3 items-center">
+                  @if (hasTableSearch()) {
+                  <p-button styleClass="!text-[12px] !text-[#777C83]" label="Clear search" [text]="true" size="small"
+                    severity="secondary" (keydown.enter)="clearTableSearch()" (click)="clearTableSearch()"></p-button>
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (service.showAdvancedFilters()) {
+            <div class="flex flex-wrap items-end gap-3 mt-3">
+              <div class="flex min-w-[180px] flex-col gap-1">
+                <label class="text-[11px] font-medium uppercase tracking-wide text-[#8D9299]"
+                  for="config-category">Category</label>
+                <p-dropdown inputId="config-category" [options]="facetOptions(service.facets().categories)"
+                  optionLabel="label" optionValue="value" [ngModel]="service.draftCategoryFilter()"
+                  (ngModelChange)="service.draftCategoryFilter.set($event)" placeholder="All"
+                  styleClass="w-full"></p-dropdown>
+              </div>
+              <div class="flex min-w-[180px] flex-col gap-1">
+                <label class="text-[11px] font-medium uppercase tracking-wide text-[#8D9299]"
+                  for="config-subcategory">Subcategory</label>
+                <p-dropdown inputId="config-subcategory" [options]="facetOptions(service.facets().subcategories)"
+                  optionLabel="label" optionValue="value" [ngModel]="service.draftSubcategoryFilter()"
+                  (ngModelChange)="service.draftSubcategoryFilter.set($event)" placeholder="All"
+                  styleClass="w-full"></p-dropdown>
+              </div>
+            </div>
+            }
+          </div>
+
+          @if (service.loadError()) {
+          <p class="px-5 py-6 text-sm text-[#B00020] bg-white border border-[#E8EBED]">We could not load
+            configurations. Please refresh the page.</p>
+          } @else {
+          @if (service.loading()) {
+          <app-custom-progress-bar></app-custom-progress-bar>
+          }
+          <div #tableRppScope class="rpp-dropup w-full border border-[#E8EBED]">
+            <p-table [value]="filteredItems()" [loading]="service.loading()" [scrollable]="true"
+              [tableStyle]="tableStyle()"
+              styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows variable-configuration-table">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="category"
+                    [style]="fixedColumnStyle(columnWidths.category)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Category
+                      <p-sortIcon field="category"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="subcategory"
+                    [style]="fixedColumnStyle(columnWidths.subcategory)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Subcategory
+                      <p-sortIcon field="subcategory"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="key"
+                    [style]="fixedColumnStyle(columnWidths.variableName)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Variable name
+                      <p-sortIcon field="key"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" [style]="descriptionColumnStyle()">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Description
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" [style]="fixedColumnStyle(columnWidths.value)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Value
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" [style]="fixedColumnStyle(columnWidths.lastUpdated)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Last updated
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" [style]="fixedColumnStyle(columnWidths.updatedBy)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Updated by
+                    </div>
+                  </th>
+                  @if (roles.canEditAppConfiguration()) {
+                  <th class="variable-config-actions-col !text-[#112F5C]" scope="col"
+                    [style]="fixedColumnStyle(columnWidths.actions)">
+                    <div class="flex items-center justify-center font-[500] leading-tight text-[14px] text-center">
+                      Actions
+                    </div>
+                  </th>
+                  }
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-row>
+                <tr class="hover:surface-ground transition-colors duration-150 text-[14px] text-[#4C5158]">
+                  <td [style]="fixedColumnStyle(columnWidths.category)">
+                    <div class="w-full min-w-0 overflow-hidden truncate" [appTruncatedTooltip]="row.category || '—'"
+                      tooltipPosition="top">
+                      {{ row.category || '—' }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.subcategory)">
+                    <div class="w-full min-w-0 overflow-hidden truncate" [appTruncatedTooltip]="row.subcategory || '—'"
+                      tooltipPosition="top">
+                      {{ row.subcategory || '—' }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.variableName)">
+                    <div class="w-full min-w-0 overflow-hidden break-all line-clamp-2" [appTruncatedTooltip]="row.key"
+                      tooltipPosition="top">{{ row.key }}</div>
+                  </td>
+                  <td class="break-words" [style]="descriptionColumnStyle()">
+                    <div class="w-full min-w-0 overflow-hidden line-clamp-2"
+                      [appTruncatedTooltip]="row.description || '—'" tooltipPosition="top">
+                      {{ row.description || '—' }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.value)">
+                    <div class="w-full min-w-0 overflow-hidden line-clamp-2" [appTruncatedTooltip]="displayValue(row)"
+                      tooltipPosition="top">
+                      @if (service.isJsonConfig(row)) {
+                      <span class="json-value-badge">{{ service.jsonSectionsLabel(row) }}</span>
+                      } @else {
+                      {{ displayValue(row) }}
+                      }
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.lastUpdated)">
+                    <div class="w-full min-w-0 overflow-hidden truncate"
+                      [appTruncatedTooltip]="formatUpdatedAt(row.updated_at)" tooltipPosition="top">
+                      {{ formatUpdatedAt(row.updated_at) }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.updatedBy)">
+                    <div class="w-full min-w-0 overflow-hidden truncate" [appTruncatedTooltip]="row.updated_by || '—'"
+                      tooltipPosition="top">
+                      {{ row.updated_by || '—' }}
+                    </div>
+                  </td>
+                  @if (roles.canEditAppConfiguration()) {
+                  <td class="variable-config-actions-col" [style]="fixedColumnStyle(columnWidths.actions)">
+                    <div class="flex items-center justify-center">
+                      <button type="button" (click)="openEdit(row)" aria-label="Edit variable" pTooltip="Edit variable"
+                        tooltipPosition="top"
+                        class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[#D9E1EB] p-[2px] hover:bg-[#D9E1EB] transition-colors duration-150">
+                        <i class="pi pi-pencil !text-[12px] text-[#035BA9]"></i>
+                      </button>
+                    </div>
+                  </td>
+                  }
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td [attr.colspan]="tableColSpan()" class="text-center p-8">
+                    <div class="flex flex-col items-center gap-2">
+                      <div class="w-16 h-16 flex items-center justify-center rounded-xl bg-blue-50">
+                        <i class="pi pi-inbox text-3xl text-blue-500"></i>
+                      </div>
+                      <h2 class="text-900 font-semibold m-0">
+                        @if (hasTableSearch()) {
+                        No variables match your search
+                        } @else {
+                        No configurations found
+                        }
+                      </h2>
+                      <p class="text-600 text-center m-0 max-w-[30rem] leading-relaxed">
+                        @if (hasTableSearch()) {
+                        Try adjusting your search criteria or clear the search to see all variables.
+                        } @else {
+                        There are currently no configuration variables to display.
+                        }
+                      </p>
+                      @if (hasTableSearch()) {
+                      <p-button label="Clear search" icon="pi pi-times" severity="primary" [outlined]="true"
+                        size="small" (keydown.enter)="clearTableSearch()" (click)="clearTableSearch()"></p-button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

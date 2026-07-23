@@ -1,0 +1,84 @@
+<div class="flex flex-col gap-6">
+
+  @for (area of impactAreasService.list() || []; track area.id) {
+  <div class="flex flex-col gap-4 p-7 bg-[#F4F7F9] border border-[#E8EBED] rounded-lg">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded flex items-center justify-center overflow-hidden">
+        <img [src]="area.icon" [alt]="area.name" class="w-full h-full object-cover">
+      </div>
+      <span class="section-title !mb-0 ">
+        IMPACT AREA #{{ area.id }}: <span class="font-semibold">{{ area.name }}</span>
+      </span>
+    </div>
+
+    <div class="flex flex-col xl:flex-row xl:items-start gap-5 justify-between pt-2.5">
+      <app-radio-button [label]="'Impact Area Score'" [isRequired]="true" [signal]="getImpactAreaScore(area.id)"
+        [disabled]="disabled" [serviceName]="'impactAreaScores'" [optionLabel]="'name'"
+        [optionValue]="{ body: 'score', option: 'id' }" [direction]="'horizontal'" [spaceX]="'gap-4'"
+        [centerOptions]="true" (selectEvent)="onScoreChange(area.id, $event)">
+      </app-radio-button>
+
+      <div class="relative w-full min-w-0 flex-1 flex-col">
+        <div class="input-container">
+          <label class="label inline-block" [attr.for]="'impact-area-global-target-' + area.id"><span>Global
+              Target</span>@if (isGlobalTargetRequired(area.id)) {<span class="text-red-500">*</span>}</label>
+        </div>
+        <div class="items">
+          <div class="w-full min-w-0" #globalTargetTrigger>
+            <p-multiSelect #globalTargetMs [inputId]="'impact-area-global-target-' + area.id"
+              [style]="isGlobalTargetInvalid(area.id) ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
+              [options]="globalTargetOptions(area.id)" [loading]="globalTargetLoading(area.id)"
+              [display]="'comma'" optionLabel="target" optionValue="targetId" [showToggleAll]="false" [filter]="true"
+              filterBy="smo_code,target" [ngModel]="getGlobalTargetIdsSignal(area.id)()"
+              (ngModelChange)="onGlobalTargetIdsChange(area.id, $event)" [disabled]="disabled" [virtualScroll]="false"
+              [scrollHeight]="'145px'" placeholder="Select the Global Target" appendTo="body" [baseZIndex]="11000"
+              [panelStyle]="globalTargetPanelStyle(area.id)"
+              (onPanelShow)="onGlobalTargetPanelOpen(area.id, globalTargetMs, globalTargetTrigger)">
+              <ng-template pTemplate="selectedItems" let-value>
+                @if (value?.length > 0) {
+                <span class="text-[#777C83]">{{ value.length }} selected</span>
+                }
+              </ng-template>
+              <ng-template pTemplate="item" let-item>
+                <span
+                  class="block w-full min-w-0 text-left text-[14px] leading-[18px] text-[#4C5158] font-['Barlow'] whitespace-normal break-words">
+                  <span class="font-[600]">{{ item?.smo_code }}</span><span class="font-normal"> {{ item?.target
+                    }}</span>
+                </span>
+              </ng-template>
+            </p-multiSelect>
+            @if (isGlobalTargetInvalid(area.id)) {
+            <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+              <i class="material-symbols-rounded !text-base">warning</i>
+              <span>This field is required</span>
+            </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @if (selectedGlobalTargetRows(area.id).length > 0) {
+    <div class="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:flex-wrap xl:gap-4">
+      @for (row of selectedGlobalTargetRows(area.id); track row.targetId) {
+      <div
+        class="flex w-full min-w-0 items-center justify-between gap-3 rounded-[6px] border !border-[#c6cdd1]/40 bg-[#E8EBED] px-5 py-2.5 xl:w-[calc(50%-0.5rem)] xl:max-w-none xl:flex-none">
+        <p
+          class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158] font-['Barlow'] line-clamp-4 [overflow-wrap:anywhere]">
+          <span class="font-[600]">{{ row.smo_code }}</span><span class="font-normal"> {{ row.target }}</span>
+        </p>
+        @if (!disabled) {
+        <button type="button"
+          class="multiselect-row-remove shrink-0 cursor-pointer border-0 bg-transparent p-0 leading-none text-[#CF0808] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#CF0808]/30 rounded"
+          (click)="removeGlobalTargetRow(area.id, row.targetId)"
+          (keydown.enter)="removeGlobalTargetRow(area.id, row.targetId)" aria-label="Remove">
+          <i class="pi pi-times-circle !text-[20px]"></i>
+        </button>
+        }
+      </div>
+      }
+    </div>
+    }
+  </div>
+  }
+</div>

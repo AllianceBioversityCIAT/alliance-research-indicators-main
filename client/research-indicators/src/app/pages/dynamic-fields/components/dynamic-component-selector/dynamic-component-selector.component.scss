@@ -1,0 +1,28 @@
+.section {
+  border: 1px dotted rgb(101 101 101);
+  box-sizing: border-box;
+  margin: 10px;
+  padding: 10px;
+}
+
+.block {
+  box-shadow: 0 0 10px 0 rgb(0 0 0 / 10%);
+  padding: 20px;
+  min-height: 200px;
+  box-sizing: border-box;
+  margin: 50px;
+}
+
+.order-mode {
+  border: solid 1px rgb(190 190 190);
+  padding: 10px;
+  background-color: rgb(232 232 232);
+}
+
+.dropper {
+  background-color: purple;
+  height: 10px;
+  width: 100px;
+  opacity: 0;
+  transition: all 0.3s ease-in-out;
+}

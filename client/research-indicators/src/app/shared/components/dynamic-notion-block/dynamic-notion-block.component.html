@@ -1,0 +1,347 @@
+@switch (block.type) {
+@case ('callout') {
+@let text = joinText(block?.callout?.rich_text);
+@let icon = block?.callout?.icon;
+@let children = block?.children;
+
+<div class="mb-2.5 flex flex-col gap-2 rounded-[5px] bg-[#f4f7f9] px-5 py-2.5">
+  <div class="flex gap-2.5">
+    @if (icon) {
+    @if (icon?.external?.url) {
+    <img [src]="icon.external.url" alt="icon" width="24" height="24" />
+    } @else {
+    <p class="m-0 text-[20px]">{{ icon?.emoji }}</p>
+    }
+    }
+    @if (text) {
+    <div class="flex items-center">
+      <p class="m-0 text-[14px] font-light leading-[1.5] text-[#4C5158]" [innerHTML]="text"></p>
+    </div>
+    }
+  </div>
+
+  @if (children) {
+  <div class="flex flex-col" [ngClass]="text ? 'ml-[30px]' : 'ml-[15px]'">
+    @for (child of children; track child.id) {
+    <app-dynamic-notion-block [block]="child"></app-dynamic-notion-block>
+    }
+  </div>
+  }
+</div>
+}
+
+@case ('heading_1') {
+@let text = joinPlainText(block?.heading_1?.rich_text);
+@if (text) {
+<h1 class="mb-2.5 m-0 font-['Space_Grotesk'] text-[16px] font-bold leading-[18px] text-[#112F5C]">
+  {{ text }}
+</h1>
+}
+}
+
+@case ('heading_2') {
+@let text = joinPlainText(block?.heading_2?.rich_text);
+@if (text) {
+<h2 class="mb-2.5 m-0 font-['Space_Grotesk'] text-[15.5px] font-semibold leading-[1.25] text-[#112F5C]">
+  {{ text }}
+</h2>
+}
+}
+
+@case ('heading_3') {
+@let text = joinPlainText(block?.heading_3?.rich_text);
+@if (text) {
+<h3 class="mb-2.5 m-0 font-['Space_Grotesk'] text-[14px] font-semibold leading-[1.25] text-[#112F5C]">
+  {{ text }}
+</h3>
+}
+}
+
+@case ('paragraph') {
+@let text = joinText(block?.paragraph?.rich_text);
+@let children = block?.children;
+@if (text) {
+<p class="mb-2.5 m-0 font-['Barlow'] text-[14px] font-light leading-[1.5] text-[#4C5158]" [innerHTML]="text"></p>
+}
+
+@if (children) {
+<div class="ml-[30px] flex flex-col">
+  @for (child of children; track child.id) {
+  <app-dynamic-notion-block [block]="child"></app-dynamic-notion-block>
+  }
+</div>
+}
+}
+
+@case ('image') {
+@let imageUrl = getImageBlockUrl(block);
+@let caption = joinText(block?.image?.caption);
+
+@if (imageUrl) {
+<img [src]="imageUrl" alt="Release note illustration"
+  class="mb-2.5 w-full max-w-full rounded-[5px] border border-[#e8ebed] object-contain" />
+}
+
+@if (caption) {
+<p class="mb-2.5 m-0 text-[13px] text-[#8d9299]">{{ caption }}</p>
+}
+}
+
+@case ('file') {
+@let fileUrl = getFileBlockUrl(block);
+@let fileName = getFileBlockName(block);
+@let fileCaption = joinText(block?.file?.caption);
+
+@if (fileUrl) {
+@if (isImageFileName(fileName)) {
+<img [src]="fileUrl" [alt]="fileName"
+  class="mb-2.5 w-full max-w-full rounded-[5px] border border-[#e8ebed] object-contain" />
+} @else {
+<a [href]="fileUrl" target="_blank" rel="noopener noreferrer" download
+  class="mb-2.5 inline-flex max-w-full items-center gap-2 rounded-[5px] border border-[#e8ebed] bg-[#f4f7f9] px-4 py-3 font-['Barlow'] text-[14px] font-medium text-[#112F5C] no-underline transition-colors hover:bg-[#e8ebed]">
+  <i class="pi pi-download shrink-0 text-[#1689ca]"></i>
+  <span class="truncate">{{ fileName }}</span>
+</a>
+}
+}
+
+@if (fileCaption) {
+<p class="mb-2.5 m-0 text-[13px] text-[#8d9299]">{{ fileCaption }}</p>
+}
+}
+
+@case ('pdf') {
+@let pdf = block?.pdf;
+@let pdfUrl = pdf?.file?.url ?? pdf?.external?.url;
+@let pdfCaption = joinText(pdf?.caption);
+
+@if (pdfUrl) {
+<a [href]="pdfUrl" target="_blank" rel="noopener noreferrer"
+  class="mb-2.5 inline-flex items-center gap-2 rounded-[5px] border border-[#e8ebed] bg-[#f4f7f9] px-4 py-3 font-['Barlow'] text-[14px] font-medium text-[#112F5C] no-underline hover:bg-[#e8ebed]">
+  <i class="pi pi-file-pdf shrink-0 text-[#B00020]"></i>
+  <span>View PDF</span>
+</a>
+}
+
+@if (pdfCaption) {
+<p class="mb-2.5 m-0 text-[13px] text-[#8d9299]">{{ pdfCaption }}</p>
+}
+}
+
+@case ('column_list') {
+@if (block?.children?.length) {
+<div class="mb-2.5 flex w-full flex-col gap-4 md:flex-row md:items-start">
+  @for (column of block.children; track column.id) {
+  <app-dynamic-notion-block [block]="column"></app-dynamic-notion-block>
+  }
+</div>
+}
+}
+
+@case ('column') {
+@if (block?.children?.length) {
+<div class="flex min-w-0 flex-1 flex-col gap-1">
+  @for (child of block.children; track child.id) {
+  <app-dynamic-notion-block [block]="child"></app-dynamic-notion-block>
+  }
+</div>
+}
+}
+
+@case ('video') {
+@let video = block?.video;
+
+@if (video?.file?.url) {
+<video [src]="video.file.url" width="100%" class="mb-2.5 w-full" controls muted loop aria-label="Release note video">
+  <track kind="captions" [src]="emptyVideoTrackSrc" srclang="en" label="English captions" default />
+  <track kind="descriptions" [src]="emptyVideoTrackSrc" srclang="en" label="English descriptions" />
+</video>
+}
+
+@if (video?.external?.url) {
+<div class="relative mb-2.5 w-full overflow-hidden rounded-lg bg-[#f4f7f9]">
+  <div class="relative w-full bg-[#e8ebed] pt-[45%]">
+    <div
+      class="absolute left-1/2 top-1/2 flex h-[60px] w-[60px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90">
+      <i class="pi pi-play"></i>
+    </div>
+  </div>
+  <a [href]="video.external.url" target="_blank" rel="noopener noreferrer" class="absolute inset-0 text-transparent">
+    Watch Video
+  </a>
+</div>
+}
+}
+
+@case ('bulleted_list_item') {
+@let text = joinText(block?.bulleted_list_item?.rich_text);
+@let children = block?.children;
+
+@if (text) {
+<ul class="m-0 list-disc ps-[30px]">
+  <li class="m-0 font-['Barlow'] text-[14px] font-light leading-[1.5] text-[#4C5158]">
+    <p class="mb-2.5 m-0" [innerHTML]="text"></p>
+
+    @if (children) {
+    @for (child of children; track child.id) {
+    <app-dynamic-notion-block [block]="child"></app-dynamic-notion-block>
+    }
+    }
+  </li>
+</ul>
+}
+}
+
+@case ('numbered_list_item') {
+@let text = joinText(block?.numbered_list_item?.rich_text);
+@let children = block?.children;
+
+@if (text) {
+<ol class="m-0 list-decimal ps-[30px]" [attr.start]="listStart ?? null">
+  <li class="m-0 font-['Barlow'] text-[14px] font-light leading-[1.5] text-[#4C5158]">
+    <p class="mb-2.5 m-0" [innerHTML]="text"></p>
+
+    @if (children) {
+    <div class="ml-[30px] flex flex-col">
+      @for (child of children; track child.id) {
+      <app-dynamic-notion-block [block]="child"></app-dynamic-notion-block>
+      }
+    </div>
+    }
+  </li>
+</ol>
+}
+}
+
+@case ('to_do') {
+@let text = joinText(block?.to_do?.rich_text);
+@let children = block?.children;
+
+@if (text) {
+<div class="flex flex-col gap-1.5">
+  <div class="mb-2.5 flex items-center gap-2.5">
+    <p-checkbox [(ngModel)]="block.to_do.checked" [binary]="true" readonly="true" />
+    <p class="m-0 font-['Barlow'] text-[14px] font-light leading-[1.5] text-[#4C5158]" [innerHTML]="text"></p>
+  </div>
+
+  @if (children) {
+  <div class="ml-[30px] flex flex-col">
+    @for (child of children; track child.id) {
+    <app-dynamic-notion-block [block]="child"></app-dynamic-notion-block>
+    }
+  </div>
+  }
+</div>
+}
+}
+
+@case ('divider') {
+<hr class="my-2.5 border-0 border-t border-[#e8ebed]" />
+}
+
+@case ('quote') {
+@let text = joinText(block?.quote?.rich_text);
+
+@if (text) {
+<div
+  class="mb-2.5 flex min-h-[30px] items-center border-l-[3px] border-[#d5dbe0] pl-[15px] font-['Barlow'] text-[14px] font-light italic leading-[1.5] text-[#777c83]"
+  [innerHTML]="text"></div>
+}
+}
+
+@case ('table') {
+@let tableRows = block?.children ?? [];
+@let hasColumnHeader = block?.table?.has_column_header === true;
+@let hasRowHeader = block?.table?.has_row_header === true;
+@let useFirstRowAsHeader = hasColumnHeader || (!hasColumnHeader && !hasRowHeader);
+
+@if (tableRows.length) {
+<table class="mb-2.5 w-full border-collapse border border-[#e8ebed]">
+  @if (useFirstRowAsHeader) {
+  <thead>
+    <tr>
+      @for (cell of tableRows[0].table_row.cells; track $index) {
+      <th scope="col"
+        class="border border-[#e8ebed] p-2 text-left font-['Barlow'] text-[14px] font-medium text-[#112F5C]"
+        [innerHTML]="joinText(cell)"></th>
+      }
+    </tr>
+  </thead>
+  }
+  <tbody>
+    @for (row of tableRows; track row.id; let rowIndex = $index) {
+    @if (!useFirstRowAsHeader || rowIndex > 0) {
+    <tr>
+      @for (cell of row.table_row.cells; track $index; let cellIndex = $index) {
+      @if (hasRowHeader && cellIndex === 0) {
+      <th scope="row"
+        class="border border-[#e8ebed] p-2 text-left font-['Barlow'] text-[14px] font-medium text-[#112F5C]"
+        [innerHTML]="joinText(cell)"></th>
+      } @else {
+      <td class="border border-[#e8ebed] p-2 text-left font-['Barlow'] text-[14px] font-light text-[#4C5158]"
+        [innerHTML]="joinText(cell)"></td>
+      }
+      }
+    </tr>
+    }
+    }
+  </tbody>
+</table>
+}
+}
+
+@case ('toggle') {
+@let text = joinText(block?.toggle?.rich_text);
+@let children = block?.children;
+
+@if (text) {
+<div class="mb-2.5">
+  <button type="button"
+    class="mb-2.5 flex w-full cursor-pointer select-none items-center gap-2 border-0 bg-transparent p-0 text-left"
+    (click)="toggleExpand()" [attr.aria-expanded]="isExpanded()">
+    <i class="pi" [ngClass]="{ 'pi-caret-right': !isExpanded(), 'pi-caret-down': isExpanded() }"></i>
+    <span class="m-0 font-['Barlow'] text-[14px] font-light leading-[1.5] text-[#4C5158]" [innerHTML]="text"></span>
+  </button>
+
+  @if (children && isExpanded()) {
+  <div class="ml-[30px] flex flex-col">
+    @for (child of children; track child.id) {
+    <app-dynamic-notion-block [block]="child"></app-dynamic-notion-block>
+    }
+  </div>
+  }
+</div>
+}
+}
+
+@case ('code') {
+@let text = joinText(block?.code?.rich_text);
+
+@if (text) {
+<pre class="mb-2.5 overflow-x-auto rounded-[5px] bg-[#f4f7f9] px-5 py-[30px]" [innerHTML]="text"></pre>
+}
+}
+
+@case ('child_page') {
+@let text = block?.child_page?.title;
+
+@if (text) {
+<button type="button"
+  class="mb-2.5 m-0 w-fit cursor-pointer rounded-[5px] border-0 bg-[#f4f7f9] px-[15px] py-[5px] font-['Space_Grotesk'] text-[14px] font-medium text-[#112F5C] hover:bg-[#e8ebed]"
+  (click)="navigateToChildPage(block.id)">
+  {{ text }}
+</button>
+}
+}
+
+@case ('bookmark') {
+@let url = block?.bookmark?.url;
+
+@if (url) {
+<a [href]="url" target="_blank" rel="noopener noreferrer"
+  class="mb-2.5 block font-['Barlow'] text-[14px] font-medium text-[#1689ca] underline-offset-2 hover:underline">
+  {{ url }}
+</a>
+}
+}
+}

@@ -1,0 +1,200 @@
+.card {
+  height: auto;
+  width: 100%;
+  border: 0.8px solid #e8ebed;
+  background-color: #fcfcfc;
+  padding: 25px 25px;
+  padding-bottom: 18px;
+  text-decoration: none;
+  display: block;
+  color: inherit;
+
+  &:hover {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .card-content {
+    display: grid;
+    gap: 20px;
+
+    .organization-identifier {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-rows: auto auto;
+
+      .project {
+        display: grid;
+        margin: 0;
+        gap: 0;
+
+        .project-id {
+          grid-row: 1;
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 13px;
+          font-weight: 400;
+          line-height: 17px;
+          color: #8d9299;
+        }
+
+        .project-name {
+          grid-row: 2;
+          font-family: Barlow, sans-serif;
+          font-size: 17px;
+          font-weight: 600;
+          line-height: 24px;
+          color: #112f5c;
+        }
+      }
+
+      .more-vert {
+        grid-column: 2;
+        text-align: right;
+        align-content: center;
+        color: #8d9299;
+      }
+    }
+
+    .project-info {
+      display: flex;
+
+      .project-title {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 18px;
+        color: #8d9299;
+      }
+
+      .project-data {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 13px;
+        font-weight: 450;
+        line-height: 18px;
+        color: #345b8f;
+      }
+
+      .principal-investigator {
+        display: flex;
+        align-items: center;
+        padding-right: 20px;
+      }
+
+      .material-symbols-rounded {
+        font-size: 18px;
+        color: #8d9299;
+        margin: 0 4px;
+      }
+
+      .start-date {
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+      }
+
+      .end-date {
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+      }
+    }
+
+    .project-indicators {
+      .indicator {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        box-sizing: border-box;
+        background-color: #f9f9f9;
+        border: 0.8px solid #e8ebed;
+        border-radius: 8px;
+        padding: 10px 10px 8px;
+        flex: 0 0 135px;
+        width: 135px;
+        max-width: 135px;
+        min-width: 0;
+
+        .indicator-number-container {
+          display: flex;
+          align-items: flex-start;
+          gap: 5px;
+          min-width: 0;
+
+          .output-icon {
+            color: #7cb580;
+          }
+
+          .outcome-icon {
+            color: #f58220;
+          }
+
+          .indicator-type {
+            flex: 1;
+            min-width: 0;
+            margin: 0;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 16px;
+            color: #8d9299;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: visible;
+          }
+        }
+
+        .indicator-number {
+          font-family: 'Space Grotesk', sans-serif;
+          font-size: 18px;
+          font-weight: 550;
+          line-height: 20px;
+          color: #112f5c;
+          margin: 0;
+        }
+
+        .indicator-filter-line {
+          position: absolute;
+          bottom: -4px;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background-color: #035ba9;
+          border-radius: 1px;
+        }
+
+        &.indicator-filtered {
+          padding-bottom: 6px;
+        }
+      }
+    }
+  }
+
+  label {
+    cursor: pointer;
+  }
+}
+
+.header-project-details {
+  background-color: #f4f7f9 !important;
+  border: 0.4px solid #e8ebed !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  cursor: default !important;
+
+  .project {
+    gap: 5px !important;
+  }
+}
+
+/* Inline "CONTRIBUTING TO POOL FUNDING" label shown next to the project code
+   on the project-detail header (per bilateral mockups `A1032 · CONTRIBUTING
+   TO POOL FUNDING`). Green-300 token from the mockup color palette §5. */
+.contributing-to-pool-funding {
+  color: var(--ac-green-300);
+  font-family: 'Space Grotesk', 'Space_Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
