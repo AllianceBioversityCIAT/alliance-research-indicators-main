@@ -5,6 +5,7 @@ import { ResultKnowledgeProductModule } from '../../entities/result-knowledge-pr
 import { ResultEvidencesModule } from '../../entities/result-evidences/result-evidences.module';
 import { ResultsModule } from '../../entities/results/results.module';
 import { ResultPolicyChangeModule } from '../../entities/result-policy-change/result-policy-change.module';
+import { ResultCapacitySharingModule } from '../../entities/result-capacity-sharing/result-capacity-sharing.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ResultPolicyChangeModule } from '../../entities/result-policy-change/re
     ResultEvidencesModule,
     ResultsModule,
     ResultPolicyChangeModule,
+    ResultCapacitySharingModule,
   ],
   providers: [SaveResultService],
   exports: [SaveResultService],

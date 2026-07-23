@@ -87,6 +87,7 @@ describe('PrmsOpenSearchService', () => {
       primary_entity: { official_code: 'PFUND', name: 'Entity' },
       created_by: undefined,
       policy_change_summary: null,
+      capacity_development_summary: null,
     };
     return Object.assign(base, overrides);
   };
@@ -732,6 +733,118 @@ describe('PrmsOpenSearchService', () => {
       ]);
 
       expect(out[0].policyChange).toBeUndefined();
+    });
+
+    it('should map capacity_development_summary for CAPACITY_SHARING indicators', async () => {
+      clarisaInstitutionsService.findByCodes.mockResolvedValueOnce([
+        { code: 21 } as any,
+        { code: 9486 } as any,
+      ]);
+
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.CAPACITY_SHARING_FOR_DEVELOPMENT),
+            name: 'Capacity Sharing',
+          },
+          capacity_development_summary: {
+            male_using: 59,
+            female_using: 16,
+            non_binary_using: 0,
+            has_unkown_using: 0,
+            is_attending_for_organization: true,
+            delivery_method: {
+              name: 'In person',
+              description: null,
+            },
+            training_length: {
+              name: 'Short-term',
+              term: 'Short-term',
+              description: '3 months or less',
+            },
+            on_behalf_organizations: [
+              {
+                id: 21,
+                name: 'MAGA',
+                acronym: 'MAGA',
+                institution_type_name: 'Government (National)',
+              },
+              {
+                id: 9486,
+                name: 'ADIPAZ',
+                acronym: 'ADIPAZ',
+                institution_type_name: 'NGO Local (General)',
+              },
+            ],
+          },
+        }),
+      ]);
+
+      expect(clarisaInstitutionsService.findByCodes).toHaveBeenCalledWith([
+        21, 9486,
+      ]);
+      expect(out[0].capacitySharing).toEqual(
+        expect.objectContaining({
+          session_format_id: 2,
+          delivery_modality_id: 3,
+          session_length_id: 1,
+          group: expect.objectContaining({
+            session_participants_male: 59,
+            session_participants_female: 16,
+            session_participants_non_binary: 0,
+            session_participants_total: 75,
+            is_attending_organization: true,
+            trainee_organization_representative: [
+              { institution_id: 21 },
+              { institution_id: 9486 },
+            ],
+          }),
+        }),
+      );
+      expect(out[0].capacitySharing.degree_id).toBeUndefined();
+    });
+
+    it('should map long-term training_length.name to degree_id', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.CAPACITY_SHARING_FOR_DEVELOPMENT),
+            name: 'Capacity Sharing',
+          },
+          capacity_development_summary: {
+            male_using: 1,
+            female_using: 0,
+            non_binary_using: 0,
+            has_unkown_using: 0,
+            is_attending_for_organization: false,
+            delivery_method: { name: 'Virtual / Online', description: null },
+            training_length: {
+              name: 'Master',
+              term: 'Long-term',
+              description: '',
+            },
+            on_behalf_organizations: [],
+          },
+        }),
+      ]);
+
+      expect(out[0].capacitySharing.session_length_id).toBe(2);
+      expect(out[0].capacitySharing.degree_id).toBe(2); // Master → MSc
+      expect(out[0].capacitySharing.delivery_modality_id).toBe(1);
+    });
+
+    it('should leave capacitySharing undefined when capacity_development_summary is null', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.CAPACITY_SHARING_FOR_DEVELOPMENT),
+            name: 'Capacity Sharing',
+          },
+          capacity_development_summary: null,
+        }),
+      ]);
+
+      expect(out[0].capacitySharing).toBeUndefined();
     });
   });
 

@@ -204,6 +204,7 @@ export class ResultResponseMapper {
   public primary_entity: PrimaryEntityMapper;
   public created_by: CreatedByMapper;
   public policy_change_summary: PolicyChangeSummaryMapper;
+  public capacity_development_summary: CapacityDevelopmentSummaryMapper;
 }
 
 export class PolicyChangeSummaryMapper {
@@ -215,6 +216,35 @@ export class PolicyChangeSummaryMapper {
   public linked_innovation_use: boolean;
   public result_related_to: ResultRelatedToMapper[];
   public policy_implementing_organizations: PolicyImplementingOrganizationsMapper[];
+}
+
+export class CapacityDevelopmentSummaryMapper {
+  public male_using: number;
+  public female_using: number;
+  public non_binary_using: number;
+  public has_unkown_using: number;
+  public is_attending_for_organization: boolean;
+  public delivery_method: DeliveryMethodMapper;
+  public training_length: TrainingLengthMapper;
+  public on_behalf_organizations: OnBehalfOrganizationMapper[];
+}
+
+export class DeliveryMethodMapper {
+  public name: string;
+  public description: string;
+}
+
+export class TrainingLengthMapper {
+  public name: string;
+  public term: string;
+  public description: string;
+}
+
+export class OnBehalfOrganizationMapper {
+  public id: number;
+  public name: string;
+  public acronym: string;
+  public institution_type_name: string;
 }
 
 export class ResultRelatedToMapper {

@@ -32,6 +32,7 @@ import { ResultInstitutionsService } from '../../entities/result-institutions/re
 import { ResultEvidencesService } from '../../entities/result-evidences/result-evidences.service';
 import { ResultsUtil } from '../utils/results.util';
 import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
+import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
 
 /**
  * Persists externally-synced result sections (PRMS, TIP) into the `results` table.
@@ -53,6 +54,7 @@ export class SaveResultService {
     private readonly _resultInstitutionsService: ResultInstitutionsService,
     private readonly _resultEvidencesService: ResultEvidencesService,
     private readonly _resultPolicyChangeService: ResultPolicyChangeService,
+    private readonly _resultCapacitySharingService: ResultCapacitySharingService,
   ) {}
 
   public async bulkSaveAllSections(
@@ -287,6 +289,14 @@ export class SaveResultService {
           await this._resultPolicyChangeService.update(
             resultId,
             result.policyChange,
+          );
+        }
+        break;
+      case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
+        if (!isEmpty(result.capacitySharing)) {
+          await this._resultCapacitySharingService.update(
+            resultId,
+            result.capacitySharing,
           );
         }
         break;

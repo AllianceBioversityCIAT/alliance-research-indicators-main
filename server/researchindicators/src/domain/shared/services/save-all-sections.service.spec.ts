@@ -19,6 +19,7 @@ import {
 } from '../../tools/tip-integration/dto/response-year-tip.dto';
 import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
 import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
+import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
@@ -39,6 +40,9 @@ describe('SaveResultService', () => {
   >;
   let resultPolicyChangeService: jest.Mocked<
     Pick<ResultPolicyChangeService, 'update'>
+  >;
+  let resultCapacitySharingService: jest.Mocked<
+    Pick<ResultCapacitySharingService, 'update'>
   >;
   let queryService: jest.Mocked<QueryService>;
   let currentUser: jest.Mocked<CurrentUserUtil>;
@@ -174,6 +178,12 @@ describe('SaveResultService', () => {
             update: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: ResultCapacitySharingService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -183,6 +193,7 @@ describe('SaveResultService', () => {
     resultInstitutionsService = module.get(ResultInstitutionsService);
     resultEvidencesService = module.get(ResultEvidencesService);
     resultPolicyChangeService = module.get(ResultPolicyChangeService);
+    resultCapacitySharingService = module.get(ResultCapacitySharingService);
     queryService = module.get(QueryService);
     currentUser = module.get(CurrentUserUtil);
     resultsUtil = module.get(ResultsUtil);
@@ -604,6 +615,36 @@ describe('SaveResultService', () => {
       await service.saveAllSections(dto, prmsExtraData());
 
       expect(resultPolicyChangeService.update).not.toHaveBeenCalled();
+    });
+
+    it('should save capacity sharing section when indicator is CAPACITY_SHARING', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 80,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id =
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT;
+      dto.capacitySharing = {
+        session_format_id: 2,
+        delivery_modality_id: 3,
+        session_length_id: 1,
+        group: {
+          session_participants_male: 59,
+          session_participants_female: 16,
+          session_participants_non_binary: 0,
+          session_participants_total: 75,
+          is_attending_organization: true,
+          trainee_organization_representative: [{ institution_id: 21 }] as any,
+        } as any,
+      };
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultCapacitySharingService.update).toHaveBeenCalledWith(
+        80,
+        dto.capacitySharing,
+      );
     });
 
     it('should merge STAR primary levers before updating alignment', async () => {

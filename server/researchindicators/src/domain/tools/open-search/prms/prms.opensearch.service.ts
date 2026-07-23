@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CapacityDevelopmentSummaryMapper,
   PrmsKnowledgeProductDto,
   PrmsTemporalResponseMapper,
   PolicyChangeSummaryMapper,
@@ -59,8 +60,17 @@ import { SaveGeoLocationDto } from '../../../entities/results/dto/save-geo-locat
 import { CreateResultInstitutionDto } from '../../../entities/result-institutions/dto/create-result-institution.dto';
 import { CreateResultEvidenceDto } from '../../../entities/result-evidences/dto/create-result-evidence.dto';
 import { CreateResultPolicyChangeDto } from '../../../entities/result-policy-change/dto/create-result-policy-change.dto';
+import {
+  CapDevGroupDto,
+  UpdateResultCapacitySharingDto,
+} from '../../../entities/result-capacity-sharing/dto/update-result-capacity-sharing.dto';
 import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
 import { PolicyTypeHomologation } from './homologation/policy-type.homologation';
+import { DeliveryModalityHomologation } from './homologation/delivery-modality.homologation';
+import { SessionLengthHomologation } from './homologation/session-length.homologation';
+import { DegreeHomologation } from './homologation/degree.homologation';
+import { SessionFormatEnum } from '../../../entities/session-formats/enums/session-format.enum';
+import { SessionLengthEnum } from '../../../entities/session-lengths/enum/session-lengths.enum';
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -411,6 +421,57 @@ export class PrmsOpenSearchService
     };
   }
 
+  /**
+   * Maps PRMS `capacity_development_summary` into STAR capacity-sharing DTO.
+   *
+   * PRMS participant counts imply a group session, so `session_format_id` is
+   * always set to {@link SessionFormatEnum.GROUP}.
+   */
+  private async mapCapacitySharing(
+    summary?: CapacityDevelopmentSummaryMapper | null,
+  ): Promise<UpdateResultCapacitySharingDto | undefined> {
+    if (isEmpty(summary)) return undefined;
+
+    const orgIds = (summary.on_behalf_organizations ?? [])
+      .map((org) => org?.id)
+      .filter((id) => !isEmpty(id));
+
+    const institutions = isEmpty(orgIds)
+      ? []
+      : await this.clarisaInstitutionsService.findByCodes(orgIds);
+
+    const male = summary?.male_using ?? 0;
+    const female = summary?.female_using ?? 0;
+    const nonBinary = summary?.non_binary_using ?? 0;
+    const unknown = summary?.has_unkown_using ?? 0;
+
+    const group = new CapDevGroupDto();
+    group.session_participants_male = male;
+    group.session_participants_female = female;
+    group.session_participants_non_binary = nonBinary;
+    group.session_participants_total = male + female + nonBinary + unknown;
+    group.is_attending_organization = summary?.is_attending_for_organization;
+    group.trainee_organization_representative = institutions.map(
+      (institution) =>
+        ({ institution_id: institution.code }) as ResultInstitution,
+    );
+
+    const capacitySharing = new UpdateResultCapacitySharingDto();
+    capacitySharing.session_format_id = SessionFormatEnum.GROUP;
+    capacitySharing.delivery_modality_id =
+      DeliveryModalityHomologation[summary?.delivery_method?.name];
+    // `term` → session length; `name` → degree only when term is Long-term.
+    capacitySharing.session_length_id =
+      SessionLengthHomologation[summary?.training_length?.term];
+    if (capacitySharing.session_length_id === SessionLengthEnum.LONG_TERM) {
+      capacitySharing.degree_id =
+        DegreeHomologation[summary?.training_length?.name];
+    }
+    capacitySharing.group = group;
+
+    return capacitySharing;
+  }
+
   async processData(
     prmsData: PrmsTemporalResponseMapper[],
   ): Promise<ExternalMappersDto[]> {
@@ -554,6 +615,12 @@ export class PrmsOpenSearchService
       if (indicator === IndicatorsEnum.POLICY_CHANGE) {
         result.policyChange = await this.mapPolicyChange(
           item.policy_change_summary,
+        );
+      }
+
+      if (indicator === IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT) {
+        result.capacitySharing = await this.mapCapacitySharing(
+          item.capacity_development_summary,
         );
       }
 
