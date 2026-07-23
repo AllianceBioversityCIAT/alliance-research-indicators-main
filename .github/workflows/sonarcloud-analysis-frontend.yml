@@ -45,7 +45,7 @@ jobs:
         run: |
           npm install -g @angular/cli
           npm install
-        working-directory: .client/research-indicators
+        working-directory: ./client/research-indicators
 
       # ✅ Step 7: Load environment.ts from Secrets Manager
       - name: Create environment.ts and environment.dev.ts from AWS Secrets Manager
@@ -56,7 +56,7 @@ jobs:
             --output text > src/environments/environment.ts
 
           cp src/environments/environment.ts src/environments/environment.dev.ts
-        working-directory: .client/research-indicators
+        working-directory: ./client/research-indicators
 
       # Step 8: Install SonarScanner
       - name: Install SonarScanner
@@ -74,6 +74,6 @@ jobs:
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
             -Dsonar.exclusions=**/environments/**,**/*.spec.ts,**/*.mock.ts \
             -Dsonar.coverage.exclusions=**
-        working-directory: .client/research-indicators
+        working-directory: ./client/research-indicators
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
