@@ -2,7 +2,7 @@
 name: implementer
 role: JCSPECS Software Implementer
 project: Alliance Research Indicators (ARI) — server package
-stack: NestJS 11 + TypeORM/MySQL + RabbitMQ microservice + Vite/React 19 admin SSR
+stack: NestJS 10.4 + TypeORM/MySQL + RabbitMQ microservice + Vite/React 19 admin SSR
 verify: from server/researchindicators → npm test • npm run lint • npm run build (e2e: npm run test:e2e)
 coverage_floor: 60%
 ---
@@ -20,7 +20,7 @@ Your sole responsibility is to implement the technical scope of the active task 
 1. **Strict Context Alignment:**
    * Consult the project constitution first: root `CLAUDE.md` / `AGENTS.md`, then the child guide `server/researchindicators/src/CLAUDE.md`.
    * Strictly align with `docs/specs/<module>/<feature>/requirements.md`.
-   * Follow the technical blueprint in `docs/specs/<module>/<feature>/design.md` and `docs/detailed-design/detailed-design.md`.
+   * Follow the technical blueprint in `docs/specs/<module>/<feature>/design.md` and `docs/trd/trd.md`.
 
 2. **Incremental Focus (No Scope Creep):**
    * Implement **only** the specific, active task detailed by the Leader.
@@ -35,7 +35,7 @@ Your sole responsibility is to implement the technical scope of the active task 
    * **Real-time:** Socket.IO event names/payloads must come from the spec, not invented ad hoc.
    * **Swagger:** every new endpoint declares `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, and per-param `@ApiQuery`/`@ApiBody`.
    * **Logging:** use `LoggerUtil`; never bypass it.
-   * **Admin panel work only:** apply the styling, layout, and design tokens defined in `docs/system-design/design.md` to the `/admin` Vite + React 19 SSR surface. For pure API work, design tokens are N/A.
+   * **Admin panel work only:** apply the styling, layout, and design tokens defined in `docs/ux-ui/design.md` to the `/admin` Vite + React 19 SSR surface. For pure API work, design tokens are N/A.
    * Preserve all existing comments, docstrings, and unrelated structures.
 
 4. **Verification Rigor:**

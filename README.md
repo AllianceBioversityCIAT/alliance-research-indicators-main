@@ -41,8 +41,8 @@ The full SDD constitutional baseline lives under [`docs/`](./docs/). Always read
 | File | What it is | When to consult |
 | --- | --- | --- |
 | [`docs/prd.md`](./docs/prd.md) | Product Requirements — problem, personas, goals, scope, user stories, acceptance criteria, open questions. | Scope, audience, or business intent questions. |
-| [`docs/system-design/design.md`](./docs/system-design/design.md) | System / UX-of-the-platform blueprint — IA, API consumer flows, response envelope, admin panel, design tokens, a11y, decisions log, open gaps. | Changes affecting how humans or machines experience the platform. |
-| [`docs/detailed-design/detailed-design.md`](./docs/detailed-design/detailed-design.md) | Technical implementation blueprint — module layout, data model, API rules, workflows, integrations, security, observability, testing. | Changes that touch code, schema, integrations, or infra-adjacent settings. |
+| [`docs/ux-ui/design.md`](./docs/ux-ui/design.md) | System / UX-of-the-platform blueprint — IA, API consumer flows, response envelope, admin panel, design tokens, a11y, decisions log, open gaps. | Changes affecting how humans or machines experience the platform. |
+| [`docs/trd/trd.md`](./docs/trd/trd.md) | Technical implementation blueprint — module layout, data model, API rules, workflows, integrations, security, observability, testing. | Changes that touch code, schema, integrations, or infra-adjacent settings. |
 | [`docs/specs/general-setup/`](./docs/specs/general-setup/) | Methodology templates every module-level spec MUST follow (`requirements.md`, `design.md`, `task.md`). | Whenever you create a new spec under `docs/specs/<module>/<feature>/`. |
 
 Agent-facing working manuals:
@@ -90,7 +90,7 @@ See [`docs/prd.md`](./docs/prd.md) for the full problem statement, goals, scope,
 
 ![Architecture Diagram](./Architecture.png)
 
-High-level topology (see [`docs/detailed-design/detailed-design.md` §1](./docs/detailed-design/detailed-design.md) for details):
+High-level topology (see [`docs/trd/trd.md` §1](./docs/trd/trd.md) for details):
 
 ```
              ┌────────────────┐
@@ -129,8 +129,8 @@ alliance-research-indicators-main/
 ├── Architecture.png                       # Architecture diagram
 ├── docs/                                  # SDD constitutional baseline
 │   ├── prd.md
-│   ├── system-design/design.md
-│   ├── detailed-design/detailed-design.md
+│   ├── ux-ui/design.md
+│   ├── trd/trd.md
 │   └── specs/general-setup/{requirements,design,task}.md
 ├── server/
 │   └── researchindicators/                # NestJS backend (this repo's focus)
@@ -258,7 +258,7 @@ npm run migration:execute            # apply built dist (production path)
 npm run migration:revert             # rollback the last migration
 ```
 
-> **Migrations are append-only.** Never edit a migration after it's merged to `main`. See [`docs/detailed-design/detailed-design.md` §3.6](./docs/detailed-design/detailed-design.md).
+> **Migrations are append-only.** Never edit a migration after it's merged to `main`. See [`docs/trd/trd.md` §3.6](./docs/trd/trd.md).
 
 ---
 
@@ -311,7 +311,7 @@ Detailed conventions: [`server/researchindicators/src/CLAUDE.md`](./server/resea
 - **Swagger** — every endpoint MUST declare `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, and per-param `@ApiQuery` / `@ApiBody`.
 - **Errors** — flow through `GlobalExceptions`; throw Nest HTTP exceptions (`UnauthorizedException`, `BadRequestException`, etc.), never raw `Error`s on the HTTP path.
 
-See [`docs/system-design/design.md` §6](./docs/system-design/design.md) for layout patterns and [`docs/detailed-design/detailed-design.md` §4](./docs/detailed-design/detailed-design.md) for the full rule set.
+See [`docs/ux-ui/design.md` §6](./docs/ux-ui/design.md) for layout patterns and [`docs/trd/trd.md` §4](./docs/trd/trd.md) for the full rule set.
 
 ---
 
@@ -337,7 +337,7 @@ Routes excluded from the JWT middleware: `/admin*`, `/admin/public*`, `/.well-kn
 
 `RolesGuard` reads `@Roles(...)` metadata. `ResultStatusGuard` gates result-mutating endpoints by the lifecycle state defined in `result_status_workflow`.
 
-See [`docs/detailed-design/detailed-design.md` §8](./docs/detailed-design/detailed-design.md).
+See [`docs/trd/trd.md` §8](./docs/trd/trd.md).
 
 ---
 
@@ -361,7 +361,7 @@ Integration rules (enforced):
 - Controllers MUST NOT call transport clients directly.
 - Cron-driven integrations live under `domain/tools/cron-jobs/` and MUST log status to `sync_process_log`.
 
-See [`docs/detailed-design/detailed-design.md` §7](./docs/detailed-design/detailed-design.md).
+See [`docs/trd/trd.md` §7](./docs/trd/trd.md).
 
 ---
 
@@ -402,7 +402,7 @@ npm run test:e2e    # supertest-based end-to-end (test/jest-e2e.json)
 - **Socket.IO gateway** — `domain/tools/socket/server.gateway.ts`. Used to emit result-update events to STAR for real-time UI refresh.
 - **RabbitMQ microservice** — bootstrapped in `main.ts` (`Transport.RMQ`, queue `ARI_QUEUE`, durable). Message handlers live in `domain/tools/broker/` (`AlianceManagementApp`, `AiRoarMiningApp`, `SelfApp`, `MessageMicroservice`).
 
-> Socket.IO event names and RabbitMQ message contracts are tracked as open work (see [`docs/system-design/design.md` §13](./docs/system-design/design.md) OG-4). Add new events through a module spec, not ad hoc.
+> Socket.IO event names and RabbitMQ message contracts are tracked as open work (see [`docs/ux-ui/design.md` §13](./docs/ux-ui/design.md) OG-4). Add new events through a module spec, not ad hoc.
 
 ---
 
@@ -410,7 +410,7 @@ npm run test:e2e    # supertest-based end-to-end (test/jest-e2e.json)
 
 The `/admin` route serves a React 19 + Vite SSR panel hosted inside the Nest app. See [`server/researchindicators/src/admin/README-REACT.md`](./server/researchindicators/src/admin/README-REACT.md) for the page-recipe (component → route → controller → sidebar entry).
 
-Current state: `/admin` is excluded from the JWT middleware. **Before any production exposure**, the admin module MUST add an `AdminGuard` bound to the appropriate roles (`SYSTEM_ADMIN`, `TECHNICAL_SUPPORT`). Tracked in [`docs/system-design/design.md` §13 OG-3](./docs/system-design/design.md).
+Current state: `/admin` is excluded from the JWT middleware. **Before any production exposure**, the admin module MUST add an `AdminGuard` bound to the appropriate roles (`SYSTEM_ADMIN`, `TECHNICAL_SUPPORT`). Tracked in [`docs/ux-ui/design.md` §13 OG-3](./docs/ux-ui/design.md).
 
 ---
 
@@ -467,7 +467,7 @@ Husky pre-commit hooks enforce lint/format. Pipeline specifics are tracked in op
 
 ## SDD workflow (how to add a feature)
 
-1. **Read** the relevant section(s) of `docs/prd.md`, `docs/system-design/design.md`, and `docs/detailed-design/detailed-design.md`.
+1. **Read** the relevant section(s) of `docs/prd.md`, `docs/ux-ui/design.md`, and `docs/trd/trd.md`.
 2. **Create a spec folder** under `docs/specs/<module>/<feature-slug>/` containing three files copied from the templates in `docs/specs/general-setup/`:
    - `requirements.md`
    - `design.md`
