@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Set up Java 17 for SonarCloud
-      - name: Set up JDK 17 for SonarCloud analysis
+      # Step 1: Set up Java 21 for SonarCloud
+      - name: Set up JDK 21 for SonarCloud analysis
         uses: actions/setup-java@v2
         with:
-          java-version: "17"
+          java-version: "21"
           distribution: "temurin"
 
       # Step 2: Verify Java version

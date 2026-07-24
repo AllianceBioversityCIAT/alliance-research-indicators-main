@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
+import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { AgressoContractController } from './agresso-contract.controller';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
@@ -7,6 +9,8 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { AgressoFindNamePayload } from './dto/agresso-find-options.payload';
+import { ROLES_KEY } from '../../shared/guards/roles.guard';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 // Mock ResponseUtils
 jest.mock('../../shared/utils/response.utils', () => ({
@@ -29,6 +33,7 @@ describe('AgressoContractController', () => {
     findContractsResultByCurrentUser: jest.fn(),
     findContratResultByContractId: jest.fn(),
     findAgressoContracts: jest.fn(),
+    setPoolFundingTag: jest.fn(),
     getGeoScopeReport: jest.fn(),
     getTopPartnersReport: jest.fn(),
     getTopContributorsReport: jest.fn(),
@@ -308,6 +313,7 @@ describe('AgressoContractController', () => {
         '1',
         '10',
         'true',
+        TrueFalseEnum.TRUE,
       );
 
       expect(service.findContracts).toHaveBeenCalledWith(
@@ -315,6 +321,7 @@ describe('AgressoContractController', () => {
           agreement_id: 'PROJECT001',
           funding_type: 'FUNDING_TYPE',
           contract_status: AgressoContractStatus.ONGOING,
+          is_pool_funding_contributor: true,
         },
         {
           limit: 10,
@@ -349,6 +356,7 @@ describe('AgressoContractController', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
 
       expect(service.findContracts).toHaveBeenCalledWith(
@@ -356,6 +364,7 @@ describe('AgressoContractController', () => {
           agreement_id: undefined,
           funding_type: undefined,
           contract_status: undefined,
+          is_pool_funding_contributor: undefined,
         },
         {
           limit: NaN,
@@ -497,7 +506,8 @@ describe('AgressoContractController', () => {
         'test query',
         'DESC',
         undefined,
-        undefined,
+        TrueFalseEnum.TRUE,
+        TrueFalseEnum.TRUE,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -516,6 +526,7 @@ describe('AgressoContractController', () => {
           ],
           exclude_pooled_funding: false,
           with_indicators: true,
+          is_pool_funding_contributor: true,
         },
         OrderFieldsEnum.START_DATE,
         'DESC',
@@ -553,6 +564,7 @@ describe('AgressoContractController', () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -568,6 +580,7 @@ describe('AgressoContractController', () => {
           status: [],
           exclude_pooled_funding: false,
           with_indicators: true,
+          is_pool_funding_contributor: undefined,
         },
         undefined,
         'ASC',
@@ -605,11 +618,13 @@ describe('AgressoContractController', () => {
         'ASC',
         undefined,
         undefined,
+        TrueFalseEnum.FALSE,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
         TrueFalseEnum.FALSE,
         expect.objectContaining({
+          is_pool_funding_contributor: false,
           status: [
             AgressoContractStatus.ONGOING,
             AgressoContractStatus.COMPLETED,
@@ -619,6 +634,23 @@ describe('AgressoContractController', () => {
         'ASC',
         { limit: 10, page: 1 },
         undefined,
+      );
+    });
+
+    it('should expose pool funding contributor query metadata for Swagger', () => {
+      const parameters = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        controller.findContracts,
+      );
+
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            in: 'query',
+            name: 'pool-funding-contributor',
+            type: Boolean,
+          }),
+        ]),
       );
     });
 
@@ -642,6 +674,7 @@ describe('AgressoContractController', () => {
         'ASC',
         TrueFalseEnum.TRUE,
         undefined,
+        undefined,
       );
 
       expect(service.findAgressoContracts).toHaveBeenCalledWith(
@@ -653,6 +686,92 @@ describe('AgressoContractController', () => {
         'ASC',
         { limit: 10, page: 1 },
         undefined,
+      );
+    });
+  });
+
+  describe('updatePoolFundingTag', () => {
+    it('should update the pool funding contributor tag', async () => {
+      const updatedContract = {
+        agreement_id: 'BIL-001',
+        is_pool_funding_contributor: true,
+      };
+      mockAgressoContractService.setPoolFundingTag.mockResolvedValue(
+        updatedContract,
+      );
+
+      const result = await controller.updatePoolFundingTag('BIL-001', {
+        is_pool_funding_contributor: true,
+      });
+
+      expect(service.setPoolFundingTag).toHaveBeenCalledWith('BIL-001', true);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Pool funding contributor tag updated',
+        status: HttpStatus.OK,
+        data: updatedContract,
+      });
+      expect(result).toEqual({
+        description: 'Pool funding contributor tag updated',
+        status: HttpStatus.OK,
+        data: updatedContract,
+      });
+    });
+
+    it('should declare CENTER_ADMIN and SYSTEM_ADMIN roles', () => {
+      const roles = Reflect.getMetadata(
+        ROLES_KEY,
+        controller.updatePoolFundingTag,
+      );
+
+      expect(roles).toEqual([
+        SecRolesEnum.CENTER_ADMIN,
+        SecRolesEnum.SYSTEM_ADMIN,
+      ]);
+    });
+
+    it('should declare Swagger operation, param, and body metadata', () => {
+      const operation = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        controller.updatePoolFundingTag,
+      );
+      const parameters = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        controller.updatePoolFundingTag,
+      );
+      const bodyParameter = parameters.find(
+        (parameter) => parameter.in === 'body',
+      );
+
+      expect(operation).toMatchObject({
+        summary: 'Update the pool funding contributor tag',
+      });
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            in: 'path',
+            name: 'code',
+            type: String,
+          }),
+        ]),
+      );
+      expect(bodyParameter).toMatchObject({
+        in: 'body',
+      });
+    });
+
+    it('should expose a body parameter for validation', () => {
+      const paramsMetadata = Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        AgressoContractController,
+        'updatePoolFundingTag',
+      );
+
+      expect(Object.values(paramsMetadata)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            data: undefined,
+          }),
+        ]),
       );
     });
   });

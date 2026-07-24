@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { AgressoContractWhere } from './dto/agresso-contract.dto';
@@ -9,6 +14,8 @@ import { AgressoContractRepository } from './repositories/agresso-contract.repos
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
+import { User } from '../../complementary-entities/secondary/user/user.entity';
+import { OpenSearchAgressoContractApi } from '../../tools/open-search/agresso-contract/agresso-contract.opensearch.api';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import {
   ContractTopPrimaryLeversReportDto,
@@ -23,6 +30,13 @@ export class AgressoContractService {
     private readonly dataSource: DataSource,
     private readonly _agressoContractRepository: AgressoContractRepository,
     private readonly currentUser: CurrentUserUtil,
+    // OpenSearchAgressoContractApi is REQUEST-scoped (transitive through
+    // AgressoContractRepository -> CurrentUserUtil). Constructor-injecting it
+    // here cascades extra REQUEST-scope depth into ResultsService (which
+    // injects AgressoContractService), tripping the ResultsService ↔
+    // ResultOicrService forwardRef empty-shell cycle. Lazy-resolved at the
+    // single usage site via moduleRef instead. See design.md §3.4.
+    private readonly moduleRef: ModuleRef,
     private readonly appConfig: AppConfig,
     private readonly clarisaLeversService: ClarisaLeversService,
   ) {}
@@ -110,6 +124,56 @@ export class AgressoContractService {
       pagination,
       query,
     );
+  }
+
+  async setPoolFundingTag(
+    contractCode: string,
+    value: boolean,
+    user?: Pick<User, 'sec_user_id'>,
+  ): Promise<AgressoContract> {
+    const contract = await this._agressoContractRepository.findOne({
+      where: { agreement_id: contractCode },
+      relations: { pooled_funding_contracts: true },
+    });
+
+    if (!contract) {
+      throw new NotFoundException('Contract not found');
+    }
+
+    if (!this.isBilateralTagTarget(contract)) {
+      throw new BadRequestException(
+        'Only bilateral non-pooled funding contracts can be tagged as pool funding contributors',
+      );
+    }
+
+    contract.is_pool_funding_contributor = value;
+    contract.updated_by = user?.sec_user_id ?? this.currentUser.user_id;
+
+    const savedContract = await this._agressoContractRepository.save(contract);
+
+    // Lazy-resolve to avoid REQUEST-scope cascade in constructor (see §3.4).
+    const openSearchApi = await this.moduleRef.resolve(
+      OpenSearchAgressoContractApi,
+      undefined,
+      { strict: false },
+    );
+    void openSearchApi.uploadSingleToOpenSearch(savedContract);
+
+    return savedContract;
+  }
+
+  private isBilateralTagTarget(contract: AgressoContract): boolean {
+    const hasActivePooledFundingContract =
+      contract.pooled_funding_contracts?.some((item) => item.is_active) ??
+      false;
+
+    // AGRESSO funding_type uses short codes: 'BLR' = Bilateral, 'POL' = Pooled, etc.
+    // We accept either the short code or the long form for forward-compat.
+    const fundingType = contract.funding_type?.toUpperCase();
+    const isBilateralFunding =
+      fundingType === 'BLR' || fundingType === 'BILATERAL';
+
+    return isBilateralFunding && !hasActivePooledFundingContract;
   }
 
   async getGeoScopeReport(contractId: string, limit?: number) {

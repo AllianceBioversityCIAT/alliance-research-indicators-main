@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import {
   Injectable,
+  Logger,
   NestMiddleware,
   Next,
   Req,
@@ -12,9 +13,13 @@ import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 import { RoarManagementService } from '../../tools/roar-management/roar-management.service';
 import { ResultsUtil } from '../utils/results.util';
 import { AppSecretsService } from '../../entities/app-secrets/app-secrets.service';
+import { ENV } from '../utils/env.utils';
+import { SecRolesEnum } from '../enum/sec_role.enum';
 
 @Injectable()
 export class JwtMiddleware implements NestMiddleware {
+  private readonly logger = new Logger(JwtMiddleware.name);
+
   constructor(
     private readonly alianceManagementApp: AlianceManagementApp,
     private readonly roarManagementService: RoarManagementService,
@@ -27,6 +32,23 @@ export class JwtMiddleware implements NestMiddleware {
     @Res() _res: Response,
     @Next() next: NextFunction,
   ) {
+    // LOCAL DEVELOPMENT ONLY — see ENV.LOCAL_AUTH_BYPASS for full safety contract.
+    // Active when ARI_LOCAL_AUTH_BYPASS=true AND IS_PRODUCTION=false.
+    // MUST NOT be enabled in any deployed environment.
+    if (ENV.LOCAL_AUTH_BYPASS) {
+      this.logger.warn(
+        `[LOCAL_AUTH_BYPASS] Skipping JWT validation for ${req.method} ${req.url} — DEV ONLY`,
+      );
+      req.user = {
+        sec_user_id: 1,
+        email: 'local-dev@example.com',
+        first_name: 'Local',
+        last_name: 'Dev',
+        roles: [SecRolesEnum.SYSTEM_ADMIN],
+      };
+      return next();
+    }
+
     const { authorization } = req.headers;
     if (typeof authorization !== 'string') {
       throw new UnauthorizedException('Token not found');

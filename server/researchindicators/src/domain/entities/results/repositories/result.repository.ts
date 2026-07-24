@@ -7,7 +7,6 @@ import { ResultOpensearchDto } from '../../../tools/open-search/results/dto/resu
 import { formatArrayToQuery } from '../../../shared/utils/queries.util';
 import { isEmpty } from '../../../shared/utils/object.utils';
 import { AppConfig } from '../../../shared/utils/app-config.util';
-import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { queryPrincipalInvestigator } from '../../../shared/const/gloabl-queries.const';
 import { resultDefaultParametersSQL } from '../../../shared/utils/results.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
@@ -16,6 +15,30 @@ import { ResultSortEnum, ResultSortFields } from '../enum/result-sort.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
+import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
+
+export interface PoolFundingAlignmentContext {
+  result_id: number;
+  result_official_code: number;
+  result_status_id: number;
+  version_id?: number;
+  report_year_id?: number;
+  is_synced_to_prms: boolean | number | string;
+  is_pool_funding_contributor: boolean | number | string;
+  // @sdd-spec bilateral-module/pending-items T-15.11 / R-BIL-078 — primary
+  // contract id is needed by the per-result SP endpoint to look up the
+  // active bilateral_project_mapping row. NULL when the result has no
+  // primary active contract.
+  agresso_agreement_id?: string | null;
+  // @sdd-spec bilateral-module/pending-items T-15.2 / R-BIL-071 — surfaced
+  // here so the source-based read-only gate can read it without a second
+  // round-trip. Populated when the row exists in `results`.
+  platform_code?: string | null;
+  // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 / R-BIL-091 —
+  // the result's indicator type drives the server-owned
+  // `result_type → allowed_levels` rule on the ToC catalog read.
+  indicator_id?: number | null;
+}
 
 @Injectable()
 export class ResultRepository
@@ -24,7 +47,6 @@ export class ResultRepository
 {
   constructor(
     private readonly appConfig: AppConfig,
-    private readonly currentUserUtil: CurrentUserUtil,
     private readonly dataSource: DataSource,
   ) {
     super(Result, dataSource.createEntityManager());
@@ -165,6 +187,41 @@ export class ResultRepository
                     AND r.is_snapshot = FALSE
                   GROUP BY r.result_id;`;
     return this.query(query);
+  }
+
+  async findPoolFundingAlignmentContext(
+    resultId: number,
+  ): Promise<PoolFundingAlignmentContext | null> {
+    const query = `
+      SELECT
+        r.result_id,
+        r.result_official_code,
+        r.result_status_id,
+        r.version_id,
+        r.report_year_id,
+        r.is_synced_to_prms,
+        r.platform_code,
+        r.indicator_id,
+        ac.agreement_id AS agresso_agreement_id,
+        -- @sdd-spec bilateral-module/mapping-drives-pool-funding-tag
+        ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor
+      FROM results r
+      LEFT JOIN result_contracts rc
+        ON rc.result_id = r.result_id
+        AND rc.is_active = TRUE
+        AND rc.is_primary = TRUE
+      LEFT JOIN agresso_contracts ac
+        ON ac.agreement_id = rc.contract_id
+        AND ac.is_active = TRUE
+      WHERE r.result_id = ?
+        AND r.is_active = TRUE
+      LIMIT 1;
+    `;
+
+    const rows = (await this.query(query, [
+      resultId,
+    ])) as PoolFundingAlignmentContext[];
+    return rows[0] ?? null;
   }
 
   private queryConstructorContract(

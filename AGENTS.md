@@ -27,6 +27,10 @@ Package-local guides extend this baseline with code-level navigation and convent
 
 Always read the parent (this file) plus the relevant child guide before touching code in that directory.
 
+### Execution triad (`.agents/`)
+
+The JCSPECS multi-agent loop used by `/sdd-execute` reads its personas from [`.agents/`](.agents/): `leader.md` (orchestrator), `implementer.md` (server coding contract), `reviewer.md` (read-only spec-conformance audit). They are tailored to this repo — verification via `npm test` / `npm run lint` / `npm run build` from `server/researchindicators/`, the `ServerResponseDto` envelope, `@Roles`/`RolesGuard` RBAC, append-only migrations, and Swagger/OpenSearch decorator rules. Don't invent execution personas inline — extend these.
+
 If you have to choose between the PRD and a piece of source code, **the source code is the truth of today** and the PRD is the truth of intent. Reconcile by updating the doc that is wrong, not by silently changing behavior.
 
 ---
