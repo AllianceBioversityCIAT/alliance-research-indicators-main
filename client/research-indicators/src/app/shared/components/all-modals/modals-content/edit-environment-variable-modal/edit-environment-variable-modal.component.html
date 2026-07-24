@@ -1,0 +1,72 @@
+@if (allModals.isModalOpen('editEnvironmentVariable').isOpen && service.editingItem(); as item) {
+<div class="flex w-full max-w-[95vw] flex-col lg:w-[801px]">
+  <section class="mx-auto flex w-full flex-col gap-4 rounded-b-[27px] px-10 py-6">
+    <div class="flex flex-col ">
+      <h2 class="m-0 text-[16px] font-[700] text-[#112F5C]">Edit environment variable</h2>
+      <p class="-mt-0.5 text-[14px] font-[400] text-[#777C83]">
+        Update the configuration settings for this environment variable.
+      </p>
+    </div>
+
+    <div class="flex flex-col gap-[3px] pt-0.5">
+      <div class="grid w-full grid-cols-1 gap-[12px] md:grid-cols-2 lg:grid-cols-3">
+        <div class="flex w-full min-w-0 flex-col">
+          <app-input label="Category" [signal]="service.editForm" optionValue="category"
+            [disabled]="!roles.canEditAppConfiguration()" placeholder="Enter category" />
+        </div>
+
+        <div class="flex w-full min-w-0 flex-col">
+          <app-input label="Subcategory" [signal]="service.editForm" optionValue="subcategory"
+            [disabled]="!roles.canEditAppConfiguration()" placeholder="Enter subcategory" />
+        </div>
+
+        <div class="flex w-full min-w-0 flex-col md:col-span-2 lg:col-span-1">
+          <app-input label="Variable name" [signal]="variableNameDisplay" optionValue="key" [disabled]="true" />
+        </div>
+      </div>
+
+      <div class="flex w-full flex-col">
+        <app-textarea [rows]="3" label="Description" [signal]="service.editForm" optionValue="description"
+          [disabled]="!roles.canEditAppConfiguration()" placeholder="Enter description" />
+      </div>
+
+      @if (service.editingUsesJson()) {
+      <div class="flex w-full flex-col gap-2 -mt-1">
+        <span class="mb-0 text-[15px] !font-[700] text-[#112F5C]">Structured value</span>
+        <p class="-mt-2 text-[14px] font-[400] text-[#777C83]">
+          Edit field values by section. Object names and structure cannot be changed.
+        </p>
+        <div class="flex flex-col pt-1">
+          <app-variable-configuration-json-row [row]="item" [sections]="service.jsonSections(item.key)"
+            [values]="service.jsonValues(item.key)" [expandedSections]="service.modalJsonSections()"
+            [disabled]="!roles.canEditAppConfiguration()" [dirty]="service.isJsonRowDirty(item.key)"
+            [saving]="service.saving()" [showActions]="false" (sectionToggle)="service.toggleModalJsonSection($event)"
+            (fieldChange)="service.onJsonFieldChange(item.key, $event)" />
+        </div>
+      </div>
+      } @else {
+      <div class="flex w-full flex-col -mt-1">
+        <app-input label="Value" [signal]="service.editForm" optionValue="simple_value"
+          [disabled]="!roles.canEditAppConfiguration()" placeholder="Enter value" />
+      </div>
+      }
+
+      <div class="flex justify-end gap-[14px] pt-5 pb-2">
+        <button type="button" (click)="service.closeEdit()"
+          class="cursor-pointer rounded-[14px] border-[1.5px] border-[#035BA9] px-5 py-2 text-[15px] font-medium text-[#035BA9]">
+          Cancel
+        </button>
+        @if (roles.canEditAppConfiguration()) {
+        <button type="button" (click)="onSave()" [disabled]="service.saving()"
+          class="flex cursor-pointer items-center gap-2 rounded-[14px] bg-[#035BA9] px-5 py-2 text-[15px] text-white disabled:cursor-not-allowed disabled:bg-[#E8EBED] disabled:text-[#A2A9AF]">
+          @if (service.saving()) {
+          <i class="pi pi-spinner pi-spin"></i>
+          }
+          Save changes
+        </button>
+        }
+      </div>
+    </div>
+  </section>
+</div>
+}

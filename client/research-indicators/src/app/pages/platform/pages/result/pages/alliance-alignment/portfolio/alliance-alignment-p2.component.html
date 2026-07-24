@@ -1,0 +1,175 @@
+<div class="flex flex-col gap-5">
+  <div class="content-section">
+    <div class="mb-10 flex flex-col rounded-[13px] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-[30px]">
+      <div class="section-title">ALLIANCE ALIGNMENT</div>
+      <div class="flex flex-col gap-[25px]">
+        <app-multiselect label="Contributing projects" [signal]="body"
+          textSpan="Select the required primary project for this result. Note that only one project can be selected."
+          optionLabel="select_label" optionValue="contract_id" signalOptionValue="contracts"
+          [disabled]="!submission.isEditableStatus()" [removeCondition]="canRemove" [isRequired]="true"
+          [scrollHeight]="'290px'" [itemHeight]="70" serviceName="contracts" [serviceParams]="contractServiceParams"
+          placeholder="Select the contributing projects">
+          <ng-template #item let-item>
+            <div class="flex flex-col gap-2 h-[54px] text-[14px]" pTooltip="{{ item?.description }}">
+              <p class="text-[#4C5158] font-[400]">
+                <b>{{ item?.agreement_id }} -</b>
+                {{ getShortDescription(item?.description) }}
+              </p>
+
+              <p class="space-x-3 text-[11px] text-[#777C83]">
+                <button class="uppercase max-w-24 text-[10px] font-semibold px-2 py-1 rounded-lg"
+                  [class]="getContractStatusClasses(item?.contract_status)">
+                  {{ item?.contract_status }}
+                </button>
+                Principal investigator <i class="pi pi-arrow-right !text-[7px] text-[#777C83] pl-1"></i>
+                <span class="text-[#345B8F]">{{ item?.project_lead_description }}</span>
+                <span class="text-[#B9C0C5]">|</span>
+                Start date <i class="pi pi-arrow-right !text-[7px] text-[#777C83] pl-1"></i>
+                <span class="text-[#345B8F]">{{ item?.start_date | date: 'dd/MM/yyyy' }}</span>
+                @if (item?.end_date) {
+                <span class="text-[#B9C0C5]">|</span>
+                End date <i class="pi pi-arrow-right !text-[7px] text-[#777C83] pl-1"></i>
+                <span class="text-[#345B8F]">{{ item?.end_date | date: 'dd/MM/yyyy' }}</span>
+                }
+              </p>
+            </div>
+          </ng-template>
+
+          <ng-template #selectedItems let-value>
+            @if (value?.length > 0) {
+            <div class="flex items-center gap-2">
+              <span> {{ value?.length }} project{{ value?.length === 1 ? '' : 's' }} selected </span>
+            </div>
+            }
+          </ng-template>
+          <ng-template #rows let-contract>
+            <div class="flex-col flex w-full">
+              <div class="text-[15px] text-[#4C5158] font-[600]">{{ contract.agreement_id }} - {{
+                contract.description }}</div>
+
+              <div class="flex justify-between pt-2 xl:pt-0">
+                <div class="flex gap-x-5 justify-between">
+                  <div class="flex items-center">
+                    <span class="font-normal text-[13px] text-[#777c83] font-['Space_Grotesk'] leading-4">Principal
+                      investigator</span>
+                    <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+                    <span class="text-[13px] uppercase leading-[18px] text-[#345b8f] font-['Space_Grotesk']">{{
+                      contract.project_lead_description
+                      }}</span>
+                  </div>
+
+                  <div class="flex items-center">
+                    <span class="text-[13px] text-[#777c83] font-['Space_Grotesk'] leading-4">Start date</span>
+                    <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+                    <span class="text-[13px] leading-[18px] text-[#345b8f] font-['Space_Grotesk']">{{
+                      contract.start_date | date: 'dd/MM/yyyy'
+                      }}</span>
+                  </div>
+
+                  <div class="flex items-center">
+                    <span class="text-[13px] text-[#777c83] font-['Space_Grotesk'] leading-4">End date</span>
+                    <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+                    <span class="text-[13px] leading-[18px] text-[#345b8f] font-['Space_Grotesk']">{{
+                      contract.endDateGlobal | date: 'dd/MM/yyyy'
+                      }}</span>
+                  </div>
+                </div>
+                <div class="pl-4">
+                  <button [disabled]="!submission.isEditableStatus()"
+                    class="px-3 py-[5px] disabled:cursor-not-allowed rounded-full text-[14px] whitespace-nowrap flex items-center cursor-pointer transition-all duration-300 group border border-[var(--ac-primary-blue-300)]"
+                    [class]="
+                      contract.is_primary
+                        ? 'bg-[var(--ac-primary-blue-300)] text-white disabled:bg-[#8D9299] disabled:border-[#8D9299]'
+                        : 'disabled:bg-[#E8EBED] disabled:!text-[#8D9299] disabled:border-[#8D9299] bg-transparent text-[var(--ac-primary-blue-300)]'
+                    " (click)="markAsPrimary(contract, 'contract')">
+                    @if (contract.is_primary) {
+                    <i class="pi pi-star-fill pr-2 !text-[12px] !text-white"></i>
+                    }
+                    {{ contract.is_primary ? 'Primary' : 'Select as Primary' }}
+                  </button>
+                </div>
+              </div>
+
+              <div
+                class="flex items-center pt-1 xl:pt-0.5 text-[13px] leading-[18px] text-[#4C5158] gap-x-1 font-['Barlow'] font-[600]">
+                @if (contract.levers?.full_name === 'Not available' || !contract.levers) {
+                Lever - <span class="text-[#4C5158] font-['Barlow'] font-normal">{{ contract.levers?.full_name ||
+                  'Not available' }}</span>
+                } @else {
+                <img [src]="contract.levers?.lever_url" alt="Lever" class="w-[22px] h-[22px] mr-1" />
+                @if (contract.levers?.full_name?.includes(':')) {
+                <span class="text-[13px] leading-[18px] text-[#77c83] font-['Barlow'] font-normal">{{
+                  contract.levers?.full_name }}</span>
+                } @else {
+                {{ contract.levers?.short_name || contract.levers?.full_name || '' }}
+                }
+                }
+              </div>
+            </div>
+          </ng-template>
+        </app-multiselect>
+
+        <app-multiselect label="Research Areas" [signal]="body" optionLabel="full_name" optionValue="lever_id"
+          signalOptionValue="research_areas" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+          [disabledSelectedScroll]="true" [filterBy]="'short_name,other_names,full_name,name'" serviceName="levers"
+          [serviceParams]="serviceParams" placeholder="Select the research areas">
+        </app-multiselect>
+
+        <app-multiselect label="Strategic Objectives" [signal]="body" optionLabel="name" optionValue="id"
+          signalOptionValue="strategic_objectives" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+          [disabledSelectedScroll]="true" [filterBy]="'name,description'" serviceName="strategicObjectives"
+          [serviceParams]="serviceParams" [enableVirtualScroll]="false" scrollHeight="205px"
+          placeholder="Select the strategic objectives">
+        </app-multiselect>
+
+        @if (shouldShowImpactOutcomes()) {
+        <app-multiselect label="Impact Outcomes" [signal]="body" optionLabel="name" optionValue="id"
+          signalOptionValue="impact_outcomes" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+          [disabledSelectedScroll]="true" [filterBy]="'name,description'" serviceName="impactOutcomes"
+          [serviceParams]="serviceParams" [enableVirtualScroll]="false" scrollHeight="205px"
+          placeholder="Select the impact outcomes">
+        </app-multiselect>
+        }
+
+        @if (!isOicrIndicator()) {
+        <app-multiselect label="Contribution to SDG" [disabled]="!submission.isEditableStatus()" [signal]="body"
+          textSpan="Indicate the SDGs to which the result is linked." optionLabel="short_name" optionValue="id"
+          signalOptionValue="result_sdgs" serviceName="sdgs" [isRequired]="true" [disabledSelectedScroll]="true"
+          [columnsOnXl]="true" [columnsOnXlCount]="3" scrollHeight="260px" placeholder="Select the SDG">
+          <ng-template #selectedItems let-value>
+            @if (value?.length > 0) {
+            <div class="flex items-center gap-2">
+              <span>{{ value?.length }} SDG target{{ value?.length === 1 ? '' : 's' }} selected </span>
+            </div>
+            }
+          </ng-template>
+          <ng-template #item let-sdg>
+            <div class="flex w-full min-w-0 items-center gap-3">
+              @if (sdg?.icon) {
+              <img [src]="sdg.icon" [alt]="sdg.short_name || 'SDG target'"
+                class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+              }
+              <span class="min-w-0 font-[550] leading-[18px] text-[#4C5158]">
+                SDG {{ sdg?.short_name?.split(':')[0] }} -
+                <span class="font-['Barlow'] font-normal">{{ sdg?.short_name?.split(':')[1]?.trim() }}</span>
+              </span>
+            </div>
+          </ng-template>
+          <ng-template #rows let-sdg>
+            <div class="flex w-full min-w-0 items-center gap-3">
+              @if (sdg?.icon) {
+              <img [src]="sdg.icon" [alt]="sdg.short_name || 'SDG target'"
+                class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+              }
+              <span class="min-w-0 font-[550] leading-[18px] text-[#4C5158] text-[15px]">
+                SDG {{ sdg?.short_name?.split(':')[0] }} -
+                <span class="font-['Barlow'] font-normal">{{ sdg?.short_name?.split(':')[1]?.trim() }}</span>
+              </span>
+            </div>
+          </ng-template>
+        </app-multiselect>
+        }
+      </div>
+    </div>
+  </div>
+</div>

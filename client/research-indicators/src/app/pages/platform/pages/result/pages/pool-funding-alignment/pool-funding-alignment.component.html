@@ -1,0 +1,275 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+  <div class="flex flex-col gap-5 w-full">
+    <div class="content-section w-full">
+      <div class="flex flex-col w-full bg-[#fcfcfc] rounded-[10px] p-[30px] mb-10">
+        <div class="flex items-center justify-between">
+          <div class="pf-alignment-section-heading flex items-center gap-1.5">
+            <div class="section-title m-0" data-testid="pf-alignment-title">SCIENCE PROGRAM CONTRIBUTION</div>
+            <i class="pi pi-info-circle pf-alignment-section-heading__icon"
+               [pTooltip]="INFO_BANNER"
+               tooltipPosition="top"
+               [attr.aria-label]="INFO_BANNER"
+               tabindex="0"
+               data-testid="pf-alignment-title-info-icon"></i>
+          </div>
+          @if (readOnlyCause() === 'synced') {
+            <app-custom-tag
+              statusId="pf-synced"
+              [statusName]="SYNCED_BADGE_LABEL"
+              [tooltip]="SYNCED_BANNER"
+              [attr.aria-label]="SYNCED_BADGE_ARIA_LABEL"
+              data-testid="pf-alignment-synced-badge">
+            </app-custom-tag>
+          } @else if (readOnlyCause() === 'prms-sourced') {
+            <app-custom-tag
+              statusId="pf-synced"
+              [statusName]="PRMS_SOURCED_BADGE_LABEL"
+              [tooltip]="PRMS_SOURCED_BANNER"
+              [attr.aria-label]="PRMS_SOURCED_BADGE_ARIA_LABEL"
+              data-testid="pf-alignment-prms-sourced-badge">
+            </app-custom-tag>
+          }
+        </div>
+
+        @if (loadFailed()) {
+          <section class="mb-4 text-sm text-red-700" data-testid="pf-alignment-load-failed" role="alert">
+            Could not load alignment — please refresh.
+          </section>
+        }
+
+        @if (readOnlyCause() === 'synced') {
+          <div role="status" aria-live="polite"
+               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               data-testid="pf-alignment-synced-banner">
+            {{ SYNCED_BANNER }}
+          </div>
+        } @else if (readOnlyCause() === 'prms-sourced') {
+          <div role="status" aria-live="polite"
+               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               data-testid="pf-alignment-prms-sourced-banner">
+            {{ PRMS_SOURCED_BANNER }}
+          </div>
+        } @else if (readOnlyCause() === 'permission') {
+          <div role="status" aria-live="polite"
+               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               data-testid="pf-alignment-readonly-banner">
+            {{ READ_ONLY_BANNER }}
+          </div>
+        }
+
+        <div role="note"
+             class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074B86] gap-[7px] px-2.5 mb-[30px]"
+             data-testid="pf-alignment-info-banner">
+          <span class="!text-[#074b86] !font-[300] material-symbols-rounded rotate-180" aria-hidden="true">info</span>
+          <h3 class="text-[#777C83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+            {{ INFO_BANNER }}
+          </h3>
+        </div>
+
+        <section class="mb-6" data-testid="pf-alignment-contribution-section">
+          <p id="pf-alignment-question" class="label inline-block mb-2">
+            {{ CONTRIBUTION_QUESTION }}<span class="text-red-500" aria-hidden="true">*</span>
+          </p>
+          <div role="radiogroup"
+               aria-labelledby="pf-alignment-question"
+               aria-required="true"
+               class="flex flex-row gap-6"
+               data-testid="pf-alignment-radio-group">
+            <div class="flex items-center">
+              <p-radioButton
+                name="pf-alignment-contribution"
+                inputId="pf-alignment-radio-yes"
+                [value]="true"
+                [ngModel]="formData().has_contribution"
+                (ngModelChange)="onContributionChange($event)"
+                [disabled]="!editable() || isReadOnly()"
+                data-testid="pf-alignment-radio-yes"></p-radioButton>
+              <label for="pf-alignment-radio-yes" class="option-label ml-2">Yes</label>
+            </div>
+            <div class="flex items-center">
+              <p-radioButton
+                name="pf-alignment-contribution"
+                inputId="pf-alignment-radio-no"
+                [value]="false"
+                [ngModel]="formData().has_contribution"
+                (ngModelChange)="onContributionChange($event)"
+                [disabled]="!editable() || isReadOnly()"
+                data-testid="pf-alignment-radio-no"></p-radioButton>
+              <label for="pf-alignment-radio-no" class="option-label ml-2">No</label>
+            </div>
+          </div>
+          @if (inlineErrors()?.['has_contribution']; as msg) {
+            <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
+                   data-testid="pf-alignment-error-has_contribution">{{ msg }}</small>
+          }
+        </section>
+
+        @if (formData().has_contribution === true) {
+          <section class="mb-6" data-testid="pf-alignment-levers-section">
+            @if (isUnmapped()) {
+              <div role="status" aria-live="polite"
+                   class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                   data-testid="pf-alignment-unmapped-message">
+                {{ UNMAPPED_SP_MESSAGE }}
+              </div>
+            } @else if (hasNoSciencePrograms()) {
+              <div role="status" aria-live="polite"
+                   class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                   data-testid="pf-alignment-no-sps-message">
+                {{ NO_SP_DEFINED_MESSAGE }}
+              </div>
+            } @else if (showSpPicker()) {
+              <app-multiselect
+                [label]="SP_PICKER_LABEL"
+                [isRequired]="true"
+                [signal]="formData"
+                signalOptionValue="selected_sps"
+                optionLabel="name"
+                optionValue="official_code"
+                serviceName="bilateralSciencePrograms"
+                placeholder="Select Science Programs"
+                selectedItemsSurfaceColor="#FFFFFF"
+                [columnsOnXl]="true"
+                [disabled]="!editable() || isReadOnly()"
+                (selectEvent)="onSpSelectionChange()">
+                <ng-template #rows let-row>
+                  @let chipCode = row.code || row.official_code;
+                  @let chipSp = findScienceProgram(chipCode);
+                  <span class="flex items-center gap-2 min-w-0"
+                        [class.pf-sp-chip-rejected]="isRejectedSp(chipCode)"
+                        [attr.data-rejected]="isRejectedSp(chipCode) ? 'true' : null"
+                        [attr.data-testid]="'pf-alignment-sp-chip-' + chipCode">
+                    <img [src]="'/sps/' + (chipSp?.icon_key || chipCode) + '.png'"
+                         [alt]="chipCode + ' icon'"
+                         class="rounded shrink-0 object-cover"
+                         [style.background]="(chipSp?.color || row.color) || 'transparent'"
+                         style="width:24px;height:24px;"
+                         loading="lazy" />
+                    <span class="truncate text-[var(--ac-primary-blue-500)] text-[14px]"
+                          style="font-family: 'Barlow', sans-serif;">
+                      <strong>{{ chipCode }} — {{ chipSp?.allocation ?? '—' }}%</strong> - {{ row.name }}
+                    </span>
+                  </span>
+                </ng-template>
+                <ng-template #item let-row>
+                  <span class="flex items-center gap-2 min-w-0">
+                    <img [src]="'/sps/' + (row.icon_key || row.code || row.official_code) + '.png'"
+                         [alt]="(row.code || row.official_code) + ' icon'"
+                         class="rounded shrink-0 object-cover"
+                         [style.background]="row.color || 'transparent'"
+                         style="width:24px;height:24px;"
+                         loading="lazy" />
+                    <span class="truncate text-[var(--ac-grey-800)] text-[14px]"
+                          style="font-family: 'Barlow', sans-serif;">
+                      <strong>{{ row.code }} — {{ row.allocation }}%</strong> - {{ row.name }}
+                    </span>
+                  </span>
+                </ng-template>
+              </app-multiselect>
+              @if (inlineErrors()?.['sp_codes']; as msg) {
+                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
+                       data-testid="pf-alignment-error-sp_codes">{{ msg }}</small>
+              }
+            }
+          </section>
+
+          @if (showHloSection() && hloSectionVisible()) {
+            <section class="mb-6" data-testid="pf-alignment-hlo-section">
+              <p class="label inline-block mb-3">
+                {{ HLO_SECTION_LABEL }}<span class="text-red-500" aria-hidden="true">*</span>
+              </p>
+
+              @if (loadingTocCatalog() && !tocCatalog()) {
+                <div role="status" aria-live="polite"
+                     class="flex items-center gap-2 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                     data-testid="pf-alignment-hlo-loading">
+                  <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+                  <span>{{ HLO_CATALOG_LOADING_MESSAGE }}</span>
+                </div>
+              } @else if (tocCatalogError() && !tocCatalog()) {
+                <div role="alert" aria-live="polite"
+                     class="flex items-center justify-between gap-3 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                     data-testid="pf-alignment-hlo-catalog-error">
+                  <span class="flex items-center gap-2">
+                    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+                    <span>{{ HLO_CATALOG_ERROR_MESSAGE }}</span>
+                  </span>
+                  <button type="button"
+                          class="shrink-0 text-[var(--ac-primary-blue-500)] underline cursor-pointer bg-transparent border-0 p-0"
+                          data-testid="pf-alignment-hlo-retry"
+                          (click)="retryCatalog()">
+                    Retry
+                  </button>
+                </div>
+              } @else if (showTocBlocks()) {
+
+              @if (versionLocked()) {
+                <div role="status" aria-live="polite"
+                     class="mb-4 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                     data-testid="pf-alignment-version-locked-banner">
+                  {{ VERSION_LOCKED_BANNER }}
+                </div>
+              }
+
+              <!-- AC-08.4 — stale saved alignments render read-only from their snapshot. -->
+              @for (stale of staleSnapshots(); track stale.sp_code) {
+                <div class="pf-stale-snapshot flex flex-col gap-2 p-4 rounded-[8px] mb-4"
+                     [attr.data-testid]="'pf-alignment-stale-' + stale.sp_code">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <strong class="text-[14px] text-[var(--ac-grey-800)]">{{ stale.sp_code }}</strong>
+                    <span class="pf-stale-tag" role="status" aria-live="polite"
+                          [attr.data-testid]="'pf-alignment-stale-tag-' + stale.sp_code">
+                      {{ STALE_SNAPSHOT_TAG }}
+                    </span>
+                  </div>
+                  <div class="text-[13px] text-[var(--ac-grey-700)] flex flex-col gap-1">
+                    <span>{{ stale.toc_result_title }}</span>
+                    <span>{{ stale.indicator_description }}</span>
+                    <span>
+                      {{ stale.unit_of_measurement || '—' }} ·
+                      Target ({{ stale.target_year }}): {{ stale.target_value ?? '—' }} ·
+                      Contribution: {{ stale.quantitative_contribution ?? '—' }}
+                    </span>
+                  </div>
+                </div>
+              }
+
+              <!-- One independent block per selected SP (AC-02.2/03.1). -->
+              <div class="flex flex-col gap-4">
+                @for (sp of formData().selected_sps; track sp.official_code) {
+                  <app-sp-toc-alignment-block
+                    [sp]="sp"
+                    [catalog]="catalogForSp(sp.official_code)"
+                    [allowedLevels]="allowedLevels()"
+                    [draft]="draftForSp(sp.official_code)"
+                    [resultType]="resultType()"
+                    [disabled]="blocksDisabled()"
+                    [inlineErrors]="blockErrorsForSp(sp.official_code)"
+                    [catalogState]="catalogState()"
+                    (draftChange)="onDraftChange($event)"
+                    (retryCatalog)="retryCatalog()"
+                    [attr.data-testid]="'pf-alignment-block-' + sp.official_code">
+                  </app-sp-toc-alignment-block>
+                }
+              </div>
+              }
+            </section>
+          }
+        }
+
+        @if (inlineErrors()?.['_global']; as msg) {
+          <div role="alert" aria-live="polite" class="mb-3 text-sm text-red-700"
+               data-testid="pf-alignment-error-global">{{ msg }}</div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <app-navigation-buttons
+    [showBack]="true"
+    [showNext]="false"
+    [showSave]="editable() && !isReadOnly()"
+    [disableSave]="!canSave() || saving()"
+    (save)="onSave()" />
+</div>

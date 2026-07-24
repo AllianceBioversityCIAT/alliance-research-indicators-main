@@ -1,0 +1,14 @@
+<div class="container">
+  <div class="title">RESULTS</div>
+  <div class="options">
+    @for (result of this.getResultsSE.results() | filterByTextWithAttr: 'title' : this.searchText(); track $index) {
+      <div
+        class="option atc-primary-blue-300"
+        (keydown.enter)="this.actions.changeResultRoute(result.result_id)"
+        (click)="this.actions.changeResultRoute(result.result_id)">
+        <strong>{{ result.result_id }}</strong> - {{ result.title }}
+      </div>
+    }
+  </div>
+  <div class="view-all-button">View all my results<span class="material-symbols-rounded"> arrow_forward </span></div>
+</div>

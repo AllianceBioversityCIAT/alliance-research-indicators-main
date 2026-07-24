@@ -92,7 +92,7 @@ Most ARI features follow this rhythm. Use it as a starting checklist; remove wha
 11. **Unit tests** — sibling `*.spec.ts` for every controller / service / guard / interceptor touched.
 12. **E2E tests** — `test/*.e2e-spec.ts`.
 13. **Admin SSR (if applicable)** — page + route + service + sidebar entry per `src/admin/README-REACT.md`.
-14. **Docs** — Swagger annotations on every new handler; update relevant section in `docs/system-design/design.md` or `docs/detailed-design/detailed-design.md` if a baseline decision changed.
+14. **Docs** — Swagger annotations on every new handler; update relevant section in `docs/ux-ui/design.md` or `docs/trd/trd.md` if a baseline decision changed.
 15. **Rollout** — feature flag / env var setup; deploy order; comms plan.
 
 ---

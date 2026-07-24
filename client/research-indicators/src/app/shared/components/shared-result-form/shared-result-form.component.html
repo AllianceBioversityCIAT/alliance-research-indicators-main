@@ -1,0 +1,56 @@
+<div #containerRef class="w-full flex flex-col">
+  <h2 class="label pb-2">Reporting Project<span class="text-[#CF0808]">*</span></h2>
+  <p-select [options]="contracts" [(ngModel)]="contractId" optionLabel="select_label" optionValue="agreement_id"
+    placeholder="Search by project code, project name or principal investigator" [virtualScroll]="true"
+    [style]="isInvalid && showWarning ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
+    [lazy]="true" (ngModelChange)="onContractChange($event)" [virtualScrollItemSize]="69" [appendTo]="'body'"
+    panelStyleClass="shared-result-form-select-panel" [filter]="true" [scrollHeight]="'290px'"
+    [filterBy]="'select_label,project_lead_description'" class="!text-[16px]">
+    <ng-template let-item pTemplate="item">
+      <div class="flex flex-col gap-2 h-[54px] text-[14px] w-full min-w-0" pTooltip="{{ item?.description }}">
+        <p class="text-[#4C5158] font-[400] w-full overflow-hidden whitespace-nowrap text-ellipsis">
+          <b>{{ item?.agreement_id }} -</b>
+          {{ item?.description }}
+        </p>
+
+        <p class="space-x-3 text-[11px] text-[#777C83]">
+          <button class="uppercase max-w-24 text-[10px] font-semibold px-2 py-1 rounded-lg"
+            [class]="getContractStatusClasses(item?.contract_status)">
+            {{ item?.contract_status }}
+          </button>
+          Principal investigator <i class="pi pi-arrow-right !text-[7px] text-[#777C83] pl-1"></i>
+          <span class="text-[#345B8F]">{{ item?.project_lead_description }}</span>
+          <span class="text-[#B9C0C5]">|</span>
+          Start date <i class="pi pi-arrow-right !text-[7px] text-[#777C83] pl-1"></i>
+          <span class="text-[#345B8F]">{{ item?.start_date | date: 'dd/MM/yyyy' }}</span>
+          @if (item?.end_date) {
+          <span class="text-[#B9C0C5]">|</span>
+          End date <i class="pi pi-arrow-right !text-[7px] text-[#777C83] pl-1"></i>
+          <span class="text-[#345B8F]">{{ item?.end_date | date: 'dd/MM/yyyy' }}</span>
+          }
+        </p>
+      </div>
+    </ng-template>
+    <ng-template let-selected pTemplate="selectedItem">
+      <div class="flex items-center block whitespace-normal break-words gap-2">
+        <p class="text-[#4C5158] font-[400] w-full">
+          <b>{{ selected?.agreement_id }} -</b>
+          {{ selected?.description }}
+        </p>
+      </div>
+    </ng-template>
+  </p-select>
+  <div class="flex flex-col mt-1 text-[#8D9299] text-[14px] leading-4.5">
+    <span> {{ helperText }} </span>
+    @if (helperText2) {
+    <span> {{ helperText2 }} </span>
+    }
+  </div>
+
+  @if (isInvalid && showWarning) {
+  <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm test-warning">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="!text-[14px]">This field is required</span>
+  </div>
+  }
+</div>

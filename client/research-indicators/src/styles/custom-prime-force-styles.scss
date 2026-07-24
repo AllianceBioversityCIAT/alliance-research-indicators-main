@@ -1,0 +1,90 @@
+.p-button-label {
+  font-weight: 500 !important;
+}
+
+.table-custom-styles {
+  td {
+    padding: 1rem !important;
+  }
+}
+
+.cpf-small-padding {
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+}
+
+.result-center-table-buttons {
+  .p-button {
+    padding: 7px 12px !important;
+  }
+}
+
+.tag-button {
+  padding: 0.2rem 0.5rem !important;
+}
+
+.p-datatable-sortable-column {
+  padding: 0.5rem !important;
+  padding-left: 1rem !important;
+}
+
+@media (orientation: landscape) and (height <= 768px) {
+  body {
+    font-size: 13px !important;
+    .p-select-option {
+      font-size: 16px !important;
+    }
+
+    .table-custom-styles {
+      td {
+        padding: 0.2rem 0.5rem !important;
+      }
+    }
+
+    .p-card-body {
+      padding: 0.8rem !important;
+    }
+  }
+}
+
+// Bilateral ToC alignment block selects (Level / HLO / Indicator) render their
+// overlay with appendTo="body", so the panel escapes component encapsulation.
+// Long HLO/indicator descriptions must wrap inside a panel that matches the
+// trigger width and scrolls vertically — never expand to the longest label.
+.p-select-overlay.sp-toc-select-panel,
+.p-select-overlay.bil-mapping-picker-panel {
+  max-width: min(40rem, calc(100vw - 2rem)) !important;
+  overflow-x: hidden;
+
+  .p-select-list-container,
+  .p-select-list {
+    max-width: 100%;
+  }
+
+  .p-select-option,
+  .p-select-option-label {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    line-height: 1.3;
+    height: auto;
+    max-width: 100%;
+  }
+}
+
+// Denser option list for the bilateral-mapping pickers only (smaller font to
+// gain vertical space). Scoped to this panel so the ToC panel is unaffected.
+// `!important` because PrimeNG sets an explicit font-size on its default option
+// label (which otherwise wins over the inherited panel font-size — the reason the
+// CLARISA picker, using default rendering, kept the larger size).
+.p-select-overlay.bil-mapping-picker-panel {
+  font-size: 0.8125rem !important;
+
+  .p-select-option,
+  .p-select-option-label,
+  .p-select-empty-message,
+  .bil-picker-option-label {
+    font-size: 0.8125rem !important;
+  }
+}

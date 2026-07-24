@@ -1,0 +1,41 @@
+<!-- dynamic-component-selector.component.html -->
+<div [formGroup]="formGroup">
+  <ng-container [ngSwitch]="field.type">
+    <!-- Section -->
+    <ng-container *ngSwitchCase="'section'">
+      <div class="section">
+        <ng-container *ngFor="let subField of field.fields">
+          <app-dynamic-component-selector [field]="subField" [formGroup]="getNestedFormGroup(field)"> </app-dynamic-component-selector>
+        </ng-container>
+      </div>
+    </ng-container>
+
+    <!-- Block -->
+    <ng-container *ngSwitchCase="'block'">
+      <div class="block">
+        <ng-container *ngFor="let subField of field.fields">
+          <app-dynamic-component-selector [field]="subField" [formGroup]="getNestedFormGroup(field)"> </app-dynamic-component-selector>
+        </ng-container>
+      </div>
+    </ng-container>
+
+    <!-- Title -->
+    <ng-container *ngSwitchCase="'title'">
+      <div class="title">
+        <app-dynamic-title [text]="field.text"></app-dynamic-title>
+      </div>
+    </ng-container>
+
+    <!-- Input -->
+    <ng-container *ngSwitchCase="'input'">
+      <div class="input">
+        <app-dynamic-input [field]="field" [formGroup]="formGroup"> </app-dynamic-input>
+      </div>
+    </ng-container>
+
+    <!-- Default -->
+    <ng-container *ngSwitchDefault>
+      <p>Tipo no soportado: {{ field.type }}</p>
+    </ng-container>
+  </ng-container>
+</div>

@@ -1,0 +1,157 @@
+:root {
+  // Light blue
+  --ac-light-blue-100: #79d9ff;
+  --ac-light-blue-200: #00b6ff;
+  --ac-light-blue-300: #1689ca;
+  --ac-light-blue-400: #035ba9;
+  --ac-light-blue-500: #074b86;
+
+  // Primary blue
+  --ac-primary-blue-100: #b0c4dd;
+  --ac-primary-blue-200: #7c9cb9;
+  --ac-primary-blue-300: #345b8f;
+  --ac-primary-blue-400: #153c71;
+  --ac-primary-blue-500: #173f6f;
+  --ac-primary-blue-600: #112f5c;
+  --ac-primary-blue-700: #0b1e3c;
+
+  // Green
+  --ac-green-100: #d3e7d5;
+  --ac-green-200: #a8ceab;
+  --ac-green-300: #7cb580;
+  --ac-green-400: #509c55;
+  --ac-green-500: #358540;
+  --ac-green-600: #235b2d;
+  --ac-green-700: #1f4e24;
+
+  // Grey
+  --ac-grey-100: #f4f7f9;
+  --ac-grey-200: #e8ebed;
+  --ac-grey-300: #d1d6da;
+  --ac-grey-400: #b9c0c5;
+  --ac-grey-500: #a2a9af;
+  --ac-grey-600: #8d9299;
+  --ac-grey-700: #777c83;
+  --ac-grey-800: #4c5158;
+  --ac-grey-900: #191919;
+
+  // Orange
+  --ac-orange-1: #f58220;
+
+  // White
+  --ac-white-1: #fff;
+  --ac-white-2: #fcfcfc;
+
+  // Background and red
+  --ac-background: #f5f5f5;
+  --ac-red-1: #cf0808;
+  --ac-pool-funding-fg: #1b5e20;
+  --ac-pool-funding-border: #2e7d32;
+}
+
+// Mixin to dynamically generate background and text color classes
+@mixin generate-color-classes($colors) {
+  @each $name, $value in $colors {
+    // acb = Alliance background color
+    .abc-#{$name} {
+      background-color: var(--ac-#{$name});
+      transition: background-color 0.3s ease;
+    }
+
+    // atc = Alliance text color
+    .atc-#{$name} {
+      color: var(--ac-#{$name});
+      transition: color 0.3s ease;
+    }
+
+    // acb = Alliance background color
+    .abc-#{$name}-i {
+      background-color: var(--ac-#{$name}) !important;
+      transition: background-color 0.3s ease;
+    }
+
+    // atc = Alliance text color
+    .atc-#{$name}-i {
+      color: var(--ac-#{$name}) !important;
+      transition: color 0.3s ease;
+    }
+  }
+}
+
+// Color map to be used in the mixins
+$colors: (
+  'light-blue-100': #79d9ff,
+  'light-blue-200': #00b6ff,
+  'light-blue-300': #1689ca,
+  'light-blue-400': #035ba9,
+  'light-blue-500': #074b86,
+  'primary-blue-100': #b0c4dd,
+  'primary-blue-200': #7c9cb9,
+  'primary-blue-300': #345b8f,
+  'primary-blue-400': #153c71,
+  'primary-blue-500': #173f6f,
+  'primary-blue-600': #112f5c,
+  'primary-blue-700': #0b1e3c,
+  'green-100': #d3e7d5,
+  'green-200': #a8ceab,
+  'green-300': #7cb580,
+  'green-400': #509c55,
+  'green-500': #358540,
+  'green-600': #235b2d,
+  'green-700': #1f4e24,
+  'grey-100': #f4f7f9,
+  'grey-200': #e8ebed,
+  'grey-300': #d1d6da,
+  'grey-400': #b9c0c5,
+  'grey-500': #a2a9af,
+  'grey-600': #8d9299,
+  'grey-700': #777c83,
+  'grey-800': #4c5158,
+  'grey-900': #191919,
+  'orange-1': #f58220,
+  'white-1': #fff,
+  'white-2': #fcfcfc,
+  'background': #f5f5f5,
+  'red-1': #cf0808
+);
+
+// Include to generate the classes
+@include generate-color-classes($colors);
+
+[data-theme='dark'] {
+  --ac-background: #191919;
+  --ac-light-blue-100: #4a708b;
+  --ac-light-blue-200: #369;
+  --ac-light-blue-300: #2b5986;
+  --ac-light-blue-400: #23466b;
+  --ac-light-blue-500: #1b3450;
+  --ac-primary-blue-100: #3d5167;
+  --ac-primary-blue-200: #2e3e51;
+  --ac-primary-blue-300: #253448;
+  --ac-primary-blue-400: #1c2938;
+  --ac-primary-blue-500: #121c25;
+  --ac-primary-blue-600: #0e1620;
+  --ac-primary-blue-700: #0a1018;
+  --ac-green-100: #3a5a41;
+  --ac-green-200: #2e4a34;
+  --ac-green-300: #244030;
+  --ac-green-400: #1a3325;
+  --ac-green-500: #14251a;
+  --ac-green-600: #101c16;
+  --ac-green-700: #0d1812;
+  --ac-grey-100: #2b2b2b;
+  --ac-grey-200: #3e3e3e;
+  --ac-grey-300: #4c4c4c;
+  --ac-grey-400: #616161;
+  --ac-grey-500: #7d7d7d;
+  --ac-grey-600: #949494;
+  --ac-grey-700: #acacac;
+  --ac-grey-800: #c2c2c2;
+  --ac-grey-900: #e5e5e5;
+  --ac-orange-1: #ff9d56;
+  --ac-white-1: #e5e5e5;
+  --ac-white-2: #dcdcdc;
+  --ac-red-1: #ff4d4d;
+  --ac-pool-funding-fg: #a5d6a7;
+  --ac-pool-funding-border: #66bb6a;
+}

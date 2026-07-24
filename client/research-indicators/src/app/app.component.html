@@ -1,2 +1,7 @@
-<h1>Hello, research-indicators</h1>
-<p>Env: {{this.name}}</p>
+<router-outlet></router-outlet>
+<app-global-alert> </app-global-alert>
+<app-global-toast></app-global-toast>
+@defer (when this.cache.showMetadataPanel()) {
+  <app-metadata-panel></app-metadata-panel>
+}
+<app-copy-token></app-copy-token>

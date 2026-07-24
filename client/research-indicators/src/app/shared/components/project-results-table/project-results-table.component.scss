@@ -1,0 +1,76 @@
+::ng-deep .custom-table {
+  border: 1px solid #e8ebed;
+  border-radius: 6px;
+
+  .p-datatable-thead {
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 15px;
+  }
+
+  .p-datatable-tbody {
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 15px;
+    color: #4c5158 !important;
+
+    tr {
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: #f8f9fa !important;
+
+        td {
+          color: #074b86;
+        }
+      }
+    }
+  }
+
+  .p-datatable-thead > tr > th,
+  .p-datatable-tbody > tr > td {
+    padding: 10px;
+    border-bottom: 1px solid #e8ebed;
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+
+  .search-box {
+    border: 0.4px solid #b0c4dd;
+    border-radius: 12px;
+    width: 50vh;
+    display: flex;
+    align-items: center;
+    background-color: #fcfcfc;
+
+    i {
+      font-size: 18px;
+      color: #345b8f;
+      margin: 6px;
+    }
+
+    input {
+      border: none;
+      outline: none;
+      color: #345b8f;
+      background: transparent;
+      flex-grow: 1;
+      padding: 7px 0;
+    }
+
+    input::placeholder {
+      color: #7c9cb9;
+    }
+  }
+
+  .options {
+    justify-content: flex-end;
+    gap: 10px;
+  }
+}

@@ -1,0 +1,10 @@
+<div [formGroup]="formGroup">
+  <div>{{ field.label }}</div>
+  <input [formControlName]="field.name" [type]="field.inputType || 'text'" />
+  <div *ngIf="formGroup.get(field.name)?.invalid && (formGroup.get(field.name)?.dirty || formGroup.get(field.name)?.touched)">
+    <!-- Show error messages -->
+    <span *ngIf="formGroup.get(field.name)?.errors?.['required']">Este campo es requerido.</span>
+    <span *ngIf="formGroup.get(field.name)?.errors?.['min']">El valor mínimo es {{ field.validators }}</span>
+    <!-- Add more validations as needed -->
+  </div>
+</div>

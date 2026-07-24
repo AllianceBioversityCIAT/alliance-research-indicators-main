@@ -1,0 +1,77 @@
+<ng-template #requiredMessage>
+  <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+    <i class="material-symbols-rounded !text-[12px]">warning</i>
+    <span class="!text-[14px]">This field is required</span>
+  </div>
+</ng-template>
+
+<div class="relative flex flex-col gap-4 bg-[#F4F7F9] border border-[#E8EBED] flex-col p-5">
+  <div class="flex justify-between gap-1">
+    <span class="text-[13px] text-[#8D9299] font-['Space_Grotesk'] tracking-widest">ACTOR # {{ actorNumber ?? 1
+      }}</span>
+
+    @if (submission.isEditableStatus()) {
+    <div class="cursor-pointer text-[#CF0808]" (click)="deleteActor()" (keydown.enter)="deleteActor()">
+      <i class="pi pi-times-circle !text-[16px] pr-1"></i>
+    </div>
+    }
+  </div>
+
+  <div class="flex flex-col gap-1">
+    <h2 class="label text-[#4C5158]">Actor type<span class="text-[14px] text-[#CF0808]">*</span></h2>
+
+    <p-select [disabled]="!submission.isEditableStatus()" [scrollHeight]="'218px'" [optionLabel]="'name'"
+      placeholder="Select the actor type" class="text-[14px]" [(ngModel)]="body().actor_type_id"
+      [style]="actorMissing ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }" [optionValue]="'code'"
+      (onChange)="onActorTypeChange($event.value)" [options]="actorService.list()">
+    </p-select>
+
+    @if (actorMissing) {
+    <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+    @if (body().actor_type_id === 5) {
+    <input pInputText class="mt-3" placeholder="Specify other" [(ngModel)]="body().actor_type_custom_name"
+      [style]="otherMissing ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
+      [disabled]="!submission.isEditableStatus()" type="text" />
+    @if (otherMissing) {
+    <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+    }
+    <div class="flex items-center space-x-2 text-[14px] text-[#4C5158] pt-3">
+      <p-checkbox id="sex_age_disaggregation_not_apply" [disabled]="!submission.isEditableStatus()"
+        [(ngModel)]="body().sex_age_disaggregation_not_apply"
+        (onChange)="onDisaggregationChange({ checked: $event.checked })" (ngModelChange)="onCheckboxChange()"
+        binary="true" styleClass="w-4 h-4" />
+      <label for="sex_age_disaggregation_not_apply"> Sex and age disaggregation does not apply </label>
+    </div>
+
+    @if (!body().sex_age_disaggregation_not_apply) {
+    <div class="flex gap-15 pt-4">
+      <div class="flex flex-col gap-4">
+        <span class="label text-[#4C5158]">Women</span>
+        <div class="flex items-center space-x-2 text-[14px] text-[#4C5158]">
+          <p-checkbox id="women_youth" [disabled]="!submission.isEditableStatus()" [(ngModel)]="body().women_youth"
+            (ngModelChange)="onCheckboxChange()" binary="true" styleClass="w-4 h-4" />
+          <label for="women_youth"> Youth </label>
+          <p-checkbox id="women_not_youth" [disabled]="!submission.isEditableStatus()"
+            [(ngModel)]="body().women_not_youth" (ngModelChange)="onCheckboxChange()" binary="true"
+            styleClass="w-4 h-4" />
+          <label for="women_not_youth"> Non-youth </label>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-4">
+        <span class="label text-[#4C5158]">Men</span>
+        <div class="flex items-center space-x-2 text-[14px] text-[#4C5158]">
+          <p-checkbox id="men_youth" [disabled]="!submission.isEditableStatus()" [(ngModel)]="body().men_youth"
+            (ngModelChange)="onCheckboxChange()" binary="true" styleClass="w-4 h-4" />
+          <label for="men_youth"> Youth </label>
+          <p-checkbox id="men_not_youth" [disabled]="!submission.isEditableStatus()" [(ngModel)]="body().men_not_youth"
+            (ngModelChange)="onCheckboxChange()" binary="true" styleClass="w-4 h-4" />
+          <label for="men_not_youth"> Non-youth </label>
+        </div>
+      </div>
+    </div>
+    }
+  </div>
+</div>

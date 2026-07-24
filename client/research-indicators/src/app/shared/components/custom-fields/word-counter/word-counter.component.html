@@ -1,0 +1,6 @@
+<span class="word-counter" style="font-family: 'Barlow', sans-serif; font-weight: 500; font-style: normal; font-size: 12px; line-height: 100%">
+  <span style="color: #8d9299">Words used: </span>
+  <span [ngStyle]="{ color: color }"
+    >{{ count }}<ng-container *ngIf="showMax && maxWords">/{{ maxWords }}</ng-container></span
+  >
+</span>
