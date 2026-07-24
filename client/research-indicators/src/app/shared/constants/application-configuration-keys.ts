@@ -1,0 +1,4 @@
+export const APPLICATION_CONFIGURATION_KEY = {
+  DATE_FORMAT: 'date-format',
+  BULK_UPLOAD_EMBED_URL: 'BULK_UPLOAD.EMBED_INFO.URL'
+} as const;

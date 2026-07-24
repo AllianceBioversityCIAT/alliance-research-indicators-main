@@ -1,0 +1,157 @@
+:host {
+  display: block;
+}
+
+.login-container {
+  display: flex;
+  min-height: 100vh;
+  font-family: 'Barlow', sans-serif;
+  position: relative;
+}
+
+.login-content {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  padding: 40px;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 80px;
+}
+
+.login-title {
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  color: #112f5c;
+  margin-bottom: 20px;
+}
+
+.login-description {
+  font-size: 14px;
+  text-align: center;
+  font-weight: 500;
+  color: #8d9299;
+  margin-bottom: 10px;
+}
+
+.login-form {
+  max-width: 510px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.cgiar-btn {
+  background-color: #509c55;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  max-width: 330px;
+  width: 100%;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.cgiar-btn:hover {
+  background-color: #3d8b40;
+}
+
+.login-divider {
+  width: 100%;
+  height: 2px;
+  background-color: #e8ebed;
+  max-width: 330px;
+}
+
+.cgiar-icon {
+  height: 24px;
+}
+
+.support-info {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.support-description {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8d9299;
+}
+
+.support-email {
+  color: #1689ca;
+  text-decoration: underline;
+  font-size: 12px;
+}
+
+.support-email:hover {
+  color: #1373aa;
+}
+
+.terms-info {
+  font-size: 12px;
+  color: #8d9299;
+  margin-top: 50px;
+  text-align: start;
+  max-width: 330px;
+}
+
+.terms-link {
+  color: #1689ca;
+  text-decoration: underline;
+}
+
+.terms-link:hover {
+  color: #1373aa;
+}
+
+.back-section {
+  position: absolute;
+  bottom: 30px;
+  left: 30px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #004976;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.back-icon {
+  font-size: 12px;
+  background: #004976;
+  color: #fff;
+  padding: 6px;
+  border-radius: 50%;
+}
+
+.back-btn:hover {
+  text-decoration: underline;
+}
+
+.bg-image-section {
+  width: 50%;
+  background-size: cover;
+  background-position: right;
+}

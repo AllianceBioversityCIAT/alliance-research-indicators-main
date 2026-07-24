@@ -1,0 +1,205 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+  <!-- TRAINING TYPE-->
+  <div class="bg-[#fcfcfc] rounded-[13px] p-[30px] mb-[25px] border border-[#e8ebed] bg-[#ffffff]">
+    <div class="section-title">TRAINING TYPE</div>
+    <div class="flex flex-col xl:flex-row gap-8 justify-between">
+      <div class="flex-1 max-w-[260px]">
+        <app-radio-button label="Training or engagement to report" [isRequired]="true" [signal]="body"
+          [disabled]="!submission.isEditableStatus()" [serviceName]="'capSharingFormats'" [optionLabel]="'name'"
+          [optionValue]="{ body: 'session_format_id', option: 'session_format_id' }"></app-radio-button>
+      </div>
+
+      <div class="flex-1 max-w-[260px]">
+        <app-radio-button label="Is this a training or a engagement?" [isRequired]="true" [signal]="body"
+          [disabled]="!submission.isEditableStatus()" [serviceName]="'capSharingTypes'" [optionLabel]="'name'"
+          [optionValue]="{ body: 'session_type_id', option: 'session_type_id' }"
+          [helperText]="'Training is a structured learning activity with clear objectives. Engagement is broader collaboration with partners or stakeholders.'"></app-radio-button>
+      </div>
+
+      <div class="flex-1 max-w-[240px]">
+        <app-radio-button label="Length of training" [isRequired]="true" [signal]="body"
+          [disabled]="!submission.isEditableStatus()" [serviceName]="'capSharingLengths'" [optionLabel]="'name'"
+          [optionValue]="{ body: 'session_length_id', option: 'session_length_id' }">
+        </app-radio-button>
+      </div>
+    </div>
+
+    <div class="flex flex-col pt-8 xl:flex-row">
+      @if (isLongTermSelected()) {
+      <div class="flex-1">
+        <app-radio-button label="Degree" [isRequired]="true" direction="horizontal" [signal]="body" spaceX="gap-[35px]"
+          [disabled]="!submission.isEditableStatus()" [serviceName]="'capSharingDegrees'" [optionLabel]="'name'"
+          [optionValue]="{ body: 'degree_id', option: 'degree_id' }">
+        </app-radio-button>
+      </div>
+      }
+    </div>
+  </div>
+
+  <!-- INDIVIDUAL TRAINING -->
+  <div class="bg-[#fcfcfc] rounded-[13px] p-[30px] mb-[25px] border border-[#e8ebed] bg-[#ffffff]"
+    [class.hidden]="body().session_format_id !== 1">
+    <div class="font-['Space_Grotesk'] text-[14px] font-medium text-[#8d9299] uppercase mb-[30px] mt-0">INDIVIDUAL
+      TRAINING</div>
+
+    <div class="flex flex-col gap-5 mb-6">
+      <div class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074B86] gap-[7px] px-2.5 mb-2">
+        <span class="!text-[#074b86] !font-[300] material-symbols-rounded rotate-180">info</span>
+        <h3 class="text-[#777C83] font-['Barlow'] text-[15px] font-normal leading-[17px] text-left my-[15px]">
+          Can't find the institution you need? Request to add it
+          <span (keydown.enter)="setSectionAndOpenModal('Capacity Sharing')"
+            (click)="setSectionAndOpenModal('Capacity Sharing')"
+            class="text-[#2792ce] cursor-pointer underline">here</span>.
+        </h3>
+      </div>
+
+      <app-select label="Trainee affiliation" [signal]="body" [disabled]="!submission.isEditableStatus()"
+        [isRequired]="true" [optionLabel]="'html_full_name'"
+        [optionValue]="{ body: 'individual.affiliation.institution_id', option: 'institution_id' }"
+        serviceName="institutions" placeholder="Select the trainee affiliation"></app-select>
+    </div>
+
+    <div class="mb-8">
+      <app-input label="Trainee name" [isRequired]="true" [disabled]="!submission.isEditableStatus()" [signal]="body"
+        optionValue="individual.trainee_name" placeholder="Write the trainee name"></app-input>
+    </div>
+
+    <div class="flex flex-col xl:flex-row gap-8">
+      <div class="flex-1 xl:max-w-[460px]">
+        <app-select label="Trainee nationality" [signal]="body" [disabled]="!submission.isEditableStatus()"
+          [isRequired]="true" [optionLabel]="'name'"
+          [optionValue]="{ body: 'individual.nationality.isoAlpha2', option: 'isoAlpha2' }" serviceName="countries"
+          placeholder="Select the trainee nationality"></app-select>
+      </div>
+
+      <div class="flex-1">
+        <app-radio-button label="Gender" [isRequired]="true" [signal]="body" direction="horizontal"
+          [disabled]="!submission.isEditableStatus()" [serviceName]="'capSharingGenders'" [optionLabel]="'name'"
+          [optionValue]="{ body: 'individual.gender_id', option: 'gender_id' }"></app-radio-button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GROUP TRAINING -->
+  <div class="bg-[#fcfcfc] rounded-[13px] p-[30px] mb-[25px] border border-[#e8ebed] bg-[#ffffff]"
+    [class.hidden]="body().session_format_id !== 2">
+    <div class="font-['Space_Grotesk'] text-[14px] font-medium text-[#8d9299] uppercase mb-[30px] mt-0">GROUP TRAINING
+    </div>
+
+    <div class="button-container">
+      <div class="flex-1">
+        <app-input label="Total participants?" type="number" [disabled]="!submission.isEditableStatus()"
+          [isRequired]="true" [signal]="body" [optionValue]="'group.session_participants_total'"
+          placeholder="0"></app-input>
+      </div>
+
+      <div class="flex-1">
+        <app-input label="Female participants?" [signal]="body" optionValue="group.session_participants_female"
+          [disabled]="!submission.isEditableStatus()" type="number" placeholder="0"></app-input>
+      </div>
+
+      <div class="flex-1">
+        <app-input label="Male participants?" [signal]="body" optionValue="group.session_participants_male"
+          [disabled]="!submission.isEditableStatus()" type="number" placeholder="0"></app-input>
+      </div>
+
+      <div class="flex-1">
+        <app-input label="Non-binary participants?" [signal]="body" optionValue="group.session_participants_non_binary"
+          [disabled]="!submission.isEditableStatus()" type="number"></app-input>
+      </div>
+    </div>
+
+    <div class="flex flex-col xl:flex-row gap-8">
+      <div class="flex-1">
+        <app-radio-button label="What was the purpose of this training/engagement?" [isRequired]="true"
+          [disabled]="!submission.isEditableStatus()" [signal]="body" [serviceName]="'capSharingSessionPurpose'"
+          [optionLabel]="'name'"
+          [optionValue]="{ body: 'group.session_purpose_id', option: 'session_purpose_id' }"></app-radio-button>
+
+        @if (body().group?.session_purpose_id === 4) {
+        <div class="flex-1 pt-2">
+          <app-input [signal]="body" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+            placeholder="Write the other purpose" optionValue="group.session_purpose_description"
+            placeholder="Write the other purpose"></app-input>
+        </div>
+        <div class="flex-1"></div>
+        }
+      </div>
+
+      <div class="flex-1">
+        <app-radio-button label="Were the trainees attending on behalf of an organization?" [isRequired]="true"
+          [disabled]="!submission.isEditableStatus()" [signal]="body" [optionLabel]="'name'" [serviceName]="'yesOrNo'"
+          [optionValue]="{ body: 'group.is_attending_organization', option: 'value' }"></app-radio-button>
+      </div>
+    </div>
+
+    @if (body().group?.is_attending_organization) {
+    <div class="mt-6">
+      <div class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074B86] gap-[7px] px-2.5 mb-[30px]">
+        <span class="!text-[#074b86] !font-[300] material-symbols-rounded rotate-180">info</span>
+        <h3 class="text-[#777C83] font-['Barlow'] text-[15px] font-normal leading-[17px] text-left my-[15px]">
+          Can't find the institution you need? Request to add it
+          <span (keydown.enter)="setSectionAndOpenModal('Capacity Sharing')"
+            (click)="setSectionAndOpenModal('Capacity Sharing')"
+            class="text-[#2792ce] cursor-pointer underline">here</span>.
+        </h3>
+      </div>
+      <app-multiselect label="Select the organizations" [isRequired]="true" [signal]="body"
+        [disabled]="!submission.isEditableStatus()" optionLabel="html_full_name" optionValue="institution_id"
+        signalOptionValue="group.trainee_organization_representative" [removeCondition]="canRemove"
+        serviceName="institutions" placeholder="Select the organizations">
+        @if (!this.loading()) {
+        <ng-template #rows let-institution>
+          <app-partner-selected-item [institution]="institution"></app-partner-selected-item>
+        </ng-template>
+        }
+      </app-multiselect>
+    </div>
+    }
+  </div>
+
+  <!-- TRAINING DETAILS -->
+  <div class="bg-[#fcfcfc] rounded-[13px] p-[30px] pb-5 mb-10 border border-[#e8ebed] bg-[#ffffff]">
+    <div class="font-['Space_Grotesk'] text-[14px] font-medium text-[#8d9299] uppercase mb-[30px] mt-0">TRAINING DETAILS
+    </div>
+
+    <div class="flex flex-col mb-6">
+      <app-select label="Training / Engagement supervisor" [isRequired]="true"
+        [disabled]="!submission.isEditableStatus()" optionLabel="full_name" optionLabel2="email" [signal]="body"
+        [optionValue]="{ body: 'training_supervisor.user_id', option: 'user_id' }" serviceName="userStaff"
+        placeholder="Select the training/engagement supervisor">
+      </app-select>
+    </div>
+
+    <div class="flex flex-col xl:flex-row gap-8 mb-6">
+      <div class="flex-1">
+        <app-select label="Language" [disabled]="!submission.isEditableStatus()" [signal]="body" [optionLabel]="'name'"
+          [optionValue]="{ body: 'training_supervisor_languages.language_id', option: 'id' }"
+          [serviceName]="'languages'" placeholder="Select the language">
+        </app-select>
+      </div>
+
+      <div class="flex-1 xl:max-w-[160px]">
+        <app-calendar-input label="Start date" [signal]="body" [disabled]="!submission.isEditableStatus()"
+          [isRequired]="true" [optionValue]="'start_date'" [maxDate]="body().end_date"
+          placeholder="Select the start date"></app-calendar-input>
+      </div>
+
+      <div class="flex-1 xl:max-w-[160px]">
+        <app-calendar-input label="End date" [signal]="body" [disabled]="!submission.isEditableStatus()"
+          [isRequired]="true" [optionValue]="'end_date'" [minDate]="body().start_date"
+          placeholder="Select the end date"></app-calendar-input>
+      </div>
+    </div>
+
+    <div class="mt-5">
+      <app-radio-button label="Delivery modality" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+        direction="horizontal" [signal]="body" spaceX="gap-[35px]" [serviceName]="'capSharingDeliveryModalities'"
+        [optionLabel]="'name'"
+        [optionValue]="{ body: 'delivery_modality_id', option: 'delivery_modality_id' }"></app-radio-button>
+    </div>
+  </div>
+
+  <app-navigation-buttons (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
+</div>

@@ -1,0 +1,117 @@
+:host ::ng-deep .p-steps-item-active .p-steps-item-number {
+  border-color: #1689ca !important;
+  border-width: 2px !important;
+  background-color: #f8f4f4 !important;
+  /* stylelint-disable-next-line */
+  color: #1689ca !important; /* NOSONAR */
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+}
+
+:host ::ng-deep .p-steps-item-active .p-steps-item-label {
+  font-weight: 500 !important;
+  color: #1689ca !important;
+  font-size: 14px !important;
+}
+
+// Step labels when active AND completed
+:host ::ng-deep .p-steps-item-active.oicr-step1-complete .p-steps-item-label {
+  font-weight: 500 !important;
+  color: #509C55 !important;
+  font-size: 14px !important;
+}
+
+:host ::ng-deep .p-steps-item-active.oicr-step2-complete .p-steps-item-label {
+  font-weight: 500 !important;
+  color: #509C55 !important;
+  font-size: 14px !important;
+}
+
+:host ::ng-deep .p-steps-item-active.oicr-step3-complete .p-steps-item-label {
+  font-weight: 500 !important;
+  color: #509C55 !important;
+  font-size: 14px !important;
+}
+
+:host ::ng-deep .p-steps-item-active.oicr-step4-complete .p-steps-item-label {
+  font-weight: 500 !important;
+  color: #509C55 !important;
+  font-size: 14px !important;
+}
+
+:host ::ng-deep .p-steps-item-number {
+  border-color: #a2a9af !important;
+  border-width: 2px !important;
+  background-color: #f8f4f4 !important;
+  /* stylelint-disable-next-line */
+  color: #a2a9af !important; /* NOSONAR */
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  box-shadow: none !important;
+}
+
+:host ::ng-deep .p-steps-item-label {
+  font-weight: 400 !important;
+  color: #a2a9af !important;
+  font-size: 14px !important;
+}
+
+// Step 1 completed: apply styles whether active or not
+:host ::ng-deep .p-steps-item.oicr-step1-complete .p-steps-item-number {
+  border-color: #509C55 !important;
+  border-width: 2px !important;
+  background-color: #509C55 !important;
+  /* stylelint-disable-next-line */
+  color: #ffffff !important; /* NOSONAR */
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+}
+
+// Step 2 completed: apply styles whether active or not
+:host ::ng-deep .p-steps-item.oicr-step2-complete .p-steps-item-number {
+  border-color: #509C55 !important;
+  border-width: 2px !important;
+  background-color: #509C55 !important;
+  /* stylelint-disable-next-line */
+  color: #ffffff !important; /* NOSONAR */
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+}
+
+// Step 3 completed: apply styles whether active or not
+:host ::ng-deep .p-steps-item.oicr-step3-complete .p-steps-item-number {
+  border-color: #509C55 !important;
+  border-width: 2px !important;
+  background-color: #509C55 !important;
+  /* stylelint-disable-next-line */
+  color: #ffffff !important; /* NOSONAR */
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+}
+
+// Step 4 completed: apply styles whether active or not
+:host ::ng-deep .p-steps-item.oicr-step4-complete .p-steps-item-number {
+  border-color: #509C55 !important;
+  border-width: 2px !important;
+  background-color: #509C55 !important;
+  /* stylelint-disable-next-line */
+  color: #ffffff !important; /* NOSONAR */
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+}
+
+:host ::ng-deep .p-accordioncontent-content {
+  padding: 0px !important;
+}

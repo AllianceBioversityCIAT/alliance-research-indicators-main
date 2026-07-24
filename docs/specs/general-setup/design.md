@@ -14,7 +14,7 @@
 - **Status:** draft | in-review | approved | implemented | superseded
 - **Owner:** <name / squad>
 - **Linked requirements:** ./requirements.md
-- **Linked detailed design:** ../../../detailed-design/detailed-design.md (sections X, Y)
+- **Linked detailed design:** ../../../trd/trd.md (sections X, Y)
 - **Last updated:** <YYYY-MM-DD>
 ```
 
@@ -178,7 +178,7 @@ Append-only:
 | --- | --- | --- | --- |
 | D-<feature>-1 | <YYYY-MM-DD> | <decision> | <why> |
 
-Decisions converted to baseline (system-design or detailed-design) MUST also be added there.
+Decisions converted to baseline (ux-ui/design or trd) MUST also be added there.
 
 ---
 

@@ -1,0 +1,58 @@
+<p-card>
+  <div class="section-header">
+    <div class="title">FIND AND CREATE RESULTS</div>
+    <p-button icon="pi pi-plus" label="Create new result" />
+  </div>
+  <p-tabView>
+    <p-tabPanel header="My results"> </p-tabPanel>
+    <p-tabPanel header="All results"> </p-tabPanel>
+  </p-tabView>
+
+  <p-table
+    #dt1
+    [value]="results()"
+    dataKey="id"
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [loading]="this.loading()"
+    [paginator]="true"
+    [globalFilterFields]="['name', 'country.name', 'representative.name', 'status']">
+    <ng-template pTemplate="caption">
+      <div class="flex">
+        <p-button label="Clear" [outlined]="true" icon="pi pi-filter-slash" (onClick)="clear(dt1)" />
+        <span class="p-input-icon-left ml-auto">
+          <i class="pi pi-search"></i>
+          <input pInputText type="text" [(ngModel)]="searchValue" placeholder="Search keyword" />
+        </span>
+      </div>
+    </ng-template>
+    <ng-template pTemplate="header">
+      <tr>
+        @for (col of this.columns; track $index) {
+          <th style="min-width: 1rem" scope="col">
+            <div class="flex align-items-center">
+              {{ col.header }}
+              <p-columnFilter type="text" [field]="col.attr" display="menu" />
+            </div>
+          </th>
+        }
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-customer>
+      <tr>
+        @for (col of this.columns; track $index) {
+          <td [class.title-cell]="col.attr === 'title'">
+            <div [class.title-content]="col.attr === 'title'">
+              {{ customer[col.attr] }}
+            </div>
+          </td>
+        }
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="7">No customers found.</td>
+      </tr>
+    </ng-template>
+  </p-table>
+</p-card>

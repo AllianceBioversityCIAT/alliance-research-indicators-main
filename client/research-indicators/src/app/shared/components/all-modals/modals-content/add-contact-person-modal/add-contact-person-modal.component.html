@@ -1,0 +1,48 @@
+<div class="grid h-[calc(100%-60px)] w-[60vw] max-w-[900px] md:overflow-x-hidden px-12 pt-12">
+  <div class="flex flex-col gap-4 bg-white rounded-[10px] p-6">
+    <h3 class="text-[16px] font-bold text-[#153C71] mb-2">ADD PEOPLE INVOLVED IN THIS RESULT</h3>
+
+    <app-select label="Author / Contact Person" [isRequired]="true" [signal]="body"
+      [optionValue]="{ body: 'contact_person_id', option: 'user_id' }" [optionLabel]="'first_name'"
+      [customFilterBy]="'first_name,last_name,email,_search'" serviceName="userStaff" [scrollHeight]="'263px'"
+      placeholder="Select a contact person">
+      <ng-template #item let-item>
+        <div class="flex flex-col gap-1">
+          <div class="text-[15px] leading-tight">
+            <span class="font-[600] text-[#4C5158]">
+              {{ item?.first_name | properCase }} {{ item?.last_name | properCase }}
+            </span>
+            <span class="text-[#777c83] lowercase"> - {{ item?.email || '-' }}</span>
+          </div>
+          <div class="flex flex-wrap items-center">
+            @if (item?.position) {
+            <span class="font-normal text-[15px] text-[#777c83] !font-['Space_Grotesk'] leading-4">Position</span>
+            <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+            <span class="text-[15px] leading-[18px] text-[#345b8f] !font-['Space_Grotesk'] uppercase">{{ (item?.position
+              | properCase) || 'undefined' }}</span>
+            <span class="text-[#B9C0C5] px-2">|</span>
+            }
+            <span class="font-normal text-[15px] text-[#777c83] !font-['Space_Grotesk'] leading-4">Affiliation</span>
+            <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+            <span class="text-[15px] uppercase leading-[18px] text-[#345b8f] !font-['Space_Grotesk']">{{
+              (item?.affiliation | properCase) || (item?.center | properCase) || '-' }}</span>
+          </div>
+        </div>
+      </ng-template>
+      <ng-template #selectedItemTemplate let-selected>
+        <div class="flex flex-col">
+          <div class="text-[16px] leading-tight">
+            <span class="font-[600] text-[#4C5158]">
+              {{ selected?.first_name | properCase }} {{ selected?.last_name | properCase }}
+            </span>
+            <span class="text-[#8D9299]"> - {{ selected?.email || '-' }}</span>
+          </div>
+        </div>
+      </ng-template>
+    </app-select>
+
+    <app-select label="Role" [isRequired]="true" [signal]="body" [optionValue]="{ body: 'role_id', option: 'id' }"
+      optionLabel="name" [scrollHeight]="'135px'" serviceName="informativeRoles" placeholder="Select a role">
+    </app-select>
+  </div>
+</div>

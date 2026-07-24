@@ -1,0 +1,158 @@
+@let hss = this.cache.hasSmallScreen();
+<div class="sidebar border-r-1 border-[#e8ebed] abc-white-1 p-[15px] {{ hss ? 'p-[19px] pt-[15px] mt-[50px]' : 'p-[24px] pt-[15px] mt-[70px]' }} {{
+    cache.isSidebarCollapsed() ? 'w-[65px]' : 'w-[250px]'
+  }}" [class.collapsed]="cache.isSidebarCollapsed()">
+  <div class="sidebar-header">
+    <div
+      class="sidebar-title text-[#8D9299] !text-[10.5px] uppercase font-[300] tracking-[4.5px] !font-[space_grotesk]">
+      RESOURCES</div>
+    <button class="material-symbols-rounded sidebar-icon !text-[18px] p-1 bg-[#F4F7F9]"
+      (click)="toggleSidebarAndResize()" (keydown.enter)="toggleSidebarAndResize()" aria-label="Toggle Sidebar">
+      keyboard_double_arrow_left
+    </button>
+  </div>
+
+  <div class="options pb-[10px]" [class.options--resources-collapsed]="cache.isSidebarCollapsed()">
+    @for (option of this.resourceOptions; track $index) {
+    @if (!option.hide) {
+    <div class="option atc-primary-blue-400" [class]="{ disabled: option.underConstruction }" [routerLink]="option.link"
+      [routerLinkActive]="'active'" [pTooltip]="cache.isSidebarCollapsed() ? option.label : ''" tooltipPosition="right"
+      [positionLeft]="15" placeholder="Right">
+      @if (cache.isSidebarCollapsed() && option.underConstruction) {
+      <div class="icon-construction-container">
+        <i class="sidebar-option-icon" [ngClass]="'pi ' + option.icon"></i>
+        <img [src]="'construction.png' | s3ImageUrl" class="construction-icon-x1 icon-construction-container-img"
+          alt="" />
+      </div>
+      } @else {
+      <i class="sidebar-option-icon" [ngClass]="'pi ' + option.icon"></i>
+      }
+
+      <div class="sidebar-option-label body-2 text flex">
+        {{ option.label }}
+        @if (option.underConstruction && !cache.isSidebarCollapsed()) {
+        <img [src]="'construction.png' | s3ImageUrl" class="construction-icon-x1" alt="" />
+        }
+      </div>
+    </div>
+    }
+    }
+  </div>
+
+  @if (rolesService.canAccessCenterAdmin() || rolesService.canAccessAppConfiguration()) {
+  @if (!cache.isSidebarCollapsed()) {
+  <hr class="divider" />
+  <div class="sidebar-title text-[#8D9299] !text-[10.5px] uppercase font-[300] tracking-[4.5px] !font-[space_grotesk]">
+    ADMINISTRATION</div>
+  <div class="administration-block flex w-full min-w-0 flex-col gap-1 py-[15px]">
+    @for (group of this.administrationGroups(); track group.id) {
+    <div class="flex w-full min-w-0 flex-col gap-1">
+      <button type="button"
+        class="admin-parent flex w-full cursor-pointer items-center gap-[15px] border-0 bg-transparent py-[7px] pl-0 pr-0 text-left atc-primary-blue-400"
+        (click)="toggleAdministrationGroup(group.id)" (keydown.enter)="toggleAdministrationGroup(group.id)">
+        @if (group.s3Image) {
+        <img [src]="group.s3Image | s3ImageUrl" alt="" class="block shrink-0 object-contain"
+          [style.width]="group.iconSize ?? '14px'" [style.height]="group.iconSize ?? '14px'" />
+        } @else {
+        <i class="sidebar-option-icon" [ngClass]="'pi ' + group.icon" [style.fontSize]="group.iconSize ?? null"></i>
+        }
+        <span class="sidebar-option-label body-2 flex flex-1">{{ group.label }}</span>
+        <i class="pi shrink-0 !text-[12px] text-[#112F5C]"
+          [class.pi-chevron-up]="isAdministrationGroupExpanded(group.id)"
+          [class.pi-chevron-down]="!isAdministrationGroupExpanded(group.id)"></i>
+      </button>
+      @if (isAdministrationGroupExpanded(group.id)) {
+      @for (child of visibleAdministrationChildren(group); track child.link) {
+      <a class="option option--nested atc-primary-blue-400 block" [routerLink]="child.link" routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }">
+        <span class="option-nested-inner flex min-w-0 items-center gap-[12px] pl-2">
+          @if (child.s3Image) {
+          <img [src]="child.s3Image | s3ImageUrl" alt="" class="shrink-0 object-contain"
+            [style.width]="child.iconSize ?? '14px'" [style.height]="child.iconSize ?? '14px'" />
+          } @else {
+          <i class="sidebar-option-icon" [ngClass]="'pi ' + child.icon" [style.fontSize]="child.iconSize ?? null"></i>
+          }
+          <span class="sidebar-option-label body-2 text">{{ child.label }}</span>
+        </span>
+      </a>
+      }
+      }
+    </div>
+    }
+  </div>
+  } @else {
+  <hr class="divider divider--collapsed-tight" />
+  <div class="administration-block administration-block--collapsed flex w-full min-w-0 flex-col">
+    @for (group of this.administrationGroups(); track group.id) {
+    <div class="admin-collapsed-popover-wrap flex w-full min-w-0 flex-col gap-0">
+      <button type="button"
+        class="admin-parent admin-parent--collapsed flex w-full cursor-pointer items-center justify-center border-0 bg-transparent py-[7px] pl-0 pr-0 atc-primary-blue-400"
+        [class.admin-parent--collapsed-open]="administrationFlyoutGroupId() === group.id"
+        (click)="toggleAdministrationFlyout(group.id, $event)"
+        (keydown.enter)="toggleAdministrationFlyout(group.id, $event)"
+        (keydown.space)="$event.preventDefault(); toggleAdministrationFlyout(group.id, $event)"
+        [attr.aria-expanded]="administrationFlyoutGroupId() === group.id" [attr.aria-label]="group.label"
+        [pTooltip]="administrationFlyoutGroupId() === group.id ? '' : group.label" tooltipPosition="right"
+        [positionLeft]="15">
+        @if (group.s3Image) {
+        <img [src]="group.s3Image | s3ImageUrl" alt="" class="block shrink-0 object-contain !max-w-none"
+          [style.width]="group.iconSize ?? '14px'" [style.height]="group.iconSize ?? '14px'" />
+        } @else {
+        <i class="sidebar-option-icon shrink-0" [ngClass]="'pi ' + group.icon"
+          [style.fontSize]="group.iconSize ?? '14px'"></i>
+        }
+      </button>
+      @if (administrationFlyoutGroupId() === group.id) {
+      <div
+        class="admin-center-admin-flyout absolute left-[calc(100%+10px)] top-0 z-[9999] min-w-[170px] rounded-lg border border-[#E8EBED] bg-white p-2 shadow-lg"
+        tabindex="-1" (click)="$event.stopPropagation()" (keydown.escape)="closeAdministrationFlyout()">
+        <div class="admin-flyout-header px-2 py-1.5 !text-[12px] font-bold capitalize tracking-wide text-[#8d9299]">
+          {{ group.label }}</div>
+        @for (child of visibleAdministrationChildren(group); track child.link) {
+        <a class="admin-flyout-row flex min-w-0 cursor-pointer items-center gap-3 rounded-md px-2 py-2 no-underline atc-primary-blue-400 hover:bg-[#F4F7F9]"
+          [routerLink]="child.link" routerLinkActive="admin-flyout-row--active"
+          [routerLinkActiveOptions]="{ exact: true }" (click)="closeAdministrationFlyout()">
+          @if (child.s3Image) {
+          <img [src]="child.s3Image | s3ImageUrl" alt="" class="shrink-0 object-contain"
+            [style.width]="child.iconSize ?? '14px'" [style.height]="child.iconSize ?? '14px'" />
+          } @else {
+          <i class="sidebar-option-icon shrink-0 text-[#112F5C]" [ngClass]="'pi ' + child.icon"
+            [style.fontSize]="child.iconSize ?? null"></i>
+          }
+          <span class="admin-flyout-label sidebar-option-label body-2 !text-[12.5px] text-[#112F5C]">{{ child.label
+            }}</span>
+        </a>
+        }
+      </div>
+      }
+    </div>
+    }
+  </div>
+  }
+  }
+
+  <hr class="divider" [class.divider--collapsed-tight]="cache.isSidebarCollapsed()" />
+  <div class="sidebar-title text-[#8D9299] !text-[10.5px] uppercase font-[300] tracking-[4.5px] !font-[space_grotesk]"
+    [class.hidden]="cache.isSidebarCollapsed()">ACCOUNT</div>
+
+  <div class="options options--account py-[15px]" [class.options--account-collapsed]="cache.isSidebarCollapsed()">
+    @for (option of this.accountOptions; track $index) {
+    @if (!option.hide) {
+    @if (option.link) {
+    <a class="option atc-primary-blue-400" [routerLink]="option.link" routerLinkActive="active"
+      [pTooltip]="cache.isSidebarCollapsed() ? option.label : ''" tooltipPosition="right" [positionLeft]="15">
+      <i class="sidebar-option-icon" [ngClass]="'pi ' + option.icon"></i>
+      <div class="sidebar-option-label body-2 text flex">{{ option.label }}</div>
+    </a>
+    } @else {
+    <button type="button" class="option option--action atc-primary-blue-400" [class.option--logout]="option.logout"
+      [class.disabled]="option.underConstruction" [pTooltip]="cache.isSidebarCollapsed() ? option.label : ''"
+      tooltipPosition="right" [positionLeft]="15" (click)="option.action?.()">
+      <i class="sidebar-option-icon" [ngClass]="'pi ' + option.icon"></i>
+      <div class="sidebar-option-label body-2 text flex">{{ option.label }}</div>
+    </button>
+    }
+    }
+    }
+  </div>
+</div>

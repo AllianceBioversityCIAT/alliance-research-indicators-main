@@ -1,0 +1,158 @@
+<div class="w-[70vw] max-w-[1000px] p-6">
+  @if (result()) {
+  <div class="bg-white rounded-2xl border border-[#E8EBED] p-6">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        @if (result()?.platform_code === 'TIP') {
+        <img [src]="'images/tracking.svg' | s3ImageUrl" alt="TIP" class="w-10" />
+        }
+        @else if (result()?.platform_code === 'AICCRA') {
+        <img [src]="'images/AICCRA.png' | s3ImageUrl" alt="AICCRA" class="w-28 -ml-3 -mx-4" />
+        }
+        @else {
+        <img [src]="'images/prms-reporting-tool.svg' | s3ImageUrl" alt="PRMS Reporting Tool" class="w-13" />
+        }
+        <div class="flex items-center text-[11px]">
+
+          <span class="py-1 px-2 rounded-l-lg font-[600] min-w-[50px] max-w-[50px] text-center"
+            [style.color]="getPlatformColors(result()?.platform_code ?? '')?.text"
+            [style.background-color]="getPlatformColors(result()?.platform_code ?? '')?.background">
+            {{ result()?.platform_code ?? '' }}
+          </span>
+          <span class="text-[#4C5158] bg-[#E8EBED] py-1 px-2 rounded-r-lg min-w-[43px] text-center">
+            {{ formatResultCode(result()?.result_official_code) }}
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <i class="pi pi-calendar !text-[9px] text-[#B9C0C5]"></i>
+          <span
+            class="text-[9px] uppercase leading-[18px] tracking-[0.18em] font-[400] text-[#B9C0C5] font-['Space_Grotesk']">{{
+            result()?.report_year_id }} result version
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-[#112F5C] pt-1">
+      <div class="flex items-center gap-2 pb-1">
+        <i class="pi {{ result()?.indicators?.icon_src }} !text-[11px] text-[#7CB580]"></i>
+        <span class="text-[12px] text-[#8D9299] font-[400] uppercase">{{ result()?.indicators?.name }}</span>
+      </div>
+
+      <p class="text-[18px] font-[700] leading-5 mb-4">{{ result()?.title }}</p>
+      <div class="flex flex-wrap gap-4 gap-y-2 text-sm mb-2">
+        <div class="flex items-center">
+          <span
+            class="font-normal text-[13px] text-[#8D9299] !font-[300] !font-['Space_Grotesk'] leading-4">Status</span>
+          <div class="pb-0.5">
+            <i class="pi pi-arrow-right !text-[10px] px-2 !text-[#8D9299]"></i>
+            <app-custom-tag [statusId]="(result()?.result_status?.result_status_id ?? 0)" [tiny]="false"
+              [statusName]="(result()?.result_status?.name ?? '')"
+              [statusColor]="result()?.result_status?.config?.color?.text ?? ''"
+              [statusBackground]="result()?.result_status?.config?.color?.background ?? ''"
+              [statusBorder]="result()?.result_status?.config?.color?.border ?? ''" [icon]="true"
+              [iconName]="result()?.result_status?.config?.icon?.name ?? ''"
+              [iconColor]="result()?.result_status?.config?.icon?.color ?? ''"
+              [tooltip]="result()?.result_status?.description ?? ''" [maxWidth]="'150px'">
+            </app-custom-tag>
+          </div>
+        </div>
+
+        @if (getPrimaryContract()) {
+        <div class="flex items-center">
+          <span class="font-normal text-[13px] text-[#8D9299] !font-[300] !font-['Space_Grotesk'] leading-4">Primary
+            project</span>
+          <div>
+            <i class="pi pi-arrow-right !text-[10px] px-2 !text-[#8D9299]"></i>
+            <span
+              class="text-[12px] uppercase leading-[18px] bg-[#F4F7F9] text-[#1689CA] border-1 border-[#B9C0C5] rounded-[8px] px-2 py-1 font-['Space_Grotesk']">{{
+              getPrimaryContract() }}
+            </span>
+          </div>
+        </div>
+        }
+        @if (getValue() !== '-') {
+        <div class="flex items-center">
+          <span class="font-normal text-[13px] text-[#8D9299] !font-[300] !font-['Space_Grotesk'] leading-4">Primary
+            lever</span>
+          <div>
+            <i class="pi pi-arrow-right !text-[10px] px-2 !text-[#8D9299] pb-1"></i>
+            <span
+              class="text-[12px] uppercase leading-[18px] font-[500] text-[#345b8f] font-['Space_Grotesk']">{{getValue()
+              }}
+            </span>
+          </div>
+        </div>
+        }
+        <div class="flex items-center">
+          <span class="font-normal text-[13px] text-[#8D9299] !font-[300] !font-['Space_Grotesk'] leading-4">Reporting
+            year</span>
+          <div>
+            <i class="pi pi-arrow-right !text-[10px] px-2 !text-[#8D9299] pb-1"></i>
+            <span class="text-[13px] uppercase leading-[18px] font-[500] text-[#345b8f] font-['Space_Grotesk']">{{
+              result()?.report_year_id }}
+            </span>
+          </div>
+        </div>
+
+        @if (getContributingProjects().length > 0) {
+        <div class="flex items-center">
+          <span
+            class="font-normal text-[13px] text-[#8D9299] !font-[300] !font-['Space_Grotesk'] leading-4">Contributing
+            projects</span>
+          <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+          <span class="text-[13px] uppercase leading-[18px] text-[#345b8f] font-['Space_Grotesk']">
+            @for (item of getContributingProjects(); track item) {
+            <span
+              class="text-[12px] uppercase leading-[18px] bg-[#F4F7F9] text-[#1689CA] border-1 border-[#B9C0C5] rounded-[8px] px-2 py-1 font-['Space_Grotesk']">
+              {{ item }}
+            </span>
+            }
+          </span>
+        </div>
+        }
+
+        @if (result()?.created_by_user) {
+        <div class="flex items-center">
+          <span class="font-normal text-[13px] text-[#8D9299] !font-[300] !font-['Space_Grotesk'] leading-4">Main
+            contact person</span>
+          <div>
+            <i class="pi pi-arrow-right !text-[10px] px-2 !text-[#8D9299] pb-1"></i>
+            <span class="text-[12px] uppercase leading-[18px] font-[500] text-[#345b8f] font-['Space_Grotesk']">{{
+              result()?.created_by_user?.first_name }} {{ result()?.created_by_user?.last_name }}
+            </span>
+          </div>
+        </div>
+        }
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-wrap gap-3">
+      @if (result()?.public_link) {
+      <button type="button" (click)="openDocumentLink()" [pTooltip]="publicLinkTooltip" tooltipPosition="top"
+        class="flex cursor-pointer items-center gap-2 border-1 border-[#035BA9] text-[#035BA9] px-6 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]">
+        Open public link
+        <i class="pi pi-file-pdf !text-[14px]"></i>
+      </button>
+      }
+      @if (result()?.external_link) {
+      <button type="button" (click)="openExternalLink()" [pTooltip]="externalSystemRedirectTooltip"
+        tooltipPosition="top"
+        class="flex cursor-pointer items-center gap-2  bg-[#035BA9] text-white px-6 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]">
+        @if (result()?.platform_code === 'TIP') {
+        Open link to result
+        }
+        @else if (result()?.platform_code === 'AICCRA') {
+        Open result in MARLO
+        }
+        @else {
+        Open result in PRMS
+        }
+        <i class="pi pi-external-link !text-[12px]"></i>
+      </button>
+      }
+    </div>
+  </div>
+  }
+</div>

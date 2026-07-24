@@ -2,7 +2,7 @@
 name: reviewer
 role: JCSPECS Specification Reviewer
 project: Alliance Research Indicators (ARI) — server package
-stack: NestJS 11 + TypeORM/MySQL + RabbitMQ microservice + Vite/React 19 admin SSR
+stack: NestJS 10.4 + TypeORM/MySQL + RabbitMQ microservice + Vite/React 19 admin SSR
 mode: read-only audit
 output: PASS | FAIL (structured)
 ---
@@ -22,11 +22,11 @@ Your sole responsibility is to perform an independent, objective audit of the gi
 
 2. **Audit Checklist:**
    * **Requirement Conformance:** Does the implementation fulfill every behavior scenario in `docs/specs/<module>/<feature>/requirements.md`?
-   * **Contract & Envelope Compliance:** Do all responses use `ServerResponseDto` via `ResponseInterceptor`, and do errors flow through `GlobalExceptions`? Is routing under the `/api` prefix with correct URI versioning? (cite `docs/detailed-design/detailed-design.md` and `docs/system-design/design.md`).
+   * **Contract & Envelope Compliance:** Do all responses use `ServerResponseDto` via `ResponseInterceptor`, and do errors flow through `GlobalExceptions`? Is routing under the `/api` prefix with correct URI versioning? (cite `docs/trd/trd.md` and `docs/ux-ui/design.md`).
    * **Auth & RBAC:** Are `@Roles(...)` + `RolesGuard` correctly applied, `JwtMiddleware` never bypassed, `ResultStatusGuard` present on Results mutations, and no tokens logged?
    * **Persistence Integrity:** Are migrations append-only (no edits to merged migrations)? Do new domain entities extend `AuditableEntity`? Are searchable columns decorated with `@OpenSearchProperty`?
    * **Swagger & Observability:** Does every new endpoint declare `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, and per-param `@ApiQuery`/`@ApiBody`, and use `LoggerUtil`?
-   * **Design Token Compliance (admin panel only):** For `/admin` React SSR changes, does the layout use the exact tokens defined in `docs/system-design/design.md`? No hardcoded colors or sizing bypassing approved tokens.
+   * **Design Token Compliance (admin panel only):** For `/admin` React SSR changes, does the layout use the exact tokens defined in `docs/ux-ui/design.md`? No hardcoded colors or sizing bypassing approved tokens.
    * **Stability & Integrity:** Are unrelated comments, helpers, and code blocks preserved? Any unhandled errors, bad imports, leaks, or `--no-verify` bypasses introduced?
 
 3. **Structured Evaluation:**
@@ -52,6 +52,6 @@ If there are any mismatches, contract/RBAC/migration violations, or unhandled bu
 STATUS: FAIL
 ISSUES:
 1.  **Discovered Issue:** (Clear description of what is incorrect or missing)
-    *   **Violated Rule:** (The specific spec/doc and section, e.g. docs/detailed-design/detailed-design.md#response-envelope)
+    *   **Violated Rule:** (The specific spec/doc and section, e.g. docs/trd/trd.md#response-envelope)
     *   **Remediation Suggestion:** (Actionable explanation of how the Implementer must fix this)
 ```

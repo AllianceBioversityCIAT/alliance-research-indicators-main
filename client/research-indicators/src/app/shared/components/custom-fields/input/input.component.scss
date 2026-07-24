@@ -1,0 +1,16 @@
+input {
+  width: 100%;
+}
+::ng-deep .p-inputnumber-increment-button,
+::ng-deep .p-inputnumber-decrement-button {
+  background-color: #112f5c !important;
+  color: white !important;
+
+  &:hover {
+    background-color: #112f5c !important;
+  }
+}
+
+::ng-deep .p-inputnumber {
+  width: 100% !important;
+}

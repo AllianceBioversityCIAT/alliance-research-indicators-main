@@ -1,0 +1,112 @@
+<div class="flex justify-between items-center bg-[#f4f7f9] border-y border-[#E8EBED] px-15 pb-7 pt-6">
+  <div class="flex-col flex w-full">
+    <div class="flex items-center {{ showTag && !shouldShowWorkflow() ? 'pb-1' : 'pb-0' }}">
+      @if (showTag) {
+      <div class="flex items-center gap-2">
+        <i class="pi pi-chart-pie !text-[12px] text-[#F58220] pt-0.5"></i>
+        <span class="text-[12px] text-[#8D9299] font-[400] !font-[Space_Grotesk] pr-1 pt-0.5">OICR
+          @if (data?.['result_official_code'] !== null && data?.['result_official_code'] !== undefined) {
+          <span class="text-[12px] text-[#8D9299] font-[400] !font-[Space_Grotesk]">
+            {{ data?.['result_official_code'] }}
+          </span>
+          }
+        </span>
+        @if (shouldShowWorkflow()) {
+        <app-oicr-workflow-status [currentStatusId]="data?.['status_id'] ?? null"
+          [statusDescription]="data?.['status_config']?.description ?? ''"
+          [iconName]="data?.['status_config']?.config?.icon?.name ?? ''"
+          [iconColor]="data?.['status_config']?.config?.icon?.color ?? ''"></app-oicr-workflow-status>
+        } @else {
+        <app-custom-tag [statusId]="data?.['status_id'] ?? 9" [statusName]="data?.['status_config']?.name ?? ''"
+          [statusColor]="data?.['status_config']?.config?.color?.text ?? ''"
+          [statusBackground]="data?.['status_config']?.config?.color?.background ?? ''"
+          [statusBorder]="data?.['status_config']?.config?.color?.border ?? ''" [icon]="true"
+          [iconName]="data?.['status_config']?.config?.icon?.name ?? ''"
+          [iconColor]="data?.['status_config']?.config?.icon?.color ?? ''"
+          [tooltip]="data?.['status_config']?.description ?? ''" class="pb-1" [maxWidth]="'150px'"></app-custom-tag>
+        }
+      </div>
+      } @else {
+      <div class="flex items-center gap-2">
+        <i class="pi pi-chart-pie !text-[12px] text-[#F58220]"></i>
+        <span class="text-[11px] text-[#8D9299] font-[400] !font-[Space_Grotesk]">OICR</span>
+      </div>
+      }
+    </div>
+    <div class="text-[17px] text-[#112F5C] font-[600] pb-1">{{ data?.['title'] || 'Enter OICR title' }}</div>
+    <div class="text-[15px] text-[#4C5158] font-[600]">{{ data?.['agreement_id'] }} - {{ data?.['description'] }}</div>
+
+    <div class="flex justify-between pt-2 xl:pt-1">
+      <div class="flex gap-x-5 justify-between">
+        <div class="flex items-center">
+          <span class="font-normal text-[13px] text-[#777c83] !font-['Space_Grotesk'] leading-4">Principal
+            investigator</span>
+          <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+          <span class="text-[13px] uppercase leading-[18px] text-[#345b8f] font-['Space_Grotesk']">{{
+            data?.['project_lead_description'] }}</span>
+        </div>
+
+        <div class="flex items-center">
+          <span class="text-[13px] text-[#777c83] !font-['Space_Grotesk'] leading-4">Start date</span>
+          <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+          <span class="text-[13px] leading-[18px] text-[#345b8f] !font-['Space_Grotesk']">{{ data?.['start_date'] |
+            date: 'dd/MM/yyyy' }}</span>
+        </div>
+
+        <div class="flex items-center">
+          <span class="text-[13px] text-[#777c83] !font-['Space_Grotesk'] leading-4">End date</span>
+          <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+          <span class="text-[13px] leading-[18px] text-[#345b8f] !font-['Space_Grotesk']">{{ data?.['endDateGlobal'] |
+            date: 'dd/MM/yyyy' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="flex items-center pt-1 xl:pt-1.5 text-[13px] leading-[18px] text-[#4C5158] gap-x-1 font-['Barlow'] font-[600]">
+      @if (data?.['levers']?.full_name === 'Not available' || !data?.['levers']) {
+      Lever - <span class="text-[#4C5158] font-['Barlow'] font-normal">{{ data?.['levers']?.full_name || 'Not available'
+        }}</span>
+      } @else {
+      <img [src]="data?.['levers']?.lever_url" alt="Lever" class="w-[22px] h-[22px] mr-1" />
+      @if (data?.['levers']?.full_name?.includes(':')) {
+      <span class="text-[13px] leading-[18px] text-[#77c83] font-['Barlow'] font-normal">{{ data?.['levers']?.full_name
+        }}</span>
+      } @else {
+      {{ data?.['levers']?.short_name || data?.['levers']?.full_name || '' }}
+      }
+      }
+    </div>
+    @if (showDownloadTemplate()) {
+    <app-download-oicr-template class="xl:hidden pt-2.5"></app-download-oicr-template>
+    }
+    @if (showHandleLinkButton()) {
+    <div class="xl:hidden pt-2.5">
+      <p-button label="CGSpace link" variant="outlined" size="small" (onClick)="openHandleLink()">
+        <ng-template pTemplate="icon">
+          <div>
+            <i class="pi pi-external-link !text-[13px]" style="color: #035BA9"></i>
+          </div>
+        </ng-template>
+      </p-button>
+    </div>
+    }
+  </div>
+
+  @if (showDownloadTemplate()) {
+  <div class="xl:min-w-[200px] hidden xl:flex ml-4">
+    <app-download-oicr-template></app-download-oicr-template>
+  </div>
+  }
+  @if (showHandleLinkButton()) {
+  <div class="xl:min-w-[200px] hidden xl:flex ml-4 shrink-0 items-center justify-end">
+    <p-button label="CGSpace link" variant="outlined" size="small" (onClick)="openHandleLink()">
+      <ng-template pTemplate="icon">
+        <div>
+          <i class="pi pi-external-link !text-[13px]" style="color: #035BA9"></i>
+        </div>
+      </ng-template>
+    </p-button>
+  </div>
+  }
+</div>
