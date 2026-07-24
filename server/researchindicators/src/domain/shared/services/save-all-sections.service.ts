@@ -33,6 +33,8 @@ import { ResultEvidencesService } from '../../entities/result-evidences/result-e
 import { ResultsUtil } from '../utils/results.util';
 import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
 import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
+import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
+import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
 
 /**
  * Persists externally-synced result sections (PRMS, TIP) into the `results` table.
@@ -55,6 +57,8 @@ export class SaveResultService {
     private readonly _resultEvidencesService: ResultEvidencesService,
     private readonly _resultPolicyChangeService: ResultPolicyChangeService,
     private readonly _resultCapacitySharingService: ResultCapacitySharingService,
+    private readonly _resultInnovationDevService: ResultInnovationDevService,
+    private readonly _resultIpRightsService: ResultIpRightsService,
   ) {}
 
   public async bulkSaveAllSections(
@@ -298,6 +302,17 @@ export class SaveResultService {
             resultId,
             result.capacitySharing,
           );
+        }
+        break;
+      case IndicatorsEnum.INNOVATION_DEV:
+        if (!isEmpty(result.innovationDev)) {
+          await this._resultInnovationDevService.update(
+            resultId,
+            result.innovationDev,
+          );
+        }
+        if (!isEmpty(result.ipRights)) {
+          await this._resultIpRightsService.update(resultId, result.ipRights);
         }
         break;
       default:

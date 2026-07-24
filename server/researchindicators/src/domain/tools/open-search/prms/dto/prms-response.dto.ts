@@ -205,6 +205,7 @@ export class ResultResponseMapper {
   public created_by: CreatedByMapper;
   public policy_change_summary: PolicyChangeSummaryMapper;
   public capacity_development_summary: CapacityDevelopmentSummaryMapper;
+  public innovation_development_summary: InnovationDevelopmentSummaryMapper;
 }
 
 export class PolicyChangeSummaryMapper {
@@ -227,6 +228,83 @@ export class CapacityDevelopmentSummaryMapper {
   public delivery_method: DeliveryMethodMapper;
   public training_length: TrainingLengthMapper;
   public on_behalf_organizations: OnBehalfOrganizationMapper[];
+}
+
+export class InnovationDevelopmentSummaryMapper {
+  public short_name: string;
+  public characterization: InnovationCharacterizationMapper;
+  public typology: InnovationTypologyMapper;
+  public innovation_user_to_be_determined: boolean;
+  public innovation_developers: string;
+  public innovation_collaborators: string;
+  public innovation_readiness_level: InnovationReadinessLevelMapper;
+  public evidences_justification: string;
+  public has_scaling_studies: boolean;
+  public anticipated_user_demand: AnticipatedUserDemandMapper;
+  public initiative_budget: unknown[];
+  public bilateral_project_budget: unknown[];
+  public partner_budget: unknown[];
+  public reference_materials: unknown[];
+  public evidence_of_user_need_user_demand: unknown[];
+  public scaling_study_urls: unknown[];
+  public innovation_development_questionnaire: InnovationDevelopmentQuestionnaireMapper;
+}
+
+export class InnovationCharacterizationMapper {
+  public id: number;
+  public name: string;
+  public definition: string;
+}
+
+export class InnovationTypologyMapper {
+  public id: number;
+  public code: number;
+  public name: string;
+  public definition: string;
+}
+
+export class InnovationReadinessLevelMapper {
+  public id: number;
+  public level: number;
+  public name: string;
+  public definition: string;
+}
+
+export class AnticipatedUserDemandMapper {
+  public actors: AnticipatedUserActorMapper[];
+  public organizations: AnticipatedUserOrganizationMapper[];
+  public measures: unknown[];
+}
+
+export class AnticipatedUserActorMapper {
+  public actor_type_name: string;
+  public sex_and_age_disaggregation: boolean;
+  public addressing_demands: string;
+}
+
+export class AnticipatedUserOrganizationMapper {
+  public institution_type_name: string;
+  public addressing_demands: string;
+}
+
+export class InnovationDevelopmentQuestionnaireMapper {
+  public responsible_innovation_and_scaling: InnovationQuestionnaireItemMapper[];
+  public intellectual_property_rights: InnovationQuestionnaireItemMapper[];
+  public innovation_team_diversity: InnovationQuestionnaireItemMapper[];
+  public megatrends: InnovationQuestionnaireItemMapper[];
+}
+
+export class InnovationQuestionnaireItemMapper {
+  public question: string;
+  public question_id: number;
+  public answer: InnovationQuestionnaireAnswerMapper;
+  public selected_sub_options?: InnovationQuestionnaireItemMapper[];
+}
+
+export class InnovationQuestionnaireAnswerMapper {
+  public text?: string;
+  public boolean?: boolean;
+  public selections?: string[];
 }
 
 export class DeliveryMethodMapper {

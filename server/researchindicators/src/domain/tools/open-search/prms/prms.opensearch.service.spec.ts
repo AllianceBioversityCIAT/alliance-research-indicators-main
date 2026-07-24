@@ -27,6 +27,12 @@ import { SyncStagingRecordsEntity } from './entities/sync-staging-records.entity
 import { ClarisaCountriesService } from '../../clarisa/entities/clarisa-countries/clarisa-countries.service';
 import { ClarisaRegionsService } from '../../clarisa/entities/clarisa-regions/clarisa-regions.service';
 import { ClarisaInstitutionsService } from '../../clarisa/entities/clarisa-institutions/clarisa-institutions.service';
+import { ClarisaInnovationCharacteristicsService } from '../../clarisa/entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.service';
+import { ClarisaInnovationTypesService } from '../../clarisa/entities/clarisa-innovation-types/clarisa-innovation-types.service';
+import { ClarisaInnovationReadinessLevelsService } from '../../clarisa/entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.service';
+import { ClarisaActorTypesService } from '../../clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
+import { ClarisaInstitutionTypesService } from '../../clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
+import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual('typeorm');
@@ -53,6 +59,11 @@ describe('PrmsOpenSearchService', () => {
   let clarisaCountriesService: jest.Mocked<ClarisaCountriesService>;
   let clarisaRegionsService: jest.Mocked<ClarisaRegionsService>;
   let clarisaInstitutionsService: jest.Mocked<ClarisaInstitutionsService>;
+  let clarisaInnovationCharacteristicsService: jest.Mocked<ClarisaInnovationCharacteristicsService>;
+  let clarisaInnovationTypesService: jest.Mocked<ClarisaInnovationTypesService>;
+  let clarisaInnovationReadinessLevelsService: jest.Mocked<ClarisaInnovationReadinessLevelsService>;
+  let clarisaActorTypesService: jest.Mocked<ClarisaActorTypesService>;
+  let clarisaInstitutionTypesService: jest.Mocked<ClarisaInstitutionTypesService>;
   let temporalRepoHandle: { save: jest.Mock };
 
   const buildResultMapper = (
@@ -88,6 +99,7 @@ describe('PrmsOpenSearchService', () => {
       created_by: undefined,
       policy_change_summary: null,
       capacity_development_summary: null,
+      innovation_development_summary: null,
     };
     return Object.assign(base, overrides);
   };
@@ -245,6 +257,47 @@ describe('PrmsOpenSearchService', () => {
             findByCodes: jest.fn().mockResolvedValue([]),
           },
         },
+        {
+          provide: ClarisaInnovationCharacteristicsService,
+          useValue: {
+            findByName: jest.fn().mockResolvedValue({ id: 1 }),
+            findOne: jest.fn().mockResolvedValue({ id: 1 }),
+          },
+        },
+        {
+          provide: ClarisaInnovationTypesService,
+          useValue: {
+            findByName: jest.fn().mockResolvedValue({ code: 13 }),
+            findOne: jest.fn().mockResolvedValue({ code: 13 }),
+          },
+        },
+        {
+          provide: ClarisaInnovationReadinessLevelsService,
+          useValue: {
+            findByValue: jest.fn().mockResolvedValue({ id: 14, level: 3 }),
+          },
+        },
+        {
+          provide: ClarisaActorTypesService,
+          useValue: {
+            findByName: jest.fn().mockImplementation(async (name: string) => {
+              if (name === 'Researchers') return { code: 10 };
+              if (name?.includes('Policy actors')) return { code: 11 };
+              return null;
+            }),
+          },
+        },
+        {
+          provide: ClarisaInstitutionTypesService,
+          useValue: {
+            findByName: jest.fn().mockImplementation(async (name: string) => {
+              if (name?.includes('NGO')) return { code: 20 };
+              if (name?.includes('Private company')) return { code: 21 };
+              if (name?.includes('Financial')) return { code: 22 };
+              return null;
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -261,6 +314,15 @@ describe('PrmsOpenSearchService', () => {
     clarisaCountriesService = module.get(ClarisaCountriesService);
     clarisaRegionsService = module.get(ClarisaRegionsService);
     clarisaInstitutionsService = module.get(ClarisaInstitutionsService);
+    clarisaInnovationCharacteristicsService = module.get(
+      ClarisaInnovationCharacteristicsService,
+    );
+    clarisaInnovationTypesService = module.get(ClarisaInnovationTypesService);
+    clarisaInnovationReadinessLevelsService = module.get(
+      ClarisaInnovationReadinessLevelsService,
+    );
+    clarisaActorTypesService = module.get(ClarisaActorTypesService);
+    clarisaInstitutionTypesService = module.get(ClarisaInstitutionTypesService);
   });
 
   afterEach(() => {
@@ -655,9 +717,10 @@ describe('PrmsOpenSearchService', () => {
         8064, 2714,
       ]);
       // PRMS policy_type 1 (Program…) → STAR policy_type_id 3
+      // PRMS policy_stage 6 (Stage 1) → STAR policy_stage_id 1
       expect(out[0].policyChange).toEqual({
         policy_type_id: 3,
-        policy_stage_id: 6,
+        policy_stage_id: 1,
         evidence_stage: undefined,
         implementing_organization: [
           { institution_id: 8064 },
@@ -696,6 +759,37 @@ describe('PrmsOpenSearchService', () => {
         ]);
 
         expect(out[0].policyChange.policy_type_id).toBe(starId);
+      }
+    });
+
+    it('should homologate PRMS policy_stage ids to STAR policy_stage_id', async () => {
+      const cases = [
+        { prmsId: 6, starId: 1 },
+        { prmsId: 7, starId: 2 },
+        { prmsId: 8, starId: 3 },
+      ];
+
+      for (const { prmsId, starId } of cases) {
+        const out = await service.processData([
+          buildTemporalMapper({
+            indicator_category: {
+              code: String(ResultTypeEnum.POLICY_CHANGE),
+              name: 'Policy Change',
+            },
+            policy_change_summary: {
+              amount: 0,
+              amount_status_label: '',
+              policy_type: { id: 2, name: '', definition: '' },
+              policy_stage: { id: prmsId, name: '', definition: '' },
+              linked_innovation_dev: false,
+              linked_innovation_use: false,
+              result_related_to: [],
+              policy_implementing_organizations: [],
+            },
+          }),
+        ]);
+
+        expect(out[0].policyChange.policy_stage_id).toBe(starId);
       }
     });
 
@@ -845,6 +939,136 @@ describe('PrmsOpenSearchService', () => {
       ]);
 
       expect(out[0].capacitySharing).toBeUndefined();
+    });
+
+    it('should map innovation_development_summary for INNOVATION_DEV indicators', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.INNOVATION_DEVELOPMENT),
+            name: 'Innovation Development',
+          },
+          innovation_development_summary: {
+            short_name: 'Holistic framework for valuing ecosystem services',
+            characterization: {
+              id: 1,
+              name: 'Incremental innovation',
+              definition: 'def',
+            },
+            typology: {
+              id: 13,
+              code: 13,
+              name: 'Capacity development innovation',
+              definition: 'def',
+            },
+            innovation_user_to_be_determined: false,
+            innovation_developers: 'dev',
+            innovation_collaborators: 'collab',
+            innovation_readiness_level: {
+              id: 14,
+              level: 3,
+              name: 'Proof of Concept',
+              definition: 'def',
+            },
+            evidences_justification: 'We chose readiness level 3',
+            has_scaling_studies: false,
+            anticipated_user_demand: {
+              actors: [
+                {
+                  actor_type_name: 'Researchers',
+                  sex_and_age_disaggregation: true,
+                  addressing_demands: 'The framework is providing methods',
+                },
+                {
+                  actor_type_name: 'Policy actors (public or private)',
+                  sex_and_age_disaggregation: true,
+                  addressing_demands: 'The framework is providing methods',
+                },
+              ],
+              organizations: [
+                {
+                  institution_type_name: 'NGO International (General)',
+                  addressing_demands: 'The framework is providing methods',
+                },
+              ],
+              measures: [],
+            },
+            initiative_budget: [],
+            bilateral_project_budget: [],
+            partner_budget: [],
+            reference_materials: [],
+            evidence_of_user_need_user_demand: [],
+            scaling_study_urls: [],
+            innovation_development_questionnaire: {
+              responsible_innovation_and_scaling: [],
+              intellectual_property_rights: [
+                {
+                  question: 'private sector engagement',
+                  question_id: 101,
+                  answer: { text: 'Not sure' },
+                },
+                {
+                  question: 'formal IPR',
+                  question_id: 102,
+                  answer: { text: 'No' },
+                },
+                {
+                  question: 'IP expert',
+                  question_id: 103,
+                  answer: { text: 'No, not now.' },
+                },
+                {
+                  question: 'already involved',
+                  question_id: 138,
+                  answer: { text: 'Not sure' },
+                },
+              ],
+              innovation_team_diversity: [],
+              megatrends: [],
+            },
+          },
+        }),
+      ]);
+
+      expect(out[0].createResult.indicator_id).toBe(
+        IndicatorsEnum.INNOVATION_DEV,
+      );
+      expect(
+        clarisaInnovationCharacteristicsService.findByName,
+      ).toHaveBeenCalledWith('Incremental innovation');
+      expect(clarisaInnovationTypesService.findByName).toHaveBeenCalledWith(
+        'Capacity development innovation',
+      );
+      expect(
+        clarisaInnovationReadinessLevelsService.findByValue,
+      ).toHaveBeenCalledWith(3);
+      expect(out[0].innovationDev).toEqual(
+        expect.objectContaining({
+          short_title: 'Holistic framework for valuing ecosystem services',
+          innovation_nature_id: 1,
+          innovation_type_id: 13,
+          innovation_readiness_id: 14,
+          innovation_readiness_explanation: 'We chose readiness level 3',
+          anticipated_users_id: 2,
+          expected_outcome: 'The framework is providing methods',
+          intended_beneficiaries_description:
+            'The framework is providing methods',
+          no_sex_age_disaggregation: false,
+        }),
+      );
+      expect(out[0].innovationDev.actors).toHaveLength(2);
+      expect(out[0].innovationDev.institution_types).toEqual([
+        expect.objectContaining({
+          institution_type_id: 20,
+          is_organization_known: false,
+        }),
+      ]);
+      expect(out[0].ipRights).toEqual({
+        private_sector_engagement_id: 3,
+        formal_ip_rights_application_id: 2,
+      });
+      expect(clarisaActorTypesService.findByName).toHaveBeenCalled();
+      expect(clarisaInstitutionTypesService.findByName).toHaveBeenCalled();
     });
   });
 

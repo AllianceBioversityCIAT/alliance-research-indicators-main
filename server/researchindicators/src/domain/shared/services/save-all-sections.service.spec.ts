@@ -20,6 +20,8 @@ import {
 import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
 import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
 import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
+import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
+import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
@@ -44,6 +46,10 @@ describe('SaveResultService', () => {
   let resultCapacitySharingService: jest.Mocked<
     Pick<ResultCapacitySharingService, 'update'>
   >;
+  let resultInnovationDevService: jest.Mocked<
+    Pick<ResultInnovationDevService, 'update'>
+  >;
+  let resultIpRightsService: jest.Mocked<Pick<ResultIpRightsService, 'update'>>;
   let queryService: jest.Mocked<QueryService>;
   let currentUser: jest.Mocked<CurrentUserUtil>;
   let resultsUtil: jest.Mocked<
@@ -184,6 +190,18 @@ describe('SaveResultService', () => {
             update: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: ResultInnovationDevService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultIpRightsService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -194,6 +212,8 @@ describe('SaveResultService', () => {
     resultEvidencesService = module.get(ResultEvidencesService);
     resultPolicyChangeService = module.get(ResultPolicyChangeService);
     resultCapacitySharingService = module.get(ResultCapacitySharingService);
+    resultInnovationDevService = module.get(ResultInnovationDevService);
+    resultIpRightsService = module.get(ResultIpRightsService);
     queryService = module.get(QueryService);
     currentUser = module.get(CurrentUserUtil);
     resultsUtil = module.get(ResultsUtil);
@@ -588,7 +608,7 @@ describe('SaveResultService', () => {
       dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
       dto.policyChange = {
         policy_type_id: 1,
-        policy_stage_id: 6,
+        policy_stage_id: 1,
         evidence_stage: undefined,
         implementing_organization: [{ institution_id: 8064 }] as any,
         innovation_development: undefined,
@@ -644,6 +664,37 @@ describe('SaveResultService', () => {
       expect(resultCapacitySharingService.update).toHaveBeenCalledWith(
         80,
         dto.capacitySharing,
+      );
+    });
+
+    it('should save innovationDev and ipRights when indicator is INNOVATION_DEV', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 90,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_DEV;
+      dto.innovationDev = {
+        short_title: 'Holistic framework',
+        innovation_nature_id: 1,
+        innovation_type_id: 13,
+        innovation_readiness_id: 14,
+        anticipated_users_id: 2,
+      } as any;
+      dto.ipRights = {
+        private_sector_engagement_id: 3,
+        formal_ip_rights_application_id: 2,
+      } as any;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultInnovationDevService.update).toHaveBeenCalledWith(
+        90,
+        dto.innovationDev,
+      );
+      expect(resultIpRightsService.update).toHaveBeenCalledWith(
+        90,
+        dto.ipRights,
       );
     });
 
