@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CapacityDevelopmentSummaryMapper,
+  InnovationDevelopmentQuestionnaireMapper,
+  InnovationDevelopmentSummaryMapper,
   PrmsKnowledgeProductDto,
   PrmsTemporalResponseMapper,
+  PolicyChangeSummaryMapper,
   ResultResponseMapper,
   SearcherResponseDto,
 } from './dto/prms-response.dto';
@@ -51,12 +55,38 @@ import { ClarisaCountriesService } from '../../clarisa/entities/clarisa-countrie
 import { ClarisaRegionsService } from '../../clarisa/entities/clarisa-regions/clarisa-regions.service';
 import { ClarisaInstitutionsService } from '../../clarisa/entities/clarisa-institutions/clarisa-institutions.service';
 import { ClarisaGeoScopeEnum } from '../../clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { ClarisaInnovationCharacteristicsService } from '../../clarisa/entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.service';
+import { ClarisaInnovationTypesService } from '../../clarisa/entities/clarisa-innovation-types/clarisa-innovation-types.service';
+import { ClarisaInnovationReadinessLevelsService } from '../../clarisa/entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.service';
+import { ClarisaActorTypesService } from '../../clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
+import { ClarisaInstitutionTypesService } from '../../clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
 import { ResultCountry } from '../../../entities/result-countries/entities/result-country.entity';
 import { ResultRegion } from '../../../entities/result-regions/entities/result-region.entity';
 import { ResultInstitution } from '../../../entities/result-institutions/entities/result-institution.entity';
 import { SaveGeoLocationDto } from '../../../entities/results/dto/save-geo-location.dto';
 import { CreateResultInstitutionDto } from '../../../entities/result-institutions/dto/create-result-institution.dto';
 import { CreateResultEvidenceDto } from '../../../entities/result-evidences/dto/create-result-evidence.dto';
+import { CreateResultPolicyChangeDto } from '../../../entities/result-policy-change/dto/create-result-policy-change.dto';
+import {
+  CapDevGroupDto,
+  UpdateResultCapacitySharingDto,
+} from '../../../entities/result-capacity-sharing/dto/update-result-capacity-sharing.dto';
+import { CreateResultInnovationDevDto } from '../../../entities/result-innovation-dev/dto/create-result-innovation-dev.dto';
+import { UpdateIpRightDto } from '../../../entities/result-ip-rights/dto/update-ip-right.dto';
+import { CreateResultActorDto } from '../../../entities/result-actors/dto/create-result-actor.dto';
+import { CreateResultInstitutionTypeDto } from '../../../entities/result-institution-types/dto/create-result-institution-type.dto';
+import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
+import { PolicyTypeHomologation } from './homologation/policy-type.homologation';
+import { PolicyStageHomologation } from './homologation/policy-stage.homologation';
+import { DeliveryModalityHomologation } from './homologation/delivery-modality.homologation';
+import { SessionLengthHomologation } from './homologation/session-length.homologation';
+import { DegreeHomologation } from './homologation/degree.homologation';
+import { IpRightsApplicationHomologation } from './homologation/ip-rights-application.homologation';
+import { PrmsInnovationIpQuestionEnum } from './homologation/prms-innovation-question.homologation';
+import { SessionFormatEnum } from '../../../entities/session-formats/enums/session-format.enum';
+import { SessionLengthEnum } from '../../../entities/session-lengths/enum/session-lengths.enum';
+import { InnovationDevAnticipatedUsers } from '../../../entities/innovation-dev-anticipated-users/enum/innovation-dev-anticipated-users.enum';
+import { ActorRolesEnum } from '../../../entities/actor-roles/enum/actor-roles.enum';
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -82,6 +112,11 @@ export class PrmsOpenSearchService
     private readonly clarisaCountriesService: ClarisaCountriesService,
     private readonly clarisaRegionsService: ClarisaRegionsService,
     private readonly clarisaInstitutionsService: ClarisaInstitutionsService,
+    private readonly clarisaInnovationCharacteristicsService: ClarisaInnovationCharacteristicsService,
+    private readonly clarisaInnovationTypesService: ClarisaInnovationTypesService,
+    private readonly clarisaInnovationReadinessLevelsService: ClarisaInnovationReadinessLevelsService,
+    private readonly clarisaActorTypesService: ClarisaActorTypesService,
+    private readonly clarisaInstitutionTypesService: ClarisaInstitutionTypesService,
   ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
@@ -375,6 +410,231 @@ export class PrmsOpenSearchService
     };
   }
 
+  /**
+   * Maps PRMS `policy_change_summary` into the STAR policy-change section DTO.
+   *
+   * PRMS only exposes boolean flags for linked innovation results (not result
+   * IDs), so `innovation_development` / `innovation_use` stay unset here.
+   */
+  private async mapPolicyChange(
+    summary?: PolicyChangeSummaryMapper | null,
+  ): Promise<CreateResultPolicyChangeDto | undefined> {
+    if (isEmpty(summary)) return undefined;
+
+    const orgIds = (summary.policy_implementing_organizations ?? [])
+      .map((org) => org?.id)
+      .filter((id) => !isEmpty(id));
+
+    const institutions = isEmpty(orgIds)
+      ? []
+      : await this.clarisaInstitutionsService.findByCodes(orgIds);
+
+    return {
+      policy_type_id: PolicyTypeHomologation[summary.policy_type?.id],
+      policy_stage_id: PolicyStageHomologation[summary.policy_stage?.id],
+      evidence_stage: undefined,
+      implementing_organization: institutions.map(
+        (institution) =>
+          ({ institution_id: institution.code }) as ResultInstitution,
+      ),
+      innovation_development: undefined,
+      innovation_use: undefined,
+    };
+  }
+
+  /**
+   * Maps PRMS `capacity_development_summary` into STAR capacity-sharing DTO.
+   *
+   * PRMS participant counts imply a group session, so `session_format_id` is
+   * always set to {@link SessionFormatEnum.GROUP}.
+   */
+  private async mapCapacitySharing(
+    summary?: CapacityDevelopmentSummaryMapper | null,
+  ): Promise<UpdateResultCapacitySharingDto | undefined> {
+    if (isEmpty(summary)) return undefined;
+
+    const orgIds = (summary.on_behalf_organizations ?? [])
+      .map((org) => org?.id)
+      .filter((id) => !isEmpty(id));
+
+    const institutions = isEmpty(orgIds)
+      ? []
+      : await this.clarisaInstitutionsService.findByCodes(orgIds);
+
+    const male = summary?.male_using ?? 0;
+    const female = summary?.female_using ?? 0;
+    const nonBinary = summary?.non_binary_using ?? 0;
+    const unknown = summary?.has_unkown_using ?? 0;
+
+    const group = new CapDevGroupDto();
+    group.session_participants_male = male;
+    group.session_participants_female = female;
+    group.session_participants_non_binary = nonBinary;
+    group.session_participants_total = male + female + nonBinary + unknown;
+    group.is_attending_organization = summary?.is_attending_for_organization;
+    group.trainee_organization_representative = institutions.map(
+      (institution) =>
+        ({ institution_id: institution.code }) as ResultInstitution,
+    );
+
+    const capacitySharing = new UpdateResultCapacitySharingDto();
+    capacitySharing.session_format_id = SessionFormatEnum.GROUP;
+    capacitySharing.delivery_modality_id =
+      DeliveryModalityHomologation[summary?.delivery_method?.name];
+    // `term` → session length; `name` → degree only when term is Long-term.
+    capacitySharing.session_length_id =
+      SessionLengthHomologation[summary?.training_length?.term];
+    if (capacitySharing.session_length_id === SessionLengthEnum.LONG_TERM) {
+      capacitySharing.degree_id =
+        DegreeHomologation[summary?.training_length?.name];
+    }
+    capacitySharing.group = group;
+
+    return capacitySharing;
+  }
+
+  /**
+   * Maps PRMS `innovation_development_summary` into STAR innovation-dev + IP rights.
+   */
+  private async mapInnovationDev(
+    summary?: InnovationDevelopmentSummaryMapper | null,
+  ): Promise<{
+    innovationDev?: CreateResultInnovationDevDto;
+    ipRights?: UpdateIpRightDto;
+  }> {
+    if (isEmpty(summary)) return {};
+
+    const innovationDev = new CreateResultInnovationDevDto();
+    innovationDev.short_title = summary?.short_name;
+    innovationDev.innovation_readiness_explanation =
+      summary?.evidences_justification;
+    innovationDev.anticipated_users_id =
+      summary.innovation_user_to_be_determined
+        ? InnovationDevAnticipatedUsers.THIS_IS_YET_TO_BE_DETERMINED
+        : InnovationDevAnticipatedUsers.USERS_HAVE_BEEN_DETERMINED;
+
+    if (!isEmpty(summary?.characterization?.name)) {
+      const nature =
+        await this.clarisaInnovationCharacteristicsService.findByName(
+          summary?.characterization.name,
+        );
+      innovationDev.innovation_nature_id =
+        nature?.id ??
+        (await this.clarisaInnovationCharacteristicsService
+          .findOne(summary?.characterization?.id)
+          .then((res) => res?.id));
+    }
+
+    if (!isEmpty(summary?.typology?.name) || !isEmpty(summary.typology?.code)) {
+      const typeByName = !isEmpty(summary?.typology?.name)
+        ? await this.clarisaInnovationTypesService.findByName(
+            summary?.typology.name,
+          )
+        : null;
+      innovationDev.innovation_type_id =
+        typeByName?.code ??
+        (await this.clarisaInnovationTypesService
+          .findOne(summary?.typology?.code)
+          .then((res) => res?.code));
+    }
+
+    if (!isEmpty(summary?.innovation_readiness_level?.level)) {
+      const readiness =
+        await this.clarisaInnovationReadinessLevelsService.findByValue(
+          summary?.innovation_readiness_level.level,
+        );
+      innovationDev.innovation_readiness_id = readiness?.id;
+    }
+
+    const demand = summary?.anticipated_user_demand;
+    const demandTexts = new Set<string>();
+    const actors: CreateResultActorDto[] = [];
+
+    for (const actor of demand?.actors ?? []) {
+      if (isEmpty(actor?.actor_type_name)) continue;
+      const actorType = await this.clarisaActorTypesService.findByName(
+        actor.actor_type_name,
+      );
+      if (isEmpty(actorType?.code)) continue;
+      const dto = new CreateResultActorDto();
+      dto.actor_type_id = actorType.code;
+      dto.actor_role_id = ActorRolesEnum.INNOVATION_DEV;
+      dto.sex_age_disaggregation_not_apply = !actor.sex_and_age_disaggregation;
+      actors.push(dto);
+      if (!isEmpty(actor.addressing_demands)) {
+        demandTexts.add(actor.addressing_demands.trim());
+      }
+    }
+    innovationDev.actors = actors;
+
+    const institutionTypes: CreateResultInstitutionTypeDto[] = [];
+    for (const org of demand?.organizations ?? []) {
+      if (isEmpty(org?.institution_type_name)) continue;
+      const institutionType =
+        await this.clarisaInstitutionTypesService.findByName(
+          org.institution_type_name,
+        );
+      if (isEmpty(institutionType?.code)) continue;
+      const dto = new CreateResultInstitutionTypeDto();
+      dto.institution_type_id = institutionType.code;
+      dto.is_organization_known = false;
+      institutionTypes.push(dto);
+      if (!isEmpty(org.addressing_demands)) {
+        demandTexts.add(org.addressing_demands.trim());
+      }
+    }
+    innovationDev.institution_types = institutionTypes;
+
+    if (demandTexts.size > 0) {
+      const outcome = [...demandTexts].join('\n');
+      innovationDev.expected_outcome = outcome;
+      innovationDev.intended_beneficiaries_description = outcome;
+    }
+
+    innovationDev.no_sex_age_disaggregation =
+      actors.length > 0 &&
+      actors.every((actor) => actor.sex_age_disaggregation_not_apply === true);
+
+    const ipRights = this.mapIpRightsFromQuestionnaire(
+      summary?.innovation_development_questionnaire,
+    );
+
+    return { innovationDev, ipRights };
+  }
+
+  private mapIpRightsFromQuestionnaire(
+    questionnaire?: InnovationDevelopmentQuestionnaireMapper | null,
+  ): UpdateIpRightDto | undefined {
+    const questions = questionnaire?.intellectual_property_rights ?? [];
+    if (isEmpty(questions)) return undefined;
+
+    const ipRights = new UpdateIpRightDto();
+    let mapped = false;
+
+    for (const item of questions) {
+      const answerText = item?.answer?.text;
+      const option = IpRightsApplicationHomologation[answerText];
+      if (isEmpty(option)) continue;
+
+      if (
+        item.question_id ===
+        PrmsInnovationIpQuestionEnum.PRIVATE_SECTOR_ENGAGEMENT
+      ) {
+        ipRights.private_sector_engagement_id = option;
+        mapped = true;
+      }
+      if (
+        item.question_id ===
+        PrmsInnovationIpQuestionEnum.FORMAL_IP_RIGHTS_APPLICATION
+      ) {
+        ipRights.formal_ip_rights_application_id = option;
+        mapped = true;
+      }
+    }
+
+    return mapped ? ipRights : undefined;
+  }
+
   async processData(
     prmsData: PrmsTemporalResponseMapper[],
   ): Promise<ExternalMappersDto[]> {
@@ -514,6 +774,26 @@ export class PrmsOpenSearchService
       result.geoScope = await this.mapGeoScope(item);
       result.partners = await this.mapPartners(item);
       result.evidence = this.mapEvidence(item);
+
+      if (indicator === IndicatorsEnum.POLICY_CHANGE) {
+        result.policyChange = await this.mapPolicyChange(
+          item.policy_change_summary,
+        );
+      }
+
+      if (indicator === IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT) {
+        result.capacitySharing = await this.mapCapacitySharing(
+          item.capacity_development_summary,
+        );
+      }
+
+      if (indicator === IndicatorsEnum.INNOVATION_DEV) {
+        const mapped = await this.mapInnovationDev(
+          item.innovation_development_summary,
+        );
+        result.innovationDev = mapped.innovationDev;
+        result.ipRights = mapped.ipRights;
+      }
 
       results.push(result);
     }

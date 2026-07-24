@@ -18,6 +18,10 @@ import {
   CounterResultsEnum,
 } from '../../tools/tip-integration/dto/response-year-tip.dto';
 import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
+import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
+import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
+import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
+import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
@@ -36,6 +40,16 @@ describe('SaveResultService', () => {
   let resultEvidencesService: jest.Mocked<
     Pick<ResultEvidencesService, 'updateResultEvidences'>
   >;
+  let resultPolicyChangeService: jest.Mocked<
+    Pick<ResultPolicyChangeService, 'update'>
+  >;
+  let resultCapacitySharingService: jest.Mocked<
+    Pick<ResultCapacitySharingService, 'update'>
+  >;
+  let resultInnovationDevService: jest.Mocked<
+    Pick<ResultInnovationDevService, 'update'>
+  >;
+  let resultIpRightsService: jest.Mocked<Pick<ResultIpRightsService, 'update'>>;
   let queryService: jest.Mocked<QueryService>;
   let currentUser: jest.Mocked<CurrentUserUtil>;
   let resultsUtil: jest.Mocked<
@@ -164,6 +178,30 @@ describe('SaveResultService', () => {
             updateResultEvidences: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: ResultPolicyChangeService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultCapacitySharingService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultInnovationDevService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultIpRightsService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -172,6 +210,10 @@ describe('SaveResultService', () => {
     knowledgeProductService = module.get(ResultKnowledgeProductService);
     resultInstitutionsService = module.get(ResultInstitutionsService);
     resultEvidencesService = module.get(ResultEvidencesService);
+    resultPolicyChangeService = module.get(ResultPolicyChangeService);
+    resultCapacitySharingService = module.get(ResultCapacitySharingService);
+    resultInnovationDevService = module.get(ResultInnovationDevService);
+    resultIpRightsService = module.get(ResultIpRightsService);
     queryService = module.get(QueryService);
     currentUser = module.get(CurrentUserUtil);
     resultsUtil = module.get(ResultsUtil);
@@ -555,6 +597,105 @@ describe('SaveResultService', () => {
 
       expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(61);
       expect(resultsUtil.clearManually).toHaveBeenCalled();
+    });
+
+    it('should save policy change section when indicator is POLICY_CHANGE', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 70,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
+      dto.policyChange = {
+        policy_type_id: 1,
+        policy_stage_id: 1,
+        evidence_stage: undefined,
+        implementing_organization: [{ institution_id: 8064 }] as any,
+        innovation_development: undefined,
+        innovation_use: undefined,
+      };
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultPolicyChangeService.update).toHaveBeenCalledWith(
+        70,
+        dto.policyChange,
+      );
+    });
+
+    it('should not save policy change section when policyChange payload is empty', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 71,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
+      dto.policyChange = undefined;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultPolicyChangeService.update).not.toHaveBeenCalled();
+    });
+
+    it('should save capacity sharing section when indicator is CAPACITY_SHARING', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 80,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id =
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT;
+      dto.capacitySharing = {
+        session_format_id: 2,
+        delivery_modality_id: 3,
+        session_length_id: 1,
+        group: {
+          session_participants_male: 59,
+          session_participants_female: 16,
+          session_participants_non_binary: 0,
+          session_participants_total: 75,
+          is_attending_organization: true,
+          trainee_organization_representative: [{ institution_id: 21 }] as any,
+        } as any,
+      };
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultCapacitySharingService.update).toHaveBeenCalledWith(
+        80,
+        dto.capacitySharing,
+      );
+    });
+
+    it('should save innovationDev and ipRights when indicator is INNOVATION_DEV', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 90,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_DEV;
+      dto.innovationDev = {
+        short_title: 'Holistic framework',
+        innovation_nature_id: 1,
+        innovation_type_id: 13,
+        innovation_readiness_id: 14,
+        anticipated_users_id: 2,
+      } as any;
+      dto.ipRights = {
+        private_sector_engagement_id: 3,
+        formal_ip_rights_application_id: 2,
+      } as any;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultInnovationDevService.update).toHaveBeenCalledWith(
+        90,
+        dto.innovationDev,
+      );
+      expect(resultIpRightsService.update).toHaveBeenCalledWith(
+        90,
+        dto.ipRights,
+      );
     });
 
     it('should merge STAR primary levers before updating alignment', async () => {

@@ -31,6 +31,10 @@ import { isEmpty } from '../utils/object.utils';
 import { ResultInstitutionsService } from '../../entities/result-institutions/result-institutions.service';
 import { ResultEvidencesService } from '../../entities/result-evidences/result-evidences.service';
 import { ResultsUtil } from '../utils/results.util';
+import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
+import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
+import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
+import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
 
 /**
  * Persists externally-synced result sections (PRMS, TIP) into the `results` table.
@@ -51,6 +55,10 @@ export class SaveResultService {
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultInstitutionsService: ResultInstitutionsService,
     private readonly _resultEvidencesService: ResultEvidencesService,
+    private readonly _resultPolicyChangeService: ResultPolicyChangeService,
+    private readonly _resultCapacitySharingService: ResultCapacitySharingService,
+    private readonly _resultInnovationDevService: ResultInnovationDevService,
+    private readonly _resultIpRightsService: ResultIpRightsService,
   ) { }
 
   public async bulkSaveAllSections(
@@ -223,6 +231,8 @@ export class SaveResultService {
         result?.knowledgeProduct,
       );
 
+      await this.saveIndicatorSpecificSections(findResult.result_id, result);
+
       this.logger.log(
         `Processed result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}.`,
       );
@@ -264,6 +274,50 @@ export class SaveResultService {
     const platform = ReportingPlatformEnum?.[platformCode];
     if (!platform) throw new BadRequestException('Invalid platform code');
     return platform;
+  }
+
+  /**
+   * Persists indicator-specific sections after the shared result sections.
+   *
+   * Each indicator owns a dedicated service (`ResultPolicyChangeService`, etc.).
+   * Extend this switch when a new indicator-specific mapper lands on
+   * {@link ExternalMappersDto}.
+   */
+  private async saveIndicatorSpecificSections(
+    resultId: number,
+    result: ExternalMappersDto,
+  ) {
+    switch (result.createResult?.indicator_id) {
+      case IndicatorsEnum.POLICY_CHANGE:
+        if (!isEmpty(result.policyChange)) {
+          await this._resultPolicyChangeService.update(
+            resultId,
+            result.policyChange,
+          );
+        }
+        break;
+      case IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT:
+        if (!isEmpty(result.capacitySharing)) {
+          await this._resultCapacitySharingService.update(
+            resultId,
+            result.capacitySharing,
+          );
+        }
+        break;
+      case IndicatorsEnum.INNOVATION_DEV:
+        if (!isEmpty(result.innovationDev)) {
+          await this._resultInnovationDevService.update(
+            resultId,
+            result.innovationDev,
+          );
+        }
+        if (!isEmpty(result.ipRights)) {
+          await this._resultIpRightsService.update(resultId, result.ipRights);
+        }
+        break;
+      default:
+        break;
+    }
   }
 
   /**

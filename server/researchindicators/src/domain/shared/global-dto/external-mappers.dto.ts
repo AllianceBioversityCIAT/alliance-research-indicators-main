@@ -2,6 +2,10 @@ import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-use
 import { CreateResultEvidenceDto } from '../../entities/result-evidences/dto/create-result-evidence.dto';
 import { CreateResultInstitutionDto } from '../../entities/result-institutions/dto/create-result-institution.dto';
 import { ResultKnowledgeProduct } from '../../entities/result-knowledge-product/entities/result-knowledge-product.entity';
+import { CreateResultPolicyChangeDto } from '../../entities/result-policy-change/dto/create-result-policy-change.dto';
+import { UpdateResultCapacitySharingDto } from '../../entities/result-capacity-sharing/dto/update-result-capacity-sharing.dto';
+import { CreateResultInnovationDevDto } from '../../entities/result-innovation-dev/dto/create-result-innovation-dev.dto';
+import { UpdateIpRightDto } from '../../entities/result-ip-rights/dto/update-ip-right.dto';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
 import { CreateResultDto } from '../../entities/results/dto/create-result.dto';
 import { ResultAlignmentDto } from '../../entities/results/dto/result-alignment.dto';
@@ -28,4 +32,8 @@ export class ExternalMappersDto {
   geoScope: SaveGeoLocationDto;
   alignments: ResultAlignmentDto;
   partners: CreateResultInstitutionDto;
+  policyChange: CreateResultPolicyChangeDto;
+  capacitySharing: UpdateResultCapacitySharingDto;
+  innovationDev: CreateResultInnovationDevDto;
+  ipRights: UpdateIpRightDto;
 }
