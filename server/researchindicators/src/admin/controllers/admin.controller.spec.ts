@@ -8,6 +8,7 @@ describe('AdminController', () => {
   const mockAdminService = {
     getDashboardStats: jest.fn(),
     getRecentActivity: jest.fn(),
+    listBilateralProjectMappings: jest.fn(),
   };
   const mockRenderer = {
     render: jest.fn(),
@@ -59,5 +60,28 @@ describe('AdminController', () => {
     await controller.settings(req, res);
     expect(mockRenderer.render).toHaveBeenCalled();
     expect(res.send).toHaveBeenCalled();
+  });
+
+  // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.15
+  it('bilateral-project-mappings SSR-loads the first page and renders', async () => {
+    const initialPage = {
+      items: [],
+      meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
+    };
+    mockAdminService.listBilateralProjectMappings.mockResolvedValueOnce(
+      initialPage,
+    );
+    const req = { url: '/admin/bilateral-project-mappings' } as any;
+    const res = { send: jest.fn() } as any;
+    await controller.bilateralProjectMappings(req, res);
+    expect(mockAdminService.listBilateralProjectMappings).toHaveBeenCalledWith({
+      page: 1,
+      limit: 20,
+    });
+    expect(mockRenderer.render).toHaveBeenCalledWith(
+      '/admin/bilateral-project-mappings',
+      { mappings: initialPage },
+    );
+    expect(res.send).toHaveBeenCalledWith('<html></html>');
   });
 });

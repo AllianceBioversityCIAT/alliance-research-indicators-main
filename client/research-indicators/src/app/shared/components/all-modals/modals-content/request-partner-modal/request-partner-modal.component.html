@@ -1,0 +1,123 @@
+<div class="px-12 pt-12 2xl:pt-12 flex flex-col gap-6 reduce-gap">
+  <div class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074b86] gap-3 px-3">
+    <i class="text-[#074b86] !text-[18px] pi pi-exclamation-circle"></i>
+    <h3 class="text-[#777c83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+      Please note that once your partner request is approved (the partner review process may take up to 2 business days), it could take up to an hour
+      to be available in the CLARISA institutions list. Make sure that you are requesting to add a legal entity.
+    </h3>
+  </div>
+
+  <div class="flex flex-col gap-6 reduce-gap">
+    <div class="flex flex-col gap-1 2xl:gap-2">
+      <h2 class="text-base font-semibold atc-primary-blue-500">Acronym</h2>
+      <input
+        pInputText
+        id="acronym"
+        aria-describedby="acronym-help"
+        [(ngModel)]="body().acronym"
+        class="w-full !text-base"
+        [disabled]="loading()"
+        placeholder="Write the acronym" />
+    </div>
+
+    <div class="flex flex-col gap-1 2xl:gap-2">
+      <h2 class="text-base font-semibold atc-primary-blue-500">Name<span class="text-red-500">*</span></h2>
+      <input
+        pInputText
+        id="name"
+        aria-describedby="name-help"
+        autocomplete="off"
+        [(ngModel)]="body().name"
+        placeholder="Write the name"
+        class="w-full !text-base"
+        [disabled]="loading()" />
+    </div>
+
+    <div class="flex flex-col gap-1 2xl:gap-2">
+      <h2 class="text-base font-semibold atc-primary-blue-500">Type<span class="text-red-500">*</span></h2>
+      <p-select
+        [style]="{ width: '100%' }"
+        [options]="serviceInstitutionsTypes.list()"
+        optionLabel="name"
+        optionValue="code"
+        [(ngModel)]="body().institutionTypeCode"
+        placeholder="Select the type"
+        [filter]="true"
+        filterBy="name"
+        class="!text-base"
+        appendTo="body"
+        [showClear]="true"
+        [disabled]="loading()">
+      </p-select>
+    </div>
+
+    <div class="flex flex-col gap-1 2xl:gap-2">
+      <h2 class="text-base font-semibold atc-primary-blue-500">Headquarter country<span class="text-red-500">*</span></h2>
+      <p-select
+        [style]="{ width: '100%' }"
+        [options]="serviceCountries.list()"
+        [(ngModel)]="body().hqCountryIso"
+        optionValue="isoAlpha2"
+        placeholder="Select the headquarter country"
+        [filter]="true"
+        filterBy="name"
+        [showClear]="true"
+        class="!text-base"
+        appendTo="body"
+        [disabled]="loading()">
+        <ng-template #selectedItem let-selectedOption>
+          @if (selectedOption) {
+            <div class="flex items-center gap-1 2xl:gap-2">
+              <div>
+                <span>{{ selectedOption.isoAlpha2 }}</span> - {{ selectedOption.name }}
+              </div>
+            </div>
+          }
+        </ng-template>
+
+        <ng-template let-country #item>
+          <div class="flex items-center gap-1 2xl:gap-2">
+            <div>
+              <span>{{ country.isoAlpha2 }}</span> - {{ country.name }}
+            </div>
+          </div>
+        </ng-template>
+      </p-select>
+    </div>
+
+    <div class="flex flex-col gap-1 2xl:gap-2">
+      <h2 class="text-base font-semibold atc-primary-blue-500">Website</h2>
+      <input
+        pInputText
+        id="website"
+        aria-describedby="website-help"
+        [(ngModel)]="body().websiteLink"
+        placeholder="Paste the website"
+        type="url"
+        (ngModelChange)="setValue($event)"
+        class="w-full !text-base"
+        [disabled]="loading()"
+        [style]="!validateWebsite(body().websiteLink ?? '') ? { border: '2px solid #E69F00' } : {}"
+        [class.ng-invalid]="!validateWebsite(body().websiteLink ?? '')" />
+    </div>
+    @if (!validateWebsite(body().websiteLink ?? '')) {
+      <div class="flex items-center gap-1 -mt-3 text-[#E69F00] text-sm">
+        <i class="material-symbols-rounded !text-base">warning</i>
+        <span>Please enter a valid URL</span>
+      </div>
+    }
+  </div>
+
+  <div class="flex mt-4 mb-10">
+    <button
+      class="bg-[#035BA9] text-[15px] text-white px-5 py-2 rounded-[14px] {{
+        !body().name || !body().institutionTypeCode || !body().hqCountryIso || !validateWebsite(body().websiteLink ?? '') || loading()
+          ? 'bg-[#E8EBED] !text-[#8D9299] cursor-not-allowed'
+          : ''
+      }}"
+      (click)="this.createPartner()"
+      [disabled]="!body().name || !body().institutionTypeCode || !body().hqCountryIso || !validateWebsite(body().websiteLink ?? '') || loading()">
+      Request
+    </button>
+  </div>
+</div>

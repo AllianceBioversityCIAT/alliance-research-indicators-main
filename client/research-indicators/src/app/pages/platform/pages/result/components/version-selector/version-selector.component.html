@@ -1,0 +1,54 @@
+<div class="flex w-full min-w-0 flex-wrap items-center justify-start gap-x-1 gap-y-2 pr-4 sm:pr-5">
+  @if (hasLiveVersion) {
+  <span (click)="selectVersion(liveVersionData)" [class.cursor-pointer]="approvedVersions().length > 0"
+    (keydown.enter)="selectVersion(liveVersionData)" class="rounded-[8px] pl-4 pr-3 py-[7px] max-h-[30px] tracking-[0.15em] cursor-default font-['Space_Grotesk'] flex items-center transition-all duration-150 min-w-[131px] shrink-0 border
+        {{
+        isSelected(liveVersionData)
+          ? 'bg-[#03A8EF] border-[#03A8EF] font-[500] text-[10px] text-white mr-0'
+          : 'bg-transparent border-[#03A8EF] text-[10px] font-[600] text-[#03A8EF] mr-0'
+      }}">
+    LIVE VERSION
+    <i class="pi pi-pencil ml-2 !text-[11px] {{ isSelected(liveVersionData) ? 'text-white' : 'text-[#03A8EF]' }}"></i>
+  </span>
+
+  <p-divider layout="vertical" class="mx-1 shrink-0 self-stretch" />
+  }
+
+  @if (approvedVersions().length === 0) {
+  <span
+    class="flex min-w-0 max-w-full text-[#777C83] font-[500] text-[12px] uppercase tracking-[0.1em] font-['Space_Grotesk']">
+    There are no approved versions for this result
+  </span>
+  } @else {
+  <div class="flex shrink-0 flex-wrap items-center gap-3.5">
+    @for (version of approvedVersions(); track version.result_id) {
+    <span (click)="selectVersion(version)" (keydown.enter)="selectVersion(version)" class="rounded-[8px] max-h-[30px] border pl-4 pr-3 py-[7px] tracking-[0.15em] font-['Space_Grotesk'] flex items-center transition-all duration-150 cursor-pointer shrink-0
+              {{
+            isSelected(version)
+              ? 'bg-[#358540] border-[#358540] font-[400] text-white text-[10px]'
+              : 'bg-transparent border-[#A8CEAB] text-[#358540] text-[10px] font-[600]'
+          }}">
+      {{ version.report_year_id }} VERSION
+      <i pTooltip="Result approved for the corresponding year." tooltipPosition="top"
+        class="pi pi-check ml-2 !text-[11px] {{ isSelected(version) ? 'text-white' : 'text-[#358540]' }}"></i>
+    </span>
+    }
+  </div>
+  }
+
+  @if (!hasLiveVersion && (cache.getCurrentPlatformCode() === 'STAR' || cache.getCurrentPlatformCode() === '')) {
+  <p-divider layout="vertical" class="shrink-0 self-stretch" />
+  <span (click)="updateResult()" (keydown.enter)="updateResult()"
+    class="shrink-0 rounded-[8px] border border-[#409acd] bg-transparent pl-3.5 pr-3 text-[12px] max-h-[30px] min-h-[30px] flex items-center font-[500] text-[#409acd] transition-all duration-150 cursor-pointer">
+    <i class="pi pi-pencil mr-2 !text-[11px] text-[#409acd]"></i>
+    Update result
+  </span>
+  } @else if (cache.getCurrentPlatformCode() !== 'STAR' && cache.getCurrentPlatformCode() !== '') {
+  <p-divider layout="vertical" class="shrink-0 self-stretch" />
+  <span (click)="editInPlatform()" (keydown.enter)="editInPlatform()"
+    class="inline-flex min-w-[125px] shrink-0 items-center justify-center rounded-[8px] border border-[#03A8EF] bg-transparent py-[7px] pl-3.5 pr-3 font-['Space_Grotesk'] text-[12px] font-[500] tracking-[0.05em] text-[#03A8EF] transition-all duration-150 cursor-pointer">
+    <i class="pi pi-external-link mr-2 !text-[13px] text-[#03A8EF]"></i>
+    {{ platformEditButtonText }}
+  </span>
+  }
+</div>

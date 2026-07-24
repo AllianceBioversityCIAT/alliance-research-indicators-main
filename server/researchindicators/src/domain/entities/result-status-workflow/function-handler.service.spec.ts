@@ -492,6 +492,21 @@ describe('StatusWorkflowFunctionHandlerService', () => {
         service.completenessValidation(generalData, null as any),
       ).resolves.not.toThrow();
     });
+
+    it('should not throw when only the visual-only pool_funding_alignment check fails', async () => {
+      // Informational check: an incomplete Pool Funding Alignment section
+      // must never block the submit flow.
+      mockGreenCheckRepository.calculateGreenChecks.mockResolvedValue({
+        general: true,
+        alignment: true,
+        pool_funding_alignment: false,
+      });
+      const generalData = makeGeneralData();
+
+      await expect(
+        service.completenessValidation(generalData, null as any),
+      ).resolves.not.toThrow();
+    });
   });
 
   // [CLAUDE/DONE] 114

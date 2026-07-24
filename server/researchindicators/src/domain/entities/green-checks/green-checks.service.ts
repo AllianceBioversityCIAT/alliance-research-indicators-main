@@ -4,7 +4,10 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { GreenCheckRepository } from './repository/green-checks.repository';
-import { FindGreenChecksDto } from './dto/find-green-checks.dto';
+import {
+  FindGreenChecksDto,
+  VISUAL_ONLY_GREEN_CHECKS,
+} from './dto/find-green-checks.dto';
 import { DataSource, Repository } from 'typeorm';
 import { Result } from '../results/entities/result.entity';
 import {
@@ -59,6 +62,7 @@ export class GreenChecksService {
     let completness = true;
 
     for (const key in greenChecks) {
+      if (VISUAL_ONLY_GREEN_CHECKS.has(key)) continue;
       completness = completness && greenChecks[key];
     }
 

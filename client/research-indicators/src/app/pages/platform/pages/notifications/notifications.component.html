@@ -1,0 +1,22 @@
+<div class="container">
+  <div class="tabView">
+    <p-tabView>
+      <p-tabPanel header="Updates">
+        <div class="filters">
+          <button class="filter-button" [class.active]="selectedFilter === 'unread'" (click)="selectFilter('unread')">UNREAD</button>
+          <button class="filter-button" [class.active]="selectedFilter === 'read'" (click)="selectFilter('read')">READ</button>
+          <button class="filter-button" [class.active]="selectedFilter === 'all'" (click)="selectFilter('all')">ALL</button>
+        </div>
+        <app-notification-item [type]="'update'"></app-notification-item>
+      </p-tabPanel>
+      <p-tabPanel header="Requests">
+        <div class="filters">
+          <button class="filter-button" [class.active]="selectedFilter === 'unread'" (click)="selectFilter('unread')">UNREAD</button>
+          <button class="filter-button" [class.active]="selectedFilter === 'read'" (click)="selectFilter('read')">READ</button>
+          <button class="filter-button" [class.active]="selectedFilter === 'all'" (click)="selectFilter('all')">ALL</button>
+        </div>
+        <app-notification-item [type]="'request'"></app-notification-item>
+      </p-tabPanel>
+    </p-tabView>
+  </div>
+</div>

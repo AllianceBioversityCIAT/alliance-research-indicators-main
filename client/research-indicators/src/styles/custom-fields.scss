@@ -1,0 +1,115 @@
+.input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+
+  input,
+  textarea,
+  .p-inputtext,
+  .p-inputtextarea,
+  .p-select-label {
+    color: #4c5158 !important;
+    font-size: 14px !important;
+    font-family: Barlow, sans-serif !important;
+  }
+
+  .p-select-label.p-placeholder {
+    color: #a2a9af !important;
+  }
+}
+
+.input-container + .items {
+  .p-multiselect-label,
+  .p-inputtext {
+    color: #4c5158 !important;
+    font-size: 14px !important;
+    font-family: Barlow, sans-serif !important;
+  }
+
+  .p-multiselect-label.p-placeholder {
+    color: #a2a9af !important;
+  }
+}
+
+.app-page-wrapper {
+  input,
+  textarea,
+  .p-inputtext,
+  .p-inputtextarea {
+    color: #4c5158 !important;
+    font-size: 14px !important;
+    font-family: Barlow, sans-serif !important;
+  }
+}
+
+.p-select-option,
+.p-select-option-label,
+.p-multiselect-option {
+  color: #4c5158 !important;
+  font-size: 14px !important;
+  font-family: Barlow, sans-serif !important;
+}
+
+.p-select-option {
+  align-items: flex-start !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}
+
+.p-multiselect-option {
+  align-items: center !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}
+
+.p-multiselect-option > * {
+  min-width: 0;
+}
+
+.p-multiselect-overlay {
+  overflow-wrap: break-word;
+}
+
+.label,
+body .label,
+.label span,
+body .label span,
+.label *,
+body .label * {
+  font-family: 'Space Grotesk', 'Space_Grotesk', sans-serif !important;
+  font-size: 14px;
+  font-weight: 450 !important;
+}
+
+.label,
+body .label {
+  color: #153c71;
+}
+
+.section-title {
+  font-family: 'Space Grotesk', 'Space_Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 450;
+  color: #a2a9af;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  margin-top: 0;
+}
+
+.description {
+  color: #777c83;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14.5px;
+  font-weight: 400;
+  line-height: 17px;
+  text-align: left;
+}
+
+.option-label {
+  color: #4c5158;
+  font-family: Barlow, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 17px;
+}

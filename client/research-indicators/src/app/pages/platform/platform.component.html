@@ -1,0 +1,19 @@
+@let hss = this.cache.hasSmallScreen();
+<div class="grid-container">
+  <div class="navbar">
+    <alliance-navbar></alliance-navbar>
+  </div>
+  <div class="sidebar">
+    <alliance-sidebar></alliance-sidebar>
+  </div>
+  <div id="content" class="content">
+    <app-section-header></app-section-header>
+    <div [ngStyle]="{
+        paddingLeft: hss ? (cache.isSidebarCollapsed() ? '64px' : '250px') : cache.isSidebarCollapsed() ? '64px' : '250px'
+      }" class="{{ hss ? 'pt-[88px]' : 'pt-[109px]' }}">
+      <router-outlet></router-outlet>
+    </div>
+  </div>
+</div>
+
+<app-all-modals></app-all-modals>

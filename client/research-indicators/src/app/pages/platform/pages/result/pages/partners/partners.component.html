@@ -1,0 +1,49 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+  <div class="flex flex-col gap-5">
+    <div class="content-section">
+      <div class="flex flex-col bg-[#fcfcfc] rounded-[13px] p-[30px] mb-10 border border-[#e8ebed] bg-[#ffffff]">
+        <div class="section-title">Results Partners</div>
+        <div class="flex items-center gap-2">
+          <p-checkbox id="is_private" [disabled]="!submission.isEditableStatus()"
+            [(ngModel)]="body().is_partner_not_applicable" binary="true" styleClass="w-4 h-4" />
+
+          <label for="is_private"
+            class="font-[400] text-[#4B5563] font-['Barlow'] text-[14px] cursor-pointer select-none">
+            This section is not applicable.
+          </label>
+        </div>
+
+        @if (!body().is_partner_not_applicable) {
+        <div class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074b86] gap-3 px-3 my-[30px]">
+          <i class="text-[#074b86] !text-[18px] pi pi-exclamation-circle"></i>
+          <h3 class="text-[#777c83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+            If you do not find the partner in the dropdown menu, you can
+            <span (keydown.enter)="setSectionAndOpenModal('Partners')" (click)="setSectionAndOpenModal('Partners')"
+              class="text-[#2792ce] cursor-pointer underline">request</span>
+            to have it added to the list.
+          </h3>
+        </div>
+
+        <app-multiselect
+          label="Partner(s) that made a significant contribution to the achievement of the result that is being submitted"
+          description="Partner organizations you collaborated with or are currently collaborating with to generate this result."
+          [isRequired]="true" [signal]="body"
+          [helperText]="'Partner organizations you collaborated with or are currently collaborating with to generate this result.'"
+          optionLabel="html_full_name" optionValue="institution_id" signalOptionValue="institutions"
+          [disabled]="!submission.isEditableStatus()"
+          [removeCondition]="!submission.isEditableStatus() ? canRemove : canRemoveInstitution" removeTooltip="{{
+          !submission.isEditableStatus() ? '' : 'This institution was added in the CapSharing details section and can only be removed from there.'
+        }}" [optionsDisabled]="this.optionsDisabled" serviceName="institutions" placeholder="Select the partners">
+          @if (!this.loading()) {
+          <ng-template #rows let-institution>
+            <app-partner-selected-item [institution]="institution" />
+          </ng-template>
+          }
+        </app-multiselect>
+        }
+      </div>
+    </div>
+  </div>
+  <app-navigation-buttons (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
+</div>

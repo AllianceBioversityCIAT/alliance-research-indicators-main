@@ -1,1 +1,7 @@
 node_modules
+
+# macOS Finder metadata
+.DS_Store
+
+# CodeGraph local index (machine-local; never commit)
+.codegraph/

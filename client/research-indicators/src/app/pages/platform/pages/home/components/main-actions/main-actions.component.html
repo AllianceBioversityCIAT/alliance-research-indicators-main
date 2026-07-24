@@ -1,0 +1,50 @@
+<div class="flex flex-col gap-3 w-full">
+  <div class="header">
+    <span class="title-text">Main actions</span>
+    <span class="description-text">Effortlessly access your key actions and get started.</span>
+  </div>
+
+  <div class="main-actions-row">
+    <a class="main-action" routerLink="/projects" [queryParams]="{ tab: 'my' }">
+      <img class="main-action__bg" [src]="'images/home/main-action-1.png' | s3ImageUrl" alt="" />
+      <div class="main-action__overlay" aria-hidden="true"></div>
+      <div class="main-action__inner">
+        <div class="main-action__icon-wrap">
+          <img [src]="'images/home/my-dashboard.png' | s3ImageUrl" alt="" class="main-action__icon" />
+        </div>
+        <div class="main-action__copy">
+          <span class="main-action__title">My projects</span>
+          <p class="main-action__description">Monitor your ongoing projects seamlessly.</p>
+        </div>
+      </div>
+    </a>
+
+    <a class="main-action" routerLink="/results-center" [queryParams]="{ tab: 'my' }">
+      <img class="main-action__bg" [src]="'images/home/main-action-3.png' | s3ImageUrl" alt="" />
+      <div class="main-action__overlay" aria-hidden="true"></div>
+      <div class="main-action__inner">
+        <div class="main-action__icon-wrap">
+          <img [src]="'images/home/my-results.png' | s3ImageUrl" alt="" class="main-action__icon" />
+        </div>
+        <div class="main-action__copy">
+          <span class="main-action__title">My results</span>
+          <p class="main-action__description">Review and organize your saved results.</p>
+        </div>
+      </div>
+    </a>
+
+    <a class="main-action" routerLink="/dashboard">
+      <img class="main-action__bg" [src]="'images/home/main-action-2.png' | s3ImageUrl" alt="" />
+      <div class="main-action__overlay" aria-hidden="true"></div>
+      <div class="main-action__inner">
+        <div class="main-action__icon-wrap">
+          <img [src]="'images/home/my-projects.png' | s3ImageUrl" alt="" class="main-action__icon" />
+        </div>
+        <div class="main-action__copy">
+          <span class="main-action__title">My dashboard</span>
+          <p class="main-action__description">Manage results and track your progress.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>

@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { TemportalDataResponse } from '../dto/prms-response.dto';
+import { LoggerUtil } from '../../../../shared/utils/logger.util';
 
 @Injectable()
 export class PrmsRepository {
+  private readonly logger = new LoggerUtil({
+    name: PrmsRepository.name,
+  });
   constructor(private readonly dataSource: DataSource) {}
 
   async findTemporalResults<T>(
@@ -32,5 +36,8 @@ export class PrmsRepository {
   async deleteTemporalResults(executionCode: string): Promise<void> {
     const query = `DELETE FROM sync_staging_records WHERE execution_code = ?;`;
     await this.dataSource.query(query, [executionCode]);
+    this.logger.log(
+      `Deleted temporal results for execution code: ${executionCode}`,
+    );
   }
 }

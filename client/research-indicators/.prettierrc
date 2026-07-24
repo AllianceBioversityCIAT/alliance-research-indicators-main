@@ -7,7 +7,15 @@
   "arrowParens": "avoid",
   "trailingComma": "none",
   "bracketSameLine": true,
-  "printWidth": 1000,
+  "printWidth": 150,
   "bracketLine": true,
-  "endOfLine": "auto"
+  "endOfLine": "auto",
+  "overrides": [
+    {
+      "files": "*.html",
+      "options": {
+        "parser": "angular"
+      }
+    }
+  ]
 }

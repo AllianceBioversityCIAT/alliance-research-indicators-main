@@ -1,0 +1,76 @@
+<a class="box-border flex h-full min-w-0 flex-col overflow-hidden rounded-[10px] border border-[#e8ebed] bg-white text-inherit no-underline transition-[border-color,box-shadow] duration-150 ease-in-out hover:border-[#d5dbe0] hover:shadow-[0_2px_8px_rgb(23_63_111/8%)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1689ca]"
+  [routerLink]="['/whats-new/details', item.id]">
+  <div class="h-[170px] w-full shrink-0 overflow-hidden bg-[#f4f7f9]">
+    @let cover = item.cover;
+
+    @switch (cover?.type) {
+    @case ('external') {
+    <img [src]="cover?.external?.url" alt="" class="h-full w-full object-cover" />
+    }
+    @case ('file') {
+    <img [src]="cover?.file?.url" alt="" class="h-full w-full object-cover" />
+    }
+    @default {
+    <div class="flex h-full w-full items-center justify-center font-['Barlow'] text-[11px] font-light text-[#a2a9af]">
+      No image
+    </div>
+    }
+    }
+  </div>
+
+  <div class="flex flex-1 flex-col gap-2 p-[15px]">
+    @let developers = item.properties['Developers']?.people;
+    @let addedBy = item.properties['Added by']?.created_by;
+    @let hasContributors = (developers?.length ?? 0) > 0 || !!addedBy;
+
+    <div class="flex items-center justify-between gap-2">
+      @if (hasContributors) {
+      <ul class="-space-x-2 m-0 flex shrink-0 list-none p-0" aria-label="Contributors">
+        @if ((developers?.length ?? 0) > 0) {
+        @for (person of developers; track person.id) {
+        <li>
+          <img [src]="person.avatar_url ? person.avatar_url : 'https://avatar.vercel.sh/' + person.id"
+            [alt]="person.name || 'Contributor'" [pTooltip]="person.name" tooltipPosition="top"
+            class="h-6 w-6 rounded-full object-cover ring-1 ring-white" />
+        </li>
+        }
+        } @else if (addedBy) {
+        <li>
+          <img [src]="addedBy.avatar_url ? addedBy.avatar_url : 'https://avatar.vercel.sh/' + addedBy.id"
+            [alt]="addedBy.name || 'Contributor'" [pTooltip]="addedBy.name" tooltipPosition="top"
+            class="h-6 w-6 rounded-full object-cover ring-1 ring-white" />
+        </li>
+        }
+      </ul>
+      } @else if (whatsNewService.isReleaseNoteNew(item)) {
+      <span class="h-2 w-2 shrink-0 rounded-full bg-[#f58220]" aria-label="New release note"></span>
+      } @else {
+      <span class="invisible h-2 w-2 shrink-0 rounded-full bg-[#f58220]" aria-hidden="true"></span>
+      }
+      <p class="m-0 whitespace-nowrap font-['Barlow'] text-[11px] font-light leading-[14px] text-[#a2a9af]">
+        {{ whatsNewService.getDisplayDate(item) | date: 'MMM d, yyyy' }}
+      </p>
+    </div>
+
+    <div class="flex flex-wrap gap-1.5">
+      @if (item.properties['Tags']?.select?.name) {
+      <p class="m-0 rounded px-1.5 py-0.5 font-['Space_Grotesk'] text-[10px] font-medium uppercase leading-[13px] text-white"
+        [style.backgroundColor]="whatsNewService.getColor(item.properties['Tags']?.select?.color)">
+        {{ item.properties['Tags']?.select?.name }}
+      </p>
+      }
+
+      @for (project of item.properties['Projects']?.multi_select ?? []; track project.name) {
+      <p class="m-0 rounded px-1.5 py-0.5 font-['Space_Grotesk'] text-[10px] font-medium uppercase leading-[13px] text-white"
+        [style.backgroundColor]="whatsNewService.getColor(project.color)">
+        {{ project.name }}
+      </p>
+      }
+    </div>
+
+    <h3
+      class="m-0 line-clamp-2 font-['Barlow'] text-[15.5px] font-[450] leading-[1.25] text-[#112f5c] [overflow-wrap:anywhere] break-words">
+      {{ item.properties['Name']?.title[0]?.plain_text }}
+    </h3>
+  </div>
+</a>

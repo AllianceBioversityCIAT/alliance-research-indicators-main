@@ -1,0 +1,26 @@
+<div class="geo-scope-map relative h-full min-h-[220px] w-full overflow-hidden rounded-xl border border-[#B7D8EF] bg-[#EAF6FD]">
+  <section #mapContainer class="geo-scope-map__canvas h-full min-h-[220px] w-full"
+    aria-label="Geographic distribution map"></section>
+
+  @if (geocodingLoading()) {
+  <div
+    class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/80 px-4 text-center backdrop-blur-[1px]">
+    <app-custom-progress-bar></app-custom-progress-bar>
+    <span class="font-['Barlow'] text-[13px] text-[#777C83]">Loading map locations…</span>
+  </div>
+  }
+
+  @if (mapError()) {
+  <div class="absolute inset-x-0 bottom-0 z-10 bg-[#FFF4F4] px-4 py-3 text-center">
+    <p class="m-0 font-['Barlow'] text-[13px] text-[#B00020]">Map could not be loaded. Check the Mapbox access token.
+    </p>
+  </div>
+  }
+
+  @if (showEmptyState() && !geocodingLoading() && !mapError()) {
+  <div class="absolute inset-x-0 bottom-0 z-10 px-4 py-3 text-center">
+    <p class="m-0 font-['Barlow'] text-[13px] text-[#777C83]">No geographic points could be resolved for this project.
+    </p>
+  </div>
+  }
+</div>

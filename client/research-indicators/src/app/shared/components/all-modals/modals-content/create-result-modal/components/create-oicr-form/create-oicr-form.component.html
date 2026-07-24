@@ -1,0 +1,461 @@
+@let canEditOicr = this.rolesService.canEditOicr();
+<ng-template #next>
+  <button type="button" (click)="goNext()"
+    class="flex cursor-pointer items-center gap-2 border-2 font-medium border-[#035BA9] text-[#035BA9] px-4 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]">
+    Next <i class="pi pi-arrow-right !text-[12px]"></i>
+  </button>
+</ng-template>
+
+<ng-template #previous>
+  <button type="button" (click)="goBack()"
+    class="flex cursor-pointer items-center gap-2 border-2 font-medium border-[#035BA9] text-[#035BA9] px-4 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]">
+    <i class="pi pi-arrow-left !text-[12px]"></i> Back
+  </button>
+</ng-template>
+
+<ng-template #editPublishedOicr>
+  @if (showEditPublishedOicrButton()) {
+  <button type="button" (click)="openFullOicrEdit()"
+    class="flex cursor-pointer items-center gap-2 border-2 font-medium border-[#035BA9] bg-[#035BA9] text-white px-4 py-2 rounded-[13px] text-[15px]">
+    <i class="pi pi-pencil !text-[12px]"></i>
+    Edit all OICR metadata
+  </button>
+  }
+</ng-template>
+
+<ng-template #createButton>
+  @if (this.createResultManagementService.statusId() !== 10 && this.createResultManagementService.statusId() !== 15 &&
+  this.createResultManagementService.statusId() !== 11 && this.createResultManagementService.statusId() !== 12 &&
+  this.createResultManagementService.statusId() !== 13 && this.createResultManagementService.statusId() !== 14) {
+  @if (this.createResultManagementService.editingOicr() && !canEditOicr) {
+  <div class="bg-[#F6FAF7] border border-[#358540] rounded-[13px] px-4 py-3 flex items-center gap-3">
+    <i class="pi pi-check-circle text-[#358540]"></i>
+    <span class="text-[#358540] font-medium">This OICR has been submitted for review</span>
+  </div>
+  } @else {
+  <div class="flex gap-3">
+    @let disableCreateButton =
+    loading || isDisabled || !canEditOicr || (this.createResultManagementService.editingOicr() ? false :
+    !this.step4opened());
+    <button
+      class="font-medium cursor-pointer text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:text-[#A2A9AF] text-[12px] {{ this.createResultManagementService.editingOicr() ? 'bg-[#509C55]' : 'bg-[#035BA9]' }} text-white px-8 py-2.5 rounded-xl flex items-center gap-2"
+      (click)="createResult()" [pTooltip]="
+            !disableCreateButton ? '' : 'This button will be enabled once all steps are completed. Please make sure to review and fill out each section.'
+          " tooltipPosition="top" [disabled]="disableCreateButton">
+      @if (loading) {
+      <div class="min-w-[191px]">
+        <i class="pi pi-spinner pi-spin text-white disabled:text-[#A2A9AF] text-xs"></i>
+      </div>
+      } @else {
+      @if (this.createResultManagementService.editingOicr()) {
+      <i class="pi pi-save !text-[12px]"></i>
+      }
+
+      {{ this.createResultManagementService.editingOicr() ? 'Save changes' : 'Create preliminary OICR submission' }}
+      @if (!this.createResultManagementService.editingOicr()) {
+      <i class="pi pi-arrow-right !text-[10px] pl-1 disabled:!text-[#A2A9AF]"></i>
+      }
+      }
+    </button>
+    @if (this.createResultManagementService.editingOicr()) {
+    <button
+      class="font-medium cursor-pointer text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:text-[#A2A9AF] text-[12px] bg-[#035BA9] text-white px-8 py-2.5 rounded-xl flex items-center gap-2"
+      (click)="openSubmitResultModal()" [disabled]="disableCreateButton || !isHeaderDataLoaded()">
+      <i class="pi pi-pencil !text-[12px]"></i>
+      Review OICR
+    </button>
+    }
+  </div>
+  }
+  }
+</ng-template>
+
+<div class="grid h-[calc(100%-60px)] w-[70vw] max-w-[1300px] md:overflow-x-hidden pb-12">
+  <!-- OICR header -->
+  @if (currentContract()) {
+  <app-oicr-header [data]="{
+      title: createResultManagementService.resultTitle() || '',
+      result_official_code: createResultManagementService.currentRequestedResultCode() ?? cache.currentMetadata().result_official_code,
+      agreement_id: currentContract()?.agreement_id,
+      description: currentContract()?.description,
+      project_lead_description: currentContract()?.project_lead_description,
+      start_date: currentContract()?.start_date,
+      endDateGlobal: currentContract()?.endDateGlobal || undefined,
+      levers: currentContract()?.levers,
+      status_id: getStatusIdAsString(),
+      status_config: cache.currentMetadata().result_status
+    }" [showTag]="this.createResultManagementService.editingOicr()"
+    [showDownload]="this.createResultManagementService.editingOicr()"
+    [cgspaceLink]="createResultManagementService.createOicrBody().cgspace_link ?? null"></app-oicr-header>
+  }
+
+  <div class="px-5 flex flex-col mx-10 mt-8">
+    @if ((this.createResultManagementService.statusId() === 11 || this.createResultManagementService.statusId() === 15)
+    && submissionHistory().length > 0) {
+    <p-accordion (activeIndexChange)="onAccordionToggle($event)">
+      <ng-template #globalToggleIcon let-active="active">
+      </ng-template>
+      <ng-template #globalSeeDetailsIcon let-active="active">
+        @if (active) {
+        <i class="pi pi-chevron-up text-[#035BA9] !text-[12px]"></i>
+        } @else {
+        <i class="pi pi-chevron-down text-[#035BA9] !text-[12px]"></i>
+        }
+      </ng-template>
+      <p-accordion-panel value="0" class="!border-none">
+        <p-accordion-header class="!border !py-4 !px-7 !font-medium"
+          [class]="'!border !p-4 !font-medium ' + (((accordionActiveState() ?? isAccordionOpen()) || !shouldShowBottomBorder()) ? '!border-b-0 !rounded-t-[13px] !rounded-b-none' : '!rounded-[13px]')"
+          [style.border-color]="cache.currentMetadata().result_status?.config?.color?.text"
+          [style.color]="cache.currentMetadata().result_status?.config?.color?.text"
+          [style.background-color]="cache.currentMetadata().result_status?.config?.color?.background">
+          <div class="flex flex-col w-full">
+            <ng-template #toggleicon let-active="active">
+              <ng-container [ngTemplateOutlet]="globalToggleIcon"
+                [ngTemplateOutletContext]="{ active: active }"></ng-container>
+              @if (accordionActiveState() !== active) {
+              @let _ = updateAccordionActiveState(active);
+              }
+            </ng-template>
+            <div class="flex items-center gap-3">
+              <i [class]="getStatusIcon()"
+                [style.color]="cache.currentMetadata().result_status?.config?.color?.text"></i>
+              <span class="font-medium">{{ cache.currentMetadata().result_status?.name || '' }}</span>
+            </div>
+            <div class="flex gap-x-5 mt-2">
+              <div class="flex items-center">
+                <span class="font-normal text-[13px] text-[#777c83] !font-['Space_Grotesk'] leading-4">Reviewed
+                  by</span>
+                <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+                <span class="text-[13px] uppercase leading-[18px] text-[#345b8f] font-['Space_Grotesk']">{{
+                  getReviewerFullName() }}</span>
+              </div>
+
+              <div class="flex items-center">
+                <span class="font-normal text-[13px] text-[#777c83] !font-['Space_Grotesk'] leading-4">Review
+                  date</span>
+                <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+                <span class="text-[13px] leading-[18px] text-[#345b8f] !font-['Space_Grotesk']">{{ getUpdatedDate() |
+                  date: 'dd/MM/yyyy' }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-4 min-w-[200px]">
+            <span
+              class="text-[#035BA9] text-[14px] px-2 text-right cursor-pointer hover:underline flex items-center gap-1">
+              See details
+              @if (accordionActiveState() ?? isAccordionOpen()) {
+              <i class="pi pi-chevron-up text-[#035BA9] !text-[12px]"></i>
+              } @else {
+              <i class="pi pi-chevron-down text-[#035BA9] !text-[12px]"></i>
+              }
+            </span>
+          </div>
+
+          @if ((this.createResultManagementService.statusId() === 11 || this.createResultManagementService.statusId()
+          === 15) && this.createResultManagementService.editingOicr()) {
+          <button
+            class="font-medium cursor-pointer min-w-[136px] text-[14px] ml-4 text-[#035BA9] border border-[#035BA9] px-4 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#035BA9]/5 transition-colors"
+            (click)="openSubmitResultModalForReviewAgain(); $event.stopPropagation()">
+            <i class="pi pi-pencil !text-[14px]"></i>
+            Review again
+          </button>
+          }
+        </p-accordion-header>
+        <p-accordion-content
+          class="!border !border-t-0 !rounded-b-[13px] !px-7 !pb-4 !mb-8 !-mt-px custom-accordion-content"
+          [style.border-color]="cache.currentMetadata().result_status?.config?.color?.text"
+          [style.color]="cache.currentMetadata().result_status?.config?.color?.text"
+          [style.background-color]="cache.currentMetadata().result_status?.config?.color?.background + ' !important'">
+          <div class="text-[#4C5158] text-[14px] leading-relaxed"
+            [style.background-color]="cache.currentMetadata().result_status?.config?.color?.background + ' !important'">
+            <span class="font-medium mb-2">Reason:
+              <span class="font-normal">{{ getSubmissionComment() || 'No justification provided.' }}</span></span>
+          </div>
+        </p-accordion-content>
+      </p-accordion-panel>
+    </p-accordion>
+    }
+
+    <p-steps [model]="createResultManagementService.stepItems()" [readonly]="false" [activeIndex]="activeIndex()"
+      (activeIndexChange)="onActiveIndexChange($event)" [styleClass]="'completed-' + activeIndex" class="mb-8">
+    </p-steps>
+
+    @if (activeIndex() === 0) {
+    <div id="general-information"
+      class="flex-col flex gap-[20px] bg-white border-[#E8EBED] border-1 rounded-[15px] p-6">
+      <p class="text-[15px] font-[800] text-[#112F5C]">GENERAL INFORMATION</p>
+
+      <div class="grid gap-[10px]">
+        <app-oicr-form-fields [body]="createResultManagementService.createOicrBody"
+          [oicrNoOptionValue]="'step_one.oicr_internal_code'"
+          [taggingOptionValue]="{ body: 'step_one.tagging.tag_id', option: 'id' }"
+          [oicrOptionValue]="{ body: 'step_one.link_result.external_oicr_id', option: 'id' }"
+          [maturityLevelOptionValue]="{ body: 'step_one.maturity_level_id', option: 'id' }"
+          [outcomeImpactOptionValue]="'step_one.outcome_impact_statement'" [showMaturityLevel]="false"
+          [showShortOutcome]="false" [showMainContactPerson]="true"
+          [mainContactPersonOptionValue]="{ body: 'step_one.main_contact_person.user_id', option: 'user_id' }"
+          [isOicrNoDisabled]="true" [clearOicrSelection]="clearOicrSelection.bind(this)">
+        </app-oicr-form-fields>
+      </div>
+
+      <div class="w-full flex justify-between items-center">
+        <div class="flex gap-3">
+          <ng-container *ngTemplateOutlet="next"></ng-container>
+        </div>
+        <div class="flex gap-3 items-center">
+          <ng-container *ngTemplateOutlet="editPublishedOicr"></ng-container>
+          <ng-container *ngTemplateOutlet="createButton"></ng-container>
+        </div>
+      </div>
+    </div>
+    }
+
+    @if (activeIndex() === 1) {
+    <div id="contributors" class="flex-col flex gap-[20px] bg-white border-[#E8EBED] border-1 rounded-[15px] p-6">
+      <p class="text-[15px] font-[800] text-[#112F5C]">CONTRIBUTORS</p>
+
+      <div class="grid gap-[10px]">
+        <div class="flex flex-col pt-2">
+          <app-multiselect label="Primary Levers"
+            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+            [signal]="createResultManagementService.createOicrBody" optionValue="lever_id"
+            [textSpan]="'Levers selected'" signalOptionValue="step_two.primary_lever" [isRequired]="true"
+            scrollHeight="260px" serviceName="levers" [serviceParams]="leverServiceParams()"
+            [optionsDisabled]="primaryOptionsDisabled" placeholder="Select the levers">
+            <ng-template #selectedItems let-value>
+              @if (value?.length > 0) {
+              <div class="flex items-center gap-2">
+                <span>{{ value?.length }} Lever{{ value?.length === 1 ? '' : 's' }} selected </span>
+              </div>
+              }
+            </ng-template>
+            <ng-template #item let-item>
+              <div class="flex items-center gap-2 text-[##4C5158]">
+                <span class="font-[600]">
+                  {{ item?.short_name }}: <span class="font-['Barlow'] font-normal">{{ item?.other_names
+                    }}</span></span>
+              </div>
+            </ng-template>
+            <ng-template #rows let-lever>
+              <div class="flex w-full min-w-0 flex-col gap-3">
+                <div
+                  class="flex items-center pt-1 xl:pt-0.5 text-[13px] leading-[18px] text-[#4C5158] gap-x-1 font-['Barlow'] font-[600]">
+                  <img [src]="lever.icon" [alt]="lever.short_name" class="w-[35px] h-[35px] mr-2 rounded-[3px]" />
+                  <span class="text-[15px] text-[#4C5158] font-[600]">
+                    {{ lever?.short_name }}: <span class="font-['Barlow'] font-normal">{{ lever?.other_names
+                      }}</span></span>
+                </div>
+                @if (isOtherLever(lever)) {
+                <app-input label="Name of the team or area creating the result"
+                  [signal]="getLeverCustomNameSignal(lever)" optionValue="custom_lever_name" [isRequired]="true"
+                  [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+                  placeholder="Write the team or area name"></app-input>
+                }
+              </div>
+            </ng-template>
+          </app-multiselect>
+        </div>
+
+        <div class="flex flex-col pt-4">
+          <app-multiselect label="Contributing Levers"
+            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+            [signal]="createResultManagementService.createOicrBody" optionValue="lever_id"
+            signalOptionValue="step_two.contributor_lever" [textSpan]="'Levers selected'" scrollHeight="260px"
+            serviceName="levers" [serviceParams]="leverServiceParams()" [optionsDisabled]="optionsDisabled"
+            placeholder="Select the levers">
+            <ng-template #selectedItems let-value>
+              @if (value?.length > 0) {
+              <div class="flex items-center gap-2">
+                <span>{{ value?.length }} Lever{{ value?.length === 1 ? '' : 's' }} selected </span>
+              </div>
+              }
+            </ng-template>
+            <ng-template #item let-item>
+              <div class="flex items-center gap-2">
+                <span class="font-[600] text-[##4C5158]">
+                  {{ item?.short_name }}: <span class="font-['Barlow'] font-normal">{{ item?.other_names
+                    }}</span></span>
+              </div>
+            </ng-template>
+            <ng-template #rows let-lever>
+              <div class="flex w-full min-w-0 flex-col gap-3">
+                <div
+                  class="flex items-center pt-1 xl:pt-0.5 text-[13px] leading-[18px] text-[#4C5158] gap-x-1 font-['Barlow'] font-[600]">
+                  <img [src]="lever.icon" [alt]="lever.short_name" class="w-[35px] h-[35px] mr-2 rounded-[3px]" />
+                  <span class="text-[15px] text-[#4C5158] font-[600]">
+                    {{ lever?.short_name }}: <span class="font-['Barlow'] font-normal">{{ lever?.other_names
+                      }}</span></span>
+                </div>
+                @if (isOtherLever(lever)) {
+                <app-input label="Name of the team or area creating the result"
+                  [signal]="getLeverCustomNameSignal(lever)" optionValue="custom_lever_name" [isRequired]="true"
+                  [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+                  placeholder="Write the team or area name"></app-input>
+                }
+              </div>
+            </ng-template>
+          </app-multiselect>
+        </div>
+      </div>
+
+      <div class="w-full flex justify-between items-center pt-4">
+        <div class="flex gap-3">
+          <ng-container *ngTemplateOutlet="previous"></ng-container>
+          <ng-container *ngTemplateOutlet="next"></ng-container>
+        </div>
+        <div class="flex gap-3 items-center">
+          <ng-container *ngTemplateOutlet="editPublishedOicr"></ng-container>
+          <ng-container *ngTemplateOutlet="createButton"></ng-container>
+        </div>
+      </div>
+    </div>
+    }
+
+    @if (activeIndex() === 2) {
+    <div id="geographic-scope" class="flex-col flex gap-[20px] bg-white border-[#E8EBED] border-1 rounded-[15px] p-6">
+      <p class="text-[15px] font-[800] text-[#112F5C]">GEOGRAPHIC SCOPE</p>
+
+      <div class="grid gap-[10px]">
+        <div class="flex flex-col gap-8">
+          <app-radio-button [isRequired]="true"
+            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+            label="What is the main geographic focus of the Impact?"
+            helperText="This should reflect where the Impact has taken place/contributed to benefit."
+            [signal]="createResultManagementService.createOicrBody" [optionLabel]="'label'" direction="horizontal"
+            spaceX="gap-10" serviceName="geoFocus" (selectEvent)="onSelect()"
+            [optionValue]="{ body: 'step_three.geo_scope_id', option: 'value' }"></app-radio-button>
+
+          @if (getMultiselectLabel().region.label) {
+          <app-multiselect [signal]="createResultManagementService.createOicrBody" [optionLabel]="'name'"
+            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+            class="-mt-5" [optionValue]="'region_id'" [signalOptionValue]="'step_three.regions'"
+            [isRequired]="isRegionsRequired()" serviceName="regions" label="{{ getMultiselectLabel().region.label }}"
+            helperText="{{ getMultiselectLabel().region.description }}" placeholder="Select the regions">
+          </app-multiselect>
+          }
+          @if (getMultiselectLabel().country.label) {
+          @if (isGeoScopeId(5) && !createResultManagementService.autofillinOicr()) {
+          <app-multiselect
+            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+            (selectEvent)="onSelect()" [signal]="createResultManagementService.createOicrBody"
+            [flagAttributes]="{ isoAlpha2: 'isoAlpha2', institution_location_name: 'name' }"
+            [disabledSelectedScroll]="isGeoScopeId(5)" [optionLabel]="'name'" class="-mt-4"
+            [isRequired]="isCountriesRequired()" [optionValue]="'isoAlpha2'"
+            [signalOptionValue]="'step_three.countries'" serviceName="countriesWithSubnational"
+            label="{{ getMultiselectLabel().country.label }}"
+            helperText="{{ getMultiselectLabel().country.description }}" placeholder="Select the countries">
+            <ng-template #rows let-country>
+              @for (c of [country]; track c.isoAlpha2) {
+              <div class="flex justify-between items-start w-full">
+                <div class="flex flex-col gap-3 max-w-[70%]">
+                  <div class="flex items-center gap-3">
+                    <img [src]="environment.flagsUrl + c.isoAlpha2 + '.svg'" [alt]="c.name"
+                      class="w-6 h-4 object-cover" />
+                    <span class="font-medium text-[var(--text-color)]">{{ c.name }}</span>
+                  </div>
+                  <div class="sub-national-section">
+                    <div class="flex flex-wrap gap-2 items-center">
+                      <span class="text-[#777c83] text-[13px]">Sub-national levels</span>
+                      <i class="pi pi-arrow-right !text-[12px] text-[#8d9299] cursor-pointer"></i>
+                      @if (c.result_countries_sub_nationals_signal()?.regions?.length > 0) {
+                      @for (region of c.result_countries_sub_nationals_signal().regions; track region.sub_national_id) {
+                      <div
+                        class="bg-[#e5e7eb] rounded-full px-3 py-1 flex items-center gap-2 text-[13px] text-[#4c5158]">
+                        {{ region.name || region.sub_national?.name }}
+                        @if (canEditOicr) {
+                        <i class="pi pi-times !text-[12px] text-[#8d9299] hover:text-[#4c5158] cursor-pointer"
+                          (keydown.enter)="removeSubnationalRegion(c, region)"
+                          (click)="removeSubnationalRegion(c, region)">
+                        </i>
+                        }
+                      </div>
+                      }
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right column: Multiselect -->
+                <div class="w-[300px]">
+                  <app-multiselect-instance [signal]="c.result_countries_sub_nationals_signal" [optionLabel]="'name'"
+                    [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+                    (valueChange)="updateCountryRegions(c.isoAlpha2, $event)" [optionValue]="'sub_national_id'"
+                    [signalOptionValue]="'regions'" serviceName="GetSubnationalByIsoAlpha" [hideSelected]="true"
+                    [endpointParams]="{ isoAlpha2: c.isoAlpha2 }">
+                  </app-multiselect-instance>
+                </div>
+              </div>
+              }
+            </ng-template>
+          </app-multiselect>
+
+          @if (showSubnationalError()) {
+          <div class="flex items-center gap-1 -mt-6 text-[#E69F00]">
+            <i class="material-symbols-rounded !text-[14px]">warning</i>
+            <span class="!text-[14px]">Please select at least one sub-national level per country.</span>
+          </div>
+          }
+          } @else {
+          <app-multiselect (selectEvent)="onSelect()" [signal]="createResultManagementService.createOicrBody"
+            class="-mt-3"
+            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+            [flagAttributes]="{ isoAlpha2: 'isoAlpha2', institution_location_name: 'name' }"
+            [disabledSelectedScroll]="isGeoScopeId(5)" [optionLabel]="'name'" [isRequired]="isCountriesRequired()"
+            [optionValue]="'isoAlpha2'" [signalOptionValue]="'step_three.countries'"
+            serviceName="countriesWithoutSubnational" label="{{ getMultiselectLabel().country.label }}"
+            helperText="{{ getMultiselectLabel().country.description }}" placeholder="Select the countries">
+          </app-multiselect>
+          }
+          }
+        </div>
+
+        <div class="flex flex-col pt-2">
+          <app-textarea [rows]="5"
+            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+            label="Comments Geographic Scope"
+            helperText="Provide additional information about the geographic scope, if necessary." [maxLength]="1000"
+            [signal]="this.createResultManagementService.createOicrBody" [optionValue]="'step_three.comment_geo_scope'"
+            placeholder="Write the comments"></app-textarea>
+        </div>
+      </div>
+
+      <div class="w-full flex justify-between items-center">
+        <div class="flex gap-3">
+          <ng-container *ngTemplateOutlet="previous"></ng-container>
+          <ng-container *ngTemplateOutlet="next"></ng-container>
+        </div>
+        <div class="flex gap-3 items-center">
+          <ng-container *ngTemplateOutlet="editPublishedOicr"></ng-container>
+          <ng-container *ngTemplateOutlet="createButton"></ng-container>
+        </div>
+      </div>
+    </div>
+    }
+
+    @if (activeIndex() === 3) {
+    <div id="general-comments" class="flex-col flex gap-[20px] bg-white border-[#E8EBED] border-1 rounded-[15px] p-6">
+      <p class="text-[15px] font-[800] text-[#112F5C]">GENERAL COMMENTS</p>
+
+      <div class="grid gap-[10px]">
+        <div class="flex flex-col">
+          <app-textarea [rows]="5"
+            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+            label="Comments, questions or anything else?" [maxLength]="400"
+            [signal]="this.createResultManagementService.createOicrBody" [maxLength]="3000"
+            [optionValue]="'step_four.general_comment'" placeholder="Write the comments"></app-textarea>
+        </div>
+      </div>
+
+      <div class="w-full flex justify-between items-center">
+        <div class="flex gap-3">
+          <ng-container *ngTemplateOutlet="previous"></ng-container>
+        </div>
+        <div class="flex gap-3 items-center">
+          <ng-container *ngTemplateOutlet="editPublishedOicr"></ng-container>
+          <ng-container *ngTemplateOutlet="createButton"></ng-container>
+        </div>
+      </div>
+    </div>
+    }
+  </div>
+</div>
