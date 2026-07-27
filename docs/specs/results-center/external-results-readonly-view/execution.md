@@ -37,4 +37,27 @@
 
 ---
 
+### T-02 — `isExternalResult` signal + `GetMetadata` interface fields
+
+- **Status:** done (PASS on attempt 1)
+- **Date:** 2026-07-27
+- **Requirements covered:** R-RC-002, R-RC-011 (client side)
+- **Skills used:** `angular-developer` (as listed — no deviation)
+- **Effort dial:** medium
+
+**Attempt 1**
+- **Files changed:**
+  - `client/research-indicators/src/app/shared/services/cache/cache.service.ts` — added `isExternalResult` computed, character-for-character matching design.md §6.1.
+  - `client/research-indicators/src/app/shared/services/cache/cache.service.spec.ts` — added truth-table test (STAR, numeric/empty, TIP, PRMS, AICCRA).
+  - `client/research-indicators/src/app/shared/interfaces/get-metadata.interface.ts` — added 4 optional fields mirroring T-01's server DTO.
+- **Implementer verification:** lint clean; `cache.service.spec` 4 suites/95 tests passed; `tsc --noEmit` showed pre-existing, unrelated errors only (confirmed via git stash before/after comparison).
+- **Reviewer verdict:** `PASS`. Independently confirmed `CacheService` has zero constructor/injections before or after — the new signal is provably dependency-free (satisfies R-RC-002 AC.2 by construction, not just by claim). Confirmed the 4 interface fields are collision-free and match the T-01 server DTO field-for-field. Confirmed via grep that `isExternalResult` has no consumers yet (`SubmissionService` correctly left untouched for T-03) and no component/UI/routing appeared in the diff.
+- **Advisory (non-blocking):** (1) Implementer's tsc pre-existing-error count was off by one (7 vs reported 6) — immaterial, all in unrelated files. (2) `npm run lint` doesn't actually lint `.spec.ts` files (outside eslint config scope) — the "all files pass" claim is true but doesn't cover the new test file specifically; no issue found in it regardless. (3) Forward note for T-05: client `updated_at` is typed `string` (correct, per design.md §6.6 — server's `Date` serializes to JSON as string), so whoever builds the header should pipe it through the existing date-format pipe rather than assume a `Date` instance.
+
+**Final verification result:** PASS — 95/95 tests, lint clean, no new tsc errors.
+**Decisions made:** none beyond the spec.
+**Issues encountered:** none.
+
+---
+
 (further entries appended below, one per task, in execution order)
