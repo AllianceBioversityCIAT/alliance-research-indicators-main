@@ -153,6 +153,27 @@ export class AgressoContractController {
       );
   }
 
+  @Get('reports/full')
+  @ApiOperation({
+    summary:
+      'Full contract reports aggregate (all partners, levers, contributors, contacts, staff and geo-scope without top-N limit)',
+  })
+  @ApiContractReportQueries({
+    contractIdDescription:
+      'Primary contract agreement id used to build the full reports payload',
+  })
+  async getFullContractReports(@Query('contract-id') contractId: string) {
+    return this.agressoContractService
+      .getFullContractReports(contractId)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract full reports generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('reports/top-contributors-contracts')
   @ApiOperation({
     summary:

@@ -44,6 +44,7 @@ describe('AgressoContractService', () => {
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
+    getFullContractReports: jest.fn(),
     getFundingTypes: jest.fn(),
   };
 
@@ -525,6 +526,36 @@ describe('AgressoContractService', () => {
       const result = await service.getContractStaffReport('A100');
 
       expect(repository.getContractStaffReport).toHaveBeenCalledWith('A100');
+      expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getFullContractReports', () => {
+    it('should delegate full contract reports to repository', async () => {
+      const expectedReport = {
+        contract_id: 'A100',
+        top_primary_levers: [],
+        top_contributors: [],
+        top_main_contact_persons: [],
+        staff: [],
+        top_partners: [],
+        geo_scope: {
+          geo_scope_summary: {
+            global: 0,
+            regional: 0,
+            countries: 0,
+            sub_national: 0,
+            yet_to_be_determined: 0,
+          },
+          top_regions: [],
+          top_countries: [],
+        },
+      };
+      mockRepository.getFullContractReports.mockResolvedValue(expectedReport);
+
+      const result = await service.getFullContractReports('A100');
+
+      expect(repository.getFullContractReports).toHaveBeenCalledWith('A100');
       expect(result).toEqual(expectedReport);
     });
   });
