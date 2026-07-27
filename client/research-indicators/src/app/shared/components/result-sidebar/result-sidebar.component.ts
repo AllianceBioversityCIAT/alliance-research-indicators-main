@@ -95,7 +95,12 @@ export class ResultSidebarComponent {
 
   showOicrStatusDropdown = computed(() => {
     const meta = this.cache.currentMetadata();
-    return this.roles.isAdmin() && meta.indicator_id === 5 && meta.status_id !== this.publishedOicrStatusId;
+    return (
+      this.roles.isAdmin() &&
+      meta.indicator_id === 5 &&
+      meta.status_id !== this.publishedOicrStatusId &&
+      !this.cache.isExternalResult()
+    );
   });
 
   getResultChildQueryParams(): Record<string, string> {
