@@ -100,12 +100,12 @@ graph TD
 - **Implementation notes:**
   - This MUST NOT change any existing test's expected output — it's a pure internal refactor.
 - **Acceptance / done check:**
-  - [ ] All existing `submission.service.spec.ts` cases pass unchanged.
-  - [ ] New test: `isEditableStatus()` returns `false` for a TIP/PRMS/AICCRA result regardless of status_id/role (regression-proofing the delegation).
+  - [x] All existing `submission.service.spec.ts` cases pass unchanged.
+  - [x] New test: `isEditableStatus()` returns `false` for a TIP/PRMS/AICCRA result regardless of status_id/role (regression-proofing the delegation) — implemented as `it.each` over 15 cases (attempt 2, after attempt 1's version was found vacuous due to `computed()` caching).
 - **Dependencies:** T-02
 - **Estimated effort:** S
 - **Owner:** TBD
-- **Status:** todo
+- **Status:** done
 - **Skills:** `angular-developer`
 
 ---
@@ -166,12 +166,12 @@ graph TD
   - `.../result-sidebar.component.spec.ts`
 - **Description — corrected during Judgment Day round 1 (F-5):** the four buttons are not four independent conditions. `:74-76` is a single shared outer `@if` wrapper (`indicator_id !== 5 && status_id not in [6,7,8]`) around Review (`:77-88`), Submit/Unsubmit (`:89-105`), and Approve (`:106-120`) together. Append `&& !cache.isExternalResult()` **once, to the shared wrapper at `:74-76`** — this closes all three simultaneously. Separately, append the same check to `showOicrStatusDropdown()` (`:96-99`). Leave the "X/Y sections completed" counter unguarded (design.md D-5).
 - **Acceptance / done check:**
-  - [ ] For an external result (any role incl. System Admin), none of Submit/Unsubmit/Review/Approve/status-dropdown render.
-  - [ ] For a STAR result, all four behave exactly as before (no regression in existing sidebar spec cases).
+  - [x] For an external result (any role incl. System Admin), none of Submit/Unsubmit/Review/Approve/status-dropdown render.
+  - [x] For a STAR result, all four behave exactly as before (no regression in existing sidebar spec cases).
 - **Dependencies:** T-02
 - **Estimated effort:** S
 - **Owner:** TBD
-- **Status:** todo
+- **Status:** done
 - **Skills:** `angular-developer`
 
 ---
@@ -295,7 +295,7 @@ graph TD
 - **Dependencies:** none (independent of the client-side tasks; can run in parallel with T-02 onward)
 - **Estimated effort:** S
 - **Owner:** TBD
-- **Status:** todo
+- **Status:** done
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
 
 ---

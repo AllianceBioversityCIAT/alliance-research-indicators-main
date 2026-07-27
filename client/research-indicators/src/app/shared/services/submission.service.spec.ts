@@ -9,7 +9,8 @@ const cacheMock = {
   greenChecks: jest.fn(),
   isMyResult: jest.fn(),
   currentMetadata: jest.fn(),
-  getCurrentPlatformCode: jest.fn()
+  getCurrentPlatformCode: jest.fn(),
+  isExternalResult: jest.fn()
 };
 
 const rolesMock = {
@@ -36,6 +37,12 @@ describe('SubmissionService', () => {
     rolesMock.isMelRegionalExpert.mockReturnValue(false);
     rolesMock.canEditAnyResult.mockImplementation(() => rolesMock.isAdmin() || rolesMock.isMelRegionalExpert());
     cacheMock.isMyResult.mockReturnValue(true);
+    // Mirrors CacheService.isExternalResult's real derivation from getCurrentPlatformCode,
+    // so existing tests that only stub getCurrentPlatformCode keep working unchanged.
+    cacheMock.isExternalResult.mockImplementation(() => {
+      const platformCode = cacheMock.getCurrentPlatformCode();
+      return platformCode !== '' && platformCode !== 'STAR';
+    });
   });
 
   it('should be created', () => {
@@ -91,6 +98,41 @@ describe('SubmissionService', () => {
     cacheMock.getCurrentPlatformCode.mockReturnValue('TIP');
     expect(service.isEditableStatus()).toBe(false);
   });
+
+  // T-03 regression (AC.1): isEditableStatus must delegate to CacheService.isExternalResult()
+  // and stay false for any otherwise-editable status_id when the result is on a non-STAR
+  // platform (TIP/PRMS/AICCRA), regardless of role/grant/ownership.
+  //
+  // Each [platformCode, statusId] pair is its own it.each case (not a loop body sharing one
+  // service instance) because isEditableStatus() is a computed() with no real signal
+  // dependencies under this mock setup: it evaluates once per SubmissionService instance and
+  // caches that result. it.each relies on the existing beforeEach re-running
+  // TestBed.configureTestingModule + TestBed.inject(SubmissionService) before every case, so
+  // each pair gets a genuinely fresh, uncached computed evaluation.
+  const editableStatuses = [4, 5, 12, 13, 10];
+  const nonStarPlatforms = ['TIP', 'PRMS', 'AICCRA'];
+  const nonStarMatrix: Array<[string, number]> = nonStarPlatforms.flatMap(platformCode =>
+    editableStatuses.map((statusId): [string, number] => [platformCode, statusId])
+  );
+
+  it.each(nonStarMatrix)(
+    'isEditableStatus false for platform %s and status_id %i, regardless of role',
+    (platformCode, statusId) => {
+      cacheMock.currentMetadata.mockReturnValue({
+        status_id: statusId,
+        has_result_edit_grant: true,
+        is_main_contact_person: true,
+        is_principal_investigator: true
+      });
+      cacheMock.getCurrentPlatformCode.mockReturnValue(platformCode);
+      cacheMock.isMyResult.mockReturnValue(true);
+      rolesMock.isAdmin.mockReturnValue(true);
+      rolesMock.canEditAnyResult.mockReturnValue(true);
+
+      expect(service.isEditableStatus()).toBe(false);
+      expect(cacheMock.isExternalResult).toHaveBeenCalled();
+    }
+  );
 
   it('isEditableStatus false for status_id 2 and STAR platform', () => {
     cacheMock.currentMetadata.mockReturnValue({ status_id: 2 });

@@ -60,4 +60,70 @@
 
 ---
 
+### T-06 — `ResultSidebarComponent`: hide status-changing actions externally
+
+- **Status:** done (PASS on attempt 1)
+- **Date:** 2026-07-27
+- **Requirements covered:** R-RC-007
+- **Skills used:** `angular-developer`
+- **Effort dial:** medium
+
+**Attempt 1**
+- **Files changed:** `result-sidebar.component.html` (single `!cache.isExternalResult()` added to the shared outer wrapper, corrected per Judgment Day F-5), `result-sidebar.component.ts` (`showOicrStatusDropdown()` guarded), `result-sidebar.component.spec.ts` (8 new tests).
+- **Implementer verification:** lint clean; 95/95 tests; only pre-existing unrelated tsc errors.
+- **Reviewer verdict:** `PASS`. Independently read the full `:74-122` span to confirm the wrapper genuinely contains Review/Submit-Unsubmit/Approve together and there is no fourth render site (repo-wide grep). Confirmed zero diff on the "sections completed" counter (D-5 honored). Reproduced 95/95 passing.
+- **Advisory (non-blocking):** Implementer's test-count/tsc-error breakdown in its report was slightly inaccurate (87+8 not 85+10; 3 pre-existing tsc errors not ~7) — totals match, no action needed.
+
+**Final verification result:** PASS — 95/95 tests, lint clean.
+
+---
+
+### T-13 — Server: submit-status endpoint rejects transitions for external results
+
+- **Status:** done (PASS on attempt 1)
+- **Date:** 2026-07-27
+- **Requirements covered:** R-RC-012
+- **Skills used:** `nestjs-expert`, `error-handling-patterns`
+- **Effort dial:** medium
+
+**Attempt 1**
+- **Files changed:** `result-status-workflow.service.ts` (new `_assertStarSourceWritable` guard called before the transaction), `result-status-workflow.controller.ts` (Swagger doc), `result-status-workflow.service.spec.ts` (2 new tests).
+- **Implementer verification:** lint clean; 89/89 tests across the module; build clean.
+- **Reviewer verdict:** `PASS`. Independently confirmed the guard runs 54 lines before `Result.update()` (not just "before" in name), confirmed `platform_code` is genuinely default-selected on the preceding `findOne` (no narrowing `select` — contrasted against a sibling method in the same file that DOES narrow-select, to show the Implementer picked the right method), and confirmed the new error string cannot collide with the locked PRMS bilateral string by reading the client's exact-match consumer (`pool-funding-alignment.component.ts:604`). Coverage on the new guard lines confirmed exercised both branches.
+- **Advisory (non-blocking):** literal `'STAR'` could use `ReportingPlatformEnum.STAR` instead (consistent either way, matches existing sibling-gate precedent); pre-existing lack of `@Roles`/`ResultStatusGuard` on this controller noted as out-of-scope, not introduced by this task.
+
+**Final verification result:** PASS — 89/89 tests, lint clean, build clean.
+
+---
+
+### T-03 — `isEditableStatus()` delegates to `isExternalResult`
+
+- **Status:** done (PASS on attempt 2 — HALT avoided, rework worked)
+- **Date:** 2026-07-27
+- **Requirements covered:** R-RC-002
+- **Skills used:** `angular-developer`
+- **Effort dial:** medium (attempt 1) → high (attempt 2, per rework-bump rule)
+
+**Attempt 1**
+- **Files changed:** `submission.service.ts` (delegation refactor), `submission.service.spec.ts` (new regression test, loop-based).
+- **Implementer verification:** lint clean; 56/56 tests passed; tsc showed only known pre-existing errors.
+- **Reviewer verdict:** `FAIL`.
+  - **Discovered Issue:** the new regression test called `service.isEditableStatus()` 15 times on ONE `SubmissionService` instance across nested nested loops. `isEditableStatus` is an Angular `computed()`; under this test's plain-`jest.fn()` mocks (not real signals), it has zero signal dependencies and caches after its first read. Only iteration 1 (TIP/status_id 4) was a real assertion — the other 14 compared against the same cached value. Proven by mutation: a broken mock treating PRMS/AICCRA as non-external still passed the test unchanged.
+  - **Violated Rule:** requirements.md R-RC-002 AC.1 (the test is supposed to be evidence of no-regression across the full TIP/PRMS/AICCRA × 5-status matrix; it provided none beyond one case).
+  - **Remediation Suggestion:** give each `[platformCode, statusId]` pair its own fresh service instance — `it.each` (preferred, since `beforeEach` already reconfigures `TestBed` per test) or manual `TestBed.resetTestingModule()` per iteration.
+  - Reviewer explicitly noted: **no change needed to `submission.service.ts`** — the production refactor itself was already correct.
+- **Leader action:** logged FAIL, bumped effort medium → high, spawned Implementer again with the Reviewer's full unedited feedback (Structured Feedback rule) plus a root-cause explanation of Angular `computed()` caching under non-signal mocks.
+
+**Attempt 2**
+- **Files changed:** `submission.service.spec.ts` only (rewrote the new test as `it.each` over the 15 pairs; each case now gets `beforeEach`'s fresh `TestBed.inject(SubmissionService)`; added `expect(cacheMock.isExternalResult).toHaveBeenCalled()` per case). `submission.service.ts` untouched, per Reviewer's attempt-1 note.
+- **Implementer verification:** lint clean; baseline 70/70 passed; **self-administered mutation test** — mocked `isExternalResult` to treat only `'TIP'` as external, reran, got exactly 10/15 targeted failures (all PRMS/AICCRA cases), reverted, reran to confirm 70/70 green again. Reported both runs as evidence (not just a green pass), per the Leader's explicit ask.
+- **Reviewer verdict:** `PASS`. Independently reproduced the exact same mutation test (10/15 failures, TIP passing / PRMS+AICCRA failing) — confirmed this specific failure pattern is only achievable with genuine per-case computed re-evaluation, not inferred from the Implementer's claim. Additionally ran a **second, self-devised mutation** (reverting the production delegation back to the old, behavior-equivalent inline check) and confirmed all 15 cases now fail on the NEW `toHaveBeenCalled()` assertion specifically — proving the test locks the *delegation itself*, not just the boolean outcome. Verified the TestBed-freshness assumption from `setup-jest.ts`/`beforeEach` wiring directly rather than trusting the code comment.
+- **Advisory (non-blocking):** `cacheMock.getCurrentPlatformCode` has no `beforeEach` default, so an un-stubbed case would read `isExternalResult` as `true` from `undefined` — a latent trip-wire for future tests, not a defect here (no such case exists). A dead string-token DI registration (`'CacheService'`) predates this diff, out of scope.
+
+**Final verification result:** PASS on attempt 2 — 70/70 tests, lint clean, mutation-tested by both the Implementer and independently by the Reviewer (two separate mutations).
+**Decisions made:** none beyond the spec; the rework stayed scoped exactly to the Reviewer's remediation suggestion.
+**Issues encountered:** Angular `computed()` caching under mocked (non-signal) test doubles — a subtle, generally-applicable gotcha worth remembering for any future test that asserts a `computed()` across changing mock state within one `it()`.
+
+---
+
 (further entries appended below, one per task, in execution order)
