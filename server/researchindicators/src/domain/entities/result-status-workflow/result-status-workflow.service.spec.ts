@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ResultStatusWorkflowService } from './result-status-workflow.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
@@ -350,6 +350,61 @@ describe('ResultStatusWorkflowService', () => {
         result_status_id: 1,
         first_name: 'John',
         last_name: 'Doe',
+      };
+      const mockTransition: Partial<ResultStatusWorkflow> = {
+        from_status_id: 1,
+        to_status_id: 2,
+        config: { actions: [] },
+      };
+      mockResultFindOne.mockResolvedValue(mockResult);
+      mockWorkflowFindOne.mockResolvedValue(mockTransition);
+
+      const mockInsertResult = { identifiers: [{ submission_history_id: 10 }] };
+      const mockHistoryEntry = {
+        submission_history_id: 10,
+        created_at: new Date(),
+      };
+      const mockManagerRepo = {
+        insert: jest.fn().mockResolvedValue(mockInsertResult),
+        findOne: jest.fn().mockResolvedValue(mockHistoryEntry),
+        update: jest.fn().mockResolvedValue(undefined),
+      };
+      mockTransaction.mockImplementation(async (cb) => {
+        return cb({
+          getRepository: jest.fn().mockReturnValue(mockManagerRepo),
+        });
+      });
+
+      await expect(
+        service.changeStatus(1, 2, { submission_comment: 'approved' } as any),
+      ).resolves.not.toThrow();
+
+      expect(mockTransaction).toHaveBeenCalled();
+    });
+
+    // @sdd-spec docs/specs/results-center/external-results-readonly-view — R-RC-012
+    it('should throw ConflictException for a non-STAR (external) result and never start the transaction', async () => {
+      mockResultFindOne.mockResolvedValue({
+        result_id: 1,
+        indicator_id: 1,
+        result_status_id: 1,
+        platform_code: 'TIP',
+      });
+
+      await expect(
+        service.changeStatus(1, 2, { submission_comment: 'test' } as any),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockWorkflowFindOne).not.toHaveBeenCalled();
+      expect(mockTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should proceed (not throw ConflictException) for a STAR-platform_code result', async () => {
+      const mockResult = {
+        result_id: 1,
+        indicator_id: 1,
+        result_status_id: 1,
+        platform_code: 'STAR',
       };
       const mockTransition: Partial<ResultStatusWorkflow> = {
         from_status_id: 1,
