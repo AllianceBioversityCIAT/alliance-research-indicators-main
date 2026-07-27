@@ -110,6 +110,10 @@ export class ResultStatusWorkflowController {
   })
   @ApiOperation({
     summary: 'Change status by result id',
+    description:
+      'Rejects with 409 Conflict when the target result is synced from an ' +
+      'external platform (TIP/PRMS/AICCRA) — status changes are only ' +
+      'permitted for STAR-origin results.',
   })
   async changeStatus(
     @Body() body: AditionalDataChangeStatusDto,
