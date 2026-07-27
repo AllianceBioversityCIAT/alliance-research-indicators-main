@@ -22,8 +22,13 @@ export class ContractTopContributorsReportDto {
   @ApiProperty({ type: String })
   contract_id!: string;
 
-  @ApiProperty({ type: Number })
-  limit!: number;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Applied top-N limit. Null when the report returns the full dataset (no LIMIT).',
+  })
+  limit!: number | null;
 
   @ApiProperty({ type: ContributorContractCountDto, isArray: true })
   top_contributors!: ContributorContractCountDto[];

@@ -205,6 +205,10 @@ export class AgressoContractService {
     return this._agressoContractRepository.getContractStaffReport(contractId);
   }
 
+  async getFullContractReports(contractId: string) {
+    return this._agressoContractRepository.getFullContractReports(contractId);
+  }
+
   async getTopPrimaryLeversReport(
     contractId: string,
     limit?: number,
