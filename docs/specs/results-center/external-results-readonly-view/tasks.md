@@ -85,7 +85,7 @@ graph TD
 - **Dependencies:** none (can run parallel to T-01)
 - **Estimated effort:** S
 - **Owner:** TBD
-- **Status:** todo
+- **Status:** done
 - **Skills:** `angular-developer`
 
 ---

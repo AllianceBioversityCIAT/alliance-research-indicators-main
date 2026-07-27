@@ -74,6 +74,25 @@ describe('CacheService', () => {
     expect(service.getCurrentPlatformCode()).toBe('');
   });
 
+  it('isExternalResult is true only for non-STAR, non-empty platform codes', () => {
+    const service = TestBed.inject(CacheService);
+
+    service.setCurrentResultId('STAR-2879');
+    expect(service.isExternalResult()).toBe(false);
+
+    service.setCurrentResultId(321);
+    expect(service.isExternalResult()).toBe(false);
+
+    service.setCurrentResultId('TIP-2863');
+    expect(service.isExternalResult()).toBe(true);
+
+    service.setCurrentResultId('PRMS-4042');
+    expect(service.isExternalResult()).toBe(true);
+
+    service.setCurrentResultId('AICCRA-1010');
+    expect(service.isExternalResult()).toBe(true);
+  });
+
   it('extractNumericId covers hyphen and plain numeric string', () => {
     const service = TestBed.inject(CacheService);
     expect(service.extractNumericId('TIP-2863')).toBe(2863);

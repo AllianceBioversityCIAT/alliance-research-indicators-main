@@ -110,4 +110,9 @@ export class CacheService {
     }
     return '';
   });
+
+  isExternalResult = computed(() => {
+    const p = this.getCurrentPlatformCode();
+    return p !== '' && p !== 'STAR';
+  });
 }
