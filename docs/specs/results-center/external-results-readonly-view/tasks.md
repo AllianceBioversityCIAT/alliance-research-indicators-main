@@ -253,12 +253,13 @@ graph TD
   - `my-latest-results.component.ts` already gates external results via `opensResultInformationModal()` — **confirmed correctly gated, no change needed.**
   - This task's job at implementation time is a final re-confirmation (nothing may have changed since spec review) and to ensure `search-a-result` is included in T-11's manual verification matrix, not to write a fix.
 - **Acceptance / done check:**
-  - [ ] Re-confirm at implementation time that neither file's relevant code has changed since this spec was written.
-  - [ ] `search-a-result` is added to T-11's manual verification pass.
+  - [x] Re-confirm at implementation time that neither file's relevant code has changed since this spec was written. **Both confirmed unchanged and exactly as described** (Leader-verified 2026-07-28): `search-a-result.component.ts:42-45` navigates unconditionally with zero modal references anywhere in the file; `my-latest-results.component.ts:130-132` still gates PRMS/TIP/AICCRA into the modal via `opensResultInformationModal()`.
+  - [x] `search-a-result` is added to T-11's manual verification pass.
+  - [ ] ⚠️ **SCOPE GAP SURFACED — see `## Scope Gap: T-10` in `execution.md`.** The verification confirmed the *facts* the spec asserted, but revealed that decision D-3 answered the wrong question: `my-latest-results` is "correctly gated" only in the sense that it has no dead-click bug — it still opens the **old modal** for external results, so the home page now behaves inconsistently with Results Center and search-a-result, and contradicts the Jira AC ("when entering a result from an external system, the full metadata must be shown in the same STAR forms"). Awaiting a product decision before extending scope.
 - **Dependencies:** T-04
 - **Estimated effort:** S
 - **Owner:** TBD
-- **Status:** todo
+- **Status:** done (verification complete; a scope-gap decision is pending, tracked separately)
 - **Skills:** `angular-developer`
 
 ---

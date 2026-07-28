@@ -301,4 +301,44 @@ These four tasks were implemented by four separate Implementer subagents (all re
 
 ---
 
+## T-10 — Confirm `search-a-result` / `my-latest-results` need no routing fix
+
+- **Status:** done (verification complete — but it surfaced a scope gap, see below)
+- **Date:** 2026-07-28
+- **Requirements covered:** R-RC-001 (verification)
+- **Verified by:** Leader directly (2-file read-only check, below the delegation threshold — no Implementer/Reviewer spawn warranted)
+
+**Findings — both files confirmed exactly as the spec described:**
+- `search-a-result.component.ts:42-45` — `openResult()` navigates unconditionally to `/result/{platform_code}-{code}/general-information` for every platform. Grep confirms **zero** references to `resultInformation` / `selectedResultForInfo` / `allModals` anywhere in the file. No routing fix needed; it inherits read-only enforcement from the destination-side fixes. ✅
+- `my-latest-results.component.ts` — still gated as described: `opensResultInformationModal()` (`:130-132`) returns `true` for PRMS/TIP/AICCRA; the template nulls `routerLink`/`queryParams` for those (`:18-20`); `onResultCardClick()` (`:158-161`) calls `preventDefault()` and opens the modal. ✅ (factually confirmed)
+
+---
+
+## Scope Gap: T-10 — `my-latest-results` still opens the old modal (product decision needed)
+
+**Not a defect in any implemented task. A gap in this spec's own scoping decision (D-3), surfaced by T-10's verification.**
+
+**What's inconsistent now that T-04 has shipped:**
+
+| Entry point | External-result behavior after this spec |
+| --- | --- |
+| Results Center (T-04) | ✅ navigates to the full read-only section shell |
+| `search-a-result` (T-10) | ✅ navigates to the full read-only section shell |
+| **Home → "My Latest Results" cards** | ❌ **still opens the old minimal `resultInformation` modal** |
+
+**Why the spec missed it:** Judgment Day F-3 and design decision D-3 evaluated `my-latest-results` by asking *"does it have the same bug as Results Center (dead-click / swallowed action)?"* — and the answer was legitimately **no**, it is cleanly gated. That conclusion is factually correct but answers the wrong question. Nobody asked *"should it also route to the shell now?"*, because the review was framed around finding bugs in the existing modal-branching rather than around completeness of the new routing behavior. So `my-latest-results` was fenced out of scope on a technically-true but irrelevant basis.
+
+**Why it matters:** the originating Jira acceptance criterion is unambiguous — *"When entering a result from an external system, the full metadata must be shown in the same STAR forms."* The home page is an "entering" path. A user opening a TIP result from Home gets ~9 fields in a modal; the same result opened from Results Center gets all 12 read-only tabs. That is a visible inconsistency in the exact behavior this spec exists to deliver.
+
+**Scope note:** requirements.md §4 does explicitly fence `my-latest-results` out, and R-RC-001 is worded "…from Results Center", so shipping as-is is *defensible against the letter of the spec* — but not against its intent or the Jira AC.
+
+**Options for the product owner:**
+1. **Extend scope now (recommended, small):** mirror T-04's fix in `my-latest-results` — delete `opensResultInformationModal()`'s special-casing so external results use the existing `getStarResultRouterLink()`/`getStarResultQueryParams()` paths that STAR results already use (both already handle the snapshot/latest-year case). Est. ~1 focused task, same shape as T-04 but far simpler (no capture-phase listener involved — this component uses ordinary `routerLink` + a click handler).
+2. **File as an immediate follow-up spec** — keeps this spec's scope frozen as approved, at the cost of shipping a known inconsistency.
+3. **Accept deliberately** — if Home cards are intended to stay a lightweight preview surface. If chosen, this should be recorded as an explicit decision in `design.md`'s log, not left implicit.
+
+**Recommendation:** option 1. The fix is small, it removes the last inconsistent entry point, and leaving it would mean the spec's headline requirement is only true depending on which screen the user came from. **No code was changed for this — awaiting the decision.**
+
+---
+
 (further entries appended below, one per task, in execution order)
