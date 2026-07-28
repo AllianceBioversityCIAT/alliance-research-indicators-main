@@ -318,11 +318,11 @@ graph TD
   - [x] F-4: quantification/extrapolated-estimates inputs disabled for external results (both parent call sites pass it).
   - [x] F-5: readiness step buttons disabled for external results.
   - [x] STAR behavior unchanged for all five — every change is an `||`/`&&` widening of an existing condition, or a new binding whose sink defaults to `false`.
-  - [ ] Re-run T-11's static sweep → zero remaining findings. *(In progress. The Reviewer's independent sweep of both OICR templates found the set complete, but the full 12-tab + shell re-sweep is the actual AC — running it, since this task twice proved enumeration-by-assumption wrong.)*
+  - [x] Re-run T-11's static sweep → **zero remaining findings (AC.6 MET)**. Independent re-sweep enumerated from source (not from prior lists), covering all 12 tabs + nested children + the shared shell + all of `custom-fields/*`. All five T-11 findings verified closed *structurally*. It also audited the content-projection mechanism exhaustively and found a **second instance of the same class in `multiselect`** (its `#rows` outlet also renders outside the `[disabled]` element, and unlike `select` it's reachable by 13 consumers since `hideSelected` defaults to `false` there) — all 13 checked, every one with interactive projected content is independently gated, so no finding.
 - **Dependencies:** T-02 (needs `isExternalResult`)
 - **Estimated effort:** M (5 findings, 2 shared components with blast radius) — actual: 3 attempts
 - **Owner:** TBD
-- **Status:** done (pending the AC.6 re-sweep confirmation)
+- **Status:** done
 - **Skills:** `angular-developer`
 
 ---
@@ -333,14 +333,14 @@ graph TD
 - **Files touched:** none (manual QA pass)
 - **Description:** In the running app (or test environment), open one TIP, one PRMS, and one AICCRA result end-to-end **via Results Center AND via `search-a-result`** (added — Judgment Day round 1, F-3: the latter already routes there unconditionally today and must show identical read-only behavior once T-02/T-03/T-06/T-07/T-08/T-09 ship). Walk all 12 tabs confirming zero interactive control remains editable/clickable in a way that would mutate data. Confirm synced-date, public-link, and deep-link render correctly (and degrade correctly when a field is absent). Click a year-badge link on a multi-snapshot external result (`openResultByYear`, F-6) and confirm it navigates rather than dead-clicking. Confirm one STAR result is visually and behaviorally unchanged from before this spec.
 - **Acceptance / done check:**
-  - [ ] ❌ **FAILED** — Zero editable controls across all 12 tabs. An exhaustive static sweep (2026-07-28) found **5 ungated controls**, 2 reaching mutation APIs directly — including a **Delete Result** action available to admins on external results. See `## T-11 Result: FAILED` in `execution.md`. **AC not met; blocking.**
+  - [x] ✅ **NOW MET** — Zero editable controls across all 12 tabs. The first sweep (2026-07-28) FAILED with 5 ungated controls, 2 reaching mutation APIs directly (incl. **Delete Result** on external results). T-15 closed all five; an independent re-sweep confirms zero remaining findings. See `## T-11 Result: FAILED`, `## T-15`, and `## AC.6 Re-sweep` in `execution.md`.
   - [ ] ⏸ Header elements render/degrade correctly per R-RC-008/009/010 — **not verifiable statically**, needs a running stack.
   - [ ] ⏸ Year-badge link on an external multi-snapshot result navigates correctly — **needs a running stack** (unit-tested, but the T-04 history shows unit tests missed the real DOM interception).
   - [ ] ⏸ STAR result baseline unaffected — **needs a running stack** for the visual/behavioral half.
-- **Dependencies:** T-03, T-04, T-05, T-06, T-07, T-08, T-09, T-10, T-13, **T-14** (added — Home is now an entry point in scope)
-- **Estimated effort:** S (re-run once the 5 findings are resolved)
+- **Dependencies:** T-03, T-04, T-05, T-06, T-07, T-08, T-09, T-10, T-13, **T-14**, **T-15** (added — the findings this task surfaced)
+- **Estimated effort:** S (only the 3 environment-dependent ACs remain)
 - **Owner:** TBD
-- **Status:** blocked (verification ran and FAILED — 5 findings to resolve, plus 3 ACs pending a running environment)
+- **Status:** partially complete — the primary AC (zero editable controls) is MET and independently re-verified; the 3 interactive ACs still require a running stack (see the two environment blockers in `execution.md`)
 - **Skills:** `angular-developer`, `systematic-debugging` (if any gap is found during the walk, debug before closing)
 
 ---

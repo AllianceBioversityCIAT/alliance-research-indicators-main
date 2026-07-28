@@ -454,4 +454,31 @@ The enumerated set grew every round: the spec scoped 12 tabs (missing 3 shared f
 
 ---
 
+## AC.6 Re-sweep — PASSED: zero remaining findings
+
+- **Date:** 2026-07-28
+- **Closes:** R-RC-014 AC.6, and by extension T-11's primary AC ("zero editable controls across all 12 tabs")
+- **Method:** independent re-run of T-11's sweep, briefed to enumerate **from source rather than from the prior finding lists** — because this spec had by then been caught out three separate times by enumeration shorter than reality (spec scope → 5 controls → 4-of-6 → 8 + a projected icon). 82 tool calls.
+
+### Verdict: AC.6 MET
+
+All five T-11 findings verified closed **structurally** (each with file:line, not via test results): F-1's double gate (computed early-return before the `|| isAdmin()` clause, plus the handler guard before `DELETE_Result()`), F-2's pair, F-3's eight controls + AI button, F-3b's projected clear icon (template guard + `clearOicrSelection()` method guard), F-4's three inputs at both call sites, F-5's step buttons.
+
+### The genuinely useful part: a second instance of the projection bug class, checked exhaustively
+
+The sweep was specifically tasked with hunting the two structural causes behind the earlier misses. It found that **`multiselect` has the same escape hatch as `select`**: its `#rows` outlet (`multiselect.component.html:116`, block `:94-138`) renders **outside** the `<p-multiSelect>` that carries `[disabled]` (`:20-83`, bound at `:24`) — architecturally identical to the `select` bug that survived two rounds.
+
+The difference in blast radius is what makes this worth recording: `SelectComponent.hideSelected` defaults to **`true`** and only one consumer overrode it, which is why that escape hatch was reachable for exactly one control. `MultiselectComponent.hideSelected` defaults to **`false`**, so its block renders for **all 13 consumers** on the result surface. The sweep enumerated all 13 and confirmed every one whose projected content is interactive carries its own explicit gate (geographic-scope's subnational remove + nested multiselect-instance; alliance-alignment's three "Select as Primary" buttons and lever-card inputs; alliance-alignment-p2's; the rest project only inert display content). **No finding — but the class is now verified, not assumed.**
+
+### Two items recorded for the backlog (neither blocks AC.6)
+
+1. **`multiselect-opensearch` is a loaded gun.** `multiselect-opensearch.component.html:14-28` has no `[disabled]` binding and the component declares no `disabled` `@Input` at all — unlike its sibling `multiselect-instance`. It is currently **unused** (zero references repo-wide), so it is unreachable and not a finding. But the first consumer to drop it onto a result tab inherits an ungated multiselect, and the feature-scoped review pattern that produced T-11's misses would not catch it. Worth a hygiene ticket.
+2. **`version-selector.updateResult()` lacks the defense-in-depth second layer.** Its template gate (`:39`, `getCurrentPlatformCode() === 'STAR' || ''`) *is* a genuine platform check, so it is correctly gated — but it is now the only mutation path on the result surface without the method-level guard that T-15 added to the other seven (`submmitConfirm`, `approveResult`, `onStatusChange`, the delete `command`, `confirmEdit`, `onDeleteContactPerson`, `clearOicrSelection`). Consistency gap only.
+
+### One observation worth keeping
+
+`isExternalResult()` derives from the route's result-id prefix (`cache.service.ts:105-111`), **not** from fetched metadata — so it is correct from first render, with no async window in which controls are transiently enabled before the platform is known. That property is what makes the whole template-level gating strategy sound, and it was worth confirming rather than assuming.
+
+---
+
 (further entries appended below, one per task, in execution order)
