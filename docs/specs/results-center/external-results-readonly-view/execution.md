@@ -126,4 +126,103 @@
 
 ---
 
+## HALT: T-04 — Results Center entry points navigate instead of opening the modal
+
+- **Date:** 2026-07-28
+- **Status:** BLOCKED after 3 rework attempts — working tree rolled back, no code merged for this task.
+- **Requirements covered:** R-RC-001
+- **Effort dial progression:** medium (attempt 1) → high (attempt 2) → xhigh (attempt 3)
+
+### Note on a mid-run interruption
+Before attempt 1, a first launch of this task (alongside 4 other tasks in a parallel batch) failed outright with an API/session error before any file was touched — no code was written, so it is not counted as a rework attempt. Attempt numbering below starts from the first Implementer spawn that actually produced a diff.
+
+### Attempt 1 — FAIL
+
+**Implementer summary:** Removed the modal-opening branch from all 6 methods (`openResult`, `openResultByYear`, `getResultHref`, `getResultRouteArray`, `onResultLinkClick`, `handleRowClickResult`), so all fall through to the same navigation logic STAR results already use. Also removed the now-dead `applyResultInformationModalContext()` helper and widened a `routerLink`-skip condition in `handleRowClickResult` to cover all platforms (reasoning: external results now render real `routerLink`s too, so the old exclusion would otherwise double-navigate). Collapsed `onResultLinkClick` to delegate to `openResult()`.
+**Verification:** lint clean; 102/102 tests; tsc showed only known pre-existing unrelated errors.
+
+**Reviewer verdict: FAIL.**
+```
+STATUS: FAIL
+ISSUES:
+1.  Discovered Issue: The openResultByYear() un-gating is dead for mouse clicks on external rows.
+    The document capture-phase listener registered in ngAfterViewInit (results-center-table.component.ts:341-348)
+    routes every in-table click through processRowClick → handleRowClickResult, which for PRMS/TIP/AICCRA calls
+    event.stopPropagation() and this.openResult(result) at :442-450 before the year-badge span's own
+    (click)="openResultByYear(...)" (results-center-table.component.html:204-208, :221-225) can fire. Clicking a
+    year badge on an external multi-snapshot row therefore navigates to /result/:code (or the latest-year variant)
+    instead of the clicked version — the { version: year } query param is silently dropped. Keyboard Enter on the
+    same badge works, mouse click does not. Not caught by tests because the suite calls openResultByYear() directly
+    and never exercises the capture-handler path with a year-badge target.
+    Violated Rule: tasks.md#T-04 implementation note + requirements.md#R-RC-001 AC.1 + design.md §6.2 / Judgment F-6.
+    Remediation Suggestion: Add a data-version-link attribute to the two year-badge spans and short-circuit in
+    processRowClick alongside the existing data-public-link-action guard; add a spec case proving it.
+
+NON-BLOCKING (evaluated and cleared): the "extra" changes (applyResultInformationModalContext removal, routerLink-skip
+widening, onResultLinkClick delegation) were all independently verified as justified and risk-free — confirmed
+zero-caller dead code, confirmed real routerLink bindings exist in the template backing the widening's premise,
+confirmed onResultLinkClick has zero production callers. Lint clean, 102/102 tests confirmed independently.
+```
+**Leader action:** logged FAIL, bumped effort medium → high, passed the Reviewer's feedback unedited to a fresh Implementer.
+
+### Attempt 2 — FAIL
+
+**Implementer summary:** Added `data-version-link` to both year-badge spans (row-level + popover) and a matching `target.closest('[data-version-link]')` short-circuit in `processRowClick`, placed right after the existing `data-public-link-action` guard. Added a spec test.
+**Verification:** lint clean; 103/103 tests (102 + 1 new); tsc unchanged baseline.
+
+**Reviewer verdict: FAIL.** (Confirmed capture-vs-bubble reasoning correct, confirmed placement correct, confirmed the new test genuinely mutation-sensitive — but found a second instance of the identical bug shape:)
+```
+STATUS: FAIL
+ISSUES:
+1.  Discovered Issue: The "+N more" popover-toggle anchor (results-center-table.component.html:211-214) is not
+    excluded from the document capture-phase handler. On TIP/PRMS/AICCRA rows, processRowClick falls through to
+    handleRowClickResult (:446-454), which calls event.stopPropagation() and navigates, so popover.toggle() never
+    fires. Because only 3 of 5+ versions render inline, every remaining year — including the one just tagged with
+    data-version-link — is unreachable, leaving the popover half of this fix dead code on the rows the spec targets.
+    Violated Rule: tasks.md T-04 AC + requirements.md:84 (the "year-link silently dead-clicks" failure mode).
+    Remediation Suggestion: Add data-version-link (or a dedicated attribute) to the "+N more" anchor + a spec case.
+```
+**Leader action:** logged FAIL, bumped effort high → xhigh (final tier before tier escalation would be needed), passed feedback unedited, additionally asked the Implementer to self-audit the ENTIRE template for any other instance of the same bug shape before reporting completion (to avoid a 4th discovery cycle).
+
+### Attempt 3 — FAIL (ceiling reached)
+
+**Implementer summary:** Added `data-version-link` to the "+N more" toggle anchor. Self-audited the full template; found and *correctly* left one look-alike case untouched with sound reasoning (a TIP `external_link` status-tag anchor with no `href` — inert, no distinct action to protect, falling through to row navigation is harmless) — the Reviewer independently confirmed this judgment call was right (though refined the *why*: the anchor's own `stopPropagation()` was already dead code regardless, since the capture-phase listener upstream had already stopped the event).
+**Verification:** lint clean; 104/104 tests (103 + 1 new); tsc unchanged baseline.
+
+**Reviewer verdict: FAIL.** (Confirmed the toggle-anchor fix itself works, confirmed attempts 1-2 remained intact, confirmed the TIP-anchor judgment call was sound — but found a THIRD instance, one DOM level up:)
+```
+STATUS: FAIL
+ISSUES:
+1.  Discovered Issue: The data-version-link escape hatch was added to the popover's interactive leaves (badges,
+    toggle anchor) but not to the popover PANEL itself. [appendTo]="'self'" does not relocate the panel out of the
+    <tr> (PrimeNG 19.0.6's appendChild('self', …) is effectively a no-op for this target), so the panel — its
+    "Approved Versions" heading, its grid-gap padding, the p-popover-content padding — still sits inside the
+    external row's DOM subtree. With the popover now openable for the first time (attempt 3's own fix), clicking
+    anywhere in that panel other than a tagged leaf is caught by the SAME capture-phase listener and navigates the
+    user out of Results Center. Aggravated by appendContainer('self') throwing, which also means the popover has no
+    outside-click dismiss wired — a user clicking to dismiss is more likely to land on the trap.
+    Violated Rule: requirements.md#R-RC-001 (year-link interactions on an external row must behave, not hijack).
+    Remediation Suggestion: Move data-version-link from the three leaf elements up to the versions-cell WRAPPER div
+    (html:201-202), which already declares "clicks here don't belong to the row" via its own stopPropagation. One
+    attribute at the wrapper level covers badges, toggle, panel, heading, and grid gaps in a single place, and makes
+    external rows behave like STAR rows in that cell (which already no-op, since handleRowClickResult returns early
+    for STAR). Add a test asserting processRowClick returns early for a popover-panel (non-badge) target.
+
+Non-blocking observation carried forward: the public_link <td> has the same bubble-only stopPropagation pattern
+protecting inert placeholder spans — by the same "inert, no overlay, no swallowed action" principle applied to the
+TIP anchor, this is harmless and out of scope, flagged only so it isn't rediscovered as a surprise.
+```
+
+### Rollback performed
+
+`git restore` applied to the 3 files this task touched (`results-center-table.component.ts`, `.html`, `.spec.ts`) — confirmed via `git status` that no other in-flight task's files were dirty at the time, so a scoped restore (rather than a repo-wide `git restore .` / `git clean -fd`) was sufficient and safer. Working tree is clean of T-04 changes; only this spec's own doc bookkeeping remains modified.
+
+### Leader's hypothesis on root cause
+
+Not spec ambiguity, not an environmental issue, not a missing-context problem — this is a **genuinely cascading UI defect** that the original modal-based design accidentally papered over. The pre-existing code intercepted every click on an external row at the document capture phase and always stopped propagation, so it never mattered that other elements inside the row (year badges, the popover toggle, the popover panel) had no distinct escape hatch — nothing under a stopped capture event ever needed one, because the "correct" behavior for all of them was simply "open the info modal." Making external rows behave like STAR rows (real navigation, real interactive sub-elements) exposes every element in that row that was silently relying on "capture stops everything" as now needing its own explicit exemption — and the versions cell has THREE nested layers of such elements (badges → toggle → panel), each one only became visible once the layer below it was fixed. Each rework attempt correctly fixed what the Reviewer found, but the Reviewer necessarily audits reactively (bug findable only once its layer is reachable) rather than proactively — attempt 3's Implementer even tried a full-template self-audit specifically to break this cycle, and still couldn't have found the panel-level issue without first fixing the toggle, since the panel wasn't renderable/inspectable-in-context until the toggle worked.
+
+**The fix the last review identified is very likely complete and correct** (move the attribute to the wrapper `<div>` at the cell level instead of tagging individual leaves) — it's a structurally different, broader-scoped exemption than the first two attempts, which is exactly why it wasn't tried first. This is not a case of the Implementer being sloppy; it's a case of the bug's shape only becoming discoverable in layers.
+
+---
+
 (further entries appended below, one per task, in execution order)
