@@ -377,4 +377,45 @@ These four tasks were implemented by four separate Implementer subagents (all re
 
 ---
 
+## T-11 Result: FAILED — 5 ungated controls found; the spec's scope list missed three files
+
+- **Date:** 2026-07-28
+- **Status:** T-11 **blocked** — its primary AC is not met. No code was changed in response yet; awaiting a scope decision.
+- **Method:** exhaustive static sweep of all 12 tab components + every nested child + the shared result shell, delegated to a read-only audit agent (74 tool calls). Chosen over a manual click-through for this AC specifically because "zero editable controls anywhere" is an exhaustiveness claim — a human walk can miss a control, a systematic sweep of every `(click)`/`<input>`/`PATCH_`/`POST_`/`DELETE_` cannot.
+
+### Why the spec missed these
+
+The requirements/design/task docs enumerated the 12 tabs and `result-sidebar`/`form-header`, but **never listed `section-header`, `submission-history-item`, or the shared `oicr-form-fields`**. The first two live in the shared shell *above* `form-header` (rendered from `platform.component.html:10`, enabled on the result route via `showSectionHeaderActions: true`, `app.routes.ts:84`); the third is a shared custom-field component embedded in the OICR tab. Five Implementer/Reviewer pairs all worked correctly within the scope they were given — the scope itself was incomplete. Same failure mode as the T-10 scope gap: the question asked was narrower than the requirement.
+
+### Findings
+
+| # | Severity | What | Where | Why ungated |
+| --- | --- | --- | --- | --- |
+| **F-1** | 🔴 **CRITICAL** — direct `DELETE` | **"Delete Result"** kebab-menu action, available to any admin on an external result → confirm modal → `api.DELETE_Result()`. Irreversible destruction of a federated record from STAR. | `section-header.component.ts:57-60` (gate), `:91` (call); rendered `platform.component.html:10` | `showDeleteOption` = `statusId===5 \|\| 7 \|\| (4 && isMyResult()) \|\| rolesService.isAdmin()` — **no platform term at all**. The `!isAdmin`-only anti-pattern R-RC-004 was written to kill, in a file the spec never named. |
+| **F-2** | 🟠 HIGH — direct `PATCH` | Submission-history "edit status-change date" pencil → `api.PATCH_StatusChangeDate()`. `confirmEdit()` has no guard either (only null-checks). | `submission-history-item.component.ts:51-53`, `:137-163` | Role + per-row flags only. Panel reachable for external results — `submission-history-content.component.ts:39-42` fetches history with no platform filter. |
+| **F-3** | 🟠 MED-HIGH | `app-oicr-form-fields` fields typable on the OICR tab (Tagging, Maturity of change, Elaboration, Short Outcome/Impact) **plus an AI-generate button that fires a real POST** (`api.fastResponse`). | `oicr-form-fields.component.html:26-30, 122-140, 146-151, 164-168`; call site `oicr-details.component.html:43-52` passes only `[isOicrNoDisabled]` | Gated on modal state (`editingOicr()`, always `false` here) and role, not on result editability. Persistence *is* blocked by `saveData`'s guard — but fields are editable and the AI button hits the network. |
+| **F-4** | 🟡 MEDIUM | Quantification / Extrapolated-Estimates card inputs (Number, Unit, Comments) have **no `[disabled]` binding at all**; every keystroke writes into the parent's signals. | `quantification-item.component.html:15-16, 20-21, 27-28` | The component has no `disabled` input to pass. Also affects STAR in non-editable statuses (pre-existing). |
+| **F-5** | 🟡 MEDIUM | Innovation-readiness step buttons 1–9 have no `[disabled]`, while every other control on that tab has one. Writes `innovation_readiness_id` and drives panel rendering. | `innovation-details.component.html:131-136` | Simple omission. `saveData()` is guarded, so no direct API hit. |
+
+### Also recorded (non-blocking, from the same sweep)
+
+- **Missing second line of defence:** `result-sidebar.component.ts`'s `submmitConfirm()`, `approveResult()` (calls `PATCH_SubmitResult` with no guard) and `onStatusChange()` have no method-level platform checks. Currently unreachable — the whole block sits inside `!cache.isExternalResult()` — but unlike `onDeleteContactPerson()` there's no backstop if that template condition ever regresses. Same for `oicr-details.onAddContactPerson()`.
+- **Cosmetic:** R-RC-006's three "Request to add" links keep `cursor-pointer underline` and are method-guarded only — functionally safe dead clicks, but the requirement's title says "hidden or disabled".
+- **Pre-existing, unrelated:** `version-selector`'s "Edit in AICCRA" maps only PRMS/TIP in `editInPlatform()`, so AICCRA yields a dead click.
+- **Confirmed correct:** the R-RC-004 fix (MEL Expert / SharePoint) is verified in place, as are all of T-06/T-07/T-08/T-09's gates and all 12 tabs' `saveData()` guards.
+
+### Leader's independent verification of F-1 (the critical one)
+
+Did not take the audit on trust. Confirmed directly: the gate at `:57-60` ends in `|| this.rolesService.isAdmin()` with no platform term; `api.DELETE_Result(...)` is really called at `:91`; `<app-section-header>` really renders at `platform.component.html:10`; and the result route really sets `showSectionHeaderActions: true` at `app.routes.ts:84`. **F-1 is real, not theoretical.** It directly violates `docs/trd/trd.md:425` ("Federation with STAR / TIP / PRMS / AICCRA is read/link-only from the client") — the exact principle this spec exists to uphold.
+
+### The three ACs that static analysis cannot settle
+
+AC.2 (header render/degrade), AC.3 (year-badge navigation in the real DOM), AC.4 (STAR visual baseline) need a running stack. Two blockers documented:
+1. **`docs/infrastructure.md` has no `## Local Environment` contract** — the section `/akili-execute` expects to consult for environment-dependent verification. Recommend closing this gap via `/akili-constitution` Step 6B.
+2. **The test environment cannot verify this work.** `allianceindicatorstest.ciat.cgiar.org` serves the *deployed* code, not this branch — pointing a browser there would verify the OLD behavior. `environment.dev.ts` targets `http://localhost:3001/api/` (needs the NestJS server + MySQL + synced external data), and the Cognito `redirect_uri` is hardcoded to the test env, so login from `localhost:4200` doesn't close the loop. Genuine manual verification needs either a full local stack or a deployment of this branch.
+
+**Note on T-04's precedent:** AC.3 is unit-tested, but T-04's three-attempt history is a direct warning that unit tests passed while the real DOM behavior was broken (capture-phase interception), and T-14 repeated it (vacuous `routerMock` tests). Treat "unit tests pass" as insufficient evidence for the interactive ACs specifically.
+
+---
+
 (further entries appended below, one per task, in execution order)

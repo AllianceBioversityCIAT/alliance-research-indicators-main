@@ -298,14 +298,14 @@ graph TD
 - **Files touched:** none (manual QA pass)
 - **Description:** In the running app (or test environment), open one TIP, one PRMS, and one AICCRA result end-to-end **via Results Center AND via `search-a-result`** (added — Judgment Day round 1, F-3: the latter already routes there unconditionally today and must show identical read-only behavior once T-02/T-03/T-06/T-07/T-08/T-09 ship). Walk all 12 tabs confirming zero interactive control remains editable/clickable in a way that would mutate data. Confirm synced-date, public-link, and deep-link render correctly (and degrade correctly when a field is absent). Click a year-badge link on a multi-snapshot external result (`openResultByYear`, F-6) and confirm it navigates rather than dead-clicking. Confirm one STAR result is visually and behaviorally unchanged from before this spec.
 - **Acceptance / done check:**
-  - [ ] Zero editable controls found across all 12 tabs for all 3 external platforms, reached via both Results Center and `search-a-result`.
-  - [ ] Header elements render/degrade correctly per R-RC-008/009/010 AC.3/AC.2.
-  - [ ] Year-badge link on an external multi-snapshot result navigates correctly (not a dead click).
-  - [ ] STAR result baseline unaffected.
-- **Dependencies:** T-03, T-04, T-05, T-06, T-07, T-08, T-09, T-10, T-13
-- **Estimated effort:** S
+  - [ ] ❌ **FAILED** — Zero editable controls across all 12 tabs. An exhaustive static sweep (2026-07-28) found **5 ungated controls**, 2 reaching mutation APIs directly — including a **Delete Result** action available to admins on external results. See `## T-11 Result: FAILED` in `execution.md`. **AC not met; blocking.**
+  - [ ] ⏸ Header elements render/degrade correctly per R-RC-008/009/010 — **not verifiable statically**, needs a running stack.
+  - [ ] ⏸ Year-badge link on an external multi-snapshot result navigates correctly — **needs a running stack** (unit-tested, but the T-04 history shows unit tests missed the real DOM interception).
+  - [ ] ⏸ STAR result baseline unaffected — **needs a running stack** for the visual/behavioral half.
+- **Dependencies:** T-03, T-04, T-05, T-06, T-07, T-08, T-09, T-10, T-13, **T-14** (added — Home is now an entry point in scope)
+- **Estimated effort:** S (re-run once the 5 findings are resolved)
 - **Owner:** TBD
-- **Status:** todo
+- **Status:** blocked (verification ran and FAILED — 5 findings to resolve, plus 3 ACs pending a running environment)
 - **Skills:** `angular-developer`, `systematic-debugging` (if any gap is found during the walk, debug before closing)
 
 ---
