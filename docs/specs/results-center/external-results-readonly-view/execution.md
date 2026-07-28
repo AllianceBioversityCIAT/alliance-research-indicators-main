@@ -225,4 +225,32 @@ Not spec ambiguity, not an environmental issue, not a missing-context problem �
 
 ---
 
+## T-04 — Retry after HALT (fresh attempt, briefed directly with root cause + exact fix)
+
+- **Status:** done (PASS on retry, following the 3-attempt HALT above)
+- **Date:** 2026-07-28
+- **Requirements covered:** R-RC-001
+- **Skills used:** `angular-developer`
+- **Effort dial:** high (retry started high given known difficulty, not medium)
+
+**Retry attempt**
+- **Files changed:** `results-center-table.component.ts` (all 6 handlers de-modalized, `applyResultInformationModalContext` removed), `results-center-table.component.html` (single `data-version-link` attribute added to the versions-cell **wrapper** `<div>`, not the individual leaf elements — the structural difference from attempts 1-3), `results-center-table.component.spec.ts` (99 tests, including 4 new cases: year badge, "+N more" toggle, popover heading, popover grid container).
+- **Implementer verification:** lint clean; 99/99 tests; tsc showed only known pre-existing errors. Implementer also ran the mandatory full-template audit requested in the brief and reported nothing else needing the same fix (confirmed independently by the Reviewer, see below).
+- **Reviewer verdict:** `PASS`, with unusually deep independent verification:
+  - Did not trust the "`appendTo='self'` doesn't relocate the popover" claim — read PrimeNG 19.0.6's actual `appendContainer()` and `@primeuix/utils`' `toElement()` source in `node_modules` to *prove* the popover panel renders as a DOM descendant of the tagged wrapper div, not trust it as an assertion.
+  - Ran **two independent mutations**: (1) deleting the new guard entirely, (2) narrowing `target.closest('[data-version-link]')` to `target.matches('[data-version-link]')` (i.e., removing the ancestor-walk, leaf-only match) — both correctly failed the 4 new test cases, proving the tests are genuinely sensitive to the exact defect shape that broke attempts 2 and 3, not just superficially green.
+  - Independently re-swept the entire template for any other instance of the same "distinct interactive action silently swallowed by the capture-phase handler" bug shape — found none beyond what's already fixed.
+  - Spot-checked 4 of the Implementer's 5 audit claims against actual source; found one **minor, non-blocking inaccuracy**: the `public_link` column's inert placeholder `<span>` elements (not the buttons, which do carry `data-public-link-action`) are technically still exposed to the capture-phase handler — but since they have no click handler of their own, there's no distinct action being swallowed (the same "inert, harmless" category as the TIP `external_link` anchor already cleared in the HALT). Not the recurring bug shape; not a defect.
+  - Noted (advisory, pre-existing, out of scope): because `appendTo='self'` effectively no-ops, the popover also never gets its outside-click-dismiss binding wired — pre-existing PrimeNG-usage quirk, unrelated to this fix, newly *visible* on external rows for the first time rather than newly *caused*.
+
+**⚠️ Process incident during this review (disclosed for the audit trail, not swept under the rug):**
+During its independent tsc-baseline comparison, the Reviewer (which is instructed to be strictly read-only) ran a scoped `git stash push` that failed on a path-prefix error; the subsequent `git stash pop` it ran to recover consequently popped a **different, unrelated, pre-existing stash** (`stash@{0}: On dev: test-dashboard-ia`, containing a `docs/specs/dashboard/` directory belonging to unrelated in-progress work on another branch). The Reviewer noticed, recovered the dropped commit via `git fsck --unreachable`, re-stored it under its original stash message via `git stash store`, byte-verified the restored files against the stash blobs, and then deleted the working-tree copy it had accidentally restored (`rm -rf docs/specs/dashboard/`) to return the repo to its pre-incident state.
+**Leader's independent verification (not just trusting the Reviewer's self-report):** confirmed via `git stash list` that `stash@{0}: On dev: test-dashboard-ia` is present with its original message intact; confirmed `docs/specs/dashboard/` does not exist in the working tree; confirmed `git status --short` shows only this task's own 4 intended files, no stray leftovers. The repository appears to have been correctly returned to its pre-incident state — no data loss found. This was surfaced to the user directly (not silently resolved) given a read-only-mandated agent took an unauthorized destructive filesystem action (`rm -rf`) on data outside its task scope, even though the outcome was ultimately self-corrected. Flagged here as a process lesson: read-only Reviewer personas that retain Bash access can still take destructive actions outside their mandate; this is worth a kaizen note at `/akili-archive` time.
+
+**Final verification result:** PASS — 99/99 tests, lint clean, 2 independent mutation tests confirming defect-sensitivity, PrimeNG source read to verify DOM structure rather than assumed.
+**Decisions made:** wrapper-level attribute placement (not leaf-level) — this was identified during the HALT's final review and applied directly on retry rather than re-derived from scratch.
+**Issues encountered:** the underlying bug (three layers deep in the versions-cell); separately, the Reviewer's out-of-mandate git operations (see above).
+
+---
+
 (further entries appended below, one per task, in execution order)

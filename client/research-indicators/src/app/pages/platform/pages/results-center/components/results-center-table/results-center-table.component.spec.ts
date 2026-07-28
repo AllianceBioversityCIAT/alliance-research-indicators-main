@@ -288,21 +288,28 @@ describe('ResultsCenterTableComponent', () => {
     expect(mockService.applyFilters).toHaveBeenCalled();
   });
 
-  it('openResult should open modal for PRMS and not navigate', () => {
+  it('openResult should navigate for PRMS (external platform) instead of opening the modal', () => {
     const prms = { ...mockResult, platform_code: 'PRMS' };
     component.openResult(prms);
-    expect(mockModals.selectedResultForInfo()).toEqual(prms);
-    expect(mockModals.setResultInformationEntryContext).toHaveBeenCalledWith(null);
-    expect(mockModals.openModal).toHaveBeenCalledWith('resultInformation');
-    expect(mockRouter.navigate).not.toHaveBeenCalled();
+    expect(mockModals.openModal).not.toHaveBeenCalledWith('resultInformation');
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', 'PRMS-7', 'general-information'], { queryParams: { version: 2024 } });
   });
 
-  it('openResult PRMS should set result information entry context to results-center when in results-center context', () => {
+  it('openResult for an external platform closes an already-open result information modal before navigating', () => {
+    mockModals.isModalOpen.mockReturnValue({ isOpen: true });
+    const prms = { ...mockResult, platform_code: 'PRMS' };
+    component.openResult(prms);
+    expect(mockModals.closeModal).toHaveBeenCalledWith('resultInformation');
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', 'PRMS-7', 'general-information'], { queryParams: { version: 2024 } });
+  });
+
+  it('openResult for an external platform preserves resultEntryContext query params when navigating', () => {
     fixture.componentRef.setInput('resultEntryContext', 'results-center');
     const prms = { ...mockResult, platform_code: 'PRMS' };
-    mockModals.setResultInformationEntryContext.mockClear();
     component.openResult(prms);
-    expect(mockModals.setResultInformationEntryContext).toHaveBeenCalledWith('results-center');
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', 'PRMS-7', 'general-information'], {
+      queryParams: { version: 2024, from: 'results-center' }
+    });
   });
 
   it('openCreateResultForProject should open create modal when primaryContractId is set', () => {
@@ -347,18 +354,20 @@ describe('ResultsCenterTableComponent', () => {
     expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', 'ROAR-7'], { queryParams: {} });
   });
 
-  it('openResultByYear should no-op for PRMS, navigate otherwise', () => {
+  it('openResultByYear should navigate for PRMS/TIP/AICCRA the same as any other platform, preserving the year as version', () => {
     component.openResultByYear(7 as any, 2020, 'PRMS');
-    expect(mockRouter.navigate).not.toHaveBeenCalled();
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', 'PRMS-7'], { queryParams: { version: 2020 } });
+    mockRouter.navigate.mockClear();
     component.openResultByYear(7 as any, 2020, 'ROAR');
     expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', 'ROAR-7'], { queryParams: { version: 2020 } });
   });
 
-  it('getResultHref should return empty and trigger modal for PRMS', () => {
+  it('getResultHref should return a real URL tree string for PRMS instead of triggering the modal', () => {
     const r = { ...mockResult, platform_code: 'PRMS' };
     const href = component.getResultHref(r as any);
-    expect(href).toBe('');
-    expect(mockModals.selectedResultForInfo()).toEqual(r);
+    expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/result', 'PRMS-7', 'general-information'], { queryParams: { version: 2024 } });
+    expect(href).toBe('/result/ROAR-7/general-information?version=2024');
+    expect(mockModals.openModal).not.toHaveBeenCalledWith('resultInformation');
   });
 
   it('getResultHref should use createUrlTree when snapshots present', () => {
@@ -380,9 +389,9 @@ describe('ResultsCenterTableComponent', () => {
     expect(component.getResultRouteArray(r as any)).toEqual(['/result', 'ROAR-7']);
   });
 
-  it('getResultRouteArray should return empty array for TIP platform', () => {
+  it('getResultRouteArray should return the real route array for TIP platform instead of an empty array', () => {
     const tipResult = { ...mockResult, platform_code: 'TIP' };
-    expect(component.getResultRouteArray(tipResult as any)).toEqual([]);
+    expect(component.getResultRouteArray(tipResult as any)).toEqual(['/result', 'TIP-7', 'general-information']);
   });
 
   it('getResultQueryParams should return latest snapshot year when status is 6 and years exist', () => {
@@ -406,21 +415,17 @@ describe('ResultsCenterTableComponent', () => {
   });
 
   it.each([
-    ['PRMS', 'PRMS'],
-    ['TIP', 'TIP'],
-    ['AICCRA', 'AICCRA']
-  ])('onResultLinkClick should open result info modal for %s', (_, platformCode) => {
+    ['PRMS', 'PRMS-7'],
+    ['TIP', 'TIP-7'],
+    ['AICCRA', 'AICCRA-7'],
+    ['ROAR', 'ROAR-7']
+  ])('onResultLinkClick should delegate to openResult and navigate for %s', (platformCode, expectedCode) => {
     const r = { ...mockResult, platform_code: platformCode };
-    mockModals.openModal.mockClear();
+    const openResultSpy = jest.spyOn(component, 'openResult');
     component.onResultLinkClick(r as any);
-    expect(mockModals.selectedResultForInfo()).toEqual(r);
-    expect(mockModals.openModal).toHaveBeenCalledWith('resultInformation');
-  });
-
-  it('onResultLinkClick should no-op when platform is not TIP, PRMS, or AICCRA', () => {
-    mockModals.openModal.mockClear();
-    component.onResultLinkClick({ ...mockResult, platform_code: 'ROAR' } as any);
-    expect(mockModals.openModal).not.toHaveBeenCalled();
+    expect(openResultSpy).toHaveBeenCalledWith(r);
+    expect(mockModals.openModal).not.toHaveBeenCalledWith('resultInformation');
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', expectedCode, 'general-information'], { queryParams: { version: 2024 } });
   });
 
   it('getPrimaryContractId should return null when result_contracts is null', () => {
@@ -583,7 +588,7 @@ describe('ResultsCenterTableComponent', () => {
     expect(openSpy).toHaveBeenCalledWith(mockResult);
   });
 
-  it('processRowClick should open PRMS modal and prevent default', () => {
+  it('processRowClick should navigate for PRMS via openResult (not the modal) and prevent default/stop propagation', () => {
     mockModals.isAnyModalOpen.mockReturnValue(false);
     const tableElement = document.createElement('div');
     const tbody = document.createElement('tbody');
@@ -605,9 +610,34 @@ describe('ResultsCenterTableComponent', () => {
     const handleSpy = jest.spyOn(component as any, 'handleRowClickResult');
     (component as any).processRowClick(td, { preventDefault: prevent, stopPropagation: stop } as any);
     expect(handleSpy).toHaveBeenCalledWith(prmsResult, td, expect.any(Object));
-    expect(mockModals.openModal).toHaveBeenCalledWith('resultInformation');
+    expect(mockModals.openModal).not.toHaveBeenCalledWith('resultInformation');
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', 'PRMS-7', 'general-information'], { queryParams: { version: 2024 } });
     expect(prevent).toHaveBeenCalled();
     expect(stop).toHaveBeenCalled();
+  });
+
+  it('processRowClick should return early for PRMS/TIP/AICCRA when clicking a real routerLink (previously excluded from this guard)', () => {
+    mockModals.isAnyModalOpen.mockReturnValue(false);
+    const tableElement = document.createElement('table');
+    const tbody = document.createElement('tbody');
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    const link = document.createElement('a');
+    link.setAttribute('routerLink', '/result/PRMS-7');
+    cell.appendChild(link);
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    tableElement.appendChild(tbody);
+    const prmsResult = { ...mockResult, platform_code: 'PRMS' };
+    (component as any).dt2 = {
+      el: { nativeElement: tableElement },
+      value: [prmsResult],
+      first: 0
+    };
+    const event = new MouseEvent('click');
+    (component as any).processRowClick(link, event);
+    expect(mockRouter.navigate).not.toHaveBeenCalled();
+    expect(mockModals.openModal).not.toHaveBeenCalledWith('resultInformation');
   });
 
   it('processRowClick should return when data.find does not find matching result', () => {
@@ -1119,5 +1149,91 @@ describe('ResultsCenterTableComponent', () => {
     (component as any).closeResultInformationModal();
     expect(mockModals.setResultInformationEntryContext).toHaveBeenCalledWith(null);
     expect(mockModals.closeModal).not.toHaveBeenCalled();
+  });
+
+  describe('processRowClick — versions cell escape hatch (data-version-link)', () => {
+    function buildRowWithVersionsWrapper(platformCode: string) {
+      const tableElement = document.createElement('table');
+      const tbody = document.createElement('tbody');
+      const row = document.createElement('tr');
+      const td = document.createElement('td');
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-version-link', '');
+
+      const badge = document.createElement('span');
+      badge.className = 'year-badge';
+      wrapper.appendChild(badge);
+
+      const toggle = document.createElement('a');
+      toggle.textContent = '+2 more';
+      wrapper.appendChild(toggle);
+
+      // Represents the p-popover panel content, which stays physically inside the
+      // row's DOM subtree despite [appendTo]="'self'" (PrimeNG 19 no-ops relocation for 'self').
+      const popoverPanel = document.createElement('div');
+      popoverPanel.className = 'p-popover-content';
+      const heading = document.createElement('div');
+      heading.textContent = 'Approved Versions';
+      popoverPanel.appendChild(heading);
+      const grid = document.createElement('div');
+      grid.className = 'grid grid-cols-2 gap-2';
+      const panelBadge = document.createElement('span');
+      grid.appendChild(panelBadge);
+      popoverPanel.appendChild(grid);
+      wrapper.appendChild(popoverPanel);
+
+      td.appendChild(wrapper);
+      row.appendChild(td);
+      row.setAttribute('data-result-id', '7');
+      row.setAttribute('data-platform', platformCode);
+      tbody.appendChild(row);
+      tableElement.appendChild(tbody);
+
+      return { tableElement, badge, toggle, heading, grid };
+    }
+
+    it('should return early for a click on a year-badge span inside the versions wrapper', () => {
+      mockModals.isAnyModalOpen.mockReturnValue(false);
+      const platformResult = { ...mockResult, platform_code: 'TIP' };
+      const { tableElement, badge } = buildRowWithVersionsWrapper('TIP');
+      (component as any).dt2 = { first: 0, value: [platformResult], el: { nativeElement: tableElement } };
+      const handleSpy = jest.spyOn(component as any, 'handleRowClickResult');
+      (component as any).processRowClick(badge, new MouseEvent('click'));
+      expect(handleSpy).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+    });
+
+    it('should return early for a click on the "+N more" popover toggle anchor', () => {
+      mockModals.isAnyModalOpen.mockReturnValue(false);
+      const platformResult = { ...mockResult, platform_code: 'TIP' };
+      const { tableElement, toggle } = buildRowWithVersionsWrapper('TIP');
+      (component as any).dt2 = { first: 0, value: [platformResult], el: { nativeElement: tableElement } };
+      const handleSpy = jest.spyOn(component as any, 'handleRowClickResult');
+      (component as any).processRowClick(toggle, new MouseEvent('click'));
+      expect(handleSpy).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+    });
+
+    it('should return early for a click inside the popover panel itself (e.g. the "Approved Versions" heading), not just its leaf badges/toggle', () => {
+      mockModals.isAnyModalOpen.mockReturnValue(false);
+      const platformResult = { ...mockResult, platform_code: 'TIP' };
+      const { tableElement, heading } = buildRowWithVersionsWrapper('TIP');
+      (component as any).dt2 = { first: 0, value: [platformResult], el: { nativeElement: tableElement } };
+      const handleSpy = jest.spyOn(component as any, 'handleRowClickResult');
+      (component as any).processRowClick(heading, new MouseEvent('click'));
+      expect(handleSpy).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+    });
+
+    it('should return early for a click on the popover grid container (a non-badge, non-toggle descendant of the panel)', () => {
+      mockModals.isAnyModalOpen.mockReturnValue(false);
+      const platformResult = { ...mockResult, platform_code: 'TIP' };
+      const { tableElement, grid } = buildRowWithVersionsWrapper('TIP');
+      (component as any).dt2 = { first: 0, value: [platformResult], el: { nativeElement: tableElement } };
+      const handleSpy = jest.spyOn(component as any, 'handleRowClickResult');
+      (component as any).processRowClick(grid, new MouseEvent('click'));
+      expect(handleSpy).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+    });
   });
 });

@@ -124,11 +124,11 @@ graph TD
   - [x] Clicking/opening a TIP/PRMS/AICCRA row, or a specific year-badge link on that row, navigates to `/result/:code` (URL assertion in spec).
   - [x] `resultInformation` modal is never opened from any of the 6 entry points for external results.
   - [x] STAR-result navigation (including the snapshot/latest-year branch) is unchanged — existing tests for that path still pass.
-  - [ ] **BLOCKED** — the "Approved Versions" popover panel (opened via the "+N more" toggle) is not exempt from the document capture-phase click interception, so clicking inside the open panel on an external row navigates the user away instead of letting them pick a version. See `execution.md` HALT block for full detail and the working-tree rollback (attempts 1-3 reverted; the 6-handler/year-badge/popover-toggle fixes will need to be redone alongside the panel fix, informed by the correct guard placement identified in attempt 3's review).
+  - [x] Popover panel (opened via "+N more") must not be a navigation trap on external rows — fixed with a single `data-version-link` attribute on the versions-cell wrapper `<div>` (not the individual leaves), verified as the correct common ancestor of badges/toggle/panel by reading PrimeNG 19.0.6's `appendContainer()`/`toElement()` source directly.
 - **Dependencies:** T-02
 - **Estimated effort:** M
 - **Owner:** TBD
-- **Status:** blocked
+- **Status:** done
 - **Skills:** `angular-developer`
 
 ---
