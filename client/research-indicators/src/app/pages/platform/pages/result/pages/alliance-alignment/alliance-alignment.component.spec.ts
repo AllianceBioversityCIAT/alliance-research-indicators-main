@@ -37,6 +37,7 @@ class CacheServiceMock {
   showSectionHeaderActions = jest.fn().mockReturnValue(false);
   hasSmallScreen = jest.fn().mockReturnValue(false);
   isSidebarCollapsed = jest.fn().mockReturnValue(false);
+  isExternalResult = jest.fn().mockReturnValue(false);
 }
 class ActionsServiceMock {
   showToast = jest.fn();

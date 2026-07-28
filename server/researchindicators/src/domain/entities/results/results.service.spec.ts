@@ -2513,6 +2513,10 @@ describe('ResultsService', () => {
             result_status_id: true,
           },
           created_by: true,
+          platform_code: true,
+          public_link: true,
+          external_link: true,
+          updated_at: true,
         },
         where: { result_id: resultId, is_active: true },
         relations: {
@@ -2524,6 +2528,96 @@ describe('ResultsService', () => {
         resultId,
         123,
       );
+    });
+
+    it('should return platform_code, public_link, external_link, and updated_at for a STAR result', async () => {
+      // Arrange
+      const resultId = 2;
+      const updatedAt = new Date('2026-07-20T10:00:00.000Z');
+      const mockResult = {
+        result_id: resultId,
+        title: 'STAR Result',
+        result_official_code: 22222,
+        result_status_id: 1,
+        report_year_id: 2024,
+        created_by: 123,
+        platform_code: 'STAR',
+        public_link: 'https://star.example.org/public/22222',
+        external_link: 'https://star.example.org/22222',
+        updated_at: updatedAt,
+        indicator: {
+          indicator_id: 1,
+          name: 'Test Indicator',
+        },
+        result_status: {
+          name: 'Active',
+        },
+      };
+      const mockPrincipalData = { is_principal: 1 };
+      const mockPrimaryContract = { contract_id: 'CONTRACT-002' };
+
+      mockMainRepo.findOne.mockResolvedValue(mockResult as any);
+      mockMainRepo.isMainContactPerson.mockResolvedValue(true);
+      mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
+        mockPrincipalData as any,
+      );
+      mockResultContractsService.getPrimaryContract.mockResolvedValue(
+        mockPrimaryContract as any,
+      );
+
+      // Act
+      const result = await service.findMetadataResult(resultId);
+
+      // Assert
+      expect(result.platform_code).toBe('STAR');
+      expect(result.public_link).toBe('https://star.example.org/public/22222');
+      expect(result.external_link).toBe('https://star.example.org/22222');
+      expect(result.updated_at).toEqual(updatedAt);
+    });
+
+    it('should return platform_code, public_link, external_link, and updated_at for a non-STAR (TIP) result', async () => {
+      // Arrange
+      const resultId = 3;
+      const updatedAt = new Date('2026-07-15T08:30:00.000Z');
+      const mockResult = {
+        result_id: resultId,
+        title: 'TIP Result',
+        result_official_code: 33333,
+        result_status_id: 1,
+        report_year_id: 2024,
+        created_by: 456,
+        platform_code: 'TIP',
+        public_link: 'https://tip.example.org/public/33333',
+        external_link: 'https://tip.example.org/33333',
+        updated_at: updatedAt,
+        indicator: {
+          indicator_id: 1,
+          name: 'Test Indicator',
+        },
+        result_status: {
+          name: 'Active',
+        },
+      };
+      const mockPrincipalData = { is_principal: 0 };
+      const mockPrimaryContract = null;
+
+      mockMainRepo.findOne.mockResolvedValue(mockResult as any);
+      mockMainRepo.isMainContactPerson.mockResolvedValue(false);
+      mockMainRepo.metadataPrincipalInvestigator.mockResolvedValue(
+        mockPrincipalData as any,
+      );
+      mockResultContractsService.getPrimaryContract.mockResolvedValue(
+        mockPrimaryContract as any,
+      );
+
+      // Act
+      const result = await service.findMetadataResult(resultId);
+
+      // Assert
+      expect(result.platform_code).toBe('TIP');
+      expect(result.public_link).toBe('https://tip.example.org/public/33333');
+      expect(result.external_link).toBe('https://tip.example.org/33333');
+      expect(result.updated_at).toEqual(updatedAt);
     });
 
     it('should throw NotFoundException when no metadata found', async () => {

@@ -19,6 +19,10 @@ export interface GetMetadata {
   has_result_edit_grant?: boolean;
   result_contract_id?: string;
   result_status?: ResultStatus;
+  platform_code?: string;
+  public_link?: string;
+  external_link?: string;
+  updated_at?: string;
 }
 
 export interface GetPortfolios {

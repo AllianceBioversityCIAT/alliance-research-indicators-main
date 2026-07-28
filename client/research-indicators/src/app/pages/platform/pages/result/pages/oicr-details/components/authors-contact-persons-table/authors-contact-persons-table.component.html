@@ -2,8 +2,8 @@
   <div class="flex items-center bg-white justify-between border-b border-[#E8EBED] w-full p-4">
     <div class="text-[#112F5C] text-[15px] uppercase font-bold">Add the people involved in this result</div>
     <p-button styleClass="!rounded-[8px] !text-[12px] !py-1 !max-h-[27px]" size="small"
-      icon="pi pi-user-plus !text-[12px]" [label]="'Add author / contact person'" (keydown.enter)="addClicked.emit()"
-      (click)="addClicked.emit()">
+      icon="pi pi-user-plus !text-[12px]" [label]="'Add author / contact person'" [disabled]="disabled"
+      (keydown.enter)="!disabled && addClicked.emit()" (click)="!disabled && addClicked.emit()">
     </p-button>
   </div>
 
@@ -65,7 +65,8 @@
         <td>{{ row.role || '-' }}</td>
         <td>
           <button type="button" class="p-button p-button-text p-1 !bg-[#FFD5D5]" pTooltip="Remove author"
-            tooltipPosition="top" (click)="deleteClicked.emit(row)" (keydown.enter)="deleteClicked.emit(row)">
+            tooltipPosition="top" [disabled]="disabled" (click)="!disabled && deleteClicked.emit(row)"
+            (keydown.enter)="!disabled && deleteClicked.emit(row)">
             <i class="pi pi-trash text-[#CF0808]"></i>
           </button>
         </td>

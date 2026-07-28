@@ -278,16 +278,6 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   }
 
   openResult(result: Result) {
-    if (
-      result.platform_code === PLATFORM_CODES.PRMS ||
-      result.platform_code === PLATFORM_CODES.TIP ||
-      result.platform_code === PLATFORM_CODES.AICCRA
-    ) {
-      this.allModalsService.selectedResultForInfo.set(result);
-      this.applyResultInformationModalContext();
-      this.allModalsService.openModal('resultInformation');
-      return;
-    }
     this.closeResultInformationModal();
     const resultCode = `${result.platform_code}-${result.result_official_code}`;
     if (result.result_status?.result_status_id === 6 && Array.isArray(result.snapshot_years) && result.snapshot_years.length > 0) {
@@ -301,9 +291,6 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   }
 
   openResultByYear(result: number, year: string | number, platformCode: string) {
-    if (platformCode === PLATFORM_CODES.PRMS || platformCode === PLATFORM_CODES.AICCRA || platformCode === PLATFORM_CODES.TIP) {
-      return;
-    }
     this.closeResultInformationModal();
     const resultCode = `${platformCode}-${result}`;
     this.router.navigate(['/result', resultCode], {
@@ -312,14 +299,6 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   }
 
   getResultHref(result: Result): string {
-    if (
-      result.platform_code === PLATFORM_CODES.PRMS ||
-      result.platform_code === PLATFORM_CODES.AICCRA ||
-      result.platform_code === PLATFORM_CODES.TIP
-    ) {
-      this.onResultLinkClick(result);
-      return '';
-    }
     const resultCode = `${result.platform_code}-${result.result_official_code}`;
     if (result.result_status?.result_status_id === 6 && Array.isArray(result.snapshot_years) && result.snapshot_years.length > 0) {
       const latestYear = Math.max(...result.snapshot_years);
@@ -333,13 +312,6 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   }
 
   getResultRouteArray(result: Result): string | string[] {
-    if (
-      result.platform_code === PLATFORM_CODES.TIP ||
-      result.platform_code === PLATFORM_CODES.PRMS ||
-      result.platform_code === PLATFORM_CODES.AICCRA
-    ) {
-      return [];
-    }
     const resultCode = `${result.platform_code}-${result.result_official_code}`;
     if (result.result_status?.result_status_id === 6 && Array.isArray(result.snapshot_years) && result.snapshot_years.length > 0) {
       return ['/result', resultCode, 'general-information'];
@@ -362,15 +334,7 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   }
 
   onResultLinkClick(result: Result): void {
-    if (
-      result.platform_code === PLATFORM_CODES.TIP ||
-      result.platform_code === PLATFORM_CODES.PRMS ||
-      result.platform_code === PLATFORM_CODES.AICCRA
-    ) {
-      this.allModalsService.selectedResultForInfo.set(result);
-      this.applyResultInformationModalContext();
-      this.allModalsService.openModal('resultInformation');
-    }
+    this.openResult(result);
   }
 
   ngAfterViewInit() {
@@ -415,6 +379,10 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
     }
 
     if (target.closest('[data-public-link-action]')) {
+      return;
+    }
+
+    if (target.closest('[data-version-link]')) {
       return;
     }
 
@@ -471,12 +439,7 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    if (
-      result.platform_code !== PLATFORM_CODES.PRMS &&
-      result.platform_code !== PLATFORM_CODES.TIP &&
-      result.platform_code !== PLATFORM_CODES.AICCRA &&
-      target.closest('a[routerLink], span[routerLink], [ng-reflect-router-link]')
-    ) {
+    if (target.closest('a[routerLink], span[routerLink], [ng-reflect-router-link]')) {
       return;
     }
 
@@ -487,9 +450,7 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
     ) {
       event.preventDefault();
       event.stopPropagation();
-      this.allModalsService.selectedResultForInfo.set(result);
-      this.applyResultInformationModalContext();
-      this.allModalsService.openModal('resultInformation');
+      this.openResult(result);
     }
   }
 
@@ -500,10 +461,6 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
       q[RESULT_ENTRY_SOURCE_QUERY] = RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER;
     }
     return q;
-  }
-
-  private applyResultInformationModalContext(): void {
-    this.allModalsService.setResultInformationEntryContext(this.resultEntryContext === 'results-center' ? 'results-center' : null);
   }
 
   private closeResultInformationModal(): void {

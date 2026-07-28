@@ -147,6 +147,7 @@ export default class CapacitySharingComponent {
   }
 
   setSectionAndOpenModal(section: string) {
+    if (this.cache.isExternalResult()) return;
     this.allModalsService.setPartnerRequestSection(section);
     this.allModalsService.openModal('requestPartner');
   }
