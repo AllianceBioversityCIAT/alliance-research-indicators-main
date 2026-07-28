@@ -481,4 +481,35 @@ The difference in blast radius is what makes this worth recording: `SelectCompon
 
 ---
 
+## T-12 — Server guard on the OICR author/contact DELETE (the last of the three)
+
+- **Status:** done (PASS on attempt 1)
+- **Date:** 2026-07-28
+- **Requirements covered:** NFR-RC-001 — **OQ-2 resolved: product owner opted in**, so this stopped being optional.
+- **Skills used:** `nestjs-expert`, `error-handling-patterns`
+
+**Change:** a private `assertStarSourceEditable()` on `ResultUsersController`, called as the first statement of `deleteAuthorContactUserByResultId()`, throwing `ConflictException('Author and contact person assignments cannot be modified for results synced from an external reporting platform')` when `platform_code` is truthy and `!== ReportingPlatformEnum.STAR`. Plus an `@ApiOperation` documenting the 409 (the handler had none), matching T-13's Swagger pattern.
+
+**Why the controller, not the service:** `ResultsUtil` already resolves and exposes `platform_code` for the current request and `_resultUtil` was already injected/used here — so the guard needed **no new query, no new injection, no new import**, unlike T-13 which had to load the `Result` itself. The service has no access to the platform, so putting it there would have meant threading it through for a single call site. The Reviewer independently confirmed there is no non-HTTP caller (`grep` over the whole repo: only this controller, the service definition, and the two specs).
+
+### The risk I flagged, and why it turned out to be structurally excluded
+
+Unlike T-13 (which loaded the `Result` with a visible `findOne`), this guard reads `this._resultUtil.platformCode` — a value populated by `SetUpInterceptor`. If ordering were wrong, or if the util were unpopulated, `platformCode` would be empty → treated as STAR → **the guard would silently do nothing while every test still passed**, because the mocks supply a value. That is precisely the failure mode that already bit this spec twice (T-03's `computed()` caching, T-15's `template: ''` stub), so I made it the Reviewer's first check.
+
+The finding is better than "ordering is fine": `ResultsUtil` exposes **two** platform getters — `platformCode` (`results.util.ts:86-89`), which **throws** `BadRequestException` on an unpopulated util, and `nullPlatformCode` (`:131-133`), which returns `null`. Had the Implementer reached for the latter, the guard would have been fail-open. It used the former, so the no-op mode is **structurally impossible, not merely untested**. `ResultsUtil` injects `REQUEST` and is request-scoped, so there's no stale cross-request state either.
+
+**Other Reviewer verifications:** all four 409 strings across T-08/T-12/T-13/the locked PRMS contract are mutually distinct, and the only client-side exact-match on a 409 description (`PRMS_SOURCED_409_DESCRIPTION`, `pool-funding-alignment.component.ts:604`) is on an unrelated endpoint — the author/contact consumer branches on `successfulRequest` only, no string matching. The empty-platform rule is byte-for-byte T-13's and is unreachable via this route anyway (`ResultsUtil.setup()` pins `where.platform_code` to a concrete enum value, so a NULL-platform row can't match). Enum import creates no cycle. All 3 new rejection tests assert **the service was not called**, not merely that an exception was thrown, and were reasoned through against three separate mutations (removing the call, dropping the truthiness check, inverting the comparison) — each is caught.
+
+**Verification:** lint 0, `tsc -p tsconfig.build.json --noEmit` 0, 2 suites / 20 tests (re-run independently by the Reviewer, which also caught that the Implementer under-counted its own new tests by one — 8 controller tests, not 7; totals correct).
+
+### Findings recorded for the backlog (non-blocking, none introduced by T-12)
+
+1. **AICCRA gets a 400 instead of a 409 through the real client path.** `DELETE_AutorContact` routes through `result.interceptor.ts`, whose `getPlatformFromUrl` builds its alternation from `[PRMS, STAR, TIP]` only — **AICCRA is missing**, though `platform-codes.ts` defines it. For an AICCRA result the `reportingPlatforms` param is omitted, the server's lookup defaults to `platform_code='STAR'`, the row isn't found, and `platformCode` throws `BadRequestException` → 400. **The mutation is still fully blocked in every path**, so NFR-RC-001's objective holds; but the status code is wrong and the cause is a pre-existing client-interceptor gap. Worth its own ticket.
+2. **Layer trade-off:** `ResultUsersModule` exports `ResultUsersService`, which is injected by four other services (`results.service.ts:133`, `result-oicr.service.ts:71`, `result-capacity-sharing.service.ts:58`, `result-owner.guard.ts:17`). None calls the delete method today, so the controller placement is sound — but a future in-process caller would bypass a controller-layer guard, unlike T-13's and T-08's service-layer guards. Documented in the code comment.
+3. **No `@Roles(...)` / `@UseGuards(ResultStatusGuard)`** on any of this controller's three handlers, contrary to the recipe in `server/.../src/CLAUDE.md` §4. Pre-existing and out of T-12's scope, but it means this platform guard is currently the *only* server-side gate on the endpoint.
+
+**With this, all three server-side mutation gaps identified by NFR-RC-001 are closed** (T-08 bilateral TIP/AICCRA, T-13 submit-status, T-12 author/contact DELETE).
+
+---
+
 (further entries appended below, one per task, in execution order)

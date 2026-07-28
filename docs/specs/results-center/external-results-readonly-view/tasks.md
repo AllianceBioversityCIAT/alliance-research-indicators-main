@@ -372,13 +372,14 @@ graph TD
   - `server/researchindicators/src/domain/entities/result-users/result-users.controller.ts` / `.service.ts` (`deleteAuthorContactByResultIdAndKey`)
 - **Description:** Add a server-side `platform_code !== 'STAR'` rejection on this one endpoint. **This task remains explicitly optional** — unlike the pool-funding and submit-status endpoints, this one touches only the child `result_user` table (confirmed — it does not call `.update()` on `Result` itself), so it cannot corrupt the R-RC-008 sync-date feature. It is a real but lower-severity, standalone gap (requirements.md OQ-2, narrowed).
 - **Acceptance / done check:**
-  - [ ] The endpoint rejects the mutation for a non-STAR `platform_code` with an appropriate error via `ServerResponseDto`.
-  - [ ] Existing STAR-result mutation tests unaffected.
-- **Dependencies:** T-11 (do not start until the product owner has decided, per OQ-2, whether this is in-scope now or a separate spec)
+  - [x] The endpoint rejects the mutation for a non-STAR `platform_code` with an appropriate error via `ServerResponseDto` (`ConflictException` → `GlobalExceptions` → envelope intact).
+  - [x] Existing STAR-result mutation tests unaffected (2 suites / 20 tests; controller 4 → 8).
+- **Dependencies:** T-11 — **OQ-2 RESOLVED 2026-07-28: product owner opted in.** No longer optional.
 - **Estimated effort:** S
-- **Owner:** TBD — pending OQ-2 decision
-- **Status:** blocked (pending product decision)
+- **Owner:** TBD
+- **Status:** done (PASS on attempt 1)
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
+- **Implementation note (Leader, from direct inspection):** this is the cleanest of the three server guards. `ResultsUtil` already selects `platform_code` (`results.util.ts:17`) and exposes it via a `platformCode` getter (`:85-88`), and `_resultUtil` is **already injected and used** in `result-users.controller.ts` (`this._resultUtil.resultId`). So the guard needs **no new DB query, no new injection, and no new import** — unlike T-13, which had to reach the `Result` itself.
 
 ---
 
