@@ -13,18 +13,18 @@
     <div>
       <h2 class="label">Number<span class="text-[15px] text-[#CF0808]">*</span></h2>
       <app-input [signal]="body" [optionValue]="'number'" [isRequired]="true" [validateEmpty]="true" [type]="'number'"
-        [min]="0" placeholder="Enter a positive number" (ngModelChange)="onValueChange()"></app-input>
+        [min]="0" [disabled]="disabled" placeholder="Enter a positive number" (ngModelChange)="onValueChange()"></app-input>
     </div>
     <div>
       <h2 class="label">Unit<span class="text-[15px] text-[#CF0808]">*</span></h2>
       <app-input [signal]="body" [optionValue]="'unit'" [isRequired]="true" [validateEmpty]="true"
-        placeholder="Write the unit" (ngModelChange)="onValueChange()"></app-input>
+        [disabled]="disabled" placeholder="Write the unit" (ngModelChange)="onValueChange()"></app-input>
     </div>
   </div>
 
   <div>
     <h2 class="label">Comments<span class="text-[15px] text-[#CF0808]">*</span></h2>
-    <app-textarea [signal]="body" [optionValue]="'comments'" [isRequired]="true" [rows]="5"
+    <app-textarea [signal]="body" [optionValue]="'comments'" [isRequired]="true" [rows]="5" [disabled]="disabled"
       placeholder="Write the comments"></app-textarea>
   </div>
 </div>

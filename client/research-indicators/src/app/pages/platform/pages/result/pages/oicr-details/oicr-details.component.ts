@@ -79,6 +79,7 @@ export default class OicrDetailsComponent {
   }
 
   onAddContactPerson() {
+    if (this.cache.isExternalResult()) return;
     this.allModalsService.toggleModal('addContactPerson');
   }
 
@@ -314,6 +315,7 @@ export default class OicrDetailsComponent {
   }
 
   clearOicrSelection(): void {
+    if (this.cache.isExternalResult() || !this.submission.isEditableStatus()) return;
     this.body.update(current => ({
       ...current,
       link_result: { external_oicr_id: 0 }

@@ -538,6 +538,14 @@ describe('ResultSidebarComponent', () => {
   });
 
   describe('submmitConfirm', () => {
+    it('should no-op for an external result (defense-in-depth method guard, T-15)', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+
+      component.submmitConfirm();
+
+      expect(actionsService.showGlobalAlert).not.toHaveBeenCalled();
+    });
+
     it('should show submission alert when result is not submitted', () => {
       (submissionService.currentResultIsSubmitted as any).mockReturnValue(false);
 
@@ -833,6 +841,14 @@ describe('ResultSidebarComponent', () => {
   });
 
   describe('approveResult', () => {
+    it('should no-op for an external result (defense-in-depth method guard, T-15)', async () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+
+      await component.approveResult();
+
+      expect(apiService.PATCH_SubmitResult).not.toHaveBeenCalled();
+    });
+
     it('should call PATCH_SubmitResult and on success update metadata and show toast', async () => {
       (apiService.PATCH_SubmitResult as jest.Mock).mockResolvedValue({ successfulRequest: true });
       (metadataService.update as jest.Mock).mockResolvedValue(undefined);
@@ -1197,6 +1213,14 @@ describe('ResultSidebarComponent', () => {
   });
 
   describe('onStatusChange', () => {
+    it('should no-op for an external result (defense-in-depth method guard, T-15)', async () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+
+      await component.onStatusChange(11);
+
+      expect(actionsService.showGlobalAlert).not.toHaveBeenCalled();
+    });
+
     it('should show special alert for status 11 (postpone)', async () => {
       cacheService.currentMetadata?.set({
         indicator_id: 1,

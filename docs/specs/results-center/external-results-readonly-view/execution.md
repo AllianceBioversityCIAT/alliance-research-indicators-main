@@ -418,4 +418,40 @@ AC.2 (header render/degrade), AC.3 (year-badge navigation in the real DOM), AC.4
 
 ---
 
+## T-15 — Close the 5 ungated controls T-11 found
+
+- **Status:** done (PASS on attempt 3 — the 3-attempt ceiling was reached exactly)
+- **Date:** 2026-07-28
+- **Requirements covered:** R-RC-014
+- **Effort dial:** medium → high → high
+
+**Attempt 1 — FAIL.** Closed F-1…F-5 and the 4 defense-in-depth guards; the Reviewer verified all of those as correct (F-1 structurally, not just via tests) and confirmed the create-result-modal blast radius was clean. **Finding:** `oicr-form-fields` has six reachable controls; the new `disabled` input was bound to four. "Select existing OICR" (`html:39`) still gated only on `editingOicr()`, which is always `false` on that tab. It fires `GET_OICRMetadata()` and mutates the tab's `body`. The Reviewer also diagnosed *why the suite missed it*: the F-3 test fixture used `body = signal({})`, under which `showOicrSelection()` is false and the control never instantiates.
+
+**Attempt 2 — FAIL.** Bound the remaining controls (all `||` widenings) and added a fixture (`{ tagging: { tag_id: 2 } }`) that genuinely renders the OICR select — the Implementer independently traced `showOicrSelection()` rather than taking the Reviewer's shorthand shape on faith. Mutation-proven by both the Implementer and the Leader. **Finding:** the Reviewer **corrected its own attempt-1 remediation**. It had asserted that disabling the `app-select` made the projected `#rows` clear icon unreachable; asked to verify rather than carry that forward, it found the claim false — `select.component.html` binds `[disabled]` once at `:19` inside `<p-select>` (`:18-104`), while the `#rows` outlet is at `:129`, inside a block opening at `:122`, **outside** the select. So the clear icon stayed live, calling `clearOicrSelection()` and wiping `link_result.external_oicr_id`. Bounded (can't persist — `saveData` is behind `isEditableStatus()`), but a reachable state mutation on a surface R-RC-014 declares non-mutable. Also flagged "Main contact person" as the last field control with no `disabled` term.
+
+**Attempt 3 — PASS.** Three edits: (a) `@if (!disabled && !editingOicr())` on the clear icon; (b) an early-return guard in `oicr-details.clearOicrSelection()` before the mutation; (c) `disabled ||` prefix on Main contact person for uniformity. The test stub was rebuilt with `@ContentChild('rows')` + `*ngTemplateOutlet` so projected content actually instantiates — the previous `template: ''` stub was structurally incapable of catching this, which is how the gap survived two rounds.
+
+**Reviewer's verification of attempt 3 (unusually strong, worth recording):**
+- **Validated the content-projection premise two independent ways** instead of reasoning from intuition — this session had already been bitten twice by plausible-but-wrong framework assumptions (`preventDefault()` vs `RouterLink` in T-14; `[disabled]` vs projected content here). *Compile-time:* AOT with `strictTemplates` accepts `this.createResultManagementService` — a member that exists **only** on `OicrFormFieldsComponent` — inside the `#rows` template; if the embedded template's context were the host, that would be a TS2339. *Runtime:* the `disabled=false` test evaluates that same expression under a stub host lacking the member, without error. So the test proves real behavior, not the stub. It also volunteered an honest caveat: the `disabled=true` assertion alone would pass under either semantics (it short-circuits), so the `disabled=false` case is the discriminating one.
+- **Closed the mechanism class, not just the instance:** `SelectComponent.hideSelected` defaults to `true`, and the OICR select is the only `<app-select>` in the file overriding it — so the `:122-149` escape hatch was reachable for exactly one control, now fixed.
+- **Independent completeness sweep** of both `oicr-form-fields.component.html` and `oicr-details.component.html`: every interactive control now carries a platform or editability term, enumerated one by one. Also verified the transitive link the sweep depends on (`submission.service.ts:60-66` short-circuits on `isExternalResult()`, regression-tested).
+- Own runs: 6 suites / 202 tests, lint clean, `ng build` (6 pre-existing unrelated errors, zero in OICR files).
+
+**Leader's independent verification:** reproduced the attempt-2 and attempt-3 mutations via out-of-repo backup copies (no git ops — deliberate, given the earlier stash incident). Reverting only the attempt-3 `:103` guard produced exactly `1 failed, 36 passed` with the expected test name; restoring gave 7 suites / 378 passed. Also confirmed by direct read that `<p-select>` spans `:18-104` with `[disabled]` only at `:19` while the `#rows` outlet is at `:129` — i.e. the Reviewer's self-correction was right.
+
+### Why this took three attempts — the pattern worth remembering
+
+The enumerated set grew every round: the spec scoped 12 tabs (missing 3 shared files) → T-11 found 5 controls → attempt 1 bound 4 of 6 → attempt 3 closed 8 controls plus a projected icon. Each round's fix was correct for what it was pointed at; each round's *enumeration* was short. Two compounding causes: (1) shared components rendered outside the feature folder are invisible to a feature-scoped file list, and (2) **test doubles that don't render what they stand in for cannot catch gaps in what they hide** — `body = signal({})` hid one control, `template: ''` hid another. Both were green suites over open controls.
+
+### Non-blocking observations recorded (out of T-15 scope)
+
+- **Pre-existing invalid TS in a spec file:** `oicr-form-fields.component.spec.ts:99-103` contains `let createResultMock: { … } as any;`, which `tsc -p tsconfig.spec.json` rejects (`TS1005`). It survives only because ts-jest error-recovers with diagnostics off. Confirmed identical at HEAD — pre-existing, not introduced. A sibling exists at `indicators-tab-filter.component.spec.ts:181`. Worth a hygiene ticket.
+- **Transitive-only gating** on four controls (external-use checkbox, its description input, `app-impact-areas`, OICR No): correct today via `isEditableStatus()`'s short-circuit, but adjacent controls spell `cache.isExternalResult() ||` explicitly. Consistency nit.
+- **Different-requirement gap:** MEL Regional Expert and SharePoint Folder Link gate on `!isAdmin || isExternalResult()` — R-RC-014 satisfied, but no editability term, so an admin can still edit them on a *STAR* result in a non-editable status. Belongs to the R-RC-003/004 family; pre-existing.
+- `<button>Published</button>` badges with no handler and no `type` — a11y semantics, pre-existing.
+
+**Final verification result:** PASS — 7 suites / 378 tests on the targeted set, lint clean, mutation-tested independently by Implementer, Reviewer, and Leader.
+
+---
+
 (further entries appended below, one per task, in execution order)

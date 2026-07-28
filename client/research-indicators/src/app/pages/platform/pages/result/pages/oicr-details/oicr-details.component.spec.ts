@@ -229,6 +229,14 @@ describe('OicrDetailsComponent', () => {
       expect(allModalsService.toggleModal).toHaveBeenCalledWith('addContactPerson');
     });
 
+    it('should no-op for an external result (defense-in-depth method guard, T-15)', () => {
+      cacheService.isExternalResult.mockReturnValue(true);
+
+      component.onAddContactPerson();
+
+      expect(allModalsService.toggleModal).not.toHaveBeenCalled();
+    });
+
     it('should load and map contact persons from array response', async () => {
       const responseData: ContactPersonResponse[] = [
         {
@@ -812,6 +820,7 @@ class FakeOicrFormFieldsComponent {
   @Input() showShortOutcome = false;
   @Input() showOicrNo = false;
   @Input() isOicrNoDisabled = false;
+  @Input() disabled = false;
   @Input() clearOicrSelection: unknown;
 }
 
@@ -820,6 +829,7 @@ class FakeQuantificationItemComponent {
   @Input() quantification: unknown;
   @Input() quantNumber = 1;
   @Input() headerLabel = '';
+  @Input() disabled = false;
   @Output() update = new EventEmitter<unknown>();
   @Output() delete = new EventEmitter<void>();
 }
@@ -945,6 +955,14 @@ describe('OicrDetailsComponent — real template disabled bindings (T-07)', () =
     return f.debugElement.query(By.directive(FakeAuthorsContactPersonsTableComponent)).componentInstance as FakeAuthorsContactPersonsTableComponent;
   }
 
+  function oicrFormFields(f: ComponentFixture<OicrDetailsComponent>): FakeOicrFormFieldsComponent {
+    return f.debugElement.query(By.directive(FakeOicrFormFieldsComponent)).componentInstance as FakeOicrFormFieldsComponent;
+  }
+
+  function quantificationItems(f: ComponentFixture<OicrDetailsComponent>): FakeQuantificationItemComponent[] {
+    return f.debugElement.queryAll(By.directive(FakeQuantificationItemComponent)).map(de => de.componentInstance as FakeQuantificationItemComponent);
+  }
+
   it('R-RC-004 AC.1 — disables MEL Regional Expert + SharePoint Folder Link for an admin on an external result', () => {
     const f = render({ isAdmin: true, isExternalResult: true, isEditableStatus: true });
 
@@ -982,6 +1000,40 @@ describe('OicrDetailsComponent — real template disabled bindings (T-07)', () =
     const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: false });
 
     expect(authorsContactTable(f).disabled).toBe(true);
+  });
+
+  it('F-3: disables the shared oicr-form-fields controls for an external result', () => {
+    const f = render({ isAdmin: true, isExternalResult: true, isEditableStatus: true });
+
+    expect(oicrFormFields(f).disabled).toBe(true);
+  });
+
+  it('F-3: leaves the shared oicr-form-fields controls enabled for a STAR result in an editable status', () => {
+    const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true });
+
+    expect(oicrFormFields(f).disabled).toBe(false);
+  });
+
+  it('F-4: disables the quantification and extrapolated-estimate items for an external result', () => {
+    const f = render({ isAdmin: true, isExternalResult: true, isEditableStatus: true });
+    component.quantifications.set([{ number: 1, unit: 'kg', comments: 'actual' }]);
+    component.extrapolatedEstimates.set([{ number: 2, unit: 'tons', comments: 'extrapolated' }]);
+    f.detectChanges();
+
+    const items = quantificationItems(f);
+    expect(items.length).toBe(2);
+    items.forEach(item => expect(item.disabled).toBe(true));
+  });
+
+  it('F-4: leaves the quantification and extrapolated-estimate items enabled for a STAR result in an editable status', () => {
+    const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true });
+    component.quantifications.set([{ number: 1, unit: 'kg', comments: 'actual' }]);
+    component.extrapolatedEstimates.set([{ number: 2, unit: 'tons', comments: 'extrapolated' }]);
+    f.detectChanges();
+
+    const items = quantificationItems(f);
+    expect(items.length).toBe(2);
+    items.forEach(item => expect(item.disabled).toBe(false));
   });
 });
 

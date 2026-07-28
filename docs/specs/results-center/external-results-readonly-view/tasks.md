@@ -312,17 +312,17 @@ graph TD
   - **F-5:** add `[disabled]="!submission.isEditableStatus()"` to the readiness step buttons (`innovation-details.component.html:131-136`), matching every other control on that tab.
   - **Also (cheap, same pass):** add method-level platform guards to `result-sidebar`'s `submmitConfirm()`, `approveResult()` (calls `PATCH_SubmitResult` unguarded), `onStatusChange()`, and `oicr-details.onAddContactPerson()` — currently unreachable behind template conditions, but with no backstop if those regress.
 - **Acceptance / done check:**
-  - [ ] F-1: external result + admin → no Delete option renders; `DELETE_Result` unreachable even if the handler is invoked directly.
-  - [ ] F-2: external result + admin → no edit-date pencil; `PATCH_StatusChangeDate` unreachable even if `confirmEdit()` is invoked directly.
-  - [ ] F-3: all four `oicr-form-fields` controls + the AI button disabled for external results; **create-result modal flow unaffected** (regression-tested).
-  - [ ] F-4: quantification/extrapolated-estimates inputs disabled for external results.
-  - [ ] F-5: readiness step buttons disabled for external results.
-  - [ ] STAR behavior unchanged for all five (existing tests pass unmodified).
-  - [ ] Re-run T-11's static sweep → zero remaining findings.
+  - [x] F-1: external result + admin → no Delete option renders; `DELETE_Result` unreachable even if the handler is invoked directly. *(Double-gated: `isExternalResult()` early-return as the computed's first statement + a handler guard before the async IIFE. Reviewer verified structurally, not just via tests.)*
+  - [x] F-2: external result + admin → no edit-date pencil; `PATCH_StatusChangeDate` unreachable even if `confirmEdit()` is invoked directly.
+  - [x] F-3: **all controls** in `oicr-form-fields` + the AI button disabled for external results; create-result modal flow unaffected (verified: it passes no `disabled`, default `false` makes every widened expression a no-op). *(Took 3 attempts — the enumerated set grew 4 → 6 → 8 controls + a projected clear icon. See execution.md.)*
+  - [x] F-4: quantification/extrapolated-estimates inputs disabled for external results (both parent call sites pass it).
+  - [x] F-5: readiness step buttons disabled for external results.
+  - [x] STAR behavior unchanged for all five — every change is an `||`/`&&` widening of an existing condition, or a new binding whose sink defaults to `false`.
+  - [ ] Re-run T-11's static sweep → zero remaining findings. *(In progress. The Reviewer's independent sweep of both OICR templates found the set complete, but the full 12-tab + shell re-sweep is the actual AC — running it, since this task twice proved enumeration-by-assumption wrong.)*
 - **Dependencies:** T-02 (needs `isExternalResult`)
-- **Estimated effort:** M (5 findings, 2 shared components with blast radius)
+- **Estimated effort:** M (5 findings, 2 shared components with blast radius) — actual: 3 attempts
 - **Owner:** TBD
-- **Status:** in-progress
+- **Status:** done (pending the AC.6 re-sweep confirmation)
 - **Skills:** `angular-developer`
 
 ---

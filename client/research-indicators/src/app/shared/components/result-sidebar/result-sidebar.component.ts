@@ -224,6 +224,7 @@ export class ResultSidebarComponent {
   }
 
   submmitConfirm() {
+    if (this.cache.isExternalResult()) return;
     const { severity, placeholder, summary, detail } = this.submissionService.currentResultIsSubmitted()
       ? this.unsavedChangesAlertData()
       : this.submissionAlertData();
@@ -263,6 +264,7 @@ export class ResultSidebarComponent {
   }
 
   async approveResult() {
+    if (this.cache.isExternalResult()) return;
     const response = await this.api.PATCH_SubmitResult({
       resultCode: this.cache.getCurrentNumericResultId(),
       status: 6
@@ -318,6 +320,7 @@ export class ResultSidebarComponent {
   }
 
   async onStatusChange(newStatusId: number): Promise<void> {
+    if (this.cache.isExternalResult()) return;
     const specialAlert = this.getSpecialStatusAlert(newStatusId);
     if (specialAlert) {
       this.actions.showGlobalAlert({
