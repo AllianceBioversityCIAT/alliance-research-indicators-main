@@ -2,12 +2,13 @@
 
 - **Module:** results-center (client feature)
 - **Spec id:** 2026-07-external-results-readonly-view
-- **Status:** not-started
+- **Status:** in-progress — all 16 code tasks done; T-11's 3 environment-dependent ACs remain (see below)
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
 - **Reviewed:** Judgment Day round 1 (`./judgment.md`) — task list corrected below: T-04/T-06 fixes simplified and re-scoped (F-5, F-6), T-08 expanded with a server-side companion (F-1), new T-13 added and no longer optional (F-2), T-10 narrowed to verification-only (F-3), T-12 narrowed to one endpoint only (F-1, F-2).
-- **Last updated:** 2026-07-27
+- **Not yet run:** `/akili-test` (no `test-report.md`) and `/akili-validate` (no `validation-report.md`).
+- **Last updated:** 2026-07-28
 
 ---
 
