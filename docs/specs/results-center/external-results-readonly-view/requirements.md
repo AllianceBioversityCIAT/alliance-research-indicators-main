@@ -376,8 +376,11 @@ Behavior: every one of the above MUST be non-interactive for a result whose `pla
 ### NFR-RC-001 — Security (defense-in-depth; corrected and narrowed after Judgment Day round 1)
 
 - **Category:** security
-- **Target — corrected (`./judgment.md` F-1, F-2):** of the three mutation endpoints originally believed fully unguarded, two are now brought in scope as blocking requirements (R-RC-005 AC.3/AC.4 for the pool-funding-alignment PATCH's TIP/AICCRA gap; R-RC-012 for the submit-status endpoint). **Only one genuinely remains deferred:** the OICR author/contact `DELETE` (`ResultUsersService.deleteAuthorContactByResultIdAndKey`) — confirmed to touch only the child `result_user` table, not `Result` itself, so (unlike the other two) it cannot corrupt the R-RC-008 sync-date display. This is a real but lower-severity gap, tracked as optional fast-follow `tasks.md` T-12.
-- **How verified:** the two now-in-scope items are verified via R-RC-005/R-RC-012's acceptance criteria. The remaining deferred item (author/contact DELETE) is recorded here so it is not silently lost — see `tasks.md` T-12 and Open Questions below.
+- **Target — corrected twice; final state:** three server-side mutation endpoints lacked a platform check. **All three are now closed** — none remains deferred:
+  1. **Pool-funding-alignment `PATCH`** — originally believed fully unguarded; Judgment Day F-1 corrected that (a tested PRMS-only gate already existed), so only the TIP/AICCRA half was missing. Closed by **R-RC-005 AC.3/AC.4** (`tasks.md` T-08).
+  2. **Submit-status `PATCH`** — had no check at all, and Judgment Day F-2 showed its `Result.update()` would silently corrupt the very `updated_at` this spec surfaces as the sync date (R-RC-008). Elevated from deferred to blocking and closed by **R-RC-012** (`tasks.md` T-13).
+  3. **OICR author/contact `DELETE`** — the last one, and genuinely the lowest-risk of the three (it touches only the child `result_user` table, not `Result`, so it cannot corrupt the sync date). Originally deferred as an optional fast-follow pending OQ-2; **OQ-2 was resolved 2026-07-28 — the product owner opted in — and it is now closed** (`tasks.md` T-12, done).
+- **How verified:** each has unit-test coverage proving rejection *before* any DB work, with a distinct 409 description that cannot collide with the locked PRMS bilateral string — see `test-report.md`'s backend-unit section for the per-AC matrix and the mutation evidence.
 
 ### NFR-RC-002 — Performance
 
@@ -424,7 +427,7 @@ Inherited defaults (not restated in full): every client HTTP call goes through `
 ## 11. Open questions
 
 - **OQ-1.** Is `Result.updated_at` actually the right "last synced" signal for the *normal* sync path, or does the TIP/PRMS/AICCRA sync path need a dedicated `last_synced_at` column distinct from any manual touch? — **Owner:** product owner / backend lead — **Target:** resolved before/at rollout via a production data spot-check (design.md D-1/RB-1). *(Narrowed by Judgment Day round 1 — the one confirmed corruption path, R-RC-012, is now mitigated in-scope; this OQ is about residual accuracy, not the concrete corruption risk, which is resolved.)*
-- **OQ-2. RESOLVED by Judgment Day round 1.** Two of the three server-side mutation gaps are now in scope (R-RC-005 AC.3/AC.4, R-RC-012); only the OICR author/contact `DELETE` remains an explicit, optional fast-follow (`tasks.md` T-12) — decision: defer only that one, since it cannot corrupt the sync-date feature and touches a child table, not `Result` itself.
+- **OQ-2. FULLY RESOLVED — all three gaps closed.** Judgment Day round 1 first narrowed this: two of the three server-side mutation gaps became in-scope blocking requirements (R-RC-005 AC.3/AC.4, R-RC-012), leaving only the OICR author/contact `DELETE` as an optional fast-follow. **On 2026-07-28 the product owner opted in for that one too**, and it shipped as `tasks.md` T-12 (done). No server-side mutation gap remains deferred.
 - **OQ-3. RESOLVED by Judgment Day round 1.** `search-a-result.component.ts` is confirmed to need **no routing change** (see R-RC-001) — it already navigates correctly and inherits the read-only fixes automatically; added to `tasks.md` T-11's verification matrix. `my-latest-results.component.ts` is confirmed already correctly gated — no change needed.
 - **OQ-4.** Is the `resultInformation` modal component fully deleted, or just no longer triggered from Results Center (kept for any other still-undiscovered caller)? — **Owner:** engineering lead — **Target:** resolved at task-authoring time (affects whether a "delete modal" task exists). *(Not addressed by Judgment Day round 1 — still open.)*
 
@@ -458,5 +461,5 @@ Inherited defaults (not restated in full): every client HTTP call goes through `
 
 - [ ] Engineering lead — TBD
 - [ ] MEL / product owner — David Felipe Casañas Hernández
-- [ ] Security review (remaining deferred gap, NFR-RC-001 / T-12) — TBD, pending OQ-2 (narrowed scope)
+- [ ] Security review (NFR-RC-001 — all three server-side mutation guards now shipped; nothing deferred) — TBD
 - [ ] DevOps (if infra touched) — N/A, no infra change

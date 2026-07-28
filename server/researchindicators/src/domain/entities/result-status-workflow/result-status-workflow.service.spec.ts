@@ -399,6 +399,43 @@ describe('ResultStatusWorkflowService', () => {
       expect(mockTransaction).not.toHaveBeenCalled();
     });
 
+    // @sdd-spec docs/specs/results-center/external-results-readonly-view — R-RC-012 AC.3
+    //
+    // Closes a coverage gap: prior tests only asserted the exception TYPE
+    // (ConflictException), never its description — so a rewording that
+    // accidentally collided with, or reused, the locked PRMS bilateral 409
+    // string ('Result is PRMS-sourced; bilateral alignment is read-only in
+    // STAR', asserted in bilateral.service.sourceReadOnlyGate.spec.ts) would
+    // have passed silently. Assert the exact wording and its distinctness.
+    it.each(['TIP', 'PRMS', 'AICCRA'])(
+      'uses a clear, accurate 409 description for a %s-sourced result that does not collide with the locked PRMS bilateral-alignment string',
+      async (platformCode) => {
+        mockResultFindOne.mockResolvedValue({
+          result_id: 1,
+          indicator_id: 1,
+          result_status_id: 1,
+          platform_code: platformCode,
+        });
+
+        let thrown: ConflictException | undefined;
+        try {
+          await service.changeStatus(1, 2, {
+            submission_comment: 'test',
+          } as any);
+        } catch (err) {
+          thrown = err as ConflictException;
+        }
+
+        expect(thrown).toBeInstanceOf(ConflictException);
+        expect(thrown!.message).toBe(
+          'Status changes are not permitted for results synced from an external platform',
+        );
+        expect(thrown!.message).not.toBe(
+          'Result is PRMS-sourced; bilateral alignment is read-only in STAR',
+        );
+      },
+    );
+
     it('should proceed (not throw ConflictException) for a STAR-platform_code result', async () => {
       const mockResult = {
         result_id: 1,
