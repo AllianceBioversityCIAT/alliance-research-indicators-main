@@ -264,6 +264,34 @@ graph TD
 
 ---
 
+### T-14 — Home "My Latest Results": route external results into the section shell
+
+**Added 2026-07-28 by product decision** to close the scope gap T-10's verification surfaced (see `execution.md` → `## Scope Gap: T-10`, and design.md D-9 superseding D-3 for this component).
+
+- **Requirements covered:** R-RC-013
+- **Files touched (intended):**
+  - `client/research-indicators/src/app/pages/platform/pages/home/components/my-latest-results/my-latest-results.component.ts`
+  - `.../my-latest-results.component.html`
+  - `.../my-latest-results.component.spec.ts`
+- **Description:** Remove the `opensResultInformationModal()` special-casing so TIP/PRMS/AICCRA cards use the same `getStarResultRouterLink()` / `getStarResultQueryParams()` navigation STAR cards already use. Both helpers are already platform-agnostic and already handle the approved-snapshot → `general-information` + `version` case, so **no new navigation logic is added** — only the modal branch is removed.
+- **Implementation notes:**
+  - Preserve the `RESULT_ENTRY_SOURCE_VALUE_HOME` query param for external results (it comes free via `getStarResultQueryParams()`).
+  - **Preserve the `.more-vert` overflow-menu click guard** in `onResultCardClick()` — unrelated concern, must keep working for all platforms.
+  - Unlike T-04, there is no document-level capture-phase listener in this component — it's an ordinary `[routerLink]` + `(click)`, so T-04's cascading-interception difficulty does not apply here.
+  - Once the modal branch is gone, `openResultInformationModal()` / `closeResultInformationModalIfOpen()` / `opensResultInformationModal()` may become dead — remove only what is provably unreferenced (grep first); do not touch `AllModalsService` itself (design.md D-4).
+- **Acceptance / done check:**
+  - [ ] Clicking a TIP/PRMS/AICCRA card navigates to `/result/:code` with the home-entry query param; the `resultInformation` modal does not open.
+  - [ ] Approved-snapshot external result resolves to `general-information` + `version`.
+  - [ ] STAR-card behavior unchanged (existing tests pass unmodified).
+  - [ ] `.more-vert` menu click still does not navigate, any platform.
+- **Dependencies:** T-04 (same behavioral contract), T-02
+- **Estimated effort:** S
+- **Owner:** TBD
+- **Status:** in-progress
+- **Skills:** `angular-developer`
+
+---
+
 ### T-11 — Manual end-to-end verification across TIP / PRMS / AICCRA
 
 - **Requirements covered:** all of R-RC-001 through R-RC-012 (verification, not new code)

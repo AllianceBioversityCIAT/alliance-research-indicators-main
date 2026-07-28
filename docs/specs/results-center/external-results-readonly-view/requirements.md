@@ -85,7 +85,7 @@ Requirements use `R-RC-<NNN>` (Results Center). Numbered in dependency order —
 - Behavior: replace the "open `resultInformation` modal" branch (or, for `openResultByYear()`, the bare `return`) in all six handlers with the same `router.navigate(['/result', resultCode], { queryParams: ... })` call already used for STAR results (mirroring the snapshot/version logic at `results-center-table.component.ts:293-300` where applicable).
 - Outputs: browser navigates to `/result/{PLATFORM}-{code}`; `ResultComponent` loads, `ResultSidebarComponent` and the requested tab render.
 - **No fix needed at `search-a-result.component.ts`** — confirmed during Judgment Day round 1 (F-3) that `openResult()` there (`:42-45`) already navigates unconditionally to `/result/{code}/general-information` for every platform, with zero gating. This entry point already does what R-RC-001 wants; it simply inherits the read-only enforcement automatically once R-RC-002 through R-RC-007 land (those fixes live in the destination components — tabs, sidebar, services — not in how the user arrived there). It is added to `tasks.md` T-11's manual verification matrix rather than needing a routing change.
-- **No fix needed at `my-latest-results.component.ts`** — confirmed already correctly gated via `opensResultInformationModal()`.
+- **`my-latest-results.component.ts` — SCOPE EXTENDED 2026-07-28 (product decision).** Originally fenced out as "already correctly gated via `opensResultInformationModal()`" — factually true (it has no dead-click bug) but answering the wrong question: it still routes external results into the **old modal**, so Home would behave inconsistently with Results Center and `search-a-result` once T-04 shipped, contradicting this spec's own headline requirement. Now in scope as **R-RC-013** / `tasks.md` T-14. See `execution.md` → `## Scope Gap: T-10` for how the gap was surfaced.
 
 **Acceptance criteria:**
 - [ ] AC.1 — Clicking a TIP/PRMS/AICCRA row, or a specific year-link on that row, in Results Center navigates to `/result/:code` (URL changes, section shell renders).
@@ -316,6 +316,28 @@ Requirements use `R-RC-<NNN>` (Results Center). Numbered in dependency order —
 
 ---
 
+### R-RC-013 — Home "My Latest Results" cards route external results into the section shell
+
+**Added 2026-07-28 by product decision**, after T-10's verification surfaced that decision D-3 had fenced this out on a technically-true but irrelevant basis (see `execution.md` → `## Scope Gap: T-10`). This closes the last inconsistent entry point.
+
+- **As a** STAR user on the Home page
+- **I want** clicking a TIP/PRMS/AICCRA card in "My Latest Results" to open the full read-only section shell
+- **So that** the behavior matches Results Center and search — the Jira AC ("when entering a result from an external system, the full metadata must be shown in the same STAR forms") holds regardless of which screen I came from
+
+**Details:**
+- `my-latest-results.component.ts`'s `opensResultInformationModal()` (`:130-132`) currently returns `true` for PRMS/TIP/AICCRA, which the template (`:18-20`) uses to null out `routerLink`/`queryParams`, and `onResultCardClick()` (`:158-161`) uses to `preventDefault()` and open the modal instead.
+- Behavior: external results MUST use the same `getStarResultRouterLink()` / `getStarResultQueryParams()` paths STAR results already use. Both are already platform-agnostic (`getStarResultRouterLink` builds `${platform_code}-${result_official_code}`) and already handle the approved-snapshot → `general-information` + `version` case, so no new navigation logic is needed — only the removal of the modal special-casing.
+- The `RESULT_ENTRY_SOURCE_VALUE_HOME` query param must continue to be applied for external results, exactly as it is for STAR.
+- The `.more-vert` overflow-menu click guard in `onResultCardClick()` MUST be preserved (unrelated concern — clicking the card's ⋮ menu must not navigate).
+
+**Acceptance criteria:**
+- [ ] AC.1 — Clicking a TIP/PRMS/AICCRA card on Home navigates to `/result/:code` with the home-entry query param, not the `resultInformation` modal.
+- [ ] AC.2 — The approved-snapshot case (`result_status_id === 6` with `snapshot_years`) resolves to `general-information` + `version`, for external results as it already does for STAR.
+- [ ] AC.3 — STAR-card behavior is completely unchanged.
+- [ ] AC.4 — Clicking the `.more-vert` menu still does not navigate, for any platform.
+
+---
+
 ## 7. Non-Functional Requirements
 
 ### NFR-RC-001 — Security (defense-in-depth; corrected and narrowed after Judgment Day round 1)
@@ -391,6 +413,7 @@ Inherited defaults (not restated in full): every client HTTP call goes through `
 | R-RC-010 | Header preserves "Open result in {platform}" deep link |
 | R-RC-011 | Metadata endpoint returns the four fields the header needs |
 | R-RC-012 | Submit-status endpoint rejects status changes for external results (added, Judgment Day round 1) |
+| R-RC-013 | Home "My Latest Results" cards route external results into the section shell (added 2026-07-28, closes the T-10 scope gap) |
 | NFR-RC-001 | Security — only the author/contact DELETE remains deferred (narrowed, Judgment Day round 1) |
 | NFR-RC-002 | Performance — no new eager-load pattern |
 | NFR-RC-003 | Accessibility — WCAG 2.1 AA on new header elements |
