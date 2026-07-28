@@ -292,6 +292,41 @@ graph TD
 
 ---
 
+### T-15 — Close the 5 ungated controls T-11 found (shared shell + OICR shared fields)
+
+**Added 2026-07-28 by product decision** after T-11's exhaustive sweep failed. See `execution.md` → `## T-11 Result: FAILED` for the full findings and the root-cause analysis (the spec's file list never included `section-header`, `submission-history-item`, or the shared `oicr-form-fields`).
+
+- **Requirements covered:** R-RC-014 (new — extends the R-RC-003/004 read-only principle to the shared shell and shared field components the original scope omitted)
+- **Files touched (intended):**
+  - `client/research-indicators/src/app/shared/components/section-header/section-header.component.ts` (+ `.spec.ts`) — **F-1**
+  - `client/research-indicators/src/app/pages/platform/pages/result/components/submission-history-item/submission-history-item.component.{ts,html}` (+ `.spec.ts`) — **F-2**
+  - `client/research-indicators/src/app/shared/components/custom-fields/oicr-form-fields/oicr-form-fields.component.{ts,html}` + call site `.../oicr-details/oicr-details.component.html` (+ specs) — **F-3**
+  - `client/research-indicators/src/app/pages/platform/pages/result/pages/oicr-details/components/quantification-item/quantification-item.component.{ts,html}` + call sites (+ `.spec.ts`) — **F-4**
+  - `client/research-indicators/src/app/pages/platform/pages/result/pages/innovation-details/innovation-details.component.html` (+ `.spec.ts`) — **F-5**
+- **Description:** add the missing platform/editability term to five controls so external results are genuinely non-mutable. F-1 and F-2 are the priority — both reach mutation APIs directly.
+- **Implementation notes (per finding):**
+  - **F-1 (CRITICAL, do first):** `showDeleteOption` (`section-header.component.ts:57-60`) ends in `|| rolesService.isAdmin()` with no platform term → add `&& !cache.isExternalResult()` to the whole expression (not just the admin clause — every branch must be gated), AND add a defensive early-return in the delete `command` handler (`:~91`) before `api.DELETE_Result()`, mirroring the `onDeleteContactPerson()` belt-and-braces pattern from T-07.
+  - **F-2:** `showCustomDateAndEdit` (`submission-history-item.component.ts:51-53`) → add `&& !cache.isExternalResult()`; also guard `confirmEdit()` (`:137-163`) before `api.PATCH_StatusChangeDate()`.
+  - **F-3:** thread a `disabled` `@Input()` through `app-oicr-form-fields` and bind it on the four ungated controls (`html:26-30`, `:122-140`, `:146-151`, `:164-168`) **including the AI-generate button** (which fires `api.fastResponse`, a real POST). Call site in `oicr-details.component.html:43-52` passes `cache.isExternalResult() || !submission.isEditableStatus()`. ⚠️ **`oicr-form-fields` is SHARED** — also used by the create-result modal; the new input must default to `false` so that flow is unaffected, and the create-result path must be regression-tested.
+  - **F-4:** add a `disabled` `@Input()` to `quantification-item` (it has none) and bind it on the three inputs (`html:15-16`, `:20-21`, `:27-28`); pass the same condition from both parent call sites in `oicr-details.component.html`.
+  - **F-5:** add `[disabled]="!submission.isEditableStatus()"` to the readiness step buttons (`innovation-details.component.html:131-136`), matching every other control on that tab.
+  - **Also (cheap, same pass):** add method-level platform guards to `result-sidebar`'s `submmitConfirm()`, `approveResult()` (calls `PATCH_SubmitResult` unguarded), `onStatusChange()`, and `oicr-details.onAddContactPerson()` — currently unreachable behind template conditions, but with no backstop if those regress.
+- **Acceptance / done check:**
+  - [ ] F-1: external result + admin → no Delete option renders; `DELETE_Result` unreachable even if the handler is invoked directly.
+  - [ ] F-2: external result + admin → no edit-date pencil; `PATCH_StatusChangeDate` unreachable even if `confirmEdit()` is invoked directly.
+  - [ ] F-3: all four `oicr-form-fields` controls + the AI button disabled for external results; **create-result modal flow unaffected** (regression-tested).
+  - [ ] F-4: quantification/extrapolated-estimates inputs disabled for external results.
+  - [ ] F-5: readiness step buttons disabled for external results.
+  - [ ] STAR behavior unchanged for all five (existing tests pass unmodified).
+  - [ ] Re-run T-11's static sweep → zero remaining findings.
+- **Dependencies:** T-02 (needs `isExternalResult`)
+- **Estimated effort:** M (5 findings, 2 shared components with blast radius)
+- **Owner:** TBD
+- **Status:** in-progress
+- **Skills:** `angular-developer`
+
+---
+
 ### T-11 — Manual end-to-end verification across TIP / PRMS / AICCRA
 
 - **Requirements covered:** all of R-RC-001 through R-RC-012 (verification, not new code)

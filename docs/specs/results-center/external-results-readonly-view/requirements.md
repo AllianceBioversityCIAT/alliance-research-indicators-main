@@ -338,6 +338,39 @@ Requirements use `R-RC-<NNN>` (Results Center). Numbered in dependency order —
 
 ---
 
+### R-RC-014 — The shared result shell and shared field components also respect external read-only
+
+**Added 2026-07-28** after T-11's exhaustive sweep found 5 ungated controls in files the original scope never enumerated. See `execution.md` → `## T-11 Result: FAILED`.
+
+- **As a** STAR platform (defending a federated record's integrity)
+- **I want** the read-only rule to hold across the *whole* result surface, not just the 12 tab components
+- **So that** no path exists to mutate — least of all **delete** — a result STAR does not own
+
+**Details:**
+The original scope (R-RC-003…007) enumerated the 12 tabs plus `result-sidebar` and `form-header`. It omitted the shared shell rendered *above* `form-header` (`section-header`, the submission-history panel — both reachable on the result route via `showSectionHeaderActions: true`) and the shared `oicr-form-fields` custom-field component. Five controls there carry no platform term:
+
+| # | Control | Reaches | Gate as written |
+| --- | --- | --- | --- |
+| F-1 | "Delete Result" kebab action | **`DELETE_Result()`** | `… \|\| rolesService.isAdmin()` — no platform term |
+| F-2 | Submission-history edit-date pencil | **`PATCH_StatusChangeDate()`** | role + per-row flags only; `confirmEdit()` unguarded |
+| F-3 | 4 `oicr-form-fields` controls + AI-generate button | `api.fastResponse` (POST); fields typable | modal-state + role, not result editability |
+| F-4 | Quantification / extrapolated-estimates inputs | writes parent signals | **no `[disabled]` at all** |
+| F-5 | Innovation-readiness step buttons 1–9 | writes `innovation_readiness_id` | **no `[disabled]` at all** |
+
+Behavior: every one of the above MUST be non-interactive for a result whose `platform_code !== 'STAR'`. F-1 and F-2 additionally require method-level guards before their API calls (defense in depth, mirroring `onDeleteContactPerson()`), not just template gating.
+
+**Acceptance criteria:**
+- [ ] AC.1 — For an external result, **no Delete Result affordance renders for any role**, and `DELETE_Result()` is unreachable even if the handler is invoked programmatically.
+- [ ] AC.2 — For an external result, no submission-history edit-date affordance renders, and `PATCH_StatusChangeDate()` is unreachable even if `confirmEdit()` is invoked programmatically.
+- [ ] AC.3 — All four `oicr-form-fields` controls and the AI-generate button are disabled for external results, **and the create-result modal flow that shares this component is unaffected**.
+- [ ] AC.4 — Quantification/extrapolated-estimates inputs and the innovation-readiness step buttons are disabled for external results.
+- [ ] AC.5 — STAR behavior is unchanged for all five surfaces.
+- [ ] AC.6 — Re-running T-11's exhaustive static sweep yields zero remaining findings.
+
+**Note on the failure mode this closes:** the gap was scope, not implementation — every prior task correctly gated everything it was pointed at. Recorded so future specs enumerate the *shared shell*, not only the feature-local components.
+
+---
+
 ## 7. Non-Functional Requirements
 
 ### NFR-RC-001 — Security (defense-in-depth; corrected and narrowed after Judgment Day round 1)
@@ -414,6 +447,7 @@ Inherited defaults (not restated in full): every client HTTP call goes through `
 | R-RC-011 | Metadata endpoint returns the four fields the header needs |
 | R-RC-012 | Submit-status endpoint rejects status changes for external results (added, Judgment Day round 1) |
 | R-RC-013 | Home "My Latest Results" cards route external results into the section shell (added 2026-07-28, closes the T-10 scope gap) |
+| R-RC-014 | Shared result shell + shared field components respect external read-only (added 2026-07-28, closes the 5 findings from T-11's failed sweep — incl. a CRITICAL Delete-Result path) |
 | NFR-RC-001 | Security — only the author/contact DELETE remains deferred (narrowed, Judgment Day round 1) |
 | NFR-RC-002 | Performance — no new eager-load pattern |
 | NFR-RC-003 | Accessibility — WCAG 2.1 AA on new header elements |
