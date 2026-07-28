@@ -4,7 +4,8 @@ import { ResultsCenterService } from '../../results-center.service';
 import { CacheService } from '../../../../../../shared/services/cache/cache.service';
 import { AllModalsService } from '../../../../../../shared/services/cache/all-modals.service';
 import { Router, provideRouter } from '@angular/router';
-import { computed, signal } from '@angular/core';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { Component, computed, signal } from '@angular/core';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApiService } from '../../../../../../shared/services/api.service';
 import { CreateResultManagementService } from '../../../../../../shared/components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
@@ -1235,5 +1236,115 @@ describe('ResultsCenterTableComponent', () => {
       expect(handleSpy).not.toHaveBeenCalled();
       expect(mockRouter.navigate).not.toHaveBeenCalled();
     });
+  });
+});
+
+// R-RC-001 AC.1 (Scenario: "clicks the row (or its title link)") — every test above exercises
+// ResultsCenterTableComponent with `.overrideComponent(..., { set: { template: '' } })`, so none of
+// them prove the *real* HTML template actually wires `[routerLink]="getResultRouteArray(result)"`
+// on the title-column anchor to real `Router` navigation for an external result. This block renders
+// the genuine template (no override) with a real `Router` via `provideRouter` + `RouterTestingHarness`
+// — the same pattern already used to close the equivalent gap in my-latest-results.component.spec.ts —
+// and proves clicking the actual rendered title-link anchor for a TIP row navigates, with a paired
+// negative/positive pair so the assertions are not vacuous.
+describe('ResultsCenterTableComponent — real template DOM click (AC.1 title-link, not vacuous)', () => {
+  @Component({ selector: 'app-dom-test-target', template: '' })
+  class DomTestTargetComponent {}
+
+  const tipResult = {
+    result_official_code: 7,
+    title: 'External Title',
+    indicators: { name: 'Ind' },
+    result_status: { name: 'SUBMITTED', result_status_id: 1 },
+    result_contracts: null,
+    snapshot_years: [],
+    platform_code: 'TIP'
+  } as any;
+
+  let harness: RouterTestingHarness;
+  let domComponent: ResultsCenterTableComponent;
+  let router: Router;
+  let domModals: { openModal: jest.Mock; closeModal: jest.Mock; isModalOpen: jest.Mock; setResultInformationEntryContext: jest.Mock; isAnyModalOpen: jest.Mock };
+
+  beforeEach(async () => {
+    TestBed.resetTestingModule();
+
+    const listSig = signal([tipResult]);
+    const domService: any = {
+      searchInput: signal(''),
+      list: listSig,
+      resultsListForTable: computed(() => listSig()),
+      resultsTablePaginatorFirst: signal(0),
+      resultsTablePaginatorRows: signal(10),
+      resultsTableTotalRecords: signal(1),
+      loading: signal(false),
+      primaryContractId: jest.fn().mockReturnValue(null),
+      getActiveFilters: jest.fn(() => []),
+      tableColumns: signal([{ field: 'title', path: 'title', header: 'Title', getValue: (r: any) => r.title }]),
+      tableFilters: signal({ sources: [] }),
+      countTableFiltersSelected: jest.fn(() => 0),
+      countFiltersSelected: jest.fn(() => 0),
+      clearAllFilters: jest.fn(),
+      removeFilter: jest.fn(),
+      tableRef: signal<any>(undefined),
+      handleResultsTableLazyLoad: jest.fn(),
+      resultsTableSortField: signal(''),
+      resultsTableSortOrder: signal(1)
+    };
+
+    const domCache: any = {
+      headerHeight: signal(0),
+      navbarHeight: signal(0),
+      tableFiltersSidebarHeight: signal(0),
+      hasSmallScreen: signal(false),
+      dataCache: signal({ user: {} })
+    };
+
+    domModals = {
+      openModal: jest.fn(),
+      closeModal: jest.fn(),
+      isModalOpen: jest.fn(() => ({ isOpen: false })),
+      setResultInformationEntryContext: jest.fn(),
+      isAnyModalOpen: jest.fn(() => false)
+    };
+
+    await TestBed.configureTestingModule({
+      providers: [
+        { provide: ResultsCenterService, useValue: domService },
+        { provide: CacheService, useValue: domCache },
+        { provide: AllModalsService, useValue: domModals },
+        { provide: ApiService, useValue: {} },
+        { provide: CreateResultManagementService, useValue: {} },
+        provideRouter([
+          { path: '', component: ResultsCenterTableComponent },
+          { path: 'result/:code', component: DomTestTargetComponent }
+        ]),
+        provideHttpClientTesting()
+      ]
+    }).compileComponents();
+
+    harness = await RouterTestingHarness.create();
+    domComponent = await harness.navigateByUrl('/', ResultsCenterTableComponent);
+    router = TestBed.inject(Router);
+    harness.fixture.detectChanges();
+    await harness.fixture.whenStable();
+  });
+
+  it('navigates to the section shell (not the modal) when the real rendered title-link anchor for a TIP row is clicked', async () => {
+    const titleLink = harness.fixture.nativeElement.querySelector('td a[routerlink], td a[ng-reflect-router-link]') as HTMLElement | null;
+    // Fall back to any anchor inside a <td> (attribute name casing/reflection can vary by build).
+    const link = titleLink ?? (harness.fixture.nativeElement.querySelector('tbody a') as HTMLElement | null);
+    expect(link).toBeTruthy();
+
+    link!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    harness.fixture.detectChanges();
+    await harness.fixture.whenStable();
+
+    expect(router.url).toBe('/result/TIP-7');
+    expect(domModals.openModal).not.toHaveBeenCalledWith('resultInformation');
+  });
+
+  it('sanity: does NOT navigate merely by rendering (proves the click above is what drives navigation)', () => {
+    expect(router.url).toBe('/');
   });
 });
