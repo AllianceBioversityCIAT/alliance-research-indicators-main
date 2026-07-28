@@ -341,4 +341,40 @@ These four tasks were implemented by four separate Implementer subagents (all re
 
 ---
 
+## T-14 — Home "My Latest Results": route external results into the section shell
+
+- **Status:** done (PASS on rework attempt 2)
+- **Date:** 2026-07-28
+- **Requirements covered:** R-RC-013 (scope extension — see `## Scope Gap: T-10` above and design.md D-9)
+- **Skills used:** `angular-developer`
+- **Effort dial:** medium (attempt 1) → high (attempt 2)
+
+**Attempt 1 — FAIL**
+- **Files changed:** `my-latest-results.component.{ts,html,spec.ts}` — removed the `opensResultInformationModal()` special-casing so external cards use the existing `getStarResultRouterLink()`/`getStarResultQueryParams()` paths; removed the resulting dead code (`opensResultInformationModal()`, `openResultInformationModal()`, the now-unused `PLATFORM_CODES` import) with grep evidence; kept `closeResultInformationModalIfOpen()` (still called).
+- **Verification:** lint clean; 55/55 tests; tsc baseline unchanged.
+- **Reviewer verdict:** `FAIL` — **core change correct (AC.1/AC.2/AC.3 confirmed)**, but two AC.4 defects:
+  1. **The `.more-vert` guard became inert for external cards.** Angular's `RouterLink` host binding is `onClick($event.button,$event.ctrlKey,$event.shiftKey,$event.altKey,$event.metaKey)` — it never receives the event object, so it cannot consult `defaultPrevented` and calls `navigateByUrl()` unconditionally. `preventDefault()` alone therefore cannot stop it. Attempt 1 made `routerLink` unconditional, removing the accidental protection external cards had from `routerLink = null`.
+  2. **Both AC.4 tests were vacuous** — they asserted on `routerMock.navigate`, but the component never injects `Router`, `RouterLink` navigates via `navigateByUrl` (absent from the mock), and no test in the file rendered the template (zero `detectChanges`). They stayed green while the behavior was broken.
+- **Leader action:** independently confirmed all three load-bearing facts before relaying (the host-binding declaration in the shipped `router.mjs`, that `.more-vert` has no handler of its own, and that `routerMock` defines only `navigate`). Bumped effort medium → high; passed the Reviewer's report unedited plus an explicit demand for mutation-test evidence, since the whole defect class was "green tests over broken behavior."
+
+**Attempt 2 — PASS**
+- **Files changed:** `my-latest-results.component.html` (added `(click)="$event.stopPropagation(); $event.preventDefault()"` to the `.more-vert` div) and `my-latest-results.component.spec.ts` (new DOM-level `describe` using a **real** `Router` via `provideRouter` + `RouterTestingHarness`). `.component.ts` untouched — attempt 1's work there stood.
+- **Implementer decisions:** no `(keydown.enter)` added (the div has no `tabindex`, isn't focusable, so it would be dead code — Enter on the focused card `<a>` should and does still navigate); **did not patch the shared `routerMock`** — used a real Router instead, both to avoid a mock silently diverging from real behavior again and to avoid blast radius on the ~10 other specs importing it.
+- **Mutation-test evidence (demanded, and independently reproduced by the Leader):** with the `stopPropagation` handler stripped, exactly **1 test failed** — the new `.more-vert` negative one (`Expected: "/" Received: "/result/TIP-202?from=home"`, i.e. it really did navigate) — and 57/57 on restore. The Leader ran this via a backup copy outside the repo, deliberately avoiding `git stash`/`git restore` given an earlier incident this session.
+- **Reviewer verdict:** `PASS`, with unusually thorough independent verification: traced the DOM propagation path to confirm a bubble-phase `stopPropagation()` on the div runs strictly before the anchor's host listeners; confirmed `preventDefault()` is *not* redundant (post-attempt-1 the anchor always carries a real `href`, so without it a browser would still do a full document navigation); ruled out every defeat vector — no `pointer-events` in the component SCSS, the client's only capture-phase document click listener is Results Center's (different route, `contains()`-guarded, torn down), and no hydration `withEventReplay`; confirmed `RouterLink` is genuinely in the component's `imports` so a live directive is exercised; and closed an async-race spuriousness vector (`ngOnInit`'s un-awaited load could have repopulated the list after `renderCardFor()`, but `whenStable()` drains it first, and the positive test's exact URL proves a single TIP-202 card rendered). Confirmed 57/57 in-file and 85/85 across `pages/home`, lint clean.
+
+### Two clarifications for future readers (requested by the Reviewer)
+
+1. **The one intentional STAR behavior change:** ⋮ clicks no longer navigate on STAR cards either. AC.4's wording ("*still* does not navigate") was written on a false premise — STAR was **already** broken this way before this spec, because STAR always carried a live `routerLink` and `preventDefault()` never stopped `RouterLink`. So this is a **pre-existing bug fixed in passing**, satisfying AC.4 for both platform classes; it is not an unflagged AC.3 deviation. Net effect: external cards regressed under attempt 1 and were repaired; STAR was repaired for the first time.
+2. **`isInteractionOnMoreMenu()` is now unreachable via the real DOM** — the div-level `stopPropagation()` fires first, so `onResultCardClick()` never sees a ⋮ click. It was retained deliberately (T-14's brief said the guard MUST be preserved) and is still directly unit-tested. Belt-and-braces, no longer the primary mechanism.
+
+### Non-blocking follow-ups recorded (out of R-RC-013 scope)
+
+- **Test-harness hardening:** `src/setup-jest.ts` registers a root `beforeEach` adding `provideNoopAnimations()` + `provideHttpClientTesting()`; the new nested `describe`'s `TestBed.resetTestingModule()` silently discards both for its 2 tests. Harmless today (all deps mocked) but a future dependency injecting `HttpClient` would fail *only in this suite* with a confusing "no provider" error. Fix: add those providers to the nested array, or move the DOM suite to a top-level `describe`/own spec file.
+- **Pre-existing ⋮ affordance gaps (NOT introduced here):** the icon has never been focusable and still has no menu behind it (a visual affordance with no action, all platforms, before and after); and `.more-vert__icon` lacks `aria-hidden="true"` unlike its sibling at `html:10`, so screen readers announce the literal ligature text "more_vert". Worth a separate a11y ticket.
+
+**Final verification result:** PASS — 57/57 in-file, 85/85 across `pages/home`, lint clean, mutation-tested by both the Implementer and independently by the Leader.
+
+---
+
 (further entries appended below, one per task, in execution order)

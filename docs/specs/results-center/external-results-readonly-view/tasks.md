@@ -280,14 +280,14 @@ graph TD
   - Unlike T-04, there is no document-level capture-phase listener in this component — it's an ordinary `[routerLink]` + `(click)`, so T-04's cascading-interception difficulty does not apply here.
   - Once the modal branch is gone, `openResultInformationModal()` / `closeResultInformationModalIfOpen()` / `opensResultInformationModal()` may become dead — remove only what is provably unreferenced (grep first); do not touch `AllModalsService` itself (design.md D-4).
 - **Acceptance / done check:**
-  - [ ] Clicking a TIP/PRMS/AICCRA card navigates to `/result/:code` with the home-entry query param; the `resultInformation` modal does not open.
-  - [ ] Approved-snapshot external result resolves to `general-information` + `version`.
-  - [ ] STAR-card behavior unchanged (existing tests pass unmodified).
-  - [ ] `.more-vert` menu click still does not navigate, any platform.
+  - [x] Clicking a TIP/PRMS/AICCRA card navigates to `/result/:code` with the home-entry query param; the `resultInformation` modal does not open. *(Proven end-to-end by a real-`Router` DOM test asserting `/result/TIP-202?from=home`.)*
+  - [x] Approved-snapshot external result resolves to `general-information` + `version`.
+  - [x] STAR-card behavior unchanged — **with one intentional exception:** ⋮ clicks no longer navigate on STAR either. See the execution.md note; AC.4's word "still" rested on a false premise, so this is a bug fix, not an AC.3 deviation.
+  - [x] `.more-vert` menu click does not navigate, any platform — now enforced by `stopPropagation()` at the div level (attempt 2), since `preventDefault()` alone provably cannot stop Angular's `RouterLink`.
 - **Dependencies:** T-04 (same behavioral contract), T-02
 - **Estimated effort:** S
 - **Owner:** TBD
-- **Status:** in-progress
+- **Status:** done
 - **Skills:** `angular-developer`
 
 ---

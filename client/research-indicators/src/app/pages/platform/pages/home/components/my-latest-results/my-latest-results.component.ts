@@ -7,7 +7,6 @@ import { FormatDatePipe } from '@shared/pipes/format-date.pipe';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { STATUS_COLOR_MAP } from '@shared/constants/status-colors';
-import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { Result, ResultFilter } from '@shared/interfaces/result/result.interface';
 import { normalizeSnapshotYears } from '@shared/interfaces/result/map-v2-result-list-item';
 import { RESULT_ENTRY_SOURCE_QUERY, RESULT_ENTRY_SOURCE_VALUE_HOME } from '@shared/constants/result-entry-source';
@@ -126,12 +125,6 @@ export class MyLatestResultsComponent implements OnInit {
     return result.created_at?.trim() || undefined;
   }
 
-  /** PRMS / TIP / AICCRA open the result information modal instead of in-app routing. */
-  opensResultInformationModal(result: Result): boolean {
-    const platform = result.platform_code;
-    return platform === PLATFORM_CODES.PRMS || platform === PLATFORM_CODES.TIP || platform === PLATFORM_CODES.AICCRA;
-  }
-
   getStarResultRouterLink(result: Result): string[] {
     const resultCode = `${result.platform_code}-${result.result_official_code}`;
     const snapshotYears = normalizeSnapshotYears(result.snapshot_years);
@@ -155,11 +148,6 @@ export class MyLatestResultsComponent implements OnInit {
       event.preventDefault();
       return;
     }
-    if (this.opensResultInformationModal(result)) {
-      event.preventDefault();
-      this.openResultInformationModal(result);
-      return;
-    }
     this.closeResultInformationModalIfOpen();
   }
 
@@ -170,12 +158,6 @@ export class MyLatestResultsComponent implements OnInit {
     }
     const el = target instanceof Element ? target : target.parentElement;
     return Boolean(el?.closest('.more-vert'));
-  }
-
-  private openResultInformationModal(result: Result): void {
-    this.allModalsService.selectedResultForInfo.set(result);
-    this.allModalsService.setResultInformationEntryContext(null);
-    this.allModalsService.openModal('resultInformation');
   }
 
   private closeResultInformationModalIfOpen(): void {
