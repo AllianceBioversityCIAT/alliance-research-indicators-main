@@ -12,6 +12,7 @@ import { InputTextModule } from 'primeng/inputtext';
 import { PartnerSelectedItemComponent } from '@shared/components/partner-selected-item/partner-selected-item.component';
 import { GetInstitutionsService } from '@shared/services/control-list/get-institutions.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
+import { CacheService } from '@shared/services/cache/cache.service';
 
 @Component({
   selector: 'app-organization-item',
@@ -35,6 +36,7 @@ export class OrganizationItemComponent implements OnInit {
   @Input() bodySignal: WritableSignal<GetInnovationDetails> = signal(new GetInnovationDetails());
   body = signal<InstitutionType>(new InstitutionType());
   submission = inject(SubmissionService);
+  cache = inject(CacheService);
   isPrivate = false;
   private updateTimeout: ReturnType<typeof setTimeout> | undefined;
   institutionsService = inject(GetInstitutionsService);
@@ -125,6 +127,7 @@ export class OrganizationItemComponent implements OnInit {
   }
 
   setSectionAndOpenModal(section: string) {
+    if (this.cache.isExternalResult()) return;
     this.allModalsService.setPartnerRequestSection(section);
     this.allModalsService.openModal('requestPartner');
   }

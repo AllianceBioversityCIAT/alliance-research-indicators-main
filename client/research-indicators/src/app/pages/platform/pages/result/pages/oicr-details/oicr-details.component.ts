@@ -110,6 +110,7 @@ export default class OicrDetailsComponent {
 
   async onDeleteContactPerson(row: ContactPersonRow) {
     if (!row?.id) return;
+    if (this.cache.isExternalResult()) return;
     const resultId = this.cache.getCurrentNumericResultId();
     const res = await this.api.DELETE_AutorContact(row.id, resultId);
     if (res.successfulRequest) {

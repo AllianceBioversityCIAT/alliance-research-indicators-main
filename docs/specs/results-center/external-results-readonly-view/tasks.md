@@ -153,7 +153,7 @@ graph TD
 - **Dependencies:** T-01, T-02
 - **Estimated effort:** M
 - **Owner:** TBD
-- **Status:** in-progress
+- **Status:** done
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ---
@@ -195,7 +195,7 @@ graph TD
 - **Dependencies:** T-02
 - **Estimated effort:** M
 - **Owner:** TBD
-- **Status:** in-progress
+- **Status:** done
 - **Skills:** `angular-developer`
 
 ---
@@ -219,7 +219,7 @@ graph TD
 - **Dependencies:** T-02
 - **Estimated effort:** M
 - **Owner:** TBD
-- **Status:** in-progress
+- **Status:** done
 - **Skills:** `angular-developer`, `nestjs-expert`
 
 ---
@@ -239,7 +239,7 @@ graph TD
 - **Dependencies:** T-02
 - **Estimated effort:** S
 - **Owner:** TBD
-- **Status:** in-progress
+- **Status:** done
 - **Skills:** `angular-developer`
 
 ---

@@ -1,5 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Component, Input, NO_ERRORS_SCHEMA, Output, EventEmitter } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { FormsModule } from '@angular/forms';
+import { CheckboxModule } from 'primeng/checkbox';
+import { AccordionModule } from 'primeng/accordion';
+import { NgTemplateOutlet } from '@angular/common';
 
 import OicrDetailsComponent from './oicr-details.component';
 import { CacheService } from '@shared/services/cache/cache.service';
@@ -27,7 +33,8 @@ describe('OicrDetailsComponent', () => {
   beforeEach(async () => {
     const mockCacheService: jest.Mocked<CacheService> = {
       getCurrentNumericResultId: jest.fn().mockReturnValue(1),
-      currentResultId: jest.fn().mockReturnValue('1')
+      currentResultId: jest.fn().mockReturnValue('1'),
+      isExternalResult: jest.fn().mockReturnValue(false)
       // @ts-expect-error partial mock
     } as jest.Mocked<CacheService>;
 
@@ -354,6 +361,28 @@ describe('OicrDetailsComponent', () => {
     it('should not delete contact person if row has no id', async () => {
       await component.onDeleteContactPerson({} as any);
       expect(apiService.DELETE_AutorContact).not.toHaveBeenCalled();
+    });
+
+    it('should not delete contact person when the result is external (T-07 R-RC-003 AC.2)', async () => {
+      const row = { id: 5 } as any;
+      cacheService.isExternalResult.mockReturnValue(true);
+
+      await component.onDeleteContactPerson(row);
+
+      expect(apiService.DELETE_AutorContact).not.toHaveBeenCalled();
+      expect(actionsService.showToast).not.toHaveBeenCalled();
+    });
+
+    it('should still delete contact person for a STAR result in an editable status (regression, R-RC-003 AC.3)', async () => {
+      const row = { id: 5 } as any;
+      cacheService.isExternalResult.mockReturnValue(false);
+      apiService.DELETE_AutorContact.mockResolvedValue({ successfulRequest: true } as any);
+      const loadSpy = jest.spyOn(component, 'loadContactPersons').mockResolvedValue();
+
+      await component.onDeleteContactPerson(row);
+
+      expect(apiService.DELETE_AutorContact).toHaveBeenCalledWith(5, cacheService.getCurrentNumericResultId());
+      expect(loadSpy).toHaveBeenCalled();
     });
 
     it('should not reload or show toast when DELETE_AutorContact returns unsuccessful', async () => {
@@ -730,6 +759,229 @@ describe('OicrDetailsComponent', () => {
 
       expect(component.body().link_result.external_oicr_id).toBe(0);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T-07 (R-RC-003 / R-RC-004) — real-template disabled-binding assertions.
+//
+// The suite above intentionally stubs OicrDetailsComponent's template to ''
+// (see `TestBed.overrideComponent(OicrDetailsComponent, { set: { template: '' } })`)
+// to avoid instantiating the full child-component dependency graph (SelectComponent,
+// InputComponent, OicrFormFieldsComponent, ImpactAreasComponent, etc. each pull in
+// their own services). That means the actual `[disabled]` expressions written in
+// oicr-details.component.html are never exercised anywhere else.
+//
+// To prove those two concrete bindings (MEL Regional Expert / SharePoint Folder Link
+// admin fields, and the authors/contact table) without dragging in every real child's
+// DI graph, this block renders the REAL production template but swaps only the child
+// components for minimal same-selector stand-ins (a standard shallow-render technique).
+// NO_ERRORS_SCHEMA covers any of their other inputs/outputs not explicitly redeclared.
+// ---------------------------------------------------------------------------
+
+@Component({ selector: 'app-form-header', standalone: true, template: '' })
+class FakeFormHeaderComponent {}
+
+@Component({ selector: 'app-select', standalone: true, template: '' })
+class FakeSelectComponent {
+  @Input() disabled = false;
+  @Input() signal: unknown;
+  @Input() isRequired = false;
+  @Input() optionValue: unknown;
+}
+
+@Component({ selector: 'app-input', standalone: true, template: '' })
+class FakeInputComponent {
+  @Input() disabled = false;
+  @Input() signal: unknown;
+  @Input() optionValue: unknown;
+}
+
+@Component({ selector: 'app-oicr-form-fields', standalone: true, template: '' })
+class FakeOicrFormFieldsComponent {
+  @Input() body: unknown;
+  @Input() oicrNoOptionValue: unknown;
+  @Input() taggingOptionValue: unknown;
+  @Input() oicrOptionValue: unknown;
+  @Input() maturityLevelOptionValue: unknown;
+  @Input() outcomeImpactOptionValue: unknown;
+  @Input() shortOutcomeOptionValue: unknown;
+  @Input() generalCommentOptionValue: unknown;
+  @Input() showMaturityLevel = false;
+  @Input() showGeneralComment = false;
+  @Input() showShortOutcome = false;
+  @Input() showOicrNo = false;
+  @Input() isOicrNoDisabled = false;
+  @Input() clearOicrSelection: unknown;
+}
+
+@Component({ selector: 'app-quantification-item', standalone: true, template: '' })
+class FakeQuantificationItemComponent {
+  @Input() quantification: unknown;
+  @Input() quantNumber = 1;
+  @Input() headerLabel = '';
+  @Output() update = new EventEmitter<unknown>();
+  @Output() delete = new EventEmitter<void>();
+}
+
+@Component({ selector: 'app-authors-contact-persons-table', standalone: true, template: '' })
+class FakeAuthorsContactPersonsTableComponent {
+  @Input() rows: unknown;
+  @Input() disabled = false;
+  @Output() addClicked = new EventEmitter<void>();
+  @Output() deleteClicked = new EventEmitter<unknown>();
+}
+
+@Component({ selector: 'app-impact-areas', standalone: true, template: '' })
+class FakeImpactAreasComponent {
+  @Input() body: unknown;
+  @Input() disabled = false;
+}
+
+@Component({ selector: 'app-navigation-buttons', standalone: true, template: '' })
+class FakeNavigationButtonsComponent {
+  @Output() back = new EventEmitter<void>();
+  @Output() next = new EventEmitter<void>();
+  @Output() save = new EventEmitter<void>();
+}
+
+describe('OicrDetailsComponent — real template disabled bindings (T-07)', () => {
+  let fixture: ComponentFixture<OicrDetailsComponent>;
+  let component: OicrDetailsComponent;
+
+  function render(opts: { isAdmin: boolean; isExternalResult: boolean; isEditableStatus: boolean }) {
+    const mockCacheService = {
+      getCurrentNumericResultId: jest.fn().mockReturnValue(1),
+      currentResultId: jest.fn().mockReturnValue('1'),
+      isExternalResult: jest.fn().mockReturnValue(opts.isExternalResult)
+    } as unknown as jest.Mocked<CacheService>;
+
+    const mockApiService = {
+      GET_AutorContact: jest.fn().mockResolvedValue({ data: [] }),
+      DELETE_AutorContact: jest.fn(),
+      POST_AutorContact: jest.fn(),
+      GET_Oicr: jest.fn().mockResolvedValue({ data: {} }),
+      PATCH_Oicr: jest.fn()
+    } as unknown as jest.Mocked<ApiService>;
+
+    const mockSubmissionService = {
+      isEditableStatus: jest.fn().mockReturnValue(opts.isEditableStatus)
+    } as unknown as jest.Mocked<SubmissionService>;
+
+    const mockActionsService = { showToast: jest.fn() } as unknown as jest.Mocked<ActionsService>;
+    const mockVersionWatcher = { onVersionChange: jest.fn() } as unknown as jest.Mocked<VersionWatcherService>;
+    const mockAllModalsService = {
+      toggleModal: jest.fn(),
+      setAddContactPersonConfirm: jest.fn(),
+      setDisabledAddContactPerson: jest.fn()
+    } as unknown as jest.Mocked<AllModalsService>;
+    const mockRolesService = { isAdmin: jest.fn().mockReturnValue(opts.isAdmin) } as unknown as jest.Mocked<RolesService>;
+    const mockRouter = { navigate: jest.fn() } as unknown as jest.Mocked<Router>;
+    const mockActivatedRoute: Partial<ActivatedRoute> = {
+      snapshot: {
+        // @ts-expect-error minimal queryParamMap mock
+        queryParamMap: { get: jest.fn().mockReturnValue(null) }
+      } as any
+    };
+    const mockServiceLocator = { getService: jest.fn() } as unknown as jest.Mocked<ServiceLocatorService>;
+
+    TestBed.overrideComponent(OicrDetailsComponent, {
+      set: {
+        imports: [
+          FormsModule,
+          CheckboxModule,
+          AccordionModule,
+          NgTemplateOutlet,
+          FakeFormHeaderComponent,
+          FakeSelectComponent,
+          FakeInputComponent,
+          FakeOicrFormFieldsComponent,
+          FakeQuantificationItemComponent,
+          FakeAuthorsContactPersonsTableComponent,
+          FakeImpactAreasComponent,
+          FakeNavigationButtonsComponent
+        ]
+      }
+    });
+
+    TestBed.configureTestingModule({
+      imports: [OicrDetailsComponent],
+      schemas: [NO_ERRORS_SCHEMA],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: ApiService, useValue: mockApiService },
+        { provide: SubmissionService, useValue: mockSubmissionService },
+        { provide: ActionsService, useValue: mockActionsService },
+        { provide: VersionWatcherService, useValue: mockVersionWatcher },
+        { provide: AllModalsService, useValue: mockAllModalsService },
+        { provide: RolesService, useValue: mockRolesService },
+        { provide: Router, useValue: mockRouter },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute },
+        { provide: ServiceLocatorService, useValue: mockServiceLocator }
+      ]
+    });
+
+    fixture = TestBed.createComponent(OicrDetailsComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  function melRegionalExpertSelect(f: ComponentFixture<OicrDetailsComponent>): FakeSelectComponent {
+    return f.debugElement.query(By.directive(FakeSelectComponent)).componentInstance as FakeSelectComponent;
+  }
+
+  function sharepointInput(f: ComponentFixture<OicrDetailsComponent>): FakeInputComponent {
+    // The SharePoint Folder Link field is the first `app-input` in document order
+    // (the second, `for_external_use_description`, only renders conditionally).
+    return f.debugElement.queryAll(By.directive(FakeInputComponent))[0].componentInstance as FakeInputComponent;
+  }
+
+  function authorsContactTable(f: ComponentFixture<OicrDetailsComponent>): FakeAuthorsContactPersonsTableComponent {
+    return f.debugElement.query(By.directive(FakeAuthorsContactPersonsTableComponent)).componentInstance as FakeAuthorsContactPersonsTableComponent;
+  }
+
+  it('R-RC-004 AC.1 — disables MEL Regional Expert + SharePoint Folder Link for an admin on an external result', () => {
+    const f = render({ isAdmin: true, isExternalResult: true, isEditableStatus: true });
+
+    expect(melRegionalExpertSelect(f).disabled).toBe(true);
+    expect(sharepointInput(f).disabled).toBe(true);
+  });
+
+  it('R-RC-004 AC.2 — leaves MEL Regional Expert + SharePoint Folder Link editable for an admin on a STAR result', () => {
+    const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true });
+
+    expect(melRegionalExpertSelect(f).disabled).toBe(false);
+    expect(sharepointInput(f).disabled).toBe(false);
+  });
+
+  it('keeps MEL Regional Expert + SharePoint Folder Link disabled for a non-admin regardless of platform', () => {
+    const f = render({ isAdmin: false, isExternalResult: false, isEditableStatus: true });
+
+    expect(melRegionalExpertSelect(f).disabled).toBe(true);
+    expect(sharepointInput(f).disabled).toBe(true);
+  });
+
+  it('R-RC-003 AC.1/AC.2 — disables the authors/contact table for an external result', () => {
+    const f = render({ isAdmin: true, isExternalResult: true, isEditableStatus: true });
+
+    expect(authorsContactTable(f).disabled).toBe(true);
+  });
+
+  it('R-RC-003 AC.3 — leaves the authors/contact table enabled for a STAR result in an editable status', () => {
+    const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true });
+
+    expect(authorsContactTable(f).disabled).toBe(false);
+  });
+
+  it('R-RC-003 AC.3 (revised) — MAY now also disable the authors/contact table Add control for a STAR result in a non-editable status (accepted tightening, not a regression)', () => {
+    const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: false });
+
+    expect(authorsContactTable(f).disabled).toBe(true);
   });
 });
 
