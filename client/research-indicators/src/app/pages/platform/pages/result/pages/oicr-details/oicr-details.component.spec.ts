@@ -767,6 +767,51 @@ describe('OicrDetailsComponent', () => {
 
       expect(component.body().link_result.external_oicr_id).toBe(0);
     });
+
+    // Defense-in-depth method guard (R-RC-014 / T-15 "#rows clear icon" — the template-level
+    // guard in oicr-form-fields.component.html:103 already hides the icon, but the handler
+    // itself must also refuse to act if ever invoked directly (mirrors onDeleteContactPerson()'s
+    // and onAddContactPerson()'s own method-level guards). Never verified anywhere else: the
+    // outer describe block stubs the template to '', so the projected #rows icon is never
+    // rendered here, and the T-07 "real template" suite only proves the icon is hidden — not
+    // that clearOicrSelection() itself is safe if called some other way.
+    it('should no-op for an external result even if invoked directly (defense-in-depth)', () => {
+      cacheService.isExternalResult.mockReturnValue(true);
+      component.body.set({
+        ...component.body(),
+        link_result: { external_oicr_id: 123 }
+      } as any);
+
+      component.clearOicrSelection();
+
+      expect(component.body().link_result.external_oicr_id).toBe(123);
+    });
+
+    it('should no-op for a STAR result in a non-editable status even if invoked directly (defense-in-depth)', () => {
+      cacheService.isExternalResult.mockReturnValue(false);
+      submissionService.isEditableStatus.mockReturnValue(false);
+      component.body.set({
+        ...component.body(),
+        link_result: { external_oicr_id: 123 }
+      } as any);
+
+      component.clearOicrSelection();
+
+      expect(component.body().link_result.external_oicr_id).toBe(123);
+    });
+
+    it('should still reset for a STAR result in an editable status (regression)', () => {
+      cacheService.isExternalResult.mockReturnValue(false);
+      submissionService.isEditableStatus.mockReturnValue(true);
+      component.body.set({
+        ...component.body(),
+        link_result: { external_oicr_id: 123 }
+      } as any);
+
+      component.clearOicrSelection();
+
+      expect(component.body().link_result.external_oicr_id).toBe(0);
+    });
   });
 });
 
