@@ -282,3 +282,92 @@ Per `/akili-execute` §2.4, an advisory may not become a task in this spec. Both
 `npm run lint` clean · `npm run build` succeeded, `strictTemplates` passes · 5 suites / 98 tests pass across `project-detail` · fix confirmed in the AOT production bundle. `project-dashboard-card.component.spec.ts` still unmodified — T-04 owns its assertions.
 
 **NFR-PDB-004 is NOT verified and must not be reported as such.** jsdom computes no box model, so the static reading establishes only that the bounded container exists and is correctly conditioned on `visibleLimit() === null`. Whether the layout actually holds is the five-step human check in `requirements.md` §7, carried by **T-06**.
+
+---
+
+### T-04 — Card spec: the real template, no stub
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS** |
+| **Date** | 2026-07-29 |
+| **Implementer attempts** | 1 |
+| **Requirements covered** | R-PDB-002, R-PDB-003, R-PDB-004, NFR-PDB-003, NFR-PDB-005 |
+| **Defect classes gated** | DC-3, DC-4, DC-6, DC-7, DC-11 (card side) — **all now genuinely gated** |
+| **Changed LOC** | +420 (`project-dashboard-card.component.spec.ts`, 114 → 534) — **+194 over the design's ~340 estimate; see the budget note** |
+| **PR** | 2 of 4 — completes it |
+
+#### Attempt 1
+
+**Files changed:** `project-dashboard-card.component.spec.ts` only. Component `.ts` and `.html` verified unmodified **by checksum**, not by trusting the report — the mutation experiments were fully reverted.
+
+**This task is the KZ-001 remediation.** It is the only place R-PDB-002/003/004 can be asserted, because `project-dashboard.component.spec.ts:205-226` replaces the card with a stub that renders none of it.
+
+#### Suite fidelity — the evidence that matters
+
+The task's own bar is that the suite must be able to **fail**. Eight mutations were run against the component: three the Implementer was instructed to run, plus **four the Reviewer invented and the Implementer never anticipated**. All were reverted.
+
+| # | Mutation | Origin | Result |
+| --- | --- | --- | --- |
+| M1 | `barColor` total → `visibleItems().length` | briefed | **KILLED** — invariance test: `rgb(52, 91, 143)` expected / `rgb(17, 47, 92)` received |
+| M2 | `columns` tracks → `items().length` | briefed | **KILLED** — DC-6 test: `repeat(5,…)` expected / `repeat(40,…)` received |
+| M3 | bounded-container condition → hardcoded `true` | briefed | **KILLED** — collapsed bounded-container test |
+| M4 | drop `&& variant() === 'card'` from the toggle guard | Reviewer | **survived — proven equivalent mutant** (see below) |
+| M5 | `toggleAriaLabel` drops `title()` | Reviewer | **KILLED** — accessible-name test |
+| M6 | `visibleItems` → `slice(0, limit + 1)` | Reviewer | **KILLED** — 3 tests |
+| M7 | disable the top-level `variant === 'list'` arm | Reviewer | **KILLED** — proves the list test is not vacuous |
+| M8 | **move the toggle out of the `@else if (items().length)` arm** | Reviewer | **KILLED** — exactly the 3 position tests |
+
+**M4 is not a suite gap.** The template's top-level `@if (variant() === 'list')` routes the list variant to a branch containing no `<section>` at all, so inside the `@else` arm `variant()` is necessarily `'card'` (the input is typed `'card' | 'list'`). The inner guard is unreachable-false, so the mutant is semantically equivalent and **no test can kill it**. M7 independently confirms the behaviour it nominally protects *is* gated.
+
+**M8 settles the toggle-position question empirically.** The Implementer claimed position was proven by asserting the toggle is absent while `loading`/`error`/`empty` even though `canExpand()` is true. Relocating the toggle to after the state-chain `</div>` turns exactly those three cases red — so the tests prove **position**, not coincidence.
+
+#### Verification — every claimed number re-measured by the Reviewer
+
+| Claim | Verified |
+| --- | --- |
+| `npm run lint` | ✅ "All files pass linting." |
+| `npx jest --coverage=false src/app/pages/platform/pages/project-detail` | ✅ **5 suites / 117 tests** (baseline 5/98; +19) |
+| Card coverage 97.14 / 85.71 / 84.61 / 100 → **100 / 100 / 100 / 100** (stmts/branches/funcs/lines) | ✅ exact, measured before and after; template stays 100 |
+
+NFR-PDB-005 satisfied — coverage **rises** on both the `.ts` and the template.
+
+**Reviewer verdict — `STATUS: PASS`**
+
+> The suite instantiates the real `ProjectDashboardCardComponent`, asserts against rendered DOM, and demonstrably fails when the behaviour it claims to cover is broken — 7 of 8 mutations killed, including three I invented that the Implementer did not anticipate, with the eighth a provably equivalent mutant. Every R-PDB-002/003/004, NFR-PDB-003 and DC-3/4/6/7/11 case required by T-04 is present, live, and free of both traps R-PDB-004's Note warns about.
+
+Both R-PDB-004 traps were confirmed avoided: the invariance claim is a **state-comparison loop** (`expanded[i] === collapsed[i]` for i<5), not an absolute colour; and `getPartnerBarStyles` extracts only `{color, width}` on the `rows-partners` layout, so `rows-stacked-lever`'s `last:border-b-0` chrome never enters the comparison.
+
+#### Decisions made
+
+| # | Decision | Basis |
+| --- | --- | --- |
+| E-04.1 | Keyboard activation is gated by the **semantic contract** — native `<button type="button">`, not disabled, plus `.click()` — rather than by a dispatched `keydown` | **Adjudicated correct; jsdom claim verified directly by the Reviewer:** `keydown`/`keyup` with `Enter` and `' '` on a focused native `<button>` produced **0 click events**. A keydown assertion therefore has only two possible forms — `expect(emitted).toBe(1)`, which fails against correct code, or `expect(emitted).toBe(0)`, which passes against a `<div>` too. Both are worse than useless. Asserting the button semantics pins the exact platform property that grants Enter/Space activation. |
+| E-04.2 | 37- and 40-row cases are derived from the fixture via `deriveLargeRankedList(size)`, cycling its 7 real institutions with strictly descending counts | Legitimate derivation, not hand-rolled data. The fixture cannot carry 37 partners and `requirements.md:184`'s scenario mandates that number. |
+| E-04.3 | 534 lines against a ~340 estimate is **load-bearing, not padded** | Reviewer breakdown: ~99 lines pre-existing kept tests, ~50 helpers (all used), ~90 comments, remainder new cases. No duplicated cases, no dead helpers, no trivially-passing assertions. High comment density is deliberate — each block records *why* an assertion is non-vacuous, which is the point of a KZ-001 remediation. |
+
+#### Finding of record — the coverage-flag contradiction, resolved
+
+T-01, T-02 and T-03's Implementers all reported that a path-scoped jest run fails the global coverage thresholds by construction. T-04's Implementer reported it does **not**. The Reviewer resolved it: **T-01/T-02/T-03 are right.**
+
+`jest.config.ts:7` sets `collectCoverage: true`, and a path-scoped run with default flags fails all four global thresholds (`9.15% / 6.43% / 5.61% / 8.79%`). T-04's Implementer saw no failure **only because `--coverage=false` was passed**, which disables collection and therefore skips threshold evaluation entirely. Both statements are true of different commands; T-04's omitted the causal flag.
+
+**Consequence for T-08, recorded now so it is not rediscovered late:** T-08's coverage gate must be a **full-suite run without `--coverage=false`**, and no path-scoped run may ever be cited as coverage evidence.
+
+#### Issues encountered
+
+None. No rework round consumed.
+
+#### ADVISORY findings (4R lens — non-gating)
+
+| # | Lens | Finding |
+| --- | --- | --- |
+| A-04.1 | Risk | **Budget tripwire needs an entry** — T-04 landed +194 (+57%) on its row. Escalated to the spec owner; see the budget note below. |
+| A-04.2 | Readability | Dead guard in already-committed T-03 code: `@if (canExpand() && variant() === 'card')` (`.html:38`) sits inside the `@else` of `@if (variant() === 'list')`, so the second conjunct can never be false (this is M4's equivalence). Matches design §5.2.5 literally and is harmless defensively, but reads as untested to future mutation runs. **Not actioned** — `tasks.md:109` pins the wording. |
+| A-04.3 | Reliability | `getBoundedContainer` uses `querySelector('.overflow-visible')`, which also matches the no-items wrapper at `:49` and the per-row inner div at `:92`; it works only because document order puts the bounded container first. M3 proved both assertions are live **today**, but a template reorder could silently retarget them. A `data-testid` would make it robust. |
+| A-04.4 | — | `expect(button.tabIndex).toBe(0)` would gate the "keyboard reachable" half of NFR-PDB-003 explicitly and catch a future `tabindex="-1"`. jsdom **does** implement `tabIndex` defaulting, so unlike a keydown assertion this one would be meaningful. |
+| A-04.5 | — | `deriveLargeRankedList` synthesizes counts and ids while borrowing only labels. `mockContractFullReports({ top_partners: [...] })` — the override hook the fixture already exposes — would keep the scale-up inside the fixture's own contract. |
+
+#### Final verification
+
+`npm run lint` clean · 5 suites / 117 tests pass · card-component coverage 100/100/100/100 · component sources verified unmodified by checksum · working tree restored exactly.

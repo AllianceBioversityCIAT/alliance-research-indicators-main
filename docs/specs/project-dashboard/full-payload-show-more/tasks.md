@@ -138,7 +138,9 @@ graph TD
 - **Evidence that does NOT count:** any assertion that passes with the template replaced by a stub. Before declaring done, sanity-check the suite's fidelity: temporarily break one thing T-04 claims to cover (e.g. point an encoding member at `visibleItems()`) and confirm the suite **fails**. A green suite that cannot fail is the exact defect KZ-001 records.
 - **Dependencies:** T-01, T-02, T-03
 - **Effort:** L · **Skills:** `angular-developer`
-- **Status:** todo
+- **Status:** **done** — Reviewer PASS attempt 1, 2026-07-29. See [`execution.md`](./execution.md) § T-04.
+- **Fidelity proven, not asserted:** 8 mutations run against the component, **7 killed**, the 8th proven a semantically equivalent mutant. Four of the eight were invented by the Reviewer and unanticipated by the author. Card coverage rose 97/86/85/100 → **100/100/100/100**.
+- **Landed at 534 lines vs the ~340 estimate (+194).** Adjudicated load-bearing, not padded — see the budget note in `execution.md`.
 
 ---
 
@@ -230,6 +232,8 @@ graph TD
   - [ ] **Full** `npm test` from `client/research-indicators/` passes — coverage floors held (statements 40 / branches 20 / lines 45 / functions 30).
   - [ ] `npm run lint` and `npm run s-lint` clean.
 - **Evidence that does NOT count:** a **targeted** suite run. **KZ-003** (active lesson): a targeted run confirms the brief was followed, not that the blast radius is clean, and this task's entire risk *is* blast radius. If the full suite was not run, the task is not done. Equally: a green suite with a skipped or `.only` spec is not a pass — check for both before reporting.
+- **Coverage-flag rule, established during T-04 (`execution.md` § T-04):** `jest.config.ts:7` sets `collectCoverage: true`, so a **path-scoped** run fails all four global thresholds by construction (measured: 9.15 / 6.43 / 5.61 / 8.79). Earlier tasks passed `--coverage=false` to suppress that noise. **T-08's coverage gate must therefore be a full-suite run WITHOUT `--coverage=false`,** and no path-scoped run may be cited as coverage evidence.
+- **`npm run s-lint` cannot be "clean" — the acceptance box above is unachievable as written.** Baseline on this branch is **352 pre-existing SCSS errors** in unrelated files (measured during T-03, confirmed byte-identical via `git stash`). Neither the card nor the dashboard component has a `.scss` file. **Awaiting an owner decision** on whether to reinterpret this as "introduces no *new* s-lint errors" (the reading this run assumes) or to drop the criterion.
 - **Dependencies:** T-01, T-05, T-06
 - **Effort:** M · **Skills:** `angular-developer`, `systematic-debugging` (if the sweep surfaces failures)
 - **Status:** todo
