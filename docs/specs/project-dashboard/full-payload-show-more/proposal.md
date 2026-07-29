@@ -1,6 +1,22 @@
 # Proposal — Chunk A: Full-payload migration + Show-more + title alignment
 
 > Child of [`../analytics-expansion/proposal.md`](../analytics-expansion/proposal.md) (umbrella). Shared context — problem inventory P-1…P-9, decomposition rationale, RICE, and decisions **D-1…D-7** — lives there and is **not restated here**. This document is the slice boundary.
+>
+> ## ⚠️ SUPERSEDED IN PART — read `requirements.md` and `design.md` instead
+>
+> **This proposal predates the A/A2 split (2026-07-29) and three rounds of blind dual review.** It is kept as the point-in-time intent record. Where it disagrees with [`./requirements.md`](./requirements.md) or [`./design.md`](./design.md), **those win**.
+>
+> Specifically superseded here:
+>
+> | In this proposal | Actual state |
+> | --- | --- |
+> | `geo-scope-card.component.*` in scope; A-6 `mapCountries` limiter; deleting `get-geo-scope.service.ts`; governing decision **D-1** | **All moved to [`../geo-scope-expansion/`](../geo-scope-expansion/proposal.md)** (Chunk A2). This spec does not touch the geographic card |
+> | **A-SC1** — "the four `reports/top-*` **and `reports/geo-scope`** URLs appear in no network call" | **Unmeetable as written.** `reports/geo-scope` is deliberately retained until A2 (`requirements.md` §10, ASM-3). The four `reports/top-*` part stands |
+> | **A-SC5** — "Geocoding calls ≤ 20 on load" | **Not this spec's criterion.** Mapbox impact is "None in this spec"; the ceiling moved to A2 as `NFR-PDB-002` |
+> | A-5 "applied across all five `layout()` branches" | Reversed by **DD-3**: the toggle lives once in the card shell, layout-agnostic |
+> | A-R2's mechanism (`maxCount` rescaling) | Corrected: the real mechanism is `barColor`'s `total`-dependent ramp (`requirements.md` R-PDB-004) |
+> | A-9 "payload measurement … recorded in the design doc" | **Done** — GATE-1 measured 2026-07-29, ~36 KB worst case (`design.md` §13.1) |
+> | A-OQ1 "do ranks continue past 5?" | Closed by inspection: `rows-stacked-lever` already renders `index + 1` |
 
 ---
 

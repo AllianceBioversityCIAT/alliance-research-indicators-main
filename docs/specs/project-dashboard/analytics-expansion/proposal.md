@@ -70,11 +70,12 @@ In scope across the four chunks: the `Result analytics` block of `project-dashbo
 
 ## 7. Decomposition — 4 bounded changes
 
-All five child proposals are written (2026-07-29):
+All child proposals are written (2026-07-29). **Chunk A was split into A and A2 on 2026-07-29** after two rounds of blind dual review put the severe finding and most warnings on the geographic card — see [`../full-payload-show-more/judgment.md`](../full-payload-show-more/judgment.md) §10. The cut is structural: A's card change is purely additive (`visibleLimit` defaults to `null` = today's behaviour), so the geographic card renders unchanged until A2 lands.
 
 | # | Chunk | Proposal | Depends on | Parallel-safe | MoSCoW | RICE |
 | --- | --- | --- | --- | --- | --- | --- |
-| **A** | Full-payload migration + Show-more + title alignment | [`../full-payload-show-more/proposal.md`](../full-payload-show-more/proposal.md) | none | no | **Must** | **36** |
+| **A** | Full-payload migration + Show-more + title alignment — **four ranked cards only** | [`../full-payload-show-more/proposal.md`](../full-payload-show-more/proposal.md) | none | no | **Must** | **36** |
+| **A2** | Geographic scope card — full payload, geocoding bounding (**D-1**), expansion | [`../geo-scope-expansion/proposal.md`](../geo-scope-expansion/proposal.md) | A | no (conflicts with D) | **Must** | **20** |
 | **B** | Indicator-metadata charts + server status aggregation | [`../indicator-metadata-charts/proposal.md`](../indicator-metadata-charts/proposal.md) | A | no vs A/C · **yes vs D** | **Must** | **16** |
 | **C1** | Chart drill-down — indicator / status / lever | [`../chart-drilldown/proposal.md`](../chart-drilldown/proposal.md) | A (schedule after B) | no | **Should** | **30** |
 | **C2** | Results filter expansion — new drill-down dimensions | [`../results-filter-expansion/proposal.md`](../results-filter-expansion/proposal.md) | C1 | no | **Could** | **8** |
@@ -82,17 +83,24 @@ All five child proposals are written (2026-07-29):
 
 > RICE = (Reach × Impact × Confidence) / Effort, Reach = 100 % of Project-Detail users in every row. Effort in dev-days: A 5 · B 10 · C1 4 · C2 12 · D 4.
 >
-> **Recommended build order: A → (B ∥ D) → C1 → C2.** RICE ranks C1 above B, but B is the ticket's headline business ask and B's new cards are what C1 would eventually have to make clickable — building C1 first means touching the same template twice. A second reason surfaced while writing the children (**C1-R3**): *Results by status* changes data source in B per D-6, so running C1 first would mean writing its status click handler twice. D is the only chunk with **no file overlap** with the others (`geo-scope-map.component.*`, `country-centroids.constants.ts`, `package.json`), so it can run in a parallel worktree alongside B — a property that **D-1's placement of the geocoding limiter in `GeoScopeCardComponent` exists to protect**.
+> **Recommended build order: A → A2 → (B ∥ D) → C1 → C2.** A2 must precede D: A2 changes only what is *passed to* the map, D changes only how the map *renders*, so running A2 first gives D a stable, already-bounded input contract to port against. Umbrella **D-1** (the geocoding limiter) moved from A to A2, because the limiter becomes mandatory only at the moment the geographic card is re-sourced to the unbounded payload — which is A2's job, not A's.
+>
+> Original rationale, unchanged: **A → (B ∥ D) → C1 → C2.** RICE ranks C1 above B, but B is the ticket's headline business ask and B's new cards are what C1 would eventually have to make clickable — building C1 first means touching the same template twice. A second reason surfaced while writing the children (**C1-R3**): *Results by status* changes data source in B per D-6, so running C1 first would mean writing its status click handler twice. D is the only chunk with **no file overlap** with the others (`geo-scope-map.component.*`, `country-centroids.constants.ts`, `package.json`), so it can run in a parallel worktree alongside B — a property that **D-1's placement of the geocoding limiter in `GeoScopeCardComponent` exists to protect**.
 
 ### Chunk A — Full-payload migration + Show-more + title alignment
 
 | | |
 | --- | --- |
-| Delivers | P-1, P-2, P-3, P-6 |
-| Server | None required — `reports/full` already ships. |
-| Client | New `ContractFullReports` interface + `GET_FullContractReports` in `api.service.ts`; one `GetFullContractReportsService` replacing `GetTopContributorsContractsService`, `GetTopMainContactPersonsService`, `GetTopPartnersService`, `GetTopPrimaryLeversService`, `GetGeoScopeService` as the dashboard's data source; `project-dashboard.component.ts` slices top-5 client-side (D-3); `project-dashboard-card` gains an internal `expanded` signal + "Show more" / "Show less" toggle that swaps the sliced list for the full one **in place** (D-2); `GeoScopeCardComponent` gains the `mapCountries` limiter (D-1); titles renamed per D-4. |
-| Retires | 5 client services + 5 `GET_Top*`/`GET_GeoScope` api methods + their specs (server endpoints untouched). |
-| Key risk | **`reports/full` is unbounded.** The screenshot's project has 521 results; `top_countries` carries sub-nationals nested per country. Payload size still needs a ceiling (R-1); the geocoding fan-out is settled by **D-1** (client-side top-5 countries / top-3 sub-nationals limiter in `GeoScopeCardComponent`). |
+> **Updated 2026-07-29 for the A/A2 split.** The geographic card, `GetGeoScopeService`, the `mapCountries` limiter and umbrella **D-1** all moved to **A2**. Chunk A covers the **four ranked cards only**.
+
+| | |
+| --- | --- |
+| Delivers | P-1, P-2, P-3, P-6 — **for the four ranked cards** (Results Partners, Primary Levers, Main contact person, Contributing projects) |
+| Server | None required — `reports/full` already ships, and **GATE-1 measured its size as ~36 KB worst case**, so no ceiling is needed. |
+| Client | New `ContractFullReports` interface + `GET_FullContractReports` in `api.service.ts`; one `GetFullContractReportsService` replacing `GetTopContributorsContractsService`, `GetTopMainContactPersonsService`, `GetTopPartnersService`, `GetTopPrimaryLeversService`; top-5 sliced client-side (D-3); `project-dashboard-card` becomes **presentational** — `visibleLimit` input (default `null`) + `expandToggled` output — with expansion state held by the host (**DD-1r**, which reversed the original internal-signal design); titles renamed per D-4. |
+| Retires | **4** client services + **4** `GET_Top*` api methods + their specs (server endpoints untouched). **`GetGeoScopeService` and `GET_GeoScope` survive — they retire in A2.** |
+| Key risk | **Resolved.** `reports/full` was feared unbounded; GATE-1 measured the real worst case at **137** partner rows / ~36 KB across the top 25 contracts, so no ceiling is warranted. The geocoding fan-out is **A2's** risk, settled there by **D-1**. |
+| Judgment | Three rounds of blind dual review — [`../full-payload-show-more/judgment.md`](../full-payload-show-more/judgment.md) |
 
 ### Chunk B — Indicator-metadata charts
 
@@ -161,7 +169,7 @@ Swap `mapbox-gl` for `leaflet` in `geo-scope-map.component.ts` (map init, `GeoJS
 
 ### MODIFIED
 
-- Dashboard load path: 6 requests → 2 (`reports/full` + `results/count`).
+- Dashboard load path: 6 requests → 2 (`reports/full` + `results/count`) — **reached across A + A2 + B, not by A alone**: A collapses the four `reports/top-*` calls, A2 retires `reports/geo-scope`, B retires the `limit: 10_000` status fetch.
 - Top-N is applied **client-side** from the full payload instead of server-side via `limit`, and the cap goes from **4 → 5** (D-3).
 - Chart titles renamed per the verified D-4 table.
 - Geographic scope map: `mapbox-gl` → `leaflet`, rendering Mapbox raster tiles with the existing token (D-5).
@@ -183,7 +191,7 @@ Swap `mapbox-gl` for `leaflet` in `geo-scope-map.component.ts` (map init, `GeoJS
 | Reviewability | Poor — a ~35-day spec, gates lose meaning | Each chunk is independently reviewable, testable, shippable | Medium |
 | Rework risk | High — the payload contract, the Show-more component and the drill-down all get designed before any of them is validated | Low — A fixes the payload contract once; B and C1 build on a proven base | **High** — building charts before the payload/Show-more pattern exists means every new card is retrofitted twice |
 | Parallelism | None | D runs in a parallel worktree; C2 can be scheduled independently | None |
-| First value | Day ~35 | Day ~5 (A ships alone: 6 requests → 2, full data reachable, titles fixed) | Day ~10 |
+| First value | Day ~35 | Day ~5 (A ships alone: the four `reports/top-*` calls collapse to one, full ranked data reachable, titles fixed. **6 → 2 arrives after A2 and B**) | Day ~10 |
 
 **Recommended: Option 2.** It is the smallest safe path because Chunk A alone establishes the two contracts every other chunk consumes — the full-payload shape and the Show-more component — and it is shippable on its own. Chunk D is genuinely orthogonal and gets a free parallel slot. Chunk C2 is honestly separated as a **results-center** change so its true cost is not hidden inside a dashboard ticket.
 

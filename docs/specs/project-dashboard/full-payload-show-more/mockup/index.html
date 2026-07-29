@@ -1,0 +1,432 @@
+<title>GATE-2 — Show more: collapsed / expanded layout contract</title>
+
+<style>
+  /* Palette taken from the app's own tokens (project-dashboard-chart-colors.constants.ts and the
+     component templates) — this mockup's job is to mirror the real UI, so it inherits rather than invents.
+     Every theme-varying value is a token, redefined in all three places. No component is styled inside a
+     media query: that would survive the viewer's theme toggle and break contrast in one direction. */
+  :root{
+    /* fixed brand ramp — identical in both themes, these are data encodings */
+    --navy:#112F5C; --mid:#345b8f; --blue:#1689CA; --green:#358540; --lightgreen:#7CB580;
+    --purple:#78288c;
+    /* theme-varying surface + text */
+    --ink:#4c5158; --muted:#777C83; --line:#e8ebed; --bg:#fafafa; --panel:#fff;
+    --chip:#E8F0F7; --chip-ink:#345B8F; --head:#112F5C; --action:#1771b3; --warn:#CF0808;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#d6dae0; --muted:#9aa1a9; --line:#2a3138; --bg:#14181d; --panel:#1b2027;
+           --chip:#243347; --chip-ink:#a9c6ea; --head:#8fb3e0; --action:#4d9fe0; --warn:#ff6b6b; }
+  }
+  :root[data-theme="dark"]{ --ink:#d6dae0; --muted:#9aa1a9; --line:#2a3138; --bg:#14181d; --panel:#1b2027;
+           --chip:#243347; --chip-ink:#a9c6ea; --head:#8fb3e0; --action:#4d9fe0; --warn:#ff6b6b; }
+  :root[data-theme="light"]{ --ink:#4c5158; --muted:#777C83; --line:#e8ebed; --bg:#fafafa; --panel:#fff;
+           --chip:#E8F0F7; --chip-ink:#345B8F; --head:#112F5C; --action:#1771b3; --warn:#CF0808; }
+
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1600px;margin:0 auto;padding:20px}
+  h1{font-size:19px;margin:0 0 4px;color:var(--head);text-wrap:balance}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+
+  /* ---- control bar ---- */
+  .controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:8px}
+  .cgroup{display:flex;gap:8px;align-items:center}
+  .clabel{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  button.seg{border:1px solid var(--line);background:transparent;color:var(--ink);
+    padding:6px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600}
+  button.seg[aria-pressed="true"]{background:var(--action);border-color:var(--action);color:#fff}
+  .note{font-size:12px;color:var(--muted)}
+
+  .banner{border-left:5px solid var(--action);background:var(--panel);padding:10px 14px;
+    border-radius:0 8px 8px 0;margin:0 0 18px;font-size:13px}
+  .banner.bad{border-left-color:var(--warn)}
+  .banner.warn{border-left-color:#E69F00}
+  .banner b{color:var(--head)}
+
+  /* ---- the REAL dashboard grid, mirrored from project-dashboard.component.html ---- */
+  .outer{display:grid;grid-template-columns:1fr;gap:20px}
+  @media(min-width:1100px){
+    .outer{grid-template-columns:3fr 1fr;min-height:520px;align-items:stretch}
+  }
+  .leftcol{display:flex;flex-direction:column;gap:20px;min-width:0}
+  .ranked{display:grid;grid-template-columns:1fr;gap:20px}
+  @media(min-width:1100px){
+    .ranked{grid-template-columns:1fr 1fr;align-items:stretch}
+    /* DD-13: only while a card in this grid is expanded do the cards size independently.
+       Collapsed keeps lg:items-stretch, so the default view is byte-for-byte today's. */
+    .ranked.independent{align-items:start}
+  }
+  .rightcol{display:flex;flex-direction:column;gap:20px;min-width:0}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;
+    display:flex;flex-direction:column;min-width:0;position:relative}
+  .card h2{font-size:15px;font-weight:600;margin:0 0 2px;color:var(--head)}
+  .card p.desc{margin:0 0 14px;font-size:13px;color:var(--muted)}
+
+  /* the list region — this is the element the design bounds */
+  .listwrap{min-width:0;flex:1}
+  .listwrap.bounded{max-height:46vh;overflow-y:auto;padding-right:6px}
+  .listwrap.bounded::-webkit-scrollbar{width:8px}
+  .listwrap.bounded::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+
+  ul.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+  /* layout="rows-partners" */
+  li.rp{display:grid;grid-template-columns:clamp(7.5rem,38%,12rem) minmax(0,1fr);
+    align-items:center;gap:10px}
+  li.rp .lbl{font-size:12.5px;font-weight:600;line-height:1.25;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical}
+  li.rp .barwrap{display:flex;align-items:center;min-width:0}
+  li.rp .bar{height:24px;border-radius:6px;flex-shrink:0;transition:width .3s}
+  li.rp .cnt{margin-left:6px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--head)}
+  /* layout="rows-stacked-lever" */
+  li.rsl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;
+    border-bottom:1px solid var(--line);padding-bottom:8px}
+  li.rsl:last-child{border-bottom:0;padding-bottom:0}
+  .rank{width:28px;height:28px;border-radius:50%;background:var(--chip);color:var(--chip-ink);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+    font-variant-numeric:tabular-nums;flex-shrink:0}
+  li.rsl .lbl2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.02em;
+    line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical}
+  li.rsl .sub2{font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0}
+  li.rsl .res{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--head);white-space:nowrap}
+
+  /* the toggle — inside the items() arm, right after the list */
+  .toggle{margin-top:14px;align-self:flex-start;background:transparent;border:0;padding:6px 2px;
+    color:var(--action);font-size:13px;font-weight:700;cursor:pointer;display:flex;gap:6px;align-items:center}
+  .toggle:focus-visible{outline:2px solid var(--action);outline-offset:3px;border-radius:6px}
+  .toggle .caret{transition:transform .2s}
+  .toggle[aria-expanded="true"] .caret{transform:rotate(180deg)}
+
+  .sidebox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .sidebox h3{font-size:15px;font-weight:600;margin:0 0 2px;color:var(--head)}
+  .total{display:flex;justify-content:space-between;align-items:flex-end;background:var(--bg);
+    border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:12px 0}
+  .total b{font-size:28px;line-height:1;color:var(--head);font-variant-numeric:tabular-nums}
+  .distro{display:flex;height:20px;border-radius:8px;overflow:hidden;background:var(--line);margin-bottom:10px}
+  .ind{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;
+    padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}
+  .ind:last-child{border-bottom:0}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+  /* geo card — untouched by chunk A, shown for adjacency only */
+  .geo{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:18px;color:var(--muted)}
+  .geo .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    background:var(--chip);color:var(--chip-ink);padding:3px 8px;border-radius:20px;margin-bottom:8px}
+
+  .watch{position:absolute;top:-9px;right:12px;font-size:10px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;background:var(--warn);color:#fff;padding:2px 8px;border-radius:20px;display:none}
+  body.unbounded .watch{display:block}
+
+  .findings{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .findings h2{font-size:15px;margin:0 0 10px;color:var(--head)}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+    background:var(--bg);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+  .scrollx{overflow-x:auto}
+  .ok{color:var(--green);font-weight:700}
+  .no{color:var(--warn);font-weight:700}
+</style>
+
+<div class="wrap">
+  <h1>GATE-2 — “Show more” layout contract: collapsed vs expanded</h1>
+  <p class="sub">
+    Chunk A · <code>project-dashboard/full-payload-show-more</code> · mirrors the real grid from
+    <code>project-dashboard.component.html:153–200</code>. Row counts are the <b>measured</b> GATE-1 worst case
+    (137 partners, 15 contributors, 12 contacts, 6 levers), not invented figures.
+  </p>
+
+  <div class="controls">
+    <div class="cgroup">
+      <span class="clabel">Containment</span>
+      <button class="seg" id="btnUnbounded" aria-pressed="false">1 · Unbounded ✗</button>
+      <button class="seg" id="btnStretch" aria-pressed="false">2 · Bounded + stretch ⚠</button>
+      <button class="seg" id="btnIndependent" aria-pressed="true">3 · Bounded + independent ✓</button>
+    </div>
+    <div class="cgroup">
+      <span class="clabel">All cards</span>
+      <button class="seg" id="btnExpand" aria-pressed="false">Expand all</button>
+      <button class="seg" id="btnCollapse" aria-pressed="false">Collapse all</button>
+    </div>
+    <span class="note">Expand <b>Results Partners</b> (137 rows) and watch the right-hand column.</span>
+  </div>
+
+  <div class="banner" id="banner">
+    <b>Bounded (recommended, OQ-3 = viewport-relative).</b>
+    The expanded list scrolls inside its own card at <code>max-height:46vh</code>. Sibling cards and the
+    right-hand column keep their height. This is the state NFR-PDB-004 requires.
+  </div>
+
+  <!-- ================= the real grid ================= -->
+  <div class="outer">
+    <div class="leftcol">
+      <div class="ranked">
+        <section class="card" data-chart="partners">
+          <span class="watch">watch this row-mate</span>
+          <h2>Results Partners</h2>
+          <p class="desc">Partner institutions most frequently linked to results on this primary project.</p>
+          <div class="listwrap bounded"><ul class="rows" data-list="partners"></ul></div>
+          <button class="toggle" aria-expanded="false" data-toggle="partners">
+            <span class="txt">Show more</span><span class="caret">▾</span>
+          </button>
+        </section>
+
+        <section class="card" data-chart="levers">
+          <span class="watch">watch this row-mate</span>
+          <h2>Primary Levers</h2>
+          <p class="desc">Primary levers most frequently linked to results on this project.</p>
+          <div class="listwrap bounded"><ul class="rows" data-list="levers"></ul></div>
+          <button class="toggle" aria-expanded="false" data-toggle="levers">
+            <span class="txt">Show more</span><span class="caret">▾</span>
+          </button>
+        </section>
+
+        <section class="card" data-chart="contacts">
+          <h2>Main contact person</h2>
+          <p class="desc">Main contact persons most frequently linked to results on this project.</p>
+          <div class="listwrap bounded"><ul class="rows" data-list="contacts"></ul></div>
+          <button class="toggle" aria-expanded="false" data-toggle="contacts">
+            <span class="txt">Show more</span><span class="caret">▾</span>
+          </button>
+        </section>
+
+        <section class="card" data-chart="contributors">
+          <h2>Contributing projects</h2>
+          <p class="desc">Top projects contributing to results where this project is the primary project.</p>
+          <div class="listwrap bounded"><ul class="rows" data-list="contributors"></ul></div>
+          <button class="toggle" aria-expanded="false" data-toggle="contributors">
+            <span class="txt">Show more</span><span class="caret">▾</span>
+          </button>
+        </section>
+      </div>
+
+      <div class="geo">
+        <span class="tag">Chunk A2 — untouched here</span>
+        <div style="font-weight:600;color:var(--head)">Geographic Scope</div>
+        <div style="font-size:13px;margin-top:4px">
+          Renders exactly as today: <code>visibleLimit</code> defaults to <code>null</code>, so adding the input
+          changes nothing for its three <code>variant="list"</code> lists (DD-12 / R-PDB-002 AC.5).
+          Its own expansion, the map limiter and the title rename land in
+          <code>project-dashboard/geo-scope-expansion</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- right column: the adjacency revision 2 got wrong -->
+    <div class="rightcol">
+      <div class="sidebox" id="sideA">
+        <h3>Results by indicator</h3>
+        <p class="desc" style="margin:2px 0 0">Number of results linked to each indicator on this project.</p>
+        <div class="total">
+          <div>
+            <div class="clabel">Total results</div><b>521</b>
+          </div>
+          <span class="note">5 indicators</span>
+        </div>
+        <div class="clabel">Distribution</div>
+        <div class="distro">
+          <div style="width:60%;background:var(--blue)"></div>
+          <div style="width:32%;background:#78288c"></div>
+          <div style="width:6%;background:var(--navy)"></div>
+          <div style="width:2%;background:var(--lightgreen)"></div>
+        </div>
+        <div class="ind"><span class="rank">1</span><span><span class="dot" style="background:var(--blue)"></span> Capacity Sharing for Development</span><b>310</b></div>
+        <div class="ind"><span class="rank">2</span><span><span class="dot" style="background:#78288c"></span> Knowledge Product</span><b>167</b></div>
+        <div class="ind"><span class="rank">3</span><span><span class="dot" style="background:var(--navy)"></span> Innovation Use</span><b>33</b></div>
+        <div class="ind"><span class="rank">4</span><span><span class="dot" style="background:var(--lightgreen)"></span> Innovation Development</span><b>9</b></div>
+        <div class="ind"><span class="rank">5</span><span><span class="dot" style="background:var(--warn)"></span> Policy Change</span><b>2</b></div>
+      </div>
+      <div class="sidebox">
+        <h3>Results by status</h3>
+        <p class="desc" style="margin:2px 0 0">Number of results by workflow status on this project.</p>
+        <div style="margin-top:12px;font-size:12.5px;color:var(--muted)">
+          QAed In PRMS · Completed In TIP · Editing In PRMS …
+          <div style="margin-top:8px"><code>Chunk B</code> moves this to a server aggregation (D-6).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= what this mockup settles ================= -->
+  <section class="findings">
+    <h2>What this mockup settles</h2>
+    <div class="scrollx">
+      <table>
+        <thead><tr><th>Question</th><th>Answer it gives</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>OQ-3</b> — bounded height: fixed or viewport-relative?</td>
+            <td><span class="ok">Viewport-relative</span>, <code>max-height:46vh</code> — taller than the collapsed
+              card on a laptop while still fitting beside the right column. A fixed pixel bound either wastes a tall
+              screen or overflows a short one. <b>But the bound alone is not the answer</b> — see DD-13 below.</td>
+          </tr>
+          <tr>
+            <td><b>DC-8</b> — which sibling does an unbounded expansion actually stretch?</td>
+            <td>Both, and the second one is the trap. Flip to <b>1 · Unbounded</b> and expand Results Partners:
+              its <i>row-mate</i> in the nested 2-column grid stretches, <b>and</b> the whole
+              <i>right-hand column</i> (Results by indicator / by status) stretches through the outer
+              <code>items-stretch</code>. Revision 2 named the wrong adjacency; the human-check script now names both.</td>
+          </tr>
+          <tr>
+            <td><b>DD-13</b> — is bounding the list enough? <span class="no">No.</span></td>
+            <td><b>This is what the mockup caught that reading the code did not.</b> Compare
+              <b>2 · Bounded + stretch</b> against <b>3 · Independent</b>. Bounding stops the page growing, but
+              <code>lg:items-stretch</code> still forces the row-mate to match the expanded card, so Primary Levers
+              grows a tall empty gap with its 5 rows stranded at the top and its “Show more” pushed far below the
+              content. Padding that gap with rows nobody asked for would break the ticket’s scope — so the fix is the
+              height, not the content: while any card in the row is expanded the grid switches to
+              <code>align-items:start</code>. Collapsed it keeps <code>items-stretch</code>, so the default view
+              does not change.</td>
+          </tr>
+          <tr>
+            <td><b>DD-4</b> — the colour consequence</td>
+            <td>Collapsed, row 5 is <code style="background:#345b8f;color:#fff;border:0">#345b8f</code> (middle),
+              <b>not</b> navy. Expanded, row 137 is the one painted
+              <code style="background:#112F5C;color:#fff;border:0">#112F5C</code>. Encoding is computed over the
+              full list, so nothing already on screen changes when you expand — that is R-PDB-004, and you can
+              verify it by eye here.</td>
+          </tr>
+          <tr>
+            <td><b>R-PDB-002 AC.2</b> — no toggle when ≤ 5</td>
+            <td><b>Contributing projects</b> has 15 rows and <b>Primary Levers</b> 6, so both show a toggle;
+              a section of ≤ 5 renders none. <code>canExpand()</code> lives in the card beside the toggle.</td>
+          </tr>
+          <tr>
+            <td><b>NFR-PDB-003</b> — a11y</td>
+            <td>Each toggle is a real <code>&lt;button&gt;</code> with <code>aria-expanded</code> and an accessible
+              name carrying its chart title, so four “Show more” buttons are distinguishable. Tab to them and press
+              <kbd>Enter</kbd>/<kbd>Space</kbd>.</td>
+          </tr>
+          <tr>
+            <td>Render cost at the measured worst case</td>
+            <td>137 rows in one card, from GATE-1. Comfortable — the concern this mockup was going to test
+              (“hundreds of rows”) is not what the data contains.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin:14px 0 0">
+      Fidelity limits, stated so this is not over-read: system fonts stand in for Barlow / Space&nbsp;Grotesk
+      (no external resources), and the geographic card is a placeholder because Chunk A does not touch it.
+      Everything else — grid columns, gaps, bar geometry, rank chips, colour ramp, toggle placement inside the
+      items arm — mirrors the real templates.
+    </p>
+  </section>
+</div>
+
+<script>
+  const LIMIT = 5;
+  const PARTNER_NAMES = ['MAGA – Ministerio de Agricultura, Ganadería y Alimentación','ARSAGRO – Asociación Regional de Servicios Agropecuarios','INSIVUMEH – Instituto Nacional de Sismología y Vulcanología','ICC – Instituto Privado de Investigación sobre Cambio Climático','CIAT – Alliance of Bioversity International','INTA – Instituto Nicaragüense de Tecnología Agropecuaria','IICA – Instituto Interamericano de Cooperación','FAO – Food and Agriculture Organization','CATIE – Centro Agronómico Tropical','UNA – Universidad Nacional Agraria','MAG – Ministerio de Agricultura y Ganadería','SENASA – Servicio Nacional de Sanidad Agraria','CGIAR System Organization','IFPRI – International Food Policy Research Institute','CIMMYT – International Maize and Wheat Center','IRRI – International Rice Research Institute','ILRI – International Livestock Research Institute','ICRISAT – Semi-Arid Tropics Institute','WorldFish','IWMI – International Water Management Institute'];
+  function partnerLabel(i){ return i < PARTNER_NAMES.length ? PARTNER_NAMES[i] : 'Partner institution ' + (i + 1) + ' – regional research node'; }
+
+  // rank ramp, mirroring projectDashboardBarColor(index, total)
+  function barColor(i, total){
+    if (total === 1) return '#112f5c';
+    if (i === 0) return '#358540';
+    if (i === 1) return '#7CB580';
+    if (i === 2) return '#1689CA';
+    if (total >= 4 && i === total - 1) return '#112F5C';
+    return '#345b8f';
+  }
+
+  // measured GATE-1 worst case
+  const DATA = {
+    partners:     Array.from({length:137},(_,i)=>({label:partnerLabel(i), count:Math.max(1, 44 - Math.floor(i*0.31))})),
+    levers:       [['LEVER 4 – BIODIVERSITY FOR FOOD AND AGRICULTURE',464],['LEVER 3 – CLIMATE ACTION',70],['LEVER 2 – MULTIFUNCTIONAL LANDSCAPES',8],['LEVER 5 – DIGITAL INCLUSION',4],['LEVER 1 – NUTRITION, HEALTH AND FOOD SECURITY',3],['LEVER 6 – GENDER EQUALITY AND INCLUSION',1]].map(([label,count])=>({label,count})),
+    contacts:     Array.from({length:12},(_,i)=>({label:['CAMILO BARRIOS PEREZ','MANUEL FRANCISCO MORENO BUSTAMANTE','EMMANUEL ZAPATA CALDAS','IVON MARITZA CASALLAS MARTINEZ','MARIA GARCIA','MARIA GARCIA','JORGE LUIS RESTREPO','ANA LUCIA TORRES','DIEGO FERNANDO OSPINA','LAURA JIMENEZ','CARLOS ANDRES RUIZ','SOFIA MENDOZA'][i], sub:'user'+(i+1)+'@cgiar.org', count:Math.max(1,5-Math.floor(i/3))})),
+    contributors: Array.from({length:15},(_,i)=>({label:(i===0?'G206 – CGIAR FUND INIT-14-AGRILAC RESILIENTE: RESILIENT AGRIFOOD INNOVATION SYSTEMS IN LATIN AMERICA':'C'+(200+i)+' – Contributing project '+(i+1)), count:Math.max(1,499-i*33)}))
+  };
+  const LAYOUT = { partners:'rp', levers:'rsl', contacts:'rsl', contributors:'rsl' };
+  const expanded = new Set();
+
+  function render(key){
+    const items = DATA[key], total = items.length;
+    const shown = expanded.has(key) ? items : items.slice(0, LIMIT);
+    const ul = document.querySelector('[data-list="'+key+'"]');
+    const max = Math.max(...items.map(i=>i.count));       // scale over the FULL list — R-PDB-004
+    ul.innerHTML = shown.map((it, i) => {
+      const colour = barColor(i, total);                   // colour over the FULL list — R-PDB-004
+      if (LAYOUT[key] === 'rp') {
+        const w = Math.min(94, (it.count / max) * 94);
+        return '<li class="rp"><span class="lbl" title="'+it.label+'">'+it.label+'</span>'
+          + '<span class="barwrap"><span class="bar" style="width:'+w+'%;min-width:8px;background:'+colour+'"></span>'
+          + '<span class="cnt">'+it.count+'</span></span></li>';
+      }
+      return '<li class="rsl"><span class="rank">'+(i+1)+'</span>'
+        + '<span><span class="lbl2">'+it.label+'</span>'
+        + (it.sub ? '<span class="sub2">'+it.sub+'</span>' : '') + '</span>'
+        + '<span class="res">'+it.count+' result'+(it.count===1?'':'s')+'</span></li>';
+    }).join('');
+
+    const btn = document.querySelector('[data-toggle="'+key+'"]');
+    const canExpand = total > LIMIT;
+    btn.style.display = canExpand ? 'flex' : 'none';
+    const isOpen = expanded.has(key);
+    btn.setAttribute('aria-expanded', String(isOpen));
+    const title = btn.closest('.card').querySelector('h2').textContent;
+    btn.querySelector('.txt').textContent = isOpen ? 'Show less' : 'Show more';
+    btn.setAttribute('aria-label', (isOpen ? 'Show less, ' : 'Show more, ') + title
+      + (isOpen ? '' : ' — ' + (total - LIMIT) + ' more'));
+  }
+
+  const ALL = Object.keys(DATA);
+  ALL.forEach(render);
+
+  document.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const k = btn.dataset.toggle;
+      expanded.has(k) ? expanded.delete(k) : expanded.add(k);
+      render(k);
+      applyMode();          // independent height depends on whether anything is expanded
+    });
+  });
+
+  const BANNERS = {
+    unbounded: ['bad',
+      '<b>1 · Unbounded — the original defect.</b> Expand <b>Results Partners</b>: its row-mate stretches, the '
+      + 'right-hand <i>Results by indicator / by status</i> column stretches too through the outer '
+      + '<code>items-stretch</code>, and the page grows instead of the card scrolling.'],
+    stretch: ['warn',
+      '<b>2 · Bounded, but still stretching — the defect the mockup caught.</b> The list now scrolls at '
+      + '<code>max-height:46vh</code>, yet <code>lg:items-stretch</code> still forces the row-mate to match the '
+      + 'expanded card’s height. <b>Primary Levers grows a large empty gap with its 5 rows stranded at the top.</b> '
+      + 'Filling that gap with unrequested rows would break the ticket’s scope, so the height itself has to go.'],
+    independent: ['',
+      '<b>3 · Bounded + independent (DD-13, recommended).</b> While any card in the row is expanded the grid '
+      + 'switches to <code>align-items:start</code>, so each card keeps its natural height: the expanded one scrolls '
+      + 'inside itself, <b>Primary Levers ends right after its own content and its “Show more” stays reachable</b>. '
+      + 'Collapsed, the grid keeps <code>items-stretch</code> — so the default view is unchanged.']
+  };
+  let MODE = 'independent';
+
+  function applyMode(){
+    const bounded = MODE !== 'unbounded';
+    document.body.classList.toggle('unbounded', MODE === 'unbounded');
+    document.querySelectorAll('.listwrap').forEach(el => el.classList.toggle('bounded', bounded));
+    // independent height only while something is actually expanded
+    document.querySelector('.ranked')
+      .classList.toggle('independent', MODE === 'independent' && expanded.size > 0);
+    for (const [id, m] of [['btnUnbounded','unbounded'],['btnStretch','stretch'],['btnIndependent','independent']]) {
+      document.getElementById(id).setAttribute('aria-pressed', String(MODE === m));
+    }
+    const [cls, html] = BANNERS[MODE];
+    const b = document.getElementById('banner');
+    b.className = 'banner' + (cls ? ' ' + cls : '');
+    b.innerHTML = html;
+  }
+  function setMode(m){ MODE = m; applyMode(); }
+
+  document.getElementById('btnUnbounded').onclick   = () => setMode('unbounded');
+  document.getElementById('btnStretch').onclick     = () => setMode('stretch');
+  document.getElementById('btnIndependent').onclick = () => setMode('independent');
+  document.getElementById('btnExpand').onclick = () => { ALL.forEach(k => { if (DATA[k].length > LIMIT) expanded.add(k); render(k); }); applyMode(); };
+  document.getElementById('btnCollapse').onclick = () => { expanded.clear(); ALL.forEach(render); applyMode(); };
+  applyMode();
+</script>
