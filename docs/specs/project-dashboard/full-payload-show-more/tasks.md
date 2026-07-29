@@ -191,7 +191,10 @@ graph TD
 - **Evidence that does NOT count:** the class assertion is **not** evidence the layout is correct — it proves a class is present, nothing about rendered geometry. Three rounds of blind review passed on a design whose containment was incomplete precisely because no automated gate can see this; it was caught by operating the mockup. If the human check is skipped, report NFR-PDB-004 as **unverified**, not as passed.
 - **Dependencies:** T-05
 - **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** 🔶 **`[~]` BLOCKED — Pivot Protocol triggered 2026-07-29.** Implementation passed all eight conformance gates and is committed; **the spec is what fails.** See [`execution.md`](./execution.md) → *Pivot Record: T-06*. **Awaiting an owner decision between options (a) / (b) / (c) before T-07 proceeds.**
+- **The gap:** DD-13 puts `align-items: start` on the ranked grid only. **`align-items` does not size grid tracks** — so the row-mate stops stretching (the half DD-13 fixes) but the track still grows to the expanded card, propagating through the left column to the outer `lg:items-stretch` grid and into the right-hand column, where `flex-1` on *Results by status* (`:270`) absorbs the entire delta as a white void. **Human-check step 3 will fail.**
+- **RB-2 confirmed the hard way:** the GATE-2 mockup's right column omits `flex:1`, so it cannot reproduce the defect — the artefact used to close GATE-2 and serve as the human-check reference carries the same blind spot. **`mockup/index.html` needs `flex:1` on the second `.sidebox` regardless of which option is chosen.**
+- Delivered and verified regardless of the pivot: R-PDB-003 **AC.4, AC.6, AC.7**.
 
 ---
 

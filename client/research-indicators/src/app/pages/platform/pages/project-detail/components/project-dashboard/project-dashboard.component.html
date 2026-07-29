@@ -154,7 +154,8 @@
     <div class="flex min-w-0 flex-col gap-5 lg:h-full lg:self-stretch ">
 
       <!-- Results by indicator -->
-      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2" [class.lg:items-start]="rankedGridIndependent()"
+        [class.lg:items-stretch]="!rankedGridIndependent()">
 
         <div class="flex flex-1">
           <app-project-dashboard-card title="Results Partners"
@@ -162,7 +163,8 @@
             class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="reports.loading()"
             [error]="reports.loadError()" [empty]="partnersEmpty()"
             emptyMessage="No partner institutions were found for this project." [items]="partnerItems()"
-            layout="rows-partners" (retry)="reports.update()">
+            layout="rows-partners" [visibleLimit]="partnersVisibleLimit()" (expandToggled)="toggleExpanded('partners')"
+            (retry)="reports.update()">
           </app-project-dashboard-card>
         </div>
 
@@ -172,7 +174,8 @@
             iconClass="pi pi-sliders-h" [compact]="true" [loading]="reports.loading()"
             [error]="reports.loadError()" [empty]="leversEmpty()"
             emptyMessage="No primary levers were found for this project." [items]="leverItems()"
-            layout="rows-stacked-lever" (retry)="reports.update()">
+            layout="rows-stacked-lever" [visibleLimit]="leversVisibleLimit()" (expandToggled)="toggleExpanded('levers')"
+            (retry)="reports.update()">
           </app-project-dashboard-card>
         </div>
 
@@ -182,7 +185,8 @@
             iconClass="pi pi-users" [compact]="true" [loading]="reports.loading()"
             [error]="reports.loadError()" [empty]="mainContactPersonsEmpty()"
             emptyMessage="No main contact persons were found for this project." [items]="mainContactPersonItems()"
-            layout="rows-stacked-lever" [itemHeightPx]="43" (retry)="reports.update()">
+            layout="rows-stacked-lever" [itemHeightPx]="43" [visibleLimit]="contactsVisibleLimit()"
+            (expandToggled)="toggleExpanded('contacts')" (retry)="reports.update()">
           </app-project-dashboard-card>
         </div>
 
@@ -192,7 +196,8 @@
             class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="reports.loading()"
             [error]="reports.loadError()" [empty]="contributorsEmpty()"
             emptyMessage="No contributor projects were found." [items]="contributorItems()" layout="rows-stacked-lever"
-            [itemHeightPx]="43" (retry)="reports.update()">
+            [itemHeightPx]="43" [visibleLimit]="contributorsVisibleLimit()" (expandToggled)="toggleExpanded('contributors')"
+            (retry)="reports.update()">
           </app-project-dashboard-card>
         </div>
       </div>

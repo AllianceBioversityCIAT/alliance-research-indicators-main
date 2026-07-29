@@ -448,3 +448,96 @@ None. No rework round consumed.
 #### Final verification
 
 `npm run lint` clean · `npm run build` succeeds, no template or type errors · **full suite 308 suites / 6,250 tests, exactly 4 failures, all expected and all in the dashboard spec** — all re-run by the Reviewer.
+
+---
+
+### T-06 — Dashboard: expansion state + DD-13 independent height
+
+| Field | Value |
+| --- | --- |
+| **Final status** | 🔶 **BLOCKED — `[~]`. Pivot Protocol triggered.** |
+| **Date** | 2026-07-29 |
+| **Implementer attempts** | 1 (**no rework attempt consumed — the defect is in the spec, not the diff**) |
+| **Requirements delivered** | R-PDB-003 AC.4, AC.6, AC.7 ✅ · **NFR-PDB-004 condition 2 ❌ — not deliverable by the specified mechanism** |
+| **Changed LOC** | 60 insertions, 6 deletions across 2 files (uncommitted at the time of the pivot; see below) |
+
+#### Attempt 1 — implementation conforms; Reviewer `STATUS: FAIL` on a spec gap
+
+**All eight conformance gates passed.** The diff is a faithful implementation of T-06 exactly as written:
+
+| Gate | Result |
+| --- | --- |
+| `ChartKey` exported, 4 members, load-bearing under `strictTemplates` | ✅ |
+| New `Set` per toggle; `current` never mutated | ✅ — `expanded.update()` is the only mutation site in the whole `project-detail` tree |
+| `visibleLimit` per card from the **imported** `COLLAPSED_ITEM_LIMIT` | ✅ |
+| Reset semantics — **absence** of a mechanism is correct (AC.6/AC.7) | ✅ — no `linkedSignal`, nothing keyed to `payload()`; `reports.update()` has no handle on the component, so it *structurally cannot* reach `expanded` |
+| DD-13 mutual exclusivity | ✅ — both classes on the same predicate; static `lg:items-stretch` removed |
+| Explicit non-solution not taken | ✅ — no extra rows rendered to fill the gap |
+| Class bindings actually apply | ✅ — names contain `:` not `.`, so the E-03.2 trap does not bite |
+| Scope | ✅ — two files; no scratch survived; four old services intact |
+
+**Verification re-run by the Reviewer:** `npx ng lint` clean · production build succeeds · `project-detail` suite 4 failed / 113 passed, and the four are **exactly** T-05's inherited cases. **No fifth failure — T-06 introduces no regression.**
+
+**The CDN concern I raised was checked and cleared.** The Reviewer fetched `@tailwindcss/browser@4.1.6` and grepped its observer options: `attributes:!0, attributeFilter:["class"], childList:!0, subtree:!0`. The browser build watches `class` mutations subtree-wide, so a class appearing only via runtime binding is still generated. The collapsed default cannot silently lose `items-stretch`.
+
+---
+
+## Pivot Record: T-06
+
+### The blocker
+
+**DD-13, as specified, cannot satisfy NFR-PDB-004 condition 2. The mechanism is incomplete — this is a spec defect, not an implementation defect.**
+
+DD-13 applies `align-items: start` to the **ranked grid only**, which is literally what `design.md` §6.3.1 prescribes. The Reviewer traced the consequence through the real CSS:
+
+1. **`align-items` does not size grid tracks.** An `auto` row is sized to the max of its items' max-content contributions; alignment only decides how a *shorter* item sits inside an already-sized track. So `items-start` stops the **row-mate** being stretched — the half DD-13 correctly fixes — but the track itself still grows to the expanded card.
+2. The expanded card is chrome + a `max-h-[46vh]` list + toggle. `46vh` exceeds five rows at any viewport taller than ~470px, so **the ranked grid grows**.
+3. The left column (`:154`, `flex flex-col lg:h-full lg:self-stretch`) is content-sized; `lg:h-full` is a percentage against an `auto` track, so it cannot clamp growth. **The left column grows.**
+4. The outer grid (`:153`, `lg:grid-cols-[3fr_1fr] lg:min-h-[520px] lg:items-stretch`) sizes its single `auto` row to the max of both columns. **`min-h` is a floor, not a ceiling.** The row track grows.
+5. The right column (`:207`) is pulled to that track by **three independent forces**: the outer grid's `lg:items-stretch`, its own `lg:self-stretch`, and `h-full`. Neutralising DD-13's one class on the *inner* grid touches none of them.
+6. **The decisive line is `:270`** — *Results by status* is `flex min-h-0 flex-1 flex-col …`. `flex-1` absorbs **all** free space while *Results by indicator* above it is `shrink-0`. The entire increase lands in one bordered, shadowed, white card whose inner list is capped at `max-h-[172px]`, rendering **a large white void**.
+
+**Human-check step 3 ("Confirm the right-hand column does not stretch") will therefore fail.** Step 2 (row-mate) will pass — DD-13 does deliver that half.
+
+### Why three rounds of blind review and a mockup all missed it
+
+**The GATE-2 mockup contains the same blind spot.** It faithfully mirrors `.outer`, `.leftcol`, `.ranked` and `.ranked.independent` — but its right column is two `.sidebox` divs (`mockup/index.html:246`, CSS `:106`) with **no `flex:1`**. In the mockup the column box grows invisibly while the white boxes stay content-sized. So mode 3's banner claim at `:163-164` — *"Sibling cards and the right-hand column keep their height"* — is true **of the mockup** and false **of the real DOM**.
+
+The artefact used to close GATE-2 and to serve as the human-check reference reproduces the defect it was meant to catch. This is precisely the failure mode **RB-1** was filed to guard against.
+
+### The reasoning error in the spec prose
+
+Both `requirements.md:286` and `design.md:188` state: *"An **unbounded** expansion therefore stretches both its row-mate card and, through the outer grid, the right-hand column."*
+
+The spec appears to have concluded that **condition 1 (bounding) removes the outer-grid propagation** and DD-13 need only remove the inner one. But bounding **caps** the growth at `46vh`; it does not **zero** it. A bounded-but-taller card propagates a bounded-but-nonzero stretch through exactly the adjacency the spec itself named.
+
+**Corollary:** condition 1's *"so the page does not grow"* is also literally false, for the same reason. The page grows by `(46vh − collapsed list height)` — bounded, not zero.
+
+### Alternatives (owner decision required)
+
+| # | Option | What it does | Cost |
+| --- | --- | --- | --- |
+| **(a)** | **Extend DD-13 outward** | Also condition the outer grid, and neutralise `lg:self-stretch` + `h-full` on the right column while expanded. **All three forces, or nothing changes.** | The page still grows. The right column becomes top-aligned and shorter than the left while expanded — a different asymmetry the human check must accept. Small, contained code change. |
+| **(b)** | **Freeze the geometry** | Bound the expanded list to the space the card **already occupies** rather than to the viewport, so it scrolls inside its existing grid area and nothing outside it moves. | **The only option that satisfies both conditions literally**, and it makes condition 1's "the page does not grow" true. Reopens **OQ-3** (closed as viewport-relative `46vh`) and touches T-03's already-committed bounded container. |
+| **(c)** | **Narrow the requirement** | Accept bounded outward growth. Rewrite condition 2 and human-check step 3 to require *"no empty gap beside the expanded card"* rather than *"no stretch"*. | Cheapest, and an accurate description of what DD-13 actually delivers — but it concedes the *Results by status* void. No code change; spec-only. |
+
+**Required regardless of the choice:** fix `mockup/index.html` — add `flex:1` to the second `.sidebox` so the human-check reference matches the real DOM. Otherwise the next reviewer inherits the blind spot.
+
+### State of the working tree at the pivot
+
+T-06's diff is **committed** despite the `[~]` status, deliberately: it passes all eight conformance gates, regresses nothing, and delivers AC.4/AC.6/AC.7 plus the row-mate half of NFR-PDB-004. Options (a) and (c) keep it unchanged; only (b) amends it. Committing preserves independently-verified work against context loss; the `[~]` in `tasks.md` and this record are what prevent it being mistaken for a completed task.
+
+### ADVISORY findings (4R lens — non-gating)
+
+| # | Finding |
+| --- | --- |
+| A-06.1 | Requirement prose overclaims condition 1 — *"so the page does not grow"* is false as written. Correct it in the same pivot so both conditions describe the same geometry. |
+| A-06.2 | Tailwind's browser build rescans asynchronously after a class mutation, so on the first toggle of a session `lg:items-start` may sit on the element for a frame before its rule is injected. Cosmetic and self-correcting; noted only because DD-13's entire payload is that one class. |
+| A-06.3 | `design.md` §5.4 promises Chunk B costs "one union member and one template binding, no new signal". The shipped shape needs a fifth `computed` per card plus the binding. Not wrong — four parallel computeds are readable and T-07 can assert each — but the extensibility claim is slightly overstated. A single `visibleLimitFor(key: ChartKey)` would match the promise literally. **Not actioned.** |
+| A-06.4 | `expanded`, `rankedGridIndependent` and the four limit computeds are all public `readonly` — which is what T-07 needs. No action. |
+
+### NFR-PDB-004 status
+
+**UNVERIFIED, and now known to be partly unsatisfiable by the current design.** Two distinct things must not be conflated:
+- The **design-reasoning** question was answered from the CSS and **resolves negatively** — condition 2 fails as specified.
+- The **rendered outcome** remains unverified and still requires the five-step human check (RB-2), which should be run against a **corrected** mockup once the pivot lands.

@@ -3,7 +3,7 @@ import { DatePipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
-import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
+import { COLLAPSED_ITEM_LIMIT, ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { GetFullContractReportsService } from '@services/get-full-contract-reports.service';
 import { GetGeoScopeService } from '@services/get-geo-scope.service';
 import { ApiService } from '@shared/services/api.service';
@@ -38,6 +38,14 @@ interface ProjectStatusChartItem {
   value: number;
   result_status_id: number;
 }
+
+/**
+ * One member per ranked card (T-06 / design.md §5.4). Exported so a typo in a template
+ * binding (`toggleExpanded('partner')` instead of `'partners'`) is a compile
+ * error rather than a silently dead toggle. Chunk B extends this union to add
+ * a card — one member, one binding, no new signal.
+ */
+export type ChartKey = 'partners' | 'levers' | 'contacts' | 'contributors';
 
 @Component({
   selector: 'app-project-dashboard',
@@ -188,6 +196,47 @@ export class ProjectDashboardComponent {
   readonly leversEmpty = computed(
     () => !this.reports.loading() && !this.reports.loadError() && this.reports.topPrimaryLevers().length === 0
   );
+
+  /**
+   * Per-card expansion state (T-06 / DD-2r §5.2.6-7). A plain `signal`, not a
+   * `linkedSignal` sourced on `payload()` — that would also fire on a per-card
+   * **Try again**, collapsing a list the user deliberately opened, which AC.7
+   * forbids. Its lifetime is this component's: every navigation that changes
+   * `:id` destroys `ProjectDashboardComponent` (D-AC5), so a fresh instance
+   * starts with a fresh, empty `Set` for free (AC.6) — no reset code needed.
+   */
+  readonly expanded = signal<ReadonlySet<ChartKey>>(new Set());
+
+  readonly partnersVisibleLimit = computed(() => (this.expanded().has('partners') ? null : COLLAPSED_ITEM_LIMIT));
+  readonly leversVisibleLimit = computed(() => (this.expanded().has('levers') ? null : COLLAPSED_ITEM_LIMIT));
+  readonly contactsVisibleLimit = computed(() => (this.expanded().has('contacts') ? null : COLLAPSED_ITEM_LIMIT));
+  readonly contributorsVisibleLimit = computed(() => (this.expanded().has('contributors') ? null : COLLAPSED_ITEM_LIMIT));
+
+  /**
+   * DD-13: while any card is expanded, the ranked grid drops `lg:items-stretch`
+   * in favour of `lg:items-start` so an expanded card's row-mate is not
+   * dragged to its height (and left with a tall empty gap). Collapsed, the
+   * grid is exactly as before this task.
+   */
+  readonly rankedGridIndependent = computed(() => this.expanded().size > 0);
+
+  /**
+   * Toggles one card's expansion. Replaces the whole `Set` with a **new**
+   * instance — mutating in place and re-`set()`-ing the same reference would
+   * fail Angular's `Object.is` check and silently never re-render (the single
+   * most likely way to get this task subtly wrong).
+   */
+  toggleExpanded(key: ChartKey): void {
+    this.expanded.update(current => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
 
   readonly pendingRevisionExcludedColumns = ['status', 'year', 'versions', 'creation_date', 'public_link', 'project'] as const;
 
