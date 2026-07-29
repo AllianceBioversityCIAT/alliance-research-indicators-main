@@ -615,4 +615,19 @@ This is verbatim the error the spec had already named for DD-13: *"Bounding **ca
 | A-06r.2 | Whatever bound ships, the collapsed state is `overflow-visible`, so a future overshoot (a 6th row, `itemHeightPx ≥ 46`, a third label line) spills **visibly** over the toggle with no gate to catch it — 13px of headroom today on contacts/contributors. Consider making overflow unconditional so an overshoot scrolls rather than spills. |
 | **A-06r.3** | **`mockup/index.html` still models `max-height:46vh` + DD-13** (`.listwrap.bounded`, `.ranked.independent`). Post-pivot it is the reference for a **superseded** design, yet `requirements.md` §7 and T-06's acceptance both send the human check to it. The `flex:1` fidelity fix landed; **the DD-14 mechanism was never modelled — and the mockup would have shown this defect had it been updated.** Owner item. |
 | A-06r.4 | `pr-[6px]` has no assertion in any suite (pre-existing). Verified manually this pass; one line in the expanded case would make it permanent. |
+### Runtime failures — T-06 revised, attempt 2 (environment, NOT work outcomes)
+
+Per `/akili-execute`'s runtime-failure fallback, these are recorded and are **not** work FAILs; they do not consume T-06's rework budget.
+
+| # | Event | Tree state afterwards |
+| --- | --- | --- |
+| 1 | Implementer spawn for mechanism (ii) terminated by **API 529 Overloaded** before making any edit | Verified untouched — diffstat identical to attempt 1's rejected diff (33 ins / 21 del), `max-h-[280px]` still at `.html:47` |
+| 2 | **Retry (the one permitted retry) also terminated by API 529 Overloaded**, again before any edit | Verified untouched again — same diffstat, `max-h-[280px]` still present |
+
+**Attempt 2 of 3 has therefore not yet been executed.** The retry allowance is now spent, so per the fallback table the Implementer role degrades to *"ask the user to approve the Leader-inline fallback — the no-code rule stands; a runtime failure does not waive it."* Escalated to the owner with the options. No code was written by the Leader.
+
+### ADVISORY (continued)
+
+| # | Finding |
+| --- | --- |
 | **A-06r.5** | **A headless Chrome is available on this machine** (`~/.cache/puppeteer/chrome-headless-shell/…`, driven with `--headless --dump-dom`, no npm dependency). The Reviewer's probe is reusable. **This materially changes what DC-8 can gate** — the "no automated gate for rendered layout" premise, which RSK-4 and RB-2 are both built on, is weaker than the spec assumed. Credit also noted: the Implementer reported plainly that jsdom returned `0` for every height and that its equal-height claim was therefore unproven, rather than dressing a vacuous assertion as a green check. That honesty is what made this audit cheap to target. |
