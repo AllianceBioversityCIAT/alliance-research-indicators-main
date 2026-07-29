@@ -541,3 +541,78 @@ T-06's diff is **committed** despite the `[~]` status, deliberately: it passes a
 **UNVERIFIED, and now known to be partly unsatisfiable by the current design.** Two distinct things must not be conflated:
 - The **design-reasoning** question was answered from the CSS and **resolves negatively** — condition 2 fails as specified.
 - The **rendered outcome** remains unverified and still requires the five-step human check (RB-2), which should be run against a **corrected** mockup once the pivot lands.
+
+---
+
+### T-06 (REVISED under DD-14) — attempt 1: Reviewer `STATUS: FAIL`
+
+| Field | Value |
+| --- | --- |
+| **Status** | 🔶 still `[~]` BLOCKED |
+| **Date** | 2026-07-29 |
+| **Rework attempts on the revised task** | 1 of 3 used |
+| **Spec rework rounds consumed overall** | **2 of 2 — the budget tripwire is now AT its ceiling.** See the escalation below |
+
+**Mechanism attempted:** static, unconditional `max-h-[280px]` on the bounded container, replacing the conditional `max-h-[46vh]`. `overflow-y-auto` and `pr-[6px]` stayed conditioned on `visibleLimit() === null`.
+
+#### Why it failed — measured, not argued
+
+**This audit was the turning point in method.** Rather than reason about the CSS a third time, the Reviewer built a faithful DOM/CSS model of the real chain (outer grid `:153` → left column `:154` → ranked grid `:157` → `.cell flex flex-1` → host `h-full` → `section.card` → body `:15` → the shipped container) and **measured it in real headless Chrome at 1440px**. Probe retained at `scratchpad/geometry-probe.html` + `probe-out.json`.
+
+| metric (px) | collapsed | expand partners | expand levers | expand contacts | expand contributors |
+| --- | --- | --- | --- | --- | --- |
+| expanded card's own section | 360 | **412** | **412** | **412** | **412** |
+| row-mate card | 360 | **412** | **412** | **412** | **412** |
+| ranked grid | 779 | **831** | **831** | **792** | **792** |
+| left column / outer grid row | 1219 | **1271** | **1271** | **1232** | **1232** |
+| *Results by status* (`flex-1`) | 977 | **1029** | **1029** | **990** | **990** |
+| document height | 1307 | **1359** | **1359** | **1320** | **1320** |
+
+Growth is deterministic, not font- or viewport-dependent: **+52px** for either row-1 card, **+13px** for either row-2 card, landing entirely inside *Results by status*, with identical page growth. Collapse restores exactly (step 6 passes); **human-check steps 2, 3, 4 and 5 all fail.**
+
+**The root cause, and it is a clean lesson:** a `max-height` clamps a box's max-content contribution **only when the content exceeds it**. Collapsed, the list is 5 rows and sits *below* 280px, so the container contributes its **natural** height; expanded it contributes exactly **280px**. **The cap binds in one state only**, so the delta `280 − collapsed` propagates through all four links.
+
+The collapsed heights are arithmetic ceilings, not estimates — `line-clamp-2` plus fixed row heights make them exact and font-independent:
+
+| Layout / call site | Derivation | Collapsed height |
+| --- | --- | --- |
+| `rows-partners` (Results Partners) | 5 × max(2-line label 31.25, bar 24) + 4×12 gap + 4 `pt-1` | **208.25px** |
+| `rows-stacked-lever` (Primary Levers) | 4 × 39.25 + 30.25 + 48 + 4 | **239.25px** |
+| `rows-stacked-lever` + `[itemHeightPx]="43"` (contacts, contributors) | 5×43 + 48 + 4 | **267px** — only **13px** under the bound |
+
+**A per-call-site pixel constant cannot work: `280px` would have to equal 208.25, 239.25 and 267 simultaneously.**
+
+This is verbatim the error the spec had already named for DD-13: *"Bounding **caps** growth; it does not **zero** it."* Replacing `46vh` with `280px` changed the magnitude of the stretch, not its existence.
+
+**My concern that 280px might clip the collapsed view was wrong** — 208.25 / 239.25 / 267 all fit under 280. And that is precisely *why* the mechanism fails: the bound never binds collapsed.
+
+#### The three FAIL issues
+
+1. **The mechanism is DD-13's failure mode with a smaller number.** Violates `design.md` §6.3.2 ("the card's rendered height is **identical**"), NFR-PDB-004 rev 4 conditions 1 **and** 2, and T-06's acceptance box.
+2. **A fixed pixel bound is the one answer OQ-3 was explicitly re-closed against** — "neither fixed nor viewport-relative but **card-area-relative**". `max-h-[280px]` is fixed and references nothing about the card's area.
+3. **The template and spec comments now assert a false causal claim in-repo.** `project-dashboard-card.component.html:33-46` and `…spec.ts:492-498` both state the unconditional class keeps the card's height from changing. Measurably false. **DD-13 survived three review rounds precisely because a plausible false rationale was written down as settled** — leaving these hands the next reader the same trap in the same shape. Violates root `CLAUDE.md` §5.
+
+#### Verified clean (checked because I asked)
+
+- Only the two assertions naming the retired `max-h-[46vh]` were touched; nothing else in the 24-case suite was weakened. The selector is not circular. **The Reviewer ran both mutations itself**: re-gating the class → 1 failure; deleting it → 2 failures. Both reverted.
+- `rankedGridIndependent` gone; the ranked-grid line is **byte-identical to pre-T-06** (`git diff 01505143`), the only delta being T-06's input/output bindings.
+- The audited T-06 internals are untouched — the `.ts` hunk is a pure 8-line deletion.
+- Exactly the four files; dashboard spec still failing with **exactly** the 4 known T-07 cases; lint clean.
+- Read-only contract honoured: `git diff | shasum` byte-identical to the audited diff.
+
+#### Two mechanisms that would actually work
+
+| # | Mechanism | Why it satisfies DD-14 |
+| --- | --- | --- |
+| **(i)** | **Measure and freeze** — hold the container in an `ElementRef`, capture `offsetHeight` while collapsed, apply it as an inline `height`/`max-height` while expanded (guarding jsdom's `0`) | The bound **equals** the collapsed height, so the contribution is identical in both states. Exactly card-area-relative, and the applied style is structurally assertable. |
+| **(ii)** | **Remove the expanded list from intrinsic sizing** — keep a 5-row in-flow list (which *is* the collapsed geometry) and render the full list while expanded in a `position:absolute; inset:0; overflow-y:auto` overlay inside a `relative` parent | An absolutely-positioned box contributes **nothing** to the track, so growth is structurally zero **with no measurement**. Encoding stays correct — `barColor(index)` and `partnerBarWidthPercent` already read `items()`. |
+
+#### ADVISORY findings (4R lens)
+
+| # | Finding |
+| --- | --- |
+| **A-06r.1** | **Spec-clarity defect that plausibly caused this failure — and it is mine.** `design.md` §6.3.2's implementation hint said *"a definite height must come from above (the row track)"*. **That is circular:** the ranked grid's rows are `auto`, sized **by** the card, so nothing definite comes from above unless the track is made definite or the collapsed height is captured. The sentence reads like a mechanism and is not one. **Fixed in the spec before re-running** — §6.3.2 now names both viable mechanisms. |
+| A-06r.2 | Whatever bound ships, the collapsed state is `overflow-visible`, so a future overshoot (a 6th row, `itemHeightPx ≥ 46`, a third label line) spills **visibly** over the toggle with no gate to catch it — 13px of headroom today on contacts/contributors. Consider making overflow unconditional so an overshoot scrolls rather than spills. |
+| **A-06r.3** | **`mockup/index.html` still models `max-height:46vh` + DD-13** (`.listwrap.bounded`, `.ranked.independent`). Post-pivot it is the reference for a **superseded** design, yet `requirements.md` §7 and T-06's acceptance both send the human check to it. The `flex:1` fidelity fix landed; **the DD-14 mechanism was never modelled — and the mockup would have shown this defect had it been updated.** Owner item. |
+| A-06r.4 | `pr-[6px]` has no assertion in any suite (pre-existing). Verified manually this pass; one line in the expanded case would make it permanent. |
+| **A-06r.5** | **A headless Chrome is available on this machine** (`~/.cache/puppeteer/chrome-headless-shell/…`, driven with `--headless --dump-dom`, no npm dependency). The Reviewer's probe is reusable. **This materially changes what DC-8 can gate** — the "no automated gate for rendered layout" premise, which RSK-4 and RB-2 are both built on, is weaker than the spec assumed. Credit also noted: the Implementer reported plainly that jsdom returned `0` for every height and that its equal-height claim was therefore unproven, rather than dressing a vacuous assertion as a green check. That honesty is what made this audit cheap to target. |

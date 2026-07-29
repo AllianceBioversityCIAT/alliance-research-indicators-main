@@ -203,7 +203,22 @@ Rendered **inside the `@if (items().length)` arm** of the state chain (`project-
 - **T-03's committed bounded container is amended**, not discarded: the `overflow-y-auto` conditioning stays, `max-h-[46vh]` goes. This is the only committed work the pivot touches.
 - **The scroll area is smaller than under DD-13** — roughly five rows rather than `46vh`. That is the honest cost of the option, and it is the right trade: GATE-1 measured the worst realistic case at 137 rows, so *any* bound means scrolling. The question was only whether the surrounding page moves while you do it.
 
-**Implementation constraint, not implementation.** For the track not to grow, the expanded list must not contribute its content height to intrinsic sizing — a definite height must come from above (the row track), with the list filling and scrolling inside it. The exact mechanism is the Implementer's, verified against the constraint above and the six-step human check.
+**Implementation constraint.** For the track not to grow, the expanded list must not contribute a **larger** max-content height than the collapsed list does.
+
+> ⚠️ **A `max-height` alone does NOT achieve this, and the first attempt at DD-14 failed on exactly this point.** A `max-height` clamps a box's max-content contribution **only when the content exceeds it**. Collapsed, five rows sit *below* any sane bound, so the container contributes its **natural** height; expanded it contributes the bound. **The cap binds in one state only**, and the difference propagates through all four links. Measured in real Chrome: a static `max-h-[280px]` produced **+52px** growth on the row-1 cards and **+13px** on row-2, landing entirely in *Results by status*.
+>
+> A per-call-site constant also cannot work. The collapsed heights are exact arithmetic (`line-clamp-2` plus fixed row heights make them font-independent): `rows-partners` **208.25px**, `rows-stacked-lever` **239.25px**, `rows-stacked-lever` + `itemHeightPx=43` **267px**. One constant would have to equal all three.
+>
+> ~~"A definite height must come from above (the row track)"~~ — **this earlier wording was circular and is retracted.** The ranked grid's rows are `auto`, so they are sized **by** the card; nothing definite comes from above unless the track is *made* definite or the collapsed height is *captured*.
+
+**Two mechanisms are known to satisfy the constraint. Either is acceptable; a third is fine if it demonstrably freezes the height.**
+
+| # | Mechanism | Why it works |
+| --- | --- | --- |
+| **(i)** | **Measure and freeze.** Hold the container in an `ElementRef`, capture its `offsetHeight` while collapsed, and apply that value as an inline `height`/`max-height` while expanded. Guard jsdom's `0`. | The bound **equals** the collapsed height, so the contribution is identical in both states. Exactly card-area-relative, and the applied inline style is structurally assertable. |
+| **(ii)** | **Remove the expanded list from intrinsic sizing.** Keep a 5-row in-flow list — which *is* the collapsed geometry that defines "the area the card already occupies" — and render the full list while expanded in a `position: absolute; inset: 0; overflow-y: auto` overlay inside a `relative` parent. | An absolutely-positioned box contributes **nothing** to track sizing, so growth is structurally zero **with no measurement to get wrong**. Encoding survives: `barColor(index)` and `partnerBarWidthPercent` already read `items()`. |
+
+**Verification note.** A headless Chrome is available in this environment (`~/.cache/puppeteer/chrome-headless-shell/…`, `--headless --dump-dom`, no npm dependency), and a reusable geometry probe exists at `scratchpad/geometry-probe.html`. **DC-8's "no automated gate for rendered layout" premise is therefore weaker than RSK-4 and RB-2 assume** — a real browser can measure the four-link chain directly. The six-step human check remains the acceptance gate, but a candidate mechanism should be measured *before* review rather than argued.
 
 ### 6.3.1 ~~Bounding is not enough — the grid must also stop stretching (DD-13)~~ — **SUPERSEDED by DD-14**
 
