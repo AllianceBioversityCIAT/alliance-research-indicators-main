@@ -117,6 +117,7 @@ import {
   TopPartnersReport,
   TopPrimaryLeversReport
 } from '@shared/interfaces/project-dashboard.interface';
+import { ContractFullReports } from '@shared/interfaces/contract-full-reports.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -890,6 +891,13 @@ export class ApiService {
 
   GET_GeoScope = (contractId: string, limit = 5): Promise<MainResponse<GeoScopeReport>> => {
     const url = () => `agresso/contracts/reports/geo-scope?contract-id=${encodeURIComponent(contractId)}&limit=${limit}`;
+    return this.TP.get(url(), {});
+  };
+
+  // Single-source payload for the four ranked dashboard charts (R-PDB-001).
+  // Contract-scoped, not result-scoped — no `useResultInterceptor`.
+  GET_FullContractReports = (contractId: string): Promise<MainResponse<ContractFullReports>> => {
+    const url = () => `agresso/contracts/reports/full?contract-id=${encodeURIComponent(contractId)}`;
     return this.TP.get(url(), {});
   };
 

@@ -1410,6 +1410,12 @@ describe('ApiService', () => {
       );
     });
 
+    it('should call GET_FullContractReports', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+      service.GET_FullContractReports('A100');
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/full?contract-id=A100', {});
+    });
+
     it('should call GET_ResultsByContractId', () => {
       const contractId = 'TEST123';
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
@@ -2160,6 +2166,15 @@ describe('ApiService', () => {
       service.GET_GeoScope('A 100/1');
       expect(mockToPromiseService.get).toHaveBeenCalledWith(
         'agresso/contracts/reports/geo-scope?contract-id=A%20100%2F1&limit=5',
+        {}
+      );
+    });
+
+    it('should call GET_FullContractReports with encoded contract id', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+      service.GET_FullContractReports('A 100/1');
+      expect(mockToPromiseService.get).toHaveBeenCalledWith(
+        'agresso/contracts/reports/full?contract-id=A%20100%2F1',
         {}
       );
     });

@@ -65,14 +65,15 @@ graph TD
   - No `useResultInterceptor` — this is a contract-scoped, not result-scoped, call.
   - Fixture must carry: >5 partners, a **duplicate-display-name contact pair**, a deliberately **out-of-order** section, one section of exactly 5 and one of 3.
 - **Acceptance / done check:**
-  - [ ] `get-full-contract-reports.service.spec.ts` asserts the URL **and** that a contract code containing a space and a `/` encodes correctly (R-PDB-001 AC.3), using `HttpTestingController`.
-  - [ ] `loadError` path asserted to set the flag **and clear `payload`**.
-  - [ ] `api.service.spec.ts` covers the new method.
-  - [ ] `npm run lint` clean.
+  - [x] `get-full-contract-reports.service.spec.ts` asserts the URL **and** that a contract code containing a space and a `/` encodes correctly (R-PDB-001 AC.3), using `HttpTestingController`.
+  - [x] `loadError` path asserted to set the flag **and clear `payload`**.
+  - [x] `api.service.spec.ts` covers the new method.
+  - [x] `npm run lint` clean.
 - **Evidence that does NOT count:** asserting the URL against a hand-built string while the service is mocked. The point of this task's gate is that a real request was shaped correctly — if `HttpTestingController` is not the mechanism, the assertion is decorative. Likewise a fixture that omits the homonym pair or the out-of-order section silently disarms T-04 and T-07.
 - **Dependencies:** none
 - **Effort:** M · **Skills:** `angular-developer`
-- **Status:** todo
+- **Status:** **done** — Reviewer PASS attempt 1, 2026-07-29. See [`execution.md`](./execution.md) § T-01.
+- **Consumed by later tasks:** service accessors are `topPartners` / `topPrimaryLevers` / `topMainContactPersons` / `topContributors` / `staff` / `geoScope`; fixture entry point is `mockContractFullReports(overrides?)` in `src/app/testing/contract-full-reports.mock.ts`.
 
 ---
 
