@@ -180,15 +180,34 @@ Rendered **inside the `@if (items().length)` arm** of the state chain (`project-
 
 **With the geographic split, every toggle in this spec is rendered by this component** — one implementation, one place to gate a11y (NFR-PDB-003). Revision 2's second, host-rendered toggle is gone.
 
-### 6.3 Bounded height (NFR-PDB-004)
+### 6.3 Bounded height (NFR-PDB-004) — **revised by DD-14, 2026-07-29**
 
 - The `variant="card"` outlet's wrapper becomes a scroll container, bounded **only when `visibleLimit() === null`**. Collapsed rendering is unaffected by the wrapper (the 4 → 5 row change and DD-4's ramp are separate, intended changes).
 - The `variant="list"` outlet is left alone — it has no wrapper today and, with the geographic split, nothing in this spec expands a `variant="list"` card.
-- Bound is viewport-relative (OQ-3), pending GATE-2.
+- ~~Bound is viewport-relative (OQ-3), pending GATE-2.~~ **Superseded by DD-14.** The bound is **card-area-relative**: the list scrolls inside the space the card already occupies, and the card's height does not change on expand. See §6.3.2.
 - **Geometry, corrected:** the four cards sit in a nested `lg:grid-cols-2 lg:items-stretch` grid (`project-dashboard.component.html:157`), itself the left column of an outer `lg:grid-cols-[3fr_1fr] lg:min-h-[520px] lg:items-stretch` grid (`:153`) whose right column holds *Results by indicator* / *Results by status*. Unbounded expansion stretches **both** the row-mate card **and** the right-hand column. Revision 2 mis-stated this adjacency; since DC-8 has no automated gate, the human-check script *is* the gate, so `requirements.md` §7 has been corrected to match.
 - **jsdom computes no layout**, so tests verify only that the container exists and is conditioned correctly.
 
-### 6.3.1 Bounding is not enough — the grid must also stop stretching (DD-13)
+### 6.3.2 Freeze the geometry (DD-14) — **the resolution of the T-06 pivot**
+
+> **Supersedes DD-13.** DD-13 (§6.3.1, retained below as the record of a wrong turn) tried to stop the growth **propagating**. DD-14 removes the growth **at its source**. Recorded in full because a future reader will otherwise re-derive DD-13, which looks correct and is not.
+
+**The constraint.** The expanded list is bounded to the area the card **already occupies**. The card's rendered height is **identical** collapsed and expanded; only the list's scroll state differs.
+
+**Why this is the only mechanism that satisfies both conditions literally.** The failure chain has four links — expanded card → ranked grid track → left column → outer grid row → right column. `align-items` acts on **link 1 only**, and it acts on the wrong thing: it governs how a *shorter* item sits inside a track, never how the track is *sized*. A track is sized to its tallest item's max-content contribution regardless of alignment. So DD-13 could stop the row-mate stretching while every downstream link kept growing. **If the card's height never changes, no growth exists to propagate, and all four links are satisfied by one property.**
+
+**Consequences, stated so they are not discovered later:**
+
+- **DD-13's conditional grid class becomes unnecessary.** With no height change there is no row-mate stretch and no empty gap, so the ranked grid keeps `lg:items-stretch` unconditionally — the collapsed *and* expanded views both look exactly like today's collapsed view. This **simplifies** the shipped T-06: the `rankedGridIndependent` computed and its two class bindings can go.
+- **OQ-3 is reopened and re-closed.** It was closed as "viewport-relative (`46vh`)" on the GATE-2 mockup's evidence. That evidence was unsound (the mockup could not model the defect — see `requirements.md` §7). **New answer: neither fixed nor viewport-relative — relative to the card's own already-established area.**
+- **T-03's committed bounded container is amended**, not discarded: the `overflow-y-auto` conditioning stays, `max-h-[46vh]` goes. This is the only committed work the pivot touches.
+- **The scroll area is smaller than under DD-13** — roughly five rows rather than `46vh`. That is the honest cost of the option, and it is the right trade: GATE-1 measured the worst realistic case at 137 rows, so *any* bound means scrolling. The question was only whether the surrounding page moves while you do it.
+
+**Implementation constraint, not implementation.** For the track not to grow, the expanded list must not contribute its content height to intrinsic sizing — a definite height must come from above (the row track), with the list filling and scrolling inside it. The exact mechanism is the Implementer's, verified against the constraint above and the six-step human check.
+
+### 6.3.1 ~~Bounding is not enough — the grid must also stop stretching (DD-13)~~ — **SUPERSEDED by DD-14**
+
+> **Retained as a record of a wrong turn, not as guidance.** Everything below correctly identifies a real defect (the row-mate's empty gap) and then prescribes a mechanism that cannot fix it, because `align-items` does not size grid tracks. Read §6.3.2 for what shipped. The value of keeping this section is that its reasoning is *plausible* — which is why it survived three rounds of blind review, a mockup, and an implementation.
 
 **Found by operating the GATE-2 mockup, after three rounds of review had passed on the design as written.** Bounding the list stops the *page* from growing, but it does not stop the *row-mate* from growing: `lg:items-stretch` on the ranked grid (`project-dashboard.component.html:157`) forces every card in a row to match the tallest. So an expanded Results Partners card at `46vh` drags Primary Levers to `46vh` too — and Primary Levers only has 5 rows to show, leaving **a tall empty gap with its rows stranded at the top and its own "Show more" pushed far below its content**.
 
@@ -280,7 +299,8 @@ Coverage: client floors (40/20/45/30). Net coverage should rise.
 | **DD-10r** | 2026-07-29 | **`contractId` keeps its `snapshot` derivation. This spec adds no route reactivity.** R-PDB-001 AC.5 is satisfied by component recreation | See §12.2. Both judges confirmed DD-10 traded a benign defect for a dangerous one |
 | ~~DD-11~~ | | ~~`mapCountries` shape~~ | **MOVED** to `../geo-scope-expansion/` |
 | **DD-12** | 2026-07-29 | `visibleLimit` defaults to **`null`** (show all), not `5` | §2.3. Makes the card change purely additive and the geographic split a clean cut. Asserted by R-PDB-002 AC.5 |
-| **DD-13** | 2026-07-29 | **While any card in the ranked grid is expanded, the grid switches from `items-stretch` to `align-items: start`.** Collapsed, it keeps `lg:items-stretch` unchanged | **Bounding the list is necessary but not sufficient — found by using the GATE-2 mockup, not by reading code.** See §6.3.1 |
+| ~~DD-13~~ | 2026-07-29 | ~~While any card is expanded, the ranked grid switches to `align-items: start`~~ | **SUPERSEDED by DD-14** — `align-items` does not size grid tracks, so it cannot stop the growth it was chosen to contain. §6.3.1 retained as the record of a wrong turn |
+| **DD-14** | 2026-07-29 | **Freeze the geometry: the expanded list is bounded to the area the card already occupies, so the card's height is identical collapsed and expanded.** The ranked grid keeps `lg:items-stretch` unconditionally | **Resolution of the T-06 pivot.** Removes the growth at its source instead of trying to stop it propagating through a four-link chain, so both NFR-PDB-004 conditions become literally true rather than approximately true. Re-closes **OQ-3**: the bound is neither fixed nor viewport-relative but card-area-relative. See §6.3.2 |
 
 ### 12.1 Reversion Challenge — DD-4
 
@@ -371,7 +391,7 @@ Method and script: `scratchpad/gate1-measure.js` (throwaway, read-only). The two
 | ID | Question | Owner | Default | Due |
 | --- | --- | --- | --- | --- |
 | OQ-2 | Rank badges on `rows-partners` when expanded? | d.casanas | **No** — §12.1 | before implementation |
-| OQ-3 | Bound height: fixed or viewport-relative? | design | **Viewport-relative** | GATE-2 |
+| ~~OQ-3~~ | Bound height: fixed or viewport-relative? | design | **CLOSED 2026-07-29 — neither. Card-area-relative (DD-14).** Originally closed as viewport-relative `46vh` on GATE-2 evidence; reopened by the T-06 pivot when that evidence proved unsound (the mockup could not model the defect), and re-closed by DD-14 | closed |
 
 Closed: OQ-1 and umbrella D-1 moved with the geographic spec · OQ-4 (`user_id` confirmed) · AC.5 mechanism (D-AC5 / DD-10r).
 

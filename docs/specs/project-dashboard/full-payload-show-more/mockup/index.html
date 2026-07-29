@@ -104,6 +104,15 @@
   .toggle[aria-expanded="true"] .caret{transform:rotate(180deg)}
 
   .sidebox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  /* FIDELITY FIX (2026-07-29, pivot on T-06). The real DOM gives "Results by indicator"
+     shrink-0 and "Results by status" flex-1, so the right column's growth lands entirely
+     inside the second white card as a visible void. Without these two rules the mockup's
+     right column grew invisibly while its boxes stayed content-sized — which is why three
+     rounds of blind review and GATE-2 all passed on a containment design that leaves the
+     right-hand column stretching. Do not remove: this is what makes the mockup able to
+     reproduce the defect it exists to catch. */
+  .rightcol > .sidebox:first-child{flex:0 0 auto}
+  .rightcol > .sidebox:last-child{flex:1}
   .sidebox h3{font-size:15px;font-weight:600;margin:0 0 2px;color:var(--head)}
   .total{display:flex;justify-content:space-between;align-items:flex-end;background:var(--bg);
     border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:12px 0}

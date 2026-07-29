@@ -279,11 +279,19 @@ Geocoding ceiling moved to `../geo-scope-expansion/` with umbrella **D-1**. ID r
 
 ### NFR-PDB-004 — Layout containment
 - **Category:** ux / reliability
-- **Target — two conditions, not one.** Revision 3 stated only the first and it is insufficient:
-  1. An expanded card scrolls **inside itself** (bounded height + `overflow-y: auto`), so the page does not grow.
-  2. **An expanded card must not change the height of the cards beside it.** Condition 1 alone does not achieve this: `lg:items-stretch` forces row-mates to match the tallest card, so a bounded-but-taller expanded card still drags its neighbour up, leaving that neighbour with a tall empty gap, its five rows stranded at the top and its own "Show more" pushed below a void. Resolved by **DD-13** — the grid drops to `align-items: start` while any card is expanded, and keeps `items-stretch` when all are collapsed.
-- **Explicit non-solution:** the empty gap must **not** be filled by rendering extra rows in the un-expanded card. That would contradict R-PDB-002 (collapsed = top 5) and show data the user did not request. The height is the defect, not the emptiness.
-- **Geometry, stated correctly:** the four ranked cards sit in a nested `lg:grid-cols-2 lg:items-stretch` grid (`project-dashboard.component.html:157`), itself the left column of an outer `lg:grid-cols-[3fr_1fr] lg:min-h-[520px] lg:items-stretch` grid (`:153`) whose right column holds *Results by indicator* and *Results by status*. An unbounded expansion therefore stretches **both** its row-mate card **and**, through the outer grid, the right-hand column. Revision 1 mis-stated this adjacency; since DC-8 has no automated gate, the human-check script **is** the gate, so getting it right matters.
+- **Target — revision 4 (2026-07-29), rewritten after the T-06 pivot. Two conditions, and both are now literally achievable:**
+  1. **An expanded card scrolls inside itself and the page does not grow.**
+  2. **An expanded card must not change the height of anything outside itself** — not its row-mate, and not the right-hand column.
+- **Resolved by DD-14 (freeze the geometry):** the expanded list is bounded to the area the card **already occupies**, not to the viewport. The card's height never changes, so no growth is produced and therefore none can propagate. See `design.md` §6.3.2.
+
+> **Why revision 3 was wrong, and it is worth stating plainly.** Revision 3 set condition 1 as a viewport-relative bound (`46vh`) and resolved condition 2 with **DD-13** — dropping the ranked grid to `align-items: start` while any card is expanded. The T-06 audit established that this cannot work: **`align-items` does not size grid tracks.** It stops a *shorter* item being stretched inside a track, but the track is still sized to its tallest item's content. So the expanded card still grew the ranked grid → the left column → the outer `lg:items-stretch` grid, and `flex-1` on *Results by status* absorbed the entire delta as a visible white void.
+>
+> The underlying reasoning error: revision 3 assumed **bounding** removed the outer-grid propagation, leaving DD-13 only the inner one. Bounding **caps** growth at `46vh`; it does not **zero** it. A bounded-but-taller card propagates a bounded-but-nonzero stretch through exactly the adjacency this requirement itself named. For the same reason revision 3's condition 1 — *"so the page does not grow"* — was also literally false: the page grew by `(46vh − collapsed list height)`.
+>
+> DD-14 removes the growth at its source rather than trying to stop it propagating, which is why both conditions become true rather than approximately true.
+
+- **Explicit non-solution (unchanged):** a gap beside an expanded card must **not** be filled by rendering extra rows in the un-expanded card. That would contradict R-PDB-002 (collapsed = top 5) and show data the user did not request. Under DD-14 no gap arises, but the fence stands.
+- **Geometry, stated correctly:** the four ranked cards sit in a nested `lg:grid-cols-2` grid (`project-dashboard.component.html:157`), itself the left column of an outer `lg:grid-cols-[3fr_1fr] lg:min-h-[520px] lg:items-stretch` grid (`:153`) whose right column holds *Results by indicator* (`shrink-0`) and *Results by status* (`flex-1`). **That `flex-1` is why the defect is visible rather than merely present** — the whole of any outward growth lands in one bordered white card. Any future change to the expanded card's height must be checked against this chain, all four links of it.
 - **How verified:** structural assertion in the card spec that the bounded container exists and is conditioned on `visibleLimit() === null`; plus the human check in §7 (no automated gate evaluates rendered layout).
 
 ### NFR-PDB-005 — Test and lint floors
@@ -320,12 +328,15 @@ Geocoding ceiling moved to `../geo-scope-expansion/` with umbrella **D-1**. ID r
 **DC-8 has no automated gate and is not substituted by one.** Its substitute is a **named human check**, on a project with more than 5 partners:
 
 1. Expand each of the four ranked cards in turn.
-2. Confirm its **row-mate card in the nested 2-column grid** does not change height **and shows no empty gap below its own content** — the row-mate's "Show more" must stay adjacent to its list, not float below a void (DD-13). This is the check that a bounded height alone would pass while still looking broken.
-3. Confirm the **right-hand column** (*Results by indicator*, *Results by status*) does not stretch — this is the adjacency the outer `items-stretch` grid creates, and the one revision 1 got wrong.
-4. Confirm the page does not grow: the expanded list scrolls inside its own card.
-5. Collapse everything and confirm the four cards are **equal height again**, exactly as before the change.
+2. Confirm the **expanded card itself does not change height** — its list scrolls inside the area the card already occupied. Under **DD-14** this is the root check: if the card's height is unchanged, steps 3 and 4 follow by construction, and if it is not, they cannot be fixed downstream.
+3. Confirm its **row-mate card in the nested 2-column grid** does not change height and shows **no empty gap** below its own content — the row-mate's "Show more" must stay adjacent to its list, not float below a void.
+4. Confirm the **right-hand column** (*Results by indicator*, *Results by status*) does not stretch. **Watch *Results by status* specifically** — it carries `flex-1` while *Results by indicator* is `shrink-0`, so any outward growth lands entirely inside that one bordered white card as a visible void. **This is the step that failed under DD-13** and the reason the T-06 pivot happened.
+5. Confirm the page does not grow — no new vertical scroll on the page itself.
+6. Collapse everything and confirm the four cards are **equal height again**, exactly as before the change.
 
-Reference for all five steps: the GATE-2 mockup at `./mockup/index.html`, whose three containment modes show the pass state, the page-growth failure, and the empty-gap failure side by side.
+Reference: the GATE-2 mockup at `./mockup/index.html`.
+
+> ⚠️ **The mockup carried this defect too, and that is the real lesson of the T-06 pivot.** Until 2026-07-29 its right column omitted the real DOM's `flex-1` / `shrink-0` split, so the column grew invisibly while its boxes stayed content-sized — and mode 3's banner claimed *"the right-hand column keeps its height"*, which was true of the mockup and false of the product. **The artefact used to close GATE-2, derive DD-13 and serve as this very human check's reference reproduced the blind spot it existed to catch.** A fidelity fix has been applied (`.rightcol > .sidebox:last-child{flex:1}`). Before trusting the mockup on any future layout question, verify the property under test is actually modelled in it.
 
 Recorded as an **accepted, named blind spot** — not silently covered by `npm test`.
 

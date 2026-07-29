@@ -181,13 +181,16 @@ graph TD
   - `signal<ReadonlySet<ChartKey>>`. On `expandToggled`, **emit a new `Set`** — a `Set` mutated in place and re-`set()` fails Angular's `Object.is` check and silently never re-renders, producing a toggle that looks wired and does nothing.
   - `visibleLimit` per card = `expanded().has(key) ? null : COLLAPSED_ITEM_LIMIT` (import the exported constant; do not hardcode `5`).
   - **A plain `signal` is the mechanism, not an omission (AC.6/AC.7).** Its lifetime is the component's, so a contract change collapses everything for free — every navigation that changes `:id` destroys this component (D-AC5, verified across all seven call sites). Nothing keyed to `payload()`: that would also fire on **Try again**, collapsing a list the user deliberately opened, which AC.7 forbids.
-  - **DD-13:** the ranked grid carries `align-items: start` **only while `expanded().size > 0`**; collapsed it keeps `lg:items-stretch`. Without this, `items-stretch` drags the row-mate to the expanded card's height and strands its five rows above a tall empty gap with its "Show more" below a void. **Do not** fill that gap with extra rows — that would contradict R-PDB-002 and show data nobody asked for.
+  - ~~**DD-13:** the ranked grid carries `align-items: start` only while `expanded().size > 0`~~ — **SUPERSEDED by DD-14 (pivot, 2026-07-29).**
+  - **DD-14 — freeze the geometry (`design.md` §6.3.2).** Bound the expanded list to the area the card **already occupies**; the card's rendered height must be **identical** collapsed and expanded. Growth is removed at its source rather than stopped from propagating, because `align-items` does not size grid tracks and so cannot contain it. Consequences: **the conditional grid class is no longer needed** (the ranked grid keeps `lg:items-stretch` unconditionally, and `rankedGridIndependent` + its two bindings can be deleted), and **T-03's committed `max-h-[46vh]` is amended** — the `overflow-y-auto` conditioning stays, the viewport bound goes.
+  - **Do not** fill any gap with extra rows — that would contradict R-PDB-002 and show data nobody asked for. Under DD-14 no gap arises, but the fence stands.
 - **Acceptance / done check:**
   - [ ] Expanding one card leaves the other three collapsed (AC.4).
   - [ ] A `loadError` → `update()` retry cycle **preserves** each card's state (AC.7).
   - [ ] A fresh component instance starts fully collapsed (AC.6).
-  - [ ] The grid class is applied when the set is non-empty and **absent when empty**.
-  - [ ] **Human check** — `requirements.md` §7, all five steps, against the GATE-2 mockup as reference: page does not grow · row-mate keeps its height **and shows no empty gap** · right-hand column does not stretch · collapsed cards are equal height again.
+  - [x] ~~The grid class is applied when the set is non-empty and absent when empty.~~ **Retired by DD-14** — there is no conditional grid class any more.
+  - [ ] **DD-14:** the expanded card's rendered height equals its collapsed height; the list scrolls inside the card's existing area.
+  - [ ] **Human check** — `requirements.md` §7, all **six** steps, against the **corrected** GATE-2 mockup: expanded card keeps its height · row-mate keeps its height and shows no empty gap · right-hand column does not stretch (**watch *Results by status*, which carries `flex-1` and absorbs the whole delta**) · page does not grow · collapsed cards equal height again.
 - **Evidence that does NOT count:** the class assertion is **not** evidence the layout is correct — it proves a class is present, nothing about rendered geometry. Three rounds of blind review passed on a design whose containment was incomplete precisely because no automated gate can see this; it was caught by operating the mockup. If the human check is skipped, report NFR-PDB-004 as **unverified**, not as passed.
 - **Dependencies:** T-05
 - **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max`
