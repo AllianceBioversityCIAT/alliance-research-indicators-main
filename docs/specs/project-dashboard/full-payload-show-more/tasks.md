@@ -164,7 +164,10 @@ graph TD
 - **Evidence that does NOT count:** request assertions written in this spec against `{ provide: ApiService, useValue: apiMock }` — that harness has no mock backend, so it cannot observe requests. Request/URL evidence lives in T-01; here assert at **spy level** (one `main()` call, zero calls to retired services).
 - **Dependencies:** T-01
 - **Effort:** M · **Skills:** `angular-developer`
-- **Status:** todo
+- **Status:** **done** — Reviewer PASS attempt 1, 2026-07-29. See [`execution.md`](./execution.md) § T-05.
+- **Known and accepted:** T-05 un-injects the four services that `project-dashboard.component.spec.ts` mocks, so that 848-line suite is **red between T-05 and T-07 by design** — the spec and its stub must change together, which is why T-07 is separate. PR 3 groups T-05+T-06+T-07, so the redness never escapes the PR. Full-suite run confirms **exactly 4 failures, all in that file** (308 suites / 6,250 tests).
+- **⚠️ T-05 must NOT ship as a standalone commit to a deployable branch.** Until T-06 binds `visibleLimit`, the cards render the **full** list — up to ~137 partner rows (GATE-1 worst case) with no bound and no toggle.
+- **T-07's work order — the four failing cases:** `should load project dashboard data for the parent contract` · `should build and sort ranked service items` · `should handle status response without result rows and lever labels with empty prefixes` · `should compute empty states from loading, error, and list signals`.
 
 ---
 

@@ -371,3 +371,80 @@ None. No rework round consumed.
 #### Final verification
 
 `npm run lint` clean · 5 suites / 117 tests pass · card-component coverage 100/100/100/100 · component sources verified unmodified by checksum · working tree restored exactly.
+
+---
+
+### T-05 — Dashboard: rewire to the single service, titles, keys, sort
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS** |
+| **Date** | 2026-07-29 |
+| **Implementer attempts** | 1 |
+| **Requirements covered** | R-PDB-001, R-PDB-004 AC.4, R-PDB-005, R-PDB-007 |
+| **Changed LOC** | 47 insertions, 68 deletions across 2 files |
+| **PR** | 3 of 4 (with T-06, T-07) — **the first PR a user notices** |
+
+#### Attempt 1
+
+**Files changed:** `project-dashboard.component.ts`, `.html`.
+
+- Four `GetTop*Service` injections replaced by one `GetFullContractReportsService`, provided at **component** level (DD-9) alongside the untouched `GetGeoScopeService`. The load `effect` now makes **one** `main(contractId)` call, replacing four.
+- All four item computeds, all four `*Empty()` computeds (each retaining its `!loadError()` guard) and all **16** `[loading]`/`[error]`/`[empty]`/`(retry)` bindings re-sourced — counted and confirmed by the Reviewer.
+- Explicit descending sort added to all four; `partnerItems()` had none (R-PDB-004 AC.4). Every sort runs on the array returned by `.map()`, never on a computed's source — no in-place mutation.
+- `id` now payload-derived everywhere: partners `institution_id`, levers `lever_id`, **contacts `user_id`** (was the formatted display name — the R-PDB-005 fix), contributors `contract_id`.
+- Titles renamed per DD-5.
+- `contractId` keeps its `snapshot` derivation (DD-10r) — verified unchanged, no `paramMap` subscription added.
+
+#### The central risk of this task, and how it was cleared
+
+Moving from the old catch-all `ProjectDashboardRankedItem` to T-01's narrower payload mirrors meant **narrowing several field accesses**. Because the suite that exercises this component is legitimately red (see below), no test could have caught a resulting rendering regression. The Reviewer therefore traced each narrowing to the **server SQL**, not to the client mirror.
+
+**The decisive finding:** `agresso-contract.repository.ts:1167` — `getFullContractReports()` **delegates to the same four builders** the four retired endpoints use (`getTopPrimaryLeversReport`, `getTopContributorsReport`, `getTopMainContactPersonsReport`, `getTopPartnersReport`, each with `undefined` limit). Only the `LIMIT` differs; the row objects are byte-identical between the old and new paths. The four old client services were confirmed pure pass-throughs with no enrichment. **Design §5.1's guarantee that label rendering cannot regress is therefore true, and now demonstrated rather than assumed.**
+
+Per-formatter, against the actual `SELECT` aliases:
+
+| Formatter reads | Emitted by the SQL? |
+| --- | --- |
+| `formatContributorLabel`: `contract_id ?? contract_code`, `contract_description ?? project_name` | `contract_id`, `contract_description`, `project_name` ✅ — **`contract_code` is emitted by nothing**; it was a dead fallback, so `contract_id` was already the label source |
+| `formatPartnerLabel`: `institution_name ?? partner_name`, `acronym` | `institution_name`, `acronym` ✅ — `partner_name` never emitted, dead |
+| `formatMainContactPersonName`: `name ?? full_name ?? contact_person_name ?? label ?? (first+last)` | only `first_name`/`last_name` emitted → falls through to `first + last`, **exactly as before** ✅ |
+| `formatLeverDisplayLabel(short_name, full_name)` | `short_name`, `full_name` ✅ |
+
+**Count narrowing cleared:** all four `SELECT`s alias the magnitude as `COUNT(DISTINCT …) AS count` and all four DTOs declare `count!: number`. Neither `results_count` nor `value` appears anywhere in the server surface — the dropped fallback chain was covering nothing. No bar can render zero-width.
+
+#### Decisions made
+
+| # | Decision | Basis |
+| --- | --- | --- |
+| E-05.1 | `formatLeverDisplayLabel(item.short_name, item.full_name ?? '')` — coerce `undefined` to `''` at the call site; the formatter itself is byte-unchanged | **Not merely equivalent — necessary.** With `''`: `''.indexOf(':')` → `-1` → `('' \|\| shortName \|\| '—').toUpperCase()` → `shortName`. With `undefined` it would **throw** (`undefined.indexOf`). The new mirror correctly types `full_name?: string`; the old `TopPrimaryLeverItem` typed it as required, which was wrong. The coercion prevents a crash the corrected type now exposes. |
+| E-05.2 | `getPartnerItemId` deleted | **Genuinely dead and its removal was mandatory, not cleanup.** Module-local, unexported, zero `grep` hits across all of `src` including specs. It guarded `institution_id === null`, impossible given `INNER JOIN clarisa_institutions` + `GROUP BY clarisa_institution.code`, and its fallback `partner_name` is never emitted. Leaving it would have failed `@typescript-eslint/no-unused-vars` — lint passes, so removal was required by T-05's own edit. |
+| E-05.3 | Contributor `id` narrowed from `contract_code ?? contract_id ?? String(index)` to `contract_id` | `secondary_contract.contract_id` is the `GROUP BY` key, so it is unique per row — satisfies R-PDB-005 AC.2/AC.3. `contract_code` was unreachable. |
+
+#### Expected failure — accepted by design, not a defect
+
+T-05 un-injects the four services that `project-dashboard.component.spec.ts` mocks, so that 848-line suite is **red between T-05 and T-07**. The provider block and the card stub must change together, which is why T-07 is a separate task; PR 3 groups T-05+T-06+T-07, so the redness never escapes the PR.
+
+**The Reviewer ran the FULL suite rather than the targeted one to prove no other failure hides behind the expected ones: 308 suites / 6,250 tests — 1 suite failed, 4 tests failed, all four in `project-dashboard.component.spec.ts`. No fifth failure anywhere in the client.**
+
+**T-07's work order — the four failing cases:**
+1. `should load project dashboard data for the parent contract` — asserts the four old mocks' `main` were each called with `('C-1', 4)`.
+2. `should build and sort ranked service items` — asserts `contributorItems()` against the four old mocks' `.list` signals.
+3. `should handle status response without result rows and lever labels with empty prefixes` — sets `topLeversMock.list` and reads `leverItems()[0]`.
+4. `should compute empty states from loading, error, and list signals` — asserts the four `*Empty()` computeds against the old mocks' signals.
+
+#### Issues encountered
+
+None. No rework round consumed.
+
+#### ADVISORY findings (4R lens — non-gating)
+
+| # | Lens | Finding |
+| --- | --- | --- |
+| A-05.1 | Risk — **operationally important** | **T-05 alone leaves the four cards rendering the FULL list.** `visibleLimit` defaults to `null` (DD-12) and T-05 correctly does not bind it, so between T-05 and T-06 a card can render up to ~137 partner rows (GATE-1 worst case) with **no bound and no toggle**. This is the documented decomposition and PR 3 groups T-05+T-06+T-07 — but **T-05 must never ship as a standalone commit to a deployable branch.** |
+| A-05.2 | — | `ProjectDashboardRankedItem` is a 47-field catch-all of which these four endpoints emit only 13. Once T-08 deletes the four services, its remaining consumers are the four formatters. A future task could narrow the formatter signatures to the T-01 mirrors and delete the dead branches. Out of scope; T-05 was right not to touch the formatters. **Recorded so T-08 does not resurrect the dead fallbacks.** |
+| A-05.3 | Readability | Pre-existing asymmetry, unchanged by T-05: `leverItems` uses `count: item.count` raw while the other three use `Number(item.count ?? 0)`. Harmless with mysql2's `COUNT()` handling, but reads as an oversight. |
+
+#### Final verification
+
+`npm run lint` clean · `npm run build` succeeds, no template or type errors · **full suite 308 suites / 6,250 tests, exactly 4 failures, all expected and all in the dashboard spec** — all re-run by the Reviewer.

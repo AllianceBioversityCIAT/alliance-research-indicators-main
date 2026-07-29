@@ -4,10 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
-import { GetTopContributorsContractsService } from '@services/get-top-contributors-contracts.service';
-import { GetTopMainContactPersonsService } from '@services/get-top-main-contact-persons.service';
-import { GetTopPartnersService } from '@services/get-top-partners.service';
-import { GetTopPrimaryLeversService } from '@services/get-top-primary-levers.service';
+import { GetFullContractReportsService } from '@services/get-full-contract-reports.service';
 import { GetGeoScopeService } from '@services/get-geo-scope.service';
 import { ApiService } from '@shared/services/api.service';
 import { ActionsService } from '@shared/services/actions.service';
@@ -46,13 +43,7 @@ interface ProjectStatusChartItem {
   selector: 'app-project-dashboard',
   standalone: true,
   imports: [ButtonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe],
-  providers: [
-    GetTopContributorsContractsService,
-    GetTopMainContactPersonsService,
-    GetTopPartnersService,
-    GetTopPrimaryLeversService,
-    GetGeoScopeService
-  ],
+  providers: [GetFullContractReportsService, GetGeoScopeService],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -133,62 +124,61 @@ export class ProjectDashboardComponent {
     return Math.max(...items.map(item => item.value), 0);
   });
 
-  readonly topContributors = inject(GetTopContributorsContractsService);
-  readonly topMainContactPersons = inject(GetTopMainContactPersonsService);
-  readonly topPartners = inject(GetTopPartnersService);
-  readonly topPrimaryLevers = inject(GetTopPrimaryLeversService);
+  readonly reports = inject(GetFullContractReportsService);
   private readonly geoScope = inject(GetGeoScopeService);
 
   readonly contributorItems = computed(() =>
-    this.topContributors
-      .list()
-      .map((item, index) => ({
-        id: item.contract_code ?? item.contract_id ?? String(index),
+    this.reports
+      .topContributors()
+      .map(item => ({
+        id: item.contract_id,
         label: formatContributorLabel(item),
-        count: Number(item.results_count ?? item.count ?? 0)
+        count: Number(item.count ?? 0)
       }))
       .sort((first, second) => second.count - first.count)
   );
 
   readonly contributorsEmpty = computed(
-    () => !this.topContributors.loading() && !this.topContributors.loadError() && this.topContributors.list().length === 0
+    () => !this.reports.loading() && !this.reports.loadError() && this.reports.topContributors().length === 0
   );
 
   readonly mainContactPersonItems = computed(() =>
-    this.topMainContactPersons
-      .list()
-      .map((item, index) => ({
-        id: formatMainContactPersonName(item) ?? String(index),
+    this.reports
+      .topMainContactPersons()
+      .map(item => ({
+        id: item.user_id,
         label: formatMainContactPersonName(item) ?? '—',
-        count: Number(item.results_count ?? item.count ?? item.value ?? 0),
+        count: Number(item.count ?? 0),
         description: item.email
       }))
       .sort((first, second) => second.count - first.count)
   );
 
   readonly mainContactPersonsEmpty = computed(
-    () =>
-      !this.topMainContactPersons.loading() &&
-      !this.topMainContactPersons.loadError() &&
-      this.topMainContactPersons.list().length === 0
+    () => !this.reports.loading() && !this.reports.loadError() && this.reports.topMainContactPersons().length === 0
   );
 
   readonly partnerItems = computed(() =>
-    this.topPartners.list().map((item, index) => ({
-      id: getPartnerItemId(item, index),
-      label: formatPartnerLabel(item),
-      count: Number(item.results_count ?? item.count ?? 0)
-    }))
+    this.reports
+      .topPartners()
+      .map(item => ({
+        id: String(item.institution_id),
+        label: formatPartnerLabel(item),
+        count: Number(item.count ?? 0)
+      }))
+      .sort((first, second) => second.count - first.count)
   );
 
-  readonly partnersEmpty = computed(() => !this.topPartners.loading() && !this.topPartners.loadError() && this.topPartners.list().length === 0);
+  readonly partnersEmpty = computed(
+    () => !this.reports.loading() && !this.reports.loadError() && this.reports.topPartners().length === 0
+  );
 
   readonly leverItems = computed(() =>
-    this.topPrimaryLevers
-      .list()
+    this.reports
+      .topPrimaryLevers()
       .map(item => ({
         id: String(item.lever_id),
-        label: formatLeverDisplayLabel(item.short_name, item.full_name),
+        label: formatLeverDisplayLabel(item.short_name, item.full_name ?? ''),
         count: item.count,
         iconUrl: item.icon || undefined
       }))
@@ -196,7 +186,7 @@ export class ProjectDashboardComponent {
   );
 
   readonly leversEmpty = computed(
-    () => !this.topPrimaryLevers.loading() && !this.topPrimaryLevers.loadError() && this.topPrimaryLevers.list().length === 0
+    () => !this.reports.loading() && !this.reports.loadError() && this.reports.topPrimaryLevers().length === 0
   );
 
   readonly pendingRevisionExcludedColumns = ['status', 'year', 'versions', 'creation_date', 'public_link', 'project'] as const;
@@ -207,10 +197,7 @@ export class ProjectDashboardComponent {
       if (contractId) {
         void this.loadProject(contractId);
         void this.loadProjectResultsByStatus(contractId);
-        this.topContributors.main(contractId, 4);
-        this.topMainContactPersons.main(contractId, 4);
-        this.topPartners.main(contractId, 4);
-        this.topPrimaryLevers.main(contractId, 4);
+        this.reports.main(contractId);
         this.geoScope.main(contractId);
         this.resultsCenterService.initializeProjectDashboardResultsTable(contractId);
 
@@ -532,14 +519,6 @@ function buildStatusChartItems(results: Result[]): ProjectStatusChartItem[] {
   }
 
   return [...statuses.values()].sort((first, second) => second.value - first.value);
-}
-
-function getPartnerItemId(item: ProjectDashboardRankedItem, index: number): string {
-  if (item.institution_id === null || item.institution_id === undefined) {
-    return item.partner_name ?? String(index);
-  }
-
-  return String(item.institution_id);
 }
 
 function formatIndicatorName(indicator: GetProjectDetailIndicator): string {

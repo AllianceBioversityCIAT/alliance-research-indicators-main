@@ -157,42 +157,42 @@
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
 
         <div class="flex flex-1">
-          <app-project-dashboard-card title="Top partner institution"
+          <app-project-dashboard-card title="Results Partners"
             description="Partner institutions most frequently linked to results on this primary project."
-            class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="topPartners.loading()"
-            [error]="topPartners.loadError()" [empty]="partnersEmpty()"
+            class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="reports.loading()"
+            [error]="reports.loadError()" [empty]="partnersEmpty()"
             emptyMessage="No partner institutions were found for this project." [items]="partnerItems()"
-            layout="rows-partners" (retry)="topPartners.update()">
+            layout="rows-partners" (retry)="reports.update()">
           </app-project-dashboard-card>
         </div>
 
         <div class="flex flex-1">
-          <app-project-dashboard-card title="Top primary levers"
+          <app-project-dashboard-card title="Primary Levers"
             description="Primary levers most frequently linked to results on this project." class="h-full w-full"
-            iconClass="pi pi-sliders-h" [compact]="true" [loading]="topPrimaryLevers.loading()"
-            [error]="topPrimaryLevers.loadError()" [empty]="leversEmpty()"
+            iconClass="pi pi-sliders-h" [compact]="true" [loading]="reports.loading()"
+            [error]="reports.loadError()" [empty]="leversEmpty()"
             emptyMessage="No primary levers were found for this project." [items]="leverItems()"
-            layout="rows-stacked-lever" (retry)="topPrimaryLevers.update()">
+            layout="rows-stacked-lever" (retry)="reports.update()">
           </app-project-dashboard-card>
         </div>
 
         <div class="flex flex-1">
-          <app-project-dashboard-card title="Top main contact person"
+          <app-project-dashboard-card title="Main contact person"
             description="Main contact persons most frequently linked to results on this project." class="h-full w-full"
-            iconClass="pi pi-users" [compact]="true" [loading]="topMainContactPersons.loading()"
-            [error]="topMainContactPersons.loadError()" [empty]="mainContactPersonsEmpty()"
+            iconClass="pi pi-users" [compact]="true" [loading]="reports.loading()"
+            [error]="reports.loadError()" [empty]="mainContactPersonsEmpty()"
             emptyMessage="No main contact persons were found for this project." [items]="mainContactPersonItems()"
-            layout="rows-stacked-lever" [itemHeightPx]="43" (retry)="topMainContactPersons.update()">
+            layout="rows-stacked-lever" [itemHeightPx]="43" (retry)="reports.update()">
           </app-project-dashboard-card>
         </div>
 
         <div class="flex lg:flex-1 [&>*]:w-full">
-          <app-project-dashboard-card title="Top contributing projects"
+          <app-project-dashboard-card title="Contributing projects"
             description="Top projects contributing to results where this project is the primary project."
-            class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="topContributors.loading()"
-            [error]="topContributors.loadError()" [empty]="contributorsEmpty()"
+            class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="reports.loading()"
+            [error]="reports.loadError()" [empty]="contributorsEmpty()"
             emptyMessage="No contributor projects were found." [items]="contributorItems()" layout="rows-stacked-lever"
-            [itemHeightPx]="43" (retry)="topContributors.update()">
+            [itemHeightPx]="43" (retry)="reports.update()">
           </app-project-dashboard-card>
         </div>
       </div>
