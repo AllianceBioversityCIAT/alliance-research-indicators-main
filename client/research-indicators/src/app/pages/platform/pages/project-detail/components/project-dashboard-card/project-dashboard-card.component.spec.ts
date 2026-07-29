@@ -26,7 +26,7 @@ import { ContractFullReports } from '@interfaces/contract-full-reports.interface
 import { ProjectDashboardRankedListItem } from '@interfaces/project-dashboard.interface';
 import { PROJECT_DASHBOARD_RANK_BAR_COLORS } from '@shared/constants/project-dashboard-chart-colors.constants';
 import { mockContractFullReports } from 'src/app/testing/contract-full-reports.mock';
-import { ProjectDashboardCardComponent } from './project-dashboard-card.component';
+import { COLLAPSED_ITEM_LIMIT, ProjectDashboardCardComponent } from './project-dashboard-card.component';
 
 // ---------------------------------------------------------------------------
 // Fixture → card-item mappers (T-01 fixture is a ContractFullReports payload;
@@ -83,18 +83,69 @@ function getToggleButton(fixture: ComponentFixture<ProjectDashboardCardComponent
   return fixture.nativeElement.querySelector('button[aria-expanded]');
 }
 
-function getBoundedContainer(fixture: ComponentFixture<ProjectDashboardCardComponent>): HTMLElement | null {
-  return fixture.nativeElement.querySelector('.overflow-visible');
+/** The DD-14 positioning context that owns the in-flow render and the overlay. */
+function getListWrapper(fixture: ComponentFixture<ProjectDashboardCardComponent>): HTMLElement | null {
+  return fixture.nativeElement.querySelector('.relative.overflow-visible');
+}
+
+/** The render that stays in flow — collapsed it carries the content, expanded it is the spacer. */
+function getInFlowRender(fixture: ComponentFixture<ProjectDashboardCardComponent>): HTMLElement | null {
+  return fixture.nativeElement.querySelector('.relative.overflow-visible > div:not(.absolute)');
+}
+
+/** The in-flow render *while it is a layout-only spacer* — i.e. only once `aria-hidden`. */
+function getHiddenLayoutSpacer(fixture: ComponentFixture<ProjectDashboardCardComponent>): HTMLElement | null {
+  return fixture.nativeElement.querySelector('.relative.overflow-visible > div[aria-hidden="true"]');
+}
+
+/** The out-of-flow render that carries the full list while expanded (DD-14 mechanism (ii)). */
+function getExpandedOverlay(fixture: ComponentFixture<ProjectDashboardCardComponent>): HTMLElement | null {
+  return fixture.nativeElement.querySelector('.relative.overflow-visible > div.absolute');
+}
+
+/**
+ * DD-14 mechanism (ii) puts **two** renders of the ranked list in an expanded
+ * `variant="card"`: an in-flow spacer, capped at the collapsed row count, whose
+ * only job is to hold the box the card already occupied, and the out-of-flow
+ * overlay that carries the rows the user actually reads. Every row-count and
+ * encoding assertion must therefore read the render that carries content, so
+ * the helpers below exclude anything inside an `aria-hidden` subtree.
+ *
+ * Discriminating on `aria-hidden` is deliberate rather than incidental: it is
+ * the same attribute that stops a screen reader announcing rows 1-5 twice, so
+ * these assertions fail if the spacer ever loses it (row counts double) or the
+ * overlay ever gains it (row counts drop to zero). A `data-*` marker would
+ * have gated the mechanism without gating its a11y consequence.
+ *
+ * The check runs from the row outward, not from the queried element: rows carry
+ * their own decorative `aria-hidden` children (the bars), so asking a bar
+ * whether it sits in an `aria-hidden` subtree would always answer yes.
+ */
+function isInContentRender(element: Element): boolean {
+  const row = element.closest('li') ?? element;
+  return row.closest('[aria-hidden="true"]') === null;
 }
 
 /** Reads rendered bar colour + width for `rows-partners` rows, in rendered order. */
 function getPartnerBarStyles(fixture: ComponentFixture<ProjectDashboardCardComponent>): { color: string; width: string }[] {
   const bars: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('li [style*="background-color"]');
-  return Array.from(bars).map(bar => ({ color: bar.style.backgroundColor, width: bar.style.width }));
+  return Array.from(bars)
+    .filter(isInContentRender)
+    .map(bar => ({ color: bar.style.backgroundColor, width: bar.style.width }));
+}
+
+function getContentListItems(fixture: ComponentFixture<ProjectDashboardCardComponent>): HTMLLIElement[] {
+  const rows: NodeListOf<HTMLLIElement> = fixture.nativeElement.querySelectorAll('ul > li');
+  return Array.from(rows).filter(isInContentRender);
+}
+
+function getContentUl(fixture: ComponentFixture<ProjectDashboardCardComponent>): HTMLUListElement {
+  const lists: NodeListOf<HTMLUListElement> = fixture.nativeElement.querySelectorAll('ul');
+  return Array.from(lists).filter(isInContentRender)[0];
 }
 
 function getRenderedListItemCount(fixture: ComponentFixture<ProjectDashboardCardComponent>): number {
-  return fixture.nativeElement.querySelectorAll('ul > li').length;
+  return getContentListItems(fixture).length;
 }
 
 describe('ProjectDashboardCardComponent', () => {
@@ -393,7 +444,7 @@ describe('ProjectDashboardCardComponent', () => {
       fixture.componentRef.setInput('layout', 'rows-stacked-lever');
       fixture.detectChanges();
 
-      const rows: NodeListOf<HTMLLIElement> = fixture.nativeElement.querySelectorAll('ul > li');
+      const rows = getContentListItems(fixture);
       expect(rows.length).toBe(37);
 
       const badgeAt = (rowIndex: number) => rows[rowIndex].querySelector('span')?.textContent?.trim();
@@ -413,7 +464,7 @@ describe('ProjectDashboardCardComponent', () => {
       fixture.componentRef.setInput('layout', 'columns');
       fixture.detectChanges();
 
-      const ulCollapsed: HTMLUListElement = fixture.nativeElement.querySelector('ul');
+      const ulCollapsed = getContentUl(fixture);
       const collapsedCellCount = getRenderedListItemCount(fixture);
       expect(collapsedCellCount).toBe(5);
       expect(ulCollapsed.style.gridTemplateColumns).toBe(`repeat(${collapsedCellCount}, minmax(0, 1fr))`);
@@ -421,7 +472,7 @@ describe('ProjectDashboardCardComponent', () => {
       fixture.componentRef.setInput('visibleLimit', null);
       fixture.detectChanges();
 
-      const ulExpanded: HTMLUListElement = fixture.nativeElement.querySelector('ul');
+      const ulExpanded = getContentUl(fixture);
       const expandedCellCount = getRenderedListItemCount(fixture);
       expect(expandedCellCount).toBe(40);
       expect(ulExpanded.style.gridTemplateColumns).toBe(`repeat(${expandedCellCount}, minmax(0, 1fr))`);
@@ -481,36 +532,99 @@ describe('ProjectDashboardCardComponent', () => {
     });
   });
 
-  // ---- NFR-PDB-004 condition 1 — bounded container, structural only -------
+  // ---- NFR-PDB-004 — DD-14 mechanism (ii), structural only ----------------
 
-  describe('bounded scroll container (NFR-PDB-004 condition 1 — structural only, no rendered-layout claim)', () => {
-    // jsdom computes no box model, so `overflow`/height propagation is
-    // invisible here (DC-8). These cases assert only that the container
-    // exists and is conditioned on `visibleLimit() === null`, per
-    // tasks.md T-03/T-04 — nothing about the rendered outcome.
+  describe('out-of-flow expanded render (NFR-PDB-004 / DD-14 — structural only, no rendered-layout claim)', () => {
+    // jsdom computes no box model (DC-8), so nothing below claims anything
+    // about a rendered height — every offset/scroll property it exposes is 0.
+    // What these cases *can* gate is the structure the mechanism is made of:
+    // which render is in flow, which is out of it, how many rows each carries,
+    // and that the out-of-flow one is the only scroll container. The rendered
+    // geometry was measured separately in headless Chrome against a model of
+    // NFR-PDB-004's four-link chain — see the T-06 record in execution.md.
+    //
+    // These replace T-03's `max-h-[46vh]` assertions, which DD-14 retired: a
+    // max-height binds only in the state where content exceeds it, so it made
+    // the two states' intrinsic contributions differ instead of equal (that is
+    // the measured +52px failure, design.md §6.3.2).
+    const largeList = deriveLargeRankedList(37);
+
     beforeEach(() => {
-      fixture.componentRef.setInput('items', toPartnerItems(mockContractFullReports())); // 7 items
+      fixture.componentRef.setInput('items', largeList);
       fixture.componentRef.setInput('layout', 'rows-partners');
     });
 
-    it('is present without the bounding classes while collapsed (visibleLimit is a number)', () => {
+    it('renders a single in-flow list and no overlay while collapsed', () => {
       fixture.componentRef.setInput('visibleLimit', 5);
       fixture.detectChanges();
 
-      const container = getBoundedContainer(fixture)!;
-      expect(container).not.toBeNull();
-      expect(container.classList.contains('max-h-[46vh]')).toBe(false);
-      expect(container.classList.contains('overflow-y-auto')).toBe(false);
+      expect(getListWrapper(fixture)).not.toBeNull();
+      expect(getExpandedOverlay(fixture)).toBeNull();
+      // Nothing is hidden from assistive tech while collapsed, and there is
+      // exactly one list in the DOM — no spacer to announce twice.
+      expect(getHiddenLayoutSpacer(fixture)).toBeNull();
+      expect(fixture.nativeElement.querySelectorAll('ul').length).toBe(1);
+      expect(getRenderedListItemCount(fixture)).toBe(5);
     });
 
-    it('gains the bounding classes only when visibleLimit() === null', () => {
+    it('moves the full list into an inset-0 absolute scroll container when visibleLimit() === null', () => {
       fixture.componentRef.setInput('visibleLimit', null);
       fixture.detectChanges();
 
-      const container = getBoundedContainer(fixture)!;
-      expect(container).not.toBeNull();
-      expect(container.classList.contains('max-h-[46vh]')).toBe(true);
-      expect(container.classList.contains('overflow-y-auto')).toBe(true);
+      const overlay = getExpandedOverlay(fixture)!;
+      expect(overlay).not.toBeNull();
+      // The three properties the freeze rests on, read off the rendered
+      // element: out of flow (`absolute`, so it adds nothing to any ancestor's
+      // max-content sizing), filling exactly the box the in-flow render
+      // established (`inset-0`), and scrolling internally instead of growing.
+      expect(overlay.classList.contains('absolute')).toBe(true);
+      expect(overlay.classList.contains('inset-0')).toBe(true);
+      expect(overlay.classList.contains('overflow-y-auto')).toBe(true);
+      // `absolute` only stays out of flow relative to a positioned ancestor —
+      // without `relative` on the wrapper the overlay would escape the card.
+      expect(overlay.parentElement!.classList.contains('relative')).toBe(true);
+      // It is the render that carries the content.
+      expect(overlay.querySelectorAll('ul > li').length).toBe(37);
+    });
+
+    it('keeps an in-flow spacer of exactly the collapsed row count, hidden from sight and from assistive tech', () => {
+      fixture.componentRef.setInput('visibleLimit', null);
+      fixture.detectChanges();
+
+      const spacer = getHiddenLayoutSpacer(fixture)!;
+      expect(spacer).not.toBeNull();
+      // `invisible` is `visibility: hidden`, which still occupies its box —
+      // `hidden` (`display: none`) would remove it and let the card shrink.
+      expect(spacer.classList.contains('invisible')).toBe(true);
+      expect(spacer.classList.contains('hidden')).toBe(false);
+      // And it is still the *collapsed* box: the cap, not the 37 rows.
+      expect(spacer.querySelectorAll('ul > li').length).toBe(COLLAPSED_ITEM_LIMIT);
+      expect(component.layoutItems().length).toBe(COLLAPSED_ITEM_LIMIT);
+    });
+
+    it('returns to a single visible in-flow list when the card collapses again', () => {
+      fixture.componentRef.setInput('visibleLimit', null);
+      fixture.detectChanges();
+      fixture.componentRef.setInput('visibleLimit', 5);
+      fixture.detectChanges();
+
+      expect(getExpandedOverlay(fixture)).toBeNull();
+      expect(getHiddenLayoutSpacer(fixture)).toBeNull();
+      expect(getInFlowRender(fixture)!.classList.contains('invisible')).toBe(false);
+      expect(getRenderedListItemCount(fixture)).toBe(5);
+    });
+
+    it('uses no overlay for an unlimited card of 5 rows or fewer, so R-PDB-002 AC.5 rendering is unchanged', () => {
+      // A `variant="card"` consumer that never binds `visibleLimit` and has no
+      // more rows than the cap must render exactly as it did before this spec:
+      // one visible, in-flow, announced list — no spacer, no overlay.
+      fixture.componentRef.setInput('items', toPrimaryLeverItems(mockContractFullReports())); // exactly 5
+      fixture.componentRef.setInput('visibleLimit', null);
+      fixture.detectChanges();
+
+      expect(getExpandedOverlay(fixture)).toBeNull();
+      expect(getHiddenLayoutSpacer(fixture)).toBeNull();
+      expect(getRenderedListItemCount(fixture)).toBe(5);
     });
   });
 

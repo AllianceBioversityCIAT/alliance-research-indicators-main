@@ -139,7 +139,7 @@ GET reports/geo-scope ─→ GetGeoScopeService ─→ GeoScopeCardComponent   [
 - [ ] AC.2 — Expanding issues **zero** network requests.
 - [ ] AC.3 — The control becomes **Show less**; collapsing restores exactly the top 5.
 - [ ] AC.4 — Expanding one card does not expand or collapse any other card.
-- [ ] AC.5 — The route does not change; no dialog or overlay opens.
+- [ ] AC.5 — The route does not change; **no modal dialog opens and no navigation occurs.** *(Clarified 2026-07-29 after the DD-14 pivot: the original wording said "no dialog or **overlay**", which now reads as self-contradictory, because DD-14 mechanism (ii) deliberately renders the expanded list in a `position: absolute` in-card overlay. The intent of this criterion was always **umbrella D-2** — in-place growth instead of a modal — so what it forbids is a dialog, a route change or an element escaping the card, not CSS positioning inside it.)*
 - [ ] AC.6 — Arriving at the dashboard for a **different contract** shows every card collapsed. Satisfied by component recreation (**D-AC5**), the same mechanism as R-PDB-001 AC.5.
 - [ ] AC.7 — A **Try again** retry of the *same* contract **preserves** each card's expanded/collapsed state. A user who expanded a list and hit retry gets their list back, not a silently collapsed one.
 

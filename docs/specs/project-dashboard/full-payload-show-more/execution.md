@@ -633,7 +633,103 @@ Per `/akili-execute`'s runtime-failure fallback, these are recorded and are **no
 
 ---
 
-## 🅿️ RUN PARKED — 2026-07-29
+### T-06 (REVISED under DD-14) — attempt 2: ✅ **Reviewer `STATUS: PASS`**
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS** — T-06 closed |
+| **Date** | 2026-07-29 |
+| **Attempts on the revised task** | 2 of 3 (attempt 1 rejected; five further spawns died on API 529 without editing) |
+| **Requirements covered** | R-PDB-003 AC.4, AC.6, AC.7 · **NFR-PDB-004 both conditions — mechanism measured, acceptance still pending the human check** |
+| **Changed LOC** | 222 insertions, 50 deletions across 5 files |
+| **Routing deviation** | **Implementer ran on `opus`, not `sonnet` (T2).** Five consecutive `sonnet` spawns died on API 529; switching model was the only untried lever and it worked. Consequence: the Reviewer is also `opus`, so **model-level `author ≠ auditor` is waived for this task only.** Recorded per `.agents/leader.md`. Mitigation: the deviation was disclosed in the Reviewer's brief with an instruction to reproduce rather than agree — which it did, building its own probe with a different driver. |
+
+#### The mechanism that finally worked (mechanism (ii), design §6.3.2)
+
+The `variant="card"` list wrapper became `relative`, holding up to two renders of `#rankedList`:
+
+| Render | When | Content |
+| --- | --- | --- |
+| **In flow — always** | every state | `layoutItems()` = `visibleLimit() === null ? items().slice(0, COLLAPSED_ITEM_LIMIT) : visibleItems()`. A numeric limit is honoured verbatim; the cap only substitutes for `null` |
+| **Out of flow — expanded only** | `expandedOverlay() = visibleLimit() === null && canExpand()` | `visibleItems()` (full list) in `absolute inset-0 min-w-0 overflow-y-auto pr-[6px]` |
+
+While expanded, the in-flow render becomes a **layout-only spacer**: `invisible` (`visibility: hidden`, which *keeps the box* — `display: none` would not) plus `aria-hidden="true"`.
+
+**Why the track cannot grow, and why this differs categorically from the two failures:** an absolutely-positioned box is removed from its containing block's flow, so it contributes nothing to any ancestor's **intrinsic size**. The ranked grid's `auto` row therefore measures only the in-flow render — capped at 5 rows in **both** states. `max-height` (attempt 1) is a *clamp on a contribution the box still makes*, so it binds asymmetrically; `align-items` (DD-13) never sizes tracks at all. Mechanism (ii) removes the contribution entirely, which is also why it is **viewport-independent** — the structural reason it cannot fail the way `46vh` did.
+
+#### Measurement — reproduced independently by the Reviewer, not accepted
+
+The Reviewer did **not** accept the Implementer's table. It re-ran that probe, verified its CSS transliteration against class lists dumped from the real rendered component, then **built its own probe with a different driver and scenarios the Implementer's omitted.**
+
+| viewport | CTRL: HEAD (`46vh`, committed) | CTRL: attempt 1 (`280px`) | **DD-14, every scenario** |
+| --- | --- | --- | --- |
+| 1440×900 | **+186px** all links | **+52px** all links | **ZERO** |
+| 1440×1400 | +416 | +52 | **ZERO** |
+| 1440×700 | +94 | +52 | **ZERO** |
+| 1280×900 | +193 | +59 | **ZERO** |
+| 1024×900 | +175 | +41 | **ZERO** |
+| 900×900 (below `lg`) | +206 | +72 | **ZERO** |
+
+**Why this table is trustworthy where three prior CSS arguments were not:**
+
+- **Both known failures reproduce as controls.** HEAD's growth **tracks viewport height** (94 → 186 → 193 → 416), exactly as a `46vh` bound must. Attempt 1 reproduces **+52px at 1440×900 — matching the earlier independent audit to the pixel.** A probe that reproduces two known defects and *then* reads flat is measuring something real.
+- **Zero on every measured node, in both directions.** Each card, each wrapper, `ranked`, `leftcol`, `outer`, the `flex-1` *Results by status* box, and `document.scrollHeight` — across each card individually, all four at once, collapse-and-reopen, asymmetric row-mates (3-row and 5-row neighbours), and cards one row past the cap. The Reviewer's probe prints deltas both ways: **no growth and no shrink.**
+- **The overlay scrolls rather than clips:** partners `1592/228`, contacts `1917/267`, levers `375/228`, contributors `817/267`.
+
+Probes and raw output are committed under [`./evidence/`](./evidence/) so a future reader can re-run them — they were previously only in a machine-local temp path (advisory 3).
+
+#### Conformance gates — all eight verified independently
+
+| # | Gate | How it was verified |
+| --- | --- | --- |
+| 1 | A11y / duplicate content | Rendered DOM: **0** focusable nodes inside the `aria-hidden` spacer; the toggle is the **only** focusable node in the expanded card and `toggle.closest('[aria-hidden="true"]') === null`. No `aria-hidden` tab stop. |
+| 2 | No shrink | **`min-h-[280px]` does NOT apply** — all four call sites pass `[compact]="true"` and render `… min-h-0`. With `compact=false` the binding *does* emit `min-h-[280px]`, so it works and simply never fires. **There is no height floor; the spacer is the only thing preventing shrink** — and zero shrink was measured. |
+| 3 | R-PDB-004 encoding | `barColor`, `maxCount`, `totalCount`, `partnerBarWidthPercent`, `fillPercent` all still read `items()`; the `.ts` hunks are purely additive. |
+| 4 | **R-PDB-002 AC.5 — geographic card byte-unchanged** | **Proven, not inspected.** Geo `variant="list"` DOM dumped at HEAD (throwaway worktree) and with the diff, for n = 0/1/3/5/6/12/37 plus the outer geo card. **Byte-identical** except Angular's dev-only `ng-reflect-*` attribute (stripped in production). |
+| 5 | `layoutItems()` honours a numeric limit | Substitutes only for `null`; R-PDB-002 AC.1 holds. |
+| 6 | **Card-spec fidelity — strengthened, not weakened** | Exact counts (5/37/40) and exact rendered `style.backgroundColor`/`style.width` retained; `recollapsed` still `toEqual(collapsed)`. **7 Reviewer-invented mutations, all killed:** drop `absolute` · drop `canExpand()` from `expandedOverlay` · `invisible`→`hidden` · drop `relative` (4 failures) · uncap `layoutItems` · `barColor` over `visibleItems()` · **remove `aria-hidden` → 6 failures**, which proves the new `aria-hidden` discriminator is load-bearing rather than decorative. |
+| 7 | Comments do not overclaim | They describe the mechanism, say "measurably failed", quote the +52px figure, and label the Chrome work a **model**. Attempt 1's "the height never changes" assertion is gone. |
+| 8 | Scope | 5 files (222/50). `project-dashboard.component.spec.ts` untouched and verified in a HEAD worktree to fail with **exactly** those 4 case names — so the diff is net **+3 passing tests**. `rankedRows` is a justified 1-line type shim (inline `ng-template` context is `any`, verified by a compile experiment both ways). |
+
+**Gates re-run by the Reviewer:** `npm run lint` clean · `npm run s-lint` **352 errors / 0 warnings, unchanged, 0 `.scss` in the diff** · `npm run build` succeeds, `strictTemplates` OK · card spec **27/27**.
+
+**Reviewer verdict — `STATUS: PASS`**
+
+> DD-14 mechanism (ii) is the first of the three attempts whose containment claim survives independent measurement: I reproduced both known failures as controls (+186 HEAD, +52 attempt 1) and then measured **zero delta on all four links of NFR-PDB-004 — in both directions, across six viewports, for every card individually and all four together** — with the expanded list genuinely scrolling inside the card's existing area. All eight conformance gates pass, the T-04 suite is stronger than before (7/7 of my mutations killed, including one that proves the `aria-hidden` discriminator is load-bearing), and R-PDB-002 AC.5 is byte-unchanged for the geographic card.
+
+#### Decisions made
+
+| # | Decision | Basis |
+| --- | --- | --- |
+| E-06.1 | Implementer model switched to `opus` | Five consecutive `sonnet` spawns died on API 529 without editing. Model choice was the only untried lever. Waiver recorded above. |
+| E-06.2 | The in-flow render is kept as an `invisible` + `aria-hidden` **spacer**, not removed | `visibility: hidden` keeps the box, which is what prevents the card **shrinking**. Since `min-h-[280px]` does not apply at these call sites, there is no floor and the spacer is load-bearing. |
+| E-06.3 | `aria-hidden` is the discriminator the card spec's DOM helpers filter on, checked from the row outward | Deliberate: the spacer losing `aria-hidden` doubles every row count and the overlay gaining it drops them to zero, so the row-count assertions now **also gate the a11y contract**. The Reviewer's mutation confirmed this — removing `aria-hidden` reddens 6 cases. |
+| E-06.4 | Keyboard scrolling of the overlay (WCAG 2.1.1) ruled **out of scope** for NFR-PDB-003 | NFR-PDB-003 is explicitly toggle-scoped (role, `aria-expanded`, accessible name, keyboard activation). The plain-`div` scroll container is pre-existing from committed T-03, so **not a regression**. **Escalated to the owner as a separate decision — see below.** |
+| E-06.5 | `layout="columns"` with an overlay left untested in a browser | No live call site uses `columns` with items; it is only the input's default. DC-6 gates its structural bindings in jsdom. |
+
+#### Issues encountered
+
+Attempt 1 rejected (see the entry above). Five spawns lost to API 529 without editing — environment, not work.
+
+#### ADVISORY findings (4R lens — non-gating)
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| **A-06ii.1** | **The scroll container is not keyboard-operable.** The overlay is a plain `div` (`tabIndex=-1`, `role=null`), so a keyboard-only user cannot scroll it. Not a regression and not covered by any requirement as written — but DD-14 shrinks the window to ~5 rows while content reaches `1917px` in a `267px` box (measured), so the **impact is now much larger**, and PRD **C-4** (WCAG 2.1 AA on every changed screen) applies to this screen. One line fixes it: `tabindex="0"` + `role="group"`/`region` + an accessible name. | **Escalated to the owner.** Per §2.4 an advisory may not become a task or widen T-06 — the owner decides whether it lands as an addendum or a tracked defect. **Not silently inherited.** |
+| **A-06ii.2** | **`mockup/index.html` still models DD-13 / `46vh`.** `requirements.md` §7 names it as *the reference for the six-step human check*, so **the owner cannot run the acceptance gate against it as it stands.** Its `flex:1` fidelity fix landed, but the DD-14 mechanism was never modelled. | **Escalated — this blocks the acceptance gate.** |
+| A-06ii.3 | Dangling evidence citations in the shipped comments: the template points at `scratchpad/geometry-probe.html` (attempt 1's probe; DD-14's is `geometry-probe-dd14.html`), and both cite "the T-06 record in `execution.md`" as a forward reference. | **Partly resolved here:** this record now exists with the measurement table, and both probes are committed under [`./evidence/`](./evidence/) so they are resolvable rather than living in a machine-local temp path. **The wrong filename inside the template comment remains** — flagged to the owner rather than edited, since Leader does not write production code. |
+| **A-06ii.4** | **Spec gap — R-PDB-003 AC.5 now reads as self-contradictory.** It says *"no dialog or **overlay** opens"*, while design §6.3.2 mechanism (ii) prescribes precisely a `position: absolute` overlay. The code follows the design doc and the evident intent (no modal, no navigation). | **Fixed by the Leader in `requirements.md`** — spec authorship, and root `CLAUDE.md` §5 requires fixing the doc that is wrong rather than letting it drift. |
+| A-06ii.5 | Cosmetic: the spacer duplicates 5 `<img>` icon nodes for `rows-stacked-lever` cards (42 vs 37 nodes while expanded). Cached and negligible. | Recorded. |
+
+#### Final verification
+
+`npm run lint` clean · `npm run s-lint` 352/0 unchanged · `npm run build` succeeds with `strictTemplates` · card spec **27/27** · `project-detail` **4 suites, 116 passed** · **zero geometry delta across 6 viewports and every expansion scenario, measured in real Chrome by two independently-built probes.**
+
+**NFR-PDB-004: the mechanism is measured and holds; ACCEPTANCE remains UNVERIFIED** pending the owner's six-step human check (RB-2), which `tasks.md` requires be reported as unverified rather than passed. **A-06ii.2 currently blocks that check** — the reference mockup models the superseded design.
+
+---
+
+## 🅿️ RUN PARKED — 2026-07-29 *(superseded: the run resumed and T-06 closed — see the entry above)*
 
 Parked at the owner's instruction after four consecutive infrastructure failures. **Not a HALT** (no rework ceiling was reached) and **not a Pivot** (the design question is settled — mechanism (ii) is chosen and specified). Purely an environment block.
 

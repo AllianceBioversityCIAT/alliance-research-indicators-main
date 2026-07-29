@@ -71,6 +71,27 @@ export class ProjectDashboardCardComponent {
   /** Whether more items exist beyond the collapsed cap — gates the (T-03) toggle. */
   readonly canExpand = computed(() => this.items().length > COLLAPSED_ITEM_LIMIT);
 
+  /**
+   * DD-14 mechanism (ii) — whether the `variant="card"` outlet renders the
+   * full list in an out-of-flow overlay instead of in flow. True only when the
+   * card is unlimited *and* has more rows than the collapsed cap, i.e. exactly
+   * the state the toggle can produce. With `<= COLLAPSED_ITEM_LIMIT` rows an
+   * unlimited card keeps its single in-flow render, so R-PDB-002 AC.5 (a card
+   * that never binds `visibleLimit` behaves as before this spec) is untouched.
+   */
+  readonly expandedOverlay = computed(() => this.visibleLimit() === null && this.canExpand());
+
+  /**
+   * The slice rendered **in flow** by the `variant="card"` outlet. It is what
+   * establishes the card's box, so DD-14 caps it at `COLLAPSED_ITEM_LIMIT`:
+   * the in-flow render is then the same size collapsed and expanded, and the
+   * expanded rows live in the overlay, which is out of flow. Any numeric
+   * `visibleLimit` is still honoured verbatim — the cap only replaces `null`.
+   */
+  readonly layoutItems = computed(() =>
+    this.visibleLimit() === null ? this.items().slice(0, COLLAPSED_ITEM_LIMIT) : this.visibleItems()
+  );
+
   /** Visible label for the (T-03) toggle button — text only, no chart title (that lives in the aria label). */
   readonly toggleLabel = computed(() => (this.visibleLimit() === null ? 'Show less' : 'Show more'));
 
@@ -121,6 +142,18 @@ export class ProjectDashboardCardComponent {
       return 0;
     }
     return Math.min(100, (count / max) * 100);
+  }
+
+  /**
+   * Re-attaches the item type to a `#rankedList` context slice. The Angular
+   * template checker types an inline `<ng-template>`'s context variables as
+   * `any`, so iterating the raw `rows` variable would silently drop
+   * compile-time checking of every `item.*` read in the five layout branches.
+   * Identity at runtime — the same array reference is returned, so `@for`'s
+   * `track` diffing sees no change.
+   */
+  rankedRows(rows: readonly ProjectDashboardRankedListItem[]): readonly ProjectDashboardRankedListItem[] {
+    return rows;
   }
 
   linkedResultsLabel(count: number): string {

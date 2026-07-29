@@ -171,7 +171,7 @@ graph TD
 
 ---
 
-### T-06 — Dashboard: expansion state + DD-13 independent height
+### T-06 — Dashboard: expansion state + DD-14 frozen geometry
 
 - **Requirements covered:** R-PDB-003 (AC.4, AC.6, AC.7), NFR-PDB-004 (condition 2)
 - **Files touched:** `…/project-dashboard.component.ts`, `.html`
@@ -194,10 +194,12 @@ graph TD
 - **Evidence that does NOT count:** the class assertion is **not** evidence the layout is correct — it proves a class is present, nothing about rendered geometry. Three rounds of blind review passed on a design whose containment was incomplete precisely because no automated gate can see this; it was caught by operating the mockup. If the human check is skipped, report NFR-PDB-004 as **unverified**, not as passed.
 - **Dependencies:** T-05
 - **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** 🔶 **`[~]` BLOCKED — Pivot Protocol triggered 2026-07-29.** Implementation passed all eight conformance gates and is committed; **the spec is what fails.** See [`execution.md`](./execution.md) → *Pivot Record: T-06*. **Awaiting an owner decision between options (a) / (b) / (c) before T-07 proceeds.**
-- **The gap:** DD-13 puts `align-items: start` on the ranked grid only. **`align-items` does not size grid tracks** — so the row-mate stops stretching (the half DD-13 fixes) but the track still grows to the expanded card, propagating through the left column to the outer `lg:items-stretch` grid and into the right-hand column, where `flex-1` on *Results by status* (`:270`) absorbs the entire delta as a white void. **Human-check step 3 will fail.**
-- **RB-2 confirmed the hard way:** the GATE-2 mockup's right column omits `flex:1`, so it cannot reproduce the defect — the artefact used to close GATE-2 and serve as the human-check reference carries the same blind spot. **`mockup/index.html` needs `flex:1` on the second `.sidebox` regardless of which option is chosen.**
-- Delivered and verified regardless of the pivot: R-PDB-003 **AC.4, AC.6, AC.7**.
+- **Status:** ✅ **done** — Reviewer PASS on **attempt 2 of the revised task**, 2026-07-29. See [`execution.md`](./execution.md) § T-06 (REVISED) attempt 2. History: DD-13 → Pivot → DD-14 attempt 1 rejected → DD-14 mechanism (ii) PASS.
+- **What shipped (DD-14 mechanism (ii)):** the card's list wrapper is `relative` and holds an always-in-flow 5-row render that defines the geometry, plus an `absolute inset-0 overflow-y-auto` overlay carrying the full list while expanded. The in-flow render becomes an `invisible` + `aria-hidden` **spacer** — `visibility: hidden` keeps its box, which is what stops the card **shrinking**. An out-of-flow box contributes nothing to ancestors' intrinsic sizing, so the grid track measures only the 5-row render, in both states. **Viewport-independent, which is the structural reason it cannot fail the way `46vh` did.**
+- **`min-h-[280px]` does NOT apply at these four call sites** — all pass `[compact]="true"` and render `min-h-0`. There is no height floor; the spacer is load-bearing.
+- **Measured, not argued.** Zero delta on all four links, **in both directions, across six viewports**, for each card and all four at once — verified by two independently-built Chrome probes, both of which first reproduced the two known failures as controls (+186px HEAD, **+52px** attempt 1, matching the earlier audit to the pixel). Probes committed under [`./evidence/`](./evidence/).
+- **Routing waiver:** Implementer ran on `opus` (not T2 `sonnet`) after five consecutive `sonnet` spawns died on API 529, so model-level `author ≠ auditor` was waived for this task. Mitigated by disclosing it to the Reviewer, which built its own probe rather than accepting the Implementer's.
+- ⚠️ **NFR-PDB-004 acceptance is still UNVERIFIED** — the mechanism is measured but the six-step human check has not been run, and **`mockup/index.html` still models the superseded DD-13 / `46vh`**, so the reference for that check is currently wrong (advisory A-06ii.2).
 
 ---
 

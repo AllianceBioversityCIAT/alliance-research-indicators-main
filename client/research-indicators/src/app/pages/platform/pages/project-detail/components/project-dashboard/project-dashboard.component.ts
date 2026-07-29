@@ -213,14 +213,6 @@ export class ProjectDashboardComponent {
   readonly contributorsVisibleLimit = computed(() => (this.expanded().has('contributors') ? null : COLLAPSED_ITEM_LIMIT));
 
   /**
-   * DD-13: while any card is expanded, the ranked grid drops `lg:items-stretch`
-   * in favour of `lg:items-start` so an expanded card's row-mate is not
-   * dragged to its height (and left with a tall empty gap). Collapsed, the
-   * grid is exactly as before this task.
-   */
-  readonly rankedGridIndependent = computed(() => this.expanded().size > 0);
-
-  /**
    * Toggles one card's expansion. Replaces the whole `Set` with a **new**
    * instance — mutating in place and re-`set()`-ing the same reference would
    * fail Angular's `Object.is` check and silently never re-render (the single
