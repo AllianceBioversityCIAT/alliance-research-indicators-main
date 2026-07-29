@@ -18,7 +18,7 @@
 
 ## 1. Task numbering
 
-`T-01` … `T-08`. Higher numbers do not imply higher priority — see §2.
+`T-01` … `T-08`, plus **`T-09`** added 2026-07-29 by owner approval during execution (keyboard operability of the DD-14 scroll container — see its own entry for why it is in scope rather than an inherited advisory). Higher numbers do not imply higher priority — see §2.
 
 Two ordering constraints are **not negotiable**:
 
@@ -248,6 +248,41 @@ graph TD
 - **Dependencies:** T-01, T-05, T-06
 - **Effort:** M · **Skills:** `angular-developer`, `systematic-debugging` (if the sweep surfaces failures)
 - **Status:** todo
+
+---
+
+---
+
+### T-09 — Card: make the expanded scroll container keyboard-operable
+
+> **Origin: owner-approved, 2026-07-29.** This began as advisory **A-06ii.1** from the T-06 review. Per `/akili-execute` §2.4 an advisory may not become a task on the Leader's initiative — the owner explicitly asked for it to be created and deferred, which is what makes it in-scope. **It was not silently inherited and it was not folded into T-06.**
+
+- **Requirements covered:** PRD **C-4** (WCAG 2.1 AA on every changed screen) · WCAG **2.1.1 Keyboard** · adjacent to NFR-PDB-003, which does **not** cover it (see below)
+- **Files touched (intended):**
+  - `…/project-dashboard-card/project-dashboard-card.component.html`
+  - `…/project-dashboard-card/project-dashboard-card.component.spec.ts`
+- **Description:** the DD-14 overlay that carries the expanded list is a plain `<div>` (`tabIndex = -1`, `role = null`), so it cannot receive focus and **a keyboard-only user cannot scroll it.** They can open the list with the toggle and then reach none of the content past the visible window.
+- **Why this is a real defect and not a nitpick:**
+  - **Not a regression** — T-03's committed `overflow-y-auto` wrapper had the same property, so nothing got worse in kind.
+  - **But the impact grew substantially with DD-14.** The scroll window shrank from `46vh` to roughly five rows, while the content behind it reaches **1917px inside a 267px box** (measured — see `execution.md` § T-06 attempt 2). Before, most of a list was visible without scrolling; now most of it is unreachable without it.
+  - **NFR-PDB-003 does not cover this.** That requirement is explicitly toggle-scoped: role, `aria-expanded`, accessible name, keyboard activation. The Reviewer adjudicated it out of scope, which is why this needs its own task rather than being treated as a T-03/T-06 gap.
+  - **PRD C-4 does apply** — WCAG 2.1 AA on every changed screen, and this screen changed.
+- **Implementation notes:**
+  - Expected shape is one line on the overlay: `tabindex="0"` plus `role="group"` (or `region`) and an accessible name — most naturally derived from `title()`, matching how `toggleAriaLabel` already distinguishes four otherwise-identical controls.
+  - **Cost to weigh:** this adds one tab stop per expanded card. With four cards expanded that is four extra stops. Consider whether the accessible name makes each stop self-explanatory enough to justify it, or whether `role="region"` (which lands in landmark navigation) is preferable to `role="group"`.
+  - Do **not** disturb the DD-14 geometry. The overlay's `absolute inset-0 overflow-y-auto pr-[6px]` classes are load-bearing and were verified by measurement across six viewports; adding attributes must not touch them.
+  - The card spec's DOM helpers filter on `aria-hidden` **from the row outward** (E-06.3). Adding a `role` and `tabindex` to the overlay must not disturb that discriminator — 6 of the suite's cases go red if `aria-hidden` semantics shift.
+- **Acceptance / done check:**
+  - [ ] The expanded overlay is focusable and scrollable by keyboard alone (`Tab` to it, then arrow keys / `Page Down`).
+  - [ ] It exposes an accessible name that identifies **which chart** it belongs to — four expanded cards must be distinguishable, the same principle NFR-PDB-003 applies to the toggle.
+  - [ ] The spacer stays `aria-hidden` and still contains **no** focusable node — an `aria-hidden` subtree containing a tab stop is itself a WCAG violation.
+  - [ ] Card-spec assertions added for focusability and the accessible name, and they must be **mutation-killable** (remove `tabindex` → red).
+  - [ ] `npm run lint` clean; `npm run build` passes `strictTemplates`; the card spec still 27/27 plus the new cases.
+  - [ ] **No geometry change** — re-run `./evidence/dd14-geometry-probe.html` and confirm the delta is still zero.
+- **Evidence that does NOT count:** asserting `tabindex="0"` is present in the template. jsdom will report the attribute whether or not the element can actually be reached — assert `document.activeElement` after a focus call, and assert the accessible name resolves, not just that an attribute exists.
+- **Dependencies:** T-06
+- **Effort:** S · **Skills:** `angular-developer`, `ui-ux-pro-max`
+- **Status:** todo — **deferred by the owner, 2026-07-29.** Not required for PR 3; can ship in PR 4 or separately.
 
 ---
 
