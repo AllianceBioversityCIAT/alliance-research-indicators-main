@@ -623,8 +623,11 @@ Per `/akili-execute`'s runtime-failure fallback, these are recorded and are **no
 | --- | --- | --- |
 | 1 | Implementer spawn for mechanism (ii) terminated by **API 529 Overloaded** before making any edit | Verified untouched — diffstat identical to attempt 1's rejected diff (33 ins / 21 del), `max-h-[280px]` still at `.html:47` |
 | 2 | **Retry (the one permitted retry) also terminated by API 529 Overloaded**, again before any edit | Verified untouched again — same diffstat, `max-h-[280px]` still present |
+| 3 | Owner authorised one further retry; **also terminated by API 529 Overloaded** before any edit | Verified untouched — diffstat unchanged, `max-h-[280px]` still at `.html:47` |
 
-**Attempt 2 of 3 has therefore not yet been executed.** The retry allowance is now spent, so per the fallback table the Implementer role degrades to *"ask the user to approve the Leader-inline fallback — the no-code rule stands; a runtime failure does not waive it."* Escalated to the owner with the options. No code was written by the Leader.
+**Attempt 2 of 3 has therefore still not been executed** — three spawns, zero edits, no work outcome either way. T-06's rework budget is untouched by these.
+
+**Consequence for the whole run, not just T-06:** the overload is sustained, and **every** remaining task (T-07, T-08) also requires Implementer and Reviewer spawns. So the blockage is not specific to DD-14 — no task in this spec can proceed through the normal triad until the API recovers. The only route that makes progress without a subagent is the Leader-inline fallback, which requires explicit owner approval and costs the `author ≠ auditor` independence that caught the `pr-1.5` silent class bug, T-05's dead-fallback narrowing, and both DD-13/DD-14 mechanism failures. Escalated to the owner. **No code has been written by the Leader.**
 
 ### ADVISORY (continued)
 
