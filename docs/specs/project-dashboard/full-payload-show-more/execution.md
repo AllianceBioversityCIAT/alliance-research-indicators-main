@@ -625,7 +625,56 @@ Per `/akili-execute`'s runtime-failure fallback, these are recorded and are **no
 | 2 | **Retry (the one permitted retry) also terminated by API 529 Overloaded**, again before any edit | Verified untouched again — same diffstat, `max-h-[280px]` still present |
 | 3 | Owner authorised one further retry; **also terminated by API 529 Overloaded** before any edit | Verified untouched — diffstat unchanged, `max-h-[280px]` still at `.html:47` |
 
-**Attempt 2 of 3 has therefore still not been executed** — three spawns, zero edits, no work outcome either way. T-06's rework budget is untouched by these.
+| 4 | Owner reported a VPN drop as a possible cause and authorised one more retry; **also terminated by API 529 Overloaded** before any edit | Verified untouched |
+
+**Attempt 2 of 3 has therefore still not been executed** — four spawns, zero edits, no work outcome either way. T-06's rework budget is untouched by these.
+
+**The VPN hypothesis was ruled out** by the fourth failure: connectivity had been restored and the error was unchanged. `529` is a server-side overload code from the **Anthropic model API** (which runs the Implementer/Reviewer subagents), not from the ARI backend. Worth recording because the two produce similar-looking stalls but are unrelated: no subagent in this task touches the ARI server — T-06 is client-only CSS/template work, and the geometry probe is a local static HTML file.
+
+---
+
+## 🅿️ RUN PARKED — 2026-07-29
+
+Parked at the owner's instruction after four consecutive infrastructure failures. **Not a HALT** (no rework ceiling was reached) and **not a Pivot** (the design question is settled — mechanism (ii) is chosen and specified). Purely an environment block.
+
+### State
+
+| Task | Status |
+| --- | --- |
+| T-01 … T-05 | ✅ **done**, Reviewer PASS, committed |
+| **T-06** | 🔶 `[~]` — expansion state committed (`e0311943`); **DD-14 mechanism (ii) not yet implemented** |
+| T-07, T-08 | ⬜ not started (both blocked by the same overload — they need the same spawns) |
+
+**Working tree is clean.** Attempt 1's rejected diff was **not** left in place, so nobody resuming can mistake known-bad code for work in progress. It is preserved as `stash@{0}` with an explicit warning label:
+
+> `REJECTED T-06 DD-14 attempt-1 (static max-h-[280px]) — DO NOT APPLY. Measured +52px/+13px growth. See execution.md Pivot Record. Only reusable parts: rankedGridIndependent deletion + ranked-grid restore.`
+
+**Do not `git stash pop` it wholesale.** The mechanism in it is measured-wrong. Only two fragments are worth salvaging, and both are trivial to redo: the 8-line `rankedGridIndependent` deletion from `project-dashboard.component.ts`, and restoring the ranked grid to an unconditional `lg:items-stretch` in `project-dashboard.component.html`.
+
+### To resume
+
+`/akili-resume`, or re-run `/akili-execute project-dashboard/full-payload-show-more`. The next action is **T-06 rework attempt 2 of 3**, implementing **DD-14 mechanism (ii)** exactly as specified in `design.md` §6.3.2 — a 5-row in-flow list for geometry plus a `position:absolute; inset:0; overflow-y:auto` overlay for the expanded list.
+
+**Three things the next Implementer must not rediscover the hard way:**
+1. **Measurement is mandatory.** Headless Chrome is available (`~/.cache/puppeteer/chrome-headless-shell/…`, `--headless --dump-dom`, no npm dependency) and a probe of the real four-link chain exists at `scratchpad/geometry-probe.html`. Two plausible CSS arguments (DD-13's `align-items`, attempt 1's `max-height`) have already been wrong. **Every metric must be flat in both directions — no growth and no shrink.**
+2. **Pitfall — duplicate content.** `visibleItems()` returns the full list when `visibleLimit() === null`, so a naive overlay yields a 5-row spacer plus a 37-row overlay: 42 DOM rows, the top five announced twice to screen readers, and T-04's row-count assertions broken.
+3. **Pitfall — the card must not shrink either.** DD-14 requires *identical*, not "not larger". Check whether `project-dashboard-card.component.html:5`'s `min-h-[280px]` binding applies at these four call sites — if the card already sits on that floor collapsed, the floor may do the work.
+
+### Budget at park
+
+| | Budgeted | Actual |
+| --- | --- | --- |
+| Tasks | 8 | 5 done · 1 blocked · 2 not started |
+| Changed LOC | ≈1,600 | ≈1,100 committed |
+| Rework rounds | 2 | **2 — at ceiling**, owner-authorised to continue |
+| Pivots | 0 | 1 (DD-13 → DD-14) |
+
+### Still owed, independent of the code
+
+- **The six-step human check** (`requirements.md` §7) — the only gate for NFR-PDB-004 (RB-2). Must be run once T-06 lands, against a mockup that models DD-14.
+- **A-06r.3:** `mockup/index.html` still models the superseded `46vh` + DD-13. Its `flex:1` fidelity fix landed, but the DD-14 mechanism was never modelled — **and the mockup would have caught attempt 1's failure had it been updated.**
+- **Two doc items from T-03** (`execution.md` § T-03): the `#1771b3` token gap, and the repo-wide Tailwind v4 leading-`!` question.
+- **T-08's `s-lint` acceptance criterion** is unachievable as written (352 pre-existing errors) and awaits an owner decision.
 
 **Consequence for the whole run, not just T-06:** the overload is sustained, and **every** remaining task (T-07, T-08) also requires Implementer and Reviewer spawns. So the blockage is not specific to DD-14 — no task in this spec can proceed through the normal triad until the API recovers. The only route that makes progress without a subagent is the Leader-inline fallback, which requires explicit owner approval and costs the `author ≠ auditor` independence that caught the `pr-1.5` silent class bug, T-05's dead-fallback narrowing, and both DD-13/DD-14 mechanism failures. Escalated to the owner. **No code has been written by the Leader.**
 
