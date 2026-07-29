@@ -193,3 +193,92 @@ None. No rework round consumed.
 #### Final verification
 
 `npm run lint` clean · `npm run build` succeeded (`strictTemplates` passes) · 3 suites / 52 tests pass including the untouched 848-line dashboard spec — all re-run by the Reviewer. Behavioural acceptance items are formally owed to **T-04**; they are statically true of this code but are not asserted in any surviving file yet.
+
+---
+
+### T-03 — Card: toggle, accessibility, bounded scroll container
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS** (on attempt 2) |
+| **Date** | 2026-07-29 |
+| **Implementer attempts** | **2** — first rework round of this spec. Budget allows 2; **1 remaining.** |
+| **Requirements covered** | R-PDB-002 AC.2, R-PDB-003 (AC.3, AC.5), NFR-PDB-003, **NFR-PDB-004 condition 1 — implemented, NOT verified** |
+| **Defect classes gated** | DC-7 (statically). **DC-8 remains ungated — by design.** |
+| **Changed LOC** | 22 insertions, 1 deletion across 2 files |
+| **PR** | 2 of 4 (with T-02, T-04) |
+
+#### Attempt 1 — Reviewer `STATUS: FAIL`
+
+**Files changed:** `project-dashboard-card.component.html`, `.ts` — the complete task: toggle, `toggleLabel`/`toggleAriaLabel` computeds, bounded container, reduced-motion handling.
+
+**Implementer verification:** `npm run lint` clean · `npm run build` succeeded · 3 suites / 52 tests passed · `npm run s-lint` showed 352 errors, verified byte-identical to baseline via `git stash`.
+
+**Reviewer FAIL finding — full text preserved:**
+
+> 1. **Discovered Issue:** `[class.pr-1.5]="visibleLimit() === null"` (`…project-dashboard-card.component.html:35`) **does not apply `pr-1.5`. It applies `pr-1`.** Angular's `createBoundElementProperty` splits the binding name on `.` and takes `parts[1]`, so `class.pr-1.5` → `['class', 'pr-1', '5']` → class name `pr-1`. I confirmed this at the emitted-instruction level with the repo's own compiler 19.1.6:
+>
+> ```
+> ɵɵclassProp('pr-1', ctx.a)      ← from [class.pr-1.5]="a"
+> ```
+>
+> No parse error, no lint error, no build error — it fails exactly the way the brief feared `max-h-[46vh]` might. The result is 4px of scrollbar clearance instead of the 6px the GATE-2 mockup specifies, and a template line that says one thing and does another. It is also a landmine for **T-04**, which is required to assert "the bounded container is present and conditioned": a tester reading this template will write `toContain('pr-1.5')` and get an inexplicable red.
+>
+>    *   **Violated Rule:** `mockup/index.html:74` — `.listwrap.bounded{max-height:46vh;overflow-y:auto;padding-right:6px}`, designated the layout contract by `tasks.md` §Visual reference and `requirements.md` §7. Also `design.md` §6.3.
+>    *   **Remediation Suggestion:** Use a class name containing no `.`. `[class.pr-[6px]]` compiles to `ɵɵclassProp('pr-[6px]', …)` and is an exact match for the mockup's 6px. Do **not** attempt to escape the dot; Angular offers no escape for this split.
+
+Everything else in attempt 1 passed audit: toggle placement, conditioning, a11y, reduced motion, the `46vh` bound, scope hygiene, and both judgement calls.
+
+#### Attempt 2 — Reviewer `STATUS: PASS`
+
+**Change:** one line. `.html:35` → `[class.pr-[6px]]="visibleLimit() === null"`.
+
+**Verified two independent ways by the Reviewer**, because the failure mode of attempt 1 was precisely a binding that compiles clean while emitting the wrong name:
+
+1. Hand-compiled the live template through the repo's own `@angular/compiler` 19.1.6 and walked the emitted AST — the only `pr-` string emitted anywhere is `pr-[6px]`.
+2. Cross-checked the **real AOT production bundle** from `npm run build`: `Fa("max-h-[46vh]",…)("overflow-y-auto",…)("pr-[6px]",…)`. `grep -rE '\("pr-1"'` across all build output: zero hits.
+
+**Rework containment confirmed:** `diff` of the attempt-1 and attempt-2 diffs differs on exactly two lines — the git blob hash and the one binding. No `.ts` delta. All five fenced-off advisories verified untouched, so no advisory was silently actioned as scope creep.
+
+**Reviewer verification (re-run, not accepted on report):** `npm run lint` clean · `npm run build` succeeded, no `strictTemplates` errors · `npx jest --coverage=false src/app/pages/platform/pages/project-detail` → **5 suites / 98 tests passed**.
+
+**Reviewer verdict — `STATUS: PASS`**
+
+> The sole rejected issue is fixed and independently confirmed at emitted-instruction level in two ways — the repo's own `@angular/compiler` emits `ɵɵclassProp("pr-[6px]", …)`, and the real AOT production bundle contains the same call with zero `("pr-1"` classProp anywhere — matching the mockup's `padding-right:6px`. The rework is a one-token change with no `.ts` delta and no advisory silently actioned; lint, `strictTemplates` build, and the 5-suite/98-test project-detail run all pass at baseline.
+
+#### Decisions made
+
+| # | Decision | Basis |
+| --- | --- | --- |
+| E-03.1 | Bound value is `max-h-[46vh]`, taken verbatim from the GATE-2 mockup (`mockup/index.html:74`) | Closes **OQ-3** ("bound height: fixed or viewport-relative?") in favour of viewport-relative, as the design default anticipated. |
+| E-03.2 | Angular class bindings in this codebase **must not contain a `.` in the class name** | Established by the attempt-1 defect. `[class.pr-1.5]` emits `pr-1` silently. Arbitrary values in square brackets (`max-h-[46vh]`, `pr-[6px]`) are safe because they contain no `.`. **This is a repo-wide trap, not a one-off.** |
+| E-03.3 | `toggleLabel` shows no item count | Adjudicated conformant. `mockup/index.html:374` sets the **visible** text to exactly `'Show less' : 'Show more'`; the `— N more` suffix exists only in the mockup's `aria-label` at `:375-376`. NFR-PDB-003 requires only that the accessible name include the chart title. |
+| E-03.4 | Hex literal `#1771b3` retained in the template despite root `CLAUDE.md` §4.2 ("No hex literals in component code") | **Adjudicated non-gating, with a doc obligation.** No `--ac-*` token carries this value — nearest are `--ac-light-blue-300: #1689ca` and `--ac-light-blue-400: #035ba9`, both different colours. `design.md` §6.4's factual premise holds: the value is already used 3× in `project-dashboard.component.html`. Satisfying §4.2 literally would require either changing the colour (an unapproved visual change; §6.4 says "No new tokens") or adding a global token plus `src/README.md` and `docs/ux-ui/design.md` §7 updates — all outside T-03's two-file fence. **See the open item below.** |
+
+#### Issues encountered
+
+One rework round, consumed by E-03.2. Root cause: a silent Angular template-compilation behaviour that produces no parse, lint or build error. Caught only because the Reviewer verified at the emitted-instruction level rather than trusting a green build.
+
+#### ADVISORY findings (4R lens — non-gating)
+
+| # | Lens | Finding |
+| --- | --- | --- |
+| A-03.1 | Reliability | `overflow-visible` stays static on `:33` while `overflow-y-auto` is added conditionally. Both single-class specificity, so the winner is Tailwind's canonical emit order, not template order. Works today but is decided by a stylesheet-ordering detail. Also: `overflow-x: visible` + `overflow-y: auto` promotes overflow-x to `auto` in CSS — a horizontal scrollbar is possible on long partner labels. **Worth a glance during the §7 human check.** |
+| A-03.2 | — | `aria-label` drops the mockup's "— N more" count. Conformant (NFR-PDB-003 does not require it), but the count is genuinely useful to a screen-reader user and costs one interpolation. Optional. |
+| A-03.3 | Risk | The `#1771b3` exception must be **recorded, not silently carried** — root `CLAUDE.md` §5. See the open item below. |
+| A-03.4 | Readability | `variant() === 'card'` in the `@if` is redundant — the whole `<section>` already sits in the `@else` of `variant() === 'list'`. `tasks.md:109` pins the wording, so it stays. Noted so a future reader does not "clean it up" and lose the documented intent. |
+| A-03.5 | — | Pre-existing `transition-[width]` / `transition-[height]` on the bars (`.html:73, 93, 158`) do not honour `motion-reduce`. Out of T-03's scope; worth a separate ticket. |
+| A-03.6 | Risk — **app-wide, not a T-03 defect** | The toggle's static classes use the **v3-style leading-bang** important modifier (`!mt-3.5 !w-fit !text-[13px] !text-[#1771b3]`). **Tailwind v4 moved the important modifier to a trailing `!`** (`mt-3.5!`). If `@tailwindcss/browser@4.1.6` does not accept the legacy prefix, these declarations no-op and the toggle falls back to default PrimeNG text-button styling instead of the GATE-2 appearance. Not attributable to T-03 — the leading-bang form is the established repo-wide convention and appears in other components' compiled consts. **Step 1 of the T-06 human check will surface it visually either way.** |
+
+#### Open items routed out of this spec (recorded, not actioned)
+
+Per `/akili-execute` §2.4, an advisory may not become a task in this spec. Both of these need a decision from the spec owner:
+
+1. **The `#1771b3` token gap (A-03.3).** Either add an `--ac-*` token in `src/styles/colors.scss` (plus `src/README.md` and `docs/ux-ui/design.md` §7) as a follow-up, **or** add a line to `design.md`'s decision log recording §6.4 as a deliberate, scoped exception to root `CLAUDE.md` §4.2. Doing neither leaves the constitution and the code in undocumented disagreement, which §5 forbids.
+2. **Tailwind v4 important-modifier syntax (A-03.6).** A repo-wide question about whether leading-`!` utilities are silently inert under the v4 CDN build. If they are, the blast radius is far larger than this dashboard.
+
+#### Final verification
+
+`npm run lint` clean · `npm run build` succeeded, `strictTemplates` passes · 5 suites / 98 tests pass across `project-detail` · fix confirmed in the AOT production bundle. `project-dashboard-card.component.spec.ts` still unmodified — T-04 owns its assertions.
+
+**NFR-PDB-004 is NOT verified and must not be reported as such.** jsdom computes no box model, so the static reading establishes only that the bounded container exists and is correctly conditioned on `visibleLimit() === null`. Whether the layout actually holds is the five-step human check in `requirements.md` §7, carried by **T-06**.

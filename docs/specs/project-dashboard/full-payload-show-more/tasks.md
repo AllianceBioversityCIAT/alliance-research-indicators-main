@@ -118,7 +118,10 @@ graph TD
 - **Evidence that does NOT count:** a passing spec is **not** evidence the layout holds. jsdom computes no box model — `overflow`, height propagation and grid stretching are invisible to it. The spec may only assert the container exists and is conditioned; the rendered outcome is the human check in `requirements.md` §7. Do not report NFR-PDB-004 as verified on the strength of `npm test`.
 - **Dependencies:** T-02
 - **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** **done** — Reviewer PASS on **attempt 2**, 2026-07-29. See [`execution.md`](./execution.md) § T-03. **First rework round of the spec; 1 of 2 remaining.**
+- **OQ-3 closed:** bound is viewport-relative, `max-h-[46vh]`, taken verbatim from the GATE-2 mockup.
+- **Trap discovered — applies to every later task (E-03.2):** an Angular class binding whose class name contains a `.` **silently emits the wrong class**. `[class.pr-1.5]` compiles clean and applies `pr-1`. Arbitrary values in square brackets (`max-h-[46vh]`, `pr-[6px]`) are safe — they contain no `.`. Never assume a green build means the class applied.
+- **NFR-PDB-004 condition 1 is implemented but UNVERIFIED** — jsdom computes no box model. T-06 carries the human check.
 
 ---
 

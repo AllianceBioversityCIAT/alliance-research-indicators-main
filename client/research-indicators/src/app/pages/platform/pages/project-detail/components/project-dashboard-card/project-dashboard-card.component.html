@@ -30,9 +30,21 @@
       <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[#777C83]">{{ emptyMessage() }}</p>
     </div>
     } @else if (items().length) {
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible"
+      [class.max-h-[46vh]]="visibleLimit() === null" [class.overflow-y-auto]="visibleLimit() === null"
+      [class.pr-[6px]]="visibleLimit() === null">
       <ng-container *ngTemplateOutlet="rankedList"></ng-container>
     </div>
+    @if (canExpand() && variant() === 'card') {
+    <button pButton type="button" [text]="true" size="small"
+      class="!mt-3.5 !w-fit !shrink-0 !gap-1.5 !px-0.5 !font-['Barlow'] !text-[13px] !font-bold !text-[#1771b3] focus-visible:!rounded-md focus-visible:!outline focus-visible:!outline-2 focus-visible:!outline-offset-2 focus-visible:!outline-[#1771b3]"
+      [attr.aria-expanded]="visibleLimit() === null" [attr.aria-label]="toggleAriaLabel()"
+      (click)="expandToggled.emit()">
+      <span>{{ toggleLabel() }}</span>
+      <i class="pi pi-chevron-down text-[11px] transition-transform duration-200 motion-reduce:transition-none"
+        [class.rotate-180]="visibleLimit() === null" aria-hidden="true"></i>
+    </button>
+    }
     } @else {
     <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
       <ng-content></ng-content>

@@ -71,6 +71,15 @@ export class ProjectDashboardCardComponent {
   /** Whether more items exist beyond the collapsed cap — gates the (T-03) toggle. */
   readonly canExpand = computed(() => this.items().length > COLLAPSED_ITEM_LIMIT);
 
+  /** Visible label for the (T-03) toggle button — text only, no chart title (that lives in the aria label). */
+  readonly toggleLabel = computed(() => (this.visibleLimit() === null ? 'Show less' : 'Show more'));
+
+  /**
+   * Accessible name for the (T-03) toggle, including `title()` (NFR-PDB-003) so a screen-reader
+   * user hearing four "Show more" buttons — one per ranked card — can tell them apart.
+   */
+  readonly toggleAriaLabel = computed(() => `${this.toggleLabel()}, ${this.title()}`);
+
   // Encoding members below deliberately keep reading `items()` (the full list),
   // never `visibleItems()` — see design.md §5.3 / R-PDB-004. `projectDashboardBarColor`
   // paints the `last` colour at `index === total - 1`; a window-scoped total would
