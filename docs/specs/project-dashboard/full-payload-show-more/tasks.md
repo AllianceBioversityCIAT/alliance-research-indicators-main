@@ -94,7 +94,8 @@ graph TD
 - **Evidence that does NOT count:** asserting colours by re-calling `projectDashboardBarColor` in the test. Read the **rendered** style off the element — otherwise the test proves the helper is pure, not that the template passes it the right total, which is the actual defect.
 - **Dependencies:** none
 - **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** **done** — Reviewer PASS attempt 1, 2026-07-29. See [`execution.md`](./execution.md) § T-02.
+- **Note for T-04:** the four acceptance boxes above are statically true of the shipped code but are **not yet asserted anywhere** — T-04 owns them. When asserting rank-5 invariance, assert **bar colour and bar width specifically**, not "row 5 renders identically": `rows-stacked-lever` carries `last:border-b-0 last:pb-0`, so row 5's divider legitimately differs between states (advisory A-02.1).
 
 ---
 

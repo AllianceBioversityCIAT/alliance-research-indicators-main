@@ -46,13 +46,13 @@
   @if (layout() === 'columns') {
   <ul
     class="m-0 grid w-full max-w-full list-none box-border items-end gap-1.5 overflow-hidden rounded-[10px] bg-[#f4f7f9] px-2 pb-2.5 pt-3 p-0"
-    [style.min-height.px]="largeColumns() ? 200 : 140" [class.justify-center]="items().length <= 3"
+    [style.min-height.px]="largeColumns() ? 200 : 140" [class.justify-center]="visibleItems().length <= 3"
     [style.grid-template-columns]="
-      items().length <= 3
-        ? 'repeat(' + items().length + ', minmax(0, ' + (largeColumns() ? '72px' : '52px') + '))'
-        : 'repeat(' + items().length + ', minmax(0, 1fr))'
+      visibleItems().length <= 3
+        ? 'repeat(' + visibleItems().length + ', minmax(0, ' + (largeColumns() ? '72px' : '52px') + '))'
+        : 'repeat(' + visibleItems().length + ', minmax(0, 1fr))'
     ">
-    @for (item of items(); track item.id; let index = $index) {
+    @for (item of visibleItems(); track item.id; let index = $index) {
     <li class="flex w-full min-w-0 flex-col items-center gap-1.5">
       <span class="font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[#112F5C]">{{ item.count }}</span>
       <div class="relative mx-auto w-full overflow-hidden" [style.height.rem]="largeColumns() ? 9 : 6"
@@ -71,7 +71,7 @@
   </ul>
   } @else if (layout() === 'rows-partners') {
   <ul class="m-0 flex list-none flex-col gap-3 justify-center pt-1">
-    @for (item of items(); track item.id; let index = $index) {
+    @for (item of visibleItems(); track item.id; let index = $index) {
     <li class="grid items-center gap-2.5" style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)"
       [style.height.px]="itemHeightPx()">
       <span
@@ -90,7 +90,7 @@
   } @else if (layout() === 'rows-stacked-lever') {
   <div class="flex w-full flex-1 flex-col min-h-0 justify-start pt-1">
     <ul class="m-0 flex w-full list-none flex-col gap-3 p-0">
-      @for (item of items(); track item.id; let index = $index) {
+      @for (item of visibleItems(); track item.id; let index = $index) {
       <li
         class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-b-[#e8ebed] pb-2 last:border-b-0 last:pb-0"
         [style.height.px]="itemHeightPx()">
@@ -121,7 +121,7 @@
   } @else if (layout() === 'rows-stacked') {
   <div class="flex w-full flex-1 flex-col min-h-0 justify-start">
     <ul class="m-0 flex w-full list-none flex-col gap-3 p-0">
-      @for (item of items(); track item.id; let index = $index) {
+      @for (item of visibleItems(); track item.id; let index = $index) {
       <li
         class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-[#e8ebed] bg-white/80 px-4 py-3">
         <span
@@ -138,7 +138,7 @@
   </div>
   } @else {
   <ul class="m-0 flex list-none flex-col gap-2.5 p-0">
-    @for (item of items(); track item.id; let index = $index) {
+    @for (item of visibleItems(); track item.id; let index = $index) {
     <li class="grid grid-cols-[minmax(0,1fr)_minmax(64px,1.6fr)_auto] items-center gap-2.5">
       <span class="cursor-default truncate font-['Barlow'] text-xs text-[#4c5158]" [pTooltip]="item.label"
         tooltipPosition="top">{{ item.label }}</span>
