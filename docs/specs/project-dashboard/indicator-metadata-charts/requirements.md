@@ -80,7 +80,15 @@ Every table name below was re-derived from its `@Entity(...)` decorator in the p
 
 ### 4.2 Scoping rule (inherited, unchanged)
 
-All 10 aggregations MUST scope to primary-contract results using the existing `buildPrimaryContractResultsSubquery()` (`agresso-contract.repository.ts:642-659`), which already filters `is_primary`, `is_active`, and `is_snapshot = FALSE`. **No aggregation may invent its own scoping join.**
+All 10 aggregations MUST scope to primary-contract results using the **single shared scoping predicate**, which filters `is_primary`, `is_active` (both sides) and `is_snapshot = FALSE`. **No aggregation may invent its own scoping join, and no second copy of the predicate may exist.**
+
+> **Amended 2026-07-30 (RB-10).** This clause originally named `AgressoContractRepository.buildPrimaryContractResultsSubquery()` at `agresso-contract.repository.ts:642-659` — but that method is **`private`**, and `IndicatorMetadataReportsRepository` is a separate class, not a subclass, so the MUST was **literally unsatisfiable as written**. Both T-03 and T-04 independently duplicated the SQL and escalated rather than hiding it. The owner authorised extraction, so the predicate now lives in one place:
+>
+> - **Source of truth:** `server/researchindicators/src/domain/entities/agresso-contract/utils/primary-contract-results.util.ts` → `buildPrimaryContractResultsScopeSql(options?)`
+> - **In-class entry point:** `AgressoContractRepository.buildPrimaryContractResultsSubquery()` remains as a one-line delegate, so its eight pre-existing call sites are untouched and the refactor's blast radius on the six pre-existing sections is provably zero.
+> - **Gate:** `primary-contract-results.util.spec.ts` asserts each filter individually, the single-`?` property, and that the two `includeGeoScope` paths differ **only** in the selected columns. Mutation-verified: dropping `is_snapshot` reddens the predicate case; making one option path diverge reddens two.
+>
+> The correction is recorded here rather than left implicit because a citation pointing at a one-line delegate would send the next reader to the wrong place — the same silent-drift failure this clause exists to prevent.
 
 ### 4.3 In scope / out of scope
 

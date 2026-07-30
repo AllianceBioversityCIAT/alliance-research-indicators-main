@@ -52,6 +52,7 @@ import {
   ContractStaffReportDto,
 } from '../dto/reports-contract-staff.dto';
 import { ContractBaseReportsDto } from '../dto/reports-full.dto';
+import { buildPrimaryContractResultsScopeSql } from '../utils/primary-contract-results.util';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 
@@ -641,23 +642,16 @@ export class AgressoContractRepository
     return { sql: `${sql}\n      LIMIT ?`, params: [...params, limit] };
   }
 
+  /**
+   * Delegates to the shared scoping rule so this class and
+   * `IndicatorMetadataReportsRepository` cannot drift apart (`requirements.md`
+   * §4.2). Kept as a private method purely so the eight existing call sites in
+   * this file stay unchanged — the SQL itself lives in one place only.
+   */
   private buildPrimaryContractResultsSubquery(options?: {
     includeGeoScope?: boolean;
   }): string {
-    const selectColumns = options?.includeGeoScope
-      ? 'r.result_id, r.geo_scope_id'
-      : 'r.result_id';
-
-    return `
-      SELECT DISTINCT ${selectColumns}
-      FROM results r
-      INNER JOIN result_contracts rc ON rc.result_id = r.result_id
-      WHERE rc.contract_id = ?
-        AND rc.is_primary = TRUE
-        AND rc.is_active = TRUE
-        AND r.is_active = TRUE
-        AND r.is_snapshot = FALSE
-    `;
+    return buildPrimaryContractResultsScopeSql(options);
   }
 
   private buildContractResultsSubquery(): string {

@@ -151,7 +151,11 @@ graph TD
 - **Evidence that does NOT count:** a spec over mocked query results — it proves the grouping code, not the SQL, and the two dominant defect classes here (wrong table name, mis-bound parameter) live entirely in the SQL. A branch that legitimately returns zero rows also proves nothing: **zero rows is exactly what a mis-bound parameter looks like.** T-07 owns the fixture that makes zero rows falsifiable; this task's own gate is a real-schema execution.
 - **Dependencies:** T-01, T-02
 - **Effort:** M · **Skills:** `nestjs-expert`, `systematic-debugging`
-- **Status:** todo
+- **Status:** **done — 2026-07-30, Reviewer PASS attempt 1** (reviewed jointly with T-04 — they share one file). See [`execution.md`](./execution.md) § T-03 + T-04.
+- **Consumed by later tasks:**
+  - `IndicatorMetadataReportsRepository.getSimpleIndicatorSections(contractId)` returns `SimpleIndicatorMetadataSections` — a `Pick` of the 10-section DTO, so it cannot drift from the wire contract.
+  - **RB-3 is discharged:** the CTE-across-UNION pattern executed against the real schema (~35–48 ms, 1 bind). No Pivot needed.
+  - **§4.2 is now satisfied via the shared helper** — see RB-10. Q1 calls `buildPrimaryContractResultsScopeSql()`; do not reintroduce a local copy.
 
 ---
 
@@ -176,7 +180,14 @@ graph TD
 - **Evidence that does NOT count:** a degree fixture that contains only Training + Long-term rows. It passes whether or not the conjunction was implemented, so it proves nothing — **DC-2 requires an Engagement row and a Short-term row that both carry a `degree_id` and must both be excluded.** T-07 owns that fixture; a "green" degree assertion without both rows present is decorative.
 - **Dependencies:** T-01, T-02
 - **Effort:** M · **Skills:** `nestjs-expert`, `systematic-debugging`
-- **Status:** todo
+- **Status:** **done — 2026-07-30, Reviewer PASS attempt 1** (reviewed jointly with T-03). See [`execution.md`](./execution.md) § T-03 + T-04.
+- **Consumed by later tasks:**
+  - `getCapacitySharingMetadata(contractId)` returns `CapacitySharingMetadataSections`: the three real sections (`session_format`, `session_type`, `degree`) `Pick`ed from the DTO, **plus the two intermediate raw shapes** `gender_individual` and `gender_group`, which are **not payload fields** — they are T-05's util inputs. Do not expose them on the wire.
+  - **T-06 must feed both raw shapes to `mergeGenderDistribution()`** to produce `gender_distribution`. The types are structurally identical to `MetadataCountDto`, so the handoff is assignable — **confirm it explicitly rather than assuming** (T-05's carried note).
+  - **T-06: do NOT add a second debug log.** Both methods already emit a `LoggerUtil._debug` line with `elapsedMs`, `totalRows` and per-section counts, which satisfies design §9 where timing is actually attributable and pre-satisfies T-06's own logging acceptance box. **T-08 should read these lines as its measurement source.**
+  - **T-07 still owes the DC-2 fixture.** The degree conjunction was proven on *live* production data (`G228`: loose 6 → strict 2; `A1618`: an Engagement/MSc row excluded; global 54 → 36), which is stronger evidence than a fixture — but **those contracts are not a test asset** and cannot gate CI.
+  - **T-10 must not assume non-null labels.** Three label columns are nullable in their entities (`clarisa_innovation_types.name`, `clarisa_innovation_characteristics.name`, `policy_stage.description`). Live rows are populated and no AC requires a fallback, so the SQL was left alone — but if a fallback is ever wanted, prefer it client-side over a `COALESCE` that would mint an unlabelled category.
+  - `if (!bucket) continue;` is unreachable (section values are SQL literals) and **will read as an uncovered branch in T-07's coverage run** — same caveat the gender util carries.
 
 ---
 
@@ -560,6 +571,8 @@ Each PR description follows `cognitive-doc-design` review-empathy rules: what to
 | **RB-5** | 2026-07-30 | **T-15 modifies `ProjectDashboardCardComponent`, which DD-6 says not to touch.** Owner-authorised via OQ-6 and narrowly scoped to attributes — but it is a multi-host component and the tension is real, not resolved by declaring it narrow | Attribute-only diff, geometry probe re-run, and a **full** client suite (T-16), not a targeted one (KZ-003) | open |
 | **RB-6** | 2026-07-30 | **DC-8 (visual quality) has no mechanical gate at all** — `axe` cannot judge contrast over rendered output and no checker distinguishes plausible-but-wrong labelling | Human check at PR 3's HITL pause **plus** a T6 Multimodal screenshot review. **If neither happens, this spec ships its dominant defect class unguarded** — recorded in `requirements.md` §9 as an accepted risk so that is a decision, not an oversight | open |
 | **RB-7** | 2026-07-30 | **D-2: conflicts with Chunk C1**, which shares `project-dashboard.component.*` | Do not run concurrently | open |
+| **RB-9** | 2026-07-30 | **`isolation: worktree` created the worktree from an unrelated old `main` commit** (`a25df379`) rather than from the session's `HEAD`. That tree had no `.agents/`, no `docs/specs/`, and none of T-01/T-02/T-05's landed work — so an Implementer that did not notice would have written code against a tree with no `MetadataCountDto`. T-03's Implementer caught it and realigned to `AC-1672` (`53d95a9b`) with a clean status and zero commits of its own | **Every worktree brief must state the expected base commit and instruct the agent to verify it before writing code.** Recorded so the next parallel wave does not rediscover it | open |
+| **RB-10** | 2026-07-30 | **`requirements.md` §4.2 requires all aggregations to scope via the existing `buildPrimaryContractResultsSubquery()`, but that method is `private` on `AgressoContractRepository` and `IndicatorMetadataReportsRepository` is a separate class, not a subclass** — so it is unreachable. T-03 duplicated the SQL byte-identically with a sync warning and declared it. **The scoping predicate is the single thing all 16 sections depend on; two copies mean a future edit to one silently changes what half the dashboard counts, with nothing failing** | ✅ **Closed 2026-07-30.** Owner authorised extraction. `buildPrimaryContractResultsScopeSql()` now lives in `agresso-contract/utils/primary-contract-results.util.ts`; `AgressoContractRepository.buildPrimaryContractResultsSubquery()` is a one-line delegate so its **eight call sites are untouched** and the blast radius on the six pre-existing sections is provably zero. **Reviewer verified byte-equivalence by hand on both `includeGeoScope` paths**, and a new `primary-contract-results.util.spec.ts` now gates it mechanically (mutation-verified). `requirements.md` §4.2 amended so its citation no longer points at the delegate | ✅ **closed** |
 | **RB-8** | 2026-07-30 | **Two parallel Implementers sharing one working tree collide on git state.** During the T-02 ‖ T-05 wave, T-02's malformed `git stash push` transiently staged T-05's untracked files and its `git restore --staged` silently undid the `git add -N` used to generate T-05's review diff — the Reviewer's `git diff` returned nothing. File contents were unaffected (verified), and it recovered only because the brief carried an explicit fallback to reading the files directly | **Spawn future parallel waves with `isolation: worktree`.** Until then, keep review briefs' diff instructions dual-path (git command **plus** direct file paths), and re-verify `git status` before extracting any diff | open |
 
 ## 8. Done definition

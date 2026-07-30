@@ -10,9 +10,11 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — **T-01, T-02, T-05 done** (3 of 17); next eligible: **T-03** and **T-04** (both unblocked)
-- **Rework rounds consumed so far:** **0** — T-02 and T-05 both passed on attempt 1. Budget allows 2–3.
-- **Owner decisions pending:** 1 — the two advisory-derived items bundled in `## Owner escalation: advisory-derived items` below.
+- **Status:** in-progress — **T-01, T-02, T-03, T-04, T-05 done** (5 of 17). Next eligible: **T-06** (sequential composition) and **T-07** (repository specs); **T-09** (Swagger) unblocks once T-06 lands.
+- **Rework rounds consumed so far:** **0** — every task has passed on attempt 1. Budget allows 2–3.
+- **All server queries now execute against the real schema.** RB-3 (the unexecuted CTE-across-UNION pattern) is **discharged**, so DD-1's consolidation is proven rather than assumed. The next open architectural risk is **RB-4 / DD-11**, which **T-08's measurement** decides.
+- **Owner decisions pending:** none. The two advisory-derived items were authorised and applied 2026-07-30 (see `## Owner escalation`); one wording correction across three documents remains deliberately open there.
+- **Branch:** all work lives on **`AC-1672-Add-New-Dashboard-Charts-Based-on-Project-Indicator`** as of 2026-07-30. The first two commits were briefly made on `dev` by mistake and moved by cherry-pick; `dev` was reset to `origin/dev`, and since neither commit had been pushed, **no published history was rewritten**. The move was non-trivial rather than cosmetic — `AC-1672` sits behind `dev` and their copies of `agresso-contract.repository.ts` differ by 20 lines. Those differences turned out to be **purely prettier formatting in lines 58–125**, disjoint from T-02's two edited lines (54 and the return type), so the cherry-pick auto-merged cleanly and was re-verified on the new base: `tsc` clean, `agresso-contract` **5 suites / 123 tests** green. **Side effect worth knowing:** `dev` carries the degraded formatting, so the **9 pre-existing prettier errors** T-02's Implementer proved against `HEAD` **do not exist on this branch** — that file now lints clean, and nobody should later read those 9 as this spec's doing.
 
 ---
 
@@ -281,9 +283,104 @@ R-IMC-007 AC.1, AC.2, AC.4 · R-IMC-012 AC.1 (the `@ApiProperty` half; the `@Api
 
 ---
 
+### T-03 + T-04 — Q1 and Q2 union repositories (reviewed jointly)
+
+- **Status:** ✅ **PASS** — one Reviewer PASS covering both, attempt 1 each
+- **Date:** 2026-07-30
+- **Implementer attempts:** 1 each, run **in parallel with `isolation: worktree`**
+- **Why one review for two tasks:** they are one artifact. `tasks.md` lists them separately, but both methods live in one class — **auditing half a class proves nothing.** Recorded so the joint review is a visible decision, not a shortcut.
+
+#### Files changed
+
+| File | |
+| --- | --- |
+| `agresso-contract/repositories/indicator-metadata-reports.repository.ts` | **new** — Q1 (`getSimpleIndicatorSections`) + Q2 (`getCapacitySharingMetadata`) |
+| `agresso-contract/utils/primary-contract-results.util.ts` | **new** — the shared scoping predicate (RB-10) |
+| `agresso-contract/utils/primary-contract-results.util.spec.ts` | **new** — its gate |
+| `agresso-contract/repositories/agresso-contract.repository.ts` | **modified** — the private method is now a one-line delegate |
+
+#### The single most important outcome: **RB-3 is discharged**
+
+The **CTE-across-UNION-branches pattern executed against the real schema.** It is valid MySQL 8 but had **no precedent in this repository and had never been run**, and DD-1's entire consolidation rested on it — a failure would have been a **Pivot**, not a rework. Q1 resolves in **~25–48 ms** with **exactly 1 parameter bind**; Q2 with **7 placeholders / 7 params** in the expected positions.
+
+#### Live-schema evidence, through the actual class
+
+| Contract | What it proves |
+| --- | --- |
+| `A1048` | Rich fixture. **All three of T-01's label decisions confirmed in output:** `18:"7. Prototype"` (`CONCAT(level,'. ',name)`), `1:"Level 1: Discourse/behavior ch…"` (`full_name`), `2:"Policy enacted."` (`description`, **not** `"Stage 2"`) |
+| `A1001` | No primary results: Q1 returns **all six keys as `[]`** — empty rather than absent or null (R-IMC-007 AC.2, R-IMC-002 AC.3). Q2's `gender_group` returns **3 rows at 0** |
+| `G228` | **DC-2 on production data:** the loose filter matches 6 rows (4 of them Training+**Short-term**), the shipped conjunction returns `[4:Other=2]` — the strict number |
+| `A1618` | **DC-2 again:** an **Engagement**/MSc row excluded; returns `[PhD=1, BSc=1]` with the id-ASC tie-break applied |
+| `A132` | `gender_group` `Non-binary=0` where the column is **NULL on all 7 group rows** — `COALESCE` yields a present row at 0, not a missing category (R-IMC-005 AC.2) |
+| Global control | loose `degree_id IS NOT NULL` = **54**, conjunction = **36** — matching T-01's independent measurement exactly |
+
+#### Reviewer verdict — `STATUS: PASS`
+
+> Both methods conform to `requirements.md` §4.1/§4.2 and R-IMC-001…R-IMC-007 AC.2 and to `design.md` §6.1–§6.4 — every join column, label column, filter, enum reference, single-bind property and union-level ordering re-derived from the schema and matched; the Leader's graft is behaviour-preserving (byte-identical scoping SQL on both option paths, eight call sites untouched), and every reported verification reproduces, including the 321/2,041 suite figure.
+
+**What the Reviewer did beyond checking claims:**
+- **Re-derived `requirements.md` §4.1 from the schema** rather than trusting it — per `tasks.md` §10's standing instruction after that map was found incomplete three times. **No fourth gap.** It also confirmed `clarisa_innovation_types.code` is `bigint` (so `Number()` is safe), that `gender` has no `id` column, and that `result_id` is `primary: true` on all four fact tables (**R-6 holds** — `COUNT(*)` cannot double-count).
+- **Proved the extraction byte-equivalent by hand**, comparing `git show HEAD:` against the util with whitespace made visible — character-identical including indentation, on **both** the default and `includeGeoScope: true` paths, the latter used by the geographic report.
+- **Adjudicated the missing `GROUP BY` on the three `gender_group` branches as correct, not a latent bug:** a bare aggregate returns exactly one row regardless of matches, including zero, where `SUM` yields NULL and `COALESCE` makes it 0. **Any `GROUP BY` column would collapse to zero rows for a contract with no group records and silently drop the category** — so this is the only construction satisfying AC.2. Valid under `ONLY_FULL_GROUP_BY`.
+- Re-ran everything: `tsc` clean · `eslint` **and `prettier --check`** clean on all three files (adding nothing to the ~26-error baseline) · full suite **321 / 2,041** · targeted run 8 suites / 135 tests.
+
+#### Two residuals where `author ≠ auditor` does **not** hold — declared, not glossed
+
+1. **The graft and the scoping extraction are the Leader's own work.** Two Implementers wrote Q1 and Q2 blind to each other; the Leader merged them, unified the row type, replaced T-04's local `MetadataCountRow` with `MetadataCountDto`, and extracted the shared predicate. That work was **written under no task brief** and was disclosed as such in the review request. The Reviewer audited it and passed it — so it *is* independently audited, which is the one place this residual is discharged.
+2. **The real-schema evidence for the grafted class was produced by the Leader who wrote the graft.** The Reviewer has no DB route and could not re-run it. It accepted the evidence because it **cross-checks against T-01's independently-run recon** (the same 54/36 degree split, the same three label strings, the same group-gender dominance) — but it is recorded here as a residual alongside T-01's, **not as independently audited**.
+
+#### `ADVISORY` findings — recorded; the two that were Leader-owned doc currency were **fixed**, not deferred
+
+| Lens | Finding | Action |
+| --- | --- | --- |
+| **Readability** | `requirements.md` §4.2 still cited `agresso-contract.repository.ts:642-659` — which is now a one-line delegate. **The Reviewer named this as the same failure mode §4.2 exists to prevent:** a reader following the citation never learns where the single source is | ✅ **Fixed.** §4.2 amended to name the util as source of truth and the method as in-class entry point, with the RB-10 history recorded. This is doc currency created by the Leader's own change — not an advisory-derived task, so §2.4 does not apply |
+| **Reliability** | **Nothing executable protected the extraction.** Byte-equivalence was proven by hand; `agresso-contract.repository.spec.ts` asserts nothing about `is_primary` / `is_snapshot` / `SELECT DISTINCT`. RB-10 reduced the risk from "two copies drift" to "one copy changes silently" — better, not closed. Fell **outside T-07's declared file list**, so it would have dropped through | ✅ **Fixed.** `primary-contract-results.util.spec.ts` added (5 cases): each filter asserted **individually** (a whole-string assertion would pass with one filter dropped), the single-`?` property, and that the two option paths differ **only** in selected columns. **Mutation-verified:** dropping `is_snapshot` reddens the predicate case; making one path diverge reddens **two**. Justification for the Leader doing this rather than escalating: the untested file is the Leader's own, and the standard applied to Implementers applies to the Leader |
+| **Readability** | The util was missing from `tasks.md` §5's `// @akili-spec` list | ✅ Marker added to both the util and its spec |
+| **Resilience** | Neither query filters the **lookup** row's `is_active`, so a soft-deleted lookup row still yields a labelled category. **This matches the six pre-existing sections** (e.g. the `clarisa_countries` join), so consistency argues for leaving it | Recorded as a decision, not changed |
+| **Reliability** | Three label columns are **nullable** in their entities (`clarisa_innovation_types.name`, `clarisa_innovation_characteristics.name`, `policy_stage.description`) → a NULL yields `name: null` against `MetadataCountDto.name!: string`. No AC requires a fallback and live rows are populated | Recorded; **routed to T-10** — the client interface must not assume non-null. Prefer a client-side fallback over a `COALESCE` that would mint an unlabelled category |
+| **Risk (routing)** | **Observability landed here, not in T-06** — both methods already emit the design §9 debug line, which pre-satisfies T-06's own logging acceptance box | Recorded; **T-06 briefed not to double-log**, and **T-08 should read these lines as its measurement source** |
+| **Risk** | **Two dead artifacts now wait on one task:** `ContractFullReportsDto` (T-02) and this whole repository are referenced by nothing in `src` until T-06 composes them. A slip in T-06 leaves both declared and never used, with nothing failing | Recorded; tracked as T-06's dependency |
+| **Reliability** | `if (!bucket) continue;` is unreachable (section values are SQL literals) and will show as an uncovered branch | Recorded; **do not read it as a coverage signal** in T-07 |
+
+#### Environment findings from the parallel wave
+
+**RB-9 confirmed with hard evidence.** Deleting the two worktree branches showed T-04's sat at **`a25df379`** — an unrelated old `main` commit — while T-03's sat at `53d95a9b`. **T-04 worked on a stale base for its entire run**, which is the single cause of everything it had to duplicate: no `MetadataCountDto`, no `SessionTypeEnum`, and a pre-existing `tsc` error in `test/app.e2e-spec.ts`. T-03 detected the same problem and realigned itself; T-04 did not, and instead recreated what it could not import — correctly flagging every duplicate for the graft. **Neither behaviour was a task failure**; the mechanism handed them a wrong tree.
+
+#### Requirements covered
+
+R-IMC-001, R-IMC-002, R-IMC-003, R-IMC-004 (all AC) · R-IMC-005 AC.1/AC.2/AC.4/AC.6 (SQL half) · R-IMC-006 (all AC) · R-IMC-007 AC.2 · §4.1, §4.2 · gates **DC-1, DC-2 (on live data), DC-12** · design §6.1–§6.4, §9, DD-1, DD-2, DD-4, DD-8.
+
+#### Decisions made
+
+| # | Decision |
+| --- | --- |
+| **O-34.1** | **Reviewed jointly.** One artifact, one audit — half a class is not auditable |
+| **O-34.2** | **The graft preserved both methods' SQL verbatim.** Both were verified against live data; "improving" a proven query is how defects enter code no test covers |
+| **O-34.3** | The scoping predicate was **extracted** (owner-authorised, RB-10) rather than made public or left duplicated — one copy, eight call sites untouched, mechanically gated |
+| **O-34.4** | The Leader **fixed** the two Leader-owned advisory items (§4.2's stale citation, the missing spec) instead of escalating them. Neither is an approved task widened from an advisory: one is doc currency created by the Leader's own edit, the other is the missing gate on the Leader's own new file |
+| **O-34.5** | Worktrees removed and their branches deleted after the graft |
+
+#### Final verification
+
+`tsc --noEmit` clean · `eslint` clean on all new files · full server suite **321 suites / 2,041 tests** green *(this branch's correct baseline — 626 spec files vs `dev`'s 632)* · `utils/` **17 tests** green (12 gender + 5 scoping) · both methods executed against `alliancereportingdb` across five contracts · the new scoping spec mutation-verified in both directions.
+
+---
+
 ## Owner escalation: advisory-derived items
 
-**Status: awaiting owner decision. Neither item was acted on.**
+**Status: ✅ both items authorised by the owner 2026-07-30 and applied. Recorded below as the decision trail, since the escalation route — not the fix — is the part worth preserving.**
+
+### Resolution as applied
+
+| Item | Applied | Verification |
+| --- | --- | --- |
+| **2** — misattributed citation | `reports-indicator-metadata.dto.ts` doc-comment now attributes the *"Evidence that does NOT count"* clause to `tasks.md` § T-02, and states DD-3's narrower point separately | Reads correctly against both sources |
+| **1** — AC.6 gated jointly with AC.3 | **A second group-only case was added** asserting three **non-zero** categories. The existing AC.6 case was **left untouched**, because it mirrors `requirements.md`'s *Scenario: Group-only project* verbatim (Male=10, Female=4, Non-binary=0) and editing its fixture would have broken that fidelity to close a wording gap | Suite **12/12**. **Mutation-killed:** under a left-biased merge the new case fails alongside AC.6, the mixed scenario, AC.4 and DD-8 — **5 failed / 7 passed**. Util restored byte-identical (checksum `c13397be…` before and after). `tsc --noEmit` clean; `agresso-contract` suites **5 / 123** |
+| **1** (wording) | The three-document contradiction — *"all three categories"* vs. AC.3's zero-dropping — is **now moot for the gate** (AC.6 is asserted independently) but the **wording itself is still uncorrected** in `tasks.md` § T-05, `design.md` §10 and `requirements.md` §9 DC-3 | ⬜ **Open.** The gate is closed; the prose still overstates. Left recorded rather than quietly edited across three documents |
+
+**Note on the commit body.** `53d95a9b` states *"this new case is green but its mutation-kill has not yet been run"*. That was accurate when written — the run was interrupted mid-mutation by a branch-change request, and the Leader prioritised restoring the mutated file over completing the check. **The mutation-kill has since been run and passed** (above), so that caveat is discharged. Recorded here rather than by amending the commit, so the sequence stays legible.
+
+### Why these were escalated rather than absorbed (retained for the record)
 
 `/akili-execute` §2.4 forbids the Leader minting a new task from an advisory or widening an approved one — an advisory is the least-vetted evidence in a run, and it is the fastest route from weak evidence to unapproved scope. Both items below are therefore **recorded and escalated, not absorbed**. Bundled into one decision so the owner is interrupted once.
 
