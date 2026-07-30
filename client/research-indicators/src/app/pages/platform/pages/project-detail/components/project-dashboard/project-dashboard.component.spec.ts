@@ -7,15 +7,11 @@ import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { GetGeoScopeService } from '@shared/services/get-geo-scope.service';
 import { GetFullContractReportsService } from '@services/get-full-contract-reports.service';
-import { GetTopContributorsContractsService } from '@shared/services/get-top-contributors-contracts.service';
-import { GetTopMainContactPersonsService } from '@shared/services/get-top-main-contact-persons.service';
-import { GetTopPartnersService } from '@shared/services/get-top-partners.service';
-import { GetTopPrimaryLeversService } from '@shared/services/get-top-primary-levers.service';
 import { FileManagerService } from '@shared/services/file-manager.service';
 import { DocumentOverviewService } from '@shared/services/document-overview.service';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { ActionsService } from '@shared/services/actions.service';
-import { ProjectDashboardComponent } from './project-dashboard.component';
+import { ChartKey, ProjectDashboardComponent } from './project-dashboard.component';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { COLLAPSED_ITEM_LIMIT, ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
@@ -80,10 +76,6 @@ describe('ProjectDashboardComponent', () => {
   let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock };
   let reportsMock: ReturnType<typeof createReportsMock>;
   let geoScopeMock: { main: jest.Mock };
-  let topPartnersMock: ReturnType<typeof createRetiredServiceMock>;
-  let topPrimaryLeversMock: ReturnType<typeof createRetiredServiceMock>;
-  let topMainContactPersonsMock: ReturnType<typeof createRetiredServiceMock>;
-  let topContributorsContractsMock: ReturnType<typeof createRetiredServiceMock>;
   let resultsCenterServiceMock: { initializeProjectDashboardResultsTable: jest.Mock };
   let fileManagerServiceMock: { uploadFile: jest.Mock };
   let documentOverviewServiceMock: {
@@ -129,21 +121,6 @@ describe('ProjectDashboardComponent', () => {
     };
   }
 
-  /**
-   * Double for each retired `GetTop*Service` (R-PDB-001 AC.2 / DC-2). Kept in
-   * the override's `add.providers` below — not because
-   * `ProjectDashboardComponent` injects any of them today (T-05 removed
-   * that), but so that IF a mutant reintroduces a component-level
-   * `providers` entry for the same token and calls `main()` from it,
-   * `overrideComponent`'s `add.providers` (appended after the component's
-   * own providers) shadows that entry and this double is what actually gets
-   * constructed — making `main` observable and the assertion below capable
-   * of failing.
-   */
-  function createRetiredServiceMock() {
-    return { main: jest.fn(), list: signal<unknown[]>([]), loading: signal(false), loadError: signal(false) };
-  }
-
   /** Drives all four ranked sections of `reportsMock` from one `ContractFullReports` payload. */
   function applyFixtureToReportsMock(mock: ReturnType<typeof createReportsMock>, data: ContractFullReports): void {
     mock.payload.set(data);
@@ -176,10 +153,6 @@ describe('ProjectDashboardComponent', () => {
   ) {
     reportsMock = createReportsMock();
     geoScopeMock = { main: jest.fn() };
-    topPartnersMock = createRetiredServiceMock();
-    topPrimaryLeversMock = createRetiredServiceMock();
-    topMainContactPersonsMock = createRetiredServiceMock();
-    topContributorsContractsMock = createRetiredServiceMock();
     resultsCenterServiceMock = { initializeProjectDashboardResultsTable: jest.fn() };
     fileManagerServiceMock = {
       uploadFile: jest.fn().mockResolvedValue({ data: { filename: 'stored-file.pdf' } })
@@ -286,11 +259,7 @@ describe('ProjectDashboardComponent', () => {
           imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
           providers: [
             { provide: GetFullContractReportsService, useValue: reportsMock },
-            { provide: GetGeoScopeService, useValue: geoScopeMock },
-            { provide: GetTopPartnersService, useValue: topPartnersMock },
-            { provide: GetTopPrimaryLeversService, useValue: topPrimaryLeversMock },
-            { provide: GetTopMainContactPersonsService, useValue: topMainContactPersonsMock },
-            { provide: GetTopContributorsContractsService, useValue: topContributorsContractsMock }
+            { provide: GetGeoScopeService, useValue: geoScopeMock }
           ]
         }
       })
@@ -325,33 +294,14 @@ describe('ProjectDashboardComponent', () => {
     expect(resultsCenterServiceMock.initializeProjectDashboardResultsTable).toHaveBeenCalledWith('C-1');
   });
 
-  it('should call main() exactly once on the single reports service and never call any of the four retired ranked services (R-PDB-001 AC.2 / DC-2)', async () => {
-    await setup();
-
-    // Spy-level proof (DC-2): one `main()` call on the sole replacement
-    // service, and the four retired services — doubled via the override's
-    // `add.providers` above, which shadows any component-level entry of the
-    // same token per Angular's last-provider-wins resolution — never see a
-    // `main()` call. Unlike a bare injection-throw, this discriminates: a
-    // mutant that puts `GetTopPartnersService` back into the component's own
-    // `providers` and calls `main()` from the load effect resolves to THIS
-    // double (not the real class), so the call lands on `topPartnersMock.main`
-    // and the assertion below reddens.
-    expect(reportsMock.main).toHaveBeenCalledTimes(1);
-    expect(topPartnersMock.main).not.toHaveBeenCalled();
-    expect(topPrimaryLeversMock.main).not.toHaveBeenCalled();
-    expect(topMainContactPersonsMock.main).not.toHaveBeenCalled();
-    expect(topContributorsContractsMock.main).not.toHaveBeenCalled();
-
-    // Secondary structural check, retained but not load-bearing on its own
-    // (it cannot fail against the mutant above): the component's own
-    // `providers` no longer list the four retired services, so resolving any
-    // of them from this fixture's injector still fails.
-    expect(() => TestBed.inject(GetTopPartnersService)).toThrow();
-    expect(() => TestBed.inject(GetTopPrimaryLeversService)).toThrow();
-    expect(() => TestBed.inject(GetTopMainContactPersonsService)).toThrow();
-    expect(() => TestBed.inject(GetTopContributorsContractsService)).toThrow();
-  });
+  // T-08 (R-PDB-008): the four `GetTop*Service`s this case used to gate at
+  // spy level (R-PDB-001 AC.2 / DC-2) are deleted along with their client
+  // methods — the services no longer exist, so there is nothing left to
+  // assert "never called". The remaining half of this case (one `main()`
+  // call on the single reports service) is not lost: it is already asserted
+  // above in "should load project dashboard data for the parent contract".
+  // Substituting a weaker assertion here to keep a test count up would be
+  // decorative, so the case is removed rather than watered down.
 
   it('should compute project summaries and formatted labels', async () => {
     await setup();
@@ -654,6 +604,50 @@ describe('ProjectDashboardComponent', () => {
         );
         expect(new Set(ids).size).toBe(ids.length);
       }
+    });
+  });
+
+  /**
+   * A-07.6 (owner-approved into T-08, 2026-07-30). Reviewer mutants M13/M14/M15
+   * survived at 47/47 despite the DC-11 seam being asserted above: deleting
+   * `(expandToggled)` from Primary Levers / Main contact person, or `(retry)`
+   * from Primary Levers, left the whole suite green. The existing seam test
+   * only ever toggles "Results Partners", so it structurally cannot catch a
+   * dead binding on any of the other three cards. These loops close that gap
+   * per-card rather than per-mechanism.
+   */
+  describe('per-card output-binding coverage (A-07.6)', () => {
+    const CARDS: ReadonlyArray<{ title: string; key: ChartKey }> = [
+      { title: 'Results Partners', key: 'partners' },
+      { title: 'Primary Levers', key: 'levers' },
+      { title: 'Main contact person', key: 'contacts' },
+      { title: 'Contributing projects', key: 'contributors' }
+    ];
+
+    for (const { title, key } of CARDS) {
+      it(`should flip only the "${key}" chart key when "${title}" emits expandToggled, leaving the other three collapsed`, async () => {
+        await setup();
+
+        getCardByTitle(title).expandToggled.emit();
+        fixture.detectChanges();
+
+        expect(component.expanded()).toEqual(new Set([key]));
+        for (const other of CARDS) {
+          if (other.key !== key) {
+            expect(component.expanded().has(other.key)).toBe(false);
+          }
+        }
+      });
+    }
+
+    it('should call reports.update() once per card when each of the four cards emits retry, reaching a call count of 4', async () => {
+      await setup();
+
+      for (const { title } of CARDS) {
+        getCardByTitle(title).retry.emit();
+      }
+
+      expect(reportsMock.update).toHaveBeenCalledTimes(4);
     });
   });
 

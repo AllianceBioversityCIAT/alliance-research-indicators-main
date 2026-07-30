@@ -2,7 +2,7 @@
 
 - **Module:** project-dashboard (STAR client)
 - **Spec id:** 2026-07-full-payload-show-more
-- **Status:** not-started
+- **Status:** **all 8 tasks done (2026-07-30)** — T-09 owner-deferred. **The spec is NOT closed:** the NFR-PDB-004 human check is unrun (and its reference mockup is wrong — A-08.3), the `s-lint` owner decision is open, `design.md`/`trd.md` are not updated, and product-owner sign-off is outstanding. See §8.
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -256,7 +256,9 @@ graph TD
 - **`npm run s-lint` cannot be "clean" — the acceptance box above is unachievable as written.** Baseline on this branch is **352 pre-existing SCSS errors** in unrelated files (measured during T-03, confirmed byte-identical via `git stash`). Neither the card nor the dashboard component has a `.scss` file. **Awaiting an owner decision** on whether to reinterpret this as "introduces no *new* s-lint errors" (the reading this run assumes) or to drop the criterion.
 - **Dependencies:** T-01, T-05, T-06
 - **Effort:** M · **Skills:** `angular-developer`, `systematic-debugging` (if the sweep surfaces failures)
-- **Status:** todo
+- **Status:** ✅ **done** — Reviewer PASS on **attempt 1**, 2026-07-30. See [`execution.md`](./execution.md) § T-08. Full suite **304 / 6234 all passing** (with coverage: 99.34 / 98.24 / 99.16 / 99.57 vs floors 40/20/45/30); 468 LOC deleted, matching the measured figure exactly; **zero** references to any of the 12 retired symbol forms. **A-07.6 landed and proven: 8/8 mutants killed, re-run independently by the Reviewer**, including the three original survivors.
+- **`s-lint` criterion: NOT met as literally written** — 352 pre-existing errors, provably unchanged (the diff touches zero `.scss` files; no s-lint error lands in any `project-dashboard*` path; neither component directory has a `.scss` file). Accepted under the "introduces no *new* errors" reading. **The owner decision this task's own note demands is still open.**
+- **Dead declarations deliberately left in place** (E-08.1/E-08.4): `TopContributorsContractReport`, `TopPartnersReport`, `TopMainContactPersonsReport`, **`TopPrimaryLeverItem`**, `TopPrimaryLeversReport` in `project-dashboard.interface.ts` are now unreferenced. Outside R-PDB-008's enumeration **and** outside this task's file fence — deleting them here would itself be the scope violation. Natural home: `../geo-scope-expansion/`, which already retires `GeoScopeReport` from the same file.
 
 ---
 
@@ -339,11 +341,14 @@ Each PR description should follow `cognitive-doc-design` review-empathy rules: w
 
 ## 8. Done definition
 
-- [ ] T-01 … T-08 all `done`.
-- [ ] Every AC in `requirements.md` checked, including **AC.7** (retry preserves expansion) and **R-PDB-002 AC.5** (the geographic card unchanged).
-- [ ] The **five-step human check** (`requirements.md` §7) performed and its result recorded in PR 3 — or NFR-PDB-004 explicitly reported unverified.
-- [ ] Full `npm test` + `npm run lint` + `npm run s-lint` pass; coverage floors held.
-- [ ] Budget actuals compared against §Budget (8 / ~1,600 / 2). Exceeding it **escalates to the user** rather than continuing silently.
-- [ ] `docs/ux-ui/design.md` records the expanded-card pattern, DD-13 and the four renamed titles; `docs/trd/trd.md` records `reports/full` as the dashboard's analytics contract.
-- [ ] Product owner has acknowledged the **four** visible changes (`design.md` §11).
-- [ ] `../geo-scope-expansion/` is unblocked — the card contract and the service it depends on exist.
+> **Reconciled 2026-07-30 at T-08 close.** All eight tasks are done; **the spec is NOT closed.** Four items below remain open and three of them are the owner's, not an agent's. Ticked only what is evidenced.
+
+- [x] T-01 … T-08 all `done`. *(T-09 owner-deferred, outside this list.)*
+- [ ] Every AC in `requirements.md` checked, including **AC.7** (retry preserves expansion) and **R-PDB-002 AC.5** (the geographic card unchanged). — **Behaviourally satisfied and mutation-gated in code** (AC.7 by M1/M11, R-PDB-002 AC.5 by the geo card being byte-identical to HEAD). **The checkbox bookkeeping inside `requirements.md` is unticked** — zero `[x]` in that file. Belongs to `/akili-archive`.
+- [ ] The **six-step human check** (`requirements.md` §7) performed and its result recorded in PR 3 — or NFR-PDB-004 explicitly reported unverified. — ❌ **UNRUN. NFR-PDB-004 is hereby reported UNVERIFIED, never passed** (RB-2). **Blocked on A-08.3:** `mockup/index.html` still contains 4 × `46vh` and models the superseded DD-13, so the reference artefact for the check is wrong — running it today would validate the rejected design. **Fix the mockup first.** *(Note: §8 said "five-step"; `requirements.md` §7 and T-06 both say six. Corrected here.)*
+- [x] Full `npm test` + `npm run lint` pass; coverage floors held. — **304 / 6234 all passing**, coverage **99.34 / 98.24 / 99.16 / 99.57** vs floors 40/20/45/30, verified independently by Implementer, Reviewer and Leader on the same tree.
+- [ ] `npm run s-lint` — **NOT met as written**; 352 pre-existing errors, provably unchanged. Accepted under "introduces no *new* errors". **Owner decision still open** (E-08.2).
+- [x] Budget actuals compared against §Budget (8 / ~1,600 / 2). — **Compared. Tasks 8 → 9** (T-09 added by owner approval). **Changed LOC ≈1,600 → ≈1,470.** **Rework rounds 2 → 3** (T-03 a2, T-06-revised a2, T-07 a2) — **exceeded, escalated at T-07 rather than continued silently, owner-authorised.** **Pivots 0 → 1** (DD-13 → DD-14). Every overrun was surfaced at the moment it happened; none was absorbed quietly.
+- [ ] `docs/ux-ui/design.md` records the expanded-card pattern, DD-14 and the four renamed titles; `docs/trd/trd.md` records `reports/full` as the dashboard's analytics contract. — ❌ **NOT done — live docs↔code drift.** Zero matches in `design.md` for `Show more` / `Results Partners` / `DD-13` / `DD-14` / `reports/full`; zero in `trd.md` for `reports/full` / `contract-full-reports`. Root `CLAUDE.md` §5 forbids letting this drift. **Belongs to no existing task** — needs minting, not closing over. *(Also note §8 said DD-13, which DD-14 superseded.)*
+- [ ] Product owner has acknowledged the **four** visible changes (`design.md` §11). — ❌ open, owner's.
+- [x] `../geo-scope-expansion/` is unblocked — the card contract and the service it depends on exist. — `ProjectDashboardCardComponent`'s `visibleLimit` contract and `GetFullContractReportsService` (with `geo_scope` in the payload) both shipped; `GetGeoScopeService` / `GET_GeoScope` deliberately survive for it to retire.

@@ -946,3 +946,149 @@ Leader-run, independently, after the Reviewer's mutation probes were restored:
 **Also carried into T-08 from this task:** advisory **A-07.8** — the dashboard spec imports the four retired classes and holds four secondary `TestBed.inject(...).toThrow()` assertions. T-08's "no dangling import anywhere" box cannot pass without deleting them alongside the services.
 
 ---
+
+### T-08 — Deletion sweep and full-suite verification
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS** on attempt 1 |
+| **Date** | 2026-07-30 |
+| **Implementer attempts** | 1 of 3 |
+| **Requirements covered** | R-PDB-008 (AC.1-AC.5), NFR-PDB-005 · DC-10 · **plus** R-PDB-003 AC.4 / DC-11 per-card (the owner-approved A-07.6 half) |
+| **Changed LOC** | **+55 / −646** across 11 files — 468 LOC of deletions matching the spec's measured figure **exactly** |
+| **PR** | 4 of 4 (`tasks.md` §6) — deletion only, no user-visible change |
+
+#### Leader pre-checks (run before the spawn, to keep the Implementer off ground already covered)
+
+- **ASM-4 re-confirmed by grep:** the **only** non-self consumer of the four retired services was `project-dashboard.component.spec.ts` (T-07's own doubles). **No production file injected any of them.** Also mapped that the `GET_Top*` spec cases sit in **two separate blocks** (~1359-1400 and ~2110-2150) — the second is the encoded-contract-id/default-limit set and is the easy half to miss.
+- **Full-suite baseline on the clean tree: `308 suites / 6260 tests`, all passing,** coverage `99.34 / 98.21 / 99.16 / 99.58`. Recorded so any red would be unambiguously attributable to T-08 rather than triaged as possibly pre-existing — the discrimination **KZ-003** exists to buy.
+
+#### Attempt 1 — Implementer
+
+Ran on `akili-implementer` / `sonnet` (T2). Effort `high`. Skills: `angular-developer` + `systematic-debugging`.
+
+**Half 1 — the deletion (R-PDB-008).** Four services + four specs deleted; four `GET_Top*` methods and their now-unused `Top*Report` type imports removed from `api.service.ts`; both blocks of spec cases (10 cases) removed from `api.service.spec.ts`; and from `project-dashboard.component.spec.ts` the four imports, the four injector-shadowing doubles, their provider entries, and the case whose only content was the retired spy-level DC-2 gate plus the four A-07.8 `TestBed.inject(...).toThrow()` assertions.
+
+**Half 2 — A-07.6 (owner-approved).** New `describe('per-card output-binding coverage (A-07.6)')`: four generated cases asserting `expandToggled` flips **only** that card's `ChartKey`, plus one asserting `reports.update()` reaches a call count of 4 across all four `retry` emissions.
+
+**Verification:** full suite **with** coverage (no `--coverage=false`, per the T-04 rule) → `304 / 6234`, all passing, coverage `99.34 / 98.24 / 99.16 / 99.57`. `npm run lint` clean. `npm run s-lint` **352 — unchanged**. **8/8 mutants reddened**, including the three original survivors. `project-dashboard.component.html` restored to byte-identical.
+
+#### Attempt 1 — Reviewer verdict: `STATUS: PASS`
+
+Ran on `akili-reviewer` / `opus` (T3). Lens checklist. It re-derived rather than accepted:
+
+- **Re-ran all 8 A-07.6 mutants itself — 8/8 killed**, matching the Implementer's table **case-for-case and count-for-count, with no inflation**. All three original survivors (M13 `(retry)` levers, M14 `(expandToggled)` levers, M15 `(expandToggled)` contacts) now redden.
+- **Specificity probe:** `expandToggled` coverage is **per-card specific** — each mutant reddens a case naming that card's title and key, so a maintainer knows which card broke. `(retry)` is **not** per-card: all four collapse onto the single `…call count of 4` case. **Conformant** — `tasks.md` prescribes exactly that shape — so advisory, not a finding (A-08.1).
+- **Delta arithmetic audited term by term** and independently reproduced: −20 (4 specs × exactly 5 `it(`) −10 (api spec, both hunks, *nothing else removed*) −1 (retired DC-2 case) +5 (A-07.6) = **−26**; suites −4. Cross-checked against a figure not derived from the Leader's baseline: the dashboard suite alone is **51** = T-07's audited 47 − 1 + 5. **No unexplained drop; DC-10 satisfied.**
+- **Semantic dangling — the class grep cannot see — checked and clean.** Notably it found that `eslint.config.js` **ignores `**/*.spec.ts`**, so `npm run lint` offers *no* unused-import guarantee for the two modified specs; it therefore hand-checked every imported identifier in both. Zero unused. Also confirmed: no barrel/`index.ts` anywhere under client `src/` to orphan a re-export, no orphaned helper, and zero residual `top-*` endpoint string literals.
+- **DC-2 retirement is correct and cost nothing live:** the load-bearing half — `expect(reportsMock.main).toHaveBeenCalledTimes(1)` + `toHaveBeenCalledWith('C-1')` — **survives** at `project-dashboard.component.spec.ts:291-292`, verified by reading it rather than trusting the in-file comment. R-PDB-001 AC.2 is now vacuous **by construction**, which is the right end state: absence-by-nonexistence strictly dominates a spy asserting non-invocation, and §7 DC-2 locates the real gate in the `HttpTestingController` specs, both live and green.
+
+#### Both Leader rulings audited and UPHELD
+
+| Ruling | Verdict |
+| --- | --- |
+| **Dead interfaces left in place** | **UPHELD**, on three grounds, the third decisive: (1) **AC.3 is not engaged** — it forbids references to a *deleted* symbol, and these are *unreferenced*, not deleted, with zero dangling references in either direction; (2) R-PDB-008's Details are an exhaustive enumeration that omits interfaces; (3) **deleting them would itself be the scope violation** — `project-dashboard.interface.ts` is not among T-08's fenced files, so editing it is what an audit should reject, not require. Spirit test also passes: type-only declarations are erased at compile time, so they are inert, not a second data path. |
+| **`s-lint` read as "no *new* errors"** | **ACCEPTABLE — and formally recorded as a criterion NOT met as literally written.** The reinterpretation is not an Implementer invention: `tasks.md` §3 T-08 already names this reading and marks the owner decision open. The Reviewer proved unchangedness *more strongly than a stash comparison could*: 352 errors across 44 `.scss` files, the diff touches **zero** `.scss` files, **no** s-lint error lands in any `project-dashboard*` path, and neither component directory contains a `.scss` file at all — so the output is **provably** identical, not merely observed identical. Meeting it literally would mean fixing 352 errors in 44 unrelated files. **The owner decision remains open and must not be silently ticked at closure.** |
+
+**Correction accepted from the Reviewer:** there are **five** now-dead declarations, not four. `TopPrimaryLeverItem` (`project-dashboard.interface.ts:70`) was consumed only by the deleted service and by the now-dead `TopPrimaryLeversReport`, so it is transitively dead. The Leader's enumeration in the Implementer brief was incomplete. Recorded as A-08.2.
+
+#### Reviewer runtime incident — disclosed, contained, Leader-verified
+
+Mid-audit the Reviewer ran a malformed `git stash push` from the wrong directory, then a `git stash pop` that consequently popped the pre-existing **`stash@{0}` (the REJECTED T-06 DD-14 diff)** and left `UU` conflicts in `project-dashboard-card.component.{html,spec.ts}`. It recovered within one command (`git checkout HEAD -- <both paths>`) and **reported the incident loudly and unprompted.**
+
+**Independently verified by the Leader afterwards:** `git status` back to the exact 11-line fence · **`stash@{0}` still on the stack with its full "DO NOT APPLY" label intact** · both card files and all geo-scope files byte-identical to HEAD · **zero conflict markers** anywhere in `src/` · no untracked files · full suite green on the final tree. **No Implementer work was touched and no stash was lost.**
+
+Recorded rather than waved through, for two reasons: an auditor mutating the tree it audits is a real hazard worth naming, and the honest disclosure is what made the containment check cheap and targeted. **Standing lesson for future mutation-based reviews:** run probes from the repo root and never use `git stash` as the restore mechanism when a labelled stash already exists — `git checkout HEAD -- <path>` is the safe primitive.
+
+#### Decisions
+
+| # | Decision | Basis |
+| --- | --- | --- |
+| E-08.1 | Dead interfaces **not** deleted | See the ruling table. Confirmed by the Reviewer as the correct call *and* as the one that avoids a scope violation on the spec's final task. |
+| E-08.2 | `s-lint` accepted under the "no new errors" reading, **and reported as unmet-as-written** | `tasks.md` §3 T-08 names this reading and marks the owner decision open. Not silently ticked. |
+| E-08.3 | Single Reviewer (lens checklist), not parallel lenses | Effort `high`, and T-08 touches no security/migration/data-loss surface. Also avoids repeating the T-07 hazard where two lenses would race on mutation probes in one working tree (E-07.6). |
+| E-08.4 | A-08.2's fifth dead declaration **not** swept up here | Same fence as E-08.1. The Reviewer's suggestion is better: `../geo-scope-expansion/` already retires `GeoScopeReport` from this same file, so one interface-cleanup pass serves both instead of two. |
+
+#### ADVISORY findings (4R lens — non-gating)
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| A-08.1 | *(reliability, low)* `(retry)` coverage is per-mechanism, not per-card — all four mutants collapse onto the `…call count of 4` case, which names no card, so a dead retry binding is **caught but not localised**. | Recorded. **Spec-conformant** (T-08 prescribes exactly the count-of-4 shape), so not a finding. Cheap improvement if ever revisited: mirror the `expandToggled` loop with a per-card reset. |
+| A-08.2 | *(readability, low)* **Five** dead declarations, not four — `TopPrimaryLeverItem:70` is dead transitively and was missing from the Leader's list. | Recorded; correctly left alone (E-08.4). Natural home is the `geo-scope-expansion` spec. |
+| **A-08.3** ⚠️ | *(risk, medium — owner)* `mockup/index.html` still contains **4 × `46vh`** — it models the **superseded DD-13**. It is the named reference for the six-step NFR-PDB-004 human check, so **running the check against it today would validate the rejected design.** | **Escalated to the owner.** Third recording of this (A-06ii.2, A-06r.3). **Fix the mockup *before* the human check, not after.** |
+| **A-08.4** | *(risk, low — but repo-wide)* `npm run lint` **cannot** police unused imports in any `*.spec.ts` (`eslint.config.js` `ignores: ["**/*.spec.ts"]`), and per E-07.2 Jest is transpile-only with specs outside `ng build`'s graph. **Spec files therefore have no static dead-code gate at all in this repo.** | Recorded. "Lint clean" is not evidence for spec-file imports; future deletion sweeps must hand-check them, as this Reviewer did. Candidate Kaizen lesson at archive. |
+
+#### Final verification — Leader-run independently, on the exact committed tree
+
+- Full suite **with** coverage → **304 suites / 6234 tests, all passing**; coverage **99.34 / 98.24 / 99.16 / 99.57** against floors **40 / 20 / 45 / 30**
+- `git status` → exactly **11** entries (3 modified, 8 deleted); scope fence exact
+- Repo-wide grep for all **12** retired symbol forms → **zero** hits
+- No `.only` / `.skip` / `fdescribe` / `xit` anywhere in `src/`
+- `project-dashboard.component.{ts,html}`, `project-dashboard-card.component.*`, `get-geo-scope*` → byte-identical to HEAD
+- `npm run lint` clean · `npm run s-lint` **352**, provably unchanged
+
+---
+
+## 3. Run Summary — all 8 tasks complete, spec NOT closed
+
+**Completed 2026-07-30.** T-01 … T-08 all carry a Reviewer PASS. **T-09 is owner-deferred**, and four `tasks.md` §8 items remain open — three of them the owner's. **This is a completed task list, not a closed spec.**
+
+### Task ledger
+
+| Task | Attempts | Outcome |
+| --- | --- | --- |
+| T-01 data layer | 1 | ✅ PASS |
+| T-02 card contract | 1 | ✅ PASS |
+| T-03 card toggle + a11y | 2 | ✅ PASS (rework round 1) |
+| T-04 card spec, real template | 1 | ✅ PASS |
+| T-05 dashboard rewire | 1 | ✅ PASS |
+| T-06 expansion + geometry | 2 (post-pivot) | ✅ PASS (rework round 2) — **DD-13 → DD-14 pivot**, routing waiver |
+| T-07 dashboard spec | 2 | ✅ PASS (rework round 3, owner-authorised past the tripwire) |
+| T-08 deletion sweep + A-07.6 | 1 | ✅ PASS |
+| T-09 keyboard-operable overlay | — | ⬜ **owner-deferred** |
+
+### Budget reconciliation
+
+| | Budgeted | Actual | Handling |
+| --- | --- | --- | --- |
+| Tasks | 8 | **9** | T-09 added by explicit owner approval, not agent initiative |
+| Changed LOC | ≈1,600 | **≈1,470** | under |
+| Rework rounds | **2** | **3** ⚠️ | **Exceeded. Escalated at T-07 and paused for the owner rather than continued silently**; owner authorised |
+| Pivots | 0 | **1** | DD-13 → DD-14, full Pivot Record |
+
+### What the `author ≠ auditor` gate actually caught
+
+Recorded because it is the load-bearing claim about this run's cost. The three rework rounds and the pivot were **not** friction — each one caught a defect that was invisible to a green suite:
+
+1. **T-03** — the `pr-1.5` silent class bug.
+2. **T-06** — two successive layout mechanisms that were *argued* correct and *measured* wrong (`align-items` does not size grid tracks; a static `max-height` still grew the card by +52px). Both died to measurement, not opinion.
+3. **T-07** — two assertions that could not fail, one of which meant **AC.7 had no working gate anywhere in the repo**.
+4. **T-08 / A-07.6** — the highest-value find of the run: `(expandToggled)` was deletable from two of the four cards with the entire repo green, so **two "Show more" toggles could have shipped dead** in the one PR a user notices. Found only because the T-07 review went deep enough to run 16 mutants.
+
+The recurring lesson, and the one worth carrying to `/akili-archive`: **in this spec a green suite was repeatedly the shape of the defect.** Mutation was the only evidence that discriminated, and `tasks.md` §3 T-07's evidence clause was amended (E-07.2) to say so after `strictTemplates` turned out not to apply here at all.
+
+### Still owed before the spec can be closed
+
+| # | Item | Owner |
+| --- | --- | --- |
+| **1** | **Fix `mockup/index.html`** — still 4 × `46vh`, still models the superseded DD-13 (**A-08.3**, third recording after A-06ii.2 / A-06r.3). **It is the named reference for the human check, so it must be corrected first** or the check validates the rejected design | agent-fixable |
+| **2** | **The six-step human check** (`requirements.md` §7). **NFR-PDB-004 is reported UNVERIFIED, never passed** (RB-2). Needs a browser | **owner** |
+| **3** | **`s-lint` decision** — reinterpret as "no new errors" (the reading this run assumed and evidenced) or drop the criterion. 352 pre-existing errors in 44 unrelated `.scss` files | **owner** |
+| **4** | **`docs/ux-ui/design.md` + `docs/trd/trd.md` are not updated** — zero matches for `Show more` / `Results Partners` / `DD-14` / `reports/full` / `contract-full-reports`. **Live docs↔code drift against root `CLAUDE.md` §5, belonging to no existing task** | needs minting |
+| **5** | Product-owner acknowledgement of the **four** visible changes (`design.md` §11) | **owner** |
+| **6** | `requirements.md` AC checkboxes are entirely unticked (bookkeeping) | `/akili-archive` |
+
+### Carried forward beyond this spec
+
+- **T-09** (keyboard-operable DD-14 overlay) — owner-deferred, ready to run.
+- **A-08.2** — five dead declarations in `project-dashboard.interface.ts`. Deliberately not swept (E-08.1/E-08.4); `../geo-scope-expansion/` already retires `GeoScopeReport` from the same file, so one pass serves both.
+- **A-07.2** — `institution_id: null` from the endpoint would yield duplicate `'undefined'` `@for` keys (NG0955). E-05.2 argues the SQL prevents it; **nothing enforces that at the client boundary.** Hardening candidate, not a defect today.
+- **A-08.4 / A-06r.5 — two candidate Kaizen lessons.** (a) **Spec files have no static dead-code gate in this repo** — `eslint.config.js` ignores `**/*.spec.ts` and Jest is transpile-only, so "lint clean" is never evidence about spec imports. (b) **Headless Chrome is available locally**, which weakens the "no automated gate for rendered layout" premise that RSK-4 and RB-2 were both built on.
+- **Reviewer tooling lesson:** run mutation probes from the repo root and never use `git stash` as the restore primitive when a labelled stash already exists — `git checkout HEAD -- <path>` is the safe one. See the T-08 runtime incident.
+- **RB-3** — `project-detail.component.ts` route staleness, a split-brain page reachable in production today. Deliberately untouched (`requirements.md` D-AC5); file separately.
+
+### Next command
+
+`/akili-test` is **not** indicated — every task authored its own gates and the full suite is green with ~99% coverage. Run **`/akili-validate`** for the AC-by-AC sweep, then **`/akili-archive`** (which runs Kaizen, syncs the agent guides, and re-indexes CodeGraph) **once items 1-5 above are resolved.** Archiving before then would close over live docs drift and an unverified NFR.
+
+---
