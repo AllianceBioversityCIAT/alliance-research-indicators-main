@@ -234,13 +234,20 @@ graph TD
 - **Files touched:**
   - **Delete:** `get-top-contributors-contracts.service.ts`, `get-top-main-contact-persons.service.ts`, `get-top-partners.service.ts`, `get-top-primary-levers.service.ts` + their four specs (**468 LOC measured**)
   - `api.service.ts` — remove four `GET_Top*` methods; `api.service.spec.ts` — remove their cases
+  - `…/project-dashboard/project-dashboard.component.spec.ts` — **two reasons, both mandatory** (see notes): it imports the four retired classes, and it is where the A-07.6 per-card coverage lands
 - **Description:** Remove the superseded client path once nothing consumes it. **Last task by design** (RSK-3).
 - **Implementation notes:**
   - **`GetGeoScopeService` and `GET_GeoScope` must survive** — they retire with the geographic spec (R-PDB-008 AC.4). Deleting them here breaks the geographic card and silently pulls A2's scope into this PR.
   - Server endpoints are untouched (umbrella OQ-8).
   - Re-confirm by grep that nothing outside `project-detail` injected the four services before deleting (ASM-4).
+  - **The dashboard spec imports all four retired classes** (T-07 added injector-shadowing doubles plus four secondary `TestBed.inject(...).toThrow()` assertions — advisory A-07.8). Deleting the services without deleting those imports and assertions leaves a dangling import and fails this task's own first acceptance box. **The spy-level DC-2 gate must not be lost in the process** — after removal, `main()`-call evidence for the retired path no longer has a subject, which is correct: the services are gone. Do not replace it with a weaker assertion; delete it and note the retirement.
+  - **A-07.6 — per-card output-binding coverage. OWNER-APPROVED 2026-07-30, which is what makes it in-scope here.** Origin: advisory from the T-07 review. Per `/akili-execute` §2.4 the Leader may not widen a task with an advisory on its own initiative; the owner explicitly chose to fold it into T-08 rather than mint a T-10. **It was not silently inherited.**
+    - **The defect:** Reviewer mutants M13/M14/M15 survive at 47/47 — `(expandToggled)` can be deleted from the **Primary Levers** and **Main contact person** cards, and `(retry)` from Primary Levers, with the whole repo green. **Two "Show more" toggles could ship dead.** This is the DC-11 defect itself; the T-04 card spec structurally cannot catch it (it owns no host state), and T-06's `ChartKey` union guards typos, not absent bindings.
+    - **The fix (~6 lines):** loop all four cards emitting `expandToggled`, asserting each flips **only its own** `ChartKey`; loop all four emitting `retry`, asserting `update()` call count reaches 4.
+    - **Verify by mutation, not by green:** delete `(expandToggled)` from each of the four cards in turn and confirm a red test each time. A passing suite is not evidence here — a passing suite is exactly what the defect looks like today.
 - **Acceptance / done check:**
-  - [ ] Four service files + four specs gone; no dangling import anywhere.
+  - [ ] Four service files + four specs gone; no dangling import anywhere — **including the four imports and the A-07.8 assertions in `project-dashboard.component.spec.ts`**.
+  - [ ] **A-07.6:** deleting `(expandToggled)` from **any** of the four cards reddens a test, and deleting `(retry)` from any of the four reddens a test. **Proven by running those eight mutants**, not by a green suite.
   - [ ] `GetGeoScopeService` / `GET_GeoScope` still present; the geographic card still renders its three lists **with the same row counts as before this spec** (DD-12 regression check).
   - [ ] **Full** `npm test` from `client/research-indicators/` passes — coverage floors held (statements 40 / branches 20 / lines 45 / functions 30).
   - [ ] `npm run lint` and `npm run s-lint` clean.

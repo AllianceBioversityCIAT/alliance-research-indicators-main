@@ -936,4 +936,13 @@ Leader-run, independently, after the Reviewer's mutation probes were restored:
 
 **Suite state for T-08:** the 848-line file is now ~1,124 lines and green. T-05's *"red between T-05 and T-07 by design"* window is **closed** — the four failures it predicted are repaired and the count went 40 → 47.
 
+#### Owner decisions at the T-07 close gate (2026-07-30)
+
+| # | Decision | Consequence |
+| --- | --- | --- |
+| **O-07.1** | **A-07.6 folded into T-08** rather than left as a recorded advisory or minted as a new T-10 | This is what makes the ~6 lines **in scope**. Per `/akili-execute` §2.4 the Leader may not widen a task from an advisory on its own initiative — the owner's explicit choice is the authority, the same route that created T-09. `tasks.md` § T-08 now carries the work order, an acceptance box, and a **mutation** requirement (a green suite is what the defect looks like today, so green is not evidence). **Not silently inherited.** |
+| **O-07.2** | Continue to **T-08**, after a `/compact` | T-08 is the last task. The Leader recommended the reset at this gate because a task boundary is the one safe point mid-spec — T-01…T-07 state is fully on disk in `execution.md` + `tasks.md`, so nothing irreplaceable lives in the conversation. Recorded **before** the compact so the decision survives it. |
+
+**Also carried into T-08 from this task:** advisory **A-07.8** — the dashboard spec imports the four retired classes and holds four secondary `TestBed.inject(...).toThrow()` assertions. T-08's "no dangling import anywhere" box cannot pass without deleting them alongside the services.
+
 ---
