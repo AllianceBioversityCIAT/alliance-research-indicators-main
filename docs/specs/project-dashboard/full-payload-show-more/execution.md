@@ -1089,6 +1089,75 @@ The recurring lesson, and the one worth carrying to `/akili-archive`: **in this 
 
 ### Next command
 
-`/akili-test` is **not** indicated — every task authored its own gates and the full suite is green with ~99% coverage. Run **`/akili-validate`** for the AC-by-AC sweep, then **`/akili-archive`** (which runs Kaizen, syncs the agent guides, and re-indexes CodeGraph) **once items 1-5 above are resolved.** Archiving before then would close over live docs drift and an unverified NFR.
+`/akili-test` is **not** indicated — every task authored its own gates and the full suite is green with ~99% coverage. Run **`/akili-validate`** for the AC-by-AC sweep, then **`/akili-archive`** (which runs Kaizen, syncs the agent guides, and re-indexes CodeGraph) **once the remaining owner items are resolved.**
+
+---
+
+## 4. Closure work — 2026-07-30 (post-task-list, owner-directed)
+
+Not numbered tasks. The owner instructed *"ejecuta como creas mejor"* after T-08, so the Leader closed the two agent-fixable items from §3's *Still owed* list. **Items 2, 3 and 5 there are the owner's by nature and remain open.**
+
+| Item | Closed | How |
+| --- | --- | --- |
+| **1 — `mockup/index.html` modelled the superseded DD-13 (A-08.3)** | ✅ | Rebuilt to model **DD-14 mechanism (ii)**, 441 → 642 lines |
+| **4 — `design.md` / `trd.md` docs↔code drift** | ✅ | Additive, surgical, every claim checked against code |
+
+Two Implementers ran in parallel on disjoint files, then **one Reviewer** audited the combined diff → **`STATUS: PASS`**, followed by a **correction pass** on nine advisories.
+
+### Why the mockup half was gated harder than a doc edit
+
+`requirements.md` §7 names this file as *the* reference for the NFR-PDB-004 six-step human check — the only gate for that NFR (RB-2). **A wrong mockup makes the acceptance gate validate a rejected design**, which is the exact failure being repaired. It had been flagged three times unfixed (A-06ii.2 → A-06r.3 → A-08.3), and the T-06 record notes it *would have caught DD-14 attempt 1's failure had it been current.*
+
+So the brief required **controls, not just a result**: mode 2 (`max-height` only) had to *reproduce* the known failure before mode 3's zero counted for anything.
+
+**Measured — Implementer and Reviewer independently, then re-measured after the correction pass:**
+
+| Mode | Δ across all four links |
+| --- | --- |
+| 1 · unbounded (control) | +5675 … +6225 |
+| 2 · `max-height:280px` (control) | **+52 partners · +13 contacts** — landing on the real component's figures **to the pixel** |
+| **3 · DD-14 (shipped, default)** | **0** — every card, all four at once, **both directions** (expand *and* collapse-again) |
+
+The Reviewer went beyond the brief: **seven** viewports (including single-column below the 1100px breakpoint) plus **two fidelity-corrected rebuilds** restoring every DOM level the mockup collapses. Deltas byte-identical in all of them — confirming the structural claim (an out-of-flow box contributes nothing to intrinsic sizing) rather than a one-viewport coincidence. Raw run committed at [`./evidence/mockup-dd14-measurements.json`](./evidence/mockup-dd14-measurements.json).
+
+### Reviewer verdict and the nine advisories
+
+`STATUS: PASS`. **All nine advisories were acted on** — unusual, and the reason is worth stating: none grew product scope. Six were **factual errors in documentation just written**, one was **a false fidelity claim on the gate's own reference artefact**, one was **Leader ledger bookkeeping**, and one was **a spec-wording defect that would have caused a false failure report**. Correcting work just produced is finishing it, not widening it.
+
+| # | Finding | Resolution |
+| --- | --- | --- |
+| **A-1** | The rebuilt mockup claimed *"mirrors the real templates class-for-class"* and *"VERIFIED class lists"* — false in 5 declarations (`flex:1 1 auto` is Tailwind's `flex-auto`, not `flex-1` = `flex:1 1 0%`), plus 3 collapsed DOM levels and an 18px/20px padding gap | ✅ 5 sites corrected; both claims reworded to name what is transcribed **and** what is deliberately collapsed. **Measured immaterial** (variants A and B, seven viewports, byte-identical) — but this artefact cannot carry an unverified fidelity claim, since that is precisely how the original blind spot was born. Noted: the pre-existing `evidence/dd14-geometry-probe.html` already had all of it right — **the new mockup regressed against it** |
+| **A-2** | Pointer claimed raw JSON lived in `evidence/`; no such file existed | ✅ Run written to `evidence/mockup-dd14-measurements.json`; pointer now resolves. Makes the table falsifiable rather than merely asserted |
+| **A-3** | `tasks.md` §8 carried two statements this work had made **false** (docs "zero matches"; human check "blocked on 4 × `46vh`") | ✅ **Leader.** Docs row → `[x]`; human-check row keeps ❌ (still unrun) but drops the stale blocker. Root `CLAUDE.md` §5 |
+| **A-4** | `trd.md` §6.3 called `contract` one of seven *sections* | ✅ It is `contract_id`, a scalar `string`. Verified against `reports-full.dto.ts` + the client mirror. **A wrong detail in a constitutional doc is worse than a missing one — it gets trusted** |
+| **A-5** | `design.md` §8.1 described the geo host as "three `variant="list"` lists" | ✅ It renders the card **four** times: a default `variant="card"` shell wrapping three lists. As written, a maintainer could conclude the `variant="card"` path was out of reach |
+| **A-6** | The title-rename entry implied no "Top " titles remain | ✅ `title="Top geographic scope"` survives on the geo card; R-PDB-007 defers it to `../geo-scope-expansion/`. Added as the fifth, deferred rename |
+| **A-7** | Mockup called 12 contacts / 6 levers the *measured* GATE-1 worst case | ✅ §13.1 measured **35 / 8**. Partners and contributors were right. Reworded as illustrative |
+| **A-8** | Mockup's toggle aria-label was `"Show more, <title> — N more"`; shipped emits `` `${toggleLabel()}, ${title()}` `` | ✅ Matched to shipped. An owner spot-checking with a screen reader would otherwise hear a string the product never emits |
+| **A-9** | **`requirements.md` §7 step 6 demanded "the four cards are equal height again" — literally false** | ✅ **Leader.** The grid's two rows are separate `auto` tracks, so equality is per-row: 366/366/**405**/405 in both mockup and product. **As written it would have produced a false failure report on the very check this work unblocked.** Corrected to per-row equality, with the reason recorded |
+
+### Leader-side corrections beyond the advisories
+
+- **Two stale T-03 claims** in `tasks.md` still asserted `max-h-[46vh]` and *"OQ-3 closed: viewport-relative"* as current, unamended since the pivot. **Struck rather than deleted** — *"taken verbatim from the mockup"* is the exact reasoning that failed, so the record is the warning.
+- **GATE-2 reconciled in all three places** it was recorded (`tasks.md` header, `design.md` §13, `requirements.md` §11 — the last two still read ⛔ **OPEN** while `tasks.md` said ✅ closed). Now uniformly closed, **dated, and explicit that the first closure was unsound**. Every copy also carries: **GATE-2 ≠ NFR-PDB-004 acceptance.** Those two were easy to conflate, and conflating them is how an unrun check gets treated as passed.
+
+**Scope discipline worth noting:** the correction-pass Implementer **declined** to reconcile GATE-2 because the Leader's fence named `docs/ux-ui/design.md` while GATE-2 lives in the *spec's* `design.md`. It flagged the gap instead of overstepping. **The fence was the Leader's error, not the worker's** — the Leader closed it directly.
+
+### Decisions
+
+| # | Decision | Basis |
+| --- | --- | --- |
+| E-C.1 | Two Implementers in parallel, **one** Reviewer sequentially | Disjoint files made the writes safe to parallelise; the Reviewer needed to run mutation/geometry probes, and two concurrent probe-runners would race on one working tree (the E-07.6 hazard). |
+| E-C.2 | All nine advisories actioned | See above — factual corrections to work just produced, not scope growth. The `/akili-execute` §2.4 fence stops advisories from *growing the spec*; it does not require shipping known-false statements. |
+| E-C.3 | Mockup row counts **not** raised to the measured 35 / 8 | The Implementer chose A-7's "reword as illustrative" branch over editing `DATA` arrays mid-correction. Correct call — DD-14's zero is structural, so smaller lists do not weaken it, and the claim is now accurate. |
+| E-C.4 | `judgment.md`'s "GATE-2 ⛔ open" left untouched | It is a **point-in-time adjudication record**, not live state. Rewriting history there would be dishonest; the live gates are `requirements.md` §11, `design.md` §13 and `tasks.md`, all now reconciled. |
+
+### Still owed — unchanged by this work, and all three are the owner's
+
+1. **The six-step human check** (`requirements.md` §7) — **now unblocked**, reference artefact measurement-verified. **NFR-PDB-004 remains UNVERIFIED, never passed.** Needs a browser and a project with >5 partners.
+2. **The `s-lint` decision** — reinterpret as "no new errors" (the reading this run assumed and evidenced) or drop the criterion.
+3. **Product-owner acknowledgement** of the four visible changes (`design.md` §11).
+
+Plus `requirements.md`'s AC checkboxes (bookkeeping, `/akili-archive`) and deferred **T-09**.
 
 ---

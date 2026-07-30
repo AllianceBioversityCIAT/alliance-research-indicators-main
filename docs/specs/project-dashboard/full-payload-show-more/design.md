@@ -378,7 +378,17 @@ Two rounds of dual review put the severe finding and most warnings on the geogra
 | ID | Gate | Status | Outcome |
 | --- | --- | --- | --- |
 | **GATE-1** | Measure `reports/full` size against the largest real contracts | ✅ **CLOSED — measured 2026-07-29** against the local backend's MySQL, replicating `buildPrimaryContractResultsSubquery` + the four section queries over the **top 25 contracts by result count**. See §13.1 | **The fence holds. No server ceiling needed.** Worst case ≈ **36 KB uncompressed / ~7 KB gzipped**; this spec's four sections ≈ **31 KB** |
-| **GATE-2** | Collapsed + expanded mockup at `./mockup/` | ⛔ **OPEN** | Spec author. Now informed by GATE-1's real row counts (137 max, not the hundreds feared) — see §13.1 |
+| **GATE-2** | Collapsed + expanded mockup at `./mockup/` | ✅ **CLOSED — re-closed 2026-07-30 on the corrected DD-14 mockup** | See the note below. Its **first** closure was unsound and is the origin of the T-06 pivot |
+
+> **GATE-2 was closed twice, and the difference between the two closures is the lesson of this spec.**
+>
+> **First closure (2026-07-29) — unsound.** It rested on a mockup whose right column omitted the real DOM's `flex-1` / `shrink-0` split, so the column grew invisibly while its boxes stayed content-sized. The artefact used to close this gate, derive **DD-13**, and serve as the reference for the `requirements.md` §7 human check **reproduced the very blind spot it existed to catch** — and mode 3's banner claimed *"the right-hand column keeps its height"*, which was true of the mockup and false of the product. Three rounds of blind review passed over it.
+>
+> **Second closure (2026-07-30) — measured.** The mockup now models **DD-14 mechanism (ii)** (§6.3.2): zero live `46vh` or `align-items:start` rules, and the geometry-bearing rules transcribed from the shipped component. It was verified by an **independent Reviewer probe in headless Chrome across seven viewports**, plus two fidelity-corrected rebuilds that restore every DOM level the mockup collapses. **DD-14 read zero delta on all four links, in both directions, per card and all four at once** — while the `max-height` control reproduced the real component's **+52px / +13px** failures **to the pixel**. Raw run committed at [`./evidence/mockup-dd14-measurements.json`](./evidence/mockup-dd14-measurements.json).
+>
+> **The controls are what make the zero mean something.** A mockup that cannot reproduce the known failure cannot be trusted when it reports success — that is precisely how the first closure passed while being wrong.
+>
+> ⚠️ **GATE-2 ≠ NFR-PDB-004 acceptance.** This gate says the *reference artefact* is now trustworthy. The **six-step human check remains UNRUN**, and NFR-PDB-004 is reported **UNVERIFIED, never passed** (RB-2). Closing this gate unblocks that check; it does not substitute for it.
 
 ### 13.1 GATE-1 measurement (2026-07-29)
 

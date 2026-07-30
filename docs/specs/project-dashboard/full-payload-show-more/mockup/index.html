@@ -1,4 +1,41 @@
-<title>GATE-2 — Show more: collapsed / expanded layout contract</title>
+<title>GATE-2 — Show more: DD-14 frozen-geometry layout contract</title>
+
+<!--
+  2026-07-30 correction (closes A-08.3, third recording after A-06ii.2 / A-06r.3).
+
+  This file previously modelled DD-13 (align-items:start on the ranked grid) and a
+  viewport-relative max-height:46vh — both superseded. requirements.md §7 names this
+  file as *the* reference for the six-step NFR-PDB-004 human check, so as long as it
+  modelled the rejected design, the check could not be run against it without
+  validating a defect the team already rejected.
+
+  What ships is DD-14 mechanism (ii) — design.md §6.3.2 — reproduced verbatim below
+  from project-dashboard-card.component.html:52-62 and .ts's `layoutItems` /
+  `expandedOverlay` computeds:
+    · an always-in-flow render capped at COLLAPSED_ITEM_LIMIT (5) defines the card's
+      geometry in both states. While expanded it becomes a layout-only SPACER
+      (visibility:hidden — keeps its box, which is what stops the card SHRINKING —
+      plus aria-hidden, so it is not re-announced to a screen reader);
+    · the full list renders in a `position:absolute; inset:0; overflow-y:auto`
+      overlay, which is out of flow and contributes NOTHING to any ancestor's
+      intrinsic (max-content) sizing — which is what the ranked grid's auto row
+      track is measured from.
+  The ranked grid keeps `lg:items-stretch` UNCONDITIONALLY (DD-13's conditional class
+  is gone — there is no "independent" mode any more, because there is no growth left
+  for it to contain).
+
+  Geometry self-check: open this file with `?probe=1` and dump the DOM after load —
+    chrome-headless-shell --headless --disable-gpu --window-size=1440,1400 \
+      --dump-dom "file://<path>/index.html?probe=1"
+  — to get a `#probeOut` element containing `RESULTS_JSON=[...]`: the same four-link
+  chain (`card`, row-mate, `ranked`, `leftcol`, `outer`, the `flex-1` status box,
+  document height) that design.md §6.3.2 and execution.md's T-06 record measure
+  against the shipped component, run here against this mockup's own markup instead.
+  Every metric must be identical collapsed vs. expanded — no growth AND no shrink
+  (DD-14 requires *identical*, not merely "not larger") — for mode 3, and the probe
+  deliberately reproduces two rejected mechanisms (modes 1 and 2) as controls: if
+  they read flat too, the probe is not measuring anything real.
+-->
 
 <style>
   /* Palette taken from the app's own tokens (project-dashboard-chart-colors.constants.ts and the
@@ -49,68 +86,103 @@
   .banner.warn{border-left-color:#E69F00}
   .banner b{color:var(--head)}
 
+  /* ---- six-step human check (requirements.md §7), quoted verbatim so it can be run against this file ---- */
+  .checklist{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin:0 0 18px}
+  .checklist h2{font-size:14px;margin:0 0 8px;color:var(--head)}
+  .checklist ol{margin:0;padding-left:20px;font-size:13px;line-height:1.55}
+  .checklist li{margin-bottom:6px}
+  .checklist li:last-child{margin-bottom:0}
+
   /* ---- the REAL dashboard grid, mirrored from project-dashboard.component.html ---- */
   .outer{display:grid;grid-template-columns:1fr;gap:20px}
   @media(min-width:1100px){
     .outer{grid-template-columns:3fr 1fr;min-height:520px;align-items:stretch}
   }
   .leftcol{display:flex;flex-direction:column;gap:20px;min-width:0}
+  /* DD-14 (design.md §6.3.2): the ranked grid keeps lg:items-stretch UNCONDITIONALLY.
+     There is no "independent" / align-items:start mode any more — that was DD-13,
+     superseded because align-items governs how a shorter item sits inside an
+     already-sized track, never how the track itself is sized, so it could not zero
+     the growth it was chosen to contain. With DD-14 there is no growth left to
+     contain, so the grid never needs to behave differently while something is
+     expanded — collapsed and expanded read identically here, by construction. */
   .ranked{display:grid;grid-template-columns:1fr;gap:20px}
   @media(min-width:1100px){
     .ranked{grid-template-columns:1fr 1fr;align-items:stretch}
-    /* DD-13: only while a card in this grid is expanded do the cards size independently.
-       Collapsed keeps lg:items-stretch, so the default view is byte-for-byte today's. */
-    .ranked.independent{align-items:start}
   }
   .rightcol{display:flex;flex-direction:column;gap:20px;min-width:0}
 
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;
-    display:flex;flex-direction:column;min-width:0;position:relative}
+    display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
   .card h2{font-size:15px;font-weight:600;margin:0 0 2px;color:var(--head)}
   .card p.desc{margin:0 0 14px;font-size:13px;color:var(--muted)}
+  .body{display:flex;min-height:0;flex:1 1 0%;flex-direction:column}
 
-  /* the list region — this is the element the design bounds */
-  .listwrap{min-width:0;flex:1}
-  .listwrap.bounded{max-height:46vh;overflow-y:auto;padding-right:6px}
-  .listwrap.bounded::-webkit-scrollbar{width:8px}
-  .listwrap.bounded::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+  /* ---- MODE 1: unbounded (today's original defect) — no containment at all ---- */
+  .listwrap-unbounded{display:flex;min-height:0;min-width:0;flex:1 1 0%;flex-direction:column;overflow:visible}
 
-  ul.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+  /* ---- MODE 2: bounded only / max-height — DD-14's REJECTED attempt 1 (design.md §6.3.2 ⚠ block).
+     Static, unconditional max-height on the single in-flow render. overflow-y:auto and the
+     scrollbar gutter are conditioned on expansion, matching the shipped diff of that attempt,
+     but the bound itself never changes — which is exactly why it fails: collapsed, 5 rows sit
+     BELOW 280px and contribute their natural height; expanded, the box contributes exactly
+     280px. The cap binds in one state only, so the difference propagates through all four
+     links anyway (measured below), just by a smaller amount than mode 1. */
+  .listwrap-bounded{display:flex;min-height:0;min-width:0;flex:1 1 0%;flex-direction:column;
+    overflow:visible;max-height:280px}
+  .listwrap-bounded.expanded{overflow-y:auto;padding-right:6px}
+
+  /* ---- MODE 3: DD-14 — freeze the geometry (shipped, default).
+     Geometry-bearing rules below are transcribed from project-dashboard-card.component.html:52-62 (flex
+     basis, min-height/min-width, visibility, position/inset/overflow). This mockup deliberately collapses
+     three real DOM levels into `.listwrap`/`.inflow`/`.overlay` — the grid cell (`div.flex.flex-1`), the
+     card host (`block h-full w-full`), and `section.h-full` — and omits the `rows-stacked-lever` layout's
+     `sl-wrap` div; none of the collapsed levels carries a geometry-relevant rule the probe measures. It is
+     NOT class-for-class parity with the shipped templates. ---- */
+  .listwrap{position:relative;display:flex;min-height:0;min-width:0;flex:1 1 0%;flex-direction:column;overflow:visible}
+  .inflow{display:flex;min-height:0;min-width:0;flex:1 1 0%;flex-direction:column}
+  .inflow.invisible{visibility:hidden}
+  .overlay{position:absolute;inset:0;min-width:0;overflow-y:auto;padding-right:6px}
+
+  ul.rows{list-style:none;margin:0;padding:4px 0 0;display:flex;flex-direction:column;gap:12px}
   /* layout="rows-partners" */
-  li.rp{display:grid;grid-template-columns:clamp(7.5rem,38%,12rem) minmax(0,1fr);
+  ul.rp li{display:grid;grid-template-columns:clamp(7.5rem,38%,12rem) minmax(0,1fr);
     align-items:center;gap:10px}
-  li.rp .lbl{font-size:12.5px;font-weight:600;line-height:1.25;overflow:hidden;
+  ul.rp .lbl{font-size:12.5px;font-weight:600;line-height:1.25;overflow:hidden;
     display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical}
-  li.rp .barwrap{display:flex;align-items:center;min-width:0}
-  li.rp .bar{height:24px;border-radius:6px;flex-shrink:0;transition:width .3s}
-  li.rp .cnt{margin-left:6px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--head)}
+  ul.rp .barwrap{display:flex;align-items:center;min-width:0;overflow:visible}
+  ul.rp .bar{height:24px;border-radius:6px;flex-shrink:0;transition:width .3s}
+  ul.rp .cnt{margin-left:6px;flex-shrink:0;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--head)}
   /* layout="rows-stacked-lever" */
-  li.rsl{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;
+  ul.rsl li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;
     border-bottom:1px solid var(--line);padding-bottom:8px}
-  li.rsl:last-child{border-bottom:0;padding-bottom:0}
+  ul.rsl li:last-child{border-bottom:0;padding-bottom:0}
+  /* itemHeightPx=43, bound only to Main contact person / Contributing projects at the real call sites */
+  ul.rsl.fixed43 li{height:43px}
   .rank{width:28px;height:28px;border-radius:50%;background:var(--chip);color:var(--chip-ink);
     display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
     font-variant-numeric:tabular-nums;flex-shrink:0}
-  li.rsl .lbl2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.02em;
+  ul.rsl .lbl2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.02em;
     line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical}
-  li.rsl .sub2{font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0}
-  li.rsl .res{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--head);white-space:nowrap}
+  ul.rsl .sub2{font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0}
+  ul.rsl .res{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--head);white-space:nowrap}
 
-  /* the toggle — inside the items() arm, right after the list */
-  .toggle{margin-top:14px;align-self:flex-start;background:transparent;border:0;padding:6px 2px;
+  /* the toggle — inside the items() arm, right after the listwrap, same as the shipped template */
+  .toggle{margin-top:14px;align-self:flex-start;flex-shrink:0;background:transparent;border:0;padding:6px 2px;
     color:var(--action);font-size:13px;font-weight:700;cursor:pointer;display:flex;gap:6px;align-items:center}
   .toggle:focus-visible{outline:2px solid var(--action);outline-offset:3px;border-radius:6px}
   .toggle .caret{transition:transform .2s}
   .toggle[aria-expanded="true"] .caret{transform:rotate(180deg)}
 
   .sidebox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
-  /* FIDELITY FIX (2026-07-29, pivot on T-06). The real DOM gives "Results by indicator"
-     shrink-0 and "Results by status" flex-1, so the right column's growth lands entirely
-     inside the second white card as a visible void. Without these two rules the mockup's
-     right column grew invisibly while its boxes stayed content-sized — which is why three
-     rounds of blind review and GATE-2 all passed on a containment design that leaves the
-     right-hand column stretching. Do not remove: this is what makes the mockup able to
-     reproduce the defect it exists to catch. */
+  /* FIDELITY FIX (2026-07-29, first landed on the T-06 pivot; still load-bearing under DD-14).
+     The real DOM gives "Results by indicator" shrink-0 and "Results by status" flex-1, so ANY
+     outward growth of the right-hand column lands entirely inside the second white card as a
+     visible void. Without these two rules the mockup's right column would grow invisibly while
+     its boxes stayed content-sized — which is why three rounds of blind review and the original
+     GATE-2 mockup all passed on a containment design that left the right-hand column stretching.
+     Do not remove: this is what makes the mockup able to reproduce the defect it exists to catch,
+     and it is exactly the box the six-step human check's step 4 asks you to watch. */
   .rightcol > .sidebox:first-child{flex:0 0 auto}
   .rightcol > .sidebox:last-child{flex:1}
   .sidebox h3{font-size:15px;font-weight:600;margin:0 0 2px;color:var(--head)}
@@ -130,7 +202,9 @@
 
   .watch{position:absolute;top:-9px;right:12px;font-size:10px;font-weight:700;letter-spacing:.05em;
     text-transform:uppercase;background:var(--warn);color:#fff;padding:2px 8px;border-radius:20px;display:none}
-  body.unbounded .watch{display:block}
+  /* shown for the two rejected mechanisms only — DD-14 (mode 3) never stretches the row-mate,
+     so there is nothing to watch for once it's selected */
+  body[data-mode="unbounded"] .watch, body[data-mode="bounded"] .watch{display:block}
 
   .findings{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
   .findings h2{font-size:15px;margin:0 0 10px;color:var(--head)}
@@ -145,74 +219,82 @@
 </style>
 
 <div class="wrap">
-  <h1>GATE-2 — “Show more” layout contract: collapsed vs expanded</h1>
+  <h1>GATE-2 — "Show more" layout contract: DD-14, measured against two rejected mechanisms</h1>
   <p class="sub">
-    Chunk A · <code>project-dashboard/full-payload-show-more</code> · mirrors the real grid from
-    <code>project-dashboard.component.html:153–200</code>. Row counts are the <b>measured</b> GATE-1 worst case
-    (137 partners, 15 contributors, 12 contacts, 6 levers), not invented figures.
+    Chunk A · <code>project-dashboard/full-payload-show-more</code> · mirrors the real grid and card markup from
+    <code>project-dashboard.component.html:153-201</code> and <code>project-dashboard-card.component.html:52-79</code>.
+    Row counts for partners (137) and contributors (15) match the <b>measured</b> GATE-1 worst case exactly
+    (<code>design.md</code> §13.1); this mockup's contacts (12) and levers (6) lists are illustrative and smaller than
+    that worst case (measured at 35 contacts, 8 levers) — the geometry mechanism does not depend on the exact
+    count, only on whether a section exceeds the 5-row collapse threshold, which all four do here. <b>Mode 3
+    (DD-14) is what shipped and is the default here.</b> Modes 1 and 2 are the two mechanisms that were tried
+    and measured wrong — they exist so the human check has a control: if the defect they model does not
+    appear, the check is not exercising anything real.
   </p>
+
+  <div class="checklist">
+    <h2>Six-step human check — <code>requirements.md</code> §7 DC-8, quoted verbatim</h2>
+    <ol>
+      <li>Expand each of the four ranked cards in turn.</li>
+      <li>Confirm the expanded card itself does not change height — its list scrolls inside the area the card
+        already occupied. Under DD-14 this is the root check: if the card's height is unchanged, steps 3 and 4
+        follow by construction, and if it is not, they cannot be fixed downstream.</li>
+      <li>Confirm its row-mate card in the nested 2-column grid does not change height and shows no empty gap below
+        its own content — the row-mate's "Show more" must stay adjacent to its list, not float below a void.</li>
+      <li>Confirm the right-hand column (<i>Results by indicator</i>, <i>Results by status</i>) does not stretch.
+        Watch <b>Results by status</b> specifically — it carries <code>flex-1</code> while <i>Results by indicator</i>
+        is <code>shrink-0</code>, so any outward growth lands entirely inside that one bordered white card as a
+        visible void. This is the step that failed under DD-13 and the reason the T-06 pivot happened.</li>
+      <li>Confirm the page does not grow — no new vertical scroll on the page itself.</li>
+      <li>Collapse everything and confirm the four cards are equal height again, exactly as before the change.</li>
+    </ol>
+  </div>
 
   <div class="controls">
     <div class="cgroup">
-      <span class="clabel">Containment</span>
-      <button class="seg" id="btnUnbounded" aria-pressed="false">1 · Unbounded ✗</button>
-      <button class="seg" id="btnStretch" aria-pressed="false">2 · Bounded + stretch ⚠</button>
-      <button class="seg" id="btnIndependent" aria-pressed="true">3 · Bounded + independent ✓</button>
+      <span class="clabel">Containment mechanism</span>
+      <button class="seg" id="btn-unbounded" aria-pressed="false">1 · Unbounded ✗ (today's original defect)</button>
+      <button class="seg" id="btn-bounded" aria-pressed="false">2 · Bounded only (max-height) ⚠ (measured failure)</button>
+      <button class="seg" id="btn-dd14" aria-pressed="true">3 · DD-14 — freeze the geometry ✓ (shipped, default)</button>
     </div>
     <div class="cgroup">
       <span class="clabel">All cards</span>
-      <button class="seg" id="btnExpand" aria-pressed="false">Expand all</button>
-      <button class="seg" id="btnCollapse" aria-pressed="false">Collapse all</button>
+      <button class="seg" id="btnExpand" type="button">Expand all</button>
+      <button class="seg" id="btnCollapse" type="button">Collapse all</button>
     </div>
-    <span class="note">Expand <b>Results Partners</b> (137 rows) and watch the right-hand column.</span>
+    <span class="note">Expand <b>Results Partners</b> (137 rows) and watch the row-mate, then the right-hand column.</span>
   </div>
 
-  <div class="banner" id="banner">
-    <b>Bounded (recommended, OQ-3 = viewport-relative).</b>
-    The expanded list scrolls inside its own card at <code>max-height:46vh</code>. Sibling cards and the
-    right-hand column keep their height. This is the state NFR-PDB-004 requires.
-  </div>
+  <div class="banner" id="banner"></div>
 
   <!-- ================= the real grid ================= -->
-  <div class="outer">
-    <div class="leftcol">
-      <div class="ranked">
+  <div class="outer" id="outer">
+    <div class="leftcol" id="leftcol">
+      <div class="ranked" id="ranked">
         <section class="card" data-chart="partners">
           <span class="watch">watch this row-mate</span>
           <h2>Results Partners</h2>
           <p class="desc">Partner institutions most frequently linked to results on this primary project.</p>
-          <div class="listwrap bounded"><ul class="rows" data-list="partners"></ul></div>
-          <button class="toggle" aria-expanded="false" data-toggle="partners">
-            <span class="txt">Show more</span><span class="caret">▾</span>
-          </button>
+          <div class="body" data-body="partners"></div>
         </section>
 
         <section class="card" data-chart="levers">
           <span class="watch">watch this row-mate</span>
           <h2>Primary Levers</h2>
           <p class="desc">Primary levers most frequently linked to results on this project.</p>
-          <div class="listwrap bounded"><ul class="rows" data-list="levers"></ul></div>
-          <button class="toggle" aria-expanded="false" data-toggle="levers">
-            <span class="txt">Show more</span><span class="caret">▾</span>
-          </button>
+          <div class="body" data-body="levers"></div>
         </section>
 
         <section class="card" data-chart="contacts">
           <h2>Main contact person</h2>
           <p class="desc">Main contact persons most frequently linked to results on this project.</p>
-          <div class="listwrap bounded"><ul class="rows" data-list="contacts"></ul></div>
-          <button class="toggle" aria-expanded="false" data-toggle="contacts">
-            <span class="txt">Show more</span><span class="caret">▾</span>
-          </button>
+          <div class="body" data-body="contacts"></div>
         </section>
 
         <section class="card" data-chart="contributors">
           <h2>Contributing projects</h2>
           <p class="desc">Top projects contributing to results where this project is the primary project.</p>
-          <div class="listwrap bounded"><ul class="rows" data-list="contributors"></ul></div>
-          <button class="toggle" aria-expanded="false" data-toggle="contributors">
-            <span class="txt">Show more</span><span class="caret">▾</span>
-          </button>
+          <div class="body" data-body="contributors"></div>
         </section>
       </div>
 
@@ -228,8 +310,8 @@
       </div>
     </div>
 
-    <!-- right column: the adjacency revision 2 got wrong -->
-    <div class="rightcol">
+    <!-- right column: the adjacency revision 2 got wrong, and the box the human check's step 4 watches -->
+    <div class="rightcol" id="rightcol">
       <div class="sidebox" id="sideA">
         <h3>Results by indicator</h3>
         <p class="desc" style="margin:2px 0 0">Number of results linked to each indicator on this project.</p>
@@ -252,7 +334,7 @@
         <div class="ind"><span class="rank">4</span><span><span class="dot" style="background:var(--lightgreen)"></span> Innovation Development</span><b>9</b></div>
         <div class="ind"><span class="rank">5</span><span><span class="dot" style="background:var(--warn)"></span> Policy Change</span><b>2</b></div>
       </div>
-      <div class="sidebox">
+      <div class="sidebox" id="statusbox">
         <h3>Results by status</h3>
         <p class="desc" style="margin:2px 0 0">Number of results by workflow status on this project.</p>
         <div style="margin-top:12px;font-size:12.5px;color:var(--muted)">
@@ -271,36 +353,39 @@
         <thead><tr><th>Question</th><th>Answer it gives</th></tr></thead>
         <tbody>
           <tr>
-            <td><b>OQ-3</b> — bounded height: fixed or viewport-relative?</td>
-            <td><span class="ok">Viewport-relative</span>, <code>max-height:46vh</code> — taller than the collapsed
-              card on a laptop while still fitting beside the right column. A fixed pixel bound either wastes a tall
-              screen or overflows a short one. <b>But the bound alone is not the answer</b> — see DD-13 below.</td>
+            <td><b>OQ-3</b> — bounded height: fixed, viewport-relative, or something else?</td>
+            <td><span class="ok">Card-area-relative (DD-14)</span> — neither. Mode 1 has no bound at all. Mode 2 is a
+              fixed pixel bound (<code>max-height:280px</code>) and still fails, measured below. Only mode 3 removes
+              the expanded render from intrinsic sizing entirely, which is why it is the only one that reaches zero
+              in both directions.</td>
           </tr>
           <tr>
             <td><b>DC-8</b> — which sibling does an unbounded expansion actually stretch?</td>
-            <td>Both, and the second one is the trap. Flip to <b>1 · Unbounded</b> and expand Results Partners:
+            <td>Both, and the second one is the trap. Select <b>1 · Unbounded</b> and expand Results Partners:
               its <i>row-mate</i> in the nested 2-column grid stretches, <b>and</b> the whole
               <i>right-hand column</i> (Results by indicator / by status) stretches through the outer
-              <code>items-stretch</code>. Revision 2 named the wrong adjacency; the human-check script now names both.</td>
+              <code>items-stretch</code> — the page grows too.</td>
           </tr>
           <tr>
-            <td><b>DD-13</b> — is bounding the list enough? <span class="no">No.</span></td>
-            <td><b>This is what the mockup caught that reading the code did not.</b> Compare
-              <b>2 · Bounded + stretch</b> against <b>3 · Independent</b>. Bounding stops the page growing, but
-              <code>lg:items-stretch</code> still forces the row-mate to match the expanded card, so Primary Levers
-              grows a tall empty gap with its 5 rows stranded at the top and its “Show more” pushed far below the
-              content. Padding that gap with rows nobody asked for would break the ticket’s scope — so the fix is the
-              height, not the content: while any card in the row is expanded the grid switches to
-              <code>align-items:start</code>. Collapsed it keeps <code>items-stretch</code>, so the default view
-              does not change.</td>
+            <td>Is bounding the list enough? <span class="no">No — and neither is a single static bound.</span></td>
+            <td><b>This is the mode-2 lesson, and it is the actual T-06 pivot, not a hypothetical.</b> A
+              <code>max-height</code> clamps a box's max-content contribution <i>only when the content exceeds it</i>.
+              Collapsed, 5 rows sit below the bound and contribute their natural height; expanded, the box contributes
+              exactly the bound. <b>The cap binds in one state only</b>, so the difference still propagates through
+              all four links — measured below, smaller than mode 1 but not zero. <code>align-items:start</code>
+              (DD-13, the first attempt to contain the propagation rather than the growth) does not fix this either:
+              alignment governs how a <i>shorter</i> item sits inside an already-sized track, never how the track is
+              <i>sized</i> — so it cannot zero a growth it never touches. Mode 3 removes the growth at its source
+              instead: the in-flow render is capped at 5 rows in <i>both</i> states, and the full list lives in an
+              absolutely-positioned overlay that contributes nothing to the ranked grid's intrinsic sizing.</td>
           </tr>
           <tr>
             <td><b>DD-4</b> — the colour consequence</td>
             <td>Collapsed, row 5 is <code style="background:#345b8f;color:#fff;border:0">#345b8f</code> (middle),
               <b>not</b> navy. Expanded, row 137 is the one painted
               <code style="background:#112F5C;color:#fff;border:0">#112F5C</code>. Encoding is computed over the
-              full list, so nothing already on screen changes when you expand — that is R-PDB-004, and you can
-              verify it by eye here.</td>
+              full list in every mode here, so nothing already on screen changes when you expand — that is
+              R-PDB-004, and you can verify it by eye in any of the three modes.</td>
           </tr>
           <tr>
             <td><b>R-PDB-002 AC.2</b> — no toggle when ≤ 5</td>
@@ -310,28 +395,88 @@
           <tr>
             <td><b>NFR-PDB-003</b> — a11y</td>
             <td>Each toggle is a real <code>&lt;button&gt;</code> with <code>aria-expanded</code> and an accessible
-              name carrying its chart title, so four “Show more” buttons are distinguishable. Tab to them and press
+              name carrying its chart title, so four "Show more" buttons are distinguishable. Tab to them and press
               <kbd>Enter</kbd>/<kbd>Space</kbd>.</td>
           </tr>
           <tr>
             <td>Render cost at the measured worst case</td>
-            <td>137 rows in one card, from GATE-1. Comfortable — the concern this mockup was going to test
-              (“hundreds of rows”) is not what the data contains.</td>
+            <td>137 rows in one card, from GATE-1. Comfortable — the concern this mockup was originally going to
+              test ("hundreds of rows") is not what the data contains.</td>
+          </tr>
+          <tr>
+            <td>Geometry — measured, not argued</td>
+            <td>See the table below. Modes 1 and 2 are controls that must reproduce a real, positive delta or the
+              probe is not measuring anything; mode 3 must read zero on every link, in both directions (no growth
+              <i>and</i> no shrink), collapsed → expanded and expanded → collapsed-again, for one card at a time and
+              for all four expanded together.</td>
           </tr>
         </tbody>
       </table>
     </div>
+
+    <h2 style="margin-top:22px">Measured (headless Chrome, this file's own markup)</h2>
+    <p class="note" style="margin:0 0 10px">
+      <code>chrome-headless-shell --headless --disable-gpu --window-size=1440,1400 --dump-dom
+      "file://…/mockup/index.html?probe=1"</code> — read the <code>#probeOut</code> element it dumps.
+      All units px, at 1440×1400. <code>Δ card</code> is the expanded card's own delta; <code>Δ row-mate</code> is
+      the OTHER card in the same row, read from the same measurement pass (a genuine row-mate stretch, not inferred).
+    </p>
+    <div class="scrollx">
+      <table>
+        <thead><tr><th>Mode</th><th>Scenario</th><th>Δ card</th><th>Δ row-mate</th><th>Δ ranked / left / outer</th><th>Δ Results by status</th><th>Δ document height</th></tr></thead>
+        <tbody id="measuredTableBody">
+          <tr><td rowspan="5"><b>1 · Unbounded</b></td><td>expand partners</td><td class="no">+5,675</td><td class="no">+5,675 (levers)</td><td class="no">+5,675</td><td class="no">+5,674</td><td class="no">+5,675</td></tr>
+          <tr><td>expand levers</td><td class="no">+49</td><td class="no">+49 (partners)</td><td class="no">+49</td><td class="no">+49</td><td class="no">+49</td></tr>
+          <tr><td>expand contacts</td><td class="no">+385</td><td class="no">+385 (contributors)</td><td class="no">+385</td><td class="no">+385</td><td class="no">+385</td></tr>
+          <tr><td>expand contributors</td><td class="no">+550</td><td class="no">+550 (contacts)</td><td class="no">+550</td><td class="no">+550</td><td class="no">+550</td></tr>
+          <tr><td>expand ALL four</td><td class="no">+5,675</td><td class="no">+5,675</td><td class="no">+6,225</td><td class="no">+6,224</td><td class="no">+6,225</td></tr>
+          <tr><td rowspan="5"><b>2 · Bounded only</b> (<code>max-h:280px</code>)</td><td>expand partners</td><td class="no">+52</td><td class="no">+52 (levers)</td><td class="no">+52</td><td class="no">+52</td><td class="no">+52</td></tr>
+          <tr><td>expand levers</td><td class="no">+49</td><td class="no">+49 (partners)</td><td class="no">+49</td><td class="no">+49</td><td class="no">+49</td></tr>
+          <tr><td>expand contacts</td><td class="no">+13</td><td class="no">+13 (contributors)</td><td class="no">+13</td><td class="no">+13</td><td class="no">+13</td></tr>
+          <tr><td>expand contributors</td><td class="no">+13</td><td class="no">+13 (contacts)</td><td class="no">+13</td><td class="no">+13</td><td class="no">+13</td></tr>
+          <tr><td>expand ALL four</td><td class="no">+52</td><td class="no">+52</td><td class="no">+65</td><td class="no">+65</td><td class="no">+65</td></tr>
+          <tr><td rowspan="5"><b>3 · DD-14</b> (shipped)</td><td>expand partners</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td></tr>
+          <tr><td>expand levers</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td></tr>
+          <tr><td>expand contacts</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td></tr>
+          <tr><td>expand contributors</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td></tr>
+          <tr><td>expand ALL four, and collapse-again</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td><td class="ok">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin:10px 0 0">
+      Measured 2026-07-30, <code>chrome-headless-shell</code> at 1440×1400 (window). <b>Modes 1 and 2 are controls
+      and both read non-zero, as required</b> — mode 2's numbers land on the exact <b>+52 / +13</b> figures
+      <code>design.md</code> §6.3.2 and <code>execution.md</code>'s T-06 record report for the real component,
+      which is what makes this mockup's geometry trustworthy rather than merely plausible. <b>Mode 3 reads zero on
+      every link, in both directions</b> (collapsed → expanded and expanded → collapsed-again), for each card
+      individually and for all four expanded together — full raw JSON (this mockup's own <code>?probe=1</code>
+      run, 22 measurement rows across all three modes) kept in
+      <a href="../evidence/mockup-dd14-measurements.json">../evidence/mockup-dd14-measurements.json</a>,
+      alongside (not merged with) the component-level probes.
+      Additionally verified: the DD-14 overlay genuinely <b>scrolls</b> rather than clips
+      (<code>scrollHeight &gt; clientHeight</code>, e.g. partners <code>5903&gt;228</code>, contacts
+      <code>652&gt;267</code>), and the <code>aria-hidden</code> spacer contains <b>zero</b> focusable nodes in
+      every mode — an <code>aria-hidden</code> subtree with a tab stop would itself be a WCAG violation (T-09).</p>
+
     <p class="note" style="margin:14px 0 0">
       Fidelity limits, stated so this is not over-read: system fonts stand in for Barlow / Space&nbsp;Grotesk
-      (no external resources), and the geographic card is a placeholder because Chunk A does not touch it.
-      Everything else — grid columns, gaps, bar geometry, rank chips, colour ramp, toggle placement inside the
-      items arm — mirrors the real templates.
+      (no external resources), the geographic card is a placeholder because Chunk A does not touch it, and this
+      card's <code>padding:18px</code> is not the shipped <code>p-5</code> (20px). The DD-14 spacer/overlay
+      geometry rules — flex basis, min-height/min-width, visibility, position/inset/overflow — are transcribed
+      from the shipped component (<code>project-dashboard-card.component.html:52-62</code>), and grid columns,
+      gaps, bar geometry, rank chips, colour ramp, and toggle placement inside the items arm mirror it too. This
+      is <b>not</b> class-for-class parity: three real DOM levels are deliberately collapsed (grid cell
+      <code>div.flex.flex-1</code> → card host <code>block h-full w-full</code> → <code>section.h-full</code>),
+      and the <code>rows-stacked-lever</code> layout's <code>sl-wrap</code> div is omitted. None of these
+      simplifications is geometry-bearing for what the probe below measures.
     </p>
   </section>
 </div>
 
+<pre id="probeOut" style="display:none"></pre>
+
 <script>
-  const LIMIT = 5;
+  const LIMIT = 5; // COLLAPSED_ITEM_LIMIT, project-dashboard-card.component.ts:18
   const PARTNER_NAMES = ['MAGA – Ministerio de Agricultura, Ganadería y Alimentación','ARSAGRO – Asociación Regional de Servicios Agropecuarios','INSIVUMEH – Instituto Nacional de Sismología y Vulcanología','ICC – Instituto Privado de Investigación sobre Cambio Climático','CIAT – Alliance of Bioversity International','INTA – Instituto Nicaragüense de Tecnología Agropecuaria','IICA – Instituto Interamericano de Cooperación','FAO – Food and Agriculture Organization','CATIE – Centro Agronómico Tropical','UNA – Universidad Nacional Agraria','MAG – Ministerio de Agricultura y Ganadería','SENASA – Servicio Nacional de Sanidad Agraria','CGIAR System Organization','IFPRI – International Food Policy Research Institute','CIMMYT – International Maize and Wheat Center','IRRI – International Rice Research Institute','ILRI – International Livestock Research Institute','ICRISAT – Semi-Arid Tropics Institute','WorldFish','IWMI – International Water Management Institute'];
   function partnerLabel(i){ return i < PARTNER_NAMES.length ? PARTNER_NAMES[i] : 'Partner institution ' + (i + 1) + ' – regional research node'; }
 
@@ -353,89 +498,163 @@
     contributors: Array.from({length:15},(_,i)=>({label:(i===0?'G206 – CGIAR FUND INIT-14-AGRILAC RESILIENTE: RESILIENT AGRIFOOD INNOVATION SYSTEMS IN LATIN AMERICA':'C'+(200+i)+' – Contributing project '+(i+1)), count:Math.max(1,499-i*33)}))
   };
   const LAYOUT = { partners:'rp', levers:'rsl', contacts:'rsl', contributors:'rsl' };
-  const expanded = new Set();
+  // itemHeightPx=43 at the real call sites for contacts/contributors only (project-dashboard.component.html:187,198)
+  const FIXED43 = { contacts:true, contributors:true };
+  const KEYS = Object.keys(DATA);
 
-  function render(key){
-    const items = DATA[key], total = items.length;
-    const shown = expanded.has(key) ? items : items.slice(0, LIMIT);
-    const ul = document.querySelector('[data-list="'+key+'"]');
-    const max = Math.max(...items.map(i=>i.count));       // scale over the FULL list — R-PDB-004
-    ul.innerHTML = shown.map((it, i) => {
-      const colour = barColor(i, total);                   // colour over the FULL list — R-PDB-004
-      if (LAYOUT[key] === 'rp') {
+  function rowsHtml(key, items, total){
+    const max = Math.max(...DATA[key].map(it=>it.count)); // scale over the FULL list, always — R-PDB-004
+    if (LAYOUT[key] === 'rp') {
+      return '<ul class="rows rp">' + items.map((it, i) => {
         const w = Math.min(94, (it.count / max) * 94);
-        return '<li class="rp"><span class="lbl" title="'+it.label+'">'+it.label+'</span>'
+        const colour = barColor(i, total);
+        return '<li><span class="lbl" title="'+it.label+'">'+it.label+'</span>'
           + '<span class="barwrap"><span class="bar" style="width:'+w+'%;min-width:8px;background:'+colour+'"></span>'
           + '<span class="cnt">'+it.count+'</span></span></li>';
-      }
-      return '<li class="rsl"><span class="rank">'+(i+1)+'</span>'
+      }).join('') + '</ul>';
+    }
+    const cls = 'rows rsl' + (FIXED43[key] ? ' fixed43' : '');
+    return '<ul class="'+cls+'">' + items.map((it, i) => {
+      return '<li><span class="rank">'+(i+1)+'</span>'
         + '<span><span class="lbl2">'+it.label+'</span>'
         + (it.sub ? '<span class="sub2">'+it.sub+'</span>' : '') + '</span>'
         + '<span class="res">'+it.count+' result'+(it.count===1?'':'s')+'</span></li>';
-    }).join('');
-
-    const btn = document.querySelector('[data-toggle="'+key+'"]');
-    const canExpand = total > LIMIT;
-    btn.style.display = canExpand ? 'flex' : 'none';
-    const isOpen = expanded.has(key);
-    btn.setAttribute('aria-expanded', String(isOpen));
-    const title = btn.closest('.card').querySelector('h2').textContent;
-    btn.querySelector('.txt').textContent = isOpen ? 'Show less' : 'Show more';
-    btn.setAttribute('aria-label', (isOpen ? 'Show less, ' : 'Show more, ') + title
-      + (isOpen ? '' : ' — ' + (total - LIMIT) + ' more'));
+    }).join('') + '</ul>';
   }
 
-  const ALL = Object.keys(DATA);
-  ALL.forEach(render);
+  function toggleHtml(key, canExpandFlag, isOpen, title, total){
+    if (!canExpandFlag) return '';
+    // matches the shipped accessible name exactly: `${toggleLabel()}, ${title()}` — no count suffix
+    // (project-dashboard-card.component.ts toggleAriaLabel(); `total` kept for call-site parity only).
+    const label = isOpen ? 'Show less' : 'Show more';
+    const aria = label + ', ' + title;
+    return '<button class="toggle" type="button" data-toggle="'+key+'" aria-expanded="'+isOpen+'" aria-label="'+aria+'">'
+      + '<span class="txt">'+label+'</span><span class="caret">▾</span></button>';
+  }
 
-  document.querySelectorAll('[data-toggle]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const k = btn.dataset.toggle;
-      expanded.has(k) ? expanded.delete(k) : expanded.add(k);
-      render(k);
-      applyMode();          // independent height depends on whether anything is expanded
-    });
+  let MODE = 'dd14';
+  const expanded = new Set();
+
+  function renderBody(key){
+    const full = DATA[key];
+    const total = full.length;
+    const isOpen = expanded.has(key);
+    const canExpandFlag = total > LIMIT;
+    const title = document.querySelector('[data-chart="'+key+'"] h2').textContent;
+    const body = document.querySelector('[data-body="'+key+'"]');
+    let wrapHtml;
+    if (MODE === 'unbounded') {
+      const shown = isOpen ? full : full.slice(0, LIMIT);
+      wrapHtml = '<div class="listwrap-unbounded">' + rowsHtml(key, shown, total) + '</div>';
+    } else if (MODE === 'bounded') {
+      const shown = isOpen ? full : full.slice(0, LIMIT);
+      wrapHtml = '<div class="listwrap-bounded'+(isOpen ? ' expanded' : '')+'">' + rowsHtml(key, shown, total) + '</div>';
+    } else {
+      // DD-14 mechanism (ii): capped in-flow spacer + absolute overlay while expanded
+      const inflow = full.slice(0, LIMIT);
+      wrapHtml = '<div class="listwrap">'
+        + '<div class="inflow'+(isOpen ? ' invisible' : '')+'"'+(isOpen ? ' aria-hidden="true"' : '')+'>'
+        + rowsHtml(key, inflow, total) + '</div>'
+        + (isOpen ? '<div class="overlay">' + rowsHtml(key, full, total) + '</div>' : '')
+        + '</div>';
+    }
+    body.innerHTML = wrapHtml + toggleHtml(key, canExpandFlag, isOpen, title, total);
+  }
+
+  function renderAll(){ KEYS.forEach(renderBody); }
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-toggle]');
+    if (!btn) return;
+    const k = btn.dataset.toggle;
+    expanded.has(k) ? expanded.delete(k) : expanded.add(k);
+    renderBody(k);
   });
 
   const BANNERS = {
     unbounded: ['bad',
-      '<b>1 · Unbounded — the original defect.</b> Expand <b>Results Partners</b>: its row-mate stretches, the '
-      + 'right-hand <i>Results by indicator / by status</i> column stretches too through the outer '
-      + '<code>items-stretch</code>, and the page grows instead of the card scrolling.'],
-    stretch: ['warn',
-      '<b>2 · Bounded, but still stretching — the defect the mockup caught.</b> The list now scrolls at '
-      + '<code>max-height:46vh</code>, yet <code>lg:items-stretch</code> still forces the row-mate to match the '
-      + 'expanded card’s height. <b>Primary Levers grows a large empty gap with its 5 rows stranded at the top.</b> '
-      + 'Filling that gap with unrequested rows would break the ticket’s scope, so the height itself has to go.'],
-    independent: ['',
-      '<b>3 · Bounded + independent (DD-13, recommended).</b> While any card in the row is expanded the grid '
-      + 'switches to <code>align-items:start</code>, so each card keeps its natural height: the expanded one scrolls '
-      + 'inside itself, <b>Primary Levers ends right after its own content and its “Show more” stays reachable</b>. '
-      + 'Collapsed, the grid keeps <code>items-stretch</code> — so the default view is unchanged.']
+      '<b>1 · Unbounded — the original defect.</b> No containment at all: the full list renders in place. Expand '
+      + '<b>Results Partners</b> and the card grows without limit, dragging its row-mate (<code>lg:items-stretch</code> '
+      + 'on the nested ranked grid) and, through the outer grid\'s own <code>items-stretch</code>, the whole '
+      + 'right-hand column — watch <b>Results by status</b> specifically, since it carries <code>flex-1</code> while '
+      + '<i>Results by indicator</i> is <code>shrink-0</code>, so the entire increase lands inside that one card. '
+      + 'The page itself grows too.'],
+    bounded: ['warn',
+      '<b>2 · Bounded only (<code>max-height</code>) — measured, and it still fails.</b> This is DD-14\'s rejected '
+      + 'first attempt: a static bound (<code>max-height:280px</code>) on the same single in-flow list. Collapsed, 5 '
+      + 'rows sit <i>below</i> the bound and contribute their natural height; expanded, the list contributes exactly '
+      + 'the bound. <b>The cap binds in one state only</b>, so the difference propagates through all four links '
+      + 'anyway — smaller than mode 1, but not zero. See the measured table below.'],
+    dd14: ['',
+      '<b>3 · DD-14 — freeze the geometry (shipped, default).</b> The in-flow render is capped at 5 rows in '
+      + '<i>both</i> states — a layout-only spacer while expanded (<code>visibility:hidden</code>, keeps its box, '
+      + '<code>aria-hidden</code>) — and the full list renders in a <code>position:absolute; inset:0</code> overlay, '
+      + 'which is out of flow and contributes nothing to the ranked grid\'s intrinsic sizing. The card\'s own height '
+      + 'is <b>identical</b> collapsed and expanded, so there is no growth to propagate. Card-area-relative, not '
+      + 'viewport-relative or fixed — this re-closes OQ-3.']
   };
-  let MODE = 'independent';
 
-  function applyMode(){
-    const bounded = MODE !== 'unbounded';
-    document.body.classList.toggle('unbounded', MODE === 'unbounded');
-    document.querySelectorAll('.listwrap').forEach(el => el.classList.toggle('bounded', bounded));
-    // independent height only while something is actually expanded
-    document.querySelector('.ranked')
-      .classList.toggle('independent', MODE === 'independent' && expanded.size > 0);
-    for (const [id, m] of [['btnUnbounded','unbounded'],['btnStretch','stretch'],['btnIndependent','independent']]) {
-      document.getElementById(id).setAttribute('aria-pressed', String(MODE === m));
-    }
-    const [cls, html] = BANNERS[MODE];
+  function applyMode(m){
+    MODE = m;
+    document.body.dataset.mode = m;
+    ['unbounded','bounded','dd14'].forEach(id => {
+      document.getElementById('btn-'+id).setAttribute('aria-pressed', String(id === m));
+    });
+    renderAll();
+    const [cls, html] = BANNERS[m];
     const b = document.getElementById('banner');
     b.className = 'banner' + (cls ? ' ' + cls : '');
     b.innerHTML = html;
   }
-  function setMode(m){ MODE = m; applyMode(); }
 
-  document.getElementById('btnUnbounded').onclick   = () => setMode('unbounded');
-  document.getElementById('btnStretch').onclick     = () => setMode('stretch');
-  document.getElementById('btnIndependent').onclick = () => setMode('independent');
-  document.getElementById('btnExpand').onclick = () => { ALL.forEach(k => { if (DATA[k].length > LIMIT) expanded.add(k); render(k); }); applyMode(); };
-  document.getElementById('btnCollapse').onclick = () => { expanded.clear(); ALL.forEach(render); applyMode(); };
-  applyMode();
+  document.getElementById('btn-unbounded').addEventListener('click', () => applyMode('unbounded'));
+  document.getElementById('btn-bounded').addEventListener('click', () => applyMode('bounded'));
+  document.getElementById('btn-dd14').addEventListener('click', () => applyMode('dd14'));
+  document.getElementById('btnExpand').addEventListener('click', () => {
+    KEYS.forEach(k => { if (DATA[k].length > LIMIT) expanded.add(k); });
+    renderAll();
+  });
+  document.getElementById('btnCollapse').addEventListener('click', () => { expanded.clear(); renderAll(); });
+
+  applyMode('dd14'); // mode 3 is the default — what shipped
+
+  // ================= geometry self-check (?probe=1) =================
+  if (location.search.includes('probe')) {
+    function measure(tag){
+      const m = { tag, mode: MODE };
+      KEYS.forEach(k => {
+        m['card_' + k] = document.querySelector('[data-chart="' + k + '"]').offsetHeight;
+        const w = document.querySelector('[data-body="' + k + '"] > div:first-child');
+        m['wrap_' + k] = w ? w.offsetHeight : null;
+      });
+      m.ranked = document.getElementById('ranked').offsetHeight;
+      m.leftcol = document.getElementById('leftcol').offsetHeight;
+      m.outer = document.getElementById('outer').offsetHeight;
+      m.statusbox = document.getElementById('statusbox').offsetHeight;
+      m.docHeight = document.documentElement.scrollHeight;
+      const ov = document.querySelector('.overlay');
+      m.overlayScrolls = ov ? (ov.scrollHeight > ov.clientHeight ? (ov.scrollHeight + '>' + ov.clientHeight) : 'NO') : '-';
+      const hidden = document.querySelectorAll('.inflow.invisible [tabindex], .inflow.invisible button, .inflow.invisible a, .inflow.invisible input');
+      m.focusableInSpacer = hidden.length;
+      return m;
+    }
+    const results = [];
+    results.push({ tag: 'viewport', innerWidth: window.innerWidth, innerHeight: window.innerHeight });
+    ['unbounded', 'bounded', 'dd14'].forEach(mode => {
+      applyMode(mode);
+      expanded.clear(); renderAll();
+      results.push(measure(mode + ' collapsed'));
+      KEYS.forEach(k => {
+        expanded.clear(); expanded.add(k); renderAll();
+        results.push(measure(mode + ' expand:' + k));
+      });
+      KEYS.forEach(k => expanded.add(k));
+      renderAll();
+      results.push(measure(mode + ' expand:ALL'));
+      expanded.clear(); renderAll();
+      results.push(measure(mode + ' collapsed-again'));
+    });
+    applyMode('dd14'); expanded.clear(); renderAll(); // restore the default for anyone who also opens this visually
+    document.getElementById('probeOut').textContent = 'RESULTS_JSON=' + JSON.stringify(results);
+  }
 </script>
