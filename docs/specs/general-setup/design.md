@@ -158,6 +158,7 @@ Mirror the test layout (`*.spec.ts` sibling files). Specify:
 - E2E tests for new endpoints (`test/jest-e2e.json`).
 - Coverage threshold target if differing from global 60%.
 - Mock strategy for external systems.
+- **Layout containment / geometry decisions close on measurement in a real browser** (headless Chrome), never on CSS argument — and the known failure must be reproduced first as a control, or a zero result proves nothing (**KZ-006**).
 
 ---
 
