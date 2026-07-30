@@ -219,10 +219,11 @@ graph TD
   - [ ] Retry preserves expansion (AC.7); fresh instance collapsed (AC.6).
   - [ ] Homonym fixture renders two rows.
   - [ ] The whole 848-line suite still passes — not only the new cases.
-- **Evidence that does NOT count:** cases that pass because the stub silently swallows an unknown binding. After wiring, confirm `strictTemplates` would reject a misspelled input — if the stub accepts anything, the input assertions prove nothing.
+- **Evidence that does NOT count:** cases that pass because the stub silently swallows an unknown binding — **and the discriminator is mutation-kill, not `strictTemplates`.** ~~confirm `strictTemplates` would reject a misspelled input~~ **AMENDED 2026-07-30 (E-07.2): that check is unachievable in this repo and was verified so by both agents.** `tsconfig.app.json` is `files: ["src/main.ts"]` + `include: ["src/**/*.d.ts"]`, so no `.spec.ts` ever enters `ng build`'s module graph; `jest.config.ts` passes `isolatedModules: true` to `jest-preset-angular`, i.e. transpile-only, so Jest type-checks nothing. Misspelling an input on the baseline stub produces **zero** failures. **Use instead:** every input assertion must compare against a **non-default** value, so that dropping the `@Input()` leaves the stub on its declared default and reddens the case. Prove it by mutation — remove the decorator, observe red, restore.
+- **Also does NOT count:** an assertion that cannot fail. Two specific traps, both found in attempt 1 — a retry test that never changes `payload` identity (the payload-keyed mutant AC.7 exists to kill survives it), and `expect(() => TestBed.inject(RetiredService)).toThrow()`, which throws for any bare `@Injectable()` regardless of the component and so proves nothing.
 - **Dependencies:** T-05, T-06
 - **Effort:** L · **Skills:** `angular-developer`
-- **Status:** todo
+- **Status:** 🔶 `[~]` **in progress** — attempt 1 `FAIL` (2 spec-conformance issues), **run paused at the spec-wide budget tripwire** before attempt 2. See [`execution.md`](./execution.md) § T-07. Per-task ceiling untouched: **attempt 1 of 3, 2 remain.** The +246/−39 diff is **uncommitted and known-incomplete** — do not treat it as landed.
 
 ---
 

@@ -779,3 +779,97 @@ Parked at the owner's instruction after four consecutive infrastructure failures
 | # | Finding |
 | --- | --- |
 | **A-06r.5** | **A headless Chrome is available on this machine** (`~/.cache/puppeteer/chrome-headless-shell/…`, driven with `--headless --dump-dom`, no npm dependency). The Reviewer's probe is reusable. **This materially changes what DC-8 can gate** — the "no automated gate for rendered layout" premise, which RSK-4 and RB-2 are both built on, is weaker than the spec assumed. Credit also noted: the Implementer reported plainly that jsdom returned `0` for every height and that its equal-height claim was therefore unproven, rather than dressing a vacuous assertion as a green check. That honesty is what made this audit cheap to target. |
+
+---
+
+### T-07 — Dashboard spec: rewrite the stub and provider block
+
+| Field | Value |
+| --- | --- |
+| **Final status** | 🔶 **IN PROGRESS** — attempt 1 `FAIL`, paused at the **budget tripwire** before attempt 2 |
+| **Date** | 2026-07-30 |
+| **Implementer attempts** | 1 of 3 run (2 remaining) |
+| **Requirements covered (intended)** | R-PDB-001, R-PDB-003 (AC.4, AC.6, AC.7), R-PDB-005, R-PDB-007 · DC-1, DC-2 (spy level), DC-5, DC-11 (host side) |
+| **Files touched** | `…/project-dashboard/project-dashboard.component.spec.ts` only (+246 / −39, 848 → ~1,055) |
+| **PR** | 3 of 4 (`tasks.md` §6) |
+
+**Leader baseline, measured on a clean tree before the spawn:** `4 failed, 36 passed, 40 total` — exactly the four cases T-05's entry names as red by design (`tasks.md:170`). No drift since T-05 landed.
+
+#### Attempt 1 — Implementer
+
+Ran on `akili-implementer` / `sonnet` (T2, the registry tier — the T-06 `opus` waiver did **not** carry over; the API had recovered). Effort `high`. Skills: `angular-developer`.
+
+**Changes:** single-file, spec-only. New `createReportsMock()` for `GetFullContractReportsService` replacing the four retired `GetTop*` mocks; `applyFixtureToReportsMock()` driving all sections from the shared `mockContractFullReports()` fixture; `getCardDebugElements()` / `getCardByTitle()` DOM helpers; stub gained `@Input() visibleLimit` and `@Output() expandToggled`; the four red cases repaired; a new `describe('ranked chart cards — host↔card seam')` block with 7 cases.
+
+**Verification (Implementer, re-run independently by the Reviewer — both agree):** `47 passed / 47 total`, `npm run build` clean, `npm run lint` clean, no `.only` / `.skip` / `fdescribe`.
+
+**Implementer-reported deviations, all three disclosed rather than buried:**
+
+1. **The task's `strictTemplates` check does not exist in this repo.** It tested the claim directly — misspelling an existing input on the *unmodified baseline* stub produced **0 failures**. The Reviewer independently confirmed the cause: `tsconfig.app.json` is `files: ["src/main.ts"]` + `include: ["src/**/*.d.ts"]`, so no `.spec.ts` ever enters `ng build`'s module graph, and `jest.config.ts` passes `isolatedModules: true` to `jest-preset-angular`, i.e. transpile-only — Jest type-checks nothing. It substituted **mutation-kill evidence** instead.
+2. "Zero calls to retired services" asserted as structural injection failure rather than a spy call-count.
+3. Did not add a `retry` `@Output()` to the stub, though the production template binds `(retry)` on all four cards.
+
+#### Attempt 1 — Reviewer verdict: `STATUS: FAIL` (2 issues)
+
+Ran on `akili-reviewer` / `opus` (T3). **`author ≠ auditor` held at model level for this task** — the T-06 waiver did not recur. The Reviewer re-ran the suite itself and verified each finding with a *surviving mutant*, not by inspection.
+
+**FAIL 1 — the AC.7 case is mutation-dead.**
+- *Discovered:* `reportsMock.payload` is `null` from `createReportsMock()` and is **never written** in the AC.7 test (the fixture is not applied there); `reportsMock.update` is a bare `jest.fn()` no-op. The real retry cycle performs **two** payload identity changes — on failure `payload.set(null)` + `loadError.set(true)`, on retry success `payload.set(response.data ?? null)`, a new object each time (`get-full-contract-reports.service.ts:39-65`). With zero payload transitions, a defective host keying expansion to the payload — `linkedSignal(() => this.reports.payload(), () => new Set<ChartKey>())`, **the exact revision-2 implementation AC.7 was written to kill** — passes the test unchanged. The only state the case adds over the toggle case above it is `loadError` true→false, which nothing in `expanded()` reads.
+- *Violated:* `tasks.md` §3 T-07 Acceptance ("Retry preserves expansion (AC.7)") · `design.md` §10 row `project-dashboard.component.spec.ts` · `requirements.md` R-PDB-003 AC.7 + its scenario · the same evidentiary standard as `requirements.md` §7 DC-3 — an assertion that cannot fail is not evidence.
+- *Net effect:* **AC.7 has no effective gate anywhere in the repo.** The card spec owns no host state, and `design.md` §10 assigns AC.7 to this file.
+
+**FAIL 2 — the "zero calls to retired services" assertion is tautological.**
+- *Discovered:* `TestBed.inject` resolves from the **module** injector, never the component's element injector, and all four retired services are bare `@Injectable()` with no `providedIn` — so those four calls throw `NullInjectorError` regardless of what `ProjectDashboardComponent` does. Proof by symmetry: `TestBed.inject(GetFullContractReportsService)` throws identically, and that service **is** injected and called. Surviving mutant: return `GetTopPartnersService` to the component's own `providers` and call `main()` — the harness's `remove.providers` names only `[GetFullContractReportsService, GetGeoScopeService]`, so the real class stays component-provided and the test stays green. The Implementer's stated reason ("nothing left to spy on") is incorrect: `overrideComponent`'s `add.providers` is appended to the component's provider list and shadows a component-level entry of the same token, so a double **is** observable.
+- *Violated:* `tasks.md` §3 T-07 header ("DC-2 (spy level)") · `design.md` §10 ("zero calls to retired services (**spy level**)") · `requirements.md` §7 DC-2 row.
+- *Secondary:* the case is labelled R-PDB-008, which is **T-08's** requirement, not in T-07's covered set.
+
+#### Leader scrutiny points — Reviewer verdicts
+
+Four points were flagged in the Reviewer brief for independent adjudication, neutrally and without a prejudged answer. Recorded because two of the four **refuted the Leader's suspicion**, which is the outcome that matters most to log.
+
+| # | Point | Verdict |
+| --- | --- | --- |
+| **A** | Do the partner ids `['undefined','null','2','undefined']` document a violation of R-PDB-005 AC.2 while a sibling test asserts it? | **REFUTED.** `ContractFullReportsPartner.institution_id` is declared **required, non-nullable `number`** (`contract-full-reports.interface.ts:12`) and E-05.2 records the null case as unreachable (`INNER JOIN clarisa_institutions` + `GROUP BY`). The two `'undefined'` ids come from `{ institution_id: undefined }` and `{}` pushed into a `signal<any[]>` — **off-DTO inputs, not a reachable production state.** Not a T-05 defect, not in T-07's scope. The uniqueness test is correctly scoped per-card against the canonical fixture, and its cross-card caveat is right — `@for` tracking is per-block. |
+| **B** | Does the no-op `update()` actually exercise AC.7? | **CONFIRMED** → FAIL 1. |
+| **C** | Is mutation-kill an adequate substitute for the absent `strictTemplates` gate? | **SPLIT.** The `strictTemplates` claim is **verified true, not an excuse** (mechanism above). The substitute is **adequate and broader than the two members mutated** — the Reviewer verified the *mechanism* rather than the claim: an undeclared binding is never written to the instance, so the stub keeps its declared default, and every input assertion in the new cases compares against a **non-default** value (`layout` `''`→`'rows-partners'`; `itemHeightPx` `null`→`43`; `items` `[]`→populated; `title` `''`→`getCardByTitle` throws; `visibleLimit` `null`→`COLLAPSED_ITEM_LIMIT`). Caveat: the `visibleLimit … toBeNull()` assertions match the default and are individually non-killable, but each pairs with `toBe(COLLAPSED_ITEM_LIMIT)` on sibling cards. |
+| **D** | Were the two rewritten expectations bent to match observed output? | **REFUTED — correct, not bent.** Recomputed by hand from source. Contacts: `count` is the sole numeric field, so `Full Name`=2 and **0 for the other five**; `Array.prototype.sort` is stable → the asserted order follows. Partners: counts `0,2,3,0`, ids `'2','null','undefined','undefined'`, descending stable → the asserted order follows. Both derivable from source independent of observed output. |
+
+#### Decisions
+
+| # | Decision | Basis |
+| --- | --- | --- |
+| E-07.1 | Both Reviewer issues adjudicated **in scope** and **spec-conformance**, not advisory | Each cites `tasks.md` §3 T-07 acceptance boxes plus `design.md` §10 plus a requirement AC. Neither is a 4R lens finding, so both legitimately consume a rework attempt. |
+| E-07.2 | `tasks.md` §3 T-07's *"Evidence that does NOT count"* clause **amended by the Leader** to name mutation-kill instead of `strictTemplates` | The clause was factually false about this repo's toolchain, verified independently by both agents. Root `CLAUDE.md` §5 requires fixing the doc that is wrong rather than letting docs and code drift. Spec authorship is Leader territory (same precedent as A-06ii.4 in T-06); **no production code written.** |
+| E-07.3 | Attempt 2 will be asked to add the `retry` `@Output()` to the stub | Not scope growth: the production template binds `(retry)` on all four cards, the stub's own new docblock claims it declares every bound output, and FAIL 1's remediation routes the retry **through** the seam rather than around it. |
+| E-07.4 | Working tree left **as-is**, not reverted | Automatic rollback is the **HALT** protocol (3 failed attempts). This is attempt 1 of 3 with a clear in-file remediation; discarding 246 correct lines to re-derive them would be waste. **The diff is uncommitted and known-incomplete** — see the pause notice below. |
+
+#### ADVISORY findings (4R lens — non-gating, recorded and closed here)
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| A-07.1 | *(reliability)* The docblock the diff adds above the stub asserts it "must declare every `@Input()`/`@Output()` the production template binds" — then omits `retry`, which all four cards bind. A comment that is false about the class it documents. | Resolved by FAIL 1's remediation (E-07.3). |
+| **A-07.2** | *(risk, out of scope)* Residual runtime exposure behind scrutiny point A: if the endpoint ever emits `institution_id: null` for ≥2 partners, `String()` yields two `'undefined'` keys → Angular `@for … track item.id` duplicate-key error **NG0955**. E-05.2 argues the SQL makes it impossible; **nothing enforces that at the client boundary.** | **Recorded and closed.** Not T-07's and not T-05's. Per `/akili-execute` §2.4 an advisory may not become a task or widen one — worth a line in a future hardening spec, the owner's call, not the Leader's. |
+| A-07.3 | *(readability)* One comment stating the `institution_id: undefined` shape is **off-DTO** (per E-05.2) would stop a future reader treating `['undefined','null','2','undefined']` as sanctioned output. | Folded into attempt 2's brief as a one-line comment — cosmetic, inside the file already being edited. |
+| A-07.4 | *(readability, minor)* `applyFixtureToReportsMock` sets `staff` and `geoScope`, which the host never reads — dead setup, harmless. | Recorded, no action. |
+| **A-07.5** | *(spec debt)* `tasks.md` §3 T-07's "Evidence that does NOT count" names `strictTemplates` as the discriminator; verified unachievable in this toolchain. | **Fixed by the Leader** — see E-07.2. |
+
+#### Issues encountered
+
+No runtime failures — both spawns completed first try. The API 529 storm that parked the run on 2026-07-29 has cleared, and the T-06 `opus` routing waiver did not need to be renewed.
+
+#### ⚠️ Budget tripwire — run paused for the owner
+
+`design.md` §13 budgets **2 Implementer→Reviewer rework rounds** for the whole spec. The T-06 park recorded actuals already **at** that ceiling ("2 — at ceiling, owner-authorised to continue"), and that authorisation was granted for T-06 specifically. T-07's attempt-1 FAIL is therefore **rework round 3 — the budget is exceeded.**
+
+Per `/akili-execute` §2.4 *Budget Tripwire* and §Step 5, a budget tripwire stops for the owner and is never auto-approved. **Attempt 2 has NOT been spawned.** The per-task ceiling is untouched (attempt 1 of 3; 2 remain) — this is the spec-wide budget line, not a HALT.
+
+| | Budgeted | Actual at pause |
+| --- | --- | --- |
+| Tasks | 8 | 6 done · 1 in progress (T-07) · 1 not started (T-08) · +1 deferred (T-09) |
+| Changed LOC | ≈1,600 | ≈1,350 committed + 285 uncommitted |
+| Rework rounds | **2** | **3** ⚠️ |
+| Pivots | 0 | 1 (DD-13 → DD-14) |
+
+**Leader's read of the cause:** not a mis-sized spec and not a struggling implementation. Both FAILs are the *same class* of defect — an assertion that cannot fail — and in both cases the Implementer's work was correct in substance while its **evidence** was weaker than the spec demands. That is precisely what a T3 auditor is for, and it is the third time in this run the `author ≠ auditor` gate has caught a vacuous green (after the `pr-1.5` silent class bug and T-06's two mechanism failures). The rounds were **spent on the thing that has been paying for itself**, which argues for continuing rather than for reducing scope.
+
+---
