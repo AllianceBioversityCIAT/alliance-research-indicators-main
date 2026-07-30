@@ -786,11 +786,11 @@ Parked at the owner's instruction after four consecutive infrastructure failures
 
 | Field | Value |
 | --- | --- |
-| **Final status** | 🔶 **IN PROGRESS** — attempt 1 `FAIL`, paused at the **budget tripwire** before attempt 2 |
+| **Final status** | ✅ **PASS** on **attempt 2 of 3** — attempt 1 `FAIL` (2 issues), owner authorised continuation past the budget tripwire, attempt 2 `PASS` |
 | **Date** | 2026-07-30 |
-| **Implementer attempts** | 1 of 3 run (2 remaining) |
-| **Requirements covered (intended)** | R-PDB-001, R-PDB-003 (AC.4, AC.6, AC.7), R-PDB-005, R-PDB-007 · DC-1, DC-2 (spy level), DC-5, DC-11 (host side) |
-| **Files touched** | `…/project-dashboard/project-dashboard.component.spec.ts` only (+246 / −39, 848 → ~1,055) |
+| **Implementer attempts** | 2 of 3 run (1 remaining, unused) |
+| **Requirements covered** | R-PDB-001 (AC.1, AC.2 spy level, AC.4 host half), R-PDB-003 (AC.4, AC.6, AC.7), R-PDB-005, R-PDB-007 · DC-1, DC-2 (spy level), DC-5, DC-11 (host side) |
+| **Files touched** | `…/project-dashboard/project-dashboard.component.spec.ts` only (+315 / −39, 848 → ~1,124) |
 | **PR** | 3 of 4 (`tasks.md` §6) |
 
 **Leader baseline, measured on a clean tree before the spawn:** `4 failed, 36 passed, 40 total` — exactly the four cases T-05's entry names as red by design (`tasks.md:170`). No drift since T-05 landed.
@@ -834,11 +834,58 @@ Four points were flagged in the Reviewer brief for independent adjudication, neu
 | **C** | Is mutation-kill an adequate substitute for the absent `strictTemplates` gate? | **SPLIT.** The `strictTemplates` claim is **verified true, not an excuse** (mechanism above). The substitute is **adequate and broader than the two members mutated** — the Reviewer verified the *mechanism* rather than the claim: an undeclared binding is never written to the instance, so the stub keeps its declared default, and every input assertion in the new cases compares against a **non-default** value (`layout` `''`→`'rows-partners'`; `itemHeightPx` `null`→`43`; `items` `[]`→populated; `title` `''`→`getCardByTitle` throws; `visibleLimit` `null`→`COLLAPSED_ITEM_LIMIT`). Caveat: the `visibleLimit … toBeNull()` assertions match the default and are individually non-killable, but each pairs with `toBe(COLLAPSED_ITEM_LIMIT)` on sibling cards. |
 | **D** | Were the two rewritten expectations bent to match observed output? | **REFUTED — correct, not bent.** Recomputed by hand from source. Contacts: `count` is the sole numeric field, so `Full Name`=2 and **0 for the other five**; `Array.prototype.sort` is stable → the asserted order follows. Partners: counts `0,2,3,0`, ids `'2','null','undefined','undefined'`, descending stable → the asserted order follows. Both derivable from source independent of observed output. |
 
+#### Attempt 2 — Implementer
+
+Ran on `akili-implementer` / `sonnet` (T2). Effort bumped `high` → **`xhigh`** per the rework loop. Skills: `angular-developer` + `systematic-debugging` (added because attempt 1's failure mode — "a test that cannot fail" — is squarely that skill's discipline). Attempt 1's diff was **kept and built on**, not discarded: the Reviewer had verified most of it, and E-07.4 declined a rollback that would only have re-derived 246 correct lines.
+
+**Changes (4):**
+
+1. **Stub gains `@Output() retry`** (E-07.3), matching the four `(retry)="reports.update()"` bindings in `project-dashboard.component.html`. Docblock corrected to name it — it previously claimed to declare every bound output while omitting this one (A-07.1).
+2. **AC.7 case rewritten** to drive the mock through the service's *real* transitions: fixture applied first, two cards expanded, then `payload.set(null)` + `loadError.set(true)` on failure, then the retry fired **through the seam** (`getCardByTitle('Results Partners').retry.emit()`) with `update` asserted called, then `loadError.set(false)` + `payload.set(mockContractFullReports())` — **a new object identity**.
+3. **Zero-calls case rewritten** to spy level: four doubles via `createRetiredServiceMock()` in the override's `add.providers`, asserting `main` was never called on any. The old `TestBed.inject(...).toThrow()` checks retained only as a labelled secondary structural note. Relabelled from R-PDB-008 (T-08's requirement) to **R-PDB-001 AC.2 / DC-2**.
+4. **A-07.3 comment added** marking the `{ institution_id: undefined }` / `{}` partner shapes as off-DTO and unreachable per E-05.2.
+
+**Verification:** `47 passed / 47`, `npm run build` clean, `npm run lint` clean, no `.only` / `.skip` / `fdescribe` / `xit`. Scope fence held — `git status` shows exactly one modified file and the component sources are byte-identical to HEAD.
+
+**Implementer-reported judgment call (a correction to the Reviewer's own remediation, and it was right):** the FAIL report prescribed `linkedSignal(sourceFn, computeFn)` as two positional args. This repo's typings expose no such overload, so the Implementer used the object form and disclosed the substitution rather than silently matching the snippet. See E-07.5 — the Reviewer went on to confirm the snippet as written would **not** have reproduced the defect.
+
+#### Attempt 2 — Reviewer verdict: `STATUS: PASS`
+
+Ran on `akili-reviewer` / `opus` (T3), **parallel lens mode** (effort `xhigh`), lens = **reliability** + baseline spec conformance. See E-07.6 for why one lens ran rather than two.
+
+**It did not accept the Implementer's mutation evidence — it built its own: 16 mutants applied, 13 killed, 3 survived.**
+
+| # | Mutant | Result |
+| --- | --- | --- |
+| M1 | `expanded` → `linkedSignal({source: reports.payload, computation: () => new Set})` | **KILLED** 46/47 — AC.7 only, `expected Set{contributors,partners} received Set{}` |
+| M2 | `GetTopPartnersService` back in component `providers` + `.main(id,5)` in the effect | **KILLED** 46/47 — zero-calls only, `topPartnersMock.main` got `("C-1", 5)` |
+| M3 | drop `(retry)` on the Results Partners card | KILLED — AC.7 |
+| M4 | cross-wire `[items]="leverItems()"` onto the partners card | KILLED — inputs case |
+| M5 | DC-1: `partnerItems` reads `topPrimaryLevers()` | KILLED ×2 |
+| M6 | AC.6: `expanded` seeded `['partners']` | KILLED ×4 |
+| M7 | R-PDB-005: contact `id` from label instead of `user_id` | KILLED — homonym case |
+| M8 | DC-11: mutate the `Set` in place instead of replacing it | KILLED ×2 |
+| M9 | R-PDB-007: title → `"Top partner institution"` | KILLED ×4 |
+| M10 | drop the `!loadError()` guard from `partnersEmpty` | KILLED |
+| M11 | copy-paste `ChartKey`: contributors card toggles `'partners'` | KILLED — AC.7 |
+| M12 | `partnersVisibleLimit` never returns `null` | KILLED ×2 |
+| — | `providedIn:'root'` on a retired service | KILLED — zero-calls case |
+| **M13** | drop `(retry)` on **Primary Levers** | **SURVIVED** 47/47 |
+| **M14** | drop `(expandToggled)` on **Primary Levers** | **SURVIVED** 47/47 |
+| **M15** | drop `(expandToggled)` on **Main contact person** | **SURVIVED** 47/47 |
+
+**Tree restored and verified** by the Reviewer (sha256 match pre/post on both component files; `get-top-partners.service.ts`, touched by one probe, `shasum -c` OK) and **independently re-verified by the Leader** afterwards: `47/47`, one modified file, all mutated sources byte-identical to HEAD. Its mutation harness is left at `scratchpad/mutate.sh` for re-runs.
+
+**Both attempt-1 remediations confirmed sound.** The four Leader-flagged suspected tautologies were all answered: `retry.emit()` genuinely traverses the host binding (M3); `expect(partners.items).toEqual(component.partnerItems())` discriminates the *binding* (M4) and its DC-1 blind spot is covered by siblings (M5); every `visibleLimit … toBeNull()` is paired with a discriminating sibling and is behaviourally killable via M12; the four `not.toHaveBeenCalled()` are reachable and live (M2).
+
 #### Decisions
 
 | # | Decision | Basis |
 | --- | --- | --- |
 | E-07.1 | Both Reviewer issues adjudicated **in scope** and **spec-conformance**, not advisory | Each cites `tasks.md` §3 T-07 acceptance boxes plus `design.md` §10 plus a requirement AC. Neither is a 4R lens finding, so both legitimately consume a rework attempt. |
+| E-07.5 | The Implementer's `linkedSignal` **object form** accepted as the faithful mutant — and the Reviewer's original snippet recorded as **wrong** | `@angular/core/index.d.ts:6893,6905` exposes only `linkedSignal(computation, options?)` and `linkedSignal({source, computation, equal?})`. The FAIL report's two-positional-arg form would bind to overload 1, yielding a signal whose value **is the payload rather than a `Set`** — not the revision-2 defect at all. The Implementer was right to substitute and right to disclose it. **Logged because the auditor's prescription, not the author's work, was the defective artefact here** — worth remembering the next time a remediation snippet is copied verbatim. |
+| E-07.6 | **Second lens Reviewer dropped**; one lens ran, not the 2–4 the `xhigh` mode table allows | Both lenses would have needed to apply mutation probes to the same working tree, and the second's test runs would intermittently observe the first's mutant — a race producing garbage verdicts. Sequential execution was the alternative; after the reliability lens returned 16 mutants covering conformance, regression (full suite green after every restore) and risk, a second pass was judged marginal. `.agents/leader.md` *Delegation Ceiling*: commit to a delegation rather than re-deriving its result. **Recorded as a deliberate narrowing, not an omission.** |
+| E-07.7 | **A-07.6 accepted as ADVISORY, not overruled to FAIL** — and escalated to the owner as a candidate spec gap | The Reviewer explicitly invited an overrule. Declined, on the spec's own asymmetric wording: `tasks.md` §3 T-07 requires inputs to reach "**each of the four cards**" (per-card, honoured) but only that the "**Seam round-trip**" be asserted, and `design.md` §10 / `requirements.md` §7 DC-11 describe the seam at mechanism level, which M8/M11 prove. Attempt 2 satisfies the letter, every named AC has a killable gate, and overruling would have spent the **last** rework attempt on work the spec does not require. Per `/akili-execute` §2.4 the correct route for an advisory too serious to drop is owner escalation as a spec gap — **not** silently widening T-07. |
 | E-07.2 | `tasks.md` §3 T-07's *"Evidence that does NOT count"* clause **amended by the Leader** to name mutation-kill instead of `strictTemplates` | The clause was factually false about this repo's toolchain, verified independently by both agents. Root `CLAUDE.md` §5 requires fixing the doc that is wrong rather than letting docs and code drift. Spec authorship is Leader territory (same precedent as A-06ii.4 in T-06); **no production code written.** |
 | E-07.3 | Attempt 2 will be asked to add the `retry` `@Output()` to the stub | Not scope growth: the production template binds `(retry)` on all four cards, the stub's own new docblock claims it declares every bound output, and FAIL 1's remediation routes the retry **through** the seam rather than around it. |
 | E-07.4 | Working tree left **as-is**, not reverted | Automatic rollback is the **HALT** protocol (3 failed attempts). This is attempt 1 of 3 with a clear in-file remediation; discarding 246 correct lines to re-derive them would be waste. **The diff is uncommitted and known-incomplete** — see the pause notice below. |
@@ -852,24 +899,41 @@ Four points were flagged in the Reviewer brief for independent adjudication, neu
 | A-07.3 | *(readability)* One comment stating the `institution_id: undefined` shape is **off-DTO** (per E-05.2) would stop a future reader treating `['undefined','null','2','undefined']` as sanctioned output. | Folded into attempt 2's brief as a one-line comment — cosmetic, inside the file already being edited. |
 | A-07.4 | *(readability, minor)* `applyFixtureToReportsMock` sets `staff` and `geoScope`, which the host never reads — dead setup, harmless. | Recorded, no action. |
 | **A-07.5** | *(spec debt)* `tasks.md` §3 T-07's "Evidence that does NOT count" names `strictTemplates` as the discriminator; verified unachievable in this toolchain. | **Fixed by the Leader** — see E-07.2. |
+| **A-07.6** ⚠️ | *(reliability — the highest-value finding of this task)* **Per-card output bindings are ungated on 2 of the 4 cards.** Mutants M13/M14/M15 all survive at 47/47: `(expandToggled)` can be deleted outright from **Primary Levers** and **Main contact person**, and `(retry)` from **Primary Levers**, with the entire repo green. **Two "Show more" toggles could ship silently dead** — which is literally the DC-11 defect ("the card emits and the host never reacts"), and the T-04 card spec structurally cannot catch it because it owns no host state. T-06's `ChartKey` union guards *typos*, not *absent bindings*. Fix is ~6 lines: loop the four cards emitting `expandToggled` and assert each flips only its own key; loop `retry.emit()` and assert `update()` call count == 4. | **ADVISORY, escalated to the owner as a candidate spec gap (E-07.7).** The Reviewer invited an overrule to FAIL and the Leader declined on the spec's asymmetric wording — inputs are specified per-card, the output seam only at mechanism level. **Recorded, not silently inherited, and not folded into T-07.** The Reviewer notes T-08's sweep is the cheapest place to land it if the owner wants it. |
+| A-07.7 | *(redundant, harmless)* The `titles.startsWith('Top ')` loop is unreachable-fail — the preceding exact-string `toEqual([...])` already pins all four titles and none begins with `Top `. R-PDB-007 AC.2 is fully implied by the AC.1 assertion, which **is** killable (M9). | Recorded. Keep as documentation or drop; no action. |
+| A-07.8 | *(near-dead, honestly labelled)* The four retained `TestBed.inject(...).toThrow()` assertions survive the component-provider mutant, as attempt 1's FAIL 2 established — but are **not fully dead**: the Reviewer reddened them by adding `providedIn: 'root'` to a retired service, so they weakly guard "retired services never become root-provided". The in-code comment accurately states they are not load-bearing, and the real DC-2 gate is now spy-level (M2). | Recorded, no action. **Note for T-08:** this file imports the four retired classes, so T-08's "no dangling import anywhere" box requires deleting these assertions together with the services. |
+| A-07.9 | *(dead setup — supersedes A-07.4)* `applyFixtureToReportsMock` still sets `staff` and `geoScope`, which the host never reads. Harmless. | Recorded, no action. |
 
 #### Issues encountered
 
-No runtime failures — both spawns completed first try. The API 529 storm that parked the run on 2026-07-29 has cleared, and the T-06 `opus` routing waiver did not need to be renewed.
+No runtime failures — all four spawns across both attempts completed first try. The API 529 storm that parked the run on 2026-07-29 has cleared, and the T-06 `opus` routing waiver did not need to be renewed: **`author ≠ auditor` held at model level for this whole task** (Implementer `sonnet` T2, Reviewer `opus` T3).
 
-#### ⚠️ Budget tripwire — run paused for the owner
+#### ⚠️ Budget tripwire — raised, escalated, resolved by the owner
 
-`design.md` §13 budgets **2 Implementer→Reviewer rework rounds** for the whole spec. The T-06 park recorded actuals already **at** that ceiling ("2 — at ceiling, owner-authorised to continue"), and that authorisation was granted for T-06 specifically. T-07's attempt-1 FAIL is therefore **rework round 3 — the budget is exceeded.**
+`design.md` §13 budgets **2 Implementer→Reviewer rework rounds** for the whole spec. The T-06 park recorded actuals already **at** that ceiling, and that authorisation was granted for T-06 specifically. T-07's attempt-1 FAIL was therefore **rework round 3 — budget exceeded.**
 
-Per `/akili-execute` §2.4 *Budget Tripwire* and §Step 5, a budget tripwire stops for the owner and is never auto-approved. **Attempt 2 has NOT been spawned.** The per-task ceiling is untouched (attempt 1 of 3; 2 remain) — this is the spec-wide budget line, not a HALT.
+Per `/akili-execute` §2.4 *Budget Tripwire* and §Step 5, the run **stopped and escalated** rather than continuing on the assumption that finishing was wanted. Attempt 2 was not spawned until the owner decided. **Owner decision, 2026-07-30: continue with attempt 2 and both fixes.** The per-task ceiling was never reached (2 of 3 used; 1 unused).
 
-| | Budgeted | Actual at pause |
+| | Budgeted | Actual at T-07 close |
 | --- | --- | --- |
-| Tasks | 8 | 6 done · 1 in progress (T-07) · 1 not started (T-08) · +1 deferred (T-09) |
-| Changed LOC | ≈1,600 | ≈1,350 committed + 285 uncommitted |
-| Rework rounds | **2** | **3** ⚠️ |
+| Tasks | 8 | **7 done** · 1 not started (T-08) · +1 deferred (T-09) |
+| Changed LOC | ≈1,600 | ≈1,415 committed |
+| Rework rounds | **2** | **3** ⚠️ (owner-authorised) |
 | Pivots | 0 | 1 (DD-13 → DD-14) |
 
-**Leader's read of the cause:** not a mis-sized spec and not a struggling implementation. Both FAILs are the *same class* of defect — an assertion that cannot fail — and in both cases the Implementer's work was correct in substance while its **evidence** was weaker than the spec demands. That is precisely what a T3 auditor is for, and it is the third time in this run the `author ≠ auditor` gate has caught a vacuous green (after the `pr-1.5` silent class bug and T-06's two mechanism failures). The rounds were **spent on the thing that has been paying for itself**, which argues for continuing rather than for reducing scope.
+**Leader's read of the cause, recorded at the time and unchanged by the outcome:** not a mis-sized spec and not a struggling implementation. Both FAILs were the *same class* of defect — an assertion that cannot fail — and in both cases the Implementer's work was correct in substance while its **evidence** was weaker than the spec demands. That is precisely what a T3 auditor is for, and it was the third time in this run the `author ≠ auditor` gate caught a vacuous green (after the `pr-1.5` silent class bug and T-06's two mechanism failures). Attempt 2 vindicated the spend: **A-07.6 — two potentially dead "Show more" toggles — was found only because the review went deep enough to run 16 mutants**, and it would have shipped in PR 3 otherwise.
+
+#### Final verification
+
+Leader-run, independently, after the Reviewer's mutation probes were restored:
+
+- `npx jest --coverage=false --testPathPattern="project-dashboard.component.spec"` → **47 passed / 47**
+- `git status --short` → **exactly one** modified file (`…/project-dashboard.component.spec.ts`)
+- `git diff --stat` on `project-dashboard.component.{ts,html}`, `project-dashboard-card.component.*`, `get-top-*.service.ts` → **empty**; no mutation residue anywhere
+- `npm run build` (Implementer) → clean, only pre-existing budget/CJS warnings · `npm run lint` (Implementer) → clean
+
+**Coverage is deliberately NOT claimed here.** Per the T-04 coverage-flag rule, a path-scoped run with `--coverage=false` cannot evidence the global floors; that is T-08's full-suite gate.
+
+**Suite state for T-08:** the 848-line file is now ~1,124 lines and green. T-05's *"red between T-05 and T-07 by design"* window is **closed** — the four failures it predicted are repaired and the count went 40 → 47.
 
 ---

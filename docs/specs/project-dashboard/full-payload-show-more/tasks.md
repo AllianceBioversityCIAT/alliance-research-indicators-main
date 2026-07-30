@@ -223,7 +223,8 @@ graph TD
 - **Also does NOT count:** an assertion that cannot fail. Two specific traps, both found in attempt 1 — a retry test that never changes `payload` identity (the payload-keyed mutant AC.7 exists to kill survives it), and `expect(() => TestBed.inject(RetiredService)).toThrow()`, which throws for any bare `@Injectable()` regardless of the component and so proves nothing.
 - **Dependencies:** T-05, T-06
 - **Effort:** L · **Skills:** `angular-developer`
-- **Status:** 🔶 `[~]` **in progress** — attempt 1 `FAIL` (2 spec-conformance issues), **run paused at the spec-wide budget tripwire** before attempt 2. See [`execution.md`](./execution.md) § T-07. Per-task ceiling untouched: **attempt 1 of 3, 2 remain.** The +246/−39 diff is **uncommitted and known-incomplete** — do not treat it as landed.
+- **Status:** ✅ **done** — Reviewer PASS on **attempt 2 of 3**, 2026-07-30. See [`execution.md`](./execution.md) § T-07. History: attempt 1 `FAIL` (two mutation-dead assertions) → budget tripwire escalated and owner-authorised → attempt 2 PASS, verified by **16 independent Reviewer mutants (13 killed)**. Suite 40 → **47/47**; T-05's by-design red window is closed.
+- ⚠️ **Advisory A-07.6 escalated to the owner, NOT absorbed into this task:** `(expandToggled)` can be deleted from **Primary Levers** and **Main contact person**, and `(retry)` from Primary Levers, with the whole repo green — **two "Show more" toggles could ship silently dead.** The Reviewer invited an overrule to FAIL; the Leader declined because this task's acceptance specifies inputs per-card but the output seam only at mechanism level (E-07.7). ~6 lines to fix; T-08's sweep is the cheapest place. **Owner's call whether it lands.**
 
 ---
 

@@ -1,10 +1,12 @@
-import { Component, Input, signal } from '@angular/core';
+import { Component, DebugElement, EventEmitter, Input, Output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { By } from '@angular/platform-browser';
 import { ApiService } from '@shared/services/api.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { GetGeoScopeService } from '@shared/services/get-geo-scope.service';
+import { GetFullContractReportsService } from '@services/get-full-contract-reports.service';
 import { GetTopContributorsContractsService } from '@shared/services/get-top-contributors-contracts.service';
 import { GetTopMainContactPersonsService } from '@shared/services/get-top-main-contact-persons.service';
 import { GetTopPartnersService } from '@shared/services/get-top-partners.service';
@@ -15,9 +17,22 @@ import { RolesService } from '@shared/services/cache/roles.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { ProjectDashboardComponent } from './project-dashboard.component';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
-import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
+import { COLLAPSED_ITEM_LIMIT, ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
+import { ContractFullReports } from '@interfaces/contract-full-reports.interface';
+import { mockContractFullReports } from 'src/app/testing/contract-full-reports.mock';
 
+/**
+ * T-07 (design.md §10 / tasks.md §3). This stub is legitimate ONLY for
+ * input/output assertions on the host↔card seam (DC-11) — anything that
+ * renders *inside* the real card is T-04's spec, already gated against the
+ * real template. It must declare every `@Input()`/`@Output()` the production
+ * template binds, including `visibleLimit` and `expandToggled` added by
+ * T-02/T-03/T-06 and `retry` (bound on all four cards in
+ * project-dashboard.component.html as `(retry)="reports.update()"`) —
+ * otherwise the assertions below read back only this class's own defaults,
+ * not what the host actually passed down (KZ-001).
+ */
 @Component({
   selector: 'app-project-dashboard-card',
   standalone: true,
@@ -35,6 +50,9 @@ class ProjectDashboardCardStubComponent {
   @Input() layout = '';
   @Input() itemHeightPx: number | null = null;
   @Input() iconClass = '';
+  @Input() visibleLimit: number | null = null;
+  @Output() expandToggled = new EventEmitter<void>();
+  @Output() retry = new EventEmitter<void>();
 }
 
 @Component({
@@ -60,11 +78,12 @@ describe('ProjectDashboardComponent', () => {
   let fixture: ComponentFixture<ProjectDashboardComponent>;
   let component: ProjectDashboardComponent;
   let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock };
-  let topContributorsMock: ReturnType<typeof createRankedServiceMock>;
-  let topMainContactsMock: ReturnType<typeof createRankedServiceMock>;
-  let topPartnersMock: ReturnType<typeof createRankedServiceMock>;
-  let topLeversMock: ReturnType<typeof createRankedServiceMock>;
+  let reportsMock: ReturnType<typeof createReportsMock>;
   let geoScopeMock: { main: jest.Mock };
+  let topPartnersMock: ReturnType<typeof createRetiredServiceMock>;
+  let topPrimaryLeversMock: ReturnType<typeof createRetiredServiceMock>;
+  let topMainContactPersonsMock: ReturnType<typeof createRetiredServiceMock>;
+  let topContributorsContractsMock: ReturnType<typeof createRetiredServiceMock>;
   let resultsCenterServiceMock: { initializeProjectDashboardResultsTable: jest.Mock };
   let fileManagerServiceMock: { uploadFile: jest.Mock };
   let documentOverviewServiceMock: {
@@ -86,25 +105,81 @@ describe('ProjectDashboardComponent', () => {
     return input;
   }
 
-  function createRankedServiceMock() {
+  /**
+   * Single mock for `GetFullContractReportsService` (T-07), replacing the
+   * four retired `GetTop*Service` mocks. Sections default empty so the
+   * existing empty-state assertions keep their meaning; tests that need a
+   * realistic full payload apply the shared fixture explicitly via
+   * `applyFixtureToReportsMock` rather than hand-rolling data (client guide:
+   * never reinvent fixtures).
+   */
+  function createReportsMock() {
     return {
-      list: signal<any[]>([]),
+      payload: signal<ContractFullReports | null>(null),
       loading: signal(false),
       loadError: signal(false),
+      topPartners: signal<any[]>([]),
+      topPrimaryLevers: signal<any[]>([]),
+      topMainContactPersons: signal<any[]>([]),
+      topContributors: signal<any[]>([]),
+      staff: signal<any[]>([]),
+      geoScope: signal<ContractFullReports['geo_scope'] | null>(null),
       main: jest.fn(),
       update: jest.fn()
     };
+  }
+
+  /**
+   * Double for each retired `GetTop*Service` (R-PDB-001 AC.2 / DC-2). Kept in
+   * the override's `add.providers` below — not because
+   * `ProjectDashboardComponent` injects any of them today (T-05 removed
+   * that), but so that IF a mutant reintroduces a component-level
+   * `providers` entry for the same token and calls `main()` from it,
+   * `overrideComponent`'s `add.providers` (appended after the component's
+   * own providers) shadows that entry and this double is what actually gets
+   * constructed — making `main` observable and the assertion below capable
+   * of failing.
+   */
+  function createRetiredServiceMock() {
+    return { main: jest.fn(), list: signal<unknown[]>([]), loading: signal(false), loadError: signal(false) };
+  }
+
+  /** Drives all four ranked sections of `reportsMock` from one `ContractFullReports` payload. */
+  function applyFixtureToReportsMock(mock: ReturnType<typeof createReportsMock>, data: ContractFullReports): void {
+    mock.payload.set(data);
+    mock.topPartners.set(data.top_partners);
+    mock.topPrimaryLevers.set(data.top_primary_levers);
+    mock.topMainContactPersons.set(data.top_main_contact_persons);
+    mock.topContributors.set(data.top_contributors);
+    mock.staff.set(data.staff);
+    mock.geoScope.set(data.geo_scope);
+  }
+
+  /** Every `app-project-dashboard-card` stub instance currently rendered by the host. */
+  function getCardDebugElements(): DebugElement[] {
+    return fixture.debugElement.queryAll(By.directive(ProjectDashboardCardStubComponent));
+  }
+
+  function getCardByTitle(title: string): ProjectDashboardCardStubComponent {
+    const match = getCardDebugElements().find(
+      element => (element.componentInstance as ProjectDashboardCardStubComponent).title === title
+    );
+    if (!match) {
+      throw new Error(`No stub card found for title "${title}"`);
+    }
+    return match.componentInstance as ProjectDashboardCardStubComponent;
   }
 
   async function setup(
     contractId: string | null = 'C-1',
     options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean }
   ) {
-    topContributorsMock = createRankedServiceMock();
-    topMainContactsMock = createRankedServiceMock();
-    topPartnersMock = createRankedServiceMock();
-    topLeversMock = createRankedServiceMock();
+    reportsMock = createReportsMock();
     geoScopeMock = { main: jest.fn() };
+    topPartnersMock = createRetiredServiceMock();
+    topPrimaryLeversMock = createRetiredServiceMock();
+    topMainContactPersonsMock = createRetiredServiceMock();
+    topContributorsContractsMock = createRetiredServiceMock();
     resultsCenterServiceMock = { initializeProjectDashboardResultsTable: jest.fn() };
     fileManagerServiceMock = {
       uploadFile: jest.fn().mockResolvedValue({ data: { filename: 'stored-file.pdf' } })
@@ -205,22 +280,17 @@ describe('ProjectDashboardComponent', () => {
       .overrideComponent(ProjectDashboardComponent, {
         remove: {
           imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent],
-          providers: [
-            GetTopContributorsContractsService,
-            GetTopMainContactPersonsService,
-            GetTopPartnersService,
-            GetTopPrimaryLeversService,
-            GetGeoScopeService
-          ]
+          providers: [GetFullContractReportsService, GetGeoScopeService]
         },
         add: {
           imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
           providers: [
-            { provide: GetTopContributorsContractsService, useValue: topContributorsMock },
-            { provide: GetTopMainContactPersonsService, useValue: topMainContactsMock },
+            { provide: GetFullContractReportsService, useValue: reportsMock },
+            { provide: GetGeoScopeService, useValue: geoScopeMock },
             { provide: GetTopPartnersService, useValue: topPartnersMock },
-            { provide: GetTopPrimaryLeversService, useValue: topLeversMock },
-            { provide: GetGeoScopeService, useValue: geoScopeMock }
+            { provide: GetTopPrimaryLeversService, useValue: topPrimaryLeversMock },
+            { provide: GetTopMainContactPersonsService, useValue: topMainContactPersonsMock },
+            { provide: GetTopContributorsContractsService, useValue: topContributorsContractsMock }
           ]
         }
       })
@@ -246,12 +316,41 @@ describe('ProjectDashboardComponent', () => {
       undefined,
       { page: 1, limit: 10000, sortField: 'code', sortOrder: 'DESC' }
     );
-    expect(topContributorsMock.main).toHaveBeenCalledWith('C-1', 4);
-    expect(topMainContactsMock.main).toHaveBeenCalledWith('C-1', 4);
-    expect(topPartnersMock.main).toHaveBeenCalledWith('C-1', 4);
-    expect(topLeversMock.main).toHaveBeenCalledWith('C-1', 4);
+    // R-PDB-001 AC.1/AC.2 at spy level (DC-2): exactly one call to the single
+    // service, per T-05's rewire. Request/URL evidence itself lives in T-01's
+    // HttpTestingController-based spec — this harness has no mock backend.
+    expect(reportsMock.main).toHaveBeenCalledTimes(1);
+    expect(reportsMock.main).toHaveBeenCalledWith('C-1');
     expect(geoScopeMock.main).toHaveBeenCalledWith('C-1');
     expect(resultsCenterServiceMock.initializeProjectDashboardResultsTable).toHaveBeenCalledWith('C-1');
+  });
+
+  it('should call main() exactly once on the single reports service and never call any of the four retired ranked services (R-PDB-001 AC.2 / DC-2)', async () => {
+    await setup();
+
+    // Spy-level proof (DC-2): one `main()` call on the sole replacement
+    // service, and the four retired services — doubled via the override's
+    // `add.providers` above, which shadows any component-level entry of the
+    // same token per Angular's last-provider-wins resolution — never see a
+    // `main()` call. Unlike a bare injection-throw, this discriminates: a
+    // mutant that puts `GetTopPartnersService` back into the component's own
+    // `providers` and calls `main()` from the load effect resolves to THIS
+    // double (not the real class), so the call lands on `topPartnersMock.main`
+    // and the assertion below reddens.
+    expect(reportsMock.main).toHaveBeenCalledTimes(1);
+    expect(topPartnersMock.main).not.toHaveBeenCalled();
+    expect(topPrimaryLeversMock.main).not.toHaveBeenCalled();
+    expect(topMainContactPersonsMock.main).not.toHaveBeenCalled();
+    expect(topContributorsContractsMock.main).not.toHaveBeenCalled();
+
+    // Secondary structural check, retained but not load-bearing on its own
+    // (it cannot fail against the mutant above): the component's own
+    // `providers` no longer list the four retired services, so resolving any
+    // of them from this fixture's injector still fails.
+    expect(() => TestBed.inject(GetTopPartnersService)).toThrow();
+    expect(() => TestBed.inject(GetTopPrimaryLeversService)).toThrow();
+    expect(() => TestBed.inject(GetTopMainContactPersonsService)).toThrow();
+    expect(() => TestBed.inject(GetTopContributorsContractsService)).toThrow();
   });
 
   it('should compute project summaries and formatted labels', async () => {
@@ -283,13 +382,13 @@ describe('ProjectDashboardComponent', () => {
   it('should build and sort ranked service items', async () => {
     await setup();
 
-    topContributorsMock.list.set([
+    reportsMock.topContributors.set([
       { contract_code: 'C-2', contract_description: 'Contributor', results_count: 1 },
       { project_name: 'Only project', count: 3 },
       { contract_id: 'C-3' },
       {}
     ]);
-    topMainContactsMock.list.set([
+    reportsMock.topMainContactPersons.set([
       { name: 'Named', results_count: 1, email: 'named@example.com' },
       { full_name: 'Full Name', count: 2 },
       { contact_person_name: 'Contact Name', value: 3 },
@@ -297,28 +396,44 @@ describe('ProjectDashboardComponent', () => {
       { first_name: 'First', last_name: 'Last' },
       {}
     ]);
-    topPartnersMock.list.set([
+    // `institution_id: undefined` / `{}` (no `institution_id` at all) are
+    // OFF-DTO: `ContractFullReportsPartner.institution_id` is a required,
+    // non-nullable `number` and E-05.2 records the null case as unreachable
+    // in production (the query is an `INNER JOIN clarisa_institutions`).
+    // They exist here only to pin `getPartnerItemId`'s literal
+    // `String(item.institution_id)` behaviour (no fallback chain) against a
+    // permissive `signal<any[]>` mock — do not read the resulting
+    // `['undefined','null','2','undefined']` ids below as sanctioned
+    // production output.
+    reportsMock.topPartners.set([
       { institution_id: 2, acronym: 'ABC', institution_name: 'Institution', results_count: 1 },
       { institution_id: null, partner_name: 'Partner', count: 2 },
       { institution_id: undefined, count: 3 },
       {}
     ]);
-    topLeversMock.list.set([
+    reportsMock.topPrimaryLevers.set([
       { lever_id: 1, short_name: 'RA', full_name: 'RA: Research area', count: 1, icon: 'icon.svg' },
       { lever_id: 2, short_name: 'L', full_name: 'L:', count: 3 },
       { lever_id: 3, short_name: '', full_name: '', count: 2 }
     ]);
 
     expect(component.contributorItems().map(item => item.label)).toEqual(['Only project', 'C-2 - Contributor', 'C-3', '—']);
+    // T-05 dropped the `results_count`/`value` fallbacks that the retired
+    // services used — `count` is now the sole numeric field (matches the
+    // full-payload DTOs), so "Contact Name" (`value: 3`, no `count`) sorts
+    // as a 0-count tie rather than ranking first.
     expect(component.mainContactPersonItems().map(item => item.label)).toEqual([
-      'Contact Name',
       'Full Name',
       'Named',
+      'Contact Name',
       'Label Name',
       'First Last',
       '—'
     ]);
-    expect(component.partnerItems().map(item => item.id)).toEqual(['2', 'Partner', '2', '3']);
+    // T-05 dropped `getPartnerItemId`'s fallback chain — `id` is now
+    // `String(item.institution_id)` verbatim (E-05.2), so a null/undefined
+    // id stringifies literally rather than falling back to a label or index.
+    expect(component.partnerItems().map(item => item.id)).toEqual(['undefined', 'null', '2', 'undefined']);
     expect(component.partnerItems().map(item => item.label)).toContain('ABC - Institution');
     expect(component.leverItems().map(item => item.label)).toEqual(['L', '—', 'RA - RESEARCH AREA']);
   });
@@ -331,7 +446,7 @@ describe('ProjectDashboardComponent', () => {
 
     expect(component.statusChartItems()).toEqual([]);
 
-    topLeversMock.list.set([{ lever_id: 4, short_name: 'RA', full_name: ': Research area', count: 1 }]);
+    reportsMock.topPrimaryLevers.set([{ lever_id: 4, short_name: 'RA', full_name: ': Research area', count: 1 }]);
     expect(component.leverItems()[0].label).toBe('RA - RESEARCH AREA');
   });
 
@@ -343,11 +458,28 @@ describe('ProjectDashboardComponent', () => {
     expect(component.partnersEmpty()).toBe(true);
     expect(component.leversEmpty()).toBe(true);
 
-    topContributorsMock.loading.set(true);
-    topMainContactsMock.loadError.set(true);
-    topPartnersMock.list.set([{}]);
-    topLeversMock.list.set([{}]);
+    // The `loading` guard: with one shared service, this signal drives all
+    // four cards at once (T-05), so a single `set` must flip all four.
+    reportsMock.loading.set(true);
+    expect(component.contributorsEmpty()).toBe(false);
+    expect(component.mainContactPersonsEmpty()).toBe(false);
+    expect(component.partnersEmpty()).toBe(false);
+    expect(component.leversEmpty()).toBe(false);
+    reportsMock.loading.set(false);
 
+    // The `loadError` guard: error must win over empty, for the same reason.
+    reportsMock.loadError.set(true);
+    expect(component.contributorsEmpty()).toBe(false);
+    expect(component.mainContactPersonsEmpty()).toBe(false);
+    expect(component.partnersEmpty()).toBe(false);
+    expect(component.leversEmpty()).toBe(false);
+    reportsMock.loadError.set(false);
+
+    // A non-empty list also flips its own `*Empty()` computed.
+    reportsMock.topContributors.set([{}]);
+    reportsMock.topMainContactPersons.set([{}]);
+    reportsMock.topPartners.set([{}]);
+    reportsMock.topPrimaryLevers.set([{}]);
     expect(component.contributorsEmpty()).toBe(false);
     expect(component.mainContactPersonsEmpty()).toBe(false);
     expect(component.partnersEmpty()).toBe(false);
@@ -379,6 +511,150 @@ describe('ProjectDashboardComponent', () => {
     await setup();
 
     expect(component.indicatorSharePercent(0)).toBe(0);
+  });
+
+  describe('ranked chart cards — host↔card seam (T-07 / R-PDB-002, 003, 004, 005, 007)', () => {
+    it('should pass the correct title, items, layout, and visibleLimit to each ranked card', async () => {
+      await setup();
+      const fixtureData = mockContractFullReports();
+      applyFixtureToReportsMock(reportsMock, fixtureData);
+      fixture.detectChanges();
+
+      const partners = getCardByTitle('Results Partners');
+      expect(partners.items).toEqual(component.partnerItems());
+      expect(partners.layout).toBe('rows-partners');
+      expect(partners.visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+
+      const levers = getCardByTitle('Primary Levers');
+      expect(levers.items).toEqual(component.leverItems());
+      expect(levers.layout).toBe('rows-stacked-lever');
+      expect(levers.visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+
+      const contacts = getCardByTitle('Main contact person');
+      expect(contacts.items).toEqual(component.mainContactPersonItems());
+      expect(contacts.layout).toBe('rows-stacked-lever');
+      expect(contacts.itemHeightPx).toBe(43);
+      expect(contacts.visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+
+      const contributors = getCardByTitle('Contributing projects');
+      expect(contributors.items).toEqual(component.contributorItems());
+      expect(contributors.layout).toBe('rows-stacked-lever');
+      expect(contributors.itemHeightPx).toBe(43);
+      expect(contributors.visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+    });
+
+    it('should render the four renamed chart titles exactly as specified by R-PDB-007', async () => {
+      await setup();
+
+      const titles = getCardDebugElements().map(element => (element.componentInstance as ProjectDashboardCardStubComponent).title);
+
+      expect(titles).toEqual(['Results Partners', 'Primary Levers', 'Main contact person', 'Contributing projects']);
+      for (const title of titles) {
+        expect(title.startsWith('Top ')).toBe(false);
+      }
+    });
+
+    it('should start a fresh component instance fully collapsed (AC.6)', async () => {
+      await setup();
+
+      expect(component.expanded().size).toBe(0);
+      for (const debugElement of getCardDebugElements()) {
+        expect((debugElement.componentInstance as ProjectDashboardCardStubComponent).visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+      }
+    });
+
+    it('should flip host expansion state and push a new visibleLimit down when the stub emits expandToggled, using a new Set (DC-11)', async () => {
+      await setup();
+
+      const beforeToggle = component.expanded();
+      expect(getCardByTitle('Results Partners').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+
+      getCardByTitle('Results Partners').expandToggled.emit();
+      fixture.detectChanges();
+
+      const afterExpand = component.expanded();
+      expect(afterExpand).not.toBe(beforeToggle);
+      expect(afterExpand.has('partners')).toBe(true);
+      expect(getCardByTitle('Results Partners').visibleLimit).toBeNull();
+
+      // AC.4: expanding one card leaves the other three collapsed.
+      expect(getCardByTitle('Primary Levers').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+      expect(getCardByTitle('Main contact person').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+      expect(getCardByTitle('Contributing projects').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+
+      const beforeCollapse = component.expanded();
+      getCardByTitle('Results Partners').expandToggled.emit();
+      fixture.detectChanges();
+
+      const afterCollapse = component.expanded();
+      expect(afterCollapse).not.toBe(beforeCollapse);
+      expect(afterCollapse.has('partners')).toBe(false);
+      expect(getCardByTitle('Results Partners').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+    });
+
+    it('should preserve each card expansion state through a loadError → update() retry cycle of the same contract (AC.7)', async () => {
+      await setup();
+      applyFixtureToReportsMock(reportsMock, mockContractFullReports());
+      fixture.detectChanges();
+
+      getCardByTitle('Results Partners').expandToggled.emit();
+      getCardByTitle('Contributing projects').expandToggled.emit();
+      fixture.detectChanges();
+
+      expect(component.expanded()).toEqual(new Set(['partners', 'contributors']));
+
+      // Drive the mock through the real retry transitions
+      // (get-full-contract-reports.service.ts:39-65): a transient failure
+      // clears `payload` and sets `loadError`, then the SAME contract's
+      // retry replaces `payload` with a NEW object identity. Two payload
+      // identity changes total — a payload-keyed reset (the defect AC.7
+      // forbids) would collapse both cards at the failure step already.
+      reportsMock.payload.set(null);
+      reportsMock.loadError.set(true);
+      fixture.detectChanges();
+
+      // Fire the retry through the real seam: the production template binds
+      // `(retry)="reports.update()"` on every card
+      // (project-dashboard.component.html), so this is what a user's "Try
+      // again" click actually does.
+      getCardByTitle('Results Partners').retry.emit();
+      expect(reportsMock.update).toHaveBeenCalledTimes(1);
+
+      reportsMock.loadError.set(false);
+      reportsMock.payload.set(mockContractFullReports());
+      fixture.detectChanges();
+
+      expect(component.expanded()).toEqual(new Set(['partners', 'contributors']));
+      expect(getCardByTitle('Results Partners').visibleLimit).toBeNull();
+      expect(getCardByTitle('Contributing projects').visibleLimit).toBeNull();
+      expect(getCardByTitle('Primary Levers').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+      expect(getCardByTitle('Main contact person').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
+    });
+
+    it('should derive every ranked id from a payload identifier and keep homonymous contacts distinct with no track collision (R-PDB-005)', async () => {
+      await setup();
+      const fixtureData = mockContractFullReports();
+      applyFixtureToReportsMock(reportsMock, fixtureData);
+      fixture.detectChanges();
+
+      const contacts = getCardByTitle('Main contact person').items as { id: string; label: string }[];
+
+      expect(contacts).toHaveLength(fixtureData.top_main_contact_persons.length);
+      const homonyms = contacts.filter(item => item.label === 'Maria Rodriguez');
+      expect(homonyms).toHaveLength(2);
+      expect(homonyms.map(item => item.id).sort()).toEqual(['contact-1', 'contact-2']);
+
+      // No `@for` track collision for any of the four sections at full
+      // length (R-PDB-005 AC.2): ids only need to be unique *within* the
+      // `@for` each card renders, not across cards — a partner and a lever
+      // legitimately reusing the same numeric id is not a collision.
+      for (const debugElement of getCardDebugElements()) {
+        const ids = ((debugElement.componentInstance as ProjectDashboardCardStubComponent).items as { id: string }[]).map(
+          item => item.id
+        );
+        expect(new Set(ids).size).toBe(ids.length);
+      }
+    });
   });
 
   describe('grounding and executive overview', () => {
