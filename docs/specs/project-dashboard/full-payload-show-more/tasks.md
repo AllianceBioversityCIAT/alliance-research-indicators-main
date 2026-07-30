@@ -2,7 +2,7 @@
 
 - **Module:** project-dashboard (STAR client)
 - **Spec id:** 2026-07-full-payload-show-more
-- **Status:** **all 8 tasks done (2026-07-30)** — T-09 owner-deferred. **The spec is NOT closed:** the NFR-PDB-004 human check is unrun (and its reference mockup is wrong — A-08.3), the `s-lint` owner decision is open, `design.md`/`trd.md` are not updated, and product-owner sign-off is outstanding. See §8.
+- **Status:** **all 8 tasks done (2026-07-30)** — T-09 owner-deferred. **The spec is NOT closed**, but the list of what is missing has shrunk: **A-08.3 is closed** (the mockup now models DD-14, measurement-verified) and **`design.md` / `trd.md` are updated**. **Three items remain, all the owner's:** the NFR-PDB-004 six-step human check is **unrun** (now *unblocked*), the `s-lint` decision is open, and product-owner sign-off is outstanding. See §8 and [`validation-report.md`](./validation-report.md).
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -10,7 +10,7 @@
 - **Visual reference:** [`./mockup/index.html`](./mockup/index.html) — GATE-2, three containment modes: unbounded (the defect) · `max-height` only (the **measured** failure, +52px/+13px) · **DD-14 freeze-the-geometry (shipped, default)**
 - **Gates:** GATE-1 ✅ closed by measurement · GATE-2 ✅ closed — **re-closed 2026-07-30 on the corrected DD-14 mockup.** Its first closure was unsound: the mockup then in use could not model the defect it was used to settle (see `requirements.md` §7 and OQ-3). **GATE-2 ≠ NFR-PDB-004 acceptance** — the six-step human check is still unrun.
 - **Budget (tripwire):** 8 tasks · ≈1,600 changed LOC · 2 review rounds
-- **Last updated:** 2026-07-29
+- **Last updated:** 2026-07-30
 
 **Client-only.** No migration, no entity, no DTO, no server change, no Swagger, no env var — so the template's schema/entity/e2e/rollout categories do not apply and are omitted rather than filled with "N/A".
 
@@ -199,7 +199,7 @@ graph TD
 - **`min-h-[280px]` does NOT apply at these four call sites** — all pass `[compact]="true"` and render `min-h-0`. There is no height floor; the spacer is load-bearing.
 - **Measured, not argued.** Zero delta on all four links, **in both directions, across six viewports**, for each card and all four at once — verified by two independently-built Chrome probes, both of which first reproduced the two known failures as controls (+186px HEAD, **+52px** attempt 1, matching the earlier audit to the pixel). Probes committed under [`./evidence/`](./evidence/).
 - **Routing waiver:** Implementer ran on `opus` (not T2 `sonnet`) after five consecutive `sonnet` spawns died on API 529, so model-level `author ≠ auditor` was waived for this task. Mitigated by disclosing it to the Reviewer, which built its own probe rather than accepting the Implementer's.
-- ⚠️ **NFR-PDB-004 acceptance is still UNVERIFIED** — the mechanism is measured but the six-step human check has not been run, and **`mockup/index.html` still models the superseded DD-13 / `46vh`**, so the reference for that check is currently wrong (advisory A-06ii.2).
+- ⚠️ **NFR-PDB-004 acceptance is still UNVERIFIED** — the mechanism is measured, but the six-step human check has not been run. ~~and `mockup/index.html` still models the superseded DD-13 / `46vh`~~ — **that blocker is GONE: A-08.3 was closed 2026-07-30** and the mockup now models DD-14 with zero live `46vh` rules, independently re-measured across six-to-seven viewports. The check is **unblocked and still owed**.
 
 ---
 
@@ -335,7 +335,7 @@ Each PR description should follow `cognitive-doc-design` review-empathy rules: w
 | # | Date | Risk / blocker | Mitigation | Status |
 | --- | --- | --- | --- | --- |
 | RB-1 | 2026-07-29 | **The round-4 fix pass has no independent review.** The judgment-day fix ceiling was reached; the final delta (AC.6/AC.7 narrowing, DD-13, budget, the geographic split) was applied under explicit user authorisation and never re-judged | Treat the first Reviewer pass in `/akili-execute` as the missing audit, especially on T-06 (AC.6/AC.7 + DD-13) | open |
-| RB-2 | 2026-07-29 | **NFR-PDB-004 has no automated gate.** Three rounds of blind review passed on an incomplete containment design; the gap was found only by operating the mockup | The five-step human check on T-06; the mockup as reference. Report unverified rather than passed if skipped | open |
+| RB-2 | 2026-07-29 | **NFR-PDB-004 has no automated gate.** Three rounds of blind review passed on an incomplete containment design; the gap was found only by operating the mockup | The **six**-step human check (`requirements.md` §7 — *five* was always wrong; corrected 2026-07-30), with the mockup as reference. **Reference corrected and measurement-verified 2026-07-30 (A-08.3 closed)**, so the check is now runnable. **Report unverified rather than passed if skipped** | **open — check still unrun** |
 | RB-3 | 2026-07-29 | `project-detail.component.ts` route staleness — **a split-brain page already reachable in production today** (`requirements.md` D-AC5). Out of scope here | File separately. Do **not** partially fix it from this spec — a reactive child plus a snapshot parent is worse than the current state | open |
 | RB-4 | 2026-07-29 | T-08 may surface consumers of the four services that grep missed | Full-suite run is the gate; `systematic-debugging` if it fails | open |
 

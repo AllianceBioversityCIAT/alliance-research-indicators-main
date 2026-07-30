@@ -9,7 +9,7 @@
 - **Linked proposal:** [`./proposal.md`](./proposal.md) · **Umbrella:** [`../analytics-expansion/proposal.md`](../analytics-expansion/proposal.md)
 - **Linked judgment:** [`./judgment.md`](./judgment.md)
 - **Linked tickets:** AC-1672
-- **Last updated:** 2026-07-29
+- **Last updated:** 2026-07-30
 
 **Blocks:** `../indicator-metadata-charts/` (Chunk B), `../chart-drilldown/` (Chunk C1).
 **Split off:** `../geo-scope-expansion/` — see §0.
@@ -92,11 +92,11 @@ GET reports/geo-scope ─→ GetGeoScopeService ─→ GeoScopeCardComponent   [
 **Details:** one `GET reports/full` per contract, exposed through a signal-based service with `loading` / `loadError` / per-section accessors. Existing per-chart label formatting and sort are preserved. Errors surface the existing per-card error state with its **Try again** retry.
 
 **Acceptance criteria:**
-- [ ] AC.1 — Loading the dashboard issues **exactly one** request whose URL contains `reports/full`.
-- [ ] AC.2 — **No** request is issued to `reports/top-partners`, `reports/top-primary-levers`, `reports/top-main-contact-persons` or `reports/top-contributors-contracts`.
-- [ ] AC.3 — `contract-id` is URL-encoded (a code containing a space or `/` yields a valid URL).
-- [ ] AC.4 — On failure every ranked card shows its error state; **Try again** re-issues the single request.
-- [ ] AC.5 — Arriving at the dashboard for a different contract loads that contract's sections. **Satisfied by component recreation** — see **D-AC5**; this spec adds no route-reactivity mechanism.
+- [x] AC.1 — Loading the dashboard issues **exactly one** request whose URL contains `reports/full`. *(validation-report.md §6.1 R-PDB-001 AC.1 — PASS)*
+- [x] AC.2 — **No** request is issued to `reports/top-partners`, `reports/top-primary-levers`, `reports/top-main-contact-persons` or `reports/top-contributors-contracts`. *(validation-report.md §6.1 R-PDB-001 AC.2 — PASS)*
+- [x] AC.3 — `contract-id` is URL-encoded (a code containing a space or `/` yields a valid URL). *(validation-report.md §6.1 R-PDB-001 AC.3 — PASS)*
+- [x] AC.4 — On failure every ranked card shows its error state; **Try again** re-issues the single request. *(validation-report.md §6.1 R-PDB-001 AC.4 — PASS)*
+- [x] AC.5 — Arriving at the dashboard for a different contract loads that contract's sections. **Satisfied by component recreation** — see **D-AC5**; this spec adds no route-reactivity mechanism. *(validation-report.md §6.1 R-PDB-001 AC.5 — PASS)*
 
 #### Scenario: One request feeds the four ranked charts
 - GIVEN a project with partners, levers, contacts and contributors
@@ -114,11 +114,11 @@ GET reports/geo-scope ─→ GetGeoScopeService ─→ GeoScopeCardComponent   [
 **Details:** slicing moves from the server `limit` to the client. The cap is **5** (umbrella **D-3**), replacing today's `limit = 4`. Ordering is unchanged. The card's `visibleLimit` **defaults to `null` (show all)** so that adding the input cannot change any existing call site; the four ranked cards pass `5` explicitly.
 
 **Acceptance criteria:**
-- [ ] AC.1 — A ranked chart with more than 5 items renders exactly **5** collapsed.
-- [ ] AC.2 — A ranked chart with 5 or fewer items renders all of them **and shows no "Show more" control**.
-- [ ] AC.3 — The 5 shown are the top 5 by count, descending.
-- [ ] AC.4 — A chart with 0 items keeps its existing empty state.
-- [ ] AC.5 — A card rendered **without** a `visibleLimit` binding renders every item, exactly as today.
+- [x] AC.1 — A ranked chart with more than 5 items renders exactly **5** collapsed. *(validation-report.md §6.1 R-PDB-002 AC.1 — PASS)*
+- [x] AC.2 — A ranked chart with 5 or fewer items renders all of them **and shows no "Show more" control**. *(validation-report.md §6.1 R-PDB-002 AC.2 — PASS)*
+- [x] AC.3 — The 5 shown are the top 5 by count, descending. *(validation-report.md §6.1 R-PDB-002 AC.3 — PASS)*
+- [x] AC.4 — A chart with 0 items keeps its existing empty state. *(validation-report.md §6.1 R-PDB-002 AC.4 — PASS)*
+- [x] AC.5 — A card rendered **without** a `visibleLimit` binding renders every item, exactly as today. *(validation-report.md §6.1 R-PDB-002 AC.5 — PASS)*
 
 #### Scenario: Adding the input changes no existing consumer
 - GIVEN the geographic card renders `app-project-dashboard-card` with no `visibleLimit` binding
@@ -135,13 +135,13 @@ GET reports/geo-scope ─→ GetGeoScopeService ─→ GeoScopeCardComponent   [
 **Details:** per umbrella **D-2**, the chart grows in place; no dialog, no navigation. Two-way toggle. State is per chart and resets when the payload changes.
 
 **Acceptance criteria:**
-- [ ] AC.1 — **Show more** renders **every** item of that section, same order, ranks continuing past 5.
-- [ ] AC.2 — Expanding issues **zero** network requests.
-- [ ] AC.3 — The control becomes **Show less**; collapsing restores exactly the top 5.
-- [ ] AC.4 — Expanding one card does not expand or collapse any other card.
-- [ ] AC.5 — The route does not change; **no modal dialog opens and no navigation occurs.** *(Clarified 2026-07-29 after the DD-14 pivot: the original wording said "no dialog or **overlay**", which now reads as self-contradictory, because DD-14 mechanism (ii) deliberately renders the expanded list in a `position: absolute` in-card overlay. The intent of this criterion was always **umbrella D-2** — in-place growth instead of a modal — so what it forbids is a dialog, a route change or an element escaping the card, not CSS positioning inside it.)*
-- [ ] AC.6 — Arriving at the dashboard for a **different contract** shows every card collapsed. Satisfied by component recreation (**D-AC5**), the same mechanism as R-PDB-001 AC.5.
-- [ ] AC.7 — A **Try again** retry of the *same* contract **preserves** each card's expanded/collapsed state. A user who expanded a list and hit retry gets their list back, not a silently collapsed one.
+- [x] AC.1 — **Show more** renders **every** item of that section, same order, ranks continuing past 5. *(validation-report.md §6.1 R-PDB-003 AC.1 — PASS)*
+- [ ] AC.2 — Expanding issues **zero** network requests. **Left open:** true by construction (the card is presentational and the host only flips a `Set`; neither has a reachable HTTP path on the toggle) but **not asserted explicitly anywhere in the suite** — validation-report.md §6.1 marks this 🟡 and lists it as finding **V-9** (advisory). No test would fail if a network call were added.
+- [x] AC.3 — The control becomes **Show less**; collapsing restores exactly the top 5. *(validation-report.md §6.1 R-PDB-003 AC.3 — PASS)*
+- [x] AC.4 — Expanding one card does not expand or collapse any other card. *(validation-report.md §6.1 R-PDB-003 AC.4 — PASS; the 4 A-07.6 mutants the auditor reddened itself)*
+- [x] AC.5 — The route does not change; **no modal dialog opens and no navigation occurs.** *(Clarified 2026-07-29 after the DD-14 pivot: the original wording said "no dialog or **overlay**", which now reads as self-contradictory, because DD-14 mechanism (ii) deliberately renders the expanded list in a `position: absolute` in-card overlay. The intent of this criterion was always **umbrella D-2** — in-place growth instead of a modal — so what it forbids is a dialog, a route change or an element escaping the card, not CSS positioning inside it.)* *(validation-report.md §6.1 R-PDB-003 AC.5 — PASS)*
+- [x] AC.6 — Arriving at the dashboard for a **different contract** shows every card collapsed. Satisfied by component recreation (**D-AC5**), the same mechanism as R-PDB-001 AC.5. *(validation-report.md §6.1 R-PDB-003 AC.6 — PASS; killed by Reviewer mutant M6 ×4)*
+- [x] AC.7 — A **Try again** retry of the *same* contract **preserves** each card's expanded/collapsed state. A user who expanded a list and hit retry gets their list back, not a silently collapsed one. *(validation-report.md §6.1 R-PDB-003 AC.7 — PASS; killed by M1/M11)*
 
 #### Scenario: Expanding a long list
 - GIVEN a partner chart whose payload holds 37 partners
@@ -171,10 +171,10 @@ GET reports/geo-scope ─→ GetGeoScopeService ─→ GeoScopeCardComponent   [
 **Details — a confirmed defect in current code.** `barColor(index)` delegates to `projectDashboardBarColor(index, total)`, which assigns the `last` colour `#112F5C` when `total >= 4 && index === total - 1` and `middle` `#345b8f` otherwise — so a window-scoped total recolours the 5th row on expand. Widths in `rows-partners` come from `partnerBarWidthPercent` → `maxCount()`, stable only while the list is sorted descending; `partnerItems()` performs **no sort** today.
 
 **Acceptance criteria:**
-- [ ] AC.1 — Every item visible before expanding keeps the **same bar colour** after expanding.
-- [ ] AC.2 — Every item visible before expanding keeps the **same bar width** after expanding.
-- [ ] AC.3 — Collapsing restores the collapsed-state colours and widths exactly.
-- [ ] AC.4 — Bar scale is computed against a **descending-sorted** list, so an out-of-order payload cannot make a later bar exceed 100 %.
+- [x] AC.1 — Every item visible before expanding keeps the **same bar colour** after expanding. *(validation-report.md §6.1 R-PDB-004 AC.1 — PASS; the auditor reddened this gate itself)*
+- [x] AC.2 — Every item visible before expanding keeps the **same bar width** after expanding. *(validation-report.md §6.1 R-PDB-004 AC.2 — PASS)*
+- [x] AC.3 — Collapsing restores the collapsed-state colours and widths exactly. *(validation-report.md §6.1 R-PDB-004 AC.3 — PASS)*
+- [x] AC.4 — Bar scale is computed against a **descending-sorted** list, so an out-of-order payload cannot make a later bar exceed 100 %. *(validation-report.md §6.1 R-PDB-004 AC.4 — PASS)*
 
 #### Scenario: The visible rows keep their encoding
 
@@ -196,9 +196,9 @@ GET reports/geo-scope ─→ GetGeoScopeService ─→ GeoScopeCardComponent   [
 **Details:** `mainContactPersonItems` derives `id` from the formatted display name. Top-4 rarely collides; a full contact list can contain two people with the same display name, breaking `@for … track`. `top_main_contact_persons[].user_id` is **confirmed present** in the payload DTO.
 
 **Acceptance criteria:**
-- [ ] AC.1 — Two contacts with an identical display name both render as separate rows when expanded.
-- [ ] AC.2 — No `@for` tracking collision for any of the four sections at full length.
-- [ ] AC.3 — Each of the four ranked sections derives `id` from a payload identifier, not from a formatted label.
+- [x] AC.1 — Two contacts with an identical display name both render as separate rows when expanded. *(validation-report.md §6.1 R-PDB-005 AC.1-AC.3 — PASS; homonym case killed by mutant M7)*
+- [x] AC.2 — No `@for` tracking collision for any of the four sections at full length. *(validation-report.md §6.1 R-PDB-005 AC.1-AC.3 — PASS)*
+- [x] AC.3 — Each of the four ranked sections derives `id` from a payload identifier, not from a formatted label. *(validation-report.md §6.1 R-PDB-005 AC.1-AC.3 — PASS)*
 
 #### Scenario: Homonymous contacts
 - GIVEN a payload with two distinct contacts both displaying as "MARIA GARCIA"
@@ -231,10 +231,10 @@ Geographic card expansion and map bounding moved to [`../geo-scope-expansion/`](
 The fifth rename ("Top geographic scope" → "Geographic Scope") is in the geographic card and **moves with it**.
 
 **Acceptance criteria:**
-- [ ] AC.1 — Each of the four renamed charts renders its new title exactly as tabled.
-- [ ] AC.2 — None of those four titles begins with "Top ".
-- [ ] AC.3 — *Results by indicator* and *Results by status* are unchanged.
-- [ ] AC.4 — The three `<h3>` headings inside the geographic card ("Top regions", "Top countries", "Top sub-national levels") are **out of scope** and must not be renamed here. They are sub-list labels inside another card, not chart titles.
+- [x] AC.1 — Each of the four renamed charts renders its new title exactly as tabled. *(validation-report.md §6.1 R-PDB-007 AC.1 — PASS; killed by mutant M9 ×4)*
+- [x] AC.2 — None of those four titles begins with "Top ". *(validation-report.md §6.1 R-PDB-007 AC.2 — PASS)*
+- [x] AC.3 — *Results by indicator* and *Results by status* are unchanged. *(validation-report.md §6.1 R-PDB-007 AC.3 — PASS)*
+- [x] AC.4 — The three `<h3>` headings inside the geographic card ("Top regions", "Top countries", "Top sub-national levels") are **out of scope** and must not be renamed here. They are sub-list labels inside another card, not chart titles. *(validation-report.md §6.1 R-PDB-007 AC.4 — PASS, verified all three still read "Top …")*
 
 ---
 
@@ -245,11 +245,11 @@ The fifth rename ("Top geographic scope" → "Geographic Scope") is in the geogr
 **Details:** delete `GetTopContributorsContractsService`, `GetTopMainContactPersonsService`, `GetTopPartnersService`, `GetTopPrimaryLeversService` and the api methods `GET_TopContributorsContracts`, `GET_TopPartners`, `GET_TopMainContactPersons`, `GET_TopPrimaryLevers`, plus their specs. **`GetGeoScopeService` and `GET_GeoScope` survive** — they move with the geographic spec. **Server endpoints are untouched.**
 
 **Acceptance criteria:**
-- [ ] AC.1 — The four service files and their specs no longer exist.
-- [ ] AC.2 — The four `api.service.ts` methods and their spec cases no longer exist.
-- [ ] AC.3 — No remaining source file references any deleted symbol.
-- [ ] AC.4 — `GetGeoScopeService` and `GET_GeoScope` still exist and the geographic card still works.
-- [ ] AC.5 — The **full** client suite passes after deletion (**KZ-003**).
+- [x] AC.1 — The four service files and their specs no longer exist. *(validation-report.md §6.1 R-PDB-008 AC.1-AC.3 — PASS; grep across all 12 retired symbol forms, 0 hits)*
+- [x] AC.2 — The four `api.service.ts` methods and their spec cases no longer exist. *(validation-report.md §6.1 R-PDB-008 AC.1-AC.3 — PASS)*
+- [x] AC.3 — No remaining source file references any deleted symbol. *(validation-report.md §6.1 R-PDB-008 AC.1-AC.3 — PASS)*
+- [x] AC.4 — `GetGeoScopeService` and `GET_GeoScope` still exist and the geographic card still works. *(validation-report.md §6.1 R-PDB-008 AC.4 — PASS)*
+- [x] AC.5 — The **full** client suite passes after deletion (**KZ-003**). *(validation-report.md §6.1 R-PDB-008 AC.5 — PASS; 304 suites / 6234 tests, run by the auditor)*
 
 #### Scenario: Nothing else depended on them
 - GIVEN the four services are removed

@@ -8,7 +8,7 @@
 - **Linked judgment:** [`./judgment.md`](./judgment.md)
 - **Split off:** [`../geo-scope-expansion/`](../geo-scope-expansion/proposal.md)
 - **Stack:** Angular **19.1.6** + PrimeNG 19, standalone, signals, `OnPush`
-- **Last updated:** 2026-07-29
+- **Last updated:** 2026-07-30
 
 > **Revision history.** R1: expansion state inside the card (DD-1) + geographic toggles in the host (DD-6) — a combination with no wiring path. R2: inverted to a presentational card (DD-1r), and added a reactive route (DD-10). R3: **the geographic card is split into its own spec**, and **DD-10 is reverted** — two independent judges confirmed it converted benign staleness into a split-brain page with a cross-contract delete call.
 
@@ -218,7 +218,7 @@ Rendered **inside the `@if (items().length)` arm** of the state chain (`project-
 | **(i)** | **Measure and freeze.** Hold the container in an `ElementRef`, capture its `offsetHeight` while collapsed, and apply that value as an inline `height`/`max-height` while expanded. Guard jsdom's `0`. | The bound **equals** the collapsed height, so the contribution is identical in both states. Exactly card-area-relative, and the applied inline style is structurally assertable. |
 | **(ii)** | **Remove the expanded list from intrinsic sizing.** Keep a 5-row in-flow list — which *is* the collapsed geometry that defines "the area the card already occupies" — and render the full list while expanded in a `position: absolute; inset: 0; overflow-y: auto` overlay inside a `relative` parent. | An absolutely-positioned box contributes **nothing** to track sizing, so growth is structurally zero **with no measurement to get wrong**. Encoding survives: `barColor(index)` and `partnerBarWidthPercent` already read `items()`. |
 
-**Verification note.** A headless Chrome is available in this environment (`~/.cache/puppeteer/chrome-headless-shell/…`, `--headless --dump-dom`, no npm dependency), and a reusable geometry probe exists at `scratchpad/geometry-probe.html`. **DC-8's "no automated gate for rendered layout" premise is therefore weaker than RSK-4 and RB-2 assume** — a real browser can measure the four-link chain directly. The six-step human check remains the acceptance gate, but a candidate mechanism should be measured *before* review rather than argued.
+**Verification note.** A headless Chrome is available in this environment (`~/.cache/puppeteer/chrome-headless-shell/…`, `--headless --dump-dom`, no npm dependency), and a reusable geometry probe is committed at [`./evidence/dd14-geometry-probe.html`](./evidence/dd14-geometry-probe.html) (raw run: [`./evidence/dd14-measurements.json`](./evidence/dd14-measurements.json)). **DC-8's "no automated gate for rendered layout" premise is therefore weaker than RSK-4 and RB-2 assume** — a real browser can measure the four-link chain directly. The six-step human check remains the acceptance gate, but a candidate mechanism should be measured *before* review rather than argued.
 
 ### 6.3.1 ~~Bounding is not enough — the grid must also stop stretching (DD-13)~~ — **SUPERSEDED by DD-14**
 

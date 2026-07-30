@@ -1152,9 +1152,47 @@ The Reviewer went beyond the brief: **seven** viewports (including single-column
 | E-C.3 | Mockup row counts **not** raised to the measured 35 / 8 | The Implementer chose A-7's "reword as illustrative" branch over editing `DATA` arrays mid-correction. Correct call — DD-14's zero is structural, so smaller lists do not weaken it, and the claim is now accurate. |
 | E-C.4 | `judgment.md`'s "GATE-2 ⛔ open" left untouched | It is a **point-in-time adjudication record**, not live state. Rewriting history there would be dishonest; the live gates are `requirements.md` §11, `design.md` §13 and `tasks.md`, all now reconciled. |
 
-### Still owed — unchanged by this work, and all three are the owner's
+## 5. Partial human-check evidence — the real screen, 2026-07-30
 
-1. **The six-step human check** (`requirements.md` §7) — **now unblocked**, reference artefact measurement-verified. **NFR-PDB-004 remains UNVERIFIED, never passed.** Needs a browser and a project with >5 partners.
+**First direct observation of the shipped feature in the running app.** The owner supplied two screenshots of `localhost:4200/project-detail/A1578/project-dashboard` — contract **A1578**, 521 results, partner counts 15/14/14/12/11, comfortably past the >5 threshold `requirements.md` §7 requires. State: **Results Partners expanded**, the other three collapsed.
+
+**This is partial evidence and does NOT complete the six-step check.** Recorded because it is the first real-screen evidence in the run and it independently confirms several ACs that until now rested only on unit tests and a mockup.
+
+### Confirmed by direct observation
+
+| Requirement | Observation |
+| --- | --- |
+| **R-PDB-007** — the four renamed titles | **"Results Partners", "Primary Levers", "Main contact person", "Contributing projects"** render exactly as specified. None begins with `Top `. **First visual confirmation of this AC.** |
+| **R-PDB-002 AC.2** — no toggle at ≤5 rows | *Contributing projects* has **one** row and renders **no** toggle |
+| **R-PDB-003** — the toggle, both directions | *Results Partners* reads **"Show less"** while expanded; *Primary Levers* reads **"Show more"** while collapsed |
+| **DD-14** — the list scrolls inside the card's own area | The partner list is clipped **both at top and bottom** mid-row, i.e. scrolled through a window roughly five rows tall — exactly the overlay behaviour |
+| **§7 step 3** — row-mate keeps its height, **no empty gap** | *Primary Levers*, collapsed, shows its five rows with **"Show more" adjacent to LEVER 8** — no void |
+| Layout chain intact | The outer `3fr 1fr` grid renders as designed: ranked 2×2 on the left, *Results by indicator* (content-sized, `shrink-0`) and *Results by status* on the right |
+
+### Why step 3's evidence also speaks to step 2
+
+Both row-1 cards measure the same height — **which alone proves nothing**, since `items-stretch` forces them equal. The load-bearing observation is that **the collapsed row-mate fills its card with no gap**. Under **DD-13** the row-mate was *also* forced to equal height, but with its five rows stranded at the top and its toggle floating below a tall white void — that is the defect that caused the pivot. Its absence means the track height **is** the row-mate's natural collapsed height, and the expanded card fits inside it. **The expanded card did not grow.**
+
+### Still not established — and why the check remains open
+
+Steps **2, 4, 5 and 6 are comparisons**: they require the same view *before* expanding, which was not supplied.
+
+- **Step 4 is the one that matters most.** *Results by status* carries `flex-1` and absorbs the entire delta; **it is the step that failed under DD-13**. It is cut off at the bottom of the frame in both screenshots, so no void could have been seen if one existed.
+- A single collapsed screenshot at the same scroll position would close 2, 5 and 6 at once: under DD-14 the page must be **pixel-identical** apart from the list rows, so any movement is immediately visible.
+
+**Verdict unchanged: NFR-PDB-004 remains UNVERIFIED, never passed** (RB-2). The evidence above raises confidence and confirms four other ACs; it does not substitute for the gate.
+
+### ADVISORY from the real screen
+
+| # | Finding |
+| --- | --- |
+| **A-HC.1** | *(UX, low — no requirement violated)* **The expanded list has no visible scroll affordance.** macOS hides scrollbars by default, so the only cue that content continues is the clipped partial row at each edge. The shipped `pr-[6px]` reserves a gutter but paints nothing. This mattered less under DD-13's `46vh` window; under DD-14 the window is ~5 rows against lists reaching **137** (GATE-1), so the proportion hidden is far larger. Candidate for the same hardening pass as **T-09**, which is already about making that container usable — a scrolling region that is neither keyboard-reachable nor visibly scrollable is the same defect seen from two angles. |
+
+---
+
+### Still owed — three items, all the owner's
+
+1. **The six-step human check** (`requirements.md` §7) — **now unblocked**, reference artefact measurement-verified, and **partially evidenced above** (steps 1 and 3 observed; 2 indirectly supported). **NFR-PDB-004 remains UNVERIFIED, never passed.** What closes it: one collapsed screenshot at the same scroll position, ideally with *Results by status* fully in frame.
 2. **The `s-lint` decision** — reinterpret as "no new errors" (the reading this run assumed and evidenced) or drop the criterion.
 3. **Product-owner acknowledgement** of the four visible changes (`design.md` §11).
 

@@ -1,5 +1,15 @@
 # Judgment Day — Project Dashboard / Full-payload migration + Show-more
 
+> ## ⚠️ POINT-IN-TIME RECORD — do not read as live state
+>
+> **This is the adjudication record of a design review held 2026-07-29, preserved unedited on purpose.** Rewriting it to match later outcomes would destroy the evidence of what was known when. Where it disagrees with [`./requirements.md`](./requirements.md), [`./design.md`](./design.md), [`./tasks.md`](./tasks.md) or [`./execution.md`](./execution.md), **those win.**
+>
+> Known stale statements, listed so nobody has to discover them:
+>
+> - **GATE-2 is recorded here as ⛔ open.** It was **closed 2026-07-30** — and closed *twice*: the first closure was unsound (the mockup then in use could not model the defect it settled, which is what produced DD-13 and forced the T-06 pivot), and it was re-closed on measurement against the corrected DD-14 mockup. Live status: `design.md` §13, `requirements.md` §11, `tasks.md` header.
+> - **The design judged here is DD-13-era.** **DD-13 was superseded by DD-14** (`design.md` §6.3.2). This document's conclusions about bounded height and grid containment describe a mechanism that was subsequently measured to fail.
+> - Its three rounds of blind review **passed** on that containment design. That is not a defect in the record — it is the record's most useful content: **three independent reviews accepted a mechanism no amount of reading could falsify, and only measurement in a real browser caught it.** See `execution.md` § T-06 Pivot Record.
+
 - **Target:** `design.md` (draft), judged against `requirements.md` (approved)
 - **Spec id:** 2026-07-full-payload-show-more
 - **Mode:** `judgment_day` — blind dual review, read-only judges
