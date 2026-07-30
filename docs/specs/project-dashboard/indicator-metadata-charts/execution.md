@@ -10,7 +10,9 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — T-01 done, T-02 … T-17 todo
+- **Status:** in-progress — **T-01, T-02, T-05 done** (3 of 17); next eligible: **T-03** and **T-04** (both unblocked)
+- **Rework rounds consumed so far:** **0** — T-02 and T-05 both passed on attempt 1. Budget allows 2–3.
+- **Owner decisions pending:** 1 — the two advisory-derived items bundled in `## Owner escalation: advisory-derived items` below.
 
 ---
 
@@ -114,5 +116,199 @@ Enables R-IMC-001 AC.3, R-IMC-002, R-IMC-003; scopes NFR-IMC-002 · closes **OQ-
 #### Final verification
 
 All five scripts ran to completion against `alliancereportingdb`. Ten joins resolved, three cardinalities counted, three label decisions taken from observed rows, two design claims quantified. **No writes, no DDL, no repo changes.**
+
+---
+
+### T-05 — Gender merge util (pure) + its specs
+
+- **Status:** ✅ **PASS** — Reviewer PASS on attempt 1
+- **Date:** 2026-07-30
+- **Implementer attempts:** 1
+- **Roles:** Implementer (T2) → Reviewer (T3). `author ≠ auditor` enforced by the `.claude/agents/akili-*` wrappers' model bindings.
+- **Files changed:**
+  - `server/…/agresso-contract/utils/gender-distribution.util.ts` *(new, 84 lines)*
+  - `server/…/agresso-contract/utils/gender-distribution.util.spec.ts` *(new, 210 lines)*
+
+#### Implementer verification (attempt 1)
+
+| Check | Result |
+| --- | --- |
+| `npx jest …/gender-distribution.util.spec.ts` | **11 passed / 11 total** |
+| **Mutation (a)** — re-sort removed | **2 failed**: the AC.7 ordering case and the id-ASC tie-break. Restored; `diff` against backup byte-identical; suite green again |
+| **Mutation (b)** — merge made left-biased (group rows filtered to ids present in `individualRows`) | **4 failed**: AC.6, the mixed scenario, AC.4, DD-8. The group-only case went from `[Male:10, Female:4]` to `[]`. Restored; `diff` byte-identical; suite green |
+| `npx eslint` on the two new files | Clean, exit 0. One prettier error found and fixed **manually, not via `--fix`** — correct, since `npm run lint` would have auto-fixed the 26 pre-existing package-wide errors and polluted the review diff |
+
+#### Reviewer verdict — `STATUS: PASS`
+
+> The merge is a structurally symmetric sum over the union of `gender_id`s with no rule subordinating group rows to individual rows, satisfying design §6.2's standing prohibition, DD-2/DD-8, and R-IMC-005 AC.1–AC.4/AC.6/AC.7; I independently reproduced both mutation kills, including the group-only case collapsing from `[Male:10, Female:4]` to `[]`, so the DC-3 gate is proven live rather than asserted. Given tasks.md RB-1 designates this pass as the missing audit for design revision 4's unwarranted DD-8 fix, I record explicitly that the prohibited rule is absent from the shipped code and that its reintroduction is now test-gated.
+
+**The Reviewer re-derived the mutation evidence rather than trusting the report**, working on copies in a scratchpad so the repo stayed untouched, and surfaced the single most important fact about this suite: **`AC.1` stays green under mutation (b).** That is precisely the hazard `tasks.md` § T-05's "Evidence that does NOT count" clause names — a mixed fixture is green over the bug — and it demonstrates the suite does not rely on it. Also confirmed: purity (input rows never mutated), and util coverage **100 % stmts / lines / funcs, 70 % branches** (above the 60 % floor; the uncovered branches are unreachable defensive guards).
+
+**RB-1 partially discharged.** This is the independent audit that design revision 4's post-terminal DD-8 fix never received. It covers the *code*, not the design document.
+
+#### The Reviewer's four adjudications on the Leader's flagged questions
+
+| # | Question | Verdict |
+| --- | --- | --- |
+| 1 | AC.1 models "3 individual Male records" as one row with `count: 3` — faithful or a convenient shape? | **Faithful.** Design §6.2 defines `gender_individual` as grouped by `gender_id` in SQL, and `tasks.md` T-04 repeats it. The fixture models T-04's contract, and the spec comment states the justification inline so no future reader mistakes it for a shortcut |
+| 2 | Name collision when the same id arrives with different `name` on both sides | **Unspecified by the spec, correctly resolved, advisory.** Individual accumulates first, so the live `gender.name` label wins over the group branch's hardcoded literal — the better of the two unspecified options under S-3's rationale (labels are editable, ids are not) |
+| 3 | Local `GenderDistributionRow` instead of `MetadataCountDto` | **Spec-sanctioned, not a gap.** `tasks.md` §2 lists T-02 and T-05 as independent and T-05's dependencies as none; a pure util that must compile without T-02 has no other option. The types are structurally identical, so TS assignability makes T-06's reconciliation free |
+| 4 | Does every in-scope AC have a dedicated named assertion? | **Yes** — AC.1, AC.2 (dedicated `undefined` case + the group-`NULL` case), AC.3, AC.4, AC.6 (plus a mirror individual-only case hardening symmetry in both directions), AC.7 (plus tie-break), DD-8 (**uses id 99, outside the seeded 1–3 range, which proves a genuine union rather than a hardcoded three-category shape**), and both DC-3 fixtures. AC.5 (the rendered provenance note) is correctly outside this task. Order asserted with ordered `toEqual`, not `toContain` |
+
+#### Implementer's `Not Done / Assumptions` — carried verbatim
+
+> - **Input type is locally defined** (`GenderDistributionRow { id, name, count }`) rather than imported from `MetadataCountDto`, because T-02 (which defines that DTO) is independent of T-05 and not yet landed in this working tree beyond an in-progress uncommitted diff I did not touch. T-06 (sequential composition/merge wiring) or a later task should confirm this shape matches `MetadataCountDto` when it lands, or add a thin adapter — I did not wire this util into any repository/service/DTO, per the scope fence.
+> - All seven ACs (AC.1–AC.4, AC.6, AC.7) plus DD-8 pass-through and the DC-3 group-only gate have a dedicated, named assertion in the spec — none were left implicit.
+> - I did not touch T-04's SQL, the repository, service, or any DTO/client file, per the scope fence.
+
+**Leader adjudication:** bullet 1 is a **coupling note owed to T-06**, not scope omitted from T-05 — the scope fence forbade touching DTOs, so no other outcome was available. Bullets 2 and 3 are confirmations, not gaps. **T-06 must reconcile `GenderDistributionRow` against `MetadataCountDto` (now landed by T-02) or add a thin adapter** — recorded in `tasks.md` § T-06.
+
+#### `ADVISORY` findings (4R lenses) — recorded, non-gating, **not converted into tasks**
+
+Per `/akili-execute` §2.4 an advisory may not become a new task or widen an existing one on the Leader's initiative. All four are recorded here and die here unless the owner decides otherwise.
+
+| Lens | Finding |
+| --- | --- |
+| **Reliability** | **A wording inconsistency across three spec documents.** `tasks.md` § T-05, `design.md` §10 and `requirements.md` §9 DC-3 all say the group-only fixture should yield *"all three categories with their summed counts"* — but the fixture gives Non-binary `count: 0`, so **AC.3 drops it** and the assertion correctly expects two entries. `requirements.md`'s own *Scenario: Group-only project* expects exactly Male=10 and Female=4, so **"all three" is literally unsatisfiable alongside AC.3 when the third is zero.** The Implementer chose correctly and the mutation kill proves the gate works, but **no test asserts three *non-zero* categories surviving a group-only merge.** The Reviewer suggested handing it to T-07 or T-16 — **the Leader declined to do that**, because it would widen an approved task from an advisory. **Escalated to the owner instead as a spec-text gap** (see the escalation note below) |
+| **Resilience** | `NaN` poisoning is category-wide: `toSafeCount` guards `null`/`undefined`, but `Number('abc')` yields `NaN`, and since `NaN > 0` is false the category is dropped **including the valid contribution from the other side**. Unreachable today (both branches are `COUNT(*)` / `COALESCE(SUM(...),0)`) and `Number()` is a genuine plus for MySQL's BIGINT-as-string. Flagged so **T-06 does not widen the input surface without revisiting the guard** |
+| **Readability** | Two layers of the same defensive guard — the `= []` parameter defaults make the inner `rows ?? []` and `row?.count` unreachable for any caller respecting the declared types. This is what holds branch coverage at 70 % while everything else is 100 %, so **do not read 70 % here as a coverage signal** |
+| **Risk** | **The 30-line doc-comment is the real defense.** It names the prohibited rule, cites §6.2, and carries the live 6,057 M / 31,436 F measurement as the reason. The code alone does not explain why the symmetry matters, so that header is the strongest guard against a future reader "simplifying" the two `accumulate` calls back into a subordinating merge. **It must survive any future refactor of this file verbatim** |
+
+#### Requirements covered
+
+R-IMC-005 AC.1, AC.2, AC.3, AC.4, **AC.6**, **AC.7** · design §6.2, DD-2, DD-8 · gate **DC-3** closed. AC.5 (rendered provenance note) belongs to T-13.
+
+#### Decisions made
+
+| # | Decision |
+| --- | --- |
+| **O-05.1** | Name collision resolved individual-first, so the live `gender.name` beats the group branch's literal. Unspecified by the spec; recorded rather than left implicit |
+| **O-05.2** | The advisory wording gap was **not** folded into T-07 or T-16 despite the Reviewer's suggestion. `/akili-execute` §2.4 forbids the Leader minting or widening tasks from advisories — the owner decides |
+
+#### Issues encountered
+
+| # | Issue |
+| --- | --- |
+| **E-05.1** | **Working-tree collision between the two parallel Implementers.** T-02, running concurrently, issued a malformed `git stash push` that transiently staged T-05's untracked files, then ran `git restore --staged` on them. **File contents were unaffected** (verified: 294 lines, checksum taken), but it silently undid the `git add -N` the Leader had used to generate T-05's review diff, so the Reviewer's `git diff` returned nothing. **It recovered only because the brief carried an explicit fallback to reading the two files directly.** Root cause: two Implementers sharing one working tree. **Mitigation for future parallel waves: spawn with `isolation: worktree`.** |
+
+#### Final verification
+
+Suite as committed: **11 / 11 green**; eslint clean on both files; both mutations independently reproduced by the Reviewer and restored. Repo untouched by the audit.
+
+---
+
+### T-02 — DTO surface: base/full split, metadata section DTOs, `SessionTypeEnum`
+
+- **Status:** ✅ **PASS** — Reviewer PASS on attempt 1
+- **Date:** 2026-07-30
+- **Implementer attempts:** 1
+- **Roles:** Implementer (T2) → Reviewer (T3), `author ≠ auditor` enforced by wrapper model bindings.
+- **Files changed:**
+  - `server/…/agresso-contract/dto/reports-indicator-metadata.dto.ts` *(new)* — `MetadataCountDto` + `IndicatorMetadataSectionsDto`
+  - `server/…/agresso-contract/dto/reports-full.dto.ts` *(modified)* — split into `ContractBaseReportsDto` (7) and `ContractFullReportsDto extends … implements IndicatorMetadataSectionsDto` (+10)
+  - `server/…/agresso-contract/repositories/agresso-contract.repository.ts` *(modified — **signature only, 2 lines**)*
+  - `server/…/session-types/enum/session-type.enum.ts` *(new)*
+
+#### Implementer verification (attempt 1)
+
+| Check | Result |
+| --- | --- |
+| `npm run build` | Succeeds. No `TS2739`, no `TS2420` |
+| `npm test` | **328 suites / 2,095 tests passed** — no regressions |
+| Falsifiability check (**KZ-004**) | Made `degree` optional on purpose → `tsc --noEmit` failed with `TS2420`; reverted, clean again. **The safety net was verified to exist before being relied on**, which is what KZ-004 demands |
+| `npx eslint` on its four files | Three clean. `agresso-contract.repository.ts` reports **9 pre-existing prettier errors at lines 61–126**, unrelated to its changed lines (54, 1164–1167). The Implementer verified this baseline **independently via a disposable `git worktree` on unmodified `HEAD`** and found the same 9 errors there |
+
+The worktree baseline check deserves note: it is the difference between *asserting* errors are pre-existing and *proving* it, on a package where 26 such errors exist and could easily have been absorbed as this task's noise.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+> All four T-02 acceptance boxes are satisfied — the 7 original fields are inherited unchanged via `extends`, the 10 new sections are non-optional `MetadataCountDto[]` with names matching design §5 exactly, the repository edit is import + return type only, and `tsc`/eslint/the touched suites are clean. The one addition beyond design §3.1's literal wording (`IndicatorMetadataSectionsDto`) is the mechanism T-02's own "Evidence that does NOT count" clause demands, and I verified it enforces rather than merely documents the contract.
+
+**Independent verification the Reviewer ran** (it did not take the report on trust): `npx tsc --noEmit -p tsconfig.json` clean, zero diagnostics · `npx jest src/domain/entities/agresso-contract` → **5 suites / 122 tests passed**, including `agresso-contract.repository.spec.ts` and `agresso-contract.service.spec.ts`, the two most exposed to the signature change (**R-IMC-007 AC.3** — passing unmodified) · reproduced the `implements` guarantee **out-of-tree** with this repo's own `tsc`, which failed with `TS2416: Property 'degree' … Type 'M[] | undefined' is not assignable to type 'M[]'`. No repo file was modified during the audit.
+
+*(The Implementer observed `TS2420` and the Reviewer `TS2416` — different positions in the same check, both genuine. The guarantee bites either way.)*
+
+#### The Reviewer's adjudications on the Leader's flagged questions
+
+| # | Question | Verdict |
+| --- | --- | --- |
+| 1 | Is `IndicatorMetadataSectionsDto` a legitimate means or scope beyond design §3.1? | **Legitimate, plainly.** T-02's own "Evidence that does NOT count" clause *orders* the non-optional shape to be assertable **by construction**, and a class alone cannot do that — nothing stops a later task adding `?`. The interface is the minimum mechanism that discharges that order; it is compile-time-only (erased, no runtime surface, no new Swagger model, no wire-contract change), lives in the file §3.1 designates, and adds no class to the DTO inventory |
+| 2 | R-IMC-007 AC.1 — inherited or re-declared? | **Inherited.** Verified against `git show HEAD:…/reports-full.dto.ts`: the diff changes only the class declaration line; all 7 fields and their `@ApiProperty` decorators are unmodified context lines. **DD-3's structural protection holds** |
+| 3 | R-IMC-007 AC.2 — all 10 non-optional? | **Yes** — definite assignment (`field!: MetadataCountDto[]`), none optional or nullable, and `implements` turns optionality into a compile error rather than a convention |
+| 4 | Field names exact? | **Character-for-character** against design §5's table: `innovation_nature`, `innovation_type`, `innovation_readiness`, `oicr_maturity`, `policy_type`, `policy_stage`, `session_format`, `session_type`, `gender_distribution`, `degree`. T-03/T-04/T-06 and the client interface can key off these safely |
+| 5 | DD-4 compliance? | **Clean.** Correct path, doc-comment citing `1727119632564-InsertDataControl`, mirroring `DegreesEnum`. **Values verified against the migration itself:** `INSERT INTO session_types (session_type_id, name) VALUES (1, 'Training'), (2, 'Engagement')`. Exactly one new enum directory; **no duplicate `SessionFormatEnum`/`SessionLengthEnum` created** — revision 1's mistake did not recur |
+| 6 | R-IMC-012 AC.1 scope boundary? | **Respected.** `@ApiProperty` on all 10 new fields and `MetadataCountDto`'s 3; `agresso-contract.controller.ts` absent from the diff, so no `@ApiOkResponse` leaked in from T-09. R-IMC-007 AC.4 also holds — no version bump, no routing change |
+
+**On the signature-only edit the Leader had already verified**, the Reviewer agreed and went further: it confirmed **no consumer breaks** — `getFullContractReports` is awaited by `agresso-contract.service.ts:208-209`, which declares no explicit return type and therefore widens by inference, and no spec or other module references `ContractFullReportsDto`.
+
+#### Implementer's `Not Done / Assumptions` — carried verbatim
+
+> - I found pre-existing **untracked** files `…/agresso-contract/utils/gender-distribution.util.ts` and `.spec.ts` already in the working tree at session start (T-05 scope, not T-02). I did not create, modify, or delete them — during an aborted `git stash push` command (bad `-m` flag syntax) they were transiently staged as `A` by git's internal stash mechanics; I ran `git restore --staged` on them immediately to return them to their original untracked state with contents unchanged. No file content was altered by this incident — confirmed via `git status`/`git diff` before and after.
+> - I assumed the 10 section field names/order match `requirements.md` §4.1 exactly (`innovation_nature`, `innovation_type`, `innovation_readiness`, `oicr_maturity`, `policy_type`, `policy_stage`, `session_format`, `session_type`, `gender_distribution`, `degree`) — this is what design §5's field table specifies, and is the assumed contract that T-03/T-04/T-06 will need to populate.
+> - Scope fence respected: no query logic, gender util, service composition, Swagger `@ApiOkResponse`, or client files were touched.
+
+**Leader adjudication:** bullet 1 is the **E-05.1 / RB-8 collision, disclosed by the agent that caused it** — the disclosure is what made it cheap to verify (contents intact, 294 lines, checksum taken) and is exactly the reporting behaviour the `Not Done / Assumptions` field exists to surface. Bullet 2's assumption was **independently confirmed** by the Reviewer against design §5, so it is closed, not carried. Bullet 3 is a confirmation. **No scope remains owed.**
+
+#### `ADVISORY` findings (4R lenses) — recorded, non-gating, **not converted into tasks**
+
+| Lens | Finding |
+| --- | --- |
+| **Readability / citation accuracy** | The doc-comment at `reports-indicator-metadata.dto.ts:31` attributes the phrase *"Evidence that does NOT count"* to `design.md` **DD-3**. That clause is in `tasks.md` § T-02; DD-3 says only that the merge step is test-gated, not structurally guaranteed. Trivial in isolation — **but `tasks.md` RB-1 names "a correction record asserting more than the source supports" as this spec's recurring failure mode across three judgment rounds, and this is that shape exactly.** Escalated to the owner rather than fixed on Leader initiative (see below) |
+| **Risk (sequencing, not code)** | After T-02, `ContractFullReportsDto` is referenced by **nothing** in `server/src` — the repository returns the base type, T-06 owns the composition, T-09 the `@ApiOkResponse`. That is the intended graph, but **until T-06 lands, the enriched contract exists only as a type declaration**; a slip there would leave 10 fields declared and never populated. **Leader is tracking this as a dependency** — legitimate tracking of an approved task, not new scope |
+| **Naming** | `IndicatorMetadataSectionsDto` carries a `Dto` suffix while being an **interface**. Harmless today, but if a later task reaches for it where Nest needs a class (an `@ApiExtraModels` entry, a `ValidationPipe` target) the suffix will suggest it works when it cannot. `IndicatorMetadataSections` would signal the constraint |
+| **Reliability** | No unit spec covers these files, **correctly** — `*.enum.ts` is coverage-excluded and the DTOs carry no logic; the runtime `[]` assertion belongs to T-07. No gap to close here |
+
+#### Requirements covered
+
+R-IMC-007 AC.1, AC.2, AC.4 · R-IMC-012 AC.1 (the `@ApiProperty` half; the `@ApiOkResponse` half is T-09) · design §3.1, §5, §6.4, DD-3, DD-4.
+
+#### Decisions made
+
+| # | Decision |
+| --- | --- |
+| **O-02.1** | `IndicatorMetadataSectionsDto` accepted as the mechanism T-02's acceptance clause requires, not as scope beyond design §3.1 — Reviewer-adjudicated, with the guarantee verified out-of-tree rather than assumed |
+| **O-02.2** | The two advisory-derived items (the misattributed citation here, the three-document wording gap from T-05) were **escalated to the owner as a single decision** rather than folded into any task. `/akili-execute` §2.4 forbids the Leader widening approved tasks from advisories, and having declined the T-05 one on that basis, applying the rule inconsistently to a smaller item would be worse than applying it strictly |
+
+#### Issues encountered
+
+| # | Issue |
+| --- | --- |
+| **E-02.1** | The malformed `git stash push` → see **E-05.1** and **RB-8**. Disclosed by this Implementer in its own report |
+
+#### Final verification
+
+`tsc --noEmit` clean · full server suite **328 / 2,095 green** · `agresso-contract` suites **5 / 122 green** · eslint clean on the three new/rewritten files, with the repository's 9 errors proven pre-existing via a `HEAD` worktree · the `implements` guarantee reproduced out-of-tree.
+
+---
+
+## Owner escalation: advisory-derived items
+
+**Status: awaiting owner decision. Neither item was acted on.**
+
+`/akili-execute` §2.4 forbids the Leader minting a new task from an advisory or widening an approved one — an advisory is the least-vetted evidence in a run, and it is the fastest route from weak evidence to unapproved scope. Both items below are therefore **recorded and escalated, not absorbed**. Bundled into one decision so the owner is interrupted once.
+
+### Item 1 — a spec-text contradiction across three documents (from T-05's review)
+
+`tasks.md` § T-05, `design.md` §10 and `requirements.md` §9 DC-3 all require the group-only fixture to yield *"all three categories with their summed counts"*. But `requirements.md`'s own **Scenario: Group-only project** expects exactly Male=10 and Female=4 with Non-binary at 0, and **AC.3 mandates dropping zero totals**. So *"all three"* is **literally unsatisfiable alongside AC.3** whenever the third category is zero.
+
+- **The shipped code is correct** — it follows the scenario, and the mutation kill proves the gate works.
+- **What is genuinely missing:** no test asserts **three non-zero** categories surviving a group-only merge. AC.6 is currently gated jointly with AC.3 rather than independently.
+- **Cost to close:** add `Non-binary: 2` to the existing group-only fixture, or a second group-only case — a few lines — plus a wording correction in three documents.
+- **Why it is not free:** it touches an approved, completed, Reviewer-passed task, and the wording lives in a `requirements.md` acceptance criterion.
+
+### Item 2 — a misattributed citation (from T-02's review)
+
+`reports-indicator-metadata.dto.ts:31` attributes the phrase *"Evidence that does NOT count"* to `design.md` **DD-3**. It is in `tasks.md` § T-02. One line.
+
+**Why this small thing is being escalated rather than silently corrected:** `tasks.md` **RB-1** names *"a correction record asserting more than the source supports"* as this spec's recurring failure mode — **four occurrences across three judgment rounds**, and the reason the design's judgment lineage terminated `ESCALATED`. A citation pointing at a document that does not contain the quoted rule is that shape in miniature. Leaving it is cheap; leaving it **unrecorded** is how the pattern survived three rounds.
+
+### Options put to the owner
+
+| Option | Effect |
+| --- | --- |
+| **Authorise both fixes now** | The Leader may touch the two completed tasks' files for these two items only, and correct the wording in the three documents. Re-review scoped to the delta |
+| **Authorise Item 2 only** | Fix the one-line citation; leave the AC.6/AC.3 wording gap recorded and open |
+| **Defer both** | Both stay recorded here and in `tasks.md`. Nothing is touched. The AC.6 independence gap is a known, accepted hole |
+| **Reopen the spec** | Treat Item 1 as a genuine spec gap and amend `requirements.md` AC.6 / DC-3 properly via the Pivot Protocol, which re-runs the budget and approval gate |
 
 ---

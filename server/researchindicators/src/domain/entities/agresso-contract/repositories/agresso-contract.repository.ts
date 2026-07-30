@@ -51,7 +51,7 @@ import {
   ContractStaffFieldsDto,
   ContractStaffReportDto,
 } from '../dto/reports-contract-staff.dto';
-import { ContractFullReportsDto } from '../dto/reports-full.dto';
+import { ContractBaseReportsDto } from '../dto/reports-full.dto';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 
@@ -1166,7 +1166,7 @@ export class AgressoContractRepository
    */
   async getFullContractReports(
     contractId: string,
-  ): Promise<ContractFullReportsDto> {
+  ): Promise<ContractBaseReportsDto> {
     if (isEmpty(contractId)) {
       throw new BadRequestException('contract_id is required');
     }

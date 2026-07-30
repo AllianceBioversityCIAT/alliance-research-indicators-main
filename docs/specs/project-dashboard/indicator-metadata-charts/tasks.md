@@ -119,7 +119,14 @@ graph TD
 - **Evidence that does NOT count:** a green build. The build passes if the fields are declared optional (`?`) — which would let a later task ship `undefined` sections and satisfy the compiler while breaking R-IMC-007 AC.2 for every consumer. Assert the **non-optional** shape by construction (the T-07 spec asserts the runtime `[]`).
 - **Dependencies:** none
 - **Effort:** S · **Skills:** `nestjs-expert`, `api-design-principles`
-- **Status:** todo
+- **Status:** **done — 2026-07-30, Reviewer PASS attempt 1.** See [`execution.md`](./execution.md) § T-02.
+- **Consumed by later tasks:**
+  - `MetadataCountDto` (`{ id, name, count }`) and `IndicatorMetadataSectionsDto` live in `agresso-contract/dto/reports-indicator-metadata.dto.ts`. `ContractFullReportsDto extends ContractBaseReportsDto implements IndicatorMetadataSectionsDto`.
+  - **The 10 field names are now fixed and Reviewer-verified character-for-character** against design §5: `innovation_nature`, `innovation_type`, `innovation_readiness`, `oicr_maturity`, `policy_type`, `policy_stage`, `session_format`, `session_type`, `gender_distribution`, `degree`. T-03/T-04/T-06 populate these; T-10 mirrors them client-side.
+  - **`implements` makes optionality a compile error**, not a convention — if T-06 needs an intermediate shape, do not relax it there.
+  - `SessionTypeEnum { TRAINING = 1, ENGAGEMENT = 2 }` at `session-types/enum/session-type.enum.ts`, values verified against migration `1727119632564` by the Reviewer. **Import the pre-existing `SessionFormatEnum` / `SessionLengthEnum`** — do not create duplicates (DD-4).
+  - **Sequencing risk for T-06:** after T-02, `ContractFullReportsDto` is referenced by **nothing** in `server/src`. The enriched contract exists only as a type declaration until T-06 composes it — a slip there leaves 10 fields declared and never populated, with nothing failing.
+  - **Known citation error to fix on the next touch of this file** (owner-escalated, not folded into any task): the doc-comment at `reports-indicator-metadata.dto.ts:31` attributes *"Evidence that does NOT count"* to `design.md` DD-3; it is in `tasks.md` § T-02.
 
 ---
 
@@ -196,7 +203,14 @@ graph TD
 - **Evidence that does NOT count:** a single mixed individual+group fixture. **A merge that subordinates group rows to individual rows passes it and fails only the group-only case** — that is precisely the defect this spec exists to catch, so a suite without the group-only fixture is green over the bug (**KZ-001**, recurrence 5). Equally: asserting the output *contains* the right counts without asserting **order** leaves AC.7 ungated.
 - **Dependencies:** none
 - **Effort:** M · **Skills:** `nestjs-expert`
-- **Status:** todo
+- **Status:** **done — 2026-07-30, Reviewer PASS attempt 1.** See [`execution.md`](./execution.md) § T-05.
+- **Consumed by later tasks:**
+  - Entry point is `mergeGenderDistribution(individualRows, groupRows)` in `agresso-contract/utils/gender-distribution.util.ts`. It is pure, has no `DataSource`, and expects both sides already bucketed to `{ id, name, count }`.
+  - **T-04 owes it the shape it assumes:** `gender_individual` **grouped by `gender_id` in SQL** (so "3 individual Male records" arrives as one row with `count: 3`), plus the three literal `gender_group` rows. The AC.1 fixture models that contract — if T-04 does not group, the fixture is testing something else.
+  - **T-06 owes a reconciliation:** the util declares its own `GenderDistributionRow` because the scope fence forbade touching DTOs and T-02 had not landed. The two types are structurally identical, so TS assignability makes this free — **but confirm it explicitly or add a thin adapter; do not assume it.**
+  - **T-06 must not widen the util's input surface without revisiting `toSafeCount`** — it guards `null`/`undefined` but not `NaN`, and a `NaN` drops the whole category including the valid side (advisory, `execution.md` § T-05).
+  - **The util's 30-line doc-comment must survive any refactor verbatim.** It is the only thing explaining why the symmetry matters, and therefore the real guard against a future reader collapsing the two `accumulate` calls back into the prohibited subordinating merge.
+  - Branch coverage on this file sits at **70 %** because the defensive guards are unreachable by design. **Do not read that as a coverage signal.**
 
 ---
 
@@ -546,6 +560,7 @@ Each PR description follows `cognitive-doc-design` review-empathy rules: what to
 | **RB-5** | 2026-07-30 | **T-15 modifies `ProjectDashboardCardComponent`, which DD-6 says not to touch.** Owner-authorised via OQ-6 and narrowly scoped to attributes — but it is a multi-host component and the tension is real, not resolved by declaring it narrow | Attribute-only diff, geometry probe re-run, and a **full** client suite (T-16), not a targeted one (KZ-003) | open |
 | **RB-6** | 2026-07-30 | **DC-8 (visual quality) has no mechanical gate at all** — `axe` cannot judge contrast over rendered output and no checker distinguishes plausible-but-wrong labelling | Human check at PR 3's HITL pause **plus** a T6 Multimodal screenshot review. **If neither happens, this spec ships its dominant defect class unguarded** — recorded in `requirements.md` §9 as an accepted risk so that is a decision, not an oversight | open |
 | **RB-7** | 2026-07-30 | **D-2: conflicts with Chunk C1**, which shares `project-dashboard.component.*` | Do not run concurrently | open |
+| **RB-8** | 2026-07-30 | **Two parallel Implementers sharing one working tree collide on git state.** During the T-02 ‖ T-05 wave, T-02's malformed `git stash push` transiently staged T-05's untracked files and its `git restore --staged` silently undid the `git add -N` used to generate T-05's review diff — the Reviewer's `git diff` returned nothing. File contents were unaffected (verified), and it recovered only because the brief carried an explicit fallback to reading the files directly | **Spawn future parallel waves with `isolation: worktree`.** Until then, keep review briefs' diff instructions dual-path (git command **plus** direct file paths), and re-verify `git status` before extracting any diff | open |
 
 ## 8. Done definition
 
