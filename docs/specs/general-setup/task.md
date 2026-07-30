@@ -67,6 +67,8 @@ Each task uses this structure:
 - **Acceptance / done check:**
   - [ ] <observable check 1>
   - [ ] <observable check 2>
+  - [ ] **If the host renders N instances of one component, gate EACH instance's bindings** — not the mechanism once (**KZ-005**).
+- **Evidence that does NOT count:** <what looks like proof and is not>. Must name a **falsifiability** check (e.g. mutation-kill: break it, see red, restore) — and **verify that check actually exists in this repo's toolchain** before relying on it (**KZ-004**).
 - **Dependencies:** T-<NN>, T-<NN>
 - **Estimated effort:** S | M | L (S ≈ ½ day, M ≈ 1 day, L ≈ 2+ days)
 - **Owner:** <name>

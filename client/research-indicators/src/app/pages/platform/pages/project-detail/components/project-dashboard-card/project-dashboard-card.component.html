@@ -1,5 +1,5 @@
 @if (variant() === 'list') {
-<ng-container *ngTemplateOutlet="rankedList"></ng-container>
+<ng-container *ngTemplateOutlet="rankedList; context: { $implicit: visibleItems() }"></ng-container>
 } @else {
 <section class="box-border flex h-full flex-col rounded-xl border border-[#e8ebed] bg-white p-5 shadow-xs"
   [class.min-h-0]="compact()" [class.min-h-[280px]]="!compact()">
@@ -30,9 +30,48 @@
       <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[#777C83]">{{ emptyMessage() }}</p>
     </div>
     } @else if (items().length) {
-    <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
-      <ng-container *ngTemplateOutlet="rankedList"></ng-container>
+    <!--
+      DD-14 mechanism (ii) — design.md §6.3.2. This wrapper is a positioning
+      context holding up to two renders of #rankedList:
+        · the in-flow render iterates layoutItems(), capped at
+          COLLAPSED_ITEM_LIMIT, so the box it establishes does not depend on
+          whether the card is expanded. While the overlay is up it becomes a
+          layout-only spacer (visibility:hidden + aria-hidden, so it neither
+          shows nor is announced, but still occupies its box);
+        · the expanded render is absolutely positioned with inset-0, and an
+          absolutely-positioned box is out of flow, so it contributes nothing
+          to any ancestor's intrinsic (max-content) sizing — which is what the
+          auto-sized ranked-grid row track is measured from.
+      A max-height was tried first and measurably failed: it clamps a box's
+      max-content contribution only when the content exceeds it, so it binds in
+      the expanded state alone and the two states' contributions differ (+52px
+      on the row-1 cards in Chrome). The four-link chain of NFR-PDB-004 is
+      measured directly in
+      docs/specs/project-dashboard/full-payload-show-more/evidence/dd14-geometry-probe.html;
+      the table for this implementation is recorded in the T-06 record in
+      docs/specs/project-dashboard/full-payload-show-more/execution.md.
+    -->
+    <div class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col" [class.invisible]="expandedOverlay()"
+        [attr.aria-hidden]="expandedOverlay() ? 'true' : null">
+        <ng-container *ngTemplateOutlet="rankedList; context: { $implicit: layoutItems() }"></ng-container>
+      </div>
+      @if (expandedOverlay()) {
+      <div class="absolute inset-0 min-w-0 overflow-y-auto pr-[6px]">
+        <ng-container *ngTemplateOutlet="rankedList; context: { $implicit: visibleItems() }"></ng-container>
+      </div>
+      }
     </div>
+    @if (canExpand() && variant() === 'card') {
+    <button pButton type="button" [text]="true" size="small"
+      class="!mt-3.5 !w-fit !shrink-0 !gap-1.5 !px-0.5 !font-['Barlow'] !text-[13px] !font-bold !text-[#1771b3] focus-visible:!rounded-md focus-visible:!outline focus-visible:!outline-2 focus-visible:!outline-offset-2 focus-visible:!outline-[#1771b3]"
+      [attr.aria-expanded]="visibleLimit() === null" [attr.aria-label]="toggleAriaLabel()"
+      (click)="expandToggled.emit()">
+      <span>{{ toggleLabel() }}</span>
+      <i class="pi pi-chevron-down text-[11px] transition-transform duration-200 motion-reduce:transition-none"
+        [class.rotate-180]="visibleLimit() === null" aria-hidden="true"></i>
+    </button>
+    }
     } @else {
     <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
       <ng-content></ng-content>
@@ -42,17 +81,26 @@
 </section>
 }
 
-<ng-template #rankedList>
+<!--
+  `rows` is the slice this render iterates, supplied by each outlet's
+  `$implicit` context (DD-14 mechanism (ii) needs two renders of the same
+  markup over two different slices). `rankedRows` re-attaches the item type: an
+  inline <ng-template>'s context variables are `any`, so iterating `rows`
+  directly would silently drop compile-time checking of every `item.*` read in
+  the five layout branches below.
+-->
+<ng-template #rankedList let-rows>
+  @let rankedItems = rankedRows(rows);
   @if (layout() === 'columns') {
   <ul
     class="m-0 grid w-full max-w-full list-none box-border items-end gap-1.5 overflow-hidden rounded-[10px] bg-[#f4f7f9] px-2 pb-2.5 pt-3 p-0"
-    [style.min-height.px]="largeColumns() ? 200 : 140" [class.justify-center]="items().length <= 3"
+    [style.min-height.px]="largeColumns() ? 200 : 140" [class.justify-center]="rankedItems.length <= 3"
     [style.grid-template-columns]="
-      items().length <= 3
-        ? 'repeat(' + items().length + ', minmax(0, ' + (largeColumns() ? '72px' : '52px') + '))'
-        : 'repeat(' + items().length + ', minmax(0, 1fr))'
+      rankedItems.length <= 3
+        ? 'repeat(' + rankedItems.length + ', minmax(0, ' + (largeColumns() ? '72px' : '52px') + '))'
+        : 'repeat(' + rankedItems.length + ', minmax(0, 1fr))'
     ">
-    @for (item of items(); track item.id; let index = $index) {
+    @for (item of rankedItems; track item.id; let index = $index) {
     <li class="flex w-full min-w-0 flex-col items-center gap-1.5">
       <span class="font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[#112F5C]">{{ item.count }}</span>
       <div class="relative mx-auto w-full overflow-hidden" [style.height.rem]="largeColumns() ? 9 : 6"
@@ -71,7 +119,7 @@
   </ul>
   } @else if (layout() === 'rows-partners') {
   <ul class="m-0 flex list-none flex-col gap-3 justify-center pt-1">
-    @for (item of items(); track item.id; let index = $index) {
+    @for (item of rankedItems; track item.id; let index = $index) {
     <li class="grid items-center gap-2.5" style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)"
       [style.height.px]="itemHeightPx()">
       <span
@@ -90,7 +138,7 @@
   } @else if (layout() === 'rows-stacked-lever') {
   <div class="flex w-full flex-1 flex-col min-h-0 justify-start pt-1">
     <ul class="m-0 flex w-full list-none flex-col gap-3 p-0">
-      @for (item of items(); track item.id; let index = $index) {
+      @for (item of rankedItems; track item.id; let index = $index) {
       <li
         class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-b-[#e8ebed] pb-2 last:border-b-0 last:pb-0"
         [style.height.px]="itemHeightPx()">
@@ -121,7 +169,7 @@
   } @else if (layout() === 'rows-stacked') {
   <div class="flex w-full flex-1 flex-col min-h-0 justify-start">
     <ul class="m-0 flex w-full list-none flex-col gap-3 p-0">
-      @for (item of items(); track item.id; let index = $index) {
+      @for (item of rankedItems; track item.id; let index = $index) {
       <li
         class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-[#e8ebed] bg-white/80 px-4 py-3">
         <span
@@ -138,7 +186,7 @@
   </div>
   } @else {
   <ul class="m-0 flex list-none flex-col gap-2.5 p-0">
-    @for (item of items(); track item.id; let index = $index) {
+    @for (item of rankedItems; track item.id; let index = $index) {
     <li class="grid grid-cols-[minmax(0,1fr)_minmax(64px,1.6fr)_auto] items-center gap-2.5">
       <span class="cursor-default truncate font-['Barlow'] text-xs text-[#4c5158]" [pTooltip]="item.label"
         tooltipPosition="top">{{ item.label }}</span>
