@@ -1,5 +1,6 @@
 // Shared fixture for the Project Dashboard "full-payload" feature.
 // @sdd-spec docs/specs/project-dashboard/full-payload-show-more (T-01)
+// @sdd-spec docs/specs/project-dashboard/indicator-metadata-charts (T-10)
 //
 // Typed against `@interfaces/contract-full-reports.interface`. This is the
 // canonical `GET reports/full` payload for every spec in this feature — do
@@ -21,6 +22,24 @@
 //   - `staff` and `geo_scope` are populated (mirrored, unused by this spec)
 //     so the interface is exercised in full — the geographic-scope spec is
 //     the eventual consumer of `geo_scope`.
+//
+// indicator-metadata-charts (T-10) extends the same payload with the 10
+// Indicator-metadata sections, carrying the five cases T-11/T-13/T-14 gate on
+// (design §7.2, requirements DC-13):
+//   - **> 5 categories**: `innovation_readiness`, 10 entries — T-01 measured
+//     this as the one real chart that exceeds the 5-category threshold, so it
+//     is the natural section to make large. Included regardless of live
+//     counts (a sync-populated table's row count is not a contract).
+//   - **exactly 5** (the boundary — no toggle at exactly 5): `policy_type`.
+//   - **exactly 3**: `oicr_maturity` (also gender_distribution, incidentally).
+//   - **empty array**: `policy_stage`.
+//   - **deliberately out-of-order** (not sorted `count DESC, id ASC`, so
+//     ordering assertions are not accidentally satisfied by insertion order):
+//     `session_type` — Engagement(25) listed before Training(40); correct
+//     order would be Training(40) first.
+// The remaining sections (`innovation_nature`, `innovation_type`,
+// `session_format`, `gender_distribution`, `degree`) carry ordinary,
+// correctly-sorted, non-empty data.
 
 import {
   ContractFullReports,
@@ -28,7 +47,8 @@ import {
   ContractFullReportsMainContactPerson,
   ContractFullReportsPartner,
   ContractFullReportsPrimaryLever,
-  ContractFullReportsStaffMember
+  ContractFullReportsStaffMember,
+  IndicatorMetadataCount
 } from '@interfaces/contract-full-reports.interface';
 
 const OUT_OF_ORDER_PARTNERS: ContractFullReportsPartner[] = [
@@ -67,6 +87,79 @@ const STAFF: ContractFullReportsStaffMember[] = [
   { name: 'Amara Chen', role: 'Program Assistant' }
 ];
 
+// --- Indicator-metadata sections (indicator-metadata-charts spec, T-10) ---
+
+const INNOVATION_NATURE: IndicatorMetadataCount[] = [
+  { id: 1, name: 'Technological', count: 12 },
+  { id: 2, name: 'Institutional', count: 8 },
+  { id: 3, name: 'Policy or regulatory', count: 5 },
+  { id: 4, name: 'Capacity development', count: 2 }
+];
+
+const INNOVATION_TYPE: IndicatorMetadataCount[] = [
+  { id: 1, name: 'Technology', count: 20 },
+  { id: 2, name: 'Product', count: 15 },
+  { id: 3, name: 'Service', count: 9 },
+  { id: 4, name: 'Process', count: 3 }
+];
+
+/** > 5 categories (design §7.2 / DC-13) — T-01 measured this as the one real chart of ten that exceeds 5. */
+const INNOVATION_READINESS_TEN_CATEGORIES: IndicatorMetadataCount[] = [
+  { id: 11, name: '0. Idea', count: 45 },
+  { id: 12, name: '1. Basic research completed', count: 38 },
+  { id: 13, name: '2. Proof of concept', count: 30 },
+  { id: 14, name: '3. Prototype development', count: 25 },
+  { id: 15, name: '4. Small-scale piloting', count: 20 },
+  { id: 16, name: '5. Fully tested small-scale', count: 15 },
+  { id: 17, name: '6. Piloting at scale', count: 10 },
+  { id: 18, name: '7. Available for uptake', count: 7 },
+  { id: 19, name: '8. Adopted or purchased', count: 4 },
+  { id: 20, name: '9. Impact at scale achieved', count: 1 }
+];
+
+/** Exactly 3 categories. */
+const OICR_MATURITY_THREE_CATEGORIES: IndicatorMetadataCount[] = [
+  { id: 1, name: 'Level 1', count: 14 },
+  { id: 2, name: 'Level 2', count: 9 },
+  { id: 3, name: 'Level 3', count: 3 }
+];
+
+/** Exactly 5 categories — the boundary DC-13 asserts must NOT show a toggle. */
+const POLICY_TYPE_FIVE_CATEGORIES: IndicatorMetadataCount[] = [
+  { id: 1, name: 'Strategy/Plan/Program', count: 12 },
+  { id: 2, name: 'Legal instrument', count: 9 },
+  { id: 3, name: 'Bill/draft legislation', count: 7 },
+  { id: 4, name: 'Budget/expenditure', count: 4 },
+  { id: 5, name: 'Regulation and enforcement', count: 2 }
+];
+
+/** Empty array — R-IMC-007 AC.2 ("always present as an array, empty rather than absent"). */
+const POLICY_STAGE_EMPTY: IndicatorMetadataCount[] = [];
+
+const SESSION_FORMAT: IndicatorMetadataCount[] = [
+  { id: 1, name: 'Individual', count: 32 },
+  { id: 2, name: 'Group', count: 18 }
+];
+
+/** Deliberately out of order: Engagement(25) precedes Training(40) — correct order would be Training first. */
+const SESSION_TYPE_OUT_OF_ORDER: IndicatorMetadataCount[] = [
+  { id: 2, name: 'Engagement', count: 25 },
+  { id: 1, name: 'Training', count: 40 }
+];
+
+const GENDER_DISTRIBUTION: IndicatorMetadataCount[] = [
+  { id: 2, name: 'Female', count: 620 },
+  { id: 1, name: 'Male', count: 410 },
+  { id: 3, name: 'Non-binary', count: 15 }
+];
+
+const DEGREE: IndicatorMetadataCount[] = [
+  { id: 1, name: 'PhD', count: 22 },
+  { id: 2, name: 'MSc', count: 15 },
+  { id: 3, name: 'BSc', count: 8 },
+  { id: 4, name: 'Other', count: 1 }
+];
+
 /** Deep-clones the canonical fixture so callers can safely mutate the result. `overrides` shallow-merge onto the top level. */
 export function mockContractFullReports(overrides: Partial<ContractFullReports> = {}): ContractFullReports {
   return {
@@ -100,6 +193,16 @@ export function mockContractFullReports(overrides: Partial<ContractFullReports> 
         }
       ]
     },
+    innovation_nature: INNOVATION_NATURE.map(item => ({ ...item })),
+    innovation_type: INNOVATION_TYPE.map(item => ({ ...item })),
+    innovation_readiness: INNOVATION_READINESS_TEN_CATEGORIES.map(item => ({ ...item })),
+    oicr_maturity: OICR_MATURITY_THREE_CATEGORIES.map(item => ({ ...item })),
+    policy_type: POLICY_TYPE_FIVE_CATEGORIES.map(item => ({ ...item })),
+    policy_stage: POLICY_STAGE_EMPTY.map(item => ({ ...item })),
+    session_format: SESSION_FORMAT.map(item => ({ ...item })),
+    session_type: SESSION_TYPE_OUT_OF_ORDER.map(item => ({ ...item })),
+    gender_distribution: GENDER_DISTRIBUTION.map(item => ({ ...item })),
+    degree: DEGREE.map(item => ({ ...item })),
     ...overrides
   };
 }

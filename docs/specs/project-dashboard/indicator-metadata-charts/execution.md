@@ -10,7 +10,7 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — **T-01 … T-09 done** (9 of 17). **The entire server tier is complete, gated, and live-verified.** Nothing on the server side is outstanding: the payload composes, the queries execute against the real schema, all three NFR-IMC-001 bounds are met, the CI gates are mutation-verified, and the OpenAPI schema is proven to render. All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
+- **Status:** in-progress — **T-01 … T-10 done** (10 of 17). Server tier complete; **the client chain has started.** **The entire server tier is complete, gated, and live-verified.** Nothing on the server side is outstanding: the payload composes, the queries execute against the real schema, all three NFR-IMC-001 bounds are met, the CI gates are mutation-verified, and the OpenAPI schema is proven to render. All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
 - **Rework rounds consumed: 1** (T-07 attempt 1 → 2), against a budget of 2–3.
 - **Next eligible:** **T-09** (Swagger — needs the app booted, so the DB tunnel must be up), then the client chain **T-10 → T-11/T-12 → T-13 → T-14**, then **T-15** (the T-09 a11y carry-forward), **T-16** (390 px measurement + full suite) and **T-17** (docs).
 - **Open items carried forward:** four one-line advisories from T-07's review escalated to the owner and not absorbed (`gender_group` id/name pairing, reorder-brittleness note, `ORDER BY` uniqueness, one stale "below"/"above" pointer); the three-document *"all three categories"* wording gap from T-05; and **RB-11**, the contained credential leak, whose rotation is the owner's call.
@@ -583,6 +583,47 @@ Ordered `toEqual` throughout with no `toContain`/`arrayContaining` anywhere; the
 #### On the cause of Issue 1 — the Leader's brief
 
 My brief instructed the Implementer to prefer the params array over SQL-text matching, calling text matching brittle. **The Reviewer settled that against me using this repo's own convention:** `utils/primary-contract-results.util.spec.ts:24-33` already asserts `toContain('rc.is_primary = TRUE')`, `toContain('r.is_snapshot = FALSE')` clause by clause. **The Leader wrote that file earlier in this same session** — so the brief warned against a pattern the Leader had itself established one file over. Two 25-character predicates on load-bearing semantics are not a query snapshot.
+
+---
+
+### T-10 — Client data layer: interface mirror + canonical fixture extension — ✅ **PASS**
+
+- **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31 · first client-side task
+- **Files:** `contract-full-reports.interface.ts` · `get-full-contract-reports.service.ts` · `contract-full-reports.mock.ts` — **182 insertions / 2 deletions, zero `*.spec.ts` touched**
+
+#### Verified by execution, not by reading
+
+The Reviewer **ran** the fixture rather than inspecting it: `innovation_readiness` **10** entries, `policy_type` **exactly 5**, `oicr_maturity` **3**, `policy_stage` **0**, and `session_type` the **only** section that fails a `count DESC, id ASC` check — so all five required cases are real, and the two that matter most (**>5** and **exactly 5**) are the ones DC-13 asserts a toggle at 6 and *no* toggle at 5. It also set-compared the 10 client field names against `MetadataCountDto` (identical character-for-character), confirmed `gender_individual`/`gender_group` appear **nowhere** in `client/src`, and checked deep-clone isolation plus `mockContractFullReports({...})` overrides.
+
+**R-IMC-007 AC.3 satisfied by diff:** zero spec files in the change. Client suite **304 suites / 6,234 tests**, matching the baseline the Leader measured before delegating.
+
+**The `tsc` exit-2 was proven pre-existing structurally**, which is stronger than the Implementer's `git stash` check: `tsconfig.app.json` declares `files: ["src/main.ts"]` and includes only `src/**/*.d.ts`, so **no `*.spec.ts` can enter the `ng build` program at all**; the three errors are `TS1005` **syntax** errors in two untouched spec files, and no change to three non-spec files can inject a syntax error elsewhere.
+
+#### Three corrections to the Leader's framing — two of them in the Leader's favour
+
+**1. The Leader wrongly took the blame for the `name: string | null` asymmetry.** I told the Reviewer *"my brief induced this."* It did not: **`tasks.md` § T-04's "Consumed by later tasks" block already mandated it in writing**, addressed to T-10 by name — *"T-10 must not assume non-null labels… prefer a client-side fallback over a `COALESCE` that would mint an unlabelled category."* So `string | null` is the **spec-conformant** side, and aligning the client to `string` would have violated the spec. Recorded because a Leader mis-assigning blame to itself distorts the audit trail as much as one deflecting it.
+
+**2. The Leader's feared burden on T-11/T-12/T-13 is structurally unreachable.** I worried the nullable label would surface as a template rendering `"null"`, ungated. It cannot: the card's item type is `ProjectDashboardRankedListItem { id: string; label: string; count: number }` (`project-dashboard.interface.ts:5`), so **T-11's mapper cannot compile** without explicitly resolving `name: string | null → label: string` and `id: number → string`. Angular also interpolates `null` as `''`, never `"null"`. The type converts the feared runtime defect into a **T-11 compile error** — precisely where T-04 said the fallback belongs.
+
+**3. On the accessors the Leader's instinct was right but the diagnosis needed narrowing.** A **typo** cannot survive — `payload()?.innovation_natrue` is a compile error against the typed interface. A **cross-wire** can: `innovationType = computed(() => payload()?.innovation_nature ?? [])` compiles cleanly, and **nothing reaches it.** `project-dashboard.component.spec.ts:108-133` replaces `GetFullContractReportsService` with `createReportsMock()`, whose accessors are **independent writable signals** set by hand — so **T-14 structurally cannot exercise the real `computed`s.** This is recurrence **3** of the dead-artifact pattern (T-02's DTO, the T-03/T-04 repository, now these).
+
+#### The finding that matters most: **T-14 has a hard blocker, discovered before it started**
+
+`createReportsMock` / `applyFixtureToReportsMock` **do not carry the 10 new sections.** Without extending them, T-14's ten per-instance DC-5 assertions — which its **own existing acceptance box already requires** — would bind to `undefined` and **pass vacuously.** That is the same shape as T-07's failure: a green suite over nothing.
+
+**Recording this is not widening T-14.** Its box already demands *"Ten separate per-card data assertions"*; the mock extension is the mechanical prerequisite for satisfying a box it already owns. Booked in `tasks.md` § T-14 as a prerequisite, not as new scope.
+
+#### `ADVISORY` — one booked as prerequisite, one escalated, one bookkeeping
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| **1** | **The server is the wrong side of the nullability asymmetry.** `MetadataCountDto.name!: string` and `design.md` §5's inline `{ id: number; name: string; count: number }` now contradict both the client and the executed schema. **The Reviewer's timing argument is the strong part:** design §5 / W-6 records that `ContractFullReportsDto` reaches OpenAPI **for the first time via this spec's own `@ApiOkResponse`** — so there is **no consumer to break**, only a known-false schema to avoid publishing. **Deferring means shipping a contract that is false on day one, and the cost rises after first publication.** | **Escalated to the owner.** Leader assessment: **not critical** by the owner's standing bar — the client already declines to trust it, so no client defect exists — but it is cheapest *now*, and that timing asymmetry is the part worth deciding on rather than inheriting |
+| **2** | **T-14 must own the accessors.** Add to its done-check: ten one-line accessor assertions in `get-full-contract-reports.service.spec.ts` mirroring the existing `:94-99` pattern for the six Chunk A accessors, so a cross-wire becomes killable | **Booked in `tasks.md` § T-14 as a recommendation**, alongside the mock extension which is a hard prerequisite. The accessor assertions are the part that is arguably new scope, so they are flagged rather than mandated |
+| **3** | T-10's *"Files touched (intended)"* listed **2** files while its Description mandated the service accessors — the third file was authorised by the Description; the file list was the stale half | ✅ **Corrected in `tasks.md`.** Bookkeeping on the Leader's own document, so no escalation needed — and worth fixing so it is never later read as scope creep |
+
+#### Requirements covered
+
+R-IMC-007 AC.3 (by diff) · §4.1 field/label map mirrored · the fixture substrate for T-11, T-13 and T-14, including DC-13's two boundary cases.
 
 ---
 

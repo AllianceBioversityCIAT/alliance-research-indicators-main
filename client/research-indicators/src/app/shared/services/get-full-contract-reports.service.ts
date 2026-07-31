@@ -31,6 +31,20 @@ export class GetFullContractReportsService {
   staff = computed(() => this.payload()?.staff ?? []);
   geoScope = computed(() => this.payload()?.geo_scope ?? null);
 
+  // Indicator-metadata sections (indicator-metadata-charts spec, T-10).
+  // Same `payload` signal, same computed-accessor pattern (DD-2r) — no
+  // second source of truth.
+  innovationNature = computed(() => this.payload()?.innovation_nature ?? []);
+  innovationType = computed(() => this.payload()?.innovation_type ?? []);
+  innovationReadiness = computed(() => this.payload()?.innovation_readiness ?? []);
+  oicrMaturity = computed(() => this.payload()?.oicr_maturity ?? []);
+  policyType = computed(() => this.payload()?.policy_type ?? []);
+  policyStage = computed(() => this.payload()?.policy_stage ?? []);
+  sessionFormat = computed(() => this.payload()?.session_format ?? []);
+  sessionType = computed(() => this.payload()?.session_type ?? []);
+  genderDistribution = computed(() => this.payload()?.gender_distribution ?? []);
+  degree = computed(() => this.payload()?.degree ?? []);
+
   main(contractId: string) {
     this.contractId = contractId;
     void this.update();
