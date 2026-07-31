@@ -586,6 +586,60 @@ My brief instructed the Implementer to prefer the params array over SQL-text mat
 
 ---
 
+### T-15 — Close Chunk A's deferred T-09 keyboard gap (+ two owner-authorised additions) — ✅ **PASS**
+
+- **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31
+- **Files:** `project-dashboard-card.component.html` *(attribute-only)* · `project-dashboard-card.component.spec.ts` · `project-dashboard.component.spec.ts` *(A-1 + A-2)*
+- **The spec's only authorised exception to DD-6**, taken on the owner's OQ-6 decision. `.component.ts` **not** in the diff.
+
+#### What closed
+
+The DD-14 overlay — the scroll container carrying **5,903 px of content inside a 228 px box** on the partners card — gained `tabindex="0" role="group" [attr.aria-label]="title()"`. A keyboard-only user can now reach the rows past the collapsed window. **WCAG 2.1.1 / PRD §8.3 C-4 / NFR-IMC-002.**
+
+**`role="group"` over `region`, and the Reviewer added a reason the Implementer had not stated.** The Implementer's argument was sound — up to **14** overlays can coexist (4 ranked + 10 metadata), and ARIA reserves `region` for significant perceivable sections, so that many landmarks would degrade the list into noise. The Reviewer added the load-bearing part: **on a generic `<div>` an `aria-label` is not exposed at all**, so *some* role was required for the accessible name to resolve — `group` is the **minimal** role that achieves it. The attribute is not decoration.
+
+**The `aria-hidden` discriminator did not shift**, verified structurally rather than by the green suite alone: none of the card spec's four DOM helpers keys on `role` or `tabindex`, no `aria-hidden` was added or removed, and the overlay is a **sibling** of the spacer under the same parent — so no subtree relationship changed. The 6 fragile cases are intact.
+
+**The evidence discriminates reachability, not attribute presence** — and the Reviewer probed the load-bearing assumption against the project's own jsdom 20.0.3: `div.focus()` **without** `tabindex` leaves `document.activeElement` as `BODY`; **with** it, the element. So the assertion genuinely tests what it claims, and mutation 1's kill is mechanically correct. The two-live-instance name test uses a **second** `TestBed.createComponent` with a different title, asserting both names resolve *and* differ — something a single mutated-input instance could not show.
+
+**KZ-003 satisfied in full** (multi-host component): the Reviewer ran the **full** client suite itself, **306 suites / 6,292 tests**, exit 0, coverage 99.33 / 98.03 / 99.14 / 99.56.
+
+#### A-1 and A-2 — both landed, and A-1's isolation was the right instinct
+
+**A-1:** the regex now takes `card.emptyMessage` as its subject inside the loop; the test-local literal survives only as the exact-match subject two lines up.
+
+**A-2:** a real host-wiring gate. The band is the **real** `IndicatorMetadataBandComponent` while the cards are stubs — the correct split for a wiring test — and `getCardByTitle` throws on no match, so the disappearance assertion is genuine rather than a truthiness check. The two mutation shapes are consistent with the code: deleting `(collapseToggled)` leaves `isBandCollapsed()` false and reddens the first assertion; deleting `[collapsed]` leaves the band's `@if (!collapsed())` unflipped so the cards stay rendered and the `.toThrow()` line reddens instead. **Different lines, as reported.**
+
+**On A-1's isolation experiment, the Reviewer's judgement is worth quoting in substance:** the question *"does A-1's regex gate W-7 on its own line?"* is **unanswerable while a strictly stronger exact-match assertion shadows it** — every mutation reddens the stronger line first, so the regex would pass every mutation test **while being decorative**. Temporarily suppressing the shadowing assertion is the only way to observe the weaker one's kill power. Done on a **test** file, restored, checksum-verified. *"This is exactly how you distinguish hardening from theatre"* — and it **confirmed** the "hardening, not a hole" framing rather than assuming it.
+
+#### ⚠ The geometry probe — a misattributed inference, corrected here
+
+The Implementer ran `dd14-geometry-probe.html` in real `chrome-headless-shell` before and after, got byte-identical `RESULTS_JSON`, and wrote that this *"confirms the change touched no geometry."*
+
+**It does not, and the Leader flagged it before the review.** The Reviewer confirmed the reasoning with the sharpest available statement: the probe is **205 self-contained lines** — no `src=`, no `import`, no fetch, **no reference to `project-dashboard-card` anywhere**. Its output is a function of (probe file × browser build × viewport) **and nothing else**, and `git status` shows **zero** files touched under `docs/specs/archive/`. So byte-identical output was **analytically guaranteed before the template was touched — and would have been equally guaranteed had the Implementer deleted `absolute inset-0` outright.**
+
+**The Implementer's own sentence contains the refutation:** *"independent of the Angular template"* is precisely why it cannot speak to an Angular-template edit.
+
+**Corrected record:** the probe re-run evidences **harness reproducibility only** (same Chrome, same rendering, deterministic). **The no-geometry-change property is evidenced by the class-list diff** — `absolute inset-0 min-w-0 overflow-y-auto pr-[6px]` is character-for-character identical, with only three attributes and a comment appended, and `.component.ts` absent from the diff entirely.
+
+**Running it was reasonable work, not waste.** It is a checklist line; an Implementer who silently skipped it would be *less* auditable than one who ran it and over-read the result. The error is confined to the write-up.
+
+#### ⚠ The spec-level artifact this exposed — and why T-16 was worse exposed
+
+`tasks.md` § T-15's *"re-run the geometry probe and confirm the delta is still zero"* was **copied verbatim from archived T-09**, and **the named artifact structurally cannot observe its subject.** Carried across two specs, it will keep producing green checkboxes backed by nothing.
+
+**T-16 inherited a worse version, for a reason specific to this spec.** Its charter never named its measurement *subject* — *"an evidence artifact under `./evidence/`; no source changes"* — and the only artifact it referenced was **the mockup**. On the plain reading, **T-16 would measure a static replica and report NFR-IMC-003 met on numbers describing hand-built HTML.**
+
+Chunk A already knew replica numbers transfer only once fidelity is **measurement-verified** — A-08.3 did exactly that dance: seven viewports, zero delta on all four links, with a `max-height` control reproducing the real component's **+52 px / +13 px** failures. **But that work covered the DD-14 ranked cards only.** This spec's `mockup/` is new, and the metadata bands and cards are **new DOM that Chunk A's fidelity verification never touched.**
+
+**NFR-IMC-003 is this spec's only outstanding responsive claim**, so measuring a replica of unverified fidelity would not close it. ✅ **T-16's entry has been amended before dispatch** to name its subject explicitly and to carry the fidelity condition — see `tasks.md` § T-16.
+
+#### One acceptance box that was never observed — routed to T-16
+
+`tasks.md` § T-15's box *"scrollable by keyboard alone (Tab to it, then arrows / Page Down)"* has **no observation behind it**: jsdom cannot scroll, and the delivered evidence covers **focusability only**. Not a defect — the scroll behaviour is native to a focused `overflow-y` container and the spec prescribed exactly this attribute shape. **But the box is not literally earned**, and **T-16's real-browser session closes it in three lines: focus the overlay, dispatch `Page Down`, read `scrollTop`.** Added to T-16.
+
+---
+
 ### T-14 — Host specs: visibility, per-instance bindings, expansion boundary, states — ✅ **PASS**
 
 - **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31

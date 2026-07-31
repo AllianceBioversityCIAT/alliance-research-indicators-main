@@ -57,7 +57,19 @@
         <ng-container *ngTemplateOutlet="rankedList; context: { $implicit: layoutItems() }"></ng-container>
       </div>
       @if (expandedOverlay()) {
-      <div class="absolute inset-0 min-w-0 overflow-y-auto pr-[6px]">
+      <!--
+        T-15 (owner-authorised DD-6 exception): attribute-only addition so this
+        overlay — the only scroll container carrying the rows past the
+        collapsed window — is keyboard-reachable (WCAG 2.1.1). `role="group"`
+        rather than `"region"`: up to 14 of these can be on screen at once
+        (4 ranked + 10 metadata cards), and landmark navigation is for a
+        page's significant sections, not a per-card repeated widget — that
+        many regions would clutter it rather than help it. `aria-label` from
+        `title()` mirrors `toggleAriaLabel` (below), which already carries the
+        same title text to distinguish otherwise-identical controls.
+      -->
+      <div class="absolute inset-0 min-w-0 overflow-y-auto pr-[6px]" tabindex="0" role="group"
+        [attr.aria-label]="title()">
         <ng-container *ngTemplateOutlet="rankedList; context: { $implicit: visibleItems() }"></ng-container>
       </div>
       }

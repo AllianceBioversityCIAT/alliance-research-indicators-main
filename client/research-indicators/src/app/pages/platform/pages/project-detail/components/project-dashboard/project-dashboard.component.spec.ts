@@ -822,11 +822,58 @@ describe('ProjectDashboardComponent', () => {
         const card = getCardByTitle(title);
         expect(card.empty).toBe(true);
         expect(card.emptyMessage).toBe(message);
+        // W-7 (design §7.5): the copy must not assert WHY the section is
+        // empty -- the true reason here (is_primary scoping) differs from
+        // the all-null case above, and the copy must not distinguish them.
+        // T-15 A-1: asserted against `card.emptyMessage` (the production
+        // value), not the `message` literal above -- that literal is
+        // test-local, so a regex on it can never redden from a production
+        // change and would silently stop gating W-7 the moment this test's
+        // own literal were edited for new copy.
+        expect(card.emptyMessage).not.toMatch(/unanswered|left this|primary/i);
       }
-      // W-7 (design §7.5): the copy must not assert WHY the section is
-      // empty -- the true reason here (is_primary scoping) differs from the
-      // all-null case above, and the copy must not distinguish them.
-      expect(message).not.toMatch(/unanswered|left this|primary/i);
+    });
+  });
+
+  /**
+   * T-15 A-2: nothing in this file referenced `collapsedBands`,
+   * `toggleBandCollapse` or `isBandCollapsed` before this case existed --
+   * T-12's own spec (`indicator-metadata-band.component.spec.ts`) proves the
+   * collapse *mechanism* (an unbound `collapsed` input hides projected
+   * content; an activated toggle emits `collapseToggled`), but nothing
+   * proved the *host* wires that mechanism up. Deleting either
+   * `[collapsed]="isBandCollapsed(band.indicatorId)"` or
+   * `(collapseToggled)="toggleBandCollapse(band.indicatorId)"` from
+   * `project-dashboard.component.html` left the entire suite green before
+   * this case existed (the A-07.6-shaped dead-button mutant). One test
+   * closes it: the metadata cards come from a single `@for`
+   * (`project-dashboard.component.html`), so unlike A-07.6 there is no
+   * per-instance multiplication to cover.
+   */
+  describe('Indicator metadata — band collapse wiring (T-15 A-2, host connects the mechanism)', () => {
+    it("collapses a band's projected cards when its own toggle is activated, and the host is what makes that happen", async () => {
+      await setup('C-1', { indicators: [BAND_INDICATOR_FIXTURES.capacitySharing] });
+      applyFixtureToReportsMock(reportsMock, mockContractFullReports());
+      fixture.detectChanges();
+
+      // Sanity: the band starts expanded (R-IMC-008 "Details") and its
+      // projected cards are present.
+      expect(component.isBandCollapsed(BAND_INDICATOR_FIXTURES.capacitySharing.indicator.indicator_id)).toBe(false);
+      expect(getCardByTitle('Gender')).toBeTruthy();
+
+      const bandElement = getMetadataBandDebugElements()[0].nativeElement as HTMLElement;
+      const toggle = bandElement.querySelector('button.imb-toggle') as HTMLButtonElement;
+      expect(toggle).not.toBeNull();
+
+      toggle.click();
+      fixture.detectChanges();
+
+      // If the host did not forward the band's `(collapseToggled)` to
+      // `toggleBandCollapse`, or did not feed `isBandCollapsed` back into
+      // `[collapsed]`, the band's own `@if (!collapsed())` never flips and
+      // its projected cards stay rendered -- either deletion reddens this.
+      expect(component.isBandCollapsed(BAND_INDICATOR_FIXTURES.capacitySharing.indicator.indicator_id)).toBe(true);
+      expect(() => getCardByTitle('Gender')).toThrow();
     });
   });
 
