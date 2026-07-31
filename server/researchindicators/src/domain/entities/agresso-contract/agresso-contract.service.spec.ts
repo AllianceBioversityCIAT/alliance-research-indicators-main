@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractRepository } from './repositories/agresso-contract.repository';
+import { IndicatorMetadataReportsRepository } from './repositories/indicator-metadata-reports.repository';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { AgressoContract } from './entities/agresso-contract.entity';
 import { AgressoContractWhere } from './dto/agresso-contract.dto';
@@ -48,6 +49,11 @@ describe('AgressoContractService', () => {
     getFundingTypes: jest.fn(),
   };
 
+  const mockIndicatorMetadataReportsRepository = {
+    getSimpleIndicatorSections: jest.fn(),
+    getCapacitySharingMetadata: jest.fn(),
+  };
+
   const mockCurrentUser = {
     user_id: 123,
     user: { sec_user_id: 123 } as any,
@@ -77,6 +83,10 @@ describe('AgressoContractService', () => {
         {
           provide: AgressoContractRepository,
           useValue: mockRepository,
+        },
+        {
+          provide: IndicatorMetadataReportsRepository,
+          useValue: mockIndicatorMetadataReportsRepository,
         },
         {
           provide: CurrentUserUtil,
@@ -530,33 +540,191 @@ describe('AgressoContractService', () => {
     });
   });
 
-  describe('getFullContractReports', () => {
-    it('should delegate full contract reports to repository', async () => {
-      const expectedReport = {
-        contract_id: 'A100',
-        top_primary_levers: [],
-        top_contributors: [],
-        top_main_contact_persons: [],
-        staff: [],
-        top_partners: [],
-        geo_scope: {
-          geo_scope_summary: {
-            global: 0,
-            regional: 0,
-            countries: 0,
-            sub_national: 0,
-            yet_to_be_determined: 0,
-          },
-          top_regions: [],
-          top_countries: [],
+  describe('getFullContractReports — T-06 sequential composition (DD-11)', () => {
+    const baseReport = {
+      contract_id: 'A100',
+      top_primary_levers: [
+        { lever_id: 1, short_name: 'L1', full_name: 'Lever 1', count: 2 },
+      ],
+      top_contributors: [
+        { contributor_id: 1, name: 'Contributor', count: 3 } as any,
+      ],
+      top_main_contact_persons: [
+        { person_id: 1, name: 'Person', count: 1 } as any,
+      ],
+      staff: [{ name: 'John Doe', role: 'Project Lead' }],
+      top_partners: [{ partner_id: 1, name: 'Partner', count: 4 } as any],
+      geo_scope: {
+        geo_scope_summary: {
+          global: 0,
+          regional: 0,
+          countries: 0,
+          sub_national: 0,
+          yet_to_be_determined: 0,
         },
-      };
-      mockRepository.getFullContractReports.mockResolvedValue(expectedReport);
+        top_regions: [],
+        top_countries: [],
+      },
+    };
 
-      const result = await service.getFullContractReports('A100');
+    const simpleIndicatorSections = {
+      innovation_nature: [{ id: 1, name: 'Nature A', count: 5 }],
+      innovation_type: [{ id: 2, name: 'Type A', count: 4 }],
+      innovation_readiness: [{ id: 3, name: 'Readiness A', count: 3 }],
+      oicr_maturity: [{ id: 4, name: 'Maturity A', count: 2 }],
+      policy_type: [{ id: 5, name: 'Policy Type A', count: 1 }],
+      policy_stage: [{ id: 6, name: 'Policy Stage A', count: 6 }],
+    };
+
+    const capacitySharingMetadata = {
+      session_format: [{ id: 1, name: 'Individual', count: 7 }],
+      session_type: [{ id: 1, name: 'Training', count: 8 }],
+      degree: [{ id: 1, name: 'PhD', count: 2 }],
+      gender_individual: [{ id: 1, name: 'Male', count: 5 }],
+      gender_group: [
+        { id: 1, name: 'Male', count: 10 },
+        { id: 2, name: 'Female', count: 20 },
+        { id: 3, name: 'Non-binary', count: 0 },
+      ],
+    };
+
+    beforeEach(() => {
+      mockRepository.getFullContractReports.mockResolvedValue(baseReport);
+      mockIndicatorMetadataReportsRepository.getSimpleIndicatorSections.mockResolvedValue(
+        simpleIndicatorSections,
+      );
+      mockIndicatorMetadataReportsRepository.getCapacitySharingMetadata.mockResolvedValue(
+        capacitySharingMetadata,
+      );
+    });
+
+    it('delegates the base report to AgressoContractRepository and the 10 new sections to IndicatorMetadataReportsRepository, keyed by contract id', async () => {
+      await service.getFullContractReports('A100');
 
       expect(repository.getFullContractReports).toHaveBeenCalledWith('A100');
-      expect(result).toEqual(expectedReport);
+      expect(
+        mockIndicatorMetadataReportsRepository.getSimpleIndicatorSections,
+      ).toHaveBeenCalledWith('A100');
+      expect(
+        mockIndicatorMetadataReportsRepository.getCapacitySharingMetadata,
+      ).toHaveBeenCalledWith('A100');
+    });
+
+    it('awaits the base repository before invoking IndicatorMetadataReportsRepository — DD-11, no Promise.all spanning both steps', async () => {
+      const callOrder: string[] = [];
+
+      mockRepository.getFullContractReports.mockImplementation(async () => {
+        callOrder.push('base:start');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        callOrder.push('base:resolved');
+        return baseReport;
+      });
+      mockIndicatorMetadataReportsRepository.getSimpleIndicatorSections.mockImplementation(
+        async () => {
+          callOrder.push('q1:invoked');
+          return simpleIndicatorSections;
+        },
+      );
+      mockIndicatorMetadataReportsRepository.getCapacitySharingMetadata.mockImplementation(
+        async () => {
+          callOrder.push('q2:invoked');
+          return capacitySharingMetadata;
+        },
+      );
+
+      await service.getFullContractReports('A100');
+
+      // The second repository must not be invoked before the first resolves.
+      // A raced (Promise.all-spanning-both) composition would interleave
+      // "base:start" ... "q1:invoked"/"q2:invoked" ... "base:resolved" — this
+      // asserts the strict order a sequential composition guarantees.
+      expect(callOrder).toEqual([
+        'base:start',
+        'base:resolved',
+        'q1:invoked',
+        'q2:invoked',
+      ]);
+    });
+
+    it('returns all 17 fields, the 7 pre-existing ones unchanged in name/shape/content (R-IMC-007 AC.1)', async () => {
+      const result = await service.getFullContractReports('A100');
+
+      // The 7 pre-existing fields are spread from the base report, not
+      // re-listed — asserting deep equality here is what would catch a
+      // re-listing mistake (design §12 DD-11 / R-IMC-007 AC.1).
+      expect(result.contract_id).toEqual(baseReport.contract_id);
+      expect(result.top_primary_levers).toEqual(baseReport.top_primary_levers);
+      expect(result.top_contributors).toEqual(baseReport.top_contributors);
+      expect(result.top_main_contact_persons).toEqual(
+        baseReport.top_main_contact_persons,
+      );
+      expect(result.staff).toEqual(baseReport.staff);
+      expect(result.top_partners).toEqual(baseReport.top_partners);
+      expect(result.geo_scope).toEqual(baseReport.geo_scope);
+
+      expect(Object.keys(result).sort()).toEqual(
+        [
+          'contract_id',
+          'top_partners',
+          'top_primary_levers',
+          'top_main_contact_persons',
+          'top_contributors',
+          'staff',
+          'geo_scope',
+          'innovation_nature',
+          'innovation_type',
+          'innovation_readiness',
+          'oicr_maturity',
+          'policy_type',
+          'policy_stage',
+          'session_format',
+          'session_type',
+          'gender_distribution',
+          'degree',
+        ].sort(),
+      );
+    });
+
+    it('merges gender_individual + gender_group into gender_distribution, sorted count DESC / id ASC, and drops the zero-total Non-binary category', async () => {
+      const result = await service.getFullContractReports('A100');
+
+      // Individual Male=5 + group Male=10 => 15; group Female=20 stands alone;
+      // group Non-binary=0 is dropped (zero-total).
+      expect(result.gender_distribution).toEqual([
+        { id: 2, name: 'Female', count: 20 },
+        { id: 1, name: 'Male', count: 15 },
+      ]);
+    });
+
+    it('never leaks gender_individual / gender_group onto the response', async () => {
+      const result = await service.getFullContractReports('A100');
+
+      expect(result).not.toHaveProperty('gender_individual');
+      expect(result).not.toHaveProperty('gender_group');
+    });
+
+    it('carries through the 6 Q1 sections and the 3 non-gender Q2 sections unchanged', async () => {
+      const result = await service.getFullContractReports('A100');
+
+      expect(result.innovation_nature).toEqual(
+        simpleIndicatorSections.innovation_nature,
+      );
+      expect(result.innovation_type).toEqual(
+        simpleIndicatorSections.innovation_type,
+      );
+      expect(result.innovation_readiness).toEqual(
+        simpleIndicatorSections.innovation_readiness,
+      );
+      expect(result.oicr_maturity).toEqual(
+        simpleIndicatorSections.oicr_maturity,
+      );
+      expect(result.policy_type).toEqual(simpleIndicatorSections.policy_type);
+      expect(result.policy_stage).toEqual(simpleIndicatorSections.policy_stage);
+      expect(result.session_format).toEqual(
+        capacitySharingMetadata.session_format,
+      );
+      expect(result.session_type).toEqual(capacitySharingMetadata.session_type);
+      expect(result.degree).toEqual(capacitySharingMetadata.degree);
     });
   });
 

@@ -10,7 +10,7 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — **T-01, T-02, T-03, T-04, T-05 done** (5 of 17). Next eligible: **T-06** (sequential composition) and **T-07** (repository specs); **T-09** (Swagger) unblocks once T-06 lands.
+- **Status:** in-progress — **T-01 … T-06 done** (6 of 17). Next eligible: **T-07** (specs, with two additions owed from T-06's review), **T-08** (the NFR-IMC-001 measurement that decides DD-11), **T-09** (Swagger). The whole server payload is now composed and live-verified; **nothing is dead any more** — T-06 closed the window where `ContractFullReportsDto` and the new repository were referenced by nothing.
 - **Rework rounds consumed so far:** **0** — every task has passed on attempt 1. Budget allows 2–3.
 - **All server queries now execute against the real schema.** RB-3 (the unexecuted CTE-across-UNION pattern) is **discharged**, so DD-1's consolidation is proven rather than assumed. The next open architectural risk is **RB-4 / DD-11**, which **T-08's measurement** decides.
 - **Owner decisions pending:** none. The two advisory-derived items were authorised and applied 2026-07-30 (see `## Owner escalation`); one wording correction across three documents remains deliberately open there.
@@ -363,6 +363,94 @@ R-IMC-001, R-IMC-002, R-IMC-003, R-IMC-004 (all AC) · R-IMC-005 AC.1/AC.2/AC.4/
 #### Final verification
 
 `tsc --noEmit` clean · `eslint` clean on all new files · full server suite **321 suites / 2,041 tests** green *(this branch's correct baseline — 626 spec files vs `dev`'s 632)* · `utils/` **17 tests** green (12 gender + 5 scoping) · both methods executed against `alliancereportingdb` across five contracts · the new scoping spec mutation-verified in both directions.
+
+---
+
+### T-06 — Sequential composition in the service + query observability
+
+- **Status:** ✅ **PASS** — Reviewer PASS attempt 1
+- **Date:** 2026-07-30
+- **Implementer attempts:** 1 · run in the **main checkout, no worktree** (single task, no file collision — which also sidesteps RB-9 entirely)
+- **Files changed:** `agresso-contract.service.ts` · `agresso-contract.module.ts` · `agresso-contract.service.spec.ts`
+
+#### What landed
+
+`getFullContractReports()` — the existing one-line pass-through at `:208-210` — now: `await` step 1 (the existing repository, body untouched, **8 concurrent**), **then** `await Promise.all([Q1, Q2])` (step 2, **2 concurrent**). Peak `max(8, 2) = 8`, exactly today's value, which is what removes any connection-pool prerequisite from this spec. It also gained an explicit `Promise<ContractFullReportsDto>` return type, the provider registration, and the gender merge.
+
+#### The interpretive question, adjudicated — and why it mattered
+
+The Implementer **flagged rather than asserted** its reading: DD-11 says *"sequentially, not with `Promise.all`"*, so is the **inner** `Promise.all([Q1, Q2])` a violation? It explicitly said "if the Reviewer reads it as also forbidding Q1‖Q2, that's a one-line change."
+
+**The Leader adjudicated it as required-by-design, and asked the Reviewer to FAIL it if it disagreed rather than rubber-stamp.** The Reviewer confirmed and strengthened the case to **five citations**, one of which the Leader had missed:
+
+| # | Source |
+| --- | --- |
+| 1 | `design.md` §3 diagram: step 2 annotated **"2 concurrent"** |
+| 2 | **DD-11** itself: *"Peak becomes `max(8,2) = 8`"* — the `2` is step 2's own peak; sequential Q1/Q2 would make it `max(8,1)` |
+| 3 | **DD-1**: *"two keeps step 2 at 2, so the peak stays at the existing 8"* |
+| 4 | **`tasks.md` § T-06's own Description** — *"(step 2, 2 concurrent)"*. **The Leader missed this one; the Reviewer found it** |
+| 5 | §1's cost model says `T_metadata_**batch**`, and T-08 must clear `T_metadata ≤ 0.5 × T_existing`. Two sequential queries would be `T_Q1 + T_Q2`, **materially raising the bar T-08 must clear** — so the categorical reading would have made DD-11 harder to satisfy than the design's own model assumes |
+
+**The Reviewer also disclosed counter-evidence against its own conclusion** — the behaviour worth naming here. `indicator-metadata-reports.repository.ts:75-79` (written by the **Leader** during the T-03/T-04 graft, not by an Implementer) read *"awaiting **them** sequentially rather than racing them"*, which with "them" = Q1+Q2 asserts the categorical reading. It correctly ruled that an implementer-authored comment paraphrasing DD-11 does not outweigh five unambiguous spec citations — **and correctly identified it as RB-1's failure mode (*a record asserting more than its source supports*) reproduced one layer down.** ✅ **Fixed in the same session:** that doc-comment now states precisely what DD-11 requires, cites all four spec anchors, and records that `T_metadata` is `max(Q1, Q2)` rather than a sum.
+
+#### The scope question, settled by the spec itself
+
+T-06 also modified `agresso-contract.service.spec.ts`, which T-06's *"Files touched (intended)"* does not list and which T-07's does. **Not encroachment:** `tasks.md` **§4 Testing expectations** co-assigns that file to **T-06 and T-07** and names the exact two assertions written (*"asserts sequential composition and the 17-field merge"*). Three further supports the Reviewer identified:
+- T-06's own acceptance box requires *"existing `agresso-contract.service.spec.ts` passes"* — **unachievable without editing it**, since the `TestingModule` lacked the new provider and `beforeEach` would fail Nest resolution, reddening the whole suite. The acceptance criterion *forces* the edit.
+- T-06's *"Evidence that does NOT count"* clause instructs T-06 directly to assert *"that the second repository is not invoked before the first resolves"* — so the `callOrder` case **is T-06's own mandated evidence**, not borrowed.
+- §2's KZ-001 rule (recurrence 5) forbids deferring a gate to a later task.
+
+The *"Files touched (intended)"* list was simply incomplete relative to §4 — and it is labelled *intended*.
+
+#### Verification — reproduced by the Reviewer, plus two mechanical probes it ran itself
+
+| Check | Result |
+| --- | --- |
+| `tsc --noEmit` | Clean |
+| **Type-probe (Reviewer-built, against the real DTO)** | As-implemented shape **compiles**; omitting `gender_distribution` → **`TS2741`**; misnaming it `genderDistribution` → **`TS2561`**. So the explicit return type makes a missing or misnamed section a **real compile error**, not a convention. **This also discharges T-05's carried debt mechanically:** `GenderDistributionRow[]` → `MetadataCountDto[]` is assignable, no adapter needed |
+| **Mutation table (Reviewer-built) on the `callOrder` gate** | As-implemented → **passes**. One `Promise.all` spanning all three → **FAILS**. Overlapped `.then` / deferred await → **FAILS**. So it reddens for **both** violation shapes T-06's acceptance box names — a real gate, not decorative |
+| Real schema, `A1048` | 17 fields. Raw `individual [Male=5, Female=2]` + `group [Female=470, Male=104, Non-binary=1]` → merged **`[Female=472, Male=109, Non-binary=1]`**, sorted `count DESC`. **This matched a cross-check the Leader supplied in advance**, making it a pass/fail contrast rather than a self-assessment |
+| Real schema, `A1001` / `A132` / `G228` / `A1618` | All 10 sections `[]` on the empty contract · `[Female=28, Male=25]` with the zero-total dropped · degree sections `[4:Other=2]` and `[PhD=1, BSc=1]` **matching `execution.md` § T-03+T-04 verbatim** |
+| Leak check | `gender_individual` / `gender_group` **structurally excluded** via rest-destructuring (the rest binding's *type* is the 3-field `Pick`), double-gated by an explicit `not.toHaveProperty` and an exact 17-key set assertion |
+| `eslint` + `prettier --check` on the 3 files | Clean — adds nothing to the ~26-error baseline |
+| Full suite | **322 suites / 2,051 tests** green. Baseline was 322 / 2,046; the Reviewer verified the **+5** arithmetically (22 → 27 `it()` in that spec, no spec files added or removed) |
+| Working-tree scope | `git status --porcelain` shows only the 3 files under review |
+
+**Also checked, and it was the more dangerous thing:** `IndicatorMetadataReportsRepository` injects only `DataSource`, so constructor-injecting it into `AgressoContractService` **cascades no REQUEST scope**. That matters because this exact constructor already documents a hazard — `OpenSearchAgressoContractApi` is lazily `moduleRef`-resolved to avoid a `forwardRef` cycle. A repository with a transitive `CurrentUserUtil` dependency would have made this a regression; this one does not.
+
+#### `ADVISORY` findings — one is a real gate gap
+
+| Lens | Finding | Routing |
+| --- | --- | --- |
+| **Reliability — R-1, the important one** | **`callOrder` cannot distinguish `Promise.all([Q1,Q2])` from `await Q1; await Q2`** — the Reviewer proved both produce the identical array. So the **"step 2 = 2 concurrent"** property that DD-1's arithmetic *and* T-08's bound both rest on is **currently ungated.** A future refactor could sequentialise step 2, inflate `T_metadata`, and leave the suite green | **Owed to T-07** (~6 lines): assert both Q1 and Q2 are *invoked* before either *resolves*. Recorded in `tasks.md` § T-07 |
+| **Risk — R-2** | **`T_metadata` is `max(Q1, Q2)`, not `Q1 + Q2`**, because step 2 is a `Promise.all` — and no log line records step 2's own wall clock. Computing it as a sum would inflate the number and could **manufacture a false breach of a decision the spec says a breach invalidates** | **Recorded in `tasks.md` § T-08's implementation notes** — this must be in T-08's brief |
+| **Readability — R-3** | The repository doc-comment contradicting §3's "2 concurrent" | ✅ **Fixed this session** (above) |
+| **Resilience — R-4** | T-05's `NaN` hazard in `toSafeCount` still stands, but this diff feeds the util exactly the shape it was written for and **widens nothing** | No action; debt stays visible |
+| **Readability — R-5** | The method's doc-comment is 30 lines against 25 lines of code — unusual, and correct: it is the only artifact explaining why DD-11 is load-bearing rather than stylistic, and carries the explicit *"Do NOT wrap step 1 and step 2 in a single `Promise.all`"* prohibition | Should survive refactors verbatim, same reasoning as the gender util's header |
+
+#### Requirements covered
+
+R-IMC-007 AC.1, AC.2 (type + source level; runtime CI coverage of the empty case routed to T-07) · design §3, §9, **DD-11**, DD-1, DD-3 · enables **NFR-IMC-001**'s measurement (T-08).
+
+#### Decisions made
+
+| # | Decision |
+| --- | --- |
+| **O-06.1** | The inner `Promise.all([Q1, Q2])` is **required by the design**, not tolerated — five citations, Reviewer-confirmed. Sequentialising step 2 would raise the bar T-08 must clear |
+| **O-06.2** | The service-spec edit is **spec-assigned** by `tasks.md` §4, not encroachment. **T-07 must EXTEND, not rewrite** — specifically, it must not touch or "consolidate" the `callOrder` block, which is DD-11's only mechanical guard |
+| **O-06.3** | The logging box is satisfied by T-03/T-04's existing lines; no second layer added. Design §9 specifies content, not layer, and the repository is where timing is attributable — which is §9's stated purpose and T-08's need |
+| **O-06.4** | Provider registered but **not exported** — zero consumers outside the module; exporting an unconsumed provider widens the module's surface for nothing, and it is a one-line reversal |
+| **O-06.5** | The Leader fixed the repository doc-comment drift it had itself introduced during the graft. Same category as §4.2's stale citation: doc currency on the Leader's own edit, not an approved task widened from an advisory |
+
+#### Issues encountered
+
+| # | Issue |
+| --- | --- |
+| **E-06.1** | The Leader's own graft introduced a doc-comment that contradicted the design and would have led a future reader to "fix" the inner `Promise.all` — landing exactly the sequential shape R-1 cannot catch. Found by the Reviewer, fixed same session. **Notable that it was found by the auditor and not by the author**, which is the argument for the gate |
+
+#### Final verification
+
+`tsc` clean · `eslint` + `prettier` clean on all three files · full suite **322 / 2,051** green · both the type-probe and the composition mutation-table run independently by the Reviewer · real-schema composition verified across five contracts with the gender arithmetic matching a pre-supplied cross-check exactly.
 
 ---
 

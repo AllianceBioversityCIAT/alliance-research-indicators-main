@@ -11,6 +11,7 @@ import { cleanObject, parseBoolean } from '../../shared/utils/object.utils';
 import { PaginationDto } from '../../shared/global-dto/pagination.dto';
 import { StringKeys } from '../../shared/global-dto/types-global';
 import { AgressoContractRepository } from './repositories/agresso-contract.repository';
+import { IndicatorMetadataReportsRepository } from './repositories/indicator-metadata-reports.repository';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { OrderFieldsEnum } from './enum/order-fields.enum';
@@ -23,12 +24,15 @@ import {
 } from './dto/reports-primary-levers.dto';
 import { resolveLeverIconUrl } from '../../tools/clarisa/entities/clarisa-levers/lever-icon.util';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
+import { ContractFullReportsDto } from './dto/reports-full.dto';
+import { mergeGenderDistribution } from './utils/gender-distribution.util';
 
 @Injectable()
 export class AgressoContractService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly _agressoContractRepository: AgressoContractRepository,
+    private readonly _indicatorMetadataReportsRepository: IndicatorMetadataReportsRepository,
     private readonly currentUser: CurrentUserUtil,
     // OpenSearchAgressoContractApi is REQUEST-scoped (transitive through
     // AgressoContractRepository -> CurrentUserUtil). Constructor-injecting it
@@ -205,8 +209,72 @@ export class AgressoContractService {
     return this._agressoContractRepository.getContractStaffReport(contractId);
   }
 
-  async getFullContractReports(contractId: string) {
-    return this._agressoContractRepository.getFullContractReports(contractId);
+  /**
+   * `reports/full`'s composition seam (`requirements.md` R-IMC-007;
+   * `design.md` §3, §12 DD-11). Edits an existing one-line pass-through —
+   * this is not a new method.
+   *
+   * **STEP 1** — await the existing repository first. Its body is
+   * untouched: 5 report methods plus `getGeoScopeReport`'s own nested
+   * `Promise.all` of 3 = **8 concurrent** queries.
+   *
+   * **STEP 2** — awaited only AFTER step 1 resolves. `IndicatorMetadataReportsRepository`
+   * exposes no combining method by design (see its class doc), so both of its
+   * queries are called here and raced only against **each other** — never
+   * against step 1 — via `Promise.all`, holding step 2's own peak at 2.
+   *
+   * **This is DD-11 and it is load-bearing, not stylistic.** Racing step 1
+   * against step 2 would peak at 10 concurrent connections against an
+   * un-configured pool whose mysql2 default `connectionLimit` is 10 — one
+   * dashboard request would monopolise every connection. Awaiting
+   * sequentially keeps peak concurrency at `max(8, 2) = 8`, exactly today's
+   * value, which is what removes any connection-pool prerequisite from this
+   * spec. Do NOT wrap step 1 and step 2 in a single `Promise.all` — that is
+   * precisely the change this method must not make.
+   *
+   * The merge is where R-IMC-007 AC.1 can silently break: the 7 pre-existing
+   * fields are spread from `baseReport` rather than re-listed, so their name,
+   * shape and content survive untouched. `gender_individual` / `gender_group`
+   * are Q2's intermediate raw shapes (not payload fields, per the repository's
+   * own doc-comment) and are destructured out here, fed to the pure
+   * `mergeGenderDistribution()` util, and never spread onto the response.
+   *
+   * Both repository methods already emit a `LoggerUtil._debug` line with
+   * `elapsedMs`, `totalRows` and per-section counts (design §9) — that is
+   * this task's logging acceptance box, satisfied by the existing lines, not
+   * a second log layer added here.
+   */
+  async getFullContractReports(
+    contractId: string,
+  ): Promise<ContractFullReportsDto> {
+    const baseReport =
+      await this._agressoContractRepository.getFullContractReports(contractId);
+
+    const [simpleIndicatorSections, capacitySharingMetadata] =
+      await Promise.all([
+        this._indicatorMetadataReportsRepository.getSimpleIndicatorSections(
+          contractId,
+        ),
+        this._indicatorMetadataReportsRepository.getCapacitySharingMetadata(
+          contractId,
+        ),
+      ]);
+
+    const {
+      gender_individual: genderIndividualRows,
+      gender_group: genderGroupRows,
+      ...capacitySharingSections
+    } = capacitySharingMetadata;
+
+    return {
+      ...baseReport,
+      ...simpleIndicatorSections,
+      ...capacitySharingSections,
+      gender_distribution: mergeGenderDistribution(
+        genderIndividualRows,
+        genderGroupRows,
+      ),
+    };
   }
 
   async getTopPrimaryLeversReport(

@@ -73,9 +73,19 @@ interface MetadataSectionRow {
  * is Q2 (T-04). Both were verified against the real schema before landing.
  *
  * This class exposes **no combining method** — composing Q1 + Q2 into the
- * payload, and awaiting them **sequentially rather than racing them** (DD-11,
- * the decision that removes this spec's infrastructure prerequisite), belongs
- * to `AgressoContractService` and is owned by T-06.
+ * payload belongs to `AgressoContractService` (T-06).
+ *
+ * **What DD-11 actually requires, stated precisely because an earlier draft of
+ * this comment got it wrong:** the **two steps** are awaited sequentially —
+ * step 2 (this repository) only after step 1 (`AgressoContractRepository`, 8
+ * concurrent) has resolved. It does **not** mean Q1 and Q2 run sequentially
+ * with each other: `design.md` §3 annotates step 2 as **"2 concurrent"**, DD-1
+ * states *"two keeps step 2 at 2"*, DD-11's own arithmetic is `max(8, 2) = 8`,
+ * and `tasks.md` § T-06 annotates *"step 2, 2 concurrent"*. Q1 ‖ Q2 is
+ * therefore load-bearing to those numbers, not merely tolerated — and §1's
+ * cost model `T_metadata` is consequently `max(Q1, Q2)`, **not** `Q1 + Q2`,
+ * which is what T-08 must measure. Sequentialising step 2 would silently raise
+ * the bar T-08 has to clear.
  */
 @Injectable()
 export class IndicatorMetadataReportsRepository {
