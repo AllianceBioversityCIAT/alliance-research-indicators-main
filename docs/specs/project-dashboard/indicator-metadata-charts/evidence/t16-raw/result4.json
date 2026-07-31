@@ -1,0 +1,527 @@
+{
+  "measure_390": {
+    "innerWidth": 390,
+    "innerHeight": 900,
+    "documentScrollWidth": 390,
+    "documentClientWidth": 390,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "pageWrapperScrollWidth": 310,
+    "pageWrapperClientWidth": 310,
+    "pageWrapperOverflowX": 0,
+    "wideGridComputedColumns": "301.688px",
+    "wideGridRect": {
+      "x": 76.15625,
+      "y": 105,
+      "width": 301.6875,
+      "height": 1169.75
+    },
+    "wideGridScrollWidth": 302,
+    "wideGridClientWidth": 302,
+    "wideGridOverflowX": 0,
+    "wideCardRects": [
+      {
+        "x": 76.15625,
+        "y": 105,
+        "width": 301.6875,
+        "height": 280
+      },
+      {
+        "x": 76.15625,
+        "y": 401,
+        "width": 301.6875,
+        "height": 280
+      },
+      {
+        "x": 76.15625,
+        "y": 697,
+        "width": 301.6875,
+        "height": 281.75
+      },
+      {
+        "x": 76.15625,
+        "y": 994.75,
+        "width": 301.6875,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "301.688px",
+    "singleGridRect": {
+      "x": 76.15625,
+      "y": 1350.75,
+      "width": 301.6875,
+      "height": 280
+    },
+    "singleGridScrollWidth": 302,
+    "singleGridClientWidth": 302,
+    "singleCardRects": [
+      {
+        "x": 76.15625,
+        "y": 1350.75,
+        "width": 301.6875,
+        "height": 280
+      }
+    ]
+  },
+  "measure_768": {
+    "innerWidth": 768,
+    "innerHeight": 1000,
+    "documentScrollWidth": 768,
+    "documentClientWidth": 768,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "pageWrapperScrollWidth": 669,
+    "pageWrapperClientWidth": 669,
+    "pageWrapperOverflowX": 0,
+    "wideGridComputedColumns": "660.797px",
+    "wideGridRect": {
+      "x": 85.59375,
+      "y": 77,
+      "width": 660.796875,
+      "height": 1169.75
+    },
+    "wideGridScrollWidth": 661,
+    "wideGridClientWidth": 661,
+    "wideGridOverflowX": 0,
+    "wideCardRects": [
+      {
+        "x": 85.59375,
+        "y": 77,
+        "width": 660.796875,
+        "height": 280
+      },
+      {
+        "x": 85.59375,
+        "y": 373,
+        "width": 660.796875,
+        "height": 280
+      },
+      {
+        "x": 85.59375,
+        "y": 669,
+        "width": 660.796875,
+        "height": 281.75
+      },
+      {
+        "x": 85.59375,
+        "y": 966.75,
+        "width": 660.796875,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "322.391px 322.406px",
+    "singleGridRect": {
+      "x": 85.59375,
+      "y": 1314.75,
+      "width": 660.796875,
+      "height": 280
+    },
+    "singleGridScrollWidth": 661,
+    "singleGridClientWidth": 661,
+    "singleCardRects": [
+      {
+        "x": 85.59375,
+        "y": 1314.75,
+        "width": 322.390625,
+        "height": 280
+      }
+    ]
+  },
+  "measure_1440": {
+    "innerWidth": 1440,
+    "innerHeight": 1200,
+    "documentScrollWidth": 1440,
+    "documentClientWidth": 1440,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "pageWrapperScrollWidth": 1307,
+    "pageWrapperClientWidth": 1307,
+    "pageWrapperOverflowX": 0,
+    "wideGridComputedColumns": "422.391px 422.391px 422.406px",
+    "wideGridRect": {
+      "x": 102.40625,
+      "y": 77,
+      "width": 1299.1875,
+      "height": 577.75
+    },
+    "wideGridScrollWidth": 1299,
+    "wideGridClientWidth": 1299,
+    "wideGridOverflowX": 0,
+    "wideCardRects": [
+      {
+        "x": 102.40625,
+        "y": 77,
+        "width": 422.390625,
+        "height": 280
+      },
+      {
+        "x": 540.796875,
+        "y": 77,
+        "width": 422.390625,
+        "height": 280
+      },
+      {
+        "x": 979.1875,
+        "y": 77,
+        "width": 422.40625,
+        "height": 281.75
+      },
+      {
+        "x": 102.40625,
+        "y": 374.75,
+        "width": 422.390625,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "312.797px 312.797px 312.797px 312.797px",
+    "singleGridRect": {
+      "x": 102.40625,
+      "y": 722.75,
+      "width": 1299.1875,
+      "height": 280
+    },
+    "singleGridScrollWidth": 1299,
+    "singleGridClientWidth": 1299,
+    "singleCardRects": [
+      {
+        "x": 102.40625,
+        "y": 722.75,
+        "width": 312.796875,
+        "height": 280
+      }
+    ]
+  },
+  "measure_1440_sidebar_expanded": {
+    "innerWidth": 1440,
+    "innerHeight": 1200,
+    "documentScrollWidth": 1440,
+    "documentClientWidth": 1440,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "pageWrapperScrollWidth": 1131,
+    "pageWrapperClientWidth": 1131,
+    "pageWrapperOverflowX": 0,
+    "wideGridComputedColumns": "553.25px 553.25px",
+    "wideGridRect": {
+      "x": 283.75,
+      "y": 77,
+      "width": 1122.5,
+      "height": 577.75
+    },
+    "wideGridScrollWidth": 1123,
+    "wideGridClientWidth": 1123,
+    "wideGridOverflowX": 0,
+    "wideCardRects": [
+      {
+        "x": 283.75,
+        "y": 77,
+        "width": 553.25,
+        "height": 280
+      },
+      {
+        "x": 853,
+        "y": 77,
+        "width": 553.25,
+        "height": 280
+      },
+      {
+        "x": 283.75,
+        "y": 373,
+        "width": 553.25,
+        "height": 281.75
+      },
+      {
+        "x": 853,
+        "y": 373,
+        "width": 553.25,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "363.5px 363.5px 363.5px",
+    "singleGridRect": {
+      "x": 283.75,
+      "y": 722.75,
+      "width": 1122.5,
+      "height": 280
+    },
+    "singleGridScrollWidth": 1123,
+    "singleGridClientWidth": 1123,
+    "singleCardRects": [
+      {
+        "x": 283.75,
+        "y": 722.75,
+        "width": 363.5,
+        "height": 280
+      }
+    ]
+  },
+  "measure_719": {
+    "innerWidth": 719,
+    "innerHeight": 1000,
+    "documentScrollWidth": 719,
+    "documentClientWidth": 719,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "pageWrapperScrollWidth": 622,
+    "pageWrapperClientWidth": 622,
+    "pageWrapperOverflowX": 0,
+    "wideGridComputedColumns": "614.25px",
+    "wideGridRect": {
+      "x": 84.375,
+      "y": 77,
+      "width": 614.25,
+      "height": 1169.75
+    },
+    "wideGridScrollWidth": 614,
+    "wideGridClientWidth": 614,
+    "wideGridOverflowX": 0,
+    "wideCardRects": [
+      {
+        "x": 84.375,
+        "y": 77,
+        "width": 614.25,
+        "height": 280
+      },
+      {
+        "x": 84.375,
+        "y": 373,
+        "width": 614.25,
+        "height": 280
+      },
+      {
+        "x": 84.375,
+        "y": 669,
+        "width": 614.25,
+        "height": 281.75
+      },
+      {
+        "x": 84.375,
+        "y": 966.75,
+        "width": 614.25,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "614.25px",
+    "singleGridRect": {
+      "x": 84.375,
+      "y": 1314.75,
+      "width": 614.25,
+      "height": 280
+    },
+    "singleGridScrollWidth": 614,
+    "singleGridClientWidth": 614,
+    "singleCardRects": [
+      {
+        "x": 84.375,
+        "y": 1314.75,
+        "width": 614.25,
+        "height": 280
+      }
+    ]
+  },
+  "measure_720": {
+    "innerWidth": 720,
+    "innerHeight": 1000,
+    "documentScrollWidth": 720,
+    "documentClientWidth": 720,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "pageWrapperScrollWidth": 623,
+    "pageWrapperClientWidth": 623,
+    "pageWrapperOverflowX": 0,
+    "wideGridComputedColumns": "615.188px",
+    "wideGridRect": {
+      "x": 84.40625,
+      "y": 77,
+      "width": 615.1875,
+      "height": 1169.75
+    },
+    "wideGridScrollWidth": 615,
+    "wideGridClientWidth": 615,
+    "wideGridOverflowX": 0,
+    "wideCardRects": [
+      {
+        "x": 84.40625,
+        "y": 77,
+        "width": 615.1875,
+        "height": 280
+      },
+      {
+        "x": 84.40625,
+        "y": 373,
+        "width": 615.1875,
+        "height": 280
+      },
+      {
+        "x": 84.40625,
+        "y": 669,
+        "width": 615.1875,
+        "height": 281.75
+      },
+      {
+        "x": 84.40625,
+        "y": 966.75,
+        "width": 615.1875,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "615.188px",
+    "singleGridRect": {
+      "x": 84.40625,
+      "y": 1314.75,
+      "width": 615.1875,
+      "height": 280
+    },
+    "singleGridScrollWidth": 615,
+    "singleGridClientWidth": 615,
+    "singleCardRects": [
+      {
+        "x": 84.40625,
+        "y": 1314.75,
+        "width": 615.1875,
+        "height": 280
+      }
+    ]
+  },
+  "control_forced_390": {
+    "innerWidth": 390,
+    "innerHeight": 900,
+    "documentScrollWidth": 390,
+    "documentClientWidth": 390,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "pageWrapperScrollWidth": 904,
+    "pageWrapperClientWidth": 310,
+    "pageWrapperOverflowX": 594,
+    "wideGridComputedColumns": "900px",
+    "wideGridRect": {
+      "x": 76.15625,
+      "y": 105,
+      "width": 301.6875,
+      "height": 1169.75
+    },
+    "wideGridScrollWidth": 900,
+    "wideGridClientWidth": 302,
+    "wideGridOverflowX": 598,
+    "wideCardRects": [
+      {
+        "x": 76.15625,
+        "y": 105,
+        "width": 900,
+        "height": 280
+      },
+      {
+        "x": 76.15625,
+        "y": 401,
+        "width": 900,
+        "height": 280
+      },
+      {
+        "x": 76.15625,
+        "y": 697,
+        "width": 900,
+        "height": 281.75
+      },
+      {
+        "x": 76.15625,
+        "y": 994.75,
+        "width": 900,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "301.688px",
+    "singleGridRect": {
+      "x": 76.15625,
+      "y": 1350.75,
+      "width": 301.6875,
+      "height": 280
+    },
+    "singleGridScrollWidth": 302,
+    "singleGridClientWidth": 302,
+    "singleCardRects": [
+      {
+        "x": 76.15625,
+        "y": 1350.75,
+        "width": 301.6875,
+        "height": 280
+      }
+    ]
+  },
+  "control_cleared_390": {
+    "innerWidth": 390,
+    "innerHeight": 900,
+    "documentScrollWidth": 390,
+    "documentClientWidth": 390,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "pageWrapperScrollWidth": 310,
+    "pageWrapperClientWidth": 310,
+    "pageWrapperOverflowX": 0,
+    "wideGridComputedColumns": "301.688px",
+    "wideGridRect": {
+      "x": 76.15625,
+      "y": 105,
+      "width": 301.6875,
+      "height": 1169.75
+    },
+    "wideGridScrollWidth": 302,
+    "wideGridClientWidth": 302,
+    "wideGridOverflowX": 0,
+    "wideCardRects": [
+      {
+        "x": 76.15625,
+        "y": 105,
+        "width": 301.6875,
+        "height": 280
+      },
+      {
+        "x": 76.15625,
+        "y": 401,
+        "width": 301.6875,
+        "height": 280
+      },
+      {
+        "x": 76.15625,
+        "y": 697,
+        "width": 301.6875,
+        "height": 281.75
+      },
+      {
+        "x": 76.15625,
+        "y": 994.75,
+        "width": 301.6875,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "301.688px",
+    "singleGridRect": {
+      "x": 76.15625,
+      "y": 1350.75,
+      "width": 301.6875,
+      "height": 280
+    },
+    "singleGridScrollWidth": 302,
+    "singleGridClientWidth": 302,
+    "singleCardRects": [
+      {
+        "x": 76.15625,
+        "y": 1350.75,
+        "width": 301.6875,
+        "height": 280
+      }
+    ]
+  },
+  "scroll_probe": {
+    "found": true,
+    "focused": true,
+    "scrollTopBefore": 0,
+    "scrollHeight": 285,
+    "clientHeight": 138,
+    "tag": "DIV",
+    "role": "group",
+    "ariaLabel": "Scroll probe (T-16 fixture)",
+    "scrollTopAfter": 120,
+    "stillActive": true,
+    "dispatched": true
+  }
+}

@@ -1,0 +1,11 @@
+
+DevTools listening on ws://127.0.0.1:9333/devtools/browser/25aca157-b6f2-491c-a16b-69ae8967c366
+[0731/152622.410167:ERROR:ui/display/mac/cv_display_link_mac.mm:165] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[0731/152750.324028:ERROR:ui/display/mac/cv_display_link_mac.mm:165] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[0731/152843.754955:ERROR:ui/display/mac/cv_display_link_mac.mm:165] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[0731/153132.220387:ERROR:ui/display/mac/cv_display_link_mac.mm:165] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[0731/153334.186323:ERROR:ui/display/mac/cv_display_link_mac.mm:165] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670
+[0731/153414.304480:ERROR:content/browser/gpu/gpu_process_host.cc:959] GPU process exited unexpectedly: exit_code=15
+[0731/153414.304520:WARNING:content/browser/gpu/gpu_process_host.cc:1400] The GPU process has crashed 1 time(s)
+[0731/153414.326960:ERROR:base/apple/mach_port_rendezvous_mac.cc:255] bootstrap_look_up org.chromium.Chromium.MachPortRendezvousServer.1: Unknown service name (1102)
+[0731/153414.327119:ERROR:base/memory/shared_memory_switch.cc:266] No rendezvous client, terminating process (parent died?)
