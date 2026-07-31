@@ -10,8 +10,10 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — **T-01 … T-06 done** (6 of 17). **T-08 is `[~]` blocked** on VPN connectivity, so **DD-11 remains contingent and unverified**. Next eligible and DB-independent: **T-07** (specs over fixtures, plus two additions owed from T-06's review). **T-09** (Swagger) also needs the DB — the Nest app boots TypeORM, so `/swagger` cannot be inspected while the tunnel is down. The whole server payload is composed and live-verified; nothing is dead any more.
-- **The spec's own ordering rule is still in force:** design §11 sequences the measurement **before all client work** so a breach costs the server PRs and not the client ones. T-08 being blocked therefore blocks **T-10 … T-16**, not just itself.
+- **Status:** in-progress — **T-01 … T-08 done** (8 of 17). **The server tier is complete and gated.** All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
+- **Rework rounds consumed: 1** (T-07 attempt 1 → 2), against a budget of 2–3.
+- **Next eligible:** **T-09** (Swagger — needs the app booted, so the DB tunnel must be up), then the client chain **T-10 → T-11/T-12 → T-13 → T-14**, then **T-15** (the T-09 a11y carry-forward), **T-16** (390 px measurement + full suite) and **T-17** (docs).
+- **Open items carried forward:** four one-line advisories from T-07's review escalated to the owner and not absorbed (`gender_group` id/name pairing, reorder-brittleness note, `ORDER BY` uniqueness, one stale "below"/"above" pointer); the three-document *"all three categories"* wording gap from T-05; and **RB-11**, the contained credential leak, whose rotation is the owner's call.
 - **Rework rounds consumed so far:** **0** — every task has passed on attempt 1. Budget allows 2–3.
 - **All server queries now execute against the real schema.** RB-3 (the unexecuted CTE-across-UNION pattern) is **discharged**, so DD-1's consolidation is proven rather than assumed. The next open architectural risk is **RB-4 / DD-11**, which **T-08's measurement** decides.
 - **Owner decisions pending:** none. The two advisory-derived items were authorised and applied 2026-07-30 (see `## Owner escalation`); one wording correction across three documents remains deliberately open there.
@@ -581,6 +583,55 @@ Ordered `toEqual` throughout with no `toContain`/`arrayContaining` anywhere; the
 #### On the cause of Issue 1 — the Leader's brief
 
 My brief instructed the Implementer to prefer the params array over SQL-text matching, calling text matching brittle. **The Reviewer settled that against me using this repo's own convention:** `utils/primary-contract-results.util.spec.ts:24-33` already asserts `toContain('rc.is_primary = TRUE')`, `toContain('r.is_snapshot = FALSE')` clause by clause. **The Leader wrote that file earlier in this same session** — so the brief warned against a pattern the Leader had itself established one file over. Two 25-character predicates on load-bearing semantics are not a query snapshot.
+
+---
+
+### T-08 — NFR-IMC-001(c) MEASURED. All three bounds met; **T-08 closes, client work unblocked**
+
+- **Date:** 2026-07-31 · executed by the **Leader** (measurement only, no code changes)
+- **Verdict: `pass` on all three parts of the amended NFR-IMC-001.**
+
+#### Two failed approaches before the one that worked — recorded, because the failures are the lesson
+
+**Attempt A — paired differences.** Each `SELECT 1` issued immediately before the real query on the same connection, so both samples share link conditions; the distribution of `(query − probe)` should estimate server-side work including its spread. **It failed, and the harness's own built-in sanity clause caught it: 25 of 60 paired differences came out negative** — in 42 % of rounds the real query was *faster* than its own probe taken milliseconds earlier. That is impossible as a statement about work, so it can only mean link noise exceeded the signal even under pairing. The medians confirm it: the **no-op's** median (73.1 ms) was **higher** than Q1's (58.0 ms). The script printed `BREACH`; **that verdict was void by the script's own rule and was discarded, not reported.**
+
+**Attempt B — `performance_schema.events_statements_history`.** The right table, but `ER_TABLEACCESS_DENIED_ERROR` for this user.
+
+**Attempt C — `SHOW PROFILES`.** Works. Deprecated in MySQL 8 (server is 8.0.45) but functional, and it reports how long a statement took **inside the server**, so network latency and its variance are not in the number at all — it does not attempt to subtract the link, it excludes it.
+
+#### Results — server-side execution, network excluded
+
+| Measurement | min | med | **p95** | max |
+| --- | --- | --- | --- | --- |
+| `SELECT 1` — instrument floor | 0.21 | 0.29 | **0.39** | 0.42 |
+| **A1578** (521 primary results) Q1 | 10.05 | 13.18 | **18.69** | 19.61 |
+| **A1578** Q2 | 11.54 | 16.76 | **19.45** | 20.38 |
+| **A1566** (242 primary results) Q1 | 5.62 | 8.93 | **12.80** | 15.91 |
+| **A1566** Q2 | 6.88 | 11.74 | **14.15** | 14.80 |
+
+**Bound (c): each query's server-side p95 ≤ 50 ms → worst observed 19.45 ms → MET**, with ~2.5× headroom. 25 rounds per query per contract, 3 warm-ups discarded.
+
+#### The cross-check that makes this credible, and retroactively indicts the earlier number
+
+**These numbers scale with data volume: 18.69 / 19.45 ms on the 521-result contract versus 12.80 / 14.15 ms on the 242-result one.** That is what a measurement of query *work* must do — and it is exactly what the VPN wall-clock measurement conspicuously failed to do (174.54 vs 173.92 ms across the same two contracts, essentially flat). **The flat number was measuring the link; this one is measuring the queries.** At 67× the instrument's own floor, it is signal rather than instrument noise.
+
+#### NFR-IMC-001, final status — all three parts met
+
+| Part | Bound | Measured | |
+| --- | --- | --- | --- |
+| **(a)** | absolute p95 ≤ 3 s | **174.5 ms** | ✅ ~17× margin |
+| **(b)** | added latency `max(Q1,Q2)` ≤ 250 ms | **92.7 ms** | ✅ |
+| **(c)** | server-side p95 ≤ 50 ms per query | **19.45 ms** | ✅ ~2.5× margin |
+
+**Consequently: T-08 → `[x]`, and design §11's gate on client work is released. T-10 … T-16 are unblocked.**
+
+#### One correction to the Leader's own earlier claim
+
+In the Pivot Record I wrote that the retired 1.5× bound *"looks mis-calibrated."* **That was stronger than the evidence supported, and (c) narrows it.** With Q1/Q2 costing ~19 ms of server-side work, the honest statement is that the 1.5× bound was **unmeasurable in this environment** — whether it was *also* mis-calibrated depends on the existing 8-query batch's server-side time, **which was never measured.** The retirement still stands on the ground that survives: a bound whose own prescribed fallback cannot satisfy it (2.12×) is not a usable gate, and (a)+(b)+(c) are measurable where it was not. But "unmeasurable here" and "wrong" are different claims and I should not have blurred them.
+
+#### Housekeeping
+
+Both harness scripts were run from the package directory and deleted immediately; `git status` clean, verified. Credentials read from `.env` at runtime via a `mysql2` connection — never hardcoded, never printed. Read-only: `SELECT`s, `SET profiling`, `SHOW PROFILES`. No writes, no DDL, no production-code changes.
 
 ---
 
