@@ -586,6 +586,101 @@ My brief instructed the Implementer to prefer the params array over SQL-text mat
 
 ---
 
+### T-12 — attempt 2: ✅ **PASS**. Both FAIL issues closed.
+
+- **Date:** 2026-07-31 · **rework round 2 of 3 for T-12; 2 of 2–3 budgeted for the whole spec**
+- **Files:** the four band-component files · `src/styles/colors.scss` · `client/research-indicators/README.md` · this spec's `design.md` §7.6
+
+#### Issue 1 closed — the dot is data-driven
+
+A fifth primitive input `color = input<string>('')`, bound `[style.background-color]="color() || null"`, with the SCSS token retained as the **unbound fallback**. The Reviewer confirmed it is **byte-for-byte the live idiom** already used one section above at `project-dashboard.component.html:253`, so no new mechanism was invented. **No hex entered component code** — the `.ts`/`.html` carry none, the `.scss` hexes are comments only, and the two in the spec are fixture *input data*, not styling. The `|| null` matters: it **removes** the inline style rather than writing `""`, so the token actually governs the unbound case. **Mutation (a):** unbinding it reddens exactly one assertion, and the Reviewer confirmed that is the only possible outcome, since jsdom leaves `style.backgroundColor === ''`.
+
+#### Issue 2 closed — and the number is now computed three independent times
+
+New token pair `--ac-chip-blue-bg` / `--ac-chip-blue-fg` in `colors.scss`, with a `[data-theme='dark']` override, documented in the client README and recorded in `design.md` §7.6.
+
+| Pair | Implementer (script) | Leader (by hand) | Reviewer (recomputed) | AA 4.5:1 |
+| --- | --- | --- | --- | --- |
+| Light `#345b8f` on `#e8f0f7` | 6.00 | ~6.0 | **6.0012** | ✅ |
+| Dark `#b0c4dd` on `#253448` | 7.09 | ~7.2 | **7.0854** | ✅ |
+| Rejected light | 3.88 | ~3.8 | **3.8782** | ❌ |
+| Rejected dark | 1.55 | — | **1.5457** | ❌ |
+
+**Three independent derivations agreeing is what turns this from an assertion into a measurement** — and the original defect was precisely that this figure had been assumed.
+
+**A finding that matters for the owner's DC-8 pass:** the Reviewer noticed the light pair is **identical to the values the chip already uses live** at `project-dashboard.component.html:250-251`. So this **tokenises the existing design rather than restyling it** — **zero visual drift in light mode**; the only new behaviour is a dark-theme override that did not previously exist.
+
+Also folded in: `(width <= 719px)` → `(width < 720px)`, still lint-clean under `media-feature-range-notation`, and **the §7.4 specificity gotcha survives** — the media block names both `.imb-grid` (0,1,0) and `.imb-grid.imb-grid-wide` (0,2,0) and is source-ordered after the base rule, so the wide selector's tie breaks toward the mobile override.
+
+**Scope boundaries held**, each verified rather than assumed: `docs/ux-ui/design.md` absent from `git status` (T-17's, and the hand-off is flagged **in writing** in §7.6); `colors.scss` + README are exactly the path the client guide prescribes; T-11's mapper untouched (confirmed by mtime); and `grep` for the component's selector outside its own four files returned **0 hits**, so T-13's boundary held.
+
+#### Mutation (b) — the deliberate negative result, and its answer
+
+Reverting the chip background to the failing token left **15/15 green. Nothing reddened.** The Implementer stated that plainly, as instructed. **So the contrast fix has no CI gate** — a regression to the old token would ship silently.
+
+**The Reviewer's answer to the Leader's question, with the owner named as requested:** the gate **is** worth having, and **T-14 should own it.** Its reasoning is the part worth preserving — **DC-8's premise is that contrast cannot be automated because *"axe cannot evaluate contrast over rendered output."* That is true of rendered output and false of a declared token pair**, which is two hex constants and a closed-form formula. ~25 LOC of pure computation: read the two stylesheets as text, assert `.imb-chip` names both `--ac-chip-blue-*`, then assert each theme's values clear 4.5:1. It kills exactly the mutation that survived.
+
+**Why T-14 and not T-16:** T-14 is already the designated gate task, already jest, already carries mutation-killability in its acceptance box, and **it lands in T-13's PR — so the gate would exist *before* the owner's DC-8 pass rather than after.** T-16's charter is explicitly *no source changes plus an evidence artifact*, so it would yield one-time evidence, not a CI gate. *(T-16 could instead measure **rendered** chip contrast in real headless Chrome with the old token as its KZ-006 control — stronger evidence, but still not a gate.)* Either choice pairs with a one-line **DC-8 amendment** in T-17's doc scope, recording that declared-token contrast **is** computable, so the next spec does not inherit the overbroad claim. **Escalated to the owner; not minted.**
+
+#### Two honesty notes recorded so they are not misread later
+
+- **T-12's `npm run build` / `strictTemplates` box is satisfied only *vacuously*.** The component is imported by nothing outside its own spec, so it is **absent from the AOT graph**; the only build-graph change is two custom properties. The TestBed run does compile the template via JIT, so this is bookkeeping rather than doubt — but **the real `strictTemplates` proof arrives with T-13**, and T-12's green build must not be read as template validation.
+- The **unbound-fallback path is rendered** by the single-band host but **never asserted**. One line (`expect(dot.style.backgroundColor).toBe('')`) would pin it for free. Not required by T-12's box; recorded.
+
+---
+
+### T-11 ✅ PASS · T-12 ❌ FAIL attempt 1 — reviewed jointly, rework routed to T-12 only
+
+- **Date:** 2026-07-31 · run **in parallel, blind to each other**, no worktree (disjoint files)
+- **Why joint review:** each task is internally consistent; **the risk was at their seam**, and auditing them separately would have missed it. That judgement paid off — the seam produced one of the two findings.
+- **T-11: PASS, no rework.** **T-12: FAIL, two issues.** Rework round **2 of 3** for T-12.
+
+#### T-11 — clean, and the gate is real
+
+Ten **per-entry** assertions, each checking one card's title **and** `toEqual(toRankedItems(payload.<own section>))`. The Reviewer verified the substrate that makes them non-vacuous: all ten fixture sections carry **pairwise-distinct labels and counts**, so any cross-wire reddens a specific per-card assertion. It also checked the mutation's *arithmetic*: swapping two `sectionKey`s reddens the two title assertions plus the composition-order test = **3 red of 18**, leaving 15 green. **That shape is the proof** — a mutation that reddens everything would prove nothing about per-instance gating.
+
+Band order sorted **explicitly** (`mapper.ts:231`) against a strictly **ascending** fixture (12/30/55/90), so pass-through order would fail. Nullable label resolved once to `UNLABELLED_CATEGORY_FALLBACK = 'Unspecified'`, with a spec asserting it is never the literal `"null"`.
+
+**On the locally-declared indicator ids 4/5 — explicitly do not send back.** No exported constant exists anywhere: the codebase writes bare `indicator_id === 5` in at least four places (`result-sidebar.component.ts:98`, `create-oicr-form.component.ts:504,533`, `alliance-alignment.component.ts:105-106`). **Two named local constants with in-file citations are strictly better than the prevailing convention**, and unifying all four would touch files outside T-11's inventory — real scope creep, correctly deferred. *(The Leader independently verified all three id citations before the review: the two exported constants, the `=== 4`/`=== 5` production gates, and `control-list/indicators.service.ts:32`'s `targetIndicatorIds = [1, 2, 4, 5]`, which filters the whole app.)*
+
+#### T-12 Issue 1 — the seam: the per-indicator dot is **specified**, so `color` is not dead
+
+The Leader asked whether a per-indicator dot colour was required or whether T-11's `color` field was dead weight. **The Reviewer settled it by going to the mockup** — which `design.md:10` designates as the **visual reference** — and found the four band dots at `mockup/index.html:180, 234, 300, 336` are `var(--c1)` / `var(--c3)` / `var(--cm)` / `var(--cl)`: **four different colours** from the declared ramp. Two further supports: the idiom is **already live on this exact screen one section above** (`project-dashboard.component.html:253` binds `[style.background-color]="indicator.color"` from the same `indicatorSummaries()` field), and `requirements.md` §9 **DC-8** names "colour ramp" as a defect class of this spec.
+
+**§7.6 was not the settling document** — "Bars from `projectDashboardBarColor()`" governs bars, and its `#1689CA` is an inventory entry harvested from the live tree. Notably `#1689CA` is the ramp's **3rd** colour, so a fixed accent dot would be right for **at most one of four bands**.
+
+**So this is the dead-artifact pattern caught one task before it materialised** — the fourth near-instance in this spec, and the first stopped pre-emptively rather than diagnosed after the fact.
+
+#### T-12 Issue 2 — the chip token substitution fails WCAG AA in **both** themes, and it corrects the Leader
+
+T-12 substituted `--ac-primary-blue-100` for the unavailable chip background `#E8F0F7`. But `--ac-primary-blue-100` is **`#b0c4dd`** — a mid-tone, not a tint. Computed contrast for 12 px **bold** text (which is *not* "large text", so the threshold is **4.5:1**):
+
+| Pair | Ratio | AA |
+| --- | --- | --- |
+| design intent `#345b8f` on `#e8f0f7` | **6.00:1** | ✅ |
+| as built, light `#345b8f` on `#b0c4dd` | **3.88:1** | ❌ |
+| as built, **dark** `#253448` on `#3d5167` | **1.55:1** | ❌ effectively illegible |
+
+**The Leader independently re-derived the light-mode figure by hand (~3.8:1) before accepting the finding** — the claim is arithmetic, not opinion.
+
+**This corrects the Leader directly.** In the review brief I wrote that a near-miss shade would be *"inspectable"* by the owner's DC-8 check, so the risk was covered. **That was wrong, and the Reviewer's reasoning is better than mine:** DC-8 exists precisely *because* axe cannot judge contrast over rendered output — but **1.55:1 is computable**, so it should never have been queued behind a human. Worse, it would ship "behind a comment that reads as a considered trade-off": the SCSS note claiming *"nearest token in the same family"* is **true of the hue and false of the value.**
+
+**This also breaks a constitutional hard rule, not just a spec clause:** `docs/prd.md` §8.3 **C-4** (WCAG 2.1 AA on every changed screen), echoed in the client child guide, plus **NFR-IMC-002** (category: a11y / PRD C-4) and §9 **DC-8**. And design §7.6 recording a hex with **no matching token is the documented trigger for the new-token path**, not for a family neighbour.
+
+#### Everything else T-12 got right — confirmed, and carried into attempt 2 unchanged
+
+- **The negative-control test is load-bearing, not theatre.** It converts *"we use the click path because jsdom cannot do keyboard"* from an author's assertion into a **demonstrated environmental fact**, and it is a live tripwire: if the harness ever gains keydown→click translation, that test reddens and tells the next maintainer the substitution is obsolete. It matches the recorded precedent at `project-dashboard-card.component.spec.ts:508-519`. *(Honest caveat, not a defect: the `Enter` and `Space` cases have byte-identical bodies — one test written twice, and the negative control is what gives them meaning.)*
+- **Both stylelint deviations are provably forced, not preference.** The Reviewer ran stylelint on a BEM-named copy: `selector-class-pattern` errors on `.imb__grid` **and** `.imb__grid--wide`, and `media-feature-range-notation` errors on `max-width: 719px` — so `(width <= 719px)` is the only lint-clean form.
+- **The specificity claim holds and the 720 px rule is safe** — verified rather than accepted: `.imb-grid.imb-grid-wide` is (0,2,0), the media block names **both** selectors, and the wide one is later in source order, so it wins for 4-card bands. Both classes coexist on the element exactly as `__`/`--` would have.
+- Layout values reproduced exactly (`auto-fill`, `minmax(300px,1fr)`, `minmax(400px,1fr)`, `align-items: start`, one column at the media query). Collapse via `@if` **removes cards from the DOM**, which is stronger than AC.4's "hides" and safe because expansion state is host-owned. **No hex literals leaked** — Issue 2 is a *wrong token*, not a literal.
+- **Primitive inputs are correct; keep them.** No spec section mandates an input shape, and §7.3 calls the component *presentational*, which primitives serve better than importing the mapper's model. Add `color` as a **fifth primitive**, do not refactor to the object.
+
+#### The one claim the Reviewer declined to verify — and the Leader closed it
+
+It stated plainly that it **did not run `npm run build`**, calling `strictTemplates` "plausible but unverified by me". **The Leader ran it: exit 0.** Declaring the gap instead of papering over it is what made it cheap to close.
+
+---
+
 ### T-10 — Client data layer: interface mirror + canonical fixture extension — ✅ **PASS**
 
 - **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31 · first client-side task

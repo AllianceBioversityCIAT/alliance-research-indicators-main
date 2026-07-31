@@ -403,7 +403,13 @@ graph TD
 - **Evidence that does NOT count:** asserting "10 cards were produced". A count passes while two cards are cross-wired — **the exact defect DC-5 names**, and the reason R-IMC-008 AC.2 says *"verified per instance, not once at mechanism level"*. Ten distinct data assertions, or the gate does not exist.
 - **Dependencies:** T-10
 - **Effort:** M · **Skills:** `angular-developer`
-- **Status:** todo
+- **Status:** **done — 2026-07-31, Reviewer PASS attempt 1** (reviewed jointly with T-12; **T-11 needed no rework**). See [`execution.md`](./execution.md).
+- **Consumed by later tasks:**
+  - Entry point `buildIndicatorMetadataBands(payload, indicatorsWithResults)` — **pure**, reaches into no component. Returns `IndicatorMetadataBandModel[]` with `{ indicatorId, indicatorLabel, resultCount, color, cards }`; each card is `{ sectionKey, title, items, empty, … }` with `items` already `ProjectDashboardRankedListItem[]`, ready for the card with no further transformation.
+  - **`color` is load-bearing, not decorative** — T-12's review established that the mockup shows **four different** band dots and that the live screen already binds `[style.background-color]="indicator.color"` one section above. **T-13 must pass `band.color` to the band component's `color` input.**
+  - Bands are **sorted explicitly** by `resultCount` descending inside the mapper — the guarantee is the mapper's, not inherited from `indicatorsWithResults()`'s incidental order.
+  - `UNLABELLED_CATEGORY_FALLBACK = 'Unspecified'` resolves `name: string | null`. Its exact wording, and the Gender/Degree note copy, are **the Implementer's own** and are **DC-8 territory** — the owner may adjust them at the visual pass.
+  - **Indicator ids are matched by `indicatorId`, never by label** (the DD-4 lesson). Ids 4 (Policy Change) and 5 (OICR) are declared **locally** with in-file citations because no exported constant exists; the Reviewer confirmed the codebase writes bare `indicator_id === 5` in at least four places, so **two named local constants are strictly better than the prevailing convention.** Unifying them is real scope creep — do not send it back.
 
 ---
 
@@ -427,7 +433,15 @@ graph TD
 - **Evidence that does NOT count:** asserting the `aria-expanded` attribute is present in the template, or that a `<button>` element exists. jsdom reports attributes whether or not the control is operable. **Assert `document.activeElement` after a focus call and assert the accessible name resolves** — not that an attribute string is there. Layout claims from reading CSS are also not evidence; T-16 owns the measurement.
 - **Dependencies:** none
 - **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** **done — 2026-07-31, Reviewer PASS on attempt 2.** One rework round (the spec's second). See [`execution.md`](./execution.md) § T-12.
+- **Consumed by later tasks:**
+  - **Five primitive inputs** — `indicator`, `resultCount`, `cardCount`, `collapsed`, **`color`** — plus a parameterless `collapseToggled` output. **Primitives are deliberate** (§7.3 calls the component *presentational*); **T-13 passes the five values individually rather than binding T-11's model object.**
+  - **`cardCount` drives the 2×2 wide grid** at exactly 4 cards; it is host-supplied, not inferred from projected content.
+  - Collapse uses `@if`, so cards are **removed from the DOM** rather than CSS-hidden — stronger than R-IMC-008 AC.4 requires, and safe because expansion state is host-owned (DD-9/DD-10).
+  - **New tokens `--ac-chip-blue-bg` / `--ac-chip-blue-fg`** in `src/styles/colors.scss` with a `[data-theme='dark']` override — **6.00:1 light / 7.09:1 dark**, recomputed independently three times. The light pair is **identical to the chip's existing live values**, so this tokenises the current design rather than restyling it: **no visual drift in light mode.**
+  - **⚠ T-17 inherits one item:** folding `--ac-chip-blue-*` into the **constitutional** `docs/ux-ui/design.md` §7 token registry. T-12 was explicitly barred from that file and flagged the hand-off in `design.md` §7.6.
+  - **T-12's green `npm run build` does NOT prove `strictTemplates`** for this template — the component is imported by nothing outside its own spec, so it is absent from the AOT graph. **The real proof arrives with T-13.**
+  - **The chip's contrast has no CI gate** (mutation (b) confirmed: reverting the token leaves 15/15 green). See T-14's recommended addition below.
 
 ---
 

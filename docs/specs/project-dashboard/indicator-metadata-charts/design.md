@@ -263,6 +263,19 @@ Loading, error and retry inherit from `ProjectDashboardCardComponent` — no new
 
 From the live component tree: navy `#112F5C`, slate `#4c5158`, grey `#777C83`, border `#e8ebed`, chip `#E8F0F7`/`#345B8F`, accent `#1689CA`; Barlow. Bars from `projectDashboardBarColor()`. Per the client guide, component code uses token utilities / CSS variables — these hexes record *which* tokens, they are not literals to paste.
 
+**Dot colour is per-indicator, not the fixed accent (T-12 rework, ISSUE 1).** `#1689CA`/`--ac-light-blue-300` above is one entry harvested from the live tree, not a statement that the dot is a fixed colour — the mockup (`mockup/index.html:180/234/300/336`) draws four different dot colours from the same ramp `projectDashboardBarColor()` produces for the ranked-list dot the section above already uses (`project-dashboard.component.html:253`). `IndicatorMetadataBandComponent` therefore takes a fifth primitive input, `color = input<string>('')`, bound by the host from `indicatorSummaries()`'s `color` field (the same field `indicator-metadata-bands.mapper.ts`'s `IndicatorMetadataBandModel.color` already carries, per T-11). `.imb-dot` binds `[style.background-color]="color() || null"`; the SCSS `--ac-light-blue-300` stays as the fallback for an unbound/empty value only.
+
+**Chip token pair replaced — WCAG 2.1 AA (T-12 rework, ISSUE 2).** `--ac-primary-blue-100` (`#b0c4dd`) was tried as the "nearest token in the same family" for the chip background and is **wrong**: it is a mid-tone, not a tint of `#E8F0F7`, and paired with `--ac-primary-blue-300` foreground it computes to **3.88:1 light / 1.55:1 dark** — both fail the 4.5:1 AA threshold for the chip's 12px/700 text (not "large text"). A new, purpose-built token pair is added to `src/styles/colors.scss`:
+
+| Theme | Background | Foreground | Computed ratio | AA (4.5:1) |
+| --- | --- | --- | --- | --- |
+| Light | `--ac-chip-blue-bg` `#e8f0f7` | `--ac-chip-blue-fg` `#345b8f` | **6.00:1** | pass |
+| Dark (`[data-theme='dark']`) | `--ac-chip-blue-bg` `#253448` | `--ac-chip-blue-fg` `#b0c4dd` | **7.09:1** | pass |
+
+Ratios computed via the standard WCAG relative-luminance formula, not asserted. `.imb-chip` binds `color: var(--ac-chip-blue-fg)` / `background-color: var(--ac-chip-blue-bg)`. This is a client-guide-prescribed new-token addition (`client/research-indicators/src/CLAUDE.md` § "Adding code"), recorded here and in `client/research-indicators/README.md`; it does **not** touch the constitutional `docs/ux-ui/design.md` §7 token registry — that fold-in is owned by **T-17**.
+
+**Mobile breakpoint corrected (T-12 rework, folded in on reopen).** §7.4's "one column below 720px" is now written as the media query `(width < 720px)`, not `(width <= 719px)` — the latter silently excludes fractional widths between 719 and 720px. Both forms are lint-clean; `<` matches the requirement's wording literally.
+
 ---
 
 ## 8. Security & Authorization
