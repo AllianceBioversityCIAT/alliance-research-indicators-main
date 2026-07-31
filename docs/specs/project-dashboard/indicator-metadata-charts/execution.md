@@ -10,11 +10,13 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — **T-01 … T-10 done** (10 of 17). Server tier complete; **the client chain has started.** **The entire server tier is complete, gated, and live-verified.** Nothing on the server side is outstanding: the payload composes, the queries execute against the real schema, all three NFR-IMC-001 bounds are met, the CI gates are mutation-verified, and the OpenAPI schema is proven to render. All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
-- **Rework rounds consumed: 1** (T-07 attempt 1 → 2), against a budget of 2–3.
-- **Next eligible:** **T-09** (Swagger — needs the app booted, so the DB tunnel must be up), then the client chain **T-10 → T-11/T-12 → T-13 → T-14**, then **T-15** (the T-09 a11y carry-forward), **T-16** (390 px measurement + full suite) and **T-17** (docs).
+- **Status:** in-progress — **T-01 … T-16 done** (16 of 17). **Only T-17 (documentation currency) remains.** Server tier complete; the client chain is complete; the closing measurements are recorded and Reviewer-verified. Server tier detail retained below for the record: **the client chain has started.** **The entire server tier is complete, gated, and live-verified.** Nothing on the server side is outstanding: the payload composes, the queries execute against the real schema, all three NFR-IMC-001 bounds are met, the CI gates are mutation-verified, and the OpenAPI schema is proven to render. All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
+- **Rework rounds consumed: 2** — T-07 (attempt 1 → 2) and T-12 (attempt 1 → 2) — against a budget of 2–3. **At the edge of budget, not over it.** T-13 … T-16 each passed on attempt 1, so nothing was consumed by the client chain's closing tasks.
+  - *Corrected 2026-07-31:* this block previously carried **two contradictory counts** — "1" here and "0" further down — and both were wrong. Restated once, here, from the log itself.
+- **Next eligible:** **T-17** — documentation currency (TRD ×2 + UX/UI design record). It is the last task in the spec.
+  - **T-17 must carry two corrections T-16 surfaced, or it will land a half-fix:** (a) **DD-7's "2×2 for 4-card bands" is contradicted at BOTH 1440 px and 768 px** in the app's default collapsed-sidebar state — 3+1 at 1440, a single stacked column at 768 — and `design.md:249` / `design.md:338` state the claim **unscoped**, with no width or sidebar qualifier; (b) the `(width < 720px)` media query is **demonstrated as the acting mechanism only on the single-card band**, not on the 4-card wide band, whose isolated pair is masked by width scarcity. Both are evidenced in `evidence/t16-report.md` §Q1/§Q2 and in T-16's ADVISORY 2 below.
 - **Open items carried forward:** four one-line advisories from T-07's review escalated to the owner and not absorbed (`gender_group` id/name pairing, reorder-brittleness note, `ORDER BY` uniqueness, one stale "below"/"above" pointer); the three-document *"all three categories"* wording gap from T-05; and **RB-11**, the contained credential leak, whose rotation is the owner's call.
-- **Rework rounds consumed so far:** **0** — every task has passed on attempt 1. Budget allows 2–3.
+- ~~**Rework rounds consumed so far:** **0** — every task has passed on attempt 1.~~ **Superseded 2026-07-31** — this line was already false when written (T-07 had failed attempt 1). The authoritative count is the corrected entry above: **2**.
 - **All server queries now execute against the real schema.** RB-3 (the unexecuted CTE-across-UNION pattern) is **discharged**, so DD-1's consolidation is proven rather than assumed. The next open architectural risk is **RB-4 / DD-11**, which **T-08's measurement** decides.
 - **Owner decisions pending:** none. The two advisory-derived items were authorised and applied 2026-07-30 (see `## Owner escalation`); one wording correction across three documents remains deliberately open there.
 - **Branch:** all work lives on **`AC-1672-Add-New-Dashboard-Charts-Based-on-Project-Indicator`** as of 2026-07-30. The first two commits were briefly made on `dev` by mistake and moved by cherry-pick; `dev` was reset to `origin/dev`, and since neither commit had been pushed, **no published history was rewritten**. The move was non-trivial rather than cosmetic — `AC-1672` sits behind `dev` and their copies of `agresso-contract.repository.ts` differ by 20 lines. Those differences turned out to be **purely prettier formatting in lines 58–125**, disjoint from T-02's two edited lines (54 and the return type), so the cherry-pick auto-merged cleanly and was re-verified on the new base: `tsc` clean, `agresso-contract` **5 suites / 123 tests** green. **Side effect worth knowing:** `dev` carries the degraded formatting, so the **9 pre-existing prettier errors** T-02's Implementer proved against `HEAD` **do not exist on this branch** — that file now lints clean, and nobody should later read those 9 as this spec's doing.
@@ -1130,3 +1132,169 @@ Design §11 sequences this measurement before all client work so a breach costs 
 | **Reopen the spec** | Treat Item 1 as a genuine spec gap and amend `requirements.md` AC.6 / DC-3 properly via the Pivot Protocol, which re-runs the budget and approval gate |
 
 ---
+
+## T-16 — Responsive measurement at 390 px, full client suite, coverage — ✅ **PASS on attempt 1**
+
+- **Date:** 2026-07-31
+- **Requirements covered:** NFR-IMC-003, NFR-IMC-004, NFR-IMC-005 · gates DC-7, DC-11
+- **Implementer attempts:** 1 · **Reviewer verdict:** PASS · **Rework consumed:** 0
+- **Files changed:** `evidence/t16-report.md` *(new, 134 lines)* — the only diff. **No source changes**, as the charter requires.
+
+### Context this task ran in — read it before reading its numbers
+
+T-16's browser measurement was **executed in a prior session** and its artifacts
+were **lost**: a VPN disconnect broke the session, the working tree was reverted,
+and the untracked evidence went with it. They were recovered byte-identically
+(SHA-256 verified) from the originating session's scratchpad and committed in
+`b08eda49`. **Nothing was re-measured and nothing was regenerated.**
+
+The Leader therefore scoped this attempt as *verification and reporting*, not
+re-measurement, and explicitly ruled harness rebuilding out of scope — the
+harness component source is permanently lost (see `evidence/README.md`). What
+**was** re-run fresh this session is both test suites, by the Implementer and
+then independently again by the Reviewer.
+
+### Attempt 1 — Implementer
+
+Produced `evidence/t16-report.md`: an auditable report resolving each acceptance
+box to earned/unearned, with every number traced to its source key.
+
+| Box | Verdict |
+| --- | --- |
+| 0 px overflow at 390/768/1440 + KZ-006 control alongside | **Earned** — 0 px at document, page-wrapper *and* grid level at all three widths |
+| One-column collapse below 720 px | **Earned** — 1 track at 719 px on both bands, both sidebar states |
+| Full client suite green; full server suite green | **Earned** — fresh run, exit 0 both |
+| Coverage vs floors, vs pre-change | **Earned** (client, byte-exact) / **earned with a stated precision gap** (server) |
+| ⊕ T-15's `scroll_probe` (trusted Page Down) | **Earned** — `scrollTop` 0 → 120 |
+
+**Fresh verification (Implementer):** client `npm test` and `npm run test:coverage`
+→ 306/306 suites, 6,292/6,292 tests, coverage 99.33 / 98.03 / 99.14 / 99.56.
+Server `npm run test:cov` → 324/324 suites, 2,069/2,069 tests, coverage
+84.16 / 74.62 / 84.67 / 84.22. Client `npm run lint` clean. All exit 0, and all
+identical to the archived 15:35 run — expected, since only `docs/` moved since.
+
+### Attempt 1 — Reviewer: **PASS**
+
+The Reviewer re-derived every number rather than accepting the report's
+arithmetic, **re-ran both suites itself** with identical results, verified every
+measurement key against `measurements.json` (no transcription error found
+anywhere), and opened all four cited `execution.md` lines to confirm they say
+what the report says they say — `:546`, `:554`, `:605`, `:906` all check out. It
+also grepped the whole log to confirm 83.32 % is genuinely the *only* server
+coverage figure ever recorded, so the report's "most recent before T-16" is
+verified rather than assumed.
+
+**On the §Q1 near-miss arithmetic the Leader flagged:** gap is `1rem` = 16 px
+(`indicator-metadata-band.component.scss:111`), so two `minmax(300px,1fr)` tracks
+need **616 px** against containers of 614.25 / 615.188 — short by **0.81 px** at
+the tighter end. The conclusion holds and the "once gap is accounted for"
+qualifier is load-bearing: without the gap, 600 ≤ 614.25 would have fit.
+Cross-checked against `measure_768` (322.391 + 322.406 + 16 = 660.797, the
+container exactly) and `breakpoint_isolated_720` (330 + 330 + 16 = 676, exactly).
+
+**Reviewer summary:** *every measurement, citation and arithmetic step verified
+independently; all five verdicts supported; the coverage caveat is honest rather
+than cosmetic; the diff is the single evidence file with no source changes.*
+
+### The two substantive findings, both confirmed by the Reviewer
+
+**Q1 — the `(width < 720px)` media query is demonstrated on ONE band, not both.**
+On the single band the isolated pair flips 1 → 2 tracks (`675.047px` →
+`330px 330px`) while the container moves ~1 px, so the media query is the only
+explanation. On the **wide** band the same pair is 1 track at both widths —
+`minmax(400px,1fr)` cannot fit two tracks in ~676 px regardless — so that pair
+**demonstrates nothing** about the mechanism for the wide band. The acceptance
+box asks for *collapse measured*, not mechanism, and collapse is observed at
+every sub-720 width on both bands, so the box is legitimately earned. The causal
+claim is deliberately not generalised.
+
+**Q2 — DD-7's 2×2 claim does not hold in the app's default state.** At 1440 px
+with the sidebar **collapsed** — `cache.service.ts:70` is
+`signal(localStorage.getItem('isSidebarCollapsed') !== 'false')`, i.e. `true` on
+a fresh browser, so collapsed **is** the default — the 4-card band renders
+**3 columns + 1 wrapped card** (`422.391px 422.391px 422.406px`, 4th card at
+`y: 374.75`). Genuine 2×2 appears only with the sidebar expanded
+(`553.25px 553.25px`). The Reviewer confirmed DD-7 is not misquoted:
+`design.md:338` and `design.md:249` both state "2×2 for 4-card bands"
+**unscoped** — no width qualifier, no sidebar qualifier — with 1440 named among
+DD-7's measured widths. **This is real design-vs-reality drift. Reported, not
+fixed** (no CSS was touched, correctly).
+
+### ADVISORY — 4R lens findings (recorded; none gating, none minting a task)
+
+1. **Reliability — the Leader's own `evidence/README.md` asserted more than its
+   source supports.** It described `t16-raw/normal-*.html` / `control-*.html` as
+   *"the rendered DOM of the harness at each width"*. They are **five
+   byte-identical copies of the un-rendered `index.html` shell** (MD5
+   `62bb1458…`, empty `<app-root>`, no `_ngcontent` / `.imb-grid` /
+   `#t16-wide-band`), captured at 15:22–15:23 **while the harness bootstrap was
+   still failing** with NG05104. Verified by the Leader and **corrected in
+   `README.md` in this task's commit.** This is the RB-1 pattern occurring in
+   the evidence directory rather than in the report; no audited conclusion
+   rested on it, and harness fidelity is instead established by the Reviewer's
+   independent route — the computed track sizes reproduce the shipped SCSS to
+   the pixel across six scenarios and both track minimums, which a hand-built
+   replica would not do by accident.
+2. **Risk — §Q2 under-scopes the DD-7 drift.** `measure_768` shows the 4-card
+   band at `wideGridComputedColumns: "660.797px"` — **one** column, four stacked
+   cards — so DD-7's warrant ("Measured in real Chrome at 500/768/1440") is
+   contradicted at **768 as well**, not only at 1440. Under-claiming, so it does
+   not trip RB-1, but **T-17 correcting DD-7 from `t16-report.md` alone would
+   fix half the drift.** Carried into T-17's context deliberately.
+3. **Readability — floor pairing mis-ordered.** `t16-report.md` lines 14 and 81
+   pair the Istanbul tuple (stmts/branch/**funcs**/**lines**) positionally
+   against the jest-config tuple (stmts/branch/**lines**/**funcs**), yielding
+   "99.14 ≥ 45, 99.56 ≥ 30" — functions against the lines floor and vice versa.
+   Both hold either way by ~50 points; no verdict moves.
+4. **Readability — `execution.md:906` attribution is loose.** The line sits under
+   `## Owner decisions → Item 2`, not under `### T-09`. The material claim it
+   supports (+1 suite / +2 tests explaining 323/2,067 → 324/2,069) is correct.
+5. **Readability — one over-determined causal sentence** (report line 36):
+   width scarcity is sufficient but not the proximate cause at 719 px, where the
+   media query also fires. The paragraph's point is unaffected.
+6. **Resilience — harness/app 1 px fidelity gap.** The driver models the
+   collapsed sidebar as `?padLeft=64`; the shipped sidebar is `w-[65px]`
+   (`alliance-sidebar.component.html:3`). Every conclusion re-derived at 65 px —
+   **nothing flips.** Noted in `README.md` in this task's commit.
+
+### Not Done / Assumptions (Implementer, verbatim — adjudicated below)
+
+- **Did not rebuild or re-run the Angular measurement harness.** Out of scope per the charter (`src/harness-t16/` is permanently lost and rebuilding it is explicitly not this task's job). All 390/768/1440/719/720/control/scroll-probe numbers are cited from the recovered `evidence/t16-raw/measurements.json`, not regenerated.
+- **Server coverage "not regressed" is directionally, not precisely, verified.** The only server coverage baseline recorded in `execution.md` (83.32%, T-07) is one task older than the true immediate-predecessor state (it predates T-09's swagger-spec addition) and carries only a single "global" figure with no branch/function/line breakdown. This run's 84.16/74.62/84.67/84.22 is higher on the one comparable dimension, supporting "not regressed," but a byte-precise four-dimension pre/post delta — the kind available for the client — does not exist in `execution.md` for the server. Reported as a stated limitation, not rounded up to a clean match.
+- **Q1's media-query causation is proven only for the single band**, not the wide band, at the container widths in this dataset.
+- **DD-7's 2×2 claim does not hold in the app's default sidebar state at 1440 px.** Surfaced, not fixed. No CSS changed.
+- **No source files were touched.**
+
+**Leader adjudication of the `Not Done` field:** three of the five items
+(harness rebuild, DD-7 not fixed, no source changes) are **exclusions the Leader
+authorised in the brief** — they are not scope owed. The fourth, Q1's bounded
+causal claim, is the report declining to over-claim, which the charter demands.
+
+The one genuine partial is the **server "not regressed" precision gap**, and the
+charter explicitly sanctions it: *"Unverified is a legitimate, reportable outcome
+— a replica number dressed as an app number is not."* The floors half is
+unambiguous (all four dimensions ≥ 60 % by a wide margin, re-verified twice
+today). Recorded as a stated limitation. **T-16 closes with it on the record.**
+
+### Decisions made
+
+- **Measurement not re-run; suites re-run.** Citing the recovered dataset was
+  judged sound (byte-identical, provenance recorded, source tree unchanged);
+  re-running the suites cost ~1 minute and converted an archival claim into a
+  this-run observation. Both the Implementer and the Reviewer ran them.
+- **Skill-set deviation from the charter.** The charter lists `ui-ux-pro-max` and
+  `systematic-debugging`; the Leader assigned `systematic-debugging` and
+  `cognitive-doc-design` instead, because no CSS/UI work remained and the
+  deliverable is an artifact written to be audited. Recorded per
+  `.agents/leader.md` → *Delegation Discipline*.
+- **Advisories 1 and 6 were acted on by the Leader**, not routed into a task:
+  both concern `evidence/README.md`, which the **Leader authored** outside any
+  task's diff. Correcting one's own artifact is not scope growth. Advisories
+  2–5 are recorded here and die here, per `/akili-execute` §2.4.
+
+### Final verification
+
+Client: 306/306 suites · 6,292/6,292 tests · 99.33 / 98.03 / 99.14 / 99.56 · lint clean.
+Server: 324/324 suites · 2,069/2,069 tests · 84.16 / 74.62 / 84.67 / 84.22.
+Run twice today by two independent agents with identical results. All exit 0.
+

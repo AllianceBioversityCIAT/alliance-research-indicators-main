@@ -50,15 +50,47 @@ is specified to leave **no source changes**), and the only copy — the one arch
 here — went with the files above. It is **not** in the scratchpad and was **never
 committed**, so it is not recoverable from git either.
 
-What remains is enough to rebuild it, and the reconstruction contract is fully
-determined by two surviving artifacts:
+What remains is enough to rebuild it, and the reconstruction contract is
+determined by **one** surviving artifact:
 
 - `t16-harness-source/driver.mjs` — pins every hook the harness must expose:
   the DOM ids `#t16-wide-band`, `#t16-single-band`, `#t16-scroll-probe`, the
   `.imb-grid` / `.app-page-wrapper` selectors, and the `?padLeft=<n>` query
   parameter that models the fixed `alliance-sidebar`'s left inset.
-- `t16-raw/normal-*.html` — the **rendered DOM** of the harness at each width,
-  which is what the harness produced.
+
+> **Correction, 2026-07-31 — this section previously claimed two artifacts.**
+> It named `t16-raw/normal-*.html` as *"the rendered DOM of the harness at each
+> width"*. **That was false.** All five `normal-*.html` / `control-*.html` files
+> are byte-identical (MD5 `62bb1458…`) copies of the **un-rendered** `index.html`
+> shell: `<app-root></app-root>` is empty, and none contains `_ngcontent`,
+> `.imb-grid` or `#t16-wide-band`. They were `--dump-dom` captures taken at
+> 15:22–15:23, **while the harness bootstrap was still failing** with NG05104
+> (a component-selector mismatch), which is why they are identical and empty.
+> The successful CDP run came after the fix, at 15:26+, and produced
+> `measurements.json` — not these files.
+>
+> The error was the Leader's, caught by T-16's Reviewer, and it is the exact
+> pattern `tasks.md` RB-1 names: **a record asserting more than its source
+> supports.** It is corrected here rather than quietly edited away, because this
+> spec's lineage produced that defect four times across three judgment rounds
+> and the count is only useful if it stays honest.
+>
+> **No audited conclusion rested on it.** `evidence/t16-report.md` never cited
+> these files, and the Reviewer corroborated harness fidelity by a different
+> route: the computed track sizes in `measurements.json` reproduce the shipped
+> SCSS to the pixel across six scenarios and both track minimums
+> (`minmax(300px,1fr)` / `minmax(400px,1fr)` / 16 px gap / the two-selector
+> `(width < 720px)` override) — which a hand-built replica would not do by
+> accident. That, not the HTML dumps, is what establishes the measured subject
+> was the real components.
+
+**One further imprecision, same review.** This file describes `?padLeft=64` as
+the app's default sidebar inset. The shipped sidebar is `w-[65px]`
+(`alliance-sidebar.component.html:3`), so the harness models it **1 px narrow**.
+Every conclusion was re-derived at 65 px and none flips: 1299.19 → 1298.19 still
+fits `3×400+32 = 1232`; 615.19 → 614.19 is still under the 616 px needed for two
+300 px tracks; 390 px still reads 0 overflow. Recorded because the number is
+stated as exact and it is not.
 
 `t16-harness-source/main.ts.orig` is the pristine `main.ts`, kept so the restore
 is auditable.
@@ -104,8 +136,11 @@ t16-harness-source/
 t16-raw/
   measurements.json           FINAL dataset — 11 scenarios (copy of result5.json)
   result.json … result5.json  the five driver iterations, in order
-  normal-390/768/1440.html    rendered DOM at each width
-  control-390/768.html        rendered DOM under the KZ-006 forced overflow
+  normal-390/768/1440.html    NOT rendered DOM — five byte-identical copies of
+  control-390/768.html        the empty index.html shell, captured while the
+                              harness bootstrap was failing (NG05104). Retained
+                              as the diagnostic trail only. See the correction
+                              in "What is missing" above.
   shot-390.png                screenshot at 390 px
   build-final.log             the client build that produced the measured bundle
   chrome-cdp.log              chrome-headless-shell startup
@@ -138,6 +173,13 @@ level the numbers were taken at.
 
 ## Status
 
-The measurements exist and are complete. **T-16 is not closed** — no `### T-16`
-section exists in `execution.md`, its four acceptance boxes in `tasks.md` are
-unchecked, and it carries no Reviewer PASS.
+**T-16 is closed — Reviewer PASS on attempt 1, 2026-07-31.** All four acceptance
+boxes plus T-15's ⊕ added box are earned; the server "not regressed" half is
+recorded as a stated precision limitation rather than rounded up. The audit trail
+is `execution.md` § T-16; the findings report is `t16-report.md` in this
+directory.
+
+Two findings T-16 surfaced are **open and belong to T-17**: DD-7's unscoped
+"2×2 for 4-card bands" is contradicted at both 1440 px and 768 px in the app's
+default sidebar state, and the `(width < 720px)` collapse is mechanism-proven
+only on the single-card band.

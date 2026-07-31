@@ -569,14 +569,16 @@ graph TD
   - **Full `npm test` in the client package, not a targeted run** (NFR-IMC-005 / KZ-003) — `project-dashboard-card` has several hosts and T-15 edited it.
   - Coverage: `npm run test:coverage` (client) and `npm run test:cov` (server); floors held and **neither regressed**.
 - **Acceptance / done check:**
-  - [ ] **0 px horizontal overflow at 390, 768 and 1440 px**, each recorded as a measured number, with the control's reproduced failure recorded alongside.
-  - [ ] One-column collapse below 720 px measured.
-  - [ ] Full client suite green; full server suite green.
-  - [ ] Coverage numbers recorded against floors (server ≥ 60 %; client 40 / 20 / 45 / 30) and compared to the pre-change values.
+  - [x] **0 px horizontal overflow at 390, 768 and 1440 px**, each recorded as a measured number, with the control's reproduced failure recorded alongside. — **0 px at document, page-wrapper AND grid level** at all three widths; the KZ-006 control (`control_forced_390`) reproduces **594 px / 598 px** of wrapper/grid overflow *while the document metric still reads 0*, which is precisely why all three levels are reported. `evidence/t16-report.md` §C.
+  - [x] One-column collapse below 720 px measured. — 1 track at 719 px on both bands, both sidebar states. **Bounded claim:** the `(width < 720px)` media query is demonstrated as the *mechanism* only on the single-card band (`675.047px` → `330px 330px` across the boundary at a ~1 px container change); on the 4-card wide band the isolated pair is masked by width scarcity and demonstrates nothing. §Q1.
+  - [x] Full client suite green; full server suite green. — Client **306/306 suites, 6,292/6,292 tests**; server **324/324 suites, 2,069/2,069 tests**. Re-run fresh today by the Implementer *and independently again by the Reviewer*, identical both times, all exit 0. §A.
+  - [x] Coverage numbers recorded against floors (server ≥ 60 %; client 40 / 20 / 45 / 30) and compared to the pre-change values. — Client **99.33 / 98.03 / 99.14 / 99.56**, byte-identical to T-15's recorded baseline (`execution.md:605`). Server **84.16 / 74.62 / 84.67 / 84.22**, all far above the 60 % floor. **Stated limitation:** the server "not regressed" half is *directional only* — the sole recorded server baseline (83.32 %, T-07) is one task older and single-dimension, so no byte-precise four-way delta exists. Recorded as a limitation rather than rounded up, per this task's own "Evidence that does NOT count" clause. §B.
 - **Evidence that does NOT count:** CSS review, or a measurement whose control did **not** reproduce a known failure — a harness that cannot detect overflow reports zero for a broken layout and a correct one alike. **A 500 px measurement is not a 390 px measurement**, and reporting the narrowest width as covered because the harness floor blocked it would repeat exactly the gap this task exists to close. If 390 px is genuinely unreachable, NFR-IMC-003 is **unverified** — say that, do not round it to met.
 - **Dependencies:** T-13, T-14, T-15
-- **Effort:** M · **Skills:** `ui-ux-pro-max`, `systematic-debugging`
-- **Status:** todo
+- **Effort:** M · **Skills:** `ui-ux-pro-max`, `systematic-debugging` *(Leader deviation: ran with `systematic-debugging` + `cognitive-doc-design` — no CSS work remained and the deliverable is an artifact written to be audited. Recorded in `execution.md` § T-16 → Decisions made.)*
+- **Status:** **done — 2026-07-31, Reviewer PASS attempt 1.** See [`execution.md`](./execution.md) § T-16 and [`evidence/t16-report.md`](./evidence/t16-report.md).
+  - **⚠ Two findings this task surfaced are T-17's to carry, and T-17 will land a half-fix without both:** (a) **DD-7's unscoped "2×2 for 4-card bands" is contradicted at 1440 px *and* at 768 px** in the app's default collapsed-sidebar state (3+1, and a single stacked column, respectively) — `design.md:249` / `design.md:338` carry no width or sidebar qualifier; (b) the `(width < 720px)` collapse is mechanism-proven only on the single-card band. **Neither was fixed here** — T-16 ships no source changes by charter.
+  - **Also corrected in this task's commit:** `evidence/README.md` had described five archived HTML files as "the rendered DOM of the harness". They are byte-identical copies of the **un-rendered** shell, captured while the harness bootstrap was failing. The Leader authored that claim; T-16's Reviewer caught it. It is the RB-1 pattern, and it is recorded as such rather than quietly edited.
 
 ---
 
