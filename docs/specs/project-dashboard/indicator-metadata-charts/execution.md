@@ -586,6 +586,44 @@ My brief instructed the Implementer to prefer the params array over SQL-text mat
 
 ---
 
+## Owner decisions, 2026-07-31 — the four open items closed
+
+Presented as a batch at the server/client boundary, which is the natural moment to decide them rather than when a PR is already built.
+
+| # | Item | Owner decision | Effect |
+| --- | --- | --- | --- |
+| **3** | **RB-11** credential rotation | *"está bien controlado"* — **no rotation** | RB-11 **closed**. Exposure was local, ~14 min, never in git, never off the machine. Owner accepts the residual with the facts on record |
+| **4** | **DC-8** visual quality — no automated gate possible | **Owner will test it personally once development is complete** | The strongest available substitute for a class that cannot be automated. Converts an *accepted risk nobody owned* into an **assigned check with an owner and a trigger**. Recorded in `requirements.md` §9. **Consequence: the spec does not close when the tasks close** — DC-8's check runs after T-10 … T-17 land |
+| **2** | Permanent Swagger-emission spec | *"si lo puedes controlar rápido hazlo"* — **authorised, done** | ✅ Landed. See below |
+| **1** | Six one-line advisories | **Permission to create tasks *only if* something is critical** | **Leader assessment: none meets that bar.** See the criticality read below — nothing was minted |
+
+### Item 2 — the Swagger-emission gate landed
+
+`agresso-contract.swagger.spec.ts` *(new, 2 tests)*. Built to the T-09 review's scope constraints exactly:
+
+- ✅ Asserts the `reports/full` **200 carries a `$ref`** — the state that was previously `{"description":""}` with no schema at all.
+- ✅ Asserts **no `$ref` in the document dangles** — the failure mode a page-eyeball check misses, because a document full of dangling refs looks populated and renders broken.
+- ❌ **Deliberately does not assert the 17 field names.** That would duplicate the DTO and become churn on every additive change, turning a guard into a maintenance tax. The field-level contract is already a **compile** error via `ContractFullReportsDto implements IndicatorMetadataSectionsDto` (T-02) — belt and braces in the right places, not the same place twice.
+
+**Mutation-verified by the Leader:** removing the exact `@ApiOkResponse` line T-09 added reddens the first assertion; the dangling-ref assertion correctly stays green, since an absent schema dangles nothing — the two tests gate different properties. Restored, checksum identical.
+
+**`requirements.md` §9 DC-10 amended** from *"Manual `/swagger` inspection"* to CI-gated. The reasoning the Reviewer gave for wanting this holds: the defect class is silent, manual gates decay across the next spec that touches the DTO, and **this repo already contains one instance of the same class left as a code comment rather than a gate** (`bilateral-hlos-indicators.response.dto.ts:12`).
+
+### Item 1 — criticality read: none is critical, and one is a closer call than the others
+
+Recorded because the owner's authorisation was conditional, so the judgement needs to be on the record rather than implied by inaction.
+
+| Advisory | Assessment |
+| --- | --- |
+| `:236` comment says "below" where it means "above" | **Not critical.** One word, no behavioural consequence. Minting a task for it would cost more than the error |
+| Branch indices are reorder-brittle | **Not critical — and it fails *closed*.** A reorder reddens up to 12 assertions rather than passing silently. That is maintenance cost, which is the acceptable direction |
+| `ORDER BY` gated for presence, not uniqueness | **Not critical.** The per-branch variant it would miss is **rejected by MySQL**, so real-schema execution already catches it |
+| Three-document *"all three categories"* wording (T-05) | **Not critical.** The gate itself is closed independently; only the prose overstates |
+| `@ApiOkResponse` documents the unwrapped payload, wire response is `ServerResponseDto` | **Not critical, and spec-conformant as prescribed** by design §5. A one-line description naming the wrapper would remove the misreading; worth doing whenever the controller is next touched |
+| **`gender_group`'s id/name pairing is unpinned within its segment** | **The closest call, and worth stating precisely.** Swapping `1 AS id, 'Male'` with `2 AS id, 'Female'` between branches while leaving the `SUM` columns would **mislabel gender counts** — user-visible wrong data in a research reporting system. The T-09 reviewer scoped it as **DC-4**, which §9 declares un-gateable. **That scoping is right about label *correctness* and arguably too broad about pairing *consistency*:** whether `'Male'` is the right label for `gender_id = 1` is a domain fact no test can know, but whether the label is attached to its own `SUM` column **is** testable, with the same branch-pinning technique already in the file, in ~3 lines. **Still not critical** — it requires someone editing those literals wrongly, and the pairing is currently correct and real-schema-verified. **Recommended as a ~3-line addition to T-16's pass rather than a new task; flagged for the owner, not acted on** |
+
+---
+
 ### T-09 — Swagger: make the response schema actually render — ✅ **PASS**
 
 - **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31
