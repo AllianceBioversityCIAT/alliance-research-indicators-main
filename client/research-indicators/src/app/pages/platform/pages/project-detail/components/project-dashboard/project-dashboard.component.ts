@@ -340,7 +340,21 @@ export class ProjectDashboardComponent {
    * case; this copy states only that no data is recorded.
    */
   metadataCardEmptyMessage(resultCount: number): string {
-    return `No data is recorded for this field across this project's ${resultCount} result${resultCount === 1 ? '' : 's'}.`;
+    // R-IMC-010 AC.1 names the indicator's result count, and W-7 (design §7.5)
+    // forbids asserting WHY the section is empty. Both hold here — but the two
+    // clauses are deliberately SEPARATE sentences, and that separation is
+    // load-bearing rather than stylistic.
+    //
+    // Band visibility derives from `count_results`, which draws no
+    // primary/non-primary distinction; the aggregations scope to
+    // `is_primary = TRUE`. Those populations differ, so a project whose results
+    // are all linked non-primary shows a visible band over empty sections. An
+    // earlier wording — "…across this project's N results" — bound the emptiness
+    // claim TO that count, which makes it arguably false in exactly that case:
+    // the field may well be recorded on those N results, just not on the primary
+    // ones this section counts. Stating the count as its own fact avoids
+    // asserting a relationship the data does not support.
+    return `No data is recorded for this field on this project. (${resultCount} result${resultCount === 1 ? '' : 's'}.)`;
   }
 
   /**
