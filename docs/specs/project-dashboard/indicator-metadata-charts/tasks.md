@@ -302,7 +302,14 @@ graph TD
 - **Evidence that does NOT count (DC-9 no-pass clause):** **if three runs vary by more than the effect being measured, the number is not evidence.** Report the spread and mark the check **inconclusive**. An inconclusive result MUST NOT be recorded as a pass, and a single run is never a p95. A measurement taken on an empty or toy dataset is also not evidence — `T_metadata ≤ 0.5 × T_existing` is a claim about *real* row counts, and two multi-branch UNION aggregations over four fact tables are exactly where a small dataset flatters the design.
 - **Dependencies:** T-06
 - **Effort:** M · **Skills:** `systematic-debugging`
-- **Status:** todo
+- **Status:** `[~]` **BLOCKED — 2026-07-30. Attempted, zero samples collected, nothing measured.** The DB host is a private `192.168.x` LAN address and the VPN tunnel is down: TCP 3306 hangs (verified independently by the Leader), ICMP 100 % loss, no `utun` route. It **was** reachable earlier in this same session (T-01 … T-06 all ran against it), so this is transient, not structural. **Not a work failure and not a DC-9 inconclusive** — DC-9's inconclusive is "variance comparable to the effect"; this is "no distribution exists at all". Recording it as `pass` or `breach` would be fabrication in either direction. See [`execution.md`](./execution.md) § T-08.
+- **Groundwork already verified by source reading, so the re-run is one pass:**
+  - Pre-change arm: `AgressoContractRepository.getFullContractReports()` at `agresso-contract.repository.ts:1161-1197`, body confirmed untouched, 8 concurrent (6 `Promise.all` branches, one nesting its own `Promise.all` of 3).
+  - Post-change arm: `AgressoContractService.getFullContractReports()` at `agresso-contract.service.ts:247-278`.
+  - `T_metadata` two ways: harness wall-clock around its own `Promise.all([Q1, Q2])` (**preferred**), cross-checked against `max(Q1, Q2)` parsed from the two existing `_debug` lines at `indicator-metadata-reports.repository.ts:224-228` and `:402-406`.
+  - **Constructor stubs suffice to run the real methods with no code changes** — `AgressoContractRepository` needs `CurrentUserUtil` / `AlianceManagementApp` only for `findContractsByUser`, which is not on this path; `IndicatorMetadataReportsRepository` needs only `DataSource`; the service method touches none of `currentUser` / `moduleRef` / `appConfig` / `clarisaLeversService`. **Sanity-check this with one successful 17-field call before collecting samples** — it is assumed from reading, not yet executed.
+  - Connection via the project's own `getDataSource(dataSourceTarget.CORE, true)`, which reads `.env` at runtime — the credential-safe path.
+- **To unblock:** reconnect the VPN that routes to the `alliancereportingdb` host (FortiClientVPN or GlobalProtect — both installed, neither tunnelling). Confirm with a read-only probe, then re-run. **This is an owner action** — the tunnel needs interactive login/2FA.
 
 ---
 

@@ -10,7 +10,8 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — **T-01 … T-06 done** (6 of 17). Next eligible: **T-07** (specs, with two additions owed from T-06's review), **T-08** (the NFR-IMC-001 measurement that decides DD-11), **T-09** (Swagger). The whole server payload is now composed and live-verified; **nothing is dead any more** — T-06 closed the window where `ContractFullReportsDto` and the new repository were referenced by nothing.
+- **Status:** in-progress — **T-01 … T-06 done** (6 of 17). **T-08 is `[~]` blocked** on VPN connectivity, so **DD-11 remains contingent and unverified**. Next eligible and DB-independent: **T-07** (specs over fixtures, plus two additions owed from T-06's review). **T-09** (Swagger) also needs the DB — the Nest app boots TypeORM, so `/swagger` cannot be inspected while the tunnel is down. The whole server payload is composed and live-verified; nothing is dead any more.
+- **The spec's own ordering rule is still in force:** design §11 sequences the measurement **before all client work** so a breach costs the server PRs and not the client ones. T-08 being blocked therefore blocks **T-10 … T-16**, not just itself.
 - **Rework rounds consumed so far:** **0** — every task has passed on attempt 1. Budget allows 2–3.
 - **All server queries now execute against the real schema.** RB-3 (the unexecuted CTE-across-UNION pattern) is **discharged**, so DD-1's consolidation is proven rather than assumed. The next open architectural risk is **RB-4 / DD-11**, which **T-08's measurement** decides.
 - **Owner decisions pending:** none. The two advisory-derived items were authorised and applied 2026-07-30 (see `## Owner escalation`); one wording correction across three documents remains deliberately open there.
@@ -451,6 +452,54 @@ R-IMC-007 AC.1, AC.2 (type + source level; runtime CI coverage of the empty case
 #### Final verification
 
 `tsc` clean · `eslint` + `prettier` clean on all three files · full suite **322 / 2,051** green · both the type-probe and the composition mutation-table run independently by the Reviewer · real-schema composition verified across five contracts with the gender arithmetic matching a pre-supplied cross-check exactly.
+
+---
+
+### T-08 — Measure NFR-IMC-001 — `[~]` BLOCKED, not failed
+
+- **Status:** `[~]` **blocked on environment. Zero samples collected. Nothing measured.**
+- **Date:** 2026-07-30
+- **Implementer attempts:** 1 (reached the blocker, did not proceed past it)
+- **Reviewer:** **not spawned** — there is no measurement to audit. Spawning one would burn a review round on an empty result.
+
+#### The blocker
+
+The DB host is a private `192.168.x` LAN address and **the VPN tunnel is down**:
+
+| Probe | Result |
+| --- | --- |
+| TCP connect to 3306 | **Hangs** — Implementer timed out on 3 attempts; **Leader independently confirmed** (60 s, no response). A closed port refuses immediately; a blackholed route hangs, which is what this is |
+| ICMP | 100 % packet loss |
+| Interfaces | `scutil --nwi` shows only `en0` (local Wi-Fi) with an IPv4 route. **No `utun` tunnel up.** FortiClientVPN's process is running but not tunnelling; GlobalProtect also installed |
+
+**It was reachable earlier in this same session** — T-01's recon and T-03/T-04/T-06's real-schema runs all executed against it, the most recent about 35 minutes before T-08 started. So this is **transient, not structural**, and almost certainly one VPN reconnect away.
+
+#### Why this is recorded as blocked rather than as a verdict
+
+The task's acceptance box demands one of exactly three words. **None of them applies**, and that distinction is the point:
+
+- **`pass`** or **`breach`** would be **fabrication** — there is no distribution in either arm.
+- **`inconclusive`** is DC-9's word for *"three runs vary by more than the effect being measured, so the number is not evidence."* That presupposes numbers. **Zero samples is a stronger and different state**, and collapsing it into DC-9's inconclusive would make a *methodological* verdict out of an *environmental* blocker — losing the fact that the measurement is still completely open.
+
+**DD-11 therefore remains contingent and unverified.** `T_metadata ≤ 0.5 × T_existing` is exactly as unproven as it was before this task ran. The spec ordered this measurement early precisely so a breach would cost the server PRs and not the client ones — **that ordering still holds, and the client work should not start until this resolves.**
+
+#### What the Implementer got right
+
+It **refused to approximate** and said so in those terms, extending the task's own rule (*"if you cannot measure without touching production code, say so instead of doing it"*) to connectivity. It then spent its remaining effort on groundwork that makes the re-run a single pass rather than a restart: both arms located and confirmed, both `_debug` line positions found, the `max(Q1, Q2)` derivation planned two independent ways, and — the useful part — **it verified from source that constructor stubs suffice to run the real methods with no production-code changes**, listing exactly which dependencies are off the call path. That is recorded in `tasks.md` § T-08.
+
+It also **created one throwaway harness file, used the project's own `getDataSource()` rather than hardcoding anything, and deleted it** — `git status --porcelain` clean, verified by the Leader. Contrast with RB-11: same task type, opposite handling, because the brief wording was fixed.
+
+#### Proportionate disclosure
+
+The Implementer proactively flagged that a `ping` echoed the **host IP** once into its tool output. Recorded because it volunteered it, and the volunteering is the behaviour worth reinforcing — **but the proportionality should be stated plainly: a private LAN address is not a credential.** No username or password was printed and nothing was written to a file. This is not an RB-11-class event and should not be filed as one.
+
+#### Not Done
+
+Everything. No contract chosen, no samples, no ratio, no spread. **Nothing here may be read into a status as progress on the measurement.**
+
+#### To unblock
+
+Reconnect the VPN routing to `alliancereportingdb`, confirm with a read-only probe, then re-run using the harness design recorded in `tasks.md` § T-08. **This is an owner action** — the tunnel requires interactive login/2FA, which is not something an agent should drive on the owner's behalf.
 
 ---
 
