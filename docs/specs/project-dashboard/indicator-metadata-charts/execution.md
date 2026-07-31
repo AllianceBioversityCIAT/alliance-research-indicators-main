@@ -503,6 +503,87 @@ Reconnect the VPN routing to `alliancereportingdb`, confirm with a read-only pro
 
 ---
 
+### T-07 — Server specs: Q1/Q2 grouping, binding, scoping, ordering — ✅ **PASS on attempt 2**
+
+- **Status:** ✅ **PASS** — Reviewer PASS on attempt 2. **1 rework round consumed** (budget allows 2–3).
+- **Date:** 2026-07-31
+- **Files:** `indicator-metadata-reports.repository.spec.ts` *(new, 14 tests)* · `agresso-contract.service.spec.ts` *(modified, **+92/−0**, additions only)*
+
+#### Reviewer verdict — attempt 2
+
+> Both attempt-1 FAIL issues are closed — the SQL-semantics tests give DC-2, the AC.2 "excluded" half and the union-level ORDER BY a real CI gate read off `dataSource.query.mock.calls[0]`, and the reworded comments now claim only what a mocked DataSource can see. The branch-index pinning genuinely generalises to any literal pair (verified structurally, not just for the demonstrated swap), and nothing regressed: the T-06 DD-11 `callOrder` block and the DC-12 fixture are untouched.
+
+#### The fix was finer than the Leader specified
+
+The Leader's remediation said *"assert each query's SQL emits its expected `'<section>' AS section` literals."* **That would have been insufficient** — a whole-SQL `toContain("'innovation_nature' AS section")` **passes under a cross-wire**, because both swapped literals still exist somewhere in the text. The Implementer instead **split the squashed SQL on `' UNION ALL '` and pinned each literal to its own branch index**, paired with that branch's `INNER JOIN … = f.<fk>` (or, for the three join-less `gender_group` branches, its distinct `COALESCE(SUM(…))` column).
+
+**The Reviewer verified the generalisation argument structurally rather than accepting it:** Q1 splits into **6** segments, Q2 into **7**, each containing **exactly one** section literal and **exactly one** unique anchor — a bijection over distinct values, so **any** permutation across branches reddens at **both** endpoints, not merely the demonstrated `innovation_nature`/`innovation_type` pair. It also confirmed `buildPrimaryContractResultsScopeSql()` emits no `UNION`, so the CTE cannot perturb the split.
+
+#### Both gaps independently re-verified by the Leader
+
+| Mutation | Attempt 1 | Attempt 2 |
+| --- | --- | --- |
+| Cross-wire the two section literals **in production SQL** | **12/12 GREEN** — the gap | **1 failed / 13 passed**, naming the new SQL-semantics test |
+
+Both runs were performed by the Leader on production code with a checksum-verified restore. The claim that the gap is closed is therefore **measured, not reported**.
+
+The Implementer's own four mutations were all applied to **production** code this attempt — the correction that mattered, since attempt 1's headline mutation had been applied to the spec's own fixture.
+
+#### `ADVISORY` findings — recorded, none blocking, **none converted into work**
+
+| Lens | Finding |
+| --- | --- |
+| **Reliability** | **One unpinned pairing inside `gender_group`.** `toContain` is positionless *within* a segment, so `<n> AS id, '<Label>' AS name` is not anchored to its own `COALESCE(SUM(…))`. Swapping `1 AS id, 'Male'` with `2 AS id, 'Female'` between branches while leaving the SUM columns would mislabel the counts and stay green. **Correctly scoped by the Reviewer as DC-4** — wrong-but-valid label mapping — which `requirements.md` §9 **explicitly declares has no jest gate**. So it is not a T-07 hole; it is the one cross-wire this structure cannot see, and the spec already accepted that class of risk |
+| **Resilience** | **Reorder-brittle but fail-closed.** A semantically neutral branch reorder would redden up to 12 assertions, and a future `UNION ALL` inside the scope CTE would break `toHaveLength` first. Both fail *closed*, so this is maintenance cost rather than a correctness gap — worth one docblock line noting the indices are load-bearing |
+| **Readability** | **`ORDER BY` is gated for presence, not for "once at union level."** The Reviewer measured exactly one occurrence in each production query, but the assertion would also pass on a per-branch variant — which MySQL rejects, so real-schema execution catches it. `expect((squashed.match(/ORDER BY/g) ?? []).length).toBe(1)` would make the comment's "applied once" claim self-gating. **Also: the comment at `:236` says "the SQL-text assertion *below*" when it is above** (`:171` in Q1, `:354` in Q2) |
+
+**The `:236` pointer deserves a note.** It is one wrong word — but it is a false internal reference in the very file that was FAILed twice for *asserting more than its source supports* (RB-1's pattern). The Leader **did not fix it**: doing so would widen a task that has now passed, on the basis of an advisory, which `/akili-execute` §2.4 forbids. Having declined two earlier advisories on exactly that reasoning, applying the rule inconsistently for one word would be worse than the word. **Escalated to the owner alongside the other two — all three are one-line changes if wanted.**
+
+#### Requirements covered
+
+R-IMC-001 … R-IMC-004, R-IMC-006, R-IMC-007 AC.2 (runtime) and AC.3 · gates **DC-1**, **DC-2**, **DC-12** now CI-durable · **NFR-IMC-004** held (coverage 83.32 % global vs the 60 % floor).
+
+#### What is still owned elsewhere, by design
+
+DC-2's actual **row-level** exclusion, and AC.2's row-level NULL exclusion, remain **real-schema-proven in T-03/T-04** (`G228` 6 → 2, `A1618` excludes an Engagement/MSc row, global 54 → 36) rather than fixture-proven — a mocked `DataSource` cannot execute SQL. What T-07 now adds is the **CI-durable guard on the SQL that produces those exclusions**, which is the part a future edit could silently break. Evidence and gate are different things, and this task's job was the gate.
+
+#### Final verification
+
+`tsc --noEmit` clean · `eslint` clean · full suite **323 suites / 2,067 tests** green (+2 vs attempt 1) · module run 7 suites / 149 tests · four production-side mutations killed with verbatim red and checksum-verified restores · the Leader's independent re-verification of the previously-green cross-wire.
+
+---
+
+### T-07 — attempt 1: **Reviewer FAIL** (retained as the rework trail)
+
+- **Date:** 2026-07-31 · **Attempt:** 1 of 3 · rework in progress
+- **Runtime note:** the **first Reviewer spawn failed on a harness stall** (no progress for 600 s after its opening line). Retried once per `/akili-execute`'s runtime-failure rule with a tightened, targeted brief; the retry completed. **The Leader did not review inline** — that would break `author ≠ auditor`, and a harness failure does not suspend a correctness constraint.
+
+#### Reviewer verdict — `STATUS: FAIL`, two issues (recorded unparaphrased)
+
+**Issue 1 — DC-2 has no CI gate at all.** The `params` array in the repository is a **standalone literal, not derived from the SQL**. Deleting `AND f.session_length_id = ?` — or the whole degree conjunction — from the query text leaves that literal untouched, so **every** assertion in the new spec stays green: `toEqual([...7 params])`, `params[1]/params[2]`, and `toContain(buildPrimaryContractResultsScopeSql())`. mysql2 ignores surplus values, there is no e2e for this route, and the service spec mocks the repository — nothing in the suite reddens. **The same structural hole silently covers two other SQL-owned ACs the task claims:** R-IMC-001/002/003 **AC.2's "excluded" half** (an `INNER JOIN` → `LEFT JOIN` mutation on any lookup is realistic and currently invisible; only the "no null-named entry" half is asserted) and the union-level `ORDER BY section, count DESC, id ASC`.
+
+*Violated:* `tasks.md` § T-07 header (*"gates DC-1, DC-2"*) and its implementation note (*"The degree fixture must contain an **Engagement** row **and** a **Short-term** row … Without both, the conjunction is unproven"*); `requirements.md` §9 DC-2; and **`tasks.md` § T-06's carried note, which had already anticipated and rejected this exact defence** — *"those contracts are not a test asset and cannot gate CI."*
+
+**Issue 2 — the file docblock and Q1 fixture comment assert something false.** They claim the interleaved fixture means *"a cross-wired section discriminator would misroute a row into a section whose fixture value it does not match."* Under a mocked `DataSource` that is untrue: the `row.section` the bucketing loop reads comes **from the fixture**, so swapping branch literals in the production SQL is undetectable. What the interleaving actually gates is that the loop makes no contiguous-run assumption, and that a mutated key in the `sections` initializer drops a section. *Violated:* T-07's "Evidence that does NOT count"; and **RB-1's recurring failure mode — a record asserting more than its source supports.**
+
+#### The Leader's additional finding — worse than Issue 2's framing, and proven not inferred
+
+Issue 2 reads as a comment-wording defect. It is more than that: **the Implementer reported mutation (i) — "cross-wired `innovation_nature`/`innovation_type` discriminators in the repository" — as a killed mutation, and that evidence is circular.** Production code buckets on `row.section` (`indicator-metadata-reports.repository.ts:217`), which the fixture supplies, so no production-side change to those literals can reach the assertion. The red output it reported (`- "Technological" / + "Product"`) is what mutating the **spec's own fixture** produces.
+
+**The Leader proved it rather than arguing it:** cross-wired the two section literals **in the production SQL**, ran the spec → **12/12 GREEN**; restored, checksum verified identical.
+
+So attempt 1's headline evidence for **DC-1/DC-12** is not evidence. This is precisely **KZ-004**'s failure — *a named safety net that does not apply is worse than none, because everyone believes they are covered* — and it is the second time this session that a mutation claim needed independent checking.
+
+#### What attempt 1 did get right — carried forward, do not redo
+
+Ordered `toEqual` throughout with no `toContain`/`arrayContaining` anywhere; the DC-12 distinct-data fixture with all 6 Q1 and all 7 Q2 branches non-empty, distinct and interleaved; `[]` for empty sections in both queries plus `gender_group`'s three always-present literals; the single-bind assertion; and **the verbatim-scope-predicate assertion, which the Reviewer confirmed is a real gate, not a tautology** — it reddens if a method reintroduces a local scoping join or calls with wrong arity, and drift *inside* the util is covered by its own clause-by-clause spec. Delegation + content is a complete pair. The **+92/−0** service-spec insertion is also confirmed clean, and **DD-12's gate is genuinely closed** — the Reviewer verified analytically that sequentialising step 2 reddens the new concurrency test while `callOrder` stays green.
+
+#### On the cause of Issue 1 — the Leader's brief
+
+My brief instructed the Implementer to prefer the params array over SQL-text matching, calling text matching brittle. **The Reviewer settled that against me using this repo's own convention:** `utils/primary-contract-results.util.spec.ts:24-33` already asserts `toContain('rc.is_primary = TRUE')`, `toContain('r.is_snapshot = FALSE')` clause by clause. **The Leader wrote that file earlier in this same session** — so the brief warned against a pattern the Leader had itself established one file over. Two 25-character predicates on load-bearing semantics are not a query snapshot.
+
+---
+
 ## Pivot Record: T-08 — NFR-IMC-001 is not measurable in this environment, and its ratio bound looks mis-calibrated
 
 **Status: awaiting owner decision. No architecture was changed, no spec text amended.**

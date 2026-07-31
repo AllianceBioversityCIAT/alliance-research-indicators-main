@@ -277,7 +277,13 @@ graph TD
 - **Evidence that does NOT count:** a passing suite whose fixture leaves any branch empty — see above; it is green over the exact defect DC-12 names. Also: asserting section **contents** while ignoring **order** leaves R-IMC-001's ordering AC ungated, and ordering here is a hard acceptance criterion, not a nicety.
 - **Dependencies:** T-03, T-04, T-05, T-06
 - **Effort:** L · **Skills:** `nestjs-expert`
-- **Status:** todo
+- **Status:** **done — 2026-07-31, Reviewer PASS on attempt 2. 1 rework round consumed** (the run's first). See [`execution.md`](./execution.md) § T-07.
+- **Consumed by later tasks:**
+  - **The SQL-semantics gate is branch-position pinned.** Both queries' specs split the squashed SQL on `' UNION ALL '` and assert each branch's `'<section>' AS section` literal against its own `INNER JOIN … = f.<fk>` at a **fixed index**. **The indices are load-bearing:** a semantically neutral branch reorder, or a future `UNION ALL` inside the scope CTE, will redden up to 12 assertions. Both fail *closed*, so this is maintenance cost rather than a correctness risk — but anyone reordering branches must update the spec deliberately, not treat the reds as flaky.
+  - **Why pinning and not a plain `toContain`:** a whole-SQL `toContain("'innovation_nature' AS section")` **passes under a cross-wire**, because both swapped literals still exist in the text. The Leader proved the unpinned version green (12/12) against a production-side swap; pinning is what makes it red.
+  - **Known and accepted, not a hole:** within a `gender_group` segment the `<n> AS id, '<Label>' AS name` pairing is **not** anchored to its own `COALESCE(SUM(…))`, so swapping a label/id pair between those three branches would mislabel counts and stay green. This is **DC-4** (wrong-but-valid label mapping), which `requirements.md` §9 already declares has **no jest gate** — the spec accepted that class of risk before this task existed.
+  - **Row-level exclusion stays real-schema-proven, not fixture-proven** (T-03/T-04: `G228` 6 → 2, `A1618` excludes Engagement/MSc, global 54 → 36). A mocked `DataSource` cannot execute SQL. T-07 gates the SQL that produces those exclusions; the exclusions themselves were proven live. **Evidence and gate are different things.**
+  - Two `if (!bucket) continue;` guards are unreachable by construction and show **0 % branch coverage** on that file. **Do not read it as a coverage signal** and do not "fix" them.
 
 ---
 

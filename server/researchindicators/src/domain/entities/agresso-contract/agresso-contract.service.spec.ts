@@ -726,6 +726,98 @@ describe('AgressoContractService', () => {
       expect(result.session_type).toEqual(capacitySharingMetadata.session_type);
       expect(result.degree).toEqual(capacitySharingMetadata.degree);
     });
+
+    // --- T-07 additions below (tasks.md § T-06's review, ADVISORY R-1 / R-2) ---
+    // Both owed by T-07; neither touches the `callOrder` case above, which
+    // remains DD-11's own mechanical guard.
+
+    it('runs Q1 and Q2 concurrently within step 2 — both invoked before either resolves (T-06 review R-1: `callOrder` alone cannot distinguish `Promise.all([Q1,Q2])` from a sequential `await Q1; await Q2`, both emit the identical array)', async () => {
+      const callOrder: string[] = [];
+
+      mockIndicatorMetadataReportsRepository.getSimpleIndicatorSections.mockImplementation(
+        async () => {
+          callOrder.push('q1:invoked');
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          callOrder.push('q1:resolved');
+          return simpleIndicatorSections;
+        },
+      );
+      mockIndicatorMetadataReportsRepository.getCapacitySharingMetadata.mockImplementation(
+        async () => {
+          callOrder.push('q2:invoked');
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          callOrder.push('q2:resolved');
+          return capacitySharingMetadata;
+        },
+      );
+
+      await service.getFullContractReports('A100');
+
+      // A sequentialised step 2 would produce
+      // ['q1:invoked','q1:resolved','q2:invoked','q2:resolved'] — indistinguishable
+      // from a race by the existing callOrder test above. Asserting that both
+      // `:invoked` entries precede both `:resolved` entries is what actually
+      // gates "step 2, 2 concurrent" (DD-1, DD-11's `max(8,2)=8` arithmetic).
+      const invokedIndex = Math.max(
+        callOrder.indexOf('q1:invoked'),
+        callOrder.indexOf('q2:invoked'),
+      );
+      const resolvedIndex = Math.min(
+        callOrder.indexOf('q1:resolved'),
+        callOrder.indexOf('q2:resolved'),
+      );
+      expect(invokedIndex).toBeLessThan(resolvedIndex);
+    });
+
+    it('returns all 10 metadata sections as empty arrays — not null, not absent — for a contract with no results (R-IMC-007 AC.2 at runtime; proven live on A1001 in execution.md § T-03+T-04, not previously covered in CI)', async () => {
+      mockRepository.getFullContractReports.mockResolvedValue({
+        ...baseReport,
+        top_partners: [],
+        top_primary_levers: [],
+        top_main_contact_persons: [],
+        top_contributors: [],
+        staff: [],
+      });
+      mockIndicatorMetadataReportsRepository.getSimpleIndicatorSections.mockResolvedValue(
+        {
+          innovation_nature: [],
+          innovation_type: [],
+          innovation_readiness: [],
+          oicr_maturity: [],
+          policy_type: [],
+          policy_stage: [],
+        },
+      );
+      mockIndicatorMetadataReportsRepository.getCapacitySharingMetadata.mockResolvedValue(
+        {
+          session_format: [],
+          session_type: [],
+          degree: [],
+          gender_individual: [],
+          gender_group: [
+            { id: 1, name: 'Male', count: 0 },
+            { id: 2, name: 'Female', count: 0 },
+            { id: 3, name: 'Non-binary', count: 0 },
+          ],
+        },
+      );
+
+      const result = await service.getFullContractReports('A100');
+
+      expect(result.innovation_nature).toEqual([]);
+      expect(result.innovation_type).toEqual([]);
+      expect(result.innovation_readiness).toEqual([]);
+      expect(result.oicr_maturity).toEqual([]);
+      expect(result.policy_type).toEqual([]);
+      expect(result.policy_stage).toEqual([]);
+      expect(result.session_format).toEqual([]);
+      expect(result.session_type).toEqual([]);
+      expect(result.degree).toEqual([]);
+      // gender_distribution: the three gender_group literals are all
+      // zero-total here, so mergeGenderDistribution drops every category —
+      // an empty array, not the 3 zero-count rows it was fed.
+      expect(result.gender_distribution).toEqual([]);
+    });
   });
 
   describe('getTopPartnersReport', () => {
