@@ -344,7 +344,11 @@ graph TD
 - **Evidence that does NOT count:** confirming the decorator is present in the source. The defect class is *"the schema does not appear on the rendered page"*, and the decorator being present is what everyone already believed was sufficient. **Open `/swagger` and look** (DC-10 is a manual gate by design).
 - **Dependencies:** T-06
 - **Effort:** S · **Skills:** `api-design-principles`, `nestjs-expert`
-- **Status:** todo
+- **Status:** **done — 2026-07-31, Reviewer PASS attempt 1.** See [`execution.md`](./execution.md) § T-09.
+- **What was proven, and how:** design §5 / W-6's claim held exactly — **BEFORE the decorator, `ContractFullReportsDto` and `MetadataCountDto` were absent from `components.schemas` entirely** and the 200 response was `{"description":""}`. AFTER: 17 properties, the 10 new ones as `array` → `items.$ref: MetadataCountDto`, 200 carrying the `$ref`. Measured at **document level** by both Implementer and Reviewer independently — not by checking that a decorator exists, which this task's clause explicitly rejects.
+- **Also verified (nobody asked):** **zero dangling `$ref`s** across all 12 transitively referenced DTOs, so the 7 pre-existing fields render fully rather than as broken refs; and `nest-cli.json` carries **no `@nestjs/swagger` CLI plugin**, so the verification harness cannot diverge from the build in decorator inference.
+- **Carried advisory (recorded, not applied):** `@ApiOkResponse({ type: ContractFullReportsDto })` documents the **unwrapped** payload while the wire response is `ServerResponseDto` via `ResponseInterceptor`. Spec-conformant as prescribed, but a consumer reading `/swagger` would think the body *is* the DTO. Repo precedent `bilateral.controller.ts:113` pairs the pattern with a description naming the wrapper.
+- **Candidate follow-up, escalated not minted:** a permanent ~15-line spec asserting Swagger emission (**the 200 carries a `$ref`** and **no `$ref` dangles** — *not* the 17 field names, which would be churn). DC-10 is currently a **manual** gate, and this repo already contains one instance of the same silent defect class left as a code comment rather than a gate (`bilateral-hlos-indicators.response.dto.ts:12`).
 
 ---
 

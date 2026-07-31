@@ -10,7 +10,7 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — **T-01 … T-08 done** (8 of 17). **The server tier is complete and gated.** All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
+- **Status:** in-progress — **T-01 … T-09 done** (9 of 17). **The entire server tier is complete, gated, and live-verified.** Nothing on the server side is outstanding: the payload composes, the queries execute against the real schema, all three NFR-IMC-001 bounds are met, the CI gates are mutation-verified, and the OpenAPI schema is proven to render. All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
 - **Rework rounds consumed: 1** (T-07 attempt 1 → 2), against a budget of 2–3.
 - **Next eligible:** **T-09** (Swagger — needs the app booted, so the DB tunnel must be up), then the client chain **T-10 → T-11/T-12 → T-13 → T-14**, then **T-15** (the T-09 a11y carry-forward), **T-16** (390 px measurement + full suite) and **T-17** (docs).
 - **Open items carried forward:** four one-line advisories from T-07's review escalated to the owner and not absorbed (`gender_group` id/name pairing, reorder-brittleness note, `ORDER BY` uniqueness, one stale "below"/"above" pointer); the three-document *"all three categories"* wording gap from T-05; and **RB-11**, the contained credential leak, whose rotation is the owner's call.
@@ -583,6 +583,58 @@ Ordered `toEqual` throughout with no `toContain`/`arrayContaining` anywhere; the
 #### On the cause of Issue 1 — the Leader's brief
 
 My brief instructed the Implementer to prefer the params array over SQL-text matching, calling text matching brittle. **The Reviewer settled that against me using this repo's own convention:** `utils/primary-contract-results.util.spec.ts:24-33` already asserts `toContain('rc.is_primary = TRUE')`, `toContain('r.is_snapshot = FALSE')` clause by clause. **The Leader wrote that file earlier in this same session** — so the brief warned against a pattern the Leader had itself established one file over. Two 25-character predicates on load-bearing semantics are not a query snapshot.
+
+---
+
+### T-09 — Swagger: make the response schema actually render — ✅ **PASS**
+
+- **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31
+- **File:** `agresso-contract.controller.ts` — **4 insertions / 1 deletion.** Two imports, one `@ApiOkResponse({ type: ContractFullReportsDto })` on the `GET reports/full` handler, one `@ApiOperation` summary line.
+
+#### The finding this task existed to fix, now demonstrated rather than argued
+
+Design §5 / W-6 claimed that `ContractFullReportsDto` was **not emitted into the OpenAPI document at all**, because the handler referenced no response type — so T-02's `@ApiProperty` decorations changed nothing on the rendered page. **Both the Implementer and the Reviewer measured that independently**, at document level:
+
+| | `components.schemas` | 200 response |
+| --- | --- | --- |
+| **BEFORE** | `['AgressoFindNamePayload', 'PoolFundingTagDto']` — **`ContractFullReportsDto` and `MetadataCountDto` absent entirely** | `{"description":""}` — **no schema** |
+| **AFTER** | `ContractFullReportsDto` with **17 properties** in declaration order; all 10 new ones `array` → `items.$ref: MetadataCountDto`; `MetadataCountDto` present | `{"$ref":"#/components/schemas/ContractFullReportsDto"}` |
+
+The BEFORE is the point: not "present but incomplete" — **absent**. `createDocument` reaches models only by traversing route response metadata, so an unreferenced class is never visited no matter how many `@ApiProperty` it carries.
+
+#### The Reviewer improved the experiment and checked two things nobody asked for
+
+- **Better isolation:** instead of `git stash`, it produced the BEFORE state with `Reflect.deleteMetadata` on the `swagger/apiResponse` key at runtime — **isolating the decorator as the only variable.** Same result, cleaner design.
+- **Zero dangling `$ref`s** — all **12** transitively referenced DTOs (`ContractFullGeoScopeDto`, `PartnerByContractCountDto`, `SubNationalByContractCountDto`, …) are emitted, so the 7 pre-existing fields render **fully**, not as broken refs. A schema full of dangling refs looks present and is broken; nobody had checked.
+- **`nest-cli.json` carries no `@nestjs/swagger` CLI plugin**, so there is no harness-vs-build divergence in decorator inference — all 17 properties are explicit. **This was a real risk the Leader had not considered:** with the plugin enabled, the build would infer properties the harness would not, and the harness would stop being representative.
+
+#### The three judgment calls
+
+| Question | Verdict |
+| --- | --- |
+| Is the BEFORE/AFTER contrast proof or a proxy? | **Proof.** It is measured on the emitted document, which *is* DC-10's defect surface |
+| Is `useValue: {}` for the service stub sound? | **Sound.** `createDocument` is purely static metadata introspection; the provider only needs to satisfy DI. It cannot mask a schema defect. What it legitimately does not cover is whether the *runtime payload* matches the DTO — that is T-06/T-08's claim, not AC.1's |
+| Is the missing `/api/v1/agresso/contracts` prefix a material gap? | **Orthogonal.** `components.schemas` is document-global; `RouterModule` prefixing changes only the `paths` key string, never schema binding. **The Implementer disclosed a real limitation that turned out not to be a material one** — the right instinct either way |
+
+#### `ADVISORY` — one finding worth the owner's eye
+
+**`@ApiOkResponse({ type: ContractFullReportsDto })` documents the *unwrapped* payload, while the wire response is `ServerResponseDto` (`{ data, status, description, … }`) via `ResponseInterceptor`.** T-09 and design §5 prescribe this decorator **literally**, so the change is spec-conformant as written — but a consumer reading the rendered page would conclude the response body *is* the DTO. The repo's one precedent, `bilateral.controller.ts:113`, pairs the same pattern with a description stating *"…inside the standard `ServerResponseDto` wrapper"*. A description of that kind here would remove the only available misreading. **Purely additive; recorded, not applied** (§2.4).
+
+#### The deferred question — the Reviewer's answer, and it is not T-09's
+
+The Implementer asked whether a **permanent spec** asserting Swagger emission is warranted, and correctly declined to add one. The Reviewer's read: **worth having, minimal, and in a follow-up task of its own — not here.**
+
+Its reasoning is sound and worth preserving: the defect class is **silent** (an unreferenced DTO fails nothing, which is exactly why AC.1 had to be rewritten to name the handler decorator); **DC-10 is a manual gate, and manual gates decay** across the next spec that touches this DTO; and the harness costs ~15 lines with no DB. It also found **the pattern already repeating in this repo** — one instance of this same class left as a *code comment* rather than a gate (`bilateral-hlos-indicators.response.dto.ts:12`).
+
+Its scope constraints, if it is ever built: assert only that **the 200 carries a `$ref`** and that **no `$ref` dangles**. **Do not assert the 17 field names** — that duplicates the DTO and turns a useful gate into churn on every additive change. **Escalated to the owner as a candidate follow-up; not minted.**
+
+#### Requirements covered
+
+**R-IMC-012 AC.1** — both halves: `@ApiProperty` (T-02) plus the handler decorator that makes the schema actually appear. Gate **DC-10** satisfied by document-level inspection rather than by eyeballing. The 7 pre-existing fields verified unchanged in the emitted schema.
+
+#### Final verification
+
+`tsc --noEmit` clean · `eslint` clean on the controller · full suite **323 suites / 2,067 tests** green, **matching baseline exactly** — correct for a decorator-only change, since both harnesses were throwaway and deleted · working tree contains only the one file.
 
 ---
 
