@@ -213,7 +213,16 @@ describe('ProjectDashboardComponent', () => {
           unitId: 'U1',
           unit: 'Unit',
           indicators: [
-            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 2 },
+            // T-13 (indicator-metadata-charts): id was `1` before this spec
+            // existed. `1` is `CAPACITY_SHARING_INDICATOR_ID`
+            // (star-pdf-report.util.ts), one of the four real band ids the
+            // new Indicator-metadata section now keys off of
+            // (indicator-metadata-bands.mapper.ts) — with `1`, this fixture
+            // incidentally produced a real Capacity Sharing band (4 cards),
+            // which broke every test asserting an exact card count/title
+            // list below. Changed to `10`, an id no band definition uses, so
+            // this fixture stays about the 4 ranked cards it was written for.
+            { indicator: { indicator_id: 10, name: 'Output' }, count_results: 2 },
             { indicator_id: 99, full_name: 'Fallback indicator', count_results: 4 },
             { indicator_id: null, count_results: undefined }
           ]

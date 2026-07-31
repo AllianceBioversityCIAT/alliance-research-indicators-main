@@ -309,6 +309,33 @@
       </section>
     </div>
   </div>
+
+  <!-- Indicator metadata (R-IMC-008/009/010) — no heading, no bands at all
+       when no indicator in indicatorsWithResults() has results (R-IMC-009 AC.3). -->
+  @if (indicatorMetadataBands().length > 0) {
+  <div class="flex items-center gap-2.5">
+    <i class="pi pi-table !text-[18px] text-[#112f5c]" aria-hidden="true"></i>
+    <h2 class="m-0 font-['Barlow'] text-[16px] font-semibold leading-tight text-[#112f5c]">Indicator metadata</h2>
+  </div>
+
+  <div class="flex flex-col gap-5">
+    @for (band of indicatorMetadataBands(); track band.indicatorId) {
+    <app-indicator-metadata-band [indicator]="band.indicatorLabel" [resultCount]="band.resultCount"
+      [cardCount]="band.cards.length" [collapsed]="isBandCollapsed(band.indicatorId)" [color]="band.color"
+      (collapseToggled)="toggleBandCollapse(band.indicatorId)">
+      @for (card of band.cards; track card.sectionKey) {
+      <app-project-dashboard-card [title]="card.title" [description]="metadataCardDescription(card)"
+        [loading]="reports.loading()" [error]="reports.loadError()" [empty]="card.empty"
+        [emptyMessage]="metadataCardEmptyMessage(band.resultCount)" [items]="card.items"
+        [layout]="metadataCardLayout(card.sectionKey)" [visibleLimit]="metadataCardVisibleLimit(card.sectionKey)"
+        (expandToggled)="toggleMetadataCardExpanded(card.sectionKey)" (retry)="reports.update()">
+      </app-project-dashboard-card>
+      }
+    </app-indicator-metadata-band>
+    }
+  </div>
+  }
+
   <!-- Pending revision results -->
   <section
     class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[#e8ebed] bg-white shadow-xs lg:flex-1">

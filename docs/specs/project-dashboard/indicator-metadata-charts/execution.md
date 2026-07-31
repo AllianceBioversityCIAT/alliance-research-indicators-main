@@ -586,6 +586,75 @@ My brief instructed the Implementer to prefer the params array over SQL-text mat
 
 ---
 
+### T-13 — Host wiring: bands, visibility, expansion contract, empty states — ✅ **PASS**
+
+- **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31 · the largest client task, and the first that produces something a user sees
+- **Files:** `project-dashboard.component.ts` · `.html` · `.spec.ts` (one fixture line)
+
+#### §7.2 / DD-10 implemented in the correct direction — both known wrong shapes absent
+
+```ts
+metadataCardVisibleLimit(sectionKey) {
+  return this.expandedMetadataCards().has(sectionKey) ? null : COLLAPSED_ITEM_LIMIT;
+}
+```
+
+`[visibleLimit]` is **bound** (so shape (a) — unbound, where `null` *is* the expanded state and produces an out-of-flow overlay plus a stuck "Show less" — is absent) and it is **not a magic large number** (shape (b), which still renders a toggle because `canExpand` reads item count alone). `(expandToggled)` is **handled**. Per-card state is a `signal<ReadonlySet<…>>` keyed by `sectionKey`, replaced not mutated; band collapse is a separate set keyed by `indicatorId`, empty by default so bands default **open**.
+
+**The Reviewer's strongest observation:** the bindings are **character-for-character the same contract** as the four Chunk A ranked cards at `:159-198`. The correction the design needed was to *reuse* proven machinery, and that is literally what landed.
+
+#### R-IMC-009 AC.1/AC.3 — structurally guaranteed, not merely untested
+
+The Leader asked whether these DOM properties needed mechanical proof *now*, since the mapper alone cannot guarantee them. The Reviewer's answer: **the template can, and does.** There is exactly one rendering path — `@if` + `@for` — and **no `display:none`, no `[hidden]`, no CSS-hiding branch anywhere in the added markup.** So the failure mode the "evidence that does not count" clause guards against (a band hidden by CSS rather than absent) is **structurally unreachable**, not just unasserted. AC.3's `@if` wraps the **heading itself**, not merely the band list.
+
+#### DD-6 held — and `description` was verified to actually render
+
+`ProjectDashboardCardComponent` untouched. The Gender provenance note (R-IMC-005 AC.5) and Degree filter-scope note (R-IMC-006 AC.4) ride the card's **existing `description` input** — the only text slot DD-6 leaves available.
+
+**The Reviewer checked the part that matters:** `project-dashboard-card.component.html:9-10` renders `description` in the header, **above** the loading/error/empty branch — so **the Degree note still shows on an empty Degree card.** An input that existed but rendered nothing would have satisfied AC.5's letter and displayed nothing.
+
+#### The task/gate split — legitimate, with a consequence the Leader must hold
+
+T-13 declared its seven boxes satisfied *"by inspection"* and **explicitly declined to claim mechanical proof**, because `tasks.md` §4's file table assigns the host spec to **T-14**. The Reviewer confirmed the split: §2's *"every spec lands with the behaviour it gates"* is satisfied by §5's Chunk 3 landing T-10 … T-14 in **one PR** — it constrains the PR, not the task boundary. T-13's own gates are `lint` + `build`, both green.
+
+**The consequence, recorded so it cannot be lost: T-13 must not be read as independently verified.** Boxes 5–7 are proven now; **boxes 1–4 are structurally sound with their mechanical proof owed by T-14.** If T-14 drops or softens any of those four, **T-13's boxes go unproven with no owner.**
+
+#### The fixture change — right fix, imperfect value
+
+The Implementer changed `GET_ResultsCount`'s `indicator_id: 1` → `10`, because **`1` is the real `CAPACITY_SHARING_INDICATOR_ID`** the mapper now keys on; with `1`, the fixture spawned a real 4-card band and broke Chunk A's R-PDB-007 title test (4 → 8 titles).
+
+**Isolating the fixture was correct.** The alternative — relaxing an **archived Chunk A** assertion to tolerate a superset — is worse. No assertion was weakened anywhere; only fixture *input* changed.
+
+**But `10` matches no real indicator.** Ground truth from `1727208057174-InsertIndicators.ts` + `indicators.enum.ts`: ids are **1–6** only. **`3` (Knowledge Product) or `6` (Innovation Use) would have been band-free *and* realistic** — behaviourally identical, strictly better. Mitigating: that fixture was never realistic (its sibling is `indicator_id: 99`, a deliberate fallback case, and `'Output'` matches no real indicator name); it exercises the ranking/naming mechanism, not the taxonomy. **Advisory, not rework.**
+
+#### ⚠ A SECOND hard prerequisite for T-14, found before T-14 started
+
+`setup(contractId, options)` accepts only `{ isAdmin, emptyOverview, rejectOverviewFetch }` — **no `indicators` hook** — and `apiMock.GET_ResultsCount` is **hard-coded inside it**. So **T-14 cannot produce a single band** without adding one. Same failure shape as the first prerequisite: without it, ten per-instance assertions bind to nothing.
+
+**This is the second time a review has found a T-14 blocker before T-14 ran.** Both are now recorded in its ⚠ block.
+
+**And one way the change *helps* T-14:** the shared fixture now yields **zero bands** (10/99/null match none of 1,2,4,5), and that default state **is R-IMC-009 AC.3** — no heading at all. T-14 gets that case free and should assert it against the default fixture.
+
+**Superset hazard for T-14:** once bands exist, `getCardDebugElements()` returns ranked **plus** metadata cards. Its ten assertions must key off the existing `getCardByTitle()` helper and **never index or count.** And if T-14 ever re-points the *shared* fixture at a band id, R-PDB-007 breaks again — the durable fix then is to scope that query to the ranked-card container, not to relax the array.
+
+#### Also confirmed
+
+`[color]="band.color"` passed ✓ · all five primitives individually ✓ · `cardCount = band.cards.length`, so the 4-card Capacity Sharing band deterministically hits `imb-grid-wide` ✓ · placement below *Result analytics* and before *Pending revision*, matching the section above's two-element shape ✓ · **R-IMC-011 AC.4** loading/error/retry bindings **identical** to the ranked cards, no new pattern ✓.
+
+**W-7 satisfied:** the copy is *"No data is recorded for this field across this project's N result(s)."* — it states **no reason**.
+
+**The layout judgment call is exact, not a stretch.** The Reviewer walked §4.1's category counts (4, 4, **10**, 3, 3, 3, 2, 2, 3, 4): every section except `innovation_readiness` is ≤ 4, and readiness is 10 *and* carries the longest labels (`CONCAT(level,'. ',name)`). §7.4's rule — *columns for ≤ 4, rows for 5+ or long labels* — maps onto that table with **no section sitting on the 5 boundary.**
+
+#### `ADVISORY` — three, all hand-offs rather than rework
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| 1 | Fixture id `10` is not a real indicator; `3` or `6` were available | Recorded. Behaviourally identical — not worth a round trip |
+| 2 | **The empty-state phrase binds its claim to `N`**, and `N` (`count_results`) is *precisely* the population that diverges from the `is_primary = TRUE` aggregation. In the all-non-primary case the sentence is arguably false in a **second** way, even though it asserts no reason. Suggested separated form: *"No data is recorded for this field on this project. (N results.)"* | **Surfaced to the owner now rather than at the visual pass** — because **T-14 is about to write assertions against this exact wording**, and changing copy afterwards invalidates them. Sequencing, not aesthetics |
+| 3 | T-14's second prerequisite (`setup()` needs an `indicators` hook) | ✅ Recorded in `tasks.md` § T-14's ⚠ block |
+
+---
+
 ### T-12 — attempt 2: ✅ **PASS**. Both FAIL issues closed.
 
 - **Date:** 2026-07-31 · **rework round 2 of 3 for T-12; 2 of 2–3 budgeted for the whole spec**
