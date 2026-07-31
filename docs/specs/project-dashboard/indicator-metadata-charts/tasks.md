@@ -509,7 +509,8 @@ graph TD
 - **Evidence that does NOT count:** a stub that reports its inputs without rendering them, used to assert anything about what the user sees — that is KZ-001 exactly, and it is the highest-recurrence lesson in the log. Also: asserting the toggle's presence at 6 categories **without** asserting its absence at 5 leaves half of DC-13 open, and the absent direction is the one a 999-style workaround would break.
 - **Dependencies:** T-10, T-13
 - **Effort:** L · **Skills:** `angular-developer`
-- **Status:** todo
+- **Status:** **done — 2026-07-31, Reviewer PASS attempt 1.** See [`execution.md`](./execution.md) § T-14 and commit `876ccf39`.
+  - *Bookkeeping correction, 2026-07-31 (found at archive readiness check):* this line read `todo` from the task's completion until now — the Reviewer PASS, the execution entry and the commit all landed, but **the status line was never flipped.** This is the recoverable direction of the ordering rule in `/akili-execute` §3 (evidence written, checkbox missed); had it been the reverse, the PASS would have been unreconstructable. Recorded rather than silently flipped, since a stale `todo` on a shipped task is exactly what `/akili-resume` would have re-dispatched.
 
 ---
 
