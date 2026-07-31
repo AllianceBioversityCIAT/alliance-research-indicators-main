@@ -287,7 +287,7 @@ graph TD
 
 - **Requirements covered:** **NFR-IMC-001** · gates **DC-9** and design **DD-11**
 - **Files touched (intended):** none — evidence recorded in `execution.md`
-- **Description:** Time `GET /api/v1/agresso/contracts/reports/full` **before and after** the server change against the same contract — the largest available — and compare p95 against the bound: **≤ 1.5× the pre-change p95**, absolute p95 **≤ 3 s**. Sequential composition makes the added latency **additive** (`T_total = T_existing + T_metadata`), so the bound requires `T_metadata ≤ 0.5 × T_existing`. That inequality is **plausible and unverified** — this task is where it becomes one or the other.
+- **Description:** *(Rewritten 2026-07-30 after the Pivot. The original demanded p95 **≤ 1.5×** the pre-change p95 and framed the task around `T_metadata ≤ 0.5 × T_existing`; that bound is **retired** — see `requirements.md` NFR-IMC-001.)* Time the pre-change repository method against the composed service method and check the **three current bounds**: **(a)** absolute p95 ≤ 3 s — **met, 174.5 ms**; **(b)** added latency `max(Q1, Q2)` ≤ 250 ms — **met, 92.7 ms**; **(c)** each query's **server-side** execution time ≤ 50 ms p95, isolated from network — **outstanding, and the only remaining gate on client work.**
 - **Implementation notes:**
   - Baseline the **pre-change** code path on the same contract and environment, not a remembered number.
   - Use T-06's debug log lines to attribute the metadata batch's share, so a breach points at Q1 or Q2 rather than at "the endpoint".
@@ -296,7 +296,8 @@ graph TD
   - **If the bound is breached, STOP and escalate — do not absorb it.** The fallback is `Promise.all` **plus** an explicit `poolSize` change: an architecture change that reopens the pool question this design was built to avoid, and therefore a **Pivot**, not a rework attempt.
 - **Acceptance / done check:**
   - [ ] Pre-change and post-change p95 recorded as numbers, with the contract id, the run count, and the **spread across runs**.
-  - [ ] The ratio is stated explicitly against 1.5×, and the absolute p95 against 3 s.
+  - [x] Absolute p95 stated against **3 s** — 174.5 ms, met. *(The original box asked for a ratio against 1.5×; that bound is retired — the ratio was 3.997×, and the Pivot Record explains why the number measures round-trip count rather than query cost.)*
+  - [ ] **(c)** Each query's **server-side** execution p95 stated against **50 ms**, with network cost isolated — **outstanding.**
   - [ ] The metadata batch's own elapsed time is recorded separately from the existing batch's.
   - [ ] The outcome is one of exactly three words: **pass**, **breach**, or **inconclusive** — and a breach triggers the Pivot Protocol before any client task starts.
 - **Evidence that does NOT count (DC-9 no-pass clause):** **if three runs vary by more than the effect being measured, the number is not evidence.** Report the spread and mark the check **inconclusive**. An inconclusive result MUST NOT be recorded as a pass, and a single run is never a p95. A measurement taken on an empty or toy dataset is also not evidence — `T_metadata ≤ 0.5 × T_existing` is a claim about *real* row counts, and two multi-branch UNION aggregations over four fact tables are exactly where a small dataset flatters the design.
