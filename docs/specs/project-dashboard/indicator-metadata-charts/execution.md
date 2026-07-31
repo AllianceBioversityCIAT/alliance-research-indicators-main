@@ -503,6 +503,64 @@ Reconnect the VPN routing to `alliancereportingdb`, confirm with a read-only pro
 
 ---
 
+## Pivot Record: T-08 — NFR-IMC-001 is not measurable in this environment, and its ratio bound looks mis-calibrated
+
+**Status: awaiting owner decision. No architecture was changed, no spec text amended.**
+
+### What was measured (2026-07-30, VPN restored)
+
+The Implementer executed the full harness: sanity check first (17-field shape confirmed by execution, so the constructor-stub assumption held), largest contract probed rather than guessed (**A1578, 521 primary results**) plus a smaller one (**A1566, 242**), 5 warm-ups discarded, **25 samples per arm**, **3-way round-robin interleaving**, and `T_metadata` captured two independent ways — harness wall clock around its own `Promise.all([Q1, Q2])`, cross-checked against `max(Q1, Q2)` from the two `_debug` lines, never the sum.
+
+| Arm (contract A1578) | min | median | **p95** | max | spread |
+| --- | --- | --- | --- | --- | --- |
+| existing | 36.66 | 38.74 | **43.67** | 123.98 | 87.33 |
+| composed | 71.10 | 100.27 | **174.54** | 191.39 | 120.29 |
+| metadata batch alone | 35.14 | 40.73 | **92.71** | 124.50 | 89.36 |
+
+Ratio p95 composed/existing: **3.997×** on A1578, **3.552×** on A1566, against a **1.5×** bound. `T_metadata` p95 92.71 ms against an allowance of 21.84 ms. **Absolute p95 174.5 ms against the 3 s bound — passes by ~17×.**
+
+**The Implementer's verdict was `breach`.** Its reasoning: the p95s are stable and mutually consistent across two contracts differing >2× in volume, so the gap is far larger than run-to-run spread — a repeatable, well-resolved breach rather than noise.
+
+### Why the Leader overrode that verdict to `inconclusive`
+
+The Implementer characterised the *arms'* variance but not the **environment's noise floor**. The Leader measured it directly:
+
+> **`SELECT 1` — zero query work — over this VPN: min 28.5 ms, median 79.5 ms, p95 155.5 ms, max 169.3 ms (n=30).**
+
+**A no-op query costs more at p95 (155.5 ms) than the entire 8-query existing batch (43.67 ms).** That is only possible if the link's latency is wildly variable, and it is: a 6× range on an empty query.
+
+Three consequences:
+
+1. **DC-9's no-pass clause applies on its own terms.** It states: *if three runs vary by more than the effect being measured, the number is not evidence.* The alleged effect is `T_metadata ≈ 93 ms`. The environment's variation on a query that does **nothing** spans **141 ms**. The noise exceeds the effect, so the bound is not resolvable here.
+2. **The ratio measures round-trip count, not query cost.** The composed path makes **two sequential round-trip windows** (step 1's parallel batch, then step 2's) where the existing path makes **one**. Over a link with a ~80 ms median RTT, "2 RTT vs 1 RTT" produces exactly the observed ~2–4× — a number that contains almost no information about the aggregations themselves.
+3. **The consistency the Implementer cited as signal is equally evidence of the opposite.** The composed p95 barely moved (174.54 → 173.92) when the dataset more than halved. If the measurement tracked query work, doubling the rows should have moved it. It did not move because **row volume was never the cost.**
+
+**So DD-11 is `unverified`, not `invalidated`.** `T_metadata ≤ 0.5 × T_existing` remains exactly as unproven as before — which is a materially different outcome from `breach`: `breach` triggers an architecture change with shared-infra and DevOps implications, and **pivoting the architecture on a VPN artifact would be the wrong call.**
+
+None of this is a criticism of the Implementer's work. Its harness design was sound, it ran the sanity check it had flagged as assumed, it measured `T_metadata` two ways, it refused to fabricate when blocked, and it stopped without attempting a fix. The missing step — profiling the environment's noise floor before trusting a ratio — is a measurement-design gap worth carrying as a Kaizen candidate, not a task failure.
+
+### A second finding that stands regardless of the environment
+
+**The fallback the spec prescribes would not satisfy NFR-IMC-001 either.** DD-11's stated fallback is `Promise.all` (racing step 1 against step 2) plus an explicit `poolSize` change. Under those observed numbers, parallel composition gives `T_total ≈ max(43.67, 92.71) = 92.71 ms` → ratio **2.12×**, still above **1.5×**.
+
+So the requirement is not merely breached by the current architecture — **it is not satisfied by the architecture the spec names as its own remedy.** That points at the requirement, not the code:
+
+- **1.5× of a 43.67 ms baseline leaves a 21.8 ms budget** for the metadata batch — less than a single round trip on this link, and on the order of one round trip even on a fast one.
+- The **absolute** bound (p95 ≤ 3 s) passes by roughly **17×**. 174 ms is objectively fine for a dashboard endpoint.
+- A relative bound is a reasonable instrument when the baseline is slow; against a 44 ms baseline it mostly measures how many round trips were added, which is a **structural fact of adding any query at all**, not a regression this spec introduced.
+
+### What the Leader recommends, and what it did not do
+
+**Recommended:** amend **NFR-IMC-001** rather than the architecture — keep the absolute bound (which passes), and replace or supplement the 1.5× relative bound with something measurable and meaningful (e.g. a bound on the metadata batch's own **server-side execution time**, or an absolute ceiling on the added latency). Then re-measure **co-located with the database**, where per-query fixed cost is sub-millisecond and the ratio would actually reflect query work.
+
+**Not done, deliberately:** no spec text was amended and no architecture changed. `/akili-execute`'s Pivot Protocol requires explicit owner review and approval before either, and a requirement amendment re-runs the budget and approval gate. **T-08 stays `[~]`.**
+
+### Client work stays blocked either way
+
+Design §11 sequences this measurement before all client work so a breach costs the server PRs and not the client ones. Whether the outcome is `inconclusive` or an amended requirement, **that ordering still holds: T-10 … T-16 should not start until NFR-IMC-001 is either met or renegotiated.**
+
+---
+
 ## Owner escalation: advisory-derived items
 
 **Status: ✅ both items authorised by the owner 2026-07-30 and applied. Recorded below as the decision trail, since the escalation route — not the fix — is the part worth preserving.**
