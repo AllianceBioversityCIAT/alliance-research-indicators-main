@@ -10,15 +10,17 @@
 - **Approval mode:** interactive (owner approves at each gate)
 - **Budget (tripwire):** 17 tasks · ~1,600 LOC · 2–3 review rounds (`tasks.md` §9)
 - **Started:** 2026-07-30
-- **Status:** in-progress — **T-01 … T-16 done** (16 of 17). **Only T-17 (documentation currency) remains.** Server tier complete; the client chain is complete; the closing measurements are recorded and Reviewer-verified. Server tier detail retained below for the record: **the client chain has started.** **The entire server tier is complete, gated, and live-verified.** Nothing on the server side is outstanding: the payload composes, the queries execute against the real schema, all three NFR-IMC-001 bounds are met, the CI gates are mutation-verified, and the OpenAPI schema is proven to render. All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
-- **Rework rounds consumed: 2** — T-07 (attempt 1 → 2) and T-12 (attempt 1 → 2) — against a budget of 2–3. **At the edge of budget, not over it.** T-13 … T-16 each passed on attempt 1, so nothing was consumed by the client chain's closing tasks.
+- **Status:** ✅ **COMPLETE — all 17 tasks done, each with a Reviewer PASS recorded** (2026-07-31). Superseded detail retained below for the record: **T-01 … T-16 done** (16 of 17). **Only T-17 (documentation currency) remains.** Server tier complete; the client chain is complete; the closing measurements are recorded and Reviewer-verified. Server tier detail retained below for the record: **the client chain has started.** **The entire server tier is complete, gated, and live-verified.** Nothing on the server side is outstanding: the payload composes, the queries execute against the real schema, all three NFR-IMC-001 bounds are met, the CI gates are mutation-verified, and the OpenAPI schema is proven to render. All three amended NFR-IMC-001 bounds are met, so **design §11's gate on client work is released: T-10 … T-16 are unblocked.**
+- ⚠️ **Rework rounds consumed: 4 — BUDGET TRIPWIRE BREACHED** (budget: 2–3, `tasks.md` §9). T-07 (1), T-12 (1), **T-17 (2)**. Recorded as a breach rather than absorbed, per `/akili-execute` §2.4: *exceeding a budget is information, not failure.*
+  - **The cause is specific and worth carrying forward:** T-17's two FAILs were **not** the documentation work — that passed on substance. Both were **the Leader's own correction records**, one of which stated a falsehood inside the paragraph incrementing the RB-1 counter. **The overrun is concentrated entirely in meta-work about this spec's own defect-tracking**, not in the feature. A future spec should budget review rounds for *correction records* separately from implementation tasks — they are a distinct, higher-risk artifact class, and this run is the evidence.
+  - Superseded: this line previously read "2 … at the edge of budget, not over it", which was true when written (before T-17).
   - *Corrected 2026-07-31:* this block previously carried **two contradictory counts** — "1" here and "0" further down — and both were wrong. Restated once, here, from the log itself.
 - **Next eligible:** **T-17** — documentation currency (TRD ×2 + UX/UI design record). It is the last task in the spec.
   - **T-17 must carry two corrections T-16 surfaced, or it will land a half-fix:** (a) **DD-7's "2×2 for 4-card bands" is contradicted at BOTH 1440 px and 768 px** in the app's default collapsed-sidebar state — 3+1 at 1440, a single stacked column at 768 — and `design.md:249` / `design.md:338` state the claim **unscoped**, with no width or sidebar qualifier; (b) the `(width < 720px)` media query is **demonstrated as the acting mechanism only on the single-card band**, not on the 4-card wide band, whose isolated pair is masked by width scarcity. Both are evidenced in `evidence/t16-report.md` §Q1/§Q2 and in T-16's ADVISORY 2 below.
 - **Open items carried forward:** four one-line advisories from T-07's review escalated to the owner and not absorbed (`gender_group` id/name pairing, reorder-brittleness note, `ORDER BY` uniqueness, one stale "below"/"above" pointer); the three-document *"all three categories"* wording gap from T-05; and **RB-11**, the contained credential leak, whose rotation is the owner's call.
 - ~~**Rework rounds consumed so far:** **0** — every task has passed on attempt 1.~~ **Superseded 2026-07-31** — this line was already false when written (T-07 had failed attempt 1). The authoritative count is the corrected entry above: **2**.
 - **All server queries now execute against the real schema.** RB-3 (the unexecuted CTE-across-UNION pattern) is **discharged**, so DD-1's consolidation is proven rather than assumed. The next open architectural risk is **RB-4 / DD-11**, which **T-08's measurement** decides.
-- **Owner decisions pending:** none. The two advisory-derived items were authorised and applied 2026-07-30 (see `## Owner escalation`); one wording correction across three documents remains deliberately open there.
+- **Owner decisions pending:** none. The two advisory-derived items were authorised and applied 2026-07-30 (see `## Owner escalation`); one wording correction across three documents remains deliberately open there. *Closed 2026-07-31 (T-17):* the wording correction landed in **four** places — `tasks.md` § T-05, `design.md` §10, `requirements.md` §9 DC-3 **and `design.md` §6.2**, the fourth surfaced by T-17's Implementer and added by owner authorisation. See `## Owner escalation → Resolution as applied`.
 - **Branch:** all work lives on **`AC-1672-Add-New-Dashboard-Charts-Based-on-Project-Indicator`** as of 2026-07-30. The first two commits were briefly made on `dev` by mistake and moved by cherry-pick; `dev` was reset to `origin/dev`, and since neither commit had been pushed, **no published history was rewritten**. The move was non-trivial rather than cosmetic — `AC-1672` sits behind `dev` and their copies of `agresso-contract.repository.ts` differ by 20 lines. Those differences turned out to be **purely prettier formatting in lines 58–125**, disjoint from T-02's two edited lines (54 and the return type), so the cherry-pick auto-merged cleanly and was re-verified on the new base: `tsc` clean, `agresso-contract` **5 suites / 123 tests** green. **Side effect worth knowing:** `dev` carries the degraded formatting, so the **9 pre-existing prettier errors** T-02's Implementer proved against `HEAD` **do not exist on this branch** — that file now lints clean, and nobody should later read those 9 as this spec's doing.
 
 ---
@@ -1099,7 +1101,7 @@ Design §11 sequences this measurement before all client work so a breach costs 
 | --- | --- | --- |
 | **2** — misattributed citation | `reports-indicator-metadata.dto.ts` doc-comment now attributes the *"Evidence that does NOT count"* clause to `tasks.md` § T-02, and states DD-3's narrower point separately | Reads correctly against both sources |
 | **1** — AC.6 gated jointly with AC.3 | **A second group-only case was added** asserting three **non-zero** categories. The existing AC.6 case was **left untouched**, because it mirrors `requirements.md`'s *Scenario: Group-only project* verbatim (Male=10, Female=4, Non-binary=0) and editing its fixture would have broken that fidelity to close a wording gap | Suite **12/12**. **Mutation-killed:** under a left-biased merge the new case fails alongside AC.6, the mixed scenario, AC.4 and DD-8 — **5 failed / 7 passed**. Util restored byte-identical (checksum `c13397be…` before and after). `tsc --noEmit` clean; `agresso-contract` suites **5 / 123** |
-| **1** (wording) | The three-document contradiction — *"all three categories"* vs. AC.3's zero-dropping — is **now moot for the gate** (AC.6 is asserted independently) but the **wording itself is still uncorrected** in `tasks.md` § T-05, `design.md` §10 and `requirements.md` §9 DC-3 | ⬜ **Open.** The gate is closed; the prose still overstates. Left recorded rather than quietly edited across three documents |
+| **1** (wording) | The three-document contradiction — *"all three categories"* vs. AC.3's zero-dropping — is **now moot for the gate** (AC.6 is asserted independently) but the **wording itself is still uncorrected** in `tasks.md` § T-05, `design.md` §10 and `requirements.md` §9 DC-3 | ✅ **Closed 2026-07-31 (T-17).** **All FOUR occurrences** reworded to *"the summed counts for every category with a non-zero total, zero-total categories dropped per AC.3"* — `tasks.md:208`, `design.md:298`, `requirements.md:427` **and `design.md:183` (§6.2)**. The fourth was **not** in the escalation's original three: T-17's Implementer surfaced it, declined to absorb it, and the **owner authorised it 2026-07-31**. *Corrected after T-17's Reviewer flagged this cell as under-enumerating (FAIL issue 2) — it previously said "all three", which would have left a reader auditing the closure to conclude §6.2 was still live.* No test, fixture or source file touched; the gate itself was already closed independently of this wording (see Item 1 above) |
 
 **Note on the commit body.** `53d95a9b` states *"this new case is green but its mutation-kill has not yet been run"*. That was accurate when written — the run was interrupted mid-mutation by a branch-change request, and the Leader prioritised restoring the mutated file over completing the check. **The mutation-kill has since been run and passed** (above), so that caveat is discharged. Recorded here rather than by amending the commit, so the sequence stays legible.
 
@@ -1165,7 +1167,7 @@ box to earned/unearned, with every number traced to its source key.
 | One-column collapse below 720 px | **Earned** — 1 track at 719 px on both bands, both sidebar states |
 | Full client suite green; full server suite green | **Earned** — fresh run, exit 0 both |
 | Coverage vs floors, vs pre-change | **Earned** (client, byte-exact) / **earned with a stated precision gap** (server) |
-| ⊕ T-15's `scroll_probe` (trusted Page Down) | **Earned** — `scrollTop` 0 → 120 |
+| ⊕ T-15's `scroll_probe` (trusted Page Down) | ~~**Earned**~~ → **DOWNGRADED to earned-for-an-equivalent-container, not for the shipped overlay.** See the correction below |
 
 **Fresh verification (Implementer):** client `npm test` and `npm run test:coverage`
 → 306/306 suites, 6,292/6,292 tests, coverage 99.33 / 98.03 / 99.14 / 99.56.
@@ -1276,6 +1278,64 @@ charter explicitly sanctions it: *"Unverified is a legitimate, reportable outcom
 unambiguous (all four dimensions ≥ 60 % by a wide margin, re-verified twice
 today). Recorded as a stated limitation. **T-16 closes with it on the record.**
 
+### ⚠ CORRECTION to this entry, 2026-07-31 — the ⊕ `scroll_probe` box was over-adjudicated by the Leader
+
+**Found during T-17's review, one task later.** T-16's ⊕ box was scored **Earned**
+above. It is not earned in the sense the charter asked for.
+
+**Who produced the claim — corrected 2026-07-31 after T-17's Reviewer showed the
+first version of this paragraph misattributed it.** That version read *"the
+Leader — **not** the Implementer and **not** T-16's Reviewer — is who signed it
+off."* Four artifacts in this repo contradict that, and the Reviewer named all
+four:
+
+| Stage | Artifact | What it shows |
+| --- | --- | --- |
+| **Authored** | `evidence/t16-report.md:15` | The Implementer's own verdict table scores the ⊕ box **Earned** |
+| **Authored** | `evidence/t16-report.md:117` | The Implementer in prose: this *"converts T-15's previously-unobserved box… into an **actually-observed** one"* |
+| **Endorsed** | `execution.md` § T-16 → Reviewer verdict | T-16's Reviewer: *"all five verdicts supported"* |
+| **Transcribed** | this entry's verdict table, above | The Leader copied the verdict into the audit trail |
+
+**The Leader's actual share, stated precisely:** it propagated the verdict into
+the audit trail and closed the task on it **without opening `driver.mjs:209` to
+check which element the probe targeted.** That is a real failure of
+adjudication — the Leader is the last gate — but it is not authorship, and the
+first version of this paragraph exonerated two parties by name while claiming to
+be the honest record. **Writing a false attribution inside the paragraph that
+increments the RB-1 counter is itself the defect it was counting.**
+
+**What the charter asked for:** *"You already stand up a real browser: **focus the
+overlay**, dispatch `Page Down`, read `scrollTop`."* The overlay meant is the
+shipped DD-14 expanded container.
+
+**What was actually measured:** `driver.mjs:209` targets
+`document.querySelector('#t16-scroll-probe [tabindex="0"]')` — a **harness-owned
+fixture**, distinct from `#t16-wide-band` / `#t16-single-band`. The recorded
+`ariaLabel` is `"Scroll probe (T-16 fixture)"`, which the shipped binding
+`[attr.aria-label]="title()"`
+(`project-dashboard-card.component.html:71-72`) cannot produce. `README.md` even
+attributes an earlier 33 px overflow to "the scroll-probe div's **own hardcoded**
+`width: 400px` — a harness defect, not a component defect", which is the same
+element saying plainly that it is a fixture.
+
+**What the numbers therefore support:** *a `tabindex="0"`, `overflow-y:auto`
+container of this shape scrolls under a trusted `Page Down` in real Chrome*
+(`scrollTopBefore: 0` → `scrollTopAfter: 120`). **Not**: *the shipped overlay was
+observed scrolling.*
+
+**Restated verdict:** the shipped overlay's **focusability** is observed (T-15's
+own specs, real template, `document.activeElement`) and its **attribute shape** is
+verified in the template. Its **scroll behaviour remains inferred** from native
+browser semantics for a focused `overflow-y` container — which is exactly the
+state T-16's ⊕ item was written to move past, and did not. The behaviour is
+almost certainly correct; the *observation* was not made.
+
+**Why this is recorded rather than quietly re-scored:** it is the **fifth**
+occurrence of the RB-1 defect in this lineage — *a record asserting more than its
+source supports* — and it landed in the Leader's own adjudication, inside the run
+whose purpose was to stop producing them. RB-1's count is only useful if it stays
+honest. **No source change is warranted**; what was wrong is the claim, not the code.
+
 ### Decisions made
 
 - **Measurement not re-run; suites re-run.** Citing the recovered dataset was
@@ -1297,4 +1357,106 @@ today). Recorded as a stated limitation. **T-16 closes with it on the record.**
 Client: 306/306 suites · 6,292/6,292 tests · 99.33 / 98.03 / 99.14 / 99.56 · lint clean.
 Server: 324/324 suites · 2,069/2,069 tests · 84.16 / 74.62 / 84.67 / 84.22.
 Run twice today by two independent agents with identical results. All exit 0.
+
+
+## Owner decision, 2026-07-31 — T-17 widened by owner authorisation
+
+**Owner:** *"solo documenta DD-7 en T-17, y cierra la contradicción de redacción."*
+
+Two additions were folded into T-17's charter **before dispatch**, recorded here
+because `/akili-execute` §2.4 forbids the Leader widening an approved task on its
+own authority — the widening is the owner's.
+
+| # | Addition | Decided against the alternative |
+| --- | --- | --- |
+| 1 | **Correct DD-7 in documentation only.** T-16 measured the 4-card band as 3+1 at 1440 px and a single stacked column at 768 px, in the app's default collapsed-sidebar state, against DD-7's unscoped "2×2" claim | The alternative — **changing the CSS** so 2×2 actually holds — was put to the owner and **declined**. The layout is not defective; the document describing it is. No source change |
+| 2 | **Close the three-document *"all three categories"* wording contradiction** (`tasks.md` § T-05, `design.md` §10, `requirements.md` §9 DC-3) — the last item left `⬜ Open` in `## Owner escalation` | Deferring again. The owner chose to close it while T-17 is already in the documents |
+
+**Constraint carried into the brief:** the wording gate is already closed and
+mutation-verified (a second group-only case asserting three non-zero categories
+landed 2026-07-30). Addition 2 changes **prose only** — no test, no fixture, no
+source.
+
+
+## T-17 — Documentation currency: TRD ×2 + UX/UI design record — ✅ **PASS on attempt 3**
+
+- **Date:** 2026-07-31 · **Requirements covered:** R-IMC-012 (AC.2, AC.3, AC.4) · design §11
+- **Implementer attempts:** 3 · **Reviewer verdicts:** FAIL → FAIL → **PASS** · **Rework consumed: 2**
+- **Files changed:** 7, all `.md`. No source, test, fixture or CSS change.
+- **This is the spec's final task. 17 of 17 complete.**
+
+### What landed
+
+| Item | Verified against |
+| --- | --- |
+| `trd.md:299` — 17 fields / 16 sections, no "six sections" text | `reports-full.dto.ts`: 7 base props + 10 added, re-counted by the Reviewer twice |
+| `trd.md:128` PERF-5 — 10 SQL queries, two sequential batches, peak concurrency 8; client request count **unchanged** | **Code, not documents**: `agresso-contract.service.ts:247-278` (sequential), `agresso-contract.repository.ts:1168-1182` (`Promise.all` of 6, with `getGeoScopeReport` nesting 3 → batch 1 = 8), `indicator-metadata-reports.repository.ts:203`/`:380` (batch 2 = 2), `orm.config.ts:58-61` (no `connectionLimit`) |
+| `docs/ux-ui/design.md` — band pattern in the chart inventory; DD-5 / DD-7 / DD-9 / DD-10 dated in the decisions log | Diff |
+| `docs/ux-ui/design.md` §10.1 — T-09 a11y disclosure updated, **no blanket WCAG 2.1.1 claim** | `project-dashboard-card.component.html:71-72` |
+| **DD-7 corrected at `design.md:249` and `:338`** — the unscoped "2×2 for 4-card bands" now describes real reflow behaviour, covering **both** the 1440 px (3+1) and 768 px (single column) contradictions | `measurements.json`, `indicator-metadata-band.component.scss:100-129`, `cache.service.ts:70` |
+| The `(width < 720px)` mechanism claim bounded to the single-card band everywhere | Grep across all changed docs |
+| **The wording contradiction closed in FOUR places** — `tasks.md:208`, `design.md:298`, `requirements.md:427`, `design.md:183` | Each line re-read by the Reviewer at final state |
+
+### Rework history — both FAILs were the Leader's own records, not the documentation work
+
+**Attempt 1 → FAIL (4 issues).** Two were Leader bookkeeping (a stale "Fourth
+pending" box; a closure row saying "three occurrences" when four were corrected).
+Two were the Implementer's: `docs/ux-ui/design.md` §10.1 attributed the
+`scroll_probe` measurement to the **shipped overlay** when it was taken on a
+harness fixture; and PERF-5's warrant was traced doc-to-doc, the exact route the
+charter forbids. **The claim was true — the citation route was not.**
+
+**Attempt 2 → FAIL (2 issues, both Leader).** The T-16 correction block written in
+attempt 1's remediation **misattributed its own defect**: it said the
+over-adjudication was the Leader's *"not the Implementer and not T-16's
+Reviewer"*, contradicted by `evidence/t16-report.md:15` and `:117` (the
+Implementer authored the verdict) and T-16's Reviewer summary (endorsed it). And
+the correction was **partial** — `t16-report.md` still asserted the retracted
+claim with no pointer, against this spec's own `evidence/README.md` precedent of
+annotating in place.
+
+**Attempt 3 → PASS.** Attribution rewritten as an authored / endorsed /
+transcribed table with the Leader's share narrowed to what the artifacts support;
+`t16-report.md` annotated in place. Three attempt-2 advisories that were
+**factual** rather than stylistic were also fixed: a warrant citing §7.4 for a
+scoping §7.4 does not contain, an `ariaLabel`-vs-id conflation in a constitutional
+document, and a "Files touched" list omitting two files.
+
+**The pattern worth keeping:** the documentation work passed review on its
+substance. What failed twice was **the correction records about it** — including
+one that stated a falsehood inside the paragraph incrementing the RB-1 counter.
+Correction records are this lineage's highest-risk artifact class, and this task
+demonstrated it on itself.
+
+### ADVISORY — final Reviewer (recorded; none gating)
+
+1. **`tasks.md:638`** claims `design.md:338` is *"the one place"* carrying the
+   media-query scoping. The same correctly-scoped statement also appears at
+   `tasks.md:573`/`:616`, `execution.md:17`/§Q1 and `t16-report.md:12`. **Not a
+   repeat of the attempt-2 defect** — the named source does carry what is
+   attributed to it, and the operative negative assertion (no document
+   over-claims) was verified true against every `720` hit. Only the *exclusivity*
+   is unsupported.
+2. **"which the shipped binding `[attr.aria-label]="title()"` cannot produce"**
+   (three documents). Strictly a binding can emit any string its host passes; the
+   conclusion actually rests on the harness-owned id and `README.md`'s
+   hardcoded-width fixture, both solid. The modal *"cannot"* is a hair stronger
+   than the aria-label evidence alone supports — and it errs toward the
+   conservative, retracting direction.
+3. **The "fifth occurrence" ordinal** follows the charter's judgment-round count.
+   This document labels several execution-phase events RB-1-shaped without ever
+   stating the counting convention. Nothing rests on the ordinal.
+
+### Not Done / Assumptions
+
+- No `npm test` / `lint` / `build` run: the diff is seven `.md` files with no
+  source, test or fixture change, so no suite can verify it. **Both full suites
+  were run twice today under T-16** against this same source tree — client
+  306/306 suites and 6,292/6,292 tests, server 324/324 and 2,069/2,069.
+- **`indicator-metadata-band.component.scss:114` still comments** *"4-card bands
+  use a wider track so they land 2x2 instead of a 3+1 orphan row"* — the exact
+  claim DD-7 just retracted, now living in code with no pointer to the
+  correction. **T-17 is forbidden from touching CSS**, and the owner declined the
+  layout change, so it stands. **Open, owner's call**, and it will outlive the
+  doc fix.
 

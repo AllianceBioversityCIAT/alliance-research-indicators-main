@@ -12,7 +12,7 @@
 | One-column collapse below 720 px | **Earned** | 1 track measured at 719 px on both bands, in both sidebar states; the media-query mechanism itself is demonstrated only on the single band (see Q1) |
 | Full client suite green; full server suite green | **Earned** | Fresh run today: client 306/306 suites, 6292/6292 tests; server 324/324 suites, 2069/2069 tests — both exit 0, both match the archived 15:35 run exactly |
 | Coverage vs floors, vs pre-change | **Earned (client, exact match) / earned with a stated precision gap (server)** | Client 99.33/98.03/99.14/99.56 vs floor 40/20/45/30, identical to T-15's recorded pre-change baseline. Server 84.16/74.62/84.67/84.22 vs floor 60%, above the one pre-change figure execution.md records (83.32%, stmts only, one task older) — not regressed, but not a byte-precise 4-dimension delta |
-| ⊕ T-15 added: `scroll_probe` (trusted Page Down) | **Earned** | `scrollTopBefore: 0` → `scrollTopAfter: 120`, `dispatched: true`, `focused: true`, `stillActive: true` |
+| ⊕ T-15 added: `scroll_probe` (trusted Page Down) | ~~**Earned**~~ **→ RETRACTED 2026-07-31. Earned for an equivalent container, NOT for the shipped overlay.** See the correction under §D | `scrollTopBefore: 0` → `scrollTopAfter: 120`, `dispatched: true`, `focused: true`, `stillActive: true` — **but measured on a harness fixture, not on the shipped element** |
 
 No box is scored a rounded-up pass where the underlying number does not support it — see the coverage caveat above and in §B.
 
@@ -114,7 +114,34 @@ Per the charter's subtlety: `control_forced_390` shows the KZ-006 control failin
 
 ## D. `scroll_probe` — T-15's added box
 
-`measurements.json → scroll_probe`: `found: true`, `focused: true`, `scrollTopBefore: 0`, `scrollTopAfter: 120` (container `scrollHeight: 285`, `clientHeight: 138`), `dispatched: true` (trusted `Input.dispatchKeyEvent` Page Down, not a synthetic DOM event), `stillActive: true` (focus retained post-scroll). This converts T-15's previously-unobserved "scrollable by keyboard alone" box (jsdom cannot scroll) into an actually-observed one, in a real browser, closing the gap `execution.md:637-639` named.
+`measurements.json → scroll_probe`: `found: true`, `focused: true`, `scrollTopBefore: 0`, `scrollTopAfter: 120` (container `scrollHeight: 285`, `clientHeight: 138`), `dispatched: true` (trusted `Input.dispatchKeyEvent` Page Down, not a synthetic DOM event), `stillActive: true` (focus retained post-scroll). ~~This converts T-15's previously-unobserved "scrollable by keyboard alone" box (jsdom cannot scroll) into an actually-observed one, in a real browser, closing the gap `execution.md:637-639` named.~~
+
+> **⚠ CORRECTION 2026-07-31 — the struck sentence above was wrong, and this
+> section's verdict is retracted to a narrower one.**
+>
+> **The measured element was not the shipped overlay.** `driver.mjs:209` targets
+> `document.querySelector('#t16-scroll-probe [tabindex="0"]')` — a harness-owned
+> id, distinct from `#t16-wide-band` / `#t16-single-band`. The recorded
+> `ariaLabel` is `"Scroll probe (T-16 fixture)"`, which the shipped binding
+> `[attr.aria-label]="title()"` (`project-dashboard-card.component.html:71-72`)
+> cannot produce. `evidence/README.md` independently calls the same element a
+> harness artifact, attributing an earlier 33 px overflow to *"the scroll-probe
+> div's **own hardcoded** `width: 400px` — a harness defect, not a component
+> defect."*
+>
+> **What these numbers support:** a `tabindex="0"` / `overflow-y:auto` container
+> of this shape scrolls under a trusted `Page Down` in real Chrome.
+> **What they do not support:** that the shipped overlay was observed scrolling.
+>
+> **Restated:** the shipped overlay's **focusability** is observed (T-15's specs,
+> real template, `document.activeElement`) and its **attribute shape** is verified
+> in the template. Its **scroll behaviour remains inferred** from native browser
+> semantics — the state this ⊕ item existed to move past, and did not. The
+> behaviour is almost certainly correct; the *observation* was not made.
+>
+> Found by T-17's Reviewer, one task later. Annotated in place rather than
+> rewritten, matching the precedent set in `evidence/README.md`. Full record:
+> `execution.md` § T-16 → *"CORRECTION to this entry"*.
 
 ---
 

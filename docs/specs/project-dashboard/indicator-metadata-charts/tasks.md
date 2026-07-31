@@ -205,7 +205,7 @@ graph TD
   - Zero-total categories are dropped (AC.3), which is also what keeps any unexpected pass-through id invisible unless it carries real data.
 - **Acceptance / done check:**
   - [ ] 3 individual Male records + one group record with `session_participants_male = 10` → **Male = 13** (AC.1).
-  - [ ] **A group-only fixture (zero individual rows) yields all three categories with their summed counts** (AC.6). This is the assertion that fails a subordinating merge and passes nothing else.
+  - [ ] **A group-only fixture (zero individual rows) yields the summed counts for every category with a non-zero total, zero-total categories dropped per AC.3** (AC.6; wording corrected 2026-07-31 — see `execution.md` § *Owner escalation*). This is the assertion that fails a subordinating merge and passes nothing else.
   - [ ] NULL participant column → treated as `0`; a category whose total is 0 is **absent** from the output (AC.2, AC.3).
   - [ ] No double-counting in either direction (AC.4).
   - [ ] An id present on only one side is carried through unchanged (DD-8).
@@ -588,7 +588,40 @@ graph TD
 - **Files touched (intended):**
   - `docs/trd/trd.md` *(modified — two places)*
   - `docs/ux-ui/design.md` *(modified)*
-- **Description:** The three documentation owners design §11 names (the fourth, Swagger, is T-09).
+  - `docs/specs/project-dashboard/indicator-metadata-charts/design.md` *(modified — DD-7 correction at §7.4 / DD-7, **plus the §10 AND §6.2 wording**)* **⊕ owner-authorised 2026-07-31**
+  - `docs/specs/project-dashboard/indicator-metadata-charts/requirements.md` *(modified — §9 DC-3 wording)* **⊕ owner-authorised 2026-07-31**
+  - `docs/specs/project-dashboard/indicator-metadata-charts/tasks.md` *(modified — § T-05 wording + this task's own charter/acceptance bookkeeping)* **⊕ owner-authorised 2026-07-31**
+  - `docs/specs/project-dashboard/indicator-metadata-charts/execution.md` *(modified — Owner-escalation closure row, Document Control, and the T-16 verdict correction)*
+  - `docs/specs/project-dashboard/indicator-metadata-charts/evidence/t16-report.md` *(modified — in-place retraction of the ⊕ `scroll_probe` verdict)*
+  - *Corrected 2026-07-31: this list previously omitted `execution.md` and `evidence/t16-report.md`, both of which this task modifies and one of which an acceptance box requires; and the `design.md` entry did not name §6.2, the fourth wording location.*
+- **Description:** The three documentation owners design §11 names (the fourth, Swagger, is T-09), **plus two owner-authorised corrections added after T-16 (see the amendment block below).**
+
+### ⚠ CHARTER AMENDED 2026-07-31, BEFORE DISPATCH — two owner-authorised additions
+
+**Owner decision, 2026-07-31:** *"solo documenta DD-7 en T-17, y cierra la contradicción de redacción."* Both items below are recorded here rather than absorbed silently, because `/akili-execute` §2.4 forbids the Leader widening an approved task on its own authority. This widening is the owner's, and it is dated.
+
+**⊕ ADDITION 1 — correct DD-7 to describe reality. Documentation only; do NOT change any CSS.**
+
+T-16 measured the shipped components in real Chrome and DD-7's claim does not hold:
+
+| Width | Sidebar state | Measured result | DD-7 claims |
+| --- | --- | --- | --- |
+| 1440 px | **collapsed — the app's default** | **3 columns + 1 wrapped card** (`422.391px ×3`, 4th card at `y: 374.75`) | 2×2 |
+| 1440 px | expanded | 2×2, genuinely (`553.25px ×2`) | 2×2 ✓ |
+| 768 px | collapsed (default) | **one column, four stacked cards** (`660.797px`) | 2×2 |
+
+- **The claim is stated UNSCOPED at `design.md:249` (§7.4) and `design.md:338` (DD-7)** — no width qualifier, no sidebar qualifier — while DD-7's warrant names "Measured in real Chrome at 500/768/1440". The default state really is collapsed: `cache.service.ts:70` is `signal(localStorage.getItem('isSidebarCollapsed') !== 'false')`, i.e. `true` on a fresh browser.
+- **Correct the text to describe the actual behaviour:** `repeat(auto-fill, minmax(400px,1fr))` reflows by available width, so the 4-card band is 1 / 3+1 / 2×2 depending on container width, and 2×2 at 1440 px is reachable only with the sidebar expanded. **Do not delete DD-7** — restate it accurately and date the correction.
+- **⚠ Fixing only the 1440 case is a half-fix.** `evidence/t16-report.md` §Q2 caught 1440; T-16's Reviewer caught **768** as well (ADVISORY 2 in `execution.md` § T-16). Both must land.
+- **Also correct, in the same pass:** the `(width < 720px)` collapse is demonstrated as the acting *mechanism* only on the single-card band. On the 4-card band the isolation pair is masked by width scarcity and proves nothing. Do not let any document claim the media query is proven for both bands.
+
+**⊕ ADDITION 2 — close the three-document wording contradiction (the last item open in `## Owner escalation`).**
+
+`tasks.md` § T-05, `design.md` §10 and `requirements.md` §9 DC-3 all require the group-only fixture to yield *"all three categories with their summed counts"*. That is **literally unsatisfiable alongside AC.3**, which mandates dropping zero totals — and `requirements.md`'s own *Scenario: Group-only project* expects Male=10, Female=4, **Non-binary=0**.
+
+- **The gate is already closed and the shipped code is correct** — a second group-only case asserting three non-zero categories was added and mutation-killed on 2026-07-30. **Only the prose still overstates.** Change wording; change no test and no code.
+- **Correct all three occurrences** to something that is true alongside AC.3 — e.g. *"the summed counts for every category with a non-zero total, zero-total categories dropped per AC.3"*. Use consistent wording in all three places.
+- Once done, mark the corresponding row in `execution.md` § *Owner escalation → Resolution as applied* (the `⬜ Open` row) as closed, dated.
 - **Implementation notes:**
   - **`trd.md:299`** — `reports/full` returns **17 fields (16 sections + `contract_id`)**, not "six sections".
   - **`trd.md:128` PERF-5 — use the restated wording (AC.3), not the original.** PERF-5 counts **client HTTP requests** (4), which this spec does not change; the original "reflects the new query count" was **unsatisfiable** because it conflated two different quantities. The correct note is: `reports/full` issues **10 SQL queries in two sequential batches, peak concurrency 8**, against a pool whose default limit is 10.
@@ -596,15 +629,24 @@ graph TD
   - **If T-15 shipped, update §10.1's honest T-09 disclosure** — that gap is now closed for the cards in scope. **Do not overstate it as full WCAG 2.1.1 conformance**; state exactly which container became operable.
   - **Every factual claim must be checked against the code**, not against this spec. The failure mode this whole spec lineage kept producing was *a document asserting more than its source supports* — three judgment rounds, four occurrences. Do not add a fifth here.
 - **Acceptance / done check:**
-  - [ ] `trd.md:299` states 17 fields / 16 sections; no "six sections" text survives.
-  - [ ] PERF-5 carries the **10 queries / two sequential batches / peak concurrency 8** note and **does not** claim the client request count changed.
-  - [ ] `docs/ux-ui/design.md` records the band pattern in the chart inventory and DD-5 / DD-7 / DD-9 / DD-10 in the decisions log, each dated.
-  - [ ] If T-15 shipped, §10.1's T-09 note is updated **without** implying blanket conformance.
-  - [ ] Every number in the diff traced to a line of code or a recorded measurement, named in the commit body.
+  - [x] `trd.md:299` states 17 fields / 16 sections; no "six sections" text survives. — Verified against `ContractFullReportsDto` (`server/researchindicators/src/domain/entities/agresso-contract/dto/reports-full.dto.ts:34-139`): 7 base properties (`ContractBaseReportsDto`) + 10 added = 17, of which `contract_id` is the one scalar, leaving 16 sections.
+  - [x] PERF-5 carries the **10 queries / two sequential batches / peak concurrency 8** note and **does not** claim the client request count changed. — `trd.md:128`. **Re-verified against code directly, own count, 2026-07-31 (rework attempt 2):** `agresso-contract.service.ts:247-278` — `getFullContractReports` awaits `baseReport` (batch 1) to resolve *before* starting `Promise.all([getSimpleIndicatorSections, getCapacitySharingMetadata])` (batch 2) — sequential, confirming DD-11. Batch 1 — `agresso-contract.repository.ts:1168-1182`, `Promise.all` of 6 calls, of which 5 are single-query methods (`this.query` at `:975`, `:1022`, `:1071`, `:1120`, `:1146`) and the 6th, `getGeoScopeReport`, runs its own nested `Promise.all` of 3 queries at `:735-739` → **5 + 3 = 8**. Batch 2 — `indicator-metadata-reports.repository.ts`: `getSimpleIndicatorSections` issues one query at `:203`, `getCapacitySharingMetadata` one at `:380` → **2**. **Total 8 + 2 = 10; peak `max(8,2) = 8`**, matching the box. Pool: `db/config/mysql/orm.config.ts:42-62` sets no `connectionLimit` in `extra` (`:58-61`), so mysql2's own default of 10 applies. My count agrees with the box as written; no discrepancy found. The existing "**4** requests" client-side claim (`trd.md:128`) is left untouched — it counts a different thing (client HTTP calls, not server SQL queries).
+  - [x] `docs/ux-ui/design.md` records the band pattern in the chart inventory and DD-5 / DD-7 / DD-9 / DD-10 in the decisions log, each dated. — §8.1 new "Indicator metadata bands" bullet; §12.2 four new dated entries (DD-5, DD-7, DD-9, DD-10).
+  - [x] If T-15 shipped, §10.1's T-09 note is updated **without** implying blanket conformance. — T-15 shipped (`git log` `a3fbf5dd`, this file's own T-15 entry: "done — 2026-07-31"). `docs/ux-ui/design.md` §10.1 updated to name the DD-14 overlay specifically and states the scope explicitly ("not... blanket WCAG 2.1.1... conformance").
+  - [x] Every number in the diff traced to a line of code or a recorded measurement, named in the commit body. — See this task's report to the Leader for the full file:line / measurement-key list.
+  - [x] **⊕ DD-7 corrected at BOTH `design.md:249` and `design.md:338`**, describing the real reflow behaviour and naming the sidebar-state dependency. **Both the 1440 px (3+1) and the 768 px (single column) contradictions addressed** — fixing only 1440 fails this box. — Both lines corrected; both widths named; `cache.service.ts:70` cited for the sidebar default.
+  - [x] **⊕ No document claims the `(width < 720px)` media query is mechanism-proven on the 4-card wide band.** — **`design.md:338` (DD-7) is the one place that carries the mechanism scoping**, and it scopes it to the single-card band. Verified absent as an over-claim from `design.md`, `requirements.md`, `execution.md` and `docs/ux-ui/design.md`. *Corrected 2026-07-31: this line previously also cited "the §7.4 row", which states no such thing — `design.md:249` merely delegates to DD-7. The operative negative assertion was true; the warrant named a source that does not support it, which is the RB-1 shape in miniature.*
+  - [x] **⊕ The *"all three categories"* wording corrected in all FOUR places** — `tasks.md:208` (§ T-05), `design.md:298` (§10), `requirements.md:427` (§9 DC-3) and `design.md:183` (§6.2) — all four now consistent and satisfiable alongside AC.3's zero-dropping rule.
+    - **⊕⊕ Fourth location added 2026-07-31 by owner authorisation**, after the Implementer surfaced it in its `Not Done` field and correctly declined to absorb it. `design.md:183` (§6.2) **read** *"yields **the three** group categories with their summed counts"* — the same unsatisfiable shape as the other three, in a document belonging to this very spec — and was **corrected 2026-07-31** in the same pass. The owner's instruction was to **close the contradiction**; leaving a fourth live instance would have closed it in name only.
+    - *Leader correction, 2026-07-31:* this box and the note above previously read *"Fourth pending"* and described `design.md:183` in the **present tense** as still carrying the defect, after the correction had already landed in this very diff. T-17's Reviewer caught it (FAIL issue 1). A tracking record asserting a state its own named source contradicts is the RB-1 defect inverted — understating completed work while quoting retracted text as current. Restated here rather than silently overwritten.
+  - [x] **⊕ No test, fixture or source file changed by this task.** It is a documentation task; the gates it describes are already closed and mutation-verified. — `git status` shows only `.md` files changed; verified below.
+  - [x] **⊕ `execution.md` § *Owner escalation* — the `⬜ Open` wording row marked closed and dated.** — Row now reads "✅ Closed 2026-07-31 (T-17)".
 - **Evidence that does NOT count:** copying figures out of `design.md`. `design.md` revision 4 **carries no judgment warrant** — its post-terminal edits were never audited, and the specific defect the lineage kept producing was a correction record asserting more than the source supports. Verify against the code and against T-08's / T-16's recorded measurements. A doc claim traceable only to another doc claim is unverified.
 - **Dependencies:** T-15, T-16
 - **Effort:** S · **Skills:** `cognitive-doc-design`
-- **Status:** todo
+- **Status:** **done — 2026-07-31, Reviewer PASS on attempt 3** (FAIL → FAIL → PASS; 2 rework rounds). Documentation-only diff across 7 `.md` files. No test/fixture/source file touched. See [`execution.md`](./execution.md) § T-17.
+  - **Both FAILs were the Leader's own correction records, not the documentation work** — including one that misattributed its own defect *inside* the paragraph incrementing the RB-1 counter. Recorded in full rather than compressed, because it is the clearest demonstration this spec produced of RB-1's actual mechanism: correction records are the highest-risk artifact class, and writing one about your own error is where it bites hardest.
+  - **Open, owner's call:** `indicator-metadata-band.component.scss:114` still comments *"4-card bands use a wider track so they land 2x2 instead of a 3+1 orphan row"* — the claim DD-7 just retracted, alive in code. T-17 is forbidden from touching CSS and the owner declined the layout change, so it stands and will outlive the doc fix.
 
 ---
 
