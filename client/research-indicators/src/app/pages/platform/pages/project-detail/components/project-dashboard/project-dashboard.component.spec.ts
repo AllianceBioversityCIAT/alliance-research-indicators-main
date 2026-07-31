@@ -15,8 +15,10 @@ import { ChartKey, ProjectDashboardComponent } from './project-dashboard.compone
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { COLLAPSED_ITEM_LIMIT, ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
-import { ContractFullReports } from '@interfaces/contract-full-reports.interface';
+import { ContractFullReports, IndicatorMetadataCount } from '@interfaces/contract-full-reports.interface';
 import { mockContractFullReports } from 'src/app/testing/contract-full-reports.mock';
+import { IndicatorMetadataBandComponent } from './indicator-metadata-band.component';
+import { UNLABELLED_CATEGORY_FALLBACK } from './indicator-metadata-bands.mapper';
 
 /**
  * T-07 (design.md §10 / tasks.md §3). This stub is legitimate ONLY for
@@ -70,6 +72,40 @@ class ResultsCenterTableStubComponent {
   @Input() emptyMessage = '';
 }
 
+/**
+ * T-14: the four real band-indicator ids (`indicator-metadata-bands.mapper.ts`
+ * `BAND_DEFINITIONS`), shaped exactly like the default `GET_ResultsCount`
+ * fixture's `indicators` entries (`{ indicator: { indicator_id, name },
+ * count_results }`) so `setup(..., { indicators: [...] })` can seed a real
+ * band. Ids verified against the mapper's own citations, not guessed:
+ * Capacity Sharing 1, Innovation Development 2, Policy Change 4, OICR 5.
+ */
+const BAND_INDICATOR_FIXTURES = {
+  innovationDevelopment: { indicator: { indicator_id: 2, name: 'Innovation Development' }, count_results: 12 },
+  capacitySharing: { indicator: { indicator_id: 1, name: 'Capacity Sharing' }, count_results: 20 },
+  policyChange: { indicator: { indicator_id: 4, name: 'Policy Change' }, count_results: 8 },
+  oicr: { indicator: { indicator_id: 5, name: 'OICR' }, count_results: 3 }
+};
+
+/** The 10 card titles, verbatim from `requirements.md` §4.1 / the mapper's `BAND_DEFINITIONS`. */
+const METADATA_CARD_TITLES = [
+  'Innovation Nature',
+  'Innovation Type',
+  'Current Readiness',
+  'OICR Maturity',
+  'Policy Type',
+  'Stage in Policy Process',
+  'Training or engagement to report',
+  'Training vs. Engagement',
+  'Gender',
+  'Degree'
+] as const;
+
+/** Mirrors `indicator-metadata-bands.mapper.ts`'s `buildCard` transform, so per-instance assertions bind against the same shape the mapper produces. */
+function metadataItems(rows: IndicatorMetadataCount[]): { id: string; label: string; count: number }[] {
+  return rows.map(row => ({ id: String(row.id), label: row.name ?? UNLABELLED_CATEGORY_FALLBACK, count: row.count }));
+}
+
 describe('ProjectDashboardComponent', () => {
   let fixture: ComponentFixture<ProjectDashboardComponent>;
   let component: ProjectDashboardComponent;
@@ -116,12 +152,31 @@ describe('ProjectDashboardComponent', () => {
       topContributors: signal<any[]>([]),
       staff: signal<any[]>([]),
       geoScope: signal<ContractFullReports['geo_scope'] | null>(null),
+      /**
+       * T-14 hard prerequisite #1 (`tasks.md` § T-14, found by T-10's
+       * review). Mirrors `GetFullContractReportsService`'s 10 new per-section
+       * `computed` accessors (`get-full-contract-reports.service.ts`) as
+       * independent writable signals, exactly like the six Chunk A sections
+       * above -- so this mock is a faithful stand-in for the real service's
+       * public shape, not only for `payload()` (which the host reads
+       * directly to build `indicatorMetadataBands()`).
+       */
+      innovationNature: signal<IndicatorMetadataCount[]>([]),
+      innovationType: signal<IndicatorMetadataCount[]>([]),
+      innovationReadiness: signal<IndicatorMetadataCount[]>([]),
+      oicrMaturity: signal<IndicatorMetadataCount[]>([]),
+      policyType: signal<IndicatorMetadataCount[]>([]),
+      policyStage: signal<IndicatorMetadataCount[]>([]),
+      sessionFormat: signal<IndicatorMetadataCount[]>([]),
+      sessionType: signal<IndicatorMetadataCount[]>([]),
+      genderDistribution: signal<IndicatorMetadataCount[]>([]),
+      degree: signal<IndicatorMetadataCount[]>([]),
       main: jest.fn(),
       update: jest.fn()
     };
   }
 
-  /** Drives all four ranked sections of `reportsMock` from one `ContractFullReports` payload. */
+  /** Drives all four ranked sections, plus the 10 indicator-metadata sections (T-14), of `reportsMock` from one `ContractFullReports` payload. */
   function applyFixtureToReportsMock(mock: ReturnType<typeof createReportsMock>, data: ContractFullReports): void {
     mock.payload.set(data);
     mock.topPartners.set(data.top_partners);
@@ -130,11 +185,36 @@ describe('ProjectDashboardComponent', () => {
     mock.topContributors.set(data.top_contributors);
     mock.staff.set(data.staff);
     mock.geoScope.set(data.geo_scope);
+    // T-14 hard prerequisite #1.
+    mock.innovationNature.set(data.innovation_nature);
+    mock.innovationType.set(data.innovation_type);
+    mock.innovationReadiness.set(data.innovation_readiness);
+    mock.oicrMaturity.set(data.oicr_maturity);
+    mock.policyType.set(data.policy_type);
+    mock.policyStage.set(data.policy_stage);
+    mock.sessionFormat.set(data.session_format);
+    mock.sessionType.set(data.session_type);
+    mock.genderDistribution.set(data.gender_distribution);
+    mock.degree.set(data.degree);
   }
 
   /** Every `app-project-dashboard-card` stub instance currently rendered by the host. */
   function getCardDebugElements(): DebugElement[] {
     return fixture.debugElement.queryAll(By.directive(ProjectDashboardCardStubComponent));
+  }
+
+  /** Every real `app-indicator-metadata-band` instance currently rendered by the host (T-14). Bands are not stubbed (DD-6/DD-9 -- state is host-owned, chrome is real), so counting/querying them carries no superset hazard. */
+  function getMetadataBandDebugElements(): DebugElement[] {
+    return fixture.debugElement.queryAll(By.directive(IndicatorMetadataBandComponent));
+  }
+
+  /** The "Indicator metadata" section heading, or `null` when R-IMC-009 AC.3 hides it entirely. */
+  function getMetadataHeading(): DebugElement | null {
+    return (
+      fixture.debugElement
+        .queryAll(By.css('h2'))
+        .find(element => (element.nativeElement as HTMLElement).textContent?.trim() === 'Indicator metadata') ?? null
+    );
   }
 
   function getCardByTitle(title: string): ProjectDashboardCardStubComponent {
@@ -149,7 +229,31 @@ describe('ProjectDashboardComponent', () => {
 
   async function setup(
     contractId: string | null = 'C-1',
-    options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean }
+    options?: {
+      isAdmin?: boolean;
+      emptyOverview?: boolean;
+      rejectOverviewFetch?: boolean;
+      /**
+       * T-14 hard prerequisite #2 (`tasks.md` § T-14, found by T-13's
+       * review). `setup()` had no way to seed `GET_ResultsCount`'s
+       * `indicators` array with a real band id (1/2/4/5), so no test could
+       * produce a single Indicator-metadata band. Defaults to the
+       * pre-existing fixture below (ids 10/99/null -- zero bands), so every
+       * existing call site that omits this option is unaffected.
+       */
+      indicators?: Array<Record<string, unknown>>;
+      /**
+       * T-14 / DC-13: whether a metadata card renders a toggle, exposes the
+       * correct `aria-expanded`, and lets its overlay behave all live inside
+       * `ProjectDashboardCardComponent`'s own template (design §7.2 / DD-10)
+       * -- per the doubles policy (`tasks.md` §4) a stub cannot be evidence
+       * for any of that. When `true`, the real card renders in place of
+       * `ProjectDashboardCardStubComponent` for the DC-13 boundary tests;
+       * every other test in this file legitimately keeps the stub for
+       * input/output assertions only.
+       */
+      renderRealCards?: boolean;
+    }
   ) {
     reportsMock = createReportsMock();
     geoScopeMock = { main: jest.fn() };
@@ -212,7 +316,7 @@ describe('ProjectDashboardComponent', () => {
           division: 'Division',
           unitId: 'U1',
           unit: 'Unit',
-          indicators: [
+          indicators: options?.indicators ?? [
             // T-13 (indicator-metadata-charts): id was `1` before this spec
             // existed. `1` is `CAPACITY_SHARING_INDICATOR_ID`
             // (star-pdf-report.util.ts), one of the four real band ids the
@@ -222,6 +326,9 @@ describe('ProjectDashboardComponent', () => {
             // which broke every test asserting an exact card count/title
             // list below. Changed to `10`, an id no band definition uses, so
             // this fixture stays about the 4 ranked cards it was written for.
+            // T-14: tests that need a real band pass `options.indicators`
+            // explicitly (`BAND_INDICATOR_FIXTURES`) rather than mutating
+            // this default, which every pre-existing test still relies on.
             { indicator: { indicator_id: 10, name: 'Output' }, count_results: 2 },
             { indicator_id: 99, full_name: 'Fallback indicator', count_results: 4 },
             { indicator_id: null, count_results: undefined }
@@ -261,11 +368,15 @@ describe('ProjectDashboardComponent', () => {
     })
       .overrideComponent(ProjectDashboardComponent, {
         remove: {
-          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent],
+          imports: options?.renderRealCards
+            ? [GeoScopeCardComponent, ResultsCenterTableComponent]
+            : [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent],
           providers: [GetFullContractReportsService, GetGeoScopeService]
         },
         add: {
-          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
+          imports: options?.renderRealCards
+            ? [GeoScopeCardStubComponent, ResultsCenterTableStubComponent]
+            : [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
           providers: [
             { provide: GetFullContractReportsService, useValue: reportsMock },
             { provide: GetGeoScopeService, useValue: geoScopeMock }
@@ -279,6 +390,34 @@ describe('ProjectDashboardComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
+  }
+
+  /**
+   * T-14: seeds all four real bands (`BAND_INDICATOR_FIXTURES`) and applies a
+   * fully populated, distinct-per-section fixture -- R-IMC-008's own
+   * scenario ("GIVEN a payload where all 10 sections carry distinct,
+   * non-empty data"). `policy_stage` is overridden because the canonical
+   * fixture deliberately leaves it `[]` (R-IMC-007 AC.2 evidence); this
+   * scenario needs every one of the 10 sections non-empty instead.
+   */
+  async function setupWithAllBandsAndFixture(): Promise<ContractFullReports> {
+    await setup('C-1', {
+      indicators: [
+        BAND_INDICATOR_FIXTURES.innovationDevelopment,
+        BAND_INDICATOR_FIXTURES.capacitySharing,
+        BAND_INDICATOR_FIXTURES.policyChange,
+        BAND_INDICATOR_FIXTURES.oicr
+      ]
+    });
+    const fixtureData = mockContractFullReports({
+      policy_stage: [
+        { id: 1, name: 'Stage 1 description', count: 6 },
+        { id: 2, name: 'Stage 2 description', count: 4 }
+      ]
+    });
+    applyFixtureToReportsMock(reportsMock, fixtureData);
+    fixture.detectChanges();
+    return fixtureData;
   }
 
   afterEach(() => {
@@ -612,6 +751,249 @@ describe('ProjectDashboardComponent', () => {
           item => item.id
         );
         expect(new Set(ids).size).toBe(ids.length);
+      }
+    });
+  });
+
+  /**
+   * T-14 (design.md §7.2/§7.5, §10 "Host specs" row; requirements.md
+   * R-IMC-008/009/010/011, §9 DC-5/DC-6/DC-13). The two hard prerequisites
+   * this task owns first (`createReportsMock`/`applyFixtureToReportsMock`
+   * carrying the 10 new sections; `setup()` gaining an `indicators` hook)
+   * are extended above; everything below is the mechanical proof T-13's
+   * boxes 1-4 were left owing.
+   */
+  describe('Indicator metadata — band visibility (R-IMC-009, DC-6)', () => {
+    it('renders the "Indicator metadata" heading and all 4 bands when every indicator has results (present)', async () => {
+      await setupWithAllBandsAndFixture();
+
+      expect(getMetadataHeading()).not.toBeNull();
+      expect(getMetadataBandDebugElements()).toHaveLength(4);
+    });
+
+    it('renders no OICR band and no OICR card for an indicator with zero results, leaving other bands visible (absent, R-IMC-009 AC.1, "no OICR work" scenario)', async () => {
+      await setup('C-1', {
+        indicators: [
+          BAND_INDICATOR_FIXTURES.innovationDevelopment,
+          { indicator: { indicator_id: 5, name: 'OICR' }, count_results: 0 }
+        ]
+      });
+      applyFixtureToReportsMock(reportsMock, mockContractFullReports());
+      fixture.detectChanges();
+
+      expect(component.indicatorMetadataBands().some(band => band.indicatorId === 5)).toBe(false);
+      expect(() => getCardByTitle('OICR Maturity')).toThrow();
+      // BUT it must NOT hide the Innovation Development band.
+      expect(getCardByTitle('Current Readiness')).toBeTruthy();
+    });
+
+    it('renders no "Indicator metadata" heading at all when no indicator has results (default fixture, R-IMC-009 AC.3 -- free, per tasks.md)', async () => {
+      await setup();
+
+      expect(component.indicatorMetadataBands()).toEqual([]);
+      expect(getMetadataHeading()).toBeNull();
+      expect(getMetadataBandDebugElements()).toHaveLength(0);
+    });
+
+    it('renders a visible band with an unanswered-field empty state when the indicator has results but every one of its sections is empty (all-null, DC-6 / R-IMC-010)', async () => {
+      await setup('C-1', { indicators: [BAND_INDICATOR_FIXTURES.capacitySharing] });
+      applyFixtureToReportsMock(
+        reportsMock,
+        mockContractFullReports({ session_format: [], session_type: [], gender_distribution: [], degree: [] })
+      );
+      fixture.detectChanges();
+
+      expect(getMetadataBandDebugElements()).toHaveLength(1);
+      for (const title of ['Training or engagement to report', 'Training vs. Engagement', 'Gender', 'Degree']) {
+        const card = getCardByTitle(title);
+        expect(card.empty).toBe(true);
+        expect(card.emptyMessage).toBe('No data is recorded for this field on this project. (20 results.)');
+      }
+    });
+
+    it('renders a visible band over empty sections when a project links results only to non-primary contracts (all-non-primary, DC-6 / design §7.5)', async () => {
+      await setup('C-1', { indicators: [BAND_INDICATOR_FIXTURES.policyChange] });
+      applyFixtureToReportsMock(reportsMock, mockContractFullReports({ policy_type: [], policy_stage: [] }));
+      fixture.detectChanges();
+
+      expect(getMetadataBandDebugElements()).toHaveLength(1);
+      const message = 'No data is recorded for this field on this project. (8 results.)';
+      for (const title of ['Policy Type', 'Stage in Policy Process']) {
+        const card = getCardByTitle(title);
+        expect(card.empty).toBe(true);
+        expect(card.emptyMessage).toBe(message);
+      }
+      // W-7 (design §7.5): the copy must not assert WHY the section is
+      // empty -- the true reason here (is_primary scoping) differs from the
+      // all-null case above, and the copy must not distinguish them.
+      expect(message).not.toMatch(/unanswered|left this|primary/i);
+    });
+  });
+
+  describe('Indicator metadata — ten per-instance card bindings (R-IMC-008 AC.1/AC.2, DC-5)', () => {
+    // R-IMC-008 scenario "Ten cards, ten distinct bindings": each assertion
+    // below is bound to its OWN card via `getCardByTitle`, never to a shared
+    // index or count (tasks.md's superset-hazard warning) -- a cross-wire
+    // between any two sections in the host template reddens exactly the pair
+    // of tests naming those two titles, never all ten at once.
+
+    it('binds the Innovation Nature card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Innovation Nature').items).toEqual(metadataItems(fixtureData.innovation_nature));
+    });
+
+    it('binds the Innovation Type card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Innovation Type').items).toEqual(metadataItems(fixtureData.innovation_type));
+    });
+
+    it('binds the Current Readiness card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Current Readiness').items).toEqual(metadataItems(fixtureData.innovation_readiness));
+    });
+
+    it('binds the OICR Maturity card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('OICR Maturity').items).toEqual(metadataItems(fixtureData.oicr_maturity));
+    });
+
+    it('binds the Policy Type card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Policy Type').items).toEqual(metadataItems(fixtureData.policy_type));
+    });
+
+    it('binds the Stage in Policy Process card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Stage in Policy Process').items).toEqual(metadataItems(fixtureData.policy_stage));
+    });
+
+    it('binds the Training or engagement to report card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Training or engagement to report').items).toEqual(
+        metadataItems(fixtureData.session_format)
+      );
+    });
+
+    it('binds the Training vs. Engagement card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Training vs. Engagement').items).toEqual(metadataItems(fixtureData.session_type));
+    });
+
+    it('binds the Gender card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Gender').items).toEqual(metadataItems(fixtureData.gender_distribution));
+    });
+
+    it('binds the Degree card to its own section only', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+      expect(getCardByTitle('Degree').items).toEqual(metadataItems(fixtureData.degree));
+    });
+  });
+
+  describe('Indicator metadata — expansion boundary at the 5-category threshold (DC-13)', () => {
+    /**
+     * DC-13 requires the toggle's actual presence/absence, `aria-expanded`,
+     * and the host handling `expandToggled` -- all of that lives inside
+     * `ProjectDashboardCardComponent`'s own template (design §7.2 / DD-10).
+     * Per the doubles policy (`tasks.md` §4 / KZ-001) a stub cannot be the
+     * evidence for any of it, so `renderRealCards: true` keeps the real card
+     * mounted here instead. Every other test in this file legitimately uses
+     * the stub for input/output assertions only.
+     */
+    function getRealMetadataCard(title: string): DebugElement {
+      const match = fixture.debugElement
+        .queryAll(By.directive(ProjectDashboardCardComponent))
+        .find(element => (element.componentInstance as ProjectDashboardCardComponent).title() === title);
+      if (!match) {
+        throw new Error(`No real card found for title "${title}"`);
+      }
+      return match;
+    }
+
+    async function setupBoundaryFixture(): Promise<void> {
+      await setup('C-1', {
+        renderRealCards: true,
+        indicators: [BAND_INDICATOR_FIXTURES.innovationDevelopment, BAND_INDICATOR_FIXTURES.policyChange]
+      });
+      applyFixtureToReportsMock(reportsMock, mockContractFullReports());
+      fixture.detectChanges();
+    }
+
+    it('renders a working toggle for the 10-category Current Readiness card (> 5), with correct aria-expanded, and the host handles expandToggled', async () => {
+      await setupBoundaryFixture();
+
+      const toggleBefore = (getRealMetadataCard('Current Readiness').nativeElement as HTMLElement).querySelector(
+        'button[aria-expanded]'
+      );
+      expect(toggleBefore).not.toBeNull();
+      expect(toggleBefore!.getAttribute('aria-expanded')).toBe('false');
+
+      (toggleBefore as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(component.expandedMetadataCards().has('innovation_readiness')).toBe(true);
+      const toggleAfter = (getRealMetadataCard('Current Readiness').nativeElement as HTMLElement).querySelector(
+        'button[aria-expanded]'
+      );
+      expect(toggleAfter!.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('renders no toggle for the exactly-5-category Policy Type card -- the absent direction DC-13 requires', async () => {
+      await setupBoundaryFixture();
+
+      const toggle = (getRealMetadataCard('Policy Type').nativeElement as HTMLElement).querySelector(
+        'button[aria-expanded]'
+      );
+      expect(toggle).toBeNull();
+    });
+  });
+
+  describe('Indicator metadata — loading, error and retry across all 10 cards (R-IMC-011)', () => {
+    it('shows the existing loading state on all 10 metadata cards while reports/full is in flight (AC.1)', async () => {
+      await setupWithAllBandsAndFixture();
+
+      reportsMock.loading.set(true);
+      fixture.detectChanges();
+
+      for (const title of METADATA_CARD_TITLES) {
+        expect(getCardByTitle(title).loading).toBe(true);
+      }
+    });
+
+    it('shows the existing error state on all 10 metadata cards on failure (AC.2)', async () => {
+      await setupWithAllBandsAndFixture();
+
+      reportsMock.loadError.set(true);
+      fixture.detectChanges();
+
+      for (const title of METADATA_CARD_TITLES) {
+        expect(getCardByTitle(title).error).toBe(true);
+      }
+    });
+
+    it('retries once and repopulates every band after a loadError -> update() cycle (AC.3)', async () => {
+      const fixtureData = await setupWithAllBandsAndFixture();
+
+      reportsMock.payload.set(null);
+      reportsMock.loadError.set(true);
+      fixture.detectChanges();
+
+      // Fire the retry through the real seam bound on every metadata card
+      // ((retry)="reports.update()", project-dashboard.component.html) --
+      // ONE card's "Try again" click, not one per card.
+      getCardByTitle('Current Readiness').retry.emit();
+      fixture.detectChanges();
+
+      expect(reportsMock.update).toHaveBeenCalledTimes(1);
+
+      reportsMock.loadError.set(false);
+      reportsMock.payload.set(fixtureData);
+      fixture.detectChanges();
+
+      for (const title of METADATA_CARD_TITLES) {
+        const card = getCardByTitle(title);
+        expect(card.error).toBe(false);
+        expect(card.items.length).toBeGreaterThan(0);
       }
     });
   });

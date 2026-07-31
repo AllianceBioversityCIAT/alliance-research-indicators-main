@@ -586,6 +586,51 @@ My brief instructed the Implementer to prefer the params array over SQL-text mat
 
 ---
 
+### T-14 — Host specs: visibility, per-instance bindings, expansion boundary, states — ✅ **PASS**
+
+- **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31
+- **Files:** `project-dashboard.component.spec.ts` *(+20 tests, both prerequisites handled)* · `get-full-contract-reports.service.spec.ts` *(+10 one-line accessor assertions)*
+- **No production code left modified** — the three mutations were reverted, and the Reviewer re-verified all three targets are intact in production.
+
+#### The load-bearing outcome: **T-13's owed boxes 1–4 are now gated**
+
+T-13 passed on the explicit condition that T-14 would supply the mechanical proof. The Reviewer confirmed box by box: box 1 by the ten `getCardByTitle()` per-instance assertions plus title loops that **throw on a missing title**; box 2 by the OICR test's DOM-level `expect(() => getCardByTitle('OICR Maturity')).toThrow()` alongside the model check; box 3 by the default-fixture heading/band-count test; box 4 by the two `renderRealCards` boundary tests. **T-13's boxes do not go unproven.** Both hard constraints held — no Chunk A or `getFullContractReports` block removed, R-PDB-007 untouched, no restructuring, and `options.indicators ?? [ …original… ]` preserves the pre-existing fixture verbatim.
+
+Coverage **99.29 / 98.02 / 99.08 / 99.52** against floors 40/20/45/30. Suite **306 / 6,287** (+20, and the Reviewer checked the arithmetic: 5 visibility + 10 per-instance + 2 DC-13 + 3 states).
+
+#### Two Leader errors, both judged
+
+**1. The "binds to `undefined`" mechanism was false — and the Reviewer called the original claim *"worse than merely wrong."*** The host reads `payload()` directly and **zero production code consumes the ten accessors**, so the assertions were never at risk of vacuity; the fixture's sections are also pairwise-distinct in label *and* count, so the substrate genuinely discriminates. **Extending the mock was worth it on fidelity grounds but only weakly, and it blocked nothing.** The claim came from T-10's review, **the Leader amplified it into two documents without checking**, and T-14's Implementer caught it. **Corrected in both `tasks.md` § T-14 and here** — RB-1's pattern, committed by the Leader.
+
+**2. The Leader's proposed fix for the dead accessors does not exist.** I suggested the host consume them as *"arguably cleaner than reaching into `payload()`."* It is not available: `buildIndicatorMetadataBands` indexes the payload by `sectionKey` — **that indexing *is* DD-5's single-loop design** — so consuming ten accessors would mean ten arguments or reassembling an object, both worse. Dropping them leaves the service asymmetric (Chunk A's 6 exposed, these 10 not) for no gain. **Keep-and-test is the right answer**, and my "worst of three states" worry is partly mitigated: the new assertions carry an inline comment stating the accessors are reached by nothing else.
+
+**Recurrence 3 of the dead-artifact pattern therefore closes as a recorded status, not as work:** ten intentionally-unconsumed public accessors, symmetric with Chunk A's six, now cross-wire-gated by the service spec.
+
+#### The three judgment calls the Leader asked for
+
+| Question | Verdict |
+| --- | --- |
+| Is a separate **all-non-primary** assertion over an identical code path a gate or ceremony? | **The case earns its place** — §7.5 W-7 and DC-6 both frame it as the case that exposes false copy. But **its distinguishing guard is a tautology** (see A-1). W-7 is still gated, by the exact-string equality on `card.emptyMessage`, which the Reviewer verified matches production output **including pluralisation** |
+| Is `renderRealCards` the KZ-001 lesson applied correctly? | **Yes.** `aria-expanded` lives only at the card's `:68` and the retry button carries none, so the selector is unambiguous. The **absent** direction is genuine — Policy Type has exactly 5, `canExpand` is false, no toggle |
+| Is mutation 3's collateral a well-placed gate or coupling? | **Well-placed.** The second failure is a **pre-existing Chunk A assertion directly on that computed's own semantics** (`[4, 2]` → `[4, 2, 0]` under `>= 0`). Two consumers of one shared computed both noticing a change to it is the correct shape |
+
+**And it corrected the record on DC-13's rationale.** `tasks.md` T-14 claimed *the absent direction is the half a `999`-style workaround would break*. **That is backwards:** a `999` binding leaves Policy Type toggle-free either way. What actually kills `999` is the **present** test's `expect(component.expandedMetadataCards().has('innovation_readiness')).toBe(true)` after a real click. The absent test's real value is against an **unconditionally-rendered toggle or a widened `canExpand`** — which is exactly what DC-13 names, so **the test is right and only my rationale was off.**
+
+**Both declared gaps verified as legitimately scoped elsewhere** — the Reviewer checked the coverage exists rather than accepting the claim: overlay mechanics at `project-dashboard-card.component.spec.ts:266-632` (including the out-of-flow/`invisible`-duplicate structure), band order at `indicator-metadata-bands.mapper.spec.ts:162-181` from a deliberately non-descending fixture.
+
+#### `ADVISORY` — four, and two are worth acting on
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| **A-1** | **One tautological assertion.** In the all-non-primary test, `expect(message).not.toMatch(/unanswered\|left this\|primary/i)` takes a **test-local literal** as its subject — it asserts the test against itself and **cannot fail from any production change**. Worse, updating the expected literal to match new copy would **silently carry the W-7 protection away with it**. Changing the subject to `card.emptyMessage` inside the loop makes it a real, copy-edit-surviving W-7 gate. **One line.** Not a FAIL because W-7 is gated today by the string equality two lines above | **Recommended to the owner** — can ride T-15 or T-16 |
+| **A-2** | **The host's band-collapse seam has zero automated gate.** Nothing references `collapsedBands`, `toggleBandCollapse` or `isBandCollapsed`. **Deleting `(collapseToggled)` or `[collapsed]` from the host template leaves the entire suite green** — the A-07.6 mutant shape exactly. T-12's spec fully proves the *mechanism*; **nothing proves the host connects it.** Correctly **not** T-14's to fix: its boxes never mention collapse and design §10 assigns collapse to the band spec. The residue is that T-14's *header* cites R-IMC-008 AC.4 while no box operationalises it. **Structurally one test closes it entirely**, because the metadata cards come from a **single `@for`** rather than Chunk A's four hand-written cards — no per-instance multiplication | **Recommended to the owner.** A dead Collapse button would ship, caught only by the owner's DC-8 pass — where, unlike the 1.55:1 contrast, it *would* be obvious on the first click |
+| **A-3** | The false "binds to `undefined`" mechanism still live in two documents | ✅ **Corrected** in `tasks.md` § T-14 and above |
+| **A-4** | Record the accessors' status rather than changing them | ✅ **Recorded** above |
+
+**What the Reviewer explicitly did not re-verify:** the full `npm test`, `build`, `lint` and `test:coverage` figures — it ran only the two affected suites, and said so. Since the diff touches **no production file**, NFR-IMC-005's blast-radius concern does not apply. *(The Leader re-ran the full gates independently — see below.)*
+
+---
+
 ### T-13 — Host wiring: bands, visibility, expansion contract, empty states — ✅ **PASS**
 
 - **Status:** ✅ **PASS** — Reviewer PASS attempt 1 · **Date:** 2026-07-31 · the largest client task, and the first that produces something a user sees
