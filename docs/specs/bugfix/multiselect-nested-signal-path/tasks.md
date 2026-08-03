@@ -2,7 +2,7 @@
 
 - **Module:** client — `shared/components/custom-fields/multiselect`
 - **Spec id:** 2026-08-multiselect-nested-signal-path
-- **Status:** in-progress — T-01…T-03 `[x]`; T-04…T-05 `[ ]`
+- **Status:** in-progress — T-01…T-03 `[x]`; T-04 `[~]`, T-05 `[~]` (both blocked on human browser verification)
 - **Owner:** d.casanas@cgiar.org
 - **Depth:** **Lite** + **Bug Mode**
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
@@ -140,7 +140,9 @@ Skipping step 1 throws *"Cannot configure the test module when the test module h
 
 ---
 
-### T-04 — Verify the newly-reachable OICR path *before* shipping
+### [~] T-04 — Verify the newly-reachable OICR path *before* shipping
+
+> **Started 2026-08-03 — blocked on human observation, by design.** The task's own evidence clause bars code reading, and a jsdom substitute is what D-6 rules out. Hazard pinned for the browser script: `create-oicr-form.component.html:360`'s `?.` guards the call's *result*, not the callee, so a country arriving without `result_countries_sub_nationals_signal` throws rather than short-circuiting. Two attachment paths race a render (`onSelect` via a `queueMicrotask`-emitted `selectEvent`, vs. the `initializeCountriesWithSignals` effect during CD) — which is precisely what the two judges split on. Script prepared; the three checks' outcomes are still unrecorded. Audit trail: [`./execution.md`](./execution.md).
 
 - **Requirements covered:** D-6 (requirements §6), R-3 · **Design references:** §2.1, DD-5, R-4/R-5
 - **Files touched:** none expected — **investigation task**. If a guard proves necessary, it lands here.
@@ -165,7 +167,9 @@ Skipping step 1 throws *"Cannot configure the test module when the test module h
 
 ---
 
-### T-05 — Full suite + both browser verifications
+### [~] T-05 — Full suite + both browser verifications
+
+> **Automated half executed early 2026-08-03 on user decision — GREEN.** Full client suite `306 suites / 6399 tests passed`; coverage 99.33% statements / 98% branches / 99.14% functions / 99.56% lines, no floor regressed. `npm run lint -- --quiet` → `All files pass linting.`, `git status` clean of `--fix` mutations. **Both browser scripts remain outstanding**, and the suite must be **re-run over the final code** if T-04 adds a guard. ⚠️ A pre-existing `ng serve` (started 14:20, before these commits) was live during the suite run — judged non-invalidating (separate toolchains, clean 14.43 s run) but recorded, and a re-run with the server quiet is recommended. Audit trail: [`./execution.md`](./execution.md).
 
 - **Requirements covered:** R-MNP-004 AC.3, D-2, D-5 · **Design references:** §11 R-1, R-4
 - **Files touched:** none

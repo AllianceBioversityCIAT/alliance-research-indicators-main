@@ -291,3 +291,86 @@ Decision 3 is carried into T-02's brief as a named hard requirement with an inst
   - [x] `#defaultTemplate let-list` at `:15` untouched
   - [x] T-01's block still green (7/7 original + 1 new = 8/8)
 - **Issues encountered:** none. No rework, no spec ambiguity, no pivot.
+- **Commit:** `d3639af9` — `[SPEC:bugfix/multiselect-nested-signal-path] fix(multiselect): derive the skeleton list from the resolved path`.
+
+---
+
+### T-05 (partial) — automated half executed ahead of T-04
+
+- **Status:** `[~]` — **automated gates green; both manual browser scripts still outstanding**
+- **Date:** 2026-08-03
+- **Requirements covered so far:** R-MNP-004 AC.3, defect class D-2
+- **Sequencing note.** `tasks.md` places T-05 after T-04, and that ordering still governs the task's *closure*. The **automated** half was run early on the user's explicit decision at the T-03 approval gate, because it is the KZ-003 blast-radius gate and its verdict usefully informs whether the browser session is worth starting. If T-04 requires a guard, the full suite must be **re-run** over the final code before T-05 can be marked `[x]` — this early run does not discharge that obligation.
+
+- **Concurrency pre-check.** No delegated agent was active at run time — the T-03 Reviewer had already reported. This satisfies the root guide's rule that measurement commands never run beside a live worker.
+
+#### Full client suite (D-2 / KZ-003)
+
+Command, from `client/research-indicators`: `npm test -- --silent`
+
+```
+Test Suites: 306 passed, 306 total
+Tests:       6399 passed, 6399 total
+Snapshots:   0 total
+Time:        14.43 s
+```
+
+Coverage summary — every metric far above the `jest.config.ts` floors (statements 40 / branches 20 / lines 45 / functions 30):
+
+| Metric | Result | Floor |
+| --- | --- | --- |
+| Statements | **99.33%** (16357/16467) | 40% |
+| Branches | **98%** (6002/6124) | 20% |
+| Functions | **99.14%** (3371/3400) | 30% |
+| Lines | **99.56%** (14791/14856) | 45% |
+
+No coverage floor regressed. The full suite — not a targeted run — is the gate that matters here, since 30 callers render this component (R-1, KZ-003).
+
+#### Lint
+
+Command, from `client/research-indicators`: `npm run lint -- --quiet` → `All files pass linting.` (exit 0)
+
+`git status --short` immediately afterwards: **clean**. The script carries `--fix` and therefore mutates files, so this check was made explicitly rather than assumed; nothing was rewritten.
+
+#### ⚠️ Caveat on the suite run's environment — recorded rather than glossed
+
+An `ng serve` dev server (PID 67538, started 14:20, i.e. **before** any of this spec's commits) was found running on port 4200 and was live during the suite run. It was not started by this session and its presence was discovered only afterwards, when starting a server for the browser scripts failed with `Port 4200 is already in use`.
+
+Leader assessment: **judged non-invalidating, but not silently.** Jest and `ng serve` use separate toolchains and separate output paths — the suite does not consume the Angular build output the dev server produces — and the run completed cleanly in 14.43 s with no flake or module-resolution failure, which is the signature the concurrency rule warns about. Nonetheless the root guide is explicit that a measurement taken beside a competing process is *wrong rather than slow*, so this is on the record and **a re-run after the dev server is restarted is recommended** (it costs ~15 s). That re-run is required in any case before T-05 closes, per the sequencing note above.
+
+The same discovery raises a live risk for the manual scripts: a dev server that predates the fixes may be serving stale code. `ng serve` watches and rebuilds, but this could not be confirmed from outside the process — a probe of the entry bundles for `writeAtPath` was inconclusive because `MultiselectComponent` lives in a lazy chunk. The browser script therefore opens with a **mandatory server restart + hard reload**, since a stale server would silently invalidate every observation, including the control step.
+
+#### Outstanding for T-05
+
+- [ ] Browser script 1 — CapSharing (D-5 step 1)
+- [ ] Browser script 2 — OICR create step 3, **console open** (D-5 step 2; the only gate for D-6)
+- [ ] Full-suite re-run over the final code, dev server quiet
+
+---
+
+### T-04 — Verify the newly-reachable OICR path *before* shipping
+
+- **Status:** `[~]` — **blocked on human observation, by design**
+- **Date:** 2026-08-03
+- **Requirements covered:** D-6 (requirements §6), R-3 · **Design references:** §2.1, DD-5, R-4/R-5
+
+**Why this is not a delegation failure.** T-04's evidence clause is explicit: *"Code reading alone [does not count]. This task exists precisely because static reasoning already disagreed between two reviewers — one called `removeOption` correct, the other flagged it. Only an observed render settles it."* No subagent in this session can drive a real browser, and a jsdom/TestBed substitute is the very thing requirements D-6 rules out (*"A green unit suite. This path has no unit coverage; that is the entire premise of D-6."*). At the T-03 approval gate the user chose to run the browser checks personally, with the Leader preparing them — recorded as the deliberate route, not a fallback.
+
+**Leader preparation performed** (this is scoping and briefing, not the investigation itself — the three checks' outcomes remain unrecorded until observed):
+
+The precise hazard was pinned down for the script via one `codegraph_explore` call plus a targeted read of the rows template, rather than by bulk file reading:
+
+- **`create-oicr-form.component.html:360`** — `@if (c.result_countries_sub_nationals_signal()?.regions?.length > 0)`. The `?.` guards the **result of the call, not the callee**, so a country object arriving without the property throws `TypeError: c.result_countries_sub_nationals_signal is not a function` rather than short-circuiting safely. `:380` passes the same property into `<app-multiselect-instance [signal]=…>`.
+- **Two attachment paths exist**, which is what makes the outcome genuinely uncertain: `onSelect` → `mapCountriesToSubnationalSignals` (`create-oicr-form.component.ts:446-449`), reached via `(selectEvent)` — which `setValue` emits inside a **`queueMicrotask`** — and the `initializeCountriesWithSignals` effect (`:467-479`), which runs during change detection.
+- **The race, stated precisely:** `signal.update()` runs synchronously and schedules change detection; the `queueMicrotask(selectEvent)` is queued *after* that. So a render can in principle occur with `step_three.countries` populated but the signal not yet attached. Whether the effect wins that race is exactly the point the two judges split on.
+- **Scope selection for the script:** `geo_scope_id = 5` ("Sub-national") is the value that renders the sub-national rows — `isSubNationalRequiredByScope` is `geoScopeId === 5`, while `isCountriesRequiredByScope` is `[4, 5]` (`geographic-scope.util.ts:67-73`). Testing at `4` would exercise countries without the cascade and miss D-6 entirely.
+- **`isCompleteStepThree`** (`create-oicr-form.component.ts:408-427`) requires `geo_scope_id > 1` **and** non-empty `countries`/`regions` per the scope's labels — previously unsatisfiable for `geo_scope_id > 1`.
+- **Script ordering decided:** script 2 (OICR) runs **first**. It is the actual risk gate, and unlike script 1 it needs no control observation — the question is not "was it broken" but "does newly-live code throw".
+
+**Script location:** `<scratchpad>/browser-verification-script.md`, with per-check recording slots for 2c (cascade render), 2e (`isCompleteStepThree`), and 2g (`removeOption` chip removal / R-3).
+
+**Outstanding — each needs an observed outcome, not a prediction:**
+- [ ] Check 1 — sub-national cascade renders with the items `setValue` produces, console clean
+- [ ] Check 2 — `isCompleteStepThree` turns true for `geo_scope_id > 1`
+- [ ] Check 3 — `removeOption` chip removal at an OICR country multiselect loses no write (R-3, uncorroborated single-judge finding)
+- [ ] If any check throws, a minimal guard justified against the reproduced failure lands **in this task**
