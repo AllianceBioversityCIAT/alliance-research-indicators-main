@@ -3,7 +3,6 @@ import { ProjectDashboardRankedListItem } from '@interfaces/project-dashboard.in
 import { CAPACITY_SHARING_INDICATOR_ID, INNOVATION_DEVELOPMENT_INDICATOR_ID } from '@shared/utils/star-pdf-report.util';
 import { mockContractFullReports } from 'src/app/testing/contract-full-reports.mock';
 import {
-  DEGREE_FILTER_SCOPE_NOTE,
   GENDER_PROVENANCE_NOTE,
   IndicatorMetadataBandModel,
   IndicatorMetadataCardModel,
@@ -122,7 +121,10 @@ describe('buildIndicatorMetadataBands', () => {
       const card = findCard(bands, 'degree');
       expect(card.title).toBe('Degree');
       expect(card.items).toEqual(toRankedItems(payload.degree));
-      expect(card.filterScopeNote).toBe(DEGREE_FILTER_SCOPE_NOTE);
+      // Pinned as the literal sentence (R-DCE-002), not a self-comparison
+      // against the exported constant — a tautology would pass for any
+      // reword and could not catch a future regression back to "training".
+      expect(card.filterScopeNote).toBe('Includes only long-term records with a recorded degree.');
       expect(card.provenanceNote).toBeUndefined();
     });
 

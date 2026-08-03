@@ -77,8 +77,15 @@ export const UNLABELLED_CATEGORY_FALLBACK = 'Unspecified';
 /** Gender card provenance note (R-IMC-005 AC.5) — both training formats are combined. */
 export const GENDER_PROVENANCE_NOTE = 'Includes participants from both individual and group training records.';
 
-/** Degree card filter-scope pill (R-IMC-006 AC.4) — the number is not "all degrees". */
-export const DEGREE_FILTER_SCOPE_NOTE = 'Includes only long-term training records with a recorded degree.';
+/**
+ * Degree card filter-scope pill (R-IMC-006 AC.4) — the number is not "all degrees".
+ * **Superseded by `docs/specs/project-dashboard/degree-chart-empty/requirements.md`
+ * R-DCE-002**: the report's degree branch no longer restricts to Training
+ * (long-term Engagements with a recorded degree now count too), so this note
+ * must not claim a training-only scope. Do not restore the word "training"
+ * from the archived R-IMC-006 wording.
+ */
+export const DEGREE_FILTER_SCOPE_NOTE = 'Includes only long-term records with a recorded degree.';
 
 /**
  * The 10 `ContractFullReports` fields this spec adds, as a literal union so a

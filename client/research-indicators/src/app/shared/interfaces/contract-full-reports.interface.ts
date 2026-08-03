@@ -160,6 +160,6 @@ export interface ContractFullReports {
   /** Capacity Sharing — combined gender distribution (R-IMC-005). */
   gender_distribution: IndicatorMetadataCount[];
 
-  /** Capacity Sharing — degree, long-term training only (R-IMC-006). */
+  /** Capacity Sharing — degree, long-term records only, any session type (R-IMC-006, superseded by R-DCE-002). */
   degree: IndicatorMetadataCount[];
 }
