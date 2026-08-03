@@ -13,11 +13,78 @@ Continuous-improvement record across AKILI-SPECS specs. One entry per archived s
 | KZ-003 | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean. | Medium | **2** | Product | proposed |
 | KZ-004 | An "evidence that does NOT count" clause must name a **falsifiability** check and be verified to exist in this repo's toolchain. A named safety net that doesn't apply is worse than none — everyone believes they are covered. | **High** | 1 | Product | **Applied** — `general-setup/task.md` §3 |
 | KZ-005 | When a host renders N instances of one component, gate **each instance's** bindings. A seam asserted once at mechanism level leaves N−1 instances undefended. | **High** | 1 | Product | **Applied** — `general-setup/task.md` §3 |
-| KZ-006 | Close layout/geometry decisions by **measuring in a real browser**, reproducing the known failure first as a control. CSS reasoning that survives blind review is still not evidence. | **High** | 1 | Product | **Applied** — `general-setup/design.md` §10 |
+| KZ-006 | Close layout/geometry decisions by **measuring in a real browser**, reproducing the known failure first as a control. CSS reasoning that survives blind review is still not evidence. | **High** | **2** | Product | **Applied** — `general-setup/design.md` §10 |
+| KZ-007 | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it — with the same rigour as the work it corrects. | **High** | 1 | Product | proposed |
+| KZ-008 | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified. | **High** | 1 | Product | proposed |
+| KZ-009 | Before trusting any measured ratio or margin, **measure the instrument's noise floor**. A rigorous harness — interleaved, warmed up, n≥25 — can still measure the wrong quantity. | **High** | 1 | Product | proposed |
 
 ---
 
 ## Entries
+
+### 2026-08-03 — `project-dashboard/indicator-metadata-charts`
+
+**Outcome:** delivered, validation **PASS / 0 FAIL / 9 WARN**. 17/17 tasks. Archived with one open DC-8 finding (Degree chart empty) carried to its own spec.
+
+#### Measure
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 17 (16 budgeted + T-15 from the owner's OQ-6 decision, declared) | `tasks.md` §9 |
+| Reviewer FAIL rework attempts | **4** (T-07 ×1, T-12 ×1, **T-17 ×2**) vs **2–3** budgeted — **breached, declared** | `execution.md` |
+| HALTs / FATAL_FAILs | 0 | `execution.md` |
+| Pivots | **1** — `Pivot Record: T-08`, NFR-IMC-001's 1.5× bound retired | `execution.md` |
+| PRODUCT_BUGs | 0 | — |
+| Judgment-day findings | 3 rounds, terminal `ESCALATED ⚠️`, **1 confirmed SEVERE live at termination** (DD-8) | `judgment.md` |
+| Validation FAIL / WARN | **0 / 9** — 4 remediated at validate, 5 carried | `validation-report.md` |
+| Environment failures | VPN down blocking T-08 twice · worktree created from an unrelated old `main` (RB-9) · two parallel Implementers colliding on one git tree (RB-8) · **credential leak, contained** (RB-11) | `tasks.md` §7 |
+| Post-ship defects found by the owner's DC-8 pass | **1** — Degree chart shows no data | `degree-chart-empty/proposal.md` |
+
+**The through-line: every serious failure in this spec was a *document* asserting more than its source supported — and the technical work was sound throughout.** No HALT, no PRODUCT_BUG, no failed gate. The four rework rounds were spent almost entirely on correction records, not on code. Meanwhile three claims that had survived review died to measurement, and a "verified" map was found incomplete for the third time.
+
+#### Learn
+
+**KZ-007 — A correction record is the highest-risk artifact class, and gets the least scrutiny. (Product, High, new)**
+
+- *Root cause:* a correction reads as **settled fact** — it is written *because* something was wrong, so the reader assumes the wrongness has been examined. That framing suppresses the verification the correction itself needs, and corrections propagate faster than the errors they fix because downstream documents cite them.
+- *Occurrences in this one spec:* T-14's *"HARD PREREQUISITE"* — the Leader amplified an unverified claim from T-10's review into **two documents**, and it was false (a one-minute `grep` refuted it); `evidence/README.md` describing five **un-rendered** shells as *"the rendered DOM of the harness"*; the archived geometry probe cited as evidence for a change it **structurally cannot observe** (205 self-contained lines, no `src=`, no import — its zero delta was analytically guaranteed before the edit and would have held had the geometry been deleted outright); and **both** of T-17's FAILs, one of which stated a falsehood *inside the paragraph incrementing this very counter*.
+- *Evidence:* `tasks.md` RB-1 · `execution.md` § T-14, § T-16, § T-17 → Rework history.
+- *What worked and should be kept:* the spec **quoted the retracted text beside each correction** instead of overwriting it. That convention is the only reason the trail is auditable, and it is what let validation catch four more stale claims at the end.
+- *Proposed standardization:* `docs/specs/general-setup/task.md` §3 — "A correction record must cite the source it verified against, not the document it corrects. Verify before writing; a doc claim traceable only to another doc claim is unverified." **Deferred — needs owner approval.**
+
+**KZ-008 — "Verified" without recorded execution is a trap. (Product, High, new)**
+
+- *Root cause:* `requirements.md` §4.1 presented itself as a verified source map three times and was incomplete all three: revision 1 invented a `result_oicr` table that does not exist; revision 4 got the label columns wrong; **T-01 then found the join column is not uniformly `id`** — `clarisa_innovation_types` joins on `code`, and **`gender.id` does not exist at all** (found by `ER_BAD_FIELD_ERROR`, not by review). Each revision was derived from decorators and *called* verified; none recorded what had actually been run.
+- *Why it bit:* the first three charts in the table's own order join on `id`, so writing them top-down establishes `.id` as the pattern and then breaks on charts 5–10. A wrong map is worse than no map — it stops people looking.
+- *The fix that worked:* T-01 **executed all ten joins** and recorded the row count each returned. §4.1 now carries an executed Join-column column, and T-03/T-04 were still told to re-derive on contact.
+- *Evidence:* `requirements.md` §4.1 (its own three-revision confession) · `execution.md` § T-01 · `tasks.md` §10.
+- *Proposed standardization:* `docs/specs/general-setup/requirements.md` — "A source map may be labelled *verified* only if each row records the evidence that verified it (executed query, decorator + line, migration). Otherwise label it *derived*." **Deferred.**
+
+**KZ-009 — Measure the instrument before trusting the measurement. (Product, High, new — extends KZ-006)**
+
+- *Root cause:* T-08's harness was **exemplary** — interleaved arms, warm-ups discarded, 25 samples, two contracts, `T_metadata` captured two independent ways — and it still returned a wrong verdict (`breach`, ratio 3.997×). It measured the **arms'** variance without measuring the **link's**. Over VPN a `SELECT 1` — zero query work — costs p95 **155.5 ms**, more than the entire 8-query pre-change batch at 43.67 ms, with a 6× range. The composed path makes two sequential round-trip windows where the old one makes one, so the ratio was counting round trips, not query cost.
+- *How it was caught and closed:* the Leader overrode `breach` → `inconclusive` under DC-9, then re-measured server-side with `SHOW PROFILES` (instrument floor 0.29 ms). **The cross-check that made it credible:** the new numbers **scale with data volume** (18.69/19.45 ms on 521 results vs 12.80/14.15 ms on 242), where the VPN wall-clock was flat (174.54 vs 173.92) — a flat number across a 2× data change was measuring the link.
+- *Second, separable finding:* the 1.5× bound was **unsatisfiable even by the fallback the design named for it** (parallel composition → 2.12×). A condition its own prescribed remedy cannot meet is mis-calibrated, not failed. 1.5× of a 43.67 ms baseline leaves a 21.8 ms budget — less than one round trip.
+- *Relation to KZ-006:* KZ-006 says *reproduce the known failure as a control*. This is the adjacent gap — a control proves the harness can **detect**; a noise floor proves it is measuring the **right quantity**. Both are needed. A `SELECT 1` probe costs one line.
+- *Evidence:* `execution.md` § *Pivot Record: T-08*, § T-08 (c) · `requirements.md` NFR-IMC-001.
+- *Proposed standardization:* `docs/specs/general-setup/design.md` §10 — one line beside KZ-006: "Before trusting a ratio or margin, characterise the environment's noise floor. Report the spread, never p95 alone." **Deferred.**
+
+#### Standardize
+
+**All three edits deferred — no file outside this log was touched.** The owner archived under time pressure to switch branches, so the approval menu was not run. Every High-severity lesson here would normally recommend *Apply all*; the proposed edits are recorded verbatim above and are 1–2 lines each.
+
+#### Recurrences raised (not duplicated)
+
+- **KZ-003 → recurrence 3.** Followed correctly. T-15 edited the multi-host `ProjectDashboardCardComponent` and the **full** client suite ran (306/6292) — by the Reviewer independently, not only the Implementer. Second consecutive spec where this lesson was applied rather than learned.
+- **KZ-006 → recurrence 2, and it paid twice.** T-16's three-level overflow measurement with a reproduced control; and DD-7's unqualified "2×2" claim — which had a KZ-006 warrant from the mockup — was falsified against the **running app** at both 1440 px and 768 px. A measurement of a replica is not a measurement of the thing.
+- **KZ-005 → held.** The data-driven band mapper turned "each card bound to its own section" into 10 cheap per-entry assertions, and a card added later inherits the gate.
+- **KZ-001 → a near-miss worth recording.** T-14's brief claimed an incomplete mock would make ten assertions *"bind to `undefined` and pass vacuously"* — the classic KZ-001 shape. **It was false**: the host reads `payload()` directly and no production code touches the accessors. The lesson was correctly recalled and incorrectly applied. Pattern-matching a known lesson is not the same as verifying it holds here — which is KZ-007 from the other direction.
+
+#### Methodology observations (no local edit — candidates for upstreaming to AKILI)
+
+- **Rework budgets should count correction rounds separately from implementation rounds.** This spec's overrun (4 vs 2–3) was *entirely* meta-work about its own defect tracking; the feature passed. A single budget hides which one is failing, and the two have different remedies.
+- **A "no source changes, produce an evidence artifact" charter can produce a vacuous result unless it names the measurement *subject*.** T-16 inherited a defective gate from an archived spec and would, on the plain reading, have measured a static mockup and reported the NFR met on numbers describing hand-built HTML. It was caught **before dispatch** only because T-15's review had just exposed the identical hole in the geometry probe. Charters should name the subject, not just the deliverable.
+- **A spec's done-definition should distinguish agent-closable from owner-closable items.** DC-8 and the product-owner acknowledgement sat unclosable in `tasks.md` §8 for two days looking like incomplete work. When DC-8 finally ran it **found a real defect in ~1 minute** that 630 suites had missed — the item was valuable, its placement made it look like a blocker for the wrong reason.
 
 ### 2026-07-30 — `project-dashboard/full-payload-show-more`
 

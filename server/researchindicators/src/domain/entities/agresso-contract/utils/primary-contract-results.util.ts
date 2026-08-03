@@ -1,7 +1,7 @@
 // @akili-spec project-dashboard/indicator-metadata-charts
 /**
  * The single source of truth for the **primary-contract results scoping rule**
- * (`requirements.md` §4.2 of `docs/specs/project-dashboard/indicator-metadata-charts/`).
+ * (`requirements.md` §4.2 of `docs/specs/archive/2026-08-03-project-dashboard--indicator-metadata-charts/`).
  *
  * Every report aggregation on `reports/full` — the six sections that predate this
  * spec and the ten it adds — must select over the **same** population: results

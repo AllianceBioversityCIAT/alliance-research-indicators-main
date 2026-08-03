@@ -2,7 +2,7 @@
 
 - **Module:** project-dashboard (client) + agresso (server reports)
 - **Spec id:** 2026-07-indicator-metadata-charts
-- **Status:** draft
+- **Status:** ✅ **implemented and validated 2026-07-31** — all 47 ACs and all 5 NFRs verified ([`./validation-report.md`](./validation-report.md)); §9 **DC-8's owner visual check and §12's sign-offs remain open**
 - **Owner:** d.casanas@cgiar.org
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) — Results analytics / project oversight
 - **Linked proposal:** [`./proposal.md`](./proposal.md)
@@ -114,6 +114,8 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 
 ## 6. Functional Requirements
 
+> **All 47 acceptance criteria below were checked on 2026-07-31 at `/akili-validate`,** each against code and a gate rather than against a task's own claim. The per-AC trace — requirement → task → file:line → gating spec — is [`./validation-report.md`](./validation-report.md) §6, including the separate table that walks every `AND IT MUST` / `BUT it must NOT` clause individually. **Two things this does *not* assert:** the §12 sign-offs remain the owner's to give, and **DC-8's visual check is not an AC** — it is §9's owner-owned gate and is still outstanding, which is why `tasks.md` §8 does not close on these boxes alone.
+
 ### R-IMC-001 — Innovation Development metadata aggregations
 
 - **As a** project lead
@@ -128,10 +130,10 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 - Permissions: unchanged from `reports/full`.
 
 **Acceptance criteria**
-- [ ] AC.1 — Given a contract with innovation results spanning 3 natures, the `innovation_nature` section returns 3 entries whose counts sum to the number of results carrying a non-null `innovation_nature_id`.
-- [ ] AC.2 — Rows with a `NULL` metadata id are excluded from that section and do not produce a null-named entry.
-- [ ] AC.3 — Each entry's `name` matches the lookup row's label column, not the id.
-- [ ] AC.4 — Results whose contract link is non-primary are excluded.
+- [x] AC.1 — Given a contract with innovation results spanning 3 natures, the `innovation_nature` section returns 3 entries whose counts sum to the number of results carrying a non-null `innovation_nature_id`.
+- [x] AC.2 — Rows with a `NULL` metadata id are excluded from that section and do not produce a null-named entry.
+- [x] AC.3 — Each entry's `name` matches the lookup row's label column, not the id.
+- [x] AC.4 — Results whose contract link is non-primary are excluded.
 
 #### Scenario: Nature distribution
 
@@ -151,9 +153,9 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 **Details** — one section `oicr_maturity` from **`result_oicrs`**`.maturity_level_id` joined to `maturity_levels`.
 
 **Acceptance criteria**
-- [ ] AC.1 — Counts equal the number of primary-contract OICR results per maturity level.
-- [ ] AC.2 — NULL `maturity_level_id` rows are excluded.
-- [ ] AC.3 — The section is an empty array (not `null`, not absent) when the project has no OICR results.
+- [x] AC.1 — Counts equal the number of primary-contract OICR results per maturity level.
+- [x] AC.2 — NULL `maturity_level_id` rows are excluded.
+- [x] AC.3 — The section is an empty array (not `null`, not absent) when the project has no OICR results.
 
 ---
 
@@ -164,9 +166,9 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 **Details** — sections `policy_type` and `policy_stage`, joining `policy_types` and **`policy_stage`** respectively.
 
 **Acceptance criteria**
-- [ ] AC.1 — Both sections count primary-contract `result_policy_change` rows.
-- [ ] AC.2 — NULL ids excluded from their section independently — a result with a type but no stage counts in `policy_type` only.
-- [ ] AC.3 — The `policy_stage` join targets the singular table name and the query executes without error against a real schema.
+- [x] AC.1 — Both sections count primary-contract `result_policy_change` rows.
+- [x] AC.2 — NULL ids excluded from their section independently — a result with a type but no stage counts in `policy_type` only.
+- [x] AC.3 — The `policy_stage` join targets the singular table name and the query executes without error against a real schema.
 
 #### Scenario: Partially-filled policy result
 
@@ -185,9 +187,9 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 **Details** — sections `session_format` (label *"Training or engagement to report"*, values Individual/Group) and `session_type` (label *"Training vs. Engagement"*, values Training/Engagement).
 
 **Acceptance criteria**
-- [ ] AC.1 — `session_format` counts group by `session_format_id`; `session_type` by `session_type_id`.
-- [ ] AC.2 — The two sections are independent; a record contributes one count to each.
-- [ ] AC.3 — Labels come from the lookup tables, so the counter-intuitive field naming is preserved rather than "corrected".
+- [x] AC.1 — `session_format` counts group by `session_format_id`; `session_type` by `session_type_id`.
+- [x] AC.2 — The two sections are independent; a record contributes one count to each.
+- [x] AC.3 — Labels come from the lookup tables, so the counter-intuitive field naming is preserved rather than "corrected".
 
 ---
 
@@ -205,13 +207,13 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 - The card MUST display a provenance note stating both sources are included (mixed units — see §9 DC-8 and proposal B-R3).
 
 **Acceptance criteria**
-- [ ] AC.1 — For a fixture with 3 individual Male records and one group record carrying `session_participants_male = 10`, the Male count is **13**.
-- [ ] AC.2 — Group participant columns that are `NULL` are treated as `0`, not as a missing category.
-- [ ] AC.3 — A gender category with a zero total is omitted from the section.
-- [ ] AC.4 — Individual records are never double-counted via the group columns, and vice versa.
-- [ ] AC.5 — The rendered card shows the provenance note.
-- [ ] AC.6 — **Neither training type is subordinate to the other.** A project whose capacity-sharing results are **all group format** (zero individual records) still reports the full gender distribution from the group totals; likewise a project with only individual records reports from those alone.
-- [ ] AC.7 — The section is ordered `count DESC, id ASC` **after** the two contributions are summed — summing can reorder the ranking, so an order inherited from the query is not sufficient.
+- [x] AC.1 — For a fixture with 3 individual Male records and one group record carrying `session_participants_male = 10`, the Male count is **13**.
+- [x] AC.2 — Group participant columns that are `NULL` are treated as `0`, not as a missing category.
+- [x] AC.3 — A gender category with a zero total is omitted from the section.
+- [x] AC.4 — Individual records are never double-counted via the group columns, and vice versa.
+- [x] AC.5 — The rendered card shows the provenance note.
+- [x] AC.6 — **Neither training type is subordinate to the other.** A project whose capacity-sharing results are **all group format** (zero individual records) still reports the full gender distribution from the group totals; likewise a project with only individual records reports from those alone.
+- [x] AC.7 — The section is ordered `count DESC, id ASC` **after** the two contributions are summed — summing can reorder the ranking, so an order inherited from the query is not sufficient.
 
 #### Scenario: Group-only project
 
@@ -245,10 +247,10 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 - The filter MUST be the two-condition conjunction. Filtering on `degree_id IS NOT NULL` alone is **incorrect**: the form only reveals Degree for long-term training and clears it via `clearDegreeIdIfNotLongTerm` (`capacity-sharing.component.ts:85-93`), but historical rows switched away from long-term may retain a stale `degree_id`.
 
 **Acceptance criteria**
-- [ ] AC.1 — A record with `session_type` = Engagement carrying a `degree_id` is **excluded**.
-- [ ] AC.2 — A record with `session_type` = Training, `session_length` = Short-term, carrying a `degree_id`, is **excluded**.
-- [ ] AC.3 — A record with Training + Long-term and a `degree_id` is **included**.
-- [ ] AC.4 — The card surfaces its filter scope so the number is not read as "all degrees".
+- [x] AC.1 — A record with `session_type` = Engagement carrying a `degree_id` is **excluded**.
+- [x] AC.2 — A record with `session_type` = Training, `session_length` = Short-term, carrying a `degree_id`, is **excluded**.
+- [x] AC.3 — A record with Training + Long-term and a `degree_id` is **included**.
+- [x] AC.4 — The card surfaces its filter scope so the number is not read as "all degrees".
 
 #### Scenario: Stale degree on a short-term record
 
@@ -266,10 +268,10 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 - **As an** existing `reports/full` consumer **I want** the payload to grow without breaking **So that** the Chunk A charts keep working.
 
 **Acceptance criteria**
-- [ ] AC.1 — All 7 pre-existing fields (`contract_id`, `top_partners`, `top_primary_levers`, `top_main_contact_persons`, `top_contributors`, `staff`, `geo_scope`) are unchanged in name, shape and content.
-- [ ] AC.2 — Every new section is always present as an array — empty rather than absent or `null`.
-- [ ] AC.3 — Every existing project-dashboard and `GetFullContractReportsService` spec passes unmodified except for fixture extension.
-- [ ] AC.4 — No URI version bump is required (non-breaking, additive).
+- [x] AC.1 — All 7 pre-existing fields (`contract_id`, `top_partners`, `top_primary_levers`, `top_main_contact_persons`, `top_contributors`, `staff`, `geo_scope`) are unchanged in name, shape and content.
+- [x] AC.2 — Every new section is always present as an array — empty rather than absent or `null`.
+- [x] AC.3 — Every existing project-dashboard and `GetFullContractReportsService` spec passes unmodified except for fixture extension.
+- [x] AC.4 — No URI version bump is required (non-breaking, additive).
 
 ---
 
@@ -284,11 +286,11 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 - Bands are collapsible, default open.
 
 **Acceptance criteria**
-- [ ] AC.1 — All 10 cards render with the titles in §4.1.
-- [ ] AC.2 — Each card is bound to its **own** payload section — verified per instance, not once at mechanism level (KZ-005).
-- [ ] AC.3 — Band order follows descending result count.
-- [ ] AC.4 — Collapsing a band hides its cards and updates `aria-expanded`.
-- [ ] AC.5 — The four Chunk A ranked cards and the geographic card are untouched.
+- [x] AC.1 — All 10 cards render with the titles in §4.1.
+- [x] AC.2 — Each card is bound to its **own** payload section — verified per instance, not once at mechanism level (KZ-005).
+- [x] AC.3 — Band order follows descending result count.
+- [x] AC.4 — Collapsing a band hides its cards and updates `aria-expanded`.
+- [x] AC.5 — The four Chunk A ranked cards and the geographic card are untouched.
 
 #### Scenario: Ten cards, ten distinct bindings
 
@@ -305,9 +307,9 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 - **As a** project lead **I want** bands for indicators I do not report to be absent **So that** I do not scroll past empty charts.
 
 **Acceptance criteria**
-- [ ] AC.1 — An indicator with zero results on the project contributes **no band and no cards** to the DOM.
-- [ ] AC.2 — Visibility is driven by the existing `indicatorsWithResults()` computed (`project-dashboard.component.ts:121`), not a new parallel source.
-- [ ] AC.3 — A project with no results for any of the four indicators renders no *Indicator metadata* section heading at all.
+- [x] AC.1 — An indicator with zero results on the project contributes **no band and no cards** to the DOM.
+- [x] AC.2 — Visibility is driven by the existing `indicatorsWithResults()` computed (`project-dashboard.component.ts:121`), not a new parallel source.
+- [x] AC.3 — A project with no results for any of the four indicators renders no *Indicator metadata* section heading at all.
 
 #### Scenario: Project with no OICR work
 
@@ -326,9 +328,9 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 **Details** — when the indicator **has** results but the field is NULL on all of them, the card renders with an explanatory empty state. This is distinct from R-IMC-009's hidden case.
 
 **Acceptance criteria**
-- [ ] AC.1 — The card renders with an empty-state message naming the indicator's result count.
-- [ ] AC.2 — The card is **not** hidden.
-- [ ] AC.3 — The message is visually distinct from the error state.
+- [x] AC.1 — The card renders with an empty-state message naming the indicator's result count.
+- [x] AC.2 — The card is **not** hidden.
+- [x] AC.3 — The message is visually distinct from the error state.
 
 ---
 
@@ -337,20 +339,20 @@ All 10 aggregations MUST scope to primary-contract results using the **single sh
 - **As a** project lead **I want** the new cards to behave like the existing ones during load and failure **So that** the page is coherent.
 
 **Acceptance criteria**
-- [ ] AC.1 — While `reports/full` is in flight, all 10 cards show the existing loading state.
-- [ ] AC.2 — On failure all 10 show the existing error state with a working retry.
-- [ ] AC.3 — Retry re-fetches once and repopulates every band.
-- [ ] AC.4 — No new loading/error pattern is introduced (`docs/ux-ui/design.md` OG-6).
+- [x] AC.1 — While `reports/full` is in flight, all 10 cards show the existing loading state.
+- [x] AC.2 — On failure all 10 show the existing error state with a working retry.
+- [x] AC.3 — Retry re-fetches once and repopulates every band.
+- [x] AC.4 — No new loading/error pattern is introduced (`docs/ux-ui/design.md` OG-6).
 
 ---
 
 ### R-IMC-012 — Documentation currency
 
 **Acceptance criteria**
-- [ ] AC.1 — Every new DTO field carries `@ApiProperty` **and the handler carries `@ApiOkResponse({ type: ContractFullReportsDto })`**, so the schema actually appears at `/swagger`. `@ApiProperty` alone is insufficient: the handler references no response type today, so the DTO is emitted into the OpenAPI document not at all.
-- [ ] AC.2 — `docs/trd/trd.md:299` is updated — `reports/full` returns 17 fields (16 sections + `contract_id`), not six sections.
-- [ ] AC.3 — **Restated.** PERF-5 (`docs/trd/trd.md:128`) counts *client HTTP requests* (4), which this spec does not change — the original wording ("reflects the new query count") was unsatisfiable. Instead, PERF-5 gains a note that `reports/full` issues **10 SQL queries in two sequential batches, with peak concurrency of 8** against a pool whose default limit is 10.
-- [ ] AC.4 — `docs/ux-ui/design.md` chart inventory and decisions log record the band pattern.
+- [x] AC.1 — Every new DTO field carries `@ApiProperty` **and the handler carries `@ApiOkResponse({ type: ContractFullReportsDto })`**, so the schema actually appears at `/swagger`. `@ApiProperty` alone is insufficient: the handler references no response type today, so the DTO is emitted into the OpenAPI document not at all.
+- [x] AC.2 — `docs/trd/trd.md:299` is updated — `reports/full` returns 17 fields (16 sections + `contract_id`), not six sections.
+- [x] AC.3 — **Restated.** PERF-5 (`docs/trd/trd.md:128`) counts *client HTTP requests* (4), which this spec does not change — the original wording ("reflects the new query count") was unsatisfiable. Instead, PERF-5 gains a note that `reports/full` issues **10 SQL queries in two sequential batches, with peak concurrency of 8** against a pool whose default limit is 10.
+- [x] AC.4 — `docs/ux-ui/design.md` chart inventory and decisions log record the band pattern.
 
 ---
 
