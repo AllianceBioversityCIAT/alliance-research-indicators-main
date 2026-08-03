@@ -43,7 +43,7 @@ The JCSPECS/AKILI multi-agent loops read their personas from [`.agents/`](.agent
 - `reviewer.md` — read-only spec-conformance audit, structured PASS/FAIL.
 - `tester.md` — single-suite QA authoring/execution (`backend-unit`, `backend-e2e`, `frontend-unit`), structured PASS/FAIL/PRODUCT_BUG.
 
-Enforced model bindings live in [`.claude/agents/akili-*.md`](.claude/agents/) (see `## Model Routing`). Don't invent execution personas inline — extend these.
+Enforced model bindings live in [`.claude/agents/akili-*.md`](.claude/agents/) for Claude Code and [`.agents/agents/akili-*/agent.md`](.agents/agents/) for Antigravity (see `## Model Routing`). The wrappers are thin — they only point back at `.agents/<role>.md`, which stays the single source of truth: editing a persona needs no wrapper change, changing a model touches only the wrapper. Don't invent execution personas inline — extend these.
 
 ---
 
@@ -91,7 +91,7 @@ alliance-research-indicators-main/            # monorepo root (husky-management)
 │   │   ├── db/
 │   │   │   ├── config/mysql/        # TypeORM datasource + targets
 │   │   │   ├── config/dynamo/       # DynamoDB module + service
-│   │   │   └── migrations/          # 238+ migrations — append-only
+│   │   │   └── migrations/          # append-only (count lives in the folder, never here)
 │   │   └── domain/
 │   │       ├── routes/main.routes.ts        # RouterModule registration
 │   │       ├── entities/<module>/           # one module per entity cluster
@@ -149,29 +149,70 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 - **Lint/format:** `npm run lint` in each package (eslint + prettier). Don't bypass `husky` hooks.
 - **Commits / PRs:** match existing style — `<type>(<module>): <subject>` (e.g. `fix(results.service): ...`). Never `--no-verify` without an explicit human approval.
 - **CodeGraph:** `.codegraph/` is initialized (machine-local, gitignored). Prefer `codegraph_*` tools for symbol lookup, callers/callees, and impact analysis before broad file scanning.
+- **Starting the local stack:** never guess the commands — read the `## Local Environment` contract in [`docs/infrastructure.md`](docs/infrastructure.md). Short version: there is **no local database** and no single start-everything command; each package starts independently (`npm run compose:up:dev`, or `npm run dev` / `npm start` without Docker) against **remote** MySQL/RabbitMQ/OpenSearch. The shared dev DB is **not** disposable — destructive data or schema operations against it are a human decision.
+- **Agent-lean verification.** A green run should cost one summary line; failures must always print **complete and verbatim** — they are the evidence. Suppress passing noise only:
+
+  | Check | Lean invocation | Note |
+  | --- | --- | --- |
+  | Server tests | `npm test -- --silent` | Jest still prints the summary and full failure output |
+  | Client tests | `npm test -- --silent` | same |
+  | Lint (server) | `npm run lint -- --quiet` | ⚠️ the script carries `--fix`, so it **mutates files** — never treat its run as read-only, and re-check `git status` after |
+  | Lint (client) | `npm run lint -- --quiet` | `ng lint` |
+
+- **Concurrency (binds every session, including ones that load no persona).** One AKILI session per checkout; additional sessions use `git worktree`. Two Leaders in one tree interleave commits and overwrite each other's `tasks.md` and `execution.md`. **Never run a measurement command — build, benchmark, Lighthouse, E2E — while a delegated agent is active:** it competes for `node_modules`, ports, lockfiles, and build output, and the result is not a slow measurement but a **wrong** one. Measure in the window after a worker reports. Cross-package parallelism (one server task + one client task) is safe; two tasks in the same package are not.
 
 ---
 
 ## Model Routing
 
-> Guidance mirror of [`docs/model-routing.md`](docs/model-routing.md). Enforced bindings live in `.claude/agents/akili-*.md`. **Criteria-first:** match the model to the dominant demand of the phase. ARCHITECT = BUILDER; **author ≠ auditor** (Reviewer/Tester must differ from the Implementer model); reserve deep reasoning for propose/design/verify; fast & cheap for orchestration/archive.
+> Guidance mirror of [`docs/model-routing.md`](docs/model-routing.md). Enforced bindings live in `.claude/agents/akili-*.md` (Claude Code) and `.agents/agents/akili-*/agent.md` (Antigravity). **Criteria-first:** match the model to the dominant demand of the phase. ARCHITECT = BUILDER; **author ≠ auditor** (Reviewer must differ from the Implementer model; Tester prefers to); reserve deep reasoning for propose/design/verify **and the orchestrating Leader**; fast & cheap for archive/bookkeeping only — **`tasks.md` decomposition is T1, not cheap formatting**.
 
-**Capability tiers:** T1 Architect (hard design/synthesis) · T2 Coder (implementation, test authoring) · T3 Auditor (independent review) · T4 Context-Ingest (large-context ingestion) · T5 Fast-Cheap (orchestration/bookkeeping) · T6 Multimodal (screenshots/diagrams).
+**Capability tiers:** T1 Architect (hard design/synthesis, **task decomposition**, and **live orchestration judgment** — decomposition in flight, runtime skill selection, FAIL adjudication, pivot) · T2 Coder (implementation, test authoring) · T3 Auditor (independent review) · T4 Context-Ingest (large-context ingestion) · T5 Fast-Cheap (bookkeeping/archive) · T6 Multimodal (screenshots/diagrams).
 
-**Phase → tier:** constitution-ingest T4 · constitution-synthesis/propose/specify T1 · execute-Leader T5 · execute-Implementer T2 · execute-Reviewer T3 (**≠ Implementer**) · test-Leader T5 · test-Tester(s) T2 (**prefer ≠ Implementer**) · validate/audit T3 · quick/archive T5.
+**Phase → tier:** constitution-ingest T4 · constitution-synthesis/propose/specify T1 · execute-Leader **T1** (orchestration judgment — writes no code but selects skills, adjudicates FAILs, decides pivots) · execute-Implementer T2 · execute-Reviewer T3 (**≠ Implementer**) · test-Leader **T1** · test-Tester(s) T2 (**prefer ≠ Implementer**) · validate/audit T3 · quick/archive T5.
 
-**Model registry** (alias-first; edit here + `docs/model-routing.md` to change). **Updated: 2026-07**
+**Model registry** (alias-first; edit here + `docs/model-routing.md` to change). **Updated: 2026-08**
 
-| Tier | Claude Code | OpenCode | Fallback |
-| --- | --- | --- | --- |
-| T1 Architect | `opus` | `<CONFIRM SLUG>` | `sonnet` |
-| T2 Coder | `sonnet` | `opencode-go/glm-5.1` `<CONFIRM>` | `sonnet` |
-| T3 Auditor | `opus` | `opencode-go/deepseek-v4-pro` `<CONFIRM>` | `opus` |
-| T4 Context-Ingest | `sonnet` | `<CONFIRM SLUG>` | `haiku` |
-| T5 Fast-Cheap | `haiku` | `opencode-go/deepseek-v4-flash` `<CONFIRM>` | `haiku` |
-| T6 Multimodal | `opus` | `<CONFIRM SLUG>` | `sonnet` |
+| Tier | Claude Code | OpenCode | Antigravity | Fallback |
+| --- | --- | --- | --- | --- |
+| T1 Architect | `opus` | `<CONFIRM SLUG>` | `pro` | `sonnet` |
+| T2 Coder | `sonnet` | `opencode-go/glm-5.1` `<CONFIRM>` | `flash` | `sonnet` |
+| T3 Auditor | `opus` | `opencode-go/deepseek-v4-pro` `<CONFIRM>` | `pro` | `opus` |
+| T4 Context-Ingest | `sonnet` | `<CONFIRM SLUG>` | `flash` | `haiku` |
+| T5 Fast-Cheap | `haiku` | `opencode-go/deepseek-v4-flash` `<CONFIRM>` | `flash` | `haiku` |
+| T6 Multimodal | `opus` | `<CONFIRM SLUG>` | `pro` | `sonnet` |
 
-Enforced wrappers: `akili-leader`→`haiku` · `akili-implementer`→`sonnet` · `akili-reviewer`→`opus` (≠ implementer) · `akili-tester`→`sonnet`. To change models edit only the registry (never pin a dated name where an alias exists); never add `model:` to command frontmatter.
+**CLI invocation per host** — the product name is not reliably the command, and a guessed binary fails as a confident "host unreachable" that then shapes the plan:
+
+| Host | Command | Status |
+| --- | --- | --- |
+| Claude Code | `claude` | Confirmed (this session) |
+| OpenCode | `opencode` `<CONFIRM>` | Unconfirmed — ask before dispatching |
+| Antigravity | `agy` (**not** `antigravity`) | Documented name; **not installed on this machine** as of 2026-08-03 |
+
+**Cross-host dispatch:** T6 Multimodal → **Antigravity** (Gemini vision) when a phase genuinely needs image/diagram reading that the session host cannot do. The rule: *reach across hosts before degrading within one, but only for a real capability gap* — a cross-host spawn costs a fresh context, which a one-tier difference does not repay. This is the third option at every command's model checkpoint, alongside switch-model and continue-as-is. Whether an orchestrator is installed to perform the dispatch is a property of the machine, not of this project.
+
+Enforced wrappers: `akili-leader`→`opus` (T1) · `akili-implementer`→`sonnet` · `akili-reviewer`→`opus` + read-only `tools: Read, Grep, Glob` (≠ implementer, both axes) · `akili-tester`→`sonnet`. To change models edit only the registry (never pin a dated name where an alias exists); never add `model:` to command frontmatter.
+
+### Effort dial
+
+Effort is the second, **per-task** routing dimension, orthogonal to the tier: the tier picks the model, effort picks how hard it thinks on *this* task.
+
+| Signal | Effort |
+| --- | --- |
+| Trivial / mechanical (copy, config, rename) | `low` |
+| Standard, well-specified scope | `medium` |
+| Complex — algorithm, concurrency, security, ambiguity | `xhigh` |
+| Correctness-critical (migrations, auth, money, data loss) | `max` |
+
+**Default by role:** T1 propose/specify/Leader `high` · T2 Implementer/Tester `medium` (flex by task) · T3 Reviewer `high` · T5 archive `low`.
+
+- **Rework rule:** bump effort one level on every retry — a fix that failed is usually under-thinking, not missing instructions.
+- **Tier ↔ effort rule:** never `max` a cheaper tier — escalate the tier instead.
+- **Re-baseline rule:** these defaults are **per-generation** and must be swept (`medium`/`high`/`xhigh` on a real spec) whenever the underlying model generation changes. The tier mapping survives model churn; these defaults do not. A task that arrives under-specified — a `[~]` resume, a post-Pivot retry — starts one level higher.
+- **Effort is not a verbosity dial:** lowering effort does not reliably shorten output. Fix long reports in the brief (`caveman`, `cognitive-doc-design`), never by dropping effort.
+
+The `/akili-execute` and `/akili-test` Leaders read this subsection to set each worker's effort.
 
 ---
 

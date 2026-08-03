@@ -97,6 +97,22 @@ describe('GetFullContractReportsService', () => {
     expect(service.topContributors()).toEqual(mock.top_contributors);
     expect(service.staff()).toEqual(mock.staff);
     expect(service.geoScope()).toEqual(mock.geo_scope);
+    // T-14 recommended addition (owner-escalated, tasks.md § T-14): the 10
+    // indicator-metadata accessors added by T-10 (indicator-metadata-charts)
+    // are reached by nothing else -- this component's own spec stubs the
+    // service, so a cross-wire here (e.g. `innovationType` reading
+    // `payload()?.innovation_nature`) would compile cleanly and stay green
+    // everywhere else. One assertion per accessor, mirroring the six above.
+    expect(service.innovationNature()).toEqual(mock.innovation_nature);
+    expect(service.innovationType()).toEqual(mock.innovation_type);
+    expect(service.innovationReadiness()).toEqual(mock.innovation_readiness);
+    expect(service.oicrMaturity()).toEqual(mock.oicr_maturity);
+    expect(service.policyType()).toEqual(mock.policy_type);
+    expect(service.policyStage()).toEqual(mock.policy_stage);
+    expect(service.sessionFormat()).toEqual(mock.session_format);
+    expect(service.sessionType()).toEqual(mock.session_type);
+    expect(service.genderDistribution()).toEqual(mock.gender_distribution);
+    expect(service.degree()).toEqual(mock.degree);
     expect(service.loading()).toBe(false);
     expect(service.loadError()).toBe(false);
   });

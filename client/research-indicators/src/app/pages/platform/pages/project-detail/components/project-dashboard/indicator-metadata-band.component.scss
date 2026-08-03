@@ -1,0 +1,129 @@
+// Design §7.6 — colours: token variables only, never hex literals. The hexes
+// recorded in the design doc name *which* token to use, not literals to
+// paste (client CLAUDE.md hard rule). Dark mode is handled for free because
+// `--ac-*` already carries a `[data-theme='dark']` override in colors.scss —
+// never branch on isDarkMode() here.
+
+.imb {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.imb-header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.imb-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+
+  // Per-indicator ramp colour is bound from the host via [style.background-color]
+  // (component .ts `color` input) — this token is only the fallback for an
+  // unbound/empty value, e.g. a standalone render with no host colour supplied.
+  // accent — design §7.6 "#1689CA" → --ac-light-blue-300 (exact match).
+  background-color: var(--ac-light-blue-300);
+}
+
+.imb-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-family: Barlow, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+
+  // navy — design §7.6 "#112F5C" → --ac-primary-blue-600 (exact match).
+  color: var(--ac-primary-blue-600);
+}
+
+.imb-chip {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  padding: 0.1875rem 0.625rem;
+  font-family: Barlow, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  // chip — design §7.6 "#345B8F"/"#E8F0F7" pair. `--ac-primary-blue-100` was
+  // tried as the nearest same-family token for the background and rejected:
+  // it is a mid-tone (#b0c4dd), not a tint, and pairs with this foreground at
+  // 3.88:1 light / 1.55:1 dark — both fail WCAG 2.1 AA (C-4, NFR-IMC-002).
+  // `--ac-chip-blue-bg`/`--ac-chip-blue-fg` (src/styles/colors.scss) is a new,
+  // purpose-built pair verified at 6.00:1 light / 7.09:1 dark — see design.md
+  // §7.6 for the computed ratios.
+  color: var(--ac-chip-blue-fg);
+  background-color: var(--ac-chip-blue-bg);
+}
+
+.imb-toggle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+
+  // slate — design §7.6 "#4c5158" → --ac-grey-800 (exact match).
+  color: var(--ac-grey-800);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--ac-grey-100);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ac-light-blue-300);
+    outline-offset: 2px;
+  }
+}
+
+.imb-toggle-icon {
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+
+  &.imb-toggle-icon-collapsed {
+    transform: rotate(-90deg);
+  }
+}
+
+// --- Grid — settled by measurement in real headless Chrome (KZ-006, DD-7). ---
+// Do not "improve" these values without a new measurement (design §7.4).
+.imb-grid {
+  display: grid;
+
+  // auto-fill, NOT auto-fit: auto-fit stretches a single-card band (OICR)
+  // to full width.
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+
+  // stretch produced large voids in low-cardinality cards.
+  align-items: start;
+  gap: 1rem;
+}
+
+// 4-card bands use a wider track so they land 2x2 instead of a 3+1 orphan row.
+.imb-grid.imb-grid-wide {
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+}
+
+// One column below 720px. `.imb-grid.imb-grid-wide` above has specificity
+// (0,2,0); an override naming only `.imb-grid` (0,1,0) would lose the
+// cascade to it for 4-card bands. Both selectors must be named here or the
+// mobile override is silently out-specified — a recorded gotcha, not a
+// style preference.
+@media (width < 720px) {
+  .imb-grid,
+  .imb-grid.imb-grid-wide {
+    grid-template-columns: 1fr;
+  }
+}

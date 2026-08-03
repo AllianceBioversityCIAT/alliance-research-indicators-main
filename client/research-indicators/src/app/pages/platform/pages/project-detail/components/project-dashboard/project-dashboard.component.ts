@@ -4,6 +4,12 @@ import { ActivatedRoute } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { COLLAPSED_ITEM_LIMIT, ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
+import { IndicatorMetadataBandComponent } from './indicator-metadata-band.component';
+import {
+  IndicatorMetadataCardModel,
+  IndicatorMetadataSectionKey,
+  buildIndicatorMetadataBands
+} from './indicator-metadata-bands.mapper';
 import { GetFullContractReportsService } from '@services/get-full-contract-reports.service';
 import { GetGeoScopeService } from '@services/get-geo-scope.service';
 import { ApiService } from '@shared/services/api.service';
@@ -20,7 +26,7 @@ import {
 } from '@shared/interfaces/document-overview.interface';
 import { environment } from '@envs/environment';
 import { GetProjectDetail, GetProjectDetailIndicator } from '@shared/interfaces/get-project-detail.interface';
-import { ProjectDashboardRankedItem } from '@interfaces/project-dashboard.interface';
+import { ProjectDashboardChartLayout, ProjectDashboardRankedItem } from '@interfaces/project-dashboard.interface';
 import { projectDashboardBarColor } from '@shared/constants/project-dashboard-chart-colors.constants';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
@@ -47,10 +53,39 @@ interface ProjectStatusChartItem {
  */
 export type ChartKey = 'partners' | 'levers' | 'contacts' | 'contributors';
 
+/**
+ * Chart layout per metadata section (T-13, design §7.4: "columns for ≤4
+ * categories, rows for 5+ or long labels"). Static per section because
+ * cardinality is a property of each aggregation's own lookup table
+ * (requirements.md §4.1 "Cats"), not of any single project's data.
+ * `innovation_readiness` is the one section T-01 measured above 5 categories
+ * (10 live) and it also carries the longest labels (`CONCAT(level,'. ',name)`),
+ * so it is the only one using `rows`.
+ */
+const METADATA_CARD_LAYOUT: Record<IndicatorMetadataSectionKey, ProjectDashboardChartLayout> = {
+  innovation_nature: 'columns',
+  innovation_type: 'columns',
+  innovation_readiness: 'rows',
+  oicr_maturity: 'columns',
+  policy_type: 'columns',
+  policy_stage: 'columns',
+  session_format: 'columns',
+  session_type: 'columns',
+  gender_distribution: 'columns',
+  degree: 'columns'
+};
+
 @Component({
   selector: 'app-project-dashboard',
   standalone: true,
-  imports: [ButtonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe],
+  imports: [
+    ButtonModule,
+    ProjectDashboardCardComponent,
+    GeoScopeCardComponent,
+    ResultsCenterTableComponent,
+    IndicatorMetadataBandComponent,
+    DatePipe
+  ],
   providers: [GetFullContractReportsService, GetGeoScopeService],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -228,6 +263,111 @@ export class ProjectDashboardComponent {
       }
       return next;
     });
+  }
+
+  /**
+   * Data-driven band model for the *Indicator metadata* section (T-11/T-13,
+   * design §7.1 DD-5). Pure function of the payload and
+   * `indicatorsWithResults()` — band visibility has no second, parallel
+   * source (R-IMC-009 AC.2).
+   */
+  readonly indicatorMetadataBands = computed(() =>
+    buildIndicatorMetadataBands(this.reports.payload(), this.indicatorsWithResults())
+  );
+
+  /**
+   * Band collapse state (DD-9) — in-memory only, keyed by `indicatorId`,
+   * mirroring `expanded` above (a fresh `Set` instance on every update, never
+   * a mutation in place, so Angular's `Object.is` check sees the change).
+   * Bands default **open** (R-IMC-008 Details): a band absent from this set
+   * is expanded, which is what an empty starting `Set` gives for free.
+   */
+  readonly collapsedBands = signal<ReadonlySet<number>>(new Set());
+
+  isBandCollapsed(indicatorId: number): boolean {
+    return this.collapsedBands().has(indicatorId);
+  }
+
+  toggleBandCollapse(indicatorId: number): void {
+    this.collapsedBands.update(current => {
+      const next = new Set(current);
+      if (next.has(indicatorId)) {
+        next.delete(indicatorId);
+      } else {
+        next.add(indicatorId);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Per-card expansion state for the metadata cards (DD-10 — design §7.2: the
+   * metadata cards join the same expansion contract Chunk A's ranked cards
+   * already use; `visibleLimit === null` **is** the expanded state, never left
+   * unbound). Keyed by `sectionKey`, the stable id T-11 provides precisely
+   * for this purpose, so cards in different bands never collide.
+   */
+  readonly expandedMetadataCards = signal<ReadonlySet<IndicatorMetadataSectionKey>>(new Set());
+
+  metadataCardVisibleLimit(sectionKey: IndicatorMetadataSectionKey): number | null {
+    return this.expandedMetadataCards().has(sectionKey) ? null : COLLAPSED_ITEM_LIMIT;
+  }
+
+  toggleMetadataCardExpanded(sectionKey: IndicatorMetadataSectionKey): void {
+    this.expandedMetadataCards.update(current => {
+      const next = new Set(current);
+      if (next.has(sectionKey)) {
+        next.delete(sectionKey);
+      } else {
+        next.add(sectionKey);
+      }
+      return next;
+    });
+  }
+
+  metadataCardLayout(sectionKey: IndicatorMetadataSectionKey): ProjectDashboardChartLayout {
+    return METADATA_CARD_LAYOUT[sectionKey];
+  }
+
+  /**
+   * R-IMC-010 empty-state copy. Must name the indicator's result count
+   * (AC.1) but must NOT assert *why* the field is empty (W-7 / design §7.5):
+   * band visibility (`indicatorsWithResults()` → `count_results`, no
+   * primary/non-primary distinction) and section content (scoped to
+   * `is_primary = TRUE`) are driven by different populations, so a project
+   * whose results are all linked non-primary shows a visible band over an
+   * empty section. "N results left this unanswered" would be false in that
+   * case; this copy states only that no data is recorded.
+   */
+  metadataCardEmptyMessage(resultCount: number): string {
+    // R-IMC-010 AC.1 names the indicator's result count, and W-7 (design §7.5)
+    // forbids asserting WHY the section is empty. Both hold here — but the two
+    // clauses are deliberately SEPARATE sentences, and that separation is
+    // load-bearing rather than stylistic.
+    //
+    // Band visibility derives from `count_results`, which draws no
+    // primary/non-primary distinction; the aggregations scope to
+    // `is_primary = TRUE`. Those populations differ, so a project whose results
+    // are all linked non-primary shows a visible band over empty sections. An
+    // earlier wording — "…across this project's N results" — bound the emptiness
+    // claim TO that count, which makes it arguably false in exactly that case:
+    // the field may well be recorded on those N results, just not on the primary
+    // ones this section counts. Stating the count as its own fact avoids
+    // asserting a relationship the data does not support.
+    return `No data is recorded for this field on this project. (${resultCount} result${resultCount === 1 ? '' : 's'}.)`;
+  }
+
+  /**
+   * Surfaces the Gender provenance note (R-IMC-005 AC.5) / Degree
+   * filter-scope note (R-IMC-006 AC.4) through the card's existing
+   * `description` input — DD-6 forbids modifying `ProjectDashboardCardComponent`,
+   * so its existing contract is the only available surface. T-11's mapper
+   * guarantees at most one of the two fields is ever populated on a given
+   * card, so `??` is safe and every other card gets `''` (the input's own
+   * default, unchanged from today).
+   */
+  metadataCardDescription(card: IndicatorMetadataCardModel): string {
+    return card.provenanceNote ?? card.filterScopeNote ?? '';
   }
 
   readonly pendingRevisionExcludedColumns = ['status', 'year', 'versions', 'creation_date', 'public_link', 'project'] as const;

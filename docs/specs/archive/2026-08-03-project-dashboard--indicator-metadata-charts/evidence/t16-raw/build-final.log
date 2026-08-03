@@ -1,0 +1,72 @@
+❯ Building...
+✔ Building...
+Initial chunk files | Names                            |  Raw size
+chunk-QL55EW5I.js   | -                                | 879.49 kB | 
+main.js             | main                             | 216.66 kB | 
+chunk-FVRPRBE5.js   | -                                | 210.75 kB | 
+chunk-TYHQVS4O.js   | -                                | 177.88 kB | 
+chunk-VWDTU7RO.js   | -                                | 147.16 kB | 
+chunk-6N7CR2RH.js   | -                                | 131.67 kB | 
+chunk-ZF2JI2OZ.js   | -                                | 112.67 kB | 
+chunk-MGHTA7Q3.js   | -                                | 100.76 kB | 
+polyfills.js        | polyfills                        |  90.20 kB | 
+styles.css          | styles                           |  86.80 kB | 
+chunk-PDGNWOVK.js   | -                                |  74.58 kB | 
+chunk-FCXAKPID.js   | -                                |  51.08 kB | 
+chunk-NRWN5JBX.js   | -                                |  38.90 kB | 
+chunk-ECFI3NUN.js   | -                                |  37.78 kB | 
+chunk-GCY3ZVMD.js   | -                                |  26.68 kB | 
+chunk-6ZA4BFOO.js   | -                                |  26.61 kB | 
+scripts.js          | scripts                          |  18.81 kB | 
+chunk-H53E6C4H.js   | -                                |  18.63 kB | 
+chunk-QCQRRBNO.js   | -                                |  16.40 kB | 
+chunk-JKR5GP75.js   | -                                |  15.01 kB | 
+chunk-OMPJPS4Q.js   | -                                |  13.04 kB | 
+chunk-RYXOQ5GK.js   | -                                |  11.31 kB | 
+chunk-HHJLFNAI.js   | -                                |   4.51 kB | 
+chunk-RWDDEN2R.js   | -                                |   4.45 kB | 
+chunk-G4FIQTRN.js   | -                                |   2.83 kB | 
+chunk-A6JLTR6I.js   | -                                |   2.27 kB | 
+chunk-7ULTCUJI.js   | -                                |   1.95 kB | 
+chunk-KFSFVV3J.js   | -                                |   1.83 kB | 
+chunk-QLFCWGUP.js   | -                                |   1.15 kB | 
+chunk-4MOJ4O65.js   | -                                | 275 bytes | 
+chunk-RXJXNHXC.js   | -                                | 210 bytes | 
+
+                    | Initial total                    |   2.52 MB
+
+Lazy chunk files    | Names                            |  Raw size
+chunk-UN4WXD4V.js   | project-dashboard-component      |   2.90 MB | 
+chunk-DYMVZ6VD.js   | platform-component               |   1.41 MB | 
+chunk-36QE5HIH.js   | -                                | 690.35 kB | 
+chunk-PD6UNHHG.js   | -                                | 495.76 kB | 
+chunk-XOV6SGZE.js   | -                                | 224.19 kB | 
+chunk-LSED7K4F.js   | -                                | 222.69 kB | 
+chunk-5MLJJWMI.js   | -                                | 158.77 kB | 
+chunk-54T3T2NS.js   | -                                | 135.80 kB | 
+chunk-ZWBOMD3D.js   | -                                | 125.15 kB | 
+chunk-6JFLUG5E.js   | innovation-details-component     | 121.44 kB | 
+chunk-H2KIS22H.js   | -                                | 120.77 kB | 
+chunk-JQNXEW6H.js   | alliance-alignment-component     | 113.62 kB | 
+chunk-3QLLBU7O.js   | -                                | 107.87 kB | 
+chunk-MAIKZAJ6.js   | pool-funding-alignment-component | 106.25 kB | 
+chunk-GCRWEMQG.js   | -                                | 105.19 kB | 
+...and 94 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [5.026 seconds]
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNG8112: @let _ is declared but its value is never read.[0m [1m[35m[plugin angular-compiler][0m
+
+    src/app/shared/components/all-modals/modals-content/create-result-modal/components/create-oicr-form/create-oicr-form.component.html:116:14:
+[37m      116 │               [32m@let _ = updateAccordionActiveState(active)[37m;
+          ╵               [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+  Error occurs in the template of component CreateOicrFormComponent.
+
+    src/app/shared/components/all-modals/modals-content/create-result-modal/components/create-oicr-form/create-oicr-form.component.ts:75:15:
+[37m      75 │   templateUrl: [32m'./create-oicr-form.component.html'[37m,
+         ╵                [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+
+Output location: /Users/pelitos/Documents/CIAT/alliance-research-indicators-main/client/research-indicators/dist/research-indicators
+

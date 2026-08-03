@@ -125,7 +125,7 @@ Each NFR is a testable scenario: *stimulus → measurable response*.
 | PERF-2 | A user navigates to a feature route for the first time | Route JS is lazy-loaded on demand (`loadComponent`), not in the initial chunk. |
 | PERF-3 | The bilateral ToC catalog is requested repeatedly within 5 min | Server serves from a 5-min backend cache (lambda-toc reads are not per-request); client fetches once per section load. |
 | PERF-4 | A list endpoint is queried | Bounded by `page`/`limit`; module specs SHOULD declare a max `limit` to cap query cost. |
-| PERF-5 | The project-dashboard route (`project-detail/:id/project-dashboard`) loads | Its load `effect` fires **4** requests on one consistent basis (`reports/full`, `reports/geo-scope`, `results/count`, the results-by-status fetch) — down from **7** before the `reports/full` migration collapsed four separate `reports/top-*` calls into one. **Do not cite "6 → 4"** — that comparison excluded the status call and compares unlike quantities. Trajectory: **3** once the geographic-scope spec retires `reports/geo-scope`; **2** once a follow-up chunk retires the status fetch. Not counted on either side: `initializeProjectDashboardResultsTable` and the executive-overview load, fired by the same effect and untouched by this migration. |
+| PERF-5 | The project-dashboard route (`project-detail/:id/project-dashboard`) loads | Its load `effect` fires **4** requests on one consistent basis (`reports/full`, `reports/geo-scope`, `results/count`, the results-by-status fetch) — down from **7** before the `reports/full` migration collapsed four separate `reports/top-*` calls into one. **Do not cite "6 → 4"** — that comparison excluded the status call and compares unlike quantities. Trajectory: **3** once the geographic-scope spec retires `reports/geo-scope`; **2** once a follow-up chunk retires the status fetch. Not counted on either side: `initializeProjectDashboardResultsTable` and the executive-overview load, fired by the same effect and untouched by this migration. **Server-side query note, added 2026-07-31 (R-IMC-012 AC.3):** the `indicator-metadata-charts` spec added 10 aggregation sections to `reports/full`'s own response; this is a change to the endpoint's SQL profile, not to the **4 client requests per load** counted above — those two are different quantities and the client count is unchanged by this spec. `reports/full` now issues **10 SQL queries in two sequential batches, peak concurrency 8** (consolidated per DD-1, composed sequentially per DD-11/DD-12 — `docs/specs/project-dashboard/indicator-metadata-charts/design.md` §1, §12), against a pool whose default `connectionLimit` is 10 (`mysql2` default, unconfigured). |
 
 ### 3.3 Scalability
 
@@ -155,7 +155,7 @@ server/researchindicators/src/
 ├── main.ts / app.module.ts / app-microservice.module.ts   # HTTP + RMQ bootstrap
 ├── controllers/                    # cross-cutting non-domain (Azure)
 ├── admin/                          # SSR admin panel (Nest + Vite/React 19)
-├── db/{config/mysql, config/dynamo, migrations}           # 238+ append-only migrations
+├── db/{config/mysql, config/dynamo, migrations}           # append-only migrations (never restate the count here)
 └── domain/
     ├── routes/main.routes.ts       # RouterModule registration tree
     ├── entities/<module>/          # one Nest module per entity cluster
@@ -163,7 +163,10 @@ server/researchindicators/src/
     ├── tools/                      # external integrations (one folder, one service)
     │   ├── agresso/ broker/ clarisa/ cron-jobs/ dynamo-feedback/
     │   ├── open-search/{results,prms,alliance-staff,core,decorators}
-    │   └── roar-management/ socket/ tip-integration/
+    │   ├── pdf-viewer/ prms-toc/ roar-management/ socket/
+    │   ├── tip-integration/ toc-integration/
+    │   └── core/                   # shared BaseApi HTTP base class (not an integration)
+    │       dto/                    # shared request DTOs (not an integration)
     └── shared/                     # interceptors, guards, pipes, filters, utils, DTOs
 ```
 
@@ -172,7 +175,7 @@ server/researchindicators/src/
 | **Entity module** | `domain/entities/<name>/` | Wraps one entity/cluster with controller + service + DTOs + repository; exports its service; registers routes in `main.routes.ts`. |
 | **Tool module** | `domain/tools/<integration>/` | Encapsulates transport; exposes one Nest service; reads `ARI_*` env vars. |
 | **Shared module** | `domain/shared/` | Interceptors, guards, pipes, decorators, utils, enums, global DTOs, middleware. No business logic. |
-| **Admin module** | `src/admin/` | SSR React panel; excluded from JWT middleware; needs its own `AdminGuard` (see §10). |
+| **Admin module** | `src/admin/` | SSR React panel; excluded from JWT middleware. ⚠️ **`AdminGuard` is specified but NOT implemented** — active security gap (see §10, §13.4). Containment: `docs/specs/bugfix/admin-ssr-data-exposure/`; real auth: `docs/specs/changes/admin-panel-auth/`. The panel has **no authentication mechanism at all**: its React client sends `credentials: 'include'` but the server reads only `Authorization: Bearer`, so every client-side `/api` call returns `401`. |
 | **Cross-cutting controllers** | `src/controllers/` | Rare non-domain HTTP routes (currently Azure). |
 
 Naming: files kebab-case; module folder == primary entity name; entities under `<module>/entities/*.entity.ts`, DTOs under `dto/*.dto.ts`, enums under `enum/*.enum.ts`.
@@ -191,9 +194,13 @@ Organized by **page domain** under `src/app/pages/`, cross-cutting code under `s
 | **Dashboard** | `pages/platform/pages/dashboard/` | Aggregate analytics, Chart.js views |
 | **Notifications** | `pages/platform/pages/notifications/` | Real-time feed |
 | **Profile / About** | `pages/platform/pages/profile/`, `about/` | User settings, theme, app info |
-| **Administration / Center Admin** | `pages/platform/pages/administration/center-admin/` | Bulk upload, SDG management, portfolio management, AGRESSO Pool Funding tag override, Bilateral Mapping (AGRESSO↔CLARISA project mapping CRUD) |
+| **Administration / Center Admin** | `pages/platform/pages/administration/center-admin/` | Bulk upload, SDG management, portfolio management, AGRESSO Pool Funding tag override, Bilateral Mapping (AGRESSO↔CLARISA project mapping CRUD). All gated by `centerAdminGuard` |
+| **Administration / Configuration** | `pages/platform/pages/administration/configuration/variable-configuration/` | Configuration variables editor, gated by `appConfigurationGuard` (the third client guard, alongside `rolesGuard` and `centerAdminGuard`) |
+| **What's New** | `pages/platform/pages/whats-new/` | Release notes — list (`whats-new-home`) + detail (`details/:id`) |
 | **Auth / Landing** | `pages/login/`, `pages/auth/`, `pages/landing/` | Cognito entry & callback; public surface |
+| **Report viewer** | `pages/star-report-viewer/` | Standalone result report at `/reports/result/:id`; top-level route (outside the platform shell), guarded by `rolesGuard` |
 | **Real-time / OICR / Dynamic Fields** | `pages/room/`, `pages/oicr-download/`, `pages/dynamic-fields/` | WebSocket collaboration; public template download; form-field config utility |
+| **Dev scaffold** ⚠️ | `pages/cache-test/` | Cache-inspection harness routed at `/cache-test` with **no guard and no `isLoggedIn` data** — publicly reachable and shipped in the production bundle. Flagged in `docs/specs/drift-report.md`; decide whether it should ship at all |
 | **Shared / Theme / Testing** | `src/app/shared/`, `theme/`, `testing/` | Components, services, pipes, interfaces; PrimeNG Aura preset (`roartheme.ts`); test harness/mocks |
 
 Client spec work follows the same domain split; module folders map to `docs/specs/<module>/<feature>/`.
@@ -227,7 +234,7 @@ The `Result` entity (`domain/entities/results/entities/result.entity.ts`) is the
 
 **OpenSearch mapping** — `@OpenSearchProperty(...)` on entity fields drives the mapping (`tools/open-search/decorators/`); `nestedType` exposes nested objects/arrays; reindex tooling reflects the decorators.
 
-**Migrations** — 238+ as of 2026-05. Generate with `npm run migration:generate -- ./src/db/migrations/<name>`; apply with `npm run migration:execute`; **never edit a migration merged to `main`**.
+**Migrations** — append-only; the authoritative count is the contents of `src/db/migrations/` and is deliberately **not** restated here (a hardcoded count drifted across four documents before 2026-08). Generate with `npm run migration:generate -- ./src/db/migrations/<name>`; apply with `npm run migration:execute`; **never edit a migration merged to `main`**.
 
 ### 5.3 Client-side view shapes
 
@@ -296,7 +303,7 @@ Three backend services, URLs from `src/environments/environment*.ts`:
 | `environment.textMiningUrl` | AI/NLP auto-fill & extraction | Text-mining team |
 | `environment.fileManagerUrl` | Evidence file upload/serve | File-manager team |
 
-**Representative endpoints (via `ApiService`):** `POST /authorization/login`, `POST /authorization/refresh-token`; `GET /indicator-types`, `/indicators`, `/maturity-levels`; `GET /tools/clarisa/*` (institutions, sdgs, levers, sdg-targets, impact-areas, countries, languages, delivery-modality, session-types); `GET|POST /results`, `GET /results/search`, `GET|PATCH /results/:id`, `PATCH /results/:id/submit`, `DELETE /results/:id/:field`; `GET /results-center`, `/dashboards`, `/projects`, `/contracts`, `/metadata`; `PATCH /agresso/contracts/:code/pool-funding-tag`; `GET|PATCH /results/:resultCode/pool-funding-alignment` (PATCH → `409` once synced to PRMS); `GET /results/:resultCode/pool-funding-alignment/hlos-indicators` (level-based ToC catalog, sourced from lambda-toc through a 5-min backend cache); `GET /agresso/contracts/reports/full?contract-id=<encoded>` — **the project dashboard's single analytics contract**: one call returns the `ContractFullReports` payload — six sections (`top_partners`, `top_primary_levers`, `top_main_contact_persons`, `top_contributors`, `staff`, `geo_scope`) plus the scalar `contract_id` string identifier — mirrored client-side in `shared/interfaces/contract-full-reports.interface.ts` and consumed via `GetFullContractReportsService` (one `payload` signal plus per-section `computed` accessors), same `MainResponse<T>` envelope as everything else through `ApiService`.
+**Representative endpoints (via `ApiService`):** `POST /authorization/login`, `POST /authorization/refresh-token`; `GET /indicator-types`, `/indicators`, `/maturity-levels`; `GET /tools/clarisa/*` (institutions, sdgs, levers, sdg-targets, impact-areas, countries, languages, delivery-modality, session-types); `GET|POST /results`, `GET /results/search`, `GET|PATCH /results/:id`, `PATCH /results/:id/submit`, `DELETE /results/:id/:field`; `GET /results-center`, `/dashboards`, `/projects`, `/contracts`, `/metadata`; `PATCH /agresso/contracts/:code/pool-funding-tag`; `GET|PATCH /results/:resultCode/pool-funding-alignment` (PATCH → `409` once synced to PRMS); `GET /results/:resultCode/pool-funding-alignment/hlos-indicators` (level-based ToC catalog, sourced from lambda-toc through a 5-min backend cache); `GET /agresso/contracts/reports/full?contract-id=<encoded>` — **the project dashboard's single analytics contract**: one call returns the `ContractFullReports` payload — **17 fields (16 sections + `contract_id`)**: the original 6 sections (`top_partners`, `top_primary_levers`, `top_main_contact_persons`, `top_contributors`, `staff`, `geo_scope`) plus **10 Indicator-metadata sections** added 2026-07-31 (`innovation_nature`, `innovation_type`, `innovation_readiness`, `oicr_maturity`, `policy_type`, `policy_stage`, `session_format`, `session_type`, `gender_distribution`, `degree` — `docs/specs/project-dashboard/indicator-metadata-charts/requirements.md` R-IMC-012 AC.2), plus the scalar `contract_id` string identifier — verified against `ContractFullReportsDto` (`server/researchindicators/src/domain/entities/agresso-contract/dto/reports-full.dto.ts:34-139`, 7 base properties + 10 added) — mirrored client-side in `shared/interfaces/contract-full-reports.interface.ts` and consumed via `GetFullContractReportsService` (one `payload` signal plus per-section `computed` accessors), same `MainResponse<T>` envelope as everything else through `ApiService`.
 
 `reports/full` replaced four separate per-chart client methods (`GET_TopPartners`, `GET_TopPrimaryLevers`, `GET_TopMainContactPersons`, `GET_TopContributorsContracts`) with the single call above; those four methods and their services were retired from the client (R-PDB-008). `GET_GeoScope` / `GetGeoScopeService` deliberately **survive** — the geographic card still consumes `reports/geo-scope` pending a follow-up spec. **The four `reports/top-*` server endpoints are untouched** — this was a client-side consumption migration only, not a server contract change. Full record: `docs/specs/project-dashboard/full-payload-show-more/`.
 
@@ -407,10 +414,14 @@ The server package also ships an SSR frontend under `src/admin/` (React 19 + rea
 | **DynamoDB feedback** | AWS SDK v3 | ARI ↔ DynamoDB | Feedback store. |
 | **RabbitMQ broker** | AMQPS | ARI ↔ broker | Queue `ARI_QUEUE` + outbound message apps. |
 | **Socket.IO** | WS | ARI → clients | Real-time result events for STAR. |
-| **lambda-toc** | HTTP (`ARI_TOC_INTEGRATION_HOST`) | ARI → lambda-toc | Bilateral ToC catalog; 5-min server cache, not persisted. |
+| **lambda-toc** | HTTP (`ARI_TOC_INTEGRATION_HOST`) | ARI → lambda-toc | Bilateral ToC catalog; 5-min in-memory cache, not persisted. Folder: `tools/toc-integration/` (`TocIntegrationService`). |
+| **PRMS ToC** | HTTP (`ARI_PRMS_TOC_HOST`) | ARI → PRMS | ToC results for PRMS science programs; 5-min in-memory cache, not persisted. Folder: `tools/prms-toc/` (`PrmsTocService`). Throws a configuration error when the host is unset. |
+| **PDF viewer** | HTTP (`ARI_PDF_VIEWER_URL`) | ARI → PDF service | Server-side PDF rendering from named templates (`enums/pdf-templates.enum.ts`). Folder: `tools/pdf-viewer/` (`PdfViewerService extends BaseApi`). **Credential exception:** its `x-api-key` is read from the `app_config` table via `AppConfigService`, not from an env var. |
 | **Azure** | HTTP | inbound | `src/controllers/azure-*.controller.ts`. |
 
-**Rules:** every integration exposes a Nest service (controllers never call transport clients directly); logs failures via `LoggerUtil` + `sync_process_log` when scheduled; all hosts/creds via `ARI_*` env vars.
+**Shared helpers under `tools/` that are NOT integrations:** `tools/core/base-api.ts` (abstract `BaseApi` HTTP base class used by `PdfViewerService`) and `tools/dto/` (shared request DTOs). They hold no transport of their own.
+
+**Rules:** every integration exposes a Nest service (controllers never call transport clients directly); logs failures via `LoggerUtil` + `sync_process_log` when scheduled; hosts via `ARI_*` env vars. **Credentials are normally `ARI_*` env vars too — `pdf-viewer` is the one documented exception, sourcing its API key from `app_config`.** New integrations should follow the env-var rule rather than that exception.
 
 ### 9.2 Client integrations
 
@@ -480,7 +491,7 @@ Federation with STAR / TIP / PRMS / AICCRA is **read/link-only** from the client
 | Aspect | Server (`server/researchindicators`) | Client (`client/research-indicators`) |
 | --- | --- | --- |
 | Runner | Jest 29 + ts-jest | Jest via `jest-preset-angular` (`jest.config.ts`), `jsdom` |
-| Layout | Sibling `*.spec.ts` per controller/service/guard/interceptor/middleware | Co-located `.spec.ts`; shared mocks in `src/app/testing/` |
+| Layout | Sibling `*.spec.ts` per controller/service/guard/interceptor/middleware — **the norm for new and changed units, not a satisfied invariant.** Controllers are near-complete; a meaningful minority of services still lack one. The **enforced gate is the coverage floor below**, not per-unit presence | Co-located `.spec.ts`; shared mocks in `src/app/testing/` |
 | **Coverage floor** | **branches / functions / lines / statements = 60%** | **statements 40 / branches 20 / lines 45 / functions 30** |
 | Exclusions | `*.entity.ts`, `db/migrations/**`, `*.enum.ts`, `*.spec.ts` | `app.config.ts`, `app.routes.ts`, `websocket.service.ts`, `alert.component.ts` |
 | E2E | Supertest 7 via `npm run test:e2e` (`test/jest-e2e.json`) — top-level routes + auth-failure paths | None today; manual smoke over golden paths in [`../ux-ui/design.md`](../ux-ui/design.md) |
@@ -525,14 +536,14 @@ Federation with STAR / TIP / PRMS / AICCRA is **read/link-only** from the client
 
 | Tier | Item |
 | --- | --- |
-| Server | Deprecated `SecRolesEnum` values need a migration plan; `/admin` needs `AdminGuard` before prod; Socket.IO event taxonomy + RabbitMQ message contracts under-documented; pagination defaults vary per controller; rate-limit not centrally enforced; secret-rotation policy undefined. |
-| Client | Coverage thresholds intentionally low (raise gradually); some `custom-prime-force-styles.scss` rules ignore dark mode; no first-class error reporting (Sentry-like); no e2e suite (consider Playwright); `ngsw-config.json` has no asset/data groups (SW effectively a no-op offline). |
+| Server | 🔴 **`/admin` is unauthenticated and production-reachable, and one route (`/admin/bilateral-project-mappings`) SSR-embeds live DB data** — `AdminGuard` specified in §4.1 but never implemented. Containment spec: `docs/specs/bugfix/admin-ssr-data-exposure/`. · `ENV.LOCAL_AUTH_BYPASS` is double-guarded only against **production** (`IS_PRODUCTION` is a single flag), so a staging host with `ARI_IS_PRODUCTION=false` would honor `ARI_LOCAL_AUTH_BYPASS=true` and grant `SYSTEM_ADMIN` to every request — the code comment overstates this as covering "dev/staging/prod". · `ARI_PDF_VIEWER_URL` is missing from `.env.example`. · Deprecated `SecRolesEnum` values need a migration plan; Socket.IO event taxonomy + RabbitMQ message contracts under-documented; pagination defaults vary per controller; rate-limit not centrally enforced; secret-rotation policy undefined. |
+| Client | ⚠️ `pages/cache-test/` is an unguarded dev harness on a public route in the production bundle (§4.2). · **47 of 75 component stylesheets hardcode hex values that duplicate declared tokens, which breaks dark mode** (the token re-binds under `[data-theme="dark"]`, the literal does not); nothing enforces the rule — `.stylelintrc` extends only `stylelint-config-standard-scss` with no color rule. · Coverage thresholds intentionally low (raise gradually); some `custom-prime-force-styles.scss` rules ignore dark mode; no first-class error reporting (Sentry-like); no e2e suite (consider Playwright); `ngsw-config.json` has no asset/data groups (SW effectively a no-op offline). |
 
 ---
 
 ## 14. References
 
-**Server:** `src/main.ts`, `src/app.module.ts`, `src/app-microservice.module.ts`; `src/domain/routes/main.routes.ts`; `src/domain/entities/results/`; `src/domain/shared/Interceptors/{response,logging,setup}.interceptor.ts`; `src/domain/shared/middlewares/jwr.middleware.ts`; `src/domain/shared/guards/{roles,result-status}.guard.ts`; `src/domain/shared/enum/sec_role.enum.ts`; `src/domain/shared/error-management/global.exception.ts`; `src/domain/tools/{clarisa,agresso,broker,cron-jobs,dynamo-feedback,open-search,roar-management,socket,tip-integration}/`; `src/db/config/mysql/orm.config.ts`, `src/db/migrations/*.ts`; `src/admin/README-REACT.md`.
+**Server:** `src/main.ts`, `src/app.module.ts`, `src/app-microservice.module.ts`; `src/domain/routes/main.routes.ts`; `src/domain/entities/results/`; `src/domain/shared/Interceptors/{response,logging,setup}.interceptor.ts`; `src/domain/shared/middlewares/jwr.middleware.ts`; `src/domain/shared/guards/{roles,result-status}.guard.ts`; `src/domain/shared/enum/sec_role.enum.ts`; `src/domain/shared/error-management/global.exception.ts`; `src/domain/tools/{clarisa,agresso,broker,cron-jobs,dynamo-feedback,open-search,pdf-viewer,prms-toc,roar-management,socket,tip-integration,toc-integration}/` (+ `tools/core/base-api.ts`, `tools/dto/` — shared helpers, not integrations); `src/db/config/mysql/orm.config.ts`, `src/db/migrations/*.ts`; `src/admin/README-REACT.md`.
 
 **Client:** `src/app/app.routes.ts`, `src/app/app.config.ts`; `src/app/shared/services/{api,cache,to-promise}.service.ts`; `src/app/shared/interfaces/{result,responses,http-error-response}.interface.ts`; `src/app/shared/interceptors/{jwt,http-error,result}.interceptor.ts`; `src/app/shared/guards/{roles,center-admin}.guard.ts`; `src/app/shared/sockets/websocket.service.ts`; `src/environments/environment*.ts`; `jest.config.ts`, `angular.json`, `ngsw-config.json`, `nginx.conf`.
 

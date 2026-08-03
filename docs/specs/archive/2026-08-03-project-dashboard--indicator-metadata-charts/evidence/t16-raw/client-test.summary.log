@@ -1,0 +1,25 @@
+### TRUNCATED EXTRACT — client-test.log
+### Original: 17.7 MB, 249731 lines. Full log NOT archived (repo size).
+### Kept verbatim: the invoked command, the 'All files' coverage row,
+### the coverage summary block and the suite totals. Nothing else.
+
+--- command ---
+
+> research-indicators@0.0.1 test
+> jest --config jest.config.ts --silent=false
+
+--- All files ---
+All files                                                                                                                     |   99.33 |    98.03 |   99.14 |   99.56 |                                                 
+
+--- summary / totals ---
+=============================== Coverage summary ===============================
+Statements   : 99.33% ( 16316/16426 )
+Branches     : 98.03% ( 6002/6122 )
+Functions    : 99.14% ( 3366/3395 )
+Lines        : 99.56% ( 14768/14833 )
+================================================================================
+Test Suites: 306 passed, 306 total
+Tests:       6292 passed, 6292 total
+Snapshots:   0 total
+Time:        17.411 s
+Ran all test suites.

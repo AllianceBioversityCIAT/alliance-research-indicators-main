@@ -628,6 +628,81 @@ describe('ProjectDashboardCardComponent', () => {
     });
   });
 
+  // ---- T-15 / NFR-IMC-002 — expanded overlay is keyboard-operable --------
+
+  describe('expanded overlay keyboard operability (T-15 / NFR-IMC-002, WCAG 2.1.1)', () => {
+    // jsdom reports `tabindex="0"` whether or not the element can actually
+    // receive focus (tasks.md T-15 "evidence that does not count"), so every
+    // case here reads `document.activeElement` after a real `.focus()` call
+    // or the resolved accessible-name attribute — never the bare attribute's
+    // presence.
+    const largeList = deriveLargeRankedList(37);
+
+    beforeEach(() => {
+      fixture.componentRef.setInput('items', largeList);
+      fixture.componentRef.setInput('layout', 'rows-partners');
+      fixture.componentRef.setInput('visibleLimit', null);
+    });
+
+    it('becomes document.activeElement after a focus() call, proving it is actually reachable', () => {
+      fixture.componentRef.setInput('title', 'Results Partners');
+      fixture.detectChanges();
+
+      const overlay = getExpandedOverlay(fixture)!;
+      overlay.focus();
+
+      expect(document.activeElement).toBe(overlay);
+    });
+
+    it('exposes an accessible name naming its own chart, distinguishable across two live cards (not asserted from one instance alone)', () => {
+      // Two SEPARATE component instances, side by side, mirroring how the
+      // dashboard host actually renders four expanded ranked cards at once
+      // (NFR-IMC-002) -- a single instance whose `title` input is mutated
+      // over time would prove only that the attribute updates, not that two
+      // simultaneous overlays are distinguishable.
+      fixture.componentRef.setInput('title', 'Results Partners');
+      fixture.detectChanges();
+      const partnersOverlay = getExpandedOverlay(fixture)!;
+
+      const leversFixture = TestBed.createComponent(ProjectDashboardCardComponent);
+      leversFixture.componentRef.setInput('items', largeList);
+      leversFixture.componentRef.setInput('layout', 'rows-partners');
+      leversFixture.componentRef.setInput('visibleLimit', null);
+      leversFixture.componentRef.setInput('title', 'Primary Levers');
+      leversFixture.detectChanges();
+      const leversOverlay = getExpandedOverlay(leversFixture)!;
+
+      expect(partnersOverlay.getAttribute('role')).toBe('group');
+      expect(leversOverlay.getAttribute('role')).toBe('group');
+      expect(partnersOverlay.getAttribute('aria-label')).toBe('Results Partners');
+      expect(leversOverlay.getAttribute('aria-label')).toBe('Primary Levers');
+      expect(leversOverlay.getAttribute('aria-label')).not.toBe(partnersOverlay.getAttribute('aria-label'));
+    });
+
+    it('keeps the in-flow spacer aria-hidden and containing no focusable node — a focusable node inside it would itself be a WCAG violation', () => {
+      fixture.componentRef.setInput('title', 'Results Partners');
+      fixture.detectChanges();
+
+      const spacer = getHiddenLayoutSpacer(fixture)!;
+      expect(spacer.getAttribute('aria-hidden')).toBe('true');
+      expect(spacer.querySelector('[tabindex]')).toBeNull();
+      expect(spacer.querySelector('button, a[href], input, select, textarea')).toBeNull();
+      // The focusable overlay this suite exercises must not itself sit inside
+      // the hidden spacer — that would make the whole subtree contradictory.
+      expect(spacer.contains(getExpandedOverlay(fixture))).toBe(false);
+    });
+
+    it('does not disturb aria-hidden on the spacer while collapsed (no overlay, no tab stop present at all)', () => {
+      fixture.componentRef.setInput('visibleLimit', 5);
+      fixture.componentRef.setInput('title', 'Results Partners');
+      fixture.detectChanges();
+
+      expect(getExpandedOverlay(fixture)).toBeNull();
+      expect(getHiddenLayoutSpacer(fixture)).toBeNull();
+      expect(getInFlowRender(fixture)!.hasAttribute('aria-hidden')).toBe(false);
+    });
+  });
+
   // ---- variant="list" renders no toggle -----------------------------------
 
   describe('variant="list" (the geographic card’s contract)', () => {
