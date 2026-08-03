@@ -30,7 +30,8 @@ describe('SubmissionHistoryItemComponent', () => {
   let mockCacheService: {
     currentMetadata: ReturnType<typeof signal>;
     editStatusDateOpenId: ReturnType<typeof signal<number | null>>;
-    getCurrentNumericResultId: () => number;
+    getCurrentNumericResultId: () => number | null;
+    isExternalResult: ReturnType<typeof signal<boolean>>;
   };
   let mockRolesService: { isAdmin: jest.Mock };
   let mockDateFormatConfigService: { config: ReturnType<typeof signal> };
@@ -44,7 +45,8 @@ describe('SubmissionHistoryItemComponent', () => {
     mockCacheService = {
       currentMetadata: signal({ indicator_id: 1 }),
       editStatusDateOpenId: editStatusDateOpenIdSignal,
-      getCurrentNumericResultId: () => 12345
+      getCurrentNumericResultId: () => 12345,
+      isExternalResult: signal(false)
     };
     const refreshSignal = signal(0);
     const mockSubmissionService = {
@@ -112,6 +114,15 @@ describe('SubmissionHistoryItemComponent', () => {
       fixture.componentRef.setInput('historyItem', { ...defaultHistoryItem, is_editable_date: true });
       fixture.detectChanges();
       expect(component.showCustomDateAndEdit()).toBe(false);
+    });
+
+    it('should not show edit for an external result even when admin and is_editable_date (F-2)', () => {
+      mockRolesService.isAdmin.mockReturnValue(true);
+      mockCacheService.isExternalResult.set(true);
+      fixture.componentRef.setInput('historyItem', { ...defaultHistoryItem, is_editable_date: true });
+      fixture.detectChanges();
+      expect(component.showCustomDateAndEdit()).toBe(false);
+      expect(component.canEditTimestamp()).toBe(false);
     });
 
     it('should compute editTimezoneLabel with editDate undefined', () => {
@@ -369,6 +380,14 @@ describe('SubmissionHistoryItemComponent', () => {
       component.openEditModal();
       await component.confirmEdit();
       expect(component.saving()).toBe(false);
+    });
+
+    it('should not call PATCH_StatusChangeDate when the result is external, even if invoked directly (F-2 method guard)', async () => {
+      mockCacheService.isExternalResult.set(true);
+      component.editDate.set(new Date());
+      component.editTime.set(new Date());
+      await component.confirmEdit();
+      expect(mockApiService.PATCH_StatusChangeDate).not.toHaveBeenCalled();
     });
   });
 

@@ -27,14 +27,14 @@
 
             <div class="flex-1 xl:max-w-[428px]">
               <app-select class="!text-[16px]" label="MEL Regional Expert" [isRequired]="true" [signal]="body"
-                [disabled]="!isAdmin" [optionValue]="{ body: 'mel_regional_expert_id', option: 'user_id' }"
+                [disabled]="!isAdmin || cache.isExternalResult()" [optionValue]="{ body: 'mel_regional_expert_id', option: 'user_id' }"
                 optionLabel="full_name" scrollHeight="220px" serviceName="allianceStaffByGroup"
                 helperText="Select the MEL Regional Expert" placeholder="Select the MEL Regional Expert"></app-select>
             </div>
 
             <div class="flex-1">
               <app-input label="SharePoint Folder Link" helperText="SPRM SharePoint Folder Link" pattern="url"
-                [disabled]="!isAdmin" [optionValue]="'sharepoint_link'" [signal]="body"
+                [disabled]="!isAdmin || cache.isExternalResult()" [optionValue]="'sharepoint_link'" [signal]="body"
                 placeholder="Paste the SharePoint folder link">
               </app-input>
             </div>
@@ -48,6 +48,7 @@
             [shortOutcomeOptionValue]="'short_outcome_impact_statement'" [generalCommentOptionValue]="'general_comment'"
             [showMaturityLevel]="true" [showGeneralComment]="false" [showShortOutcome]="true" [showOicrNo]="true"
             [isOicrNoDisabled]="!submission.isEditableStatus() || !isAdmin"
+            [disabled]="cache.isExternalResult() || !submission.isEditableStatus()"
             [clearOicrSelection]="clearOicrSelection.bind(this)">
           </app-oicr-form-fields>
 
@@ -57,6 +58,7 @@
 
             @for (q of quantifications(); track $index) {
             <app-quantification-item [quantification]="q" [quantNumber]="$index + 1"
+              [disabled]="cache.isExternalResult() || !submission.isEditableStatus()"
               (update)="updateQuantification($index, $event)" (delete)="removeQuantification($index)">
             </app-quantification-item>
             }
@@ -77,7 +79,8 @@
 
             @for (est of extrapolatedEstimates(); track $index) {
             <app-quantification-item [quantification]="est" [quantNumber]="$index + 1"
-              [headerLabel]="'EXTRAPOLATED ESTIMATES'" (update)="updateExtrapolatedEstimate($index, $event)"
+              [headerLabel]="'EXTRAPOLATED ESTIMATES'" [disabled]="cache.isExternalResult() || !submission.isEditableStatus()"
+              (update)="updateExtrapolatedEstimate($index, $event)"
               (delete)="removeExtrapolatedEstimate($index)">
             </app-quantification-item>
             }
@@ -112,7 +115,8 @@
           <div class="flex flex-col py-2">
             <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold pb-4">Authors and Contact
               Persons</span>
-            <app-authors-contact-persons-table [rows]="contactPersons()" (addClicked)="onAddContactPerson()"
+            <app-authors-contact-persons-table [rows]="contactPersons()"
+              [disabled]="cache.isExternalResult() || !submission.isEditableStatus()" (addClicked)="onAddContactPerson()"
               (deleteClicked)="onDeleteContactPerson($event)"></app-authors-contact-persons-table>
           </div>
 

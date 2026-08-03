@@ -61,10 +61,7 @@ export class SubmissionService {
     const editableStatuses = [4, 5, 12, 13, 10];
     const meta = this.cache.currentMetadata();
     const statusId = meta.status_id ?? -1;
-    const platformCode = this.cache.getCurrentPlatformCode();
-    const isStarPlatform = platformCode === 'STAR';
-    const hasNoPlatformCode = platformCode === '';
-    if (!isStarPlatform && !hasNoPlatformCode) {
+    if (this.cache.isExternalResult()) {
       return false;
     }
     if (statusId === 14 && this.rolesService.isAdmin()) {

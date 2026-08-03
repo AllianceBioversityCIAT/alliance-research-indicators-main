@@ -49,7 +49,10 @@ export class SubmissionHistoryItemComponent implements OnDestroy {
   panelStyle = signal<{ top: string; left: string } | null>(null);
 
   showCustomDateAndEdit = computed(
-    () => (!!this.historyItem().is_editable_date || !!this.historyItem().editable_timestamp) && this.rolesService.isAdmin()
+    () =>
+      (!!this.historyItem().is_editable_date || !!this.historyItem().editable_timestamp) &&
+      this.rolesService.isAdmin() &&
+      !this.cache.isExternalResult()
   );
 
   submissionHistoryId = computed(() => {
@@ -135,6 +138,7 @@ export class SubmissionHistoryItemComponent implements OnDestroy {
   }
 
   async confirmEdit(): Promise<void> {
+    if (this.cache.isExternalResult()) return;
     const date = this.editDate();
     const time = this.editTime();
     const id = this.submissionHistoryId();

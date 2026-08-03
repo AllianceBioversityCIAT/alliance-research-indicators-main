@@ -100,4 +100,32 @@ export class MetadataResultDto {
     required: false,
   })
   portfolio: Partial<Portfolio>;
+
+  @ApiProperty({
+    type: String,
+    description: 'The platform code the result originates from',
+    required: false,
+  })
+  platform_code?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The public link with the complete metadata for this result',
+    required: false,
+  })
+  public_link?: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'The deep link back into the source platform for this result',
+    required: false,
+  })
+  external_link?: string;
+
+  @ApiProperty({
+    type: Date,
+    description: 'The last time this result was updated/synced',
+    required: false,
+  })
+  updated_at?: Date;
 }

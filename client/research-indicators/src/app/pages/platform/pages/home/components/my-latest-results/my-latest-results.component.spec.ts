@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { MyLatestResultsComponent } from './my-latest-results.component';
 import { ApiService } from '@shared/services/api.service';
 import { mockLatestResults, mockGreenChecks, apiServiceMock, routerMock } from '../../../../../../testing/mock-services.mock';
@@ -8,7 +8,8 @@ import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { STATUS_COLOR_MAP } from '@shared/constants/status-colors';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { Result } from '@shared/interfaces/result/result.interface';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import {
@@ -477,29 +478,70 @@ describe('MyLatestResultsComponent', () => {
       allModalsServiceMock.isModalOpen.mockReturnValue({ isOpen: false });
     });
 
-    it('should open result information modal for PRMS and call preventDefault', () => {
+    it('should build a STAR-shell router link/query params for a PRMS card and not open the modal on click', () => {
       const ev = new Event('click', { cancelable: true });
-      jest.spyOn(ev, 'preventDefault');
-      const r = latestMockItemToResult(mockLatestResults.data[0], { platform_code: PLATFORM_CODES.PRMS });
+      const r = latestMockItemToResult(mockLatestResults.data[0], {
+        platform_code: PLATFORM_CODES.PRMS,
+        result_official_code: '201'
+      });
+
+      expect(component.getStarResultRouterLink(r)).toEqual(['/result', 'PRMS-201']);
+      expect(component.getStarResultQueryParams(r)).toEqual({
+        [RESULT_ENTRY_SOURCE_QUERY]: RESULT_ENTRY_SOURCE_VALUE_HOME
+      });
+
       component.onResultCardClick(r, ev);
-      expect(ev.preventDefault).toHaveBeenCalled();
-      expect(allModalsServiceMock.openModal).toHaveBeenCalledWith('resultInformation');
-      expect(allModalsServiceMock.setResultInformationEntryContext).toHaveBeenCalledWith(null);
-      expect(allModalsServiceMock.selectedResultForInfo()).toBe(r);
+
+      expect(allModalsServiceMock.openModal).not.toHaveBeenCalledWith('resultInformation');
+      expect(allModalsServiceMock.selectedResultForInfo()).toBeNull();
     });
 
-    it('should open result information modal for TIP', () => {
+    it('should build a STAR-shell router link/query params for a TIP card and not open the modal on click', () => {
       const ev = new Event('click', { cancelable: true });
-      const r = latestMockItemToResult(mockLatestResults.data[0], { platform_code: PLATFORM_CODES.TIP });
+      const r = latestMockItemToResult(mockLatestResults.data[0], {
+        platform_code: PLATFORM_CODES.TIP,
+        result_official_code: '202'
+      });
+
+      expect(component.getStarResultRouterLink(r)).toEqual(['/result', 'TIP-202']);
+      expect(component.getStarResultQueryParams(r)).toEqual({
+        [RESULT_ENTRY_SOURCE_QUERY]: RESULT_ENTRY_SOURCE_VALUE_HOME
+      });
+
       component.onResultCardClick(r, ev);
-      expect(allModalsServiceMock.openModal).toHaveBeenCalledWith('resultInformation');
+
+      expect(allModalsServiceMock.openModal).not.toHaveBeenCalledWith('resultInformation');
     });
 
-    it('should open result information modal for AICCRA', () => {
+    it('should build a STAR-shell router link/query params for an AICCRA card and not open the modal on click', () => {
       const ev = new Event('click', { cancelable: true });
-      const r = latestMockItemToResult(mockLatestResults.data[0], { platform_code: PLATFORM_CODES.AICCRA });
+      const r = latestMockItemToResult(mockLatestResults.data[0], {
+        platform_code: PLATFORM_CODES.AICCRA,
+        result_official_code: '203'
+      });
+
+      expect(component.getStarResultRouterLink(r)).toEqual(['/result', 'AICCRA-203']);
+      expect(component.getStarResultQueryParams(r)).toEqual({
+        [RESULT_ENTRY_SOURCE_QUERY]: RESULT_ENTRY_SOURCE_VALUE_HOME
+      });
+
       component.onResultCardClick(r, ev);
-      expect(allModalsServiceMock.openModal).toHaveBeenCalledWith('resultInformation');
+
+      expect(allModalsServiceMock.openModal).not.toHaveBeenCalledWith('resultInformation');
+    });
+
+    it('should build general-information link with version for an external (TIP) card when status is 6 and snapshot years exist', () => {
+      const r = latestMockItemToResult(mockLatestResults.data[0], {
+        platform_code: PLATFORM_CODES.TIP,
+        result_official_code: '204',
+        result_status: { ...mockLatestResults.data[0].result_status, result_status_id: 6 } as Result['result_status'],
+        snapshot_years: [2023, 2024]
+      });
+      expect(component.getStarResultRouterLink(r)).toEqual(['/result', 'TIP-204', 'general-information']);
+      expect(component.getStarResultQueryParams(r)).toEqual({
+        version: 2024,
+        [RESULT_ENTRY_SOURCE_QUERY]: RESULT_ENTRY_SOURCE_VALUE_HOME
+      });
     });
 
     it('should build STAR router link and from=home query params', () => {
@@ -545,6 +587,26 @@ describe('MyLatestResultsComponent', () => {
       expect(allModalsServiceMock.openModal).not.toHaveBeenCalled();
     });
 
+    it('should not activate when click target is inside more-vert menu, for an external (TIP) card', () => {
+      const more = document.createElement('div');
+      more.className = 'more-vert';
+      const inner = document.createElement('span');
+      more.appendChild(inner);
+      document.body.appendChild(more);
+      const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(ev, 'target', { value: inner, enumerable: true });
+      jest.spyOn(ev, 'preventDefault');
+
+      const r = latestMockItemToResult(mockLatestResults.data[0], { platform_code: PLATFORM_CODES.TIP });
+      component.onResultCardClick(r, ev);
+
+      more.remove();
+      expect(ev.preventDefault).toHaveBeenCalled();
+      expect(routerMock.navigate).not.toHaveBeenCalled();
+      expect(allModalsServiceMock.openModal).not.toHaveBeenCalled();
+      expect(allModalsServiceMock.closeModal).not.toHaveBeenCalled();
+    });
+
     it('should close result information modal when open before navigating to STAR', () => {
       allModalsServiceMock.isModalOpen.mockReturnValue({ isOpen: true });
       const r = latestMockItemToResult(mockLatestResults.data[0], {
@@ -580,6 +642,75 @@ describe('MyLatestResultsComponent', () => {
       el.appendChild(text);
       const ev = { target: text } as unknown as Event;
       expect((component as any).isInteractionOnMoreMenu(ev)).toBe(false);
+    });
+  });
+
+  describe('DOM click-guard for .more-vert overflow menu (AC.4, real RouterLink)', () => {
+    // Dummy routed target so `provideRouter` can resolve `/result/:code` for real, without
+    // mocking `Router` at all — this is what actually invokes `RouterLink.onClick`.
+    @Component({ selector: 'app-dom-test-target', template: '' })
+    class DomTestTargetComponent {}
+
+    let harness: RouterTestingHarness;
+    let domComponent: MyLatestResultsComponent;
+    let router: Router;
+
+    function renderCardFor(platformCode: string): void {
+      const result = latestMockItemToResult(mockLatestResults.data[0], {
+        platform_code: platformCode,
+        result_official_code: '202'
+      });
+      domComponent.latestResultList.set([result]);
+      harness.fixture.detectChanges();
+    }
+
+    beforeEach(async () => {
+      // The outer `beforeEach` above already instantiated a TestBed module (with a mocked
+      // Router) for this file's other suites — reset it so we can configure a *real* Router
+      // via `provideRouter`, which is required for `RouterLink.onClick` to actually run.
+      TestBed.resetTestingModule();
+
+      await TestBed.configureTestingModule({
+        providers: [
+          { provide: ApiService, useValue: apiServiceMock },
+          { provide: AllModalsService, useValue: allModalsServiceMock },
+          { provide: CacheService, useValue: cacheMock },
+          { provide: DateFormatConfigService, useValue: dateFormatConfigMock },
+          provideRouter([
+            { path: '', component: MyLatestResultsComponent },
+            { path: 'result/:code', component: DomTestTargetComponent }
+          ])
+        ]
+      }).compileComponents();
+
+      harness = await RouterTestingHarness.create();
+      domComponent = await harness.navigateByUrl('/', MyLatestResultsComponent);
+      await harness.fixture.whenStable();
+      router = TestBed.inject(Router);
+
+      renderCardFor(PLATFORM_CODES.TIP);
+    });
+
+    it('does NOT navigate when the .more-vert overflow icon is clicked (negative)', async () => {
+      const moreVertIcon = harness.fixture.nativeElement.querySelector('.more-vert__icon') as HTMLElement;
+      expect(moreVertIcon).toBeTruthy();
+
+      moreVertIcon.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      harness.fixture.detectChanges();
+      await harness.fixture.whenStable();
+
+      expect(router.url).toBe('/');
+    });
+
+    it('DOES navigate to the STAR shell route when the card body is clicked (positive — proves the negative test above is not vacuous)', async () => {
+      const card = harness.fixture.nativeElement.querySelector('a.card') as HTMLElement;
+      expect(card).toBeTruthy();
+
+      card.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      harness.fixture.detectChanges();
+      await harness.fixture.whenStable();
+
+      expect(router.url).toBe('/result/TIP-202?from=home');
     });
   });
 
