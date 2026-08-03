@@ -1,0 +1,110 @@
+@let hss = this.cache.hasSmallScreen();
+<div id="navbar" #navbar class="navbar bg-[#173F6F]">
+  <div class="logo flex min-w-0 shrink flex-wrap items-center gap-1 sm:gap-2" routerLink="/">
+    <img [src]="'STAR.png' | s3ImageUrl" alt="" class="flex-shrink-0 {{ hss ? 'h-[40px]' : 'h-[60px]' }}" />
+    @if (!isProductionEnvironment) {
+    <div class="testing-env-badge bg-[#CF0808] text-white !rounded-[8px] shadow-lg" aria-label="Testing Environment">
+      <span class="hidden xl:inline">Testing Environment</span>
+      <span class="hidden md:inline xl:hidden">Testing</span>
+      <span class="md:hidden">Test</span>
+    </div>
+    }
+  </div>
+
+  <div class="options">
+    @for (option of this.options; track $index) {
+    @if (!option.hide) {
+    <a class="option atc-white-1 {{ hss ? 'py-[15px] px-[15px] xl:px-[10px]' : 'py-[25px] px-[15px] xl:px-[25px]' }} "
+      [routerLink]="option.disabled ? null : option.path" routerLinkActive="active atc-light-blue-200-i"
+      [routerLinkActiveOptions]="option.path === '/projects' ? { exact: false } : { exact: true }"
+      [attr.data-route]="option.path" [class.disabled]="option.disabled"
+      [attr.aria-disabled]="option.disabled ? true : null">
+      @if (option.path === '/projects') {
+      <span class="hidden" [routerLink]="'/project-detail'"></span>
+      }
+      {{ option.label }}
+      <a class="option-icon material-symbols-rounded atc-white-1" routerLinkActive="active atc-light-blue-200-i">
+        {{ option.icon }}
+      </a>
+      @if (option.underConstruction) {
+      <img [src]="'construction.png' | s3ImageUrl" class="construction-icon-x1" alt="" />
+      }
+    </a>
+    }
+    }
+
+    <div class="create-result-nav-wrap">
+      <button type="button" class="create-result-btn !text-white"
+        (click)="this.allModalsService.openModal('createResult')">
+        <span class="material-symbols-rounded create-result-btn__icon" aria-hidden="true">add_circle_outline</span>
+        <span class="create-result-btn__label !text-white">Create Result</span>
+      </button>
+    </div>
+    <div class="icons-container">
+      <div class="search-box {{ hss ? '!w-60' : '' }} !w-60 xl:!w-75 ml-3">
+        <i class="pi pi-search !text-[11px] px-2"></i>
+        <label class="sr-only" for="search-result-input">Search results</label>
+        <input id="search-result-input" type="text" placeholder="Search"
+          class="{{ hss ? '!h-7.5 !text-[13px]' : '!h-8 !text-[14px]' }}"
+          (keyup.enter)="this.onSearchTextChange($event)" />
+      </div>
+      <a class="whats-new-nav-link" routerLink="/whats-new" routerLinkActive="whats-new-nav-link--active"
+        [routerLinkActiveOptions]="{ exact: true }" pTooltip="What's New" tooltipPosition="bottom"
+        [attr.aria-label]="whatsNewService.hasUnreadReleaseNotes() ? 'What\'s New, new release notes available' : 'What\'s New'">
+        <span class="material-symbols-rounded whats-new-nav-link__icon" aria-hidden="true">rocket_launch</span>
+        @if (whatsNewService.hasUnreadReleaseNotes()) {
+        <span class="whats-new-nav-link__indicator" aria-hidden="true"></span>
+        }
+      </a>
+      <div dropdown-button (keydown.enter)="this.showDropdown = !this.showDropdown"
+        (click)="this.showDropdown = !this.showDropdown">
+        <p-avatar [label]="this.actions.getInitials()"
+          styleClass="!rounded-xl cursor-pointer font-[600] flex pb-[1px]"></p-avatar>
+      </div>
+    </div>
+  </div>
+</div>
+
+@if (this.showDropdown) {
+<div #dropdownRef class="fixed top-12 right-12 z-[9999] w-[290px] rounded-xl bg-white py-3 shadow-xl">
+  <div class="mb-3 flex items-center justify-between px-4">
+    <span class="text-[11px] font-semibold tracking-[2px] font-[space_grotesk] text-[#8D9299] uppercase">Account</span>
+    <button type="button"
+      class="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-[#8D9299] transition-colors hover:bg-gray-100"
+      (click)="this.showDropdown = false">
+      <i class="pi pi-times !text-[9px]"></i>
+    </button>
+  </div>
+
+  <div class="mb-4 flex items-center gap-3 px-4">
+    <p-avatar [label]="this.actions.getInitials()" class="!rounded-xl" size="large"></p-avatar>
+    <div class="flex flex-col">
+      <span class="text-[14px] font-medium text-[#112F5C]">{{ this.cache.dataCache().user.first_name }} {{
+        this.cache.dataCache().user.last_name }}</span>
+      <span class="text-[12.5px] text-[#8D9299]">{{ this.cache.dataCache().user.email }}</span>
+    </div>
+  </div>
+
+  <div class="mb-4 flex items-center gap-2 px-4">
+    <span class="text-[12px] font-[420] text-[#8D9299]">Role:</span>
+    <span
+      class="!rounded-[10px] border border-[#112F5C]/40 bg-white px-2 py-[2px] text-[10px] font-medium tracking-wide text-[#112F5C] uppercase">{{
+      this.cache.dataCache().user.roleName }}</span>
+  </div>
+
+  <div class="mb-3 border-t border-[#E4E4E7]"></div>
+
+  <div class="px-4">
+    <button type="button"
+      class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#cf0808] px-4 py-1.5 text-[13px] font-[450] text-[#cf0808] disabled:cursor-not-allowed disabled:opacity-50"
+      [disabled]="this.cache.isValidatingToken()" (click)="this.actions.logOut()">
+      @if (this.cache.isValidatingToken()) {
+      <i class="pi pi-spin pi-spinner text-[13px]"></i>
+      } @else {
+      <i class="pi pi-sign-out !text-[13px]"></i>
+      }
+      Log out
+    </button>
+  </div>
+</div>
+}

@@ -1,0 +1,6 @@
+<form [formGroup]="form" (ngSubmit)="save()">
+  <ng-container *ngFor="let field of fields">
+    <app-dynamic-component-selector [field]="field" [formGroup]="form"> </app-dynamic-component-selector>
+  </ng-container>
+  <button type="submit">Submit</button>
+</form>

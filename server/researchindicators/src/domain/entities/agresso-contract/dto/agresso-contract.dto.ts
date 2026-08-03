@@ -4,4 +4,5 @@ export class AgressoContractWhere {
   public agreement_id: string;
   public funding_type: string;
   public contract_status: AgressoContractStatus;
+  public is_pool_funding_contributor?: boolean;
 }

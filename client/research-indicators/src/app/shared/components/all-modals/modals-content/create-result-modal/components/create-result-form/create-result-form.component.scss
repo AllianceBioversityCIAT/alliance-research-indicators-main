@@ -1,0 +1,13 @@
+:host {
+  .form-word-counter-container {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .form-word-counter-container span {
+    font-size: 11px !important;
+    font-weight: 500 !important;
+  }
+}

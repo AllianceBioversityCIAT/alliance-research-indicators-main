@@ -1,0 +1,211 @@
+.sp-toc-block {
+  background: var(--ac-grey-100);
+  border: 1px solid var(--ac-grey-200);
+
+  &__swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid var(--ac-grey-300);
+  }
+
+  &__title {
+    color: var(--ac-grey-800);
+    font-size: 15px;
+    letter-spacing: 0.04em;
+  }
+
+  &__name {
+    color: var(--ac-grey-700);
+    font-weight: 400;
+  }
+
+  &__required {
+    color: var(--ac-red-1);
+    margin-left: 2px;
+  }
+
+  &__error {
+    display: block;
+    margin-top: 4px;
+    color: var(--ac-red-1);
+    font-size: 13px;
+  }
+
+  // Async / empty notices — color is never the sole signal (icon + text carry it).
+  &__notice {
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--ac-grey-300);
+    background: var(--ac-white-1);
+    color: var(--ac-grey-800);
+    font-size: 14px;
+
+    &--error {
+      border-color: var(--ac-red-1);
+      color: var(--ac-red-1);
+    }
+
+    // Cross-type selection warning (T-BIL-ITG-04): amber via --ac-orange-1 —
+    // the platform's warning-toned token (light #f58220 / dark #ff9d56, both
+    // defined in styles/colors.scss). Border + icon carry the amber; body text
+    // stays the notice's --ac-grey-800 for AA contrast — the icon + wording are
+    // the signal, never color alone (NF-02).
+    &--warning {
+      border-color: var(--ac-orange-1);
+
+      .pi {
+        color: var(--ac-orange-1);
+      }
+    }
+  }
+
+  &__retry {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--ac-red-1);
+    background: transparent;
+    color: var(--ac-red-1);
+    font-size: 13px;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--ac-red-1);
+      color: var(--ac-white-1);
+    }
+  }
+
+  &__hlo-label {
+    color: var(--ac-grey-800);
+    font-size: 14px;
+
+    strong {
+      color: var(--ac-primary-blue-500);
+    }
+  }
+
+  // Indicator-type guidance (T-BIL-ITG-03) — neutral chips/headers, token-only
+  // colors so dark/light parity rides the --ac-* variables (NF-04). These spans
+  // are authored in this component's templates, so emulated encapsulation still
+  // applies inside the body-appended select overlay.
+  &__type-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    margin-left: 6px;
+    border: 1px solid var(--ac-grey-300);
+    border-radius: 999px;
+    background: var(--ac-grey-200);
+    color: var(--ac-grey-700);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  &__group-label {
+    display: block;
+    color: var(--ac-grey-600);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  // HLO compatibility hint tag (T-BIL-ITG-05): same neutral chip treatment as
+  // `__type-badge`; the tag TEXT ("has <type>") carries the meaning, never
+  // color alone (NF-02).
+  &__type-tag {
+    display: inline-block;
+    padding: 1px 8px;
+    margin-left: 6px;
+    border: 1px solid var(--ac-grey-300);
+    border-radius: 999px;
+    background: var(--ac-grey-200);
+    color: var(--ac-grey-700);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  // No-type-match notice suggestion list (T-BIL-ITG-05): native <button>s so
+  // they're keyboard-operable with the platform's focus-visible styles (NF-02);
+  // link-like so the notice reads as guidance, not a second form control.
+  &__suggestions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__suggestion {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ac-primary-blue-500);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+
+    strong {
+      color: inherit;
+    }
+
+    &:focus-visible {
+      text-decoration: underline;
+    }
+
+    &:disabled {
+      color: var(--ac-grey-600);
+      cursor: not-allowed;
+      text-decoration: none;
+    }
+
+    &:hover:not(:disabled) {
+      text-decoration: underline;
+    }
+  }
+
+  // Contribution panel
+  &__contribution {
+    background: var(--ac-white-1);
+    border: 1px solid var(--ac-grey-200);
+  }
+
+  &__readonly-label {
+    color: var(--ac-grey-600);
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  &__readonly-value {
+    color: var(--ac-grey-800);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  // Short numeric field — input-only wrapper; label stays full width on one line.
+  &__contribution-input {
+    width: 7.5rem;
+    max-width: 100%;
+  }
+}
+
+/* stylelint-disable selector-pseudo-element-no-unknown, selector-class-pattern */
+:host ::ng-deep .sp-toc-block__contribution-input p-inputnumber {
+  display: block;
+  width: 100%;
+
+  .p-inputnumber-input {
+    width: 100%;
+  }
+}
+/* stylelint-enable selector-pseudo-element-no-unknown, selector-class-pattern */

@@ -1,0 +1,33 @@
+.dropdown {
+  position: relative;
+  display: inline-block;
+
+  .dropdown-button {
+    cursor: pointer;
+  }
+
+  .dropdown-content {
+    position: absolute;
+    background-color: #fff;
+    min-width: 160px;
+    box-shadow: 0 0 5px rgb(0 0 0 / 20%);
+    z-index: 1;
+    border-radius: 4px;
+    transition: all 0.1s ease-in-out;
+    transform: scale(0);
+  }
+
+  &:focus-within .dropdown-content {
+    transform: scale(1);
+  }
+
+  &.top-left .dropdown-content {
+    top: 45px;
+    left: 0;
+  }
+
+  &.top-right .dropdown-content {
+    top: 30px;
+    right: 10px;
+  }
+}

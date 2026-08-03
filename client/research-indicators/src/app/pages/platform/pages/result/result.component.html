@@ -1,0 +1,10 @@
+<div class="container mx-auto">
+  <app-result-sidebar></app-result-sidebar>
+  <div class="result-content">
+    <router-outlet></router-outlet>
+  </div>
+</div>
+<app-section-sidebar [title]="'Submission History'" [showSignal]="this.cache.showSubmissionHistory" [hideActions]="true"
+  [subtractExtraOffset]="true">
+  <app-submission-history-content></app-submission-history-content>
+</app-section-sidebar>

@@ -1,0 +1,321 @@
+<section class="block flex w-full flex-col gap-6 p-1">
+  <div class="flex items-center gap-3 border-l-[5px] border-l-[#074b86] bg-[#fafafa] px-3 py-3">
+    <i class="pi pi-info-circle text-[#074b86] !text-[18px]" aria-hidden="true"></i>
+    <p class="m-0 text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[#777c83]">
+      The figures shown in this dashboard are based on results reported in the STAR platform. Some metrics rely on
+      metadata that is currently available for STAR results. Results imported from TIP, PRMS, and AICCRA are not yet
+      enriched with the same metadata, so the level of detail displayed in certain dashboard visualizations may vary
+      depending on the source platform. We are actively working to make information from these additional systems
+      available with the same level of detail and consistency.
+    </p>
+  </div>
+
+  @if (canAccessGroundingSetup()) {
+  <section class="rounded-xl border border-[#e8ebed] bg-[#fafafa] px-6 py-5 shadow-xs">
+    <div class="flex flex-col gap-4">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div class="min-w-0 flex-1">
+          <div class="mb-2 flex items-center gap-2.5">
+            <i class="pi pi-file !text-[18px] text-[#112f5c]" aria-hidden="true"></i>
+            <h2 class="m-0 font-['Barlow'] text-[16px] font-semibold leading-tight text-[#112f5c]">Grounding &amp; Setup
+            </h2>
+          </div>
+          <p class="m-0 max-w-4xl font-['Barlow'] text-[14px] font-normal leading-4.5 text-[#777C83]">
+            Upload project foundational documents (Contract, Scope of Work, Theory of Change) to prime the AI. The system
+            will use these documents to better understand goals and context for generating insights and reports.
+          </p>
+        </div>
+
+        <div class="flex shrink-0 flex-wrap items-center gap-3 lg:justify-end">
+          <button pButton type="button"
+            class="!h-9 !min-w-[8.75rem] !rounded-lg !border-[#1771b3] !bg-[#1771b3] !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-white"
+            [class.!justify-center]="uploadingGroundingDoc()"
+            [disabled]="!canUploadMoreGroundingDocs() || uploadingGroundingDoc()" [loading]="uploadingGroundingDoc()"
+            [attr.aria-label]="uploadingGroundingDoc() ? 'Uploading documents' : 'Upload Docs'"
+            (click)="triggerGroundingUpload(groundingFileInput)">
+            @if (!uploadingGroundingDoc()) {
+            <i class="pi pi-file-plus mr-1 !text-[14px]" aria-hidden="true"></i>
+            Upload Docs
+            }
+          </button>
+
+          @if (hasGroundedDocuments()) {
+          <button pButton type="button"
+            class="!h-9 !min-w-[7.25rem] !rounded-lg !border-[#1771b3] !bg-transparent !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-[#1771b3] hover:!bg-[#f0f7fc]"
+            [class.!justify-center]="executiveOverviewLoading()"
+            [disabled]="!canGenerateExecutiveOverview()" [loading]="executiveOverviewLoading()"
+            [attr.aria-label]="executiveOverviewLoading() ? 'Generating executive overview' : 'Generate'"
+            (click)="generateExecutiveOverview()">
+            @if (!executiveOverviewLoading()) {
+            <i class="pi pi-sparkles mr-1 !text-[14px]" aria-hidden="true"></i>
+            Generate
+            }
+          </button>
+          }
+
+          <label class="sr-only" for="grounding-file-input">Upload foundational project documents</label>
+          <input #groundingFileInput id="grounding-file-input" type="file" class="hidden"
+            [accept]="groundingAcceptedFormats.join(',')" multiple (change)="onGroundingFilesSelected($event)" />
+        </div>
+      </div>
+
+      @if (hasGroundedDocuments()) {
+      <span
+        class="font-['Barlow'] text-[12px] font-medium leading-none"
+        [attr.aria-label]="'Documents uploaded: ' + groundedDocuments().length + ' of ' + maxGroundingDocs">
+        <span class="text-[#8d9299]">Documents uploaded: </span>
+        <span [style.color]="groundedDocumentsCountColor()">{{ groundedDocuments().length }}/{{ maxGroundingDocs }}</span>
+      </span>
+
+      <ul class="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2 xl:grid-cols-3">
+        @for (document of groundedDocuments(); track document.fileKey) {
+        <li
+          class="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[#e8ebed] bg-white px-3 py-2.5">
+          <span class="flex min-w-0 flex-1 items-center gap-2">
+            <i class="pi pi-file !text-[14px] shrink-0 text-[#1689CA]" aria-hidden="true"></i>
+            <span class="truncate font-['Barlow'] text-[13px] font-medium text-[#112f5c]" [title]="document.fileName">{{
+              document.fileName }}</span>
+          </span>
+          <button type="button"
+            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 text-[#CF0808] transition-colors hover:bg-[#fdecec]"
+            [attr.aria-label]="'Remove ' + document.fileName" (click)="removeGroundingDocument(document.fileKey)">
+            <i class="pi pi-times !text-[14px]" aria-hidden="true"></i>
+          </button>
+        </li>
+        }
+      </ul>
+      }
+    </div>
+  </section>
+  }
+
+  @if (showExecutiveOverview()) {
+  <section class="flex flex-col gap-5 rounded-xl border border-[#e8ebed] bg-white px-6 py-6 shadow-xs">
+    <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div class="flex min-w-0 flex-col gap-2">
+        <h2 class="m-0 font-['Barlow'] text-[15px] font-semibold leading-tight text-[#112f5c]">Executive Overview</h2>
+        @if (!executiveOverviewLoading() && executiveOverviewGeneratedAt()) {
+        <p class="m-0 font-['Barlow'] text-[13px] font-normal leading-snug text-[#777C83]">
+          Generated on {{ executiveOverviewGeneratedAt() | date: 'dd/MM/yyyy HH:mm' }}
+        </p>
+        }
+      </div>
+      @if (!executiveOverviewLoading()) {
+      <div class="flex flex-wrap items-center gap-2">
+        <span
+          class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#eef6ff] px-3 py-1.5 font-['Space_Grotesk'] text-[11px] font-bold uppercase tracking-wide text-[#1689CA]">
+          <i class="pi pi-sparkles !text-[12px]" aria-hidden="true"></i>
+          Grounded AI Summary
+        </span>
+      </div>
+      }
+    </header>
+
+    @if (!executiveOverviewLoading() && overviewSourceDocuments().length > 0) {
+    <div class="flex flex-col gap-2 rounded-lg border border-[#e8ebed] bg-[#fafafa] px-4 py-3">
+      <span class="font-['Space_Grotesk'] text-[11px] font-semibold uppercase tracking-[0.03rem] text-[#8D9299]">
+        Generated from</span>
+      <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
+        @for (document of overviewSourceDocuments(); track document.fileKey) {
+        <li class="flex min-w-0 items-center gap-2">
+          <i class="pi pi-file !text-[12px] shrink-0 text-[#1689CA]" aria-hidden="true"></i>
+          <span class="truncate font-['Barlow'] text-[13px] font-medium text-[#112f5c]" [title]="document.fileName">{{
+            document.fileName }}</span>
+        </li>
+        }
+      </ul>
+    </div>
+    }
+
+    <div class="flex flex-col gap-4">
+      @if (executiveOverviewLoading()) {
+      <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[#777C83]">Generating grounded summary...
+      </p>
+      } @else if (executiveOverviewError()) {
+      <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[#777C83]">Unable to generate the
+        executive overview. Please try again.</p>
+      } @else {
+      @for (paragraph of executiveOverviewParagraphs(); track paragraph) {
+      <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[#4c5158]">{{ paragraph }}</p>
+      }
+      }
+    </div>
+  </section>
+  }
+
+
+  <div class=" flex items-center gap-2.5">
+    <i class="pi pi-chart-bar !text-[18px] text-[#112f5c]" aria-hidden="true"></i>
+    <h2 class="m-0 font-['Barlow'] text-[16px] font-semibold leading-tight text-[#112f5c]">Result analytics
+    </h2>
+  </div>
+  <!-- Geo scope -->
+  <div class="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_1fr]  lg:min-h-[520px] lg:items-stretch ">
+    <div class="flex min-w-0 flex-col gap-5 lg:h-full lg:self-stretch ">
+
+      <!-- Results by indicator -->
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
+
+        <div class="flex flex-1">
+          <app-project-dashboard-card title="Top partner institution"
+            description="Partner institutions most frequently linked to results on this primary project."
+            class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="topPartners.loading()"
+            [error]="topPartners.loadError()" [empty]="partnersEmpty()"
+            emptyMessage="No partner institutions were found for this project." [items]="partnerItems()"
+            layout="rows-partners" (retry)="topPartners.update()">
+          </app-project-dashboard-card>
+        </div>
+
+        <div class="flex flex-1">
+          <app-project-dashboard-card title="Top primary levers"
+            description="Primary levers most frequently linked to results on this project." class="h-full w-full"
+            iconClass="pi pi-sliders-h" [compact]="true" [loading]="topPrimaryLevers.loading()"
+            [error]="topPrimaryLevers.loadError()" [empty]="leversEmpty()"
+            emptyMessage="No primary levers were found for this project." [items]="leverItems()"
+            layout="rows-stacked-lever" (retry)="topPrimaryLevers.update()">
+          </app-project-dashboard-card>
+        </div>
+
+        <div class="flex flex-1">
+          <app-project-dashboard-card title="Top main contact person"
+            description="Main contact persons most frequently linked to results on this project." class="h-full w-full"
+            iconClass="pi pi-users" [compact]="true" [loading]="topMainContactPersons.loading()"
+            [error]="topMainContactPersons.loadError()" [empty]="mainContactPersonsEmpty()"
+            emptyMessage="No main contact persons were found for this project." [items]="mainContactPersonItems()"
+            layout="rows-stacked-lever" [itemHeightPx]="43" (retry)="topMainContactPersons.update()">
+          </app-project-dashboard-card>
+        </div>
+
+        <div class="flex lg:flex-1 [&>*]:w-full">
+          <app-project-dashboard-card title="Top contributing projects"
+            description="Top projects contributing to results where this project is the primary project."
+            class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="topContributors.loading()"
+            [error]="topContributors.loadError()" [empty]="contributorsEmpty()"
+            emptyMessage="No contributor projects were found." [items]="contributorItems()" layout="rows-stacked-lever"
+            [itemHeightPx]="43" (retry)="topContributors.update()">
+          </app-project-dashboard-card>
+        </div>
+      </div>
+
+      <app-geo-scope-card class="h-full w-full"></app-geo-scope-card>
+    </div>
+    <div class="flex h-full min-w-0 flex-col gap-5 lg:min-h-0 lg:self-stretch">
+      <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[#e8ebed] bg-white p-5 shadow-xs">
+        <header class="flex flex-col gap-1">
+          <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[#112f5c]">Results by indicator</span>
+          <span class="font-['Barlow'] text-[14px] leading-4 text-[#777C83]">Number of results linked to each indicator
+            on this project.</span>
+        </header>
+
+        @if (totalProjectResults() === 0) {
+        <div class="flex flex-col items-center justify-center gap-2 rounded-lg px-4 py-8 text-center">
+          <i class="pi pi-chart-pie text-[24px] text-[#1689CA]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[#777C83]">No results were found for any indicator
+            on this project.</p>
+        </div>
+        } @else {
+        <div class="flex items-end justify-between gap-3 rounded-lg border border-[#e8ebed] bg-[#f4f7f9] px-4 py-3">
+          <div class="flex flex-col gap-0.5">
+            <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[#8D9299]">Total
+              results</span>
+            <strong class="font-['Barlow'] text-[28px] font-semibold leading-none tabular-nums text-[#112F5C]">{{
+              totalProjectResults() }}</strong>
+          </div>
+          <span class="pb-0.5 font-['Barlow'] text-[12px] text-[#777C83]">{{ indicatorsWithResults().length }}
+            indicators</span>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <span
+            class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[#8D9299]">Distribution</span>
+          <figure class="m-0 flex h-5 w-full overflow-hidden rounded-lg bg-[#e8ebed]"
+            [attr.aria-label]="'Results distribution across ' + indicatorsWithResults().length + ' indicators'">
+            @for (indicator of indicatorsWithResults(); track indicator.id) {
+            <div class="h-full min-w-[3px] transition-[width] duration-300 ease-in-out"
+              [style.width.%]="indicatorSharePercent(indicator.value)" [style.background-color]="indicator.color"
+              [title]="indicator.label + ': ' + indicator.value + ' results'"></div>
+            }
+          </figure>
+        </div>
+
+        <ul class="m-0 flex list-none flex-col gap-0 divide-y divide-[#e8ebed] p-0">
+          @for (indicator of indicatorsWithResults(); track indicator.id; let rank = $index) {
+          <li class="py-3 first:pt-0 last:pb-0">
+            <div class="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+              <span
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E8F0F7] font-['Barlow'] text-[12px] font-bold tabular-nums text-[#345B8F]">{{
+                rank + 1 }}</span>
+              <span class="flex min-w-0 items-center gap-2">
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color"></span>
+                <span class="min-w-0 font-['Barlow'] text-[12px] font-semibold leading-snug text-[#112F5C] line-clamp-2"
+                  [title]="indicator.label">{{ indicator.label }}</span>
+              </span>
+              <span class="shrink-0 text-right">
+                <strong class="block font-['Barlow'] text-[14px] font-bold tabular-nums leading-none text-[#112F5C]">{{
+                  indicator.value }}</strong>
+                <span class="mt-0.5 block font-['Barlow'] text-[11px] tabular-nums text-[#777C83]">{{
+                  indicatorSharePercent(indicator.value) }}%</span>
+              </span>
+            </div>
+          </li>
+          }
+        </ul>
+        }
+      </section>
+      <section class="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-[#e8ebed] bg-white p-5 shadow-xs">
+        <header class="flex flex-col gap-1">
+          <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[#112f5c]">Results by status</span>
+          <span class="font-['Barlow'] text-[14px] leading-4 text-[#777C83]">Number of results by workflow status on
+            this project.</span>
+        </header>
+
+        @if (statusChartLoading()) {
+        <div class="flex flex-col items-center justify-center gap-2 rounded-lg bg-[#f4f7f9] px-4 py-8 text-center">
+          <span class="font-['Barlow'] text-[13px] text-[#777C83]">Loading status data...</span>
+        </div>
+        } @else if (statusChartError() || !statusChartItems().length) {
+        <div class="flex flex-col items-center justify-center gap-2 h-full px-4 py-8 text-center">
+          <i class="pi pi-chart-bar text-[24px] text-[#1689CA]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[#777C83]">No result statuses were found for this
+            project.</p>
+        </div>
+        } @else {
+        <ul class="m-0 flex max-h-[172px] min-h-0 list-none flex-col gap-3 overflow-y-auto p-0 pr-1 pt-1">
+          @for (item of statusChartItems(); track item.result_status_id) {
+          <li class="m-0 list-none p-0">
+            <div class="grid w-full items-center gap-2.5 text-left text-inherit"
+              style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)">
+              <span
+                class="min-w-0 overflow-hidden font-['Barlow'] text-[12.5px] font-semibold capitalize leading-tight text-[#4c5158] line-clamp-2"
+                [title]="item.label">{{ item.label }}</span>
+              <span class="min-w-0 w-full overflow-hidden">
+                <span class="flex max-w-full items-center gap-2 transition-[width] duration-300 ease-in-out"
+                  [style.width.%]="statusBarFillPercent(item.value)" [style.min-width.px]="item.value > 0 ? 32 : 0">
+                  <span class="h-3 min-w-2 flex-1 rounded-full" [style.background-color]="item.color"
+                    aria-hidden="true"></span>
+                  <span class="shrink-0 font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[#112F5C]">{{
+                    item.value }}</span>
+                </span>
+              </span>
+            </div>
+          </li>
+          }
+        </ul>
+        }
+      </section>
+    </div>
+  </div>
+  <!-- Pending revision results -->
+  <section
+    class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[#e8ebed] bg-white shadow-xs lg:flex-1">
+    <header class="border-b border-[#e8ebed] px-5 py-4">
+      <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[#112f5c]">Pending revision</span>
+      <span class="block font-['Barlow'] text-[14px] leading-4 text-[#777C83]">Results pending revision on project
+        {{
+        project().agreement_id || contractId() }}.</span>
+    </header>
+    <app-results-center-table class="block min-h-0 flex-1 overflow-hidden" [hideFiltersToolbar]="true"
+      [roundedBottom]="true" [excludedColumnFields]="pendingRevisionExcludedColumns"
+      emptyMessage="No results pending revision"></app-results-center-table>
+  </section>
+</section>

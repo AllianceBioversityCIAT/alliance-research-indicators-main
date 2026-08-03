@@ -25,7 +25,11 @@ export const AgressoContractMapper = (
   );
   delete tempData.sustainableDevelopmentGoals;
 
-  const mapperData: AgressoContract = { ...tempData, sdgs: sdgObjectList };
+  const mapperData: AgressoContract = {
+    ...tempData,
+    is_pool_funding_contributor: false,
+    sdgs: sdgObjectList,
+  };
   return mapperData;
 };
 

@@ -23,6 +23,9 @@ export enum ResultStatusEnum {
   SUBMITTED_IN_PRMS = 17,
   QAED_IN_PRMS = 18,
   DISCONTINUED_IN_PRMS = 19,
+  BILATERAL_PENDING_REVIEW = 23,
+  BILATERAL_APPROVED = 24,
+  BILATERAL_REJECTED = 25,
 }
 
 export const ResultStatusNameEnum = {
@@ -45,6 +48,9 @@ export const ResultStatusNameEnum = {
   17: 'Submitted in PRMS',
   18: 'QAed in PRMS',
   19: 'Discontinued in PRMS',
+  23: 'Bilateral Pending Review',
+  24: 'Bilateral Approved',
+  25: 'Bilateral Rejected',
 };
 
 export const getTemplateByStatus = (

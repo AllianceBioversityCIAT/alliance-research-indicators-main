@@ -1,0 +1,137 @@
+@for (alert of this.alertList(); track $index) {
+<div class="alert-overlay">
+  <div class="alert flex w-full" [style]="{ borderColor: alert.color }">
+    <div class="w-full flex justify-end -mt-4 -mr-5">
+      @if (!alert.hideCloseButton) {
+      <i class="pi pi-times top-2 right-2 text-[#777C83] !text-[15px] cursor-pointer" (click)="closeAlert($index)"
+        (keydown)="closeAlert($index)">
+      </i>
+      }
+    </div>
+
+    <div class="w-full flex justify-center -mt-5">
+      <i [class]="alert.icon" [style]="{ 'font-size': '50px', color: alert.color }"></i>
+    </div>
+
+    <div class="summary !font-[Space_Grotesk] !text-[{{ alert.color }}]">{{ alert.summary }}</div>
+    <div class="detail -mt-1.5 leading-[22px] text-[#4C5158]" [innerHTML]="alert.detail"
+      (click)="onDetailLinkClick($event, $index)" (keydown)="onDetailLinkClick($event, $index)"></div>
+    @if (alert.selectorLabel) {
+    <div class="w-full flex flex-col pb-2">
+      <label class="label inline-block self-start" for="username">{{ alert.selectorLabel }}
+        <span class="text-red-500">*</span>
+      </label>
+
+      <p-select styleClass="w-full !text-start"
+        [style]="isInvalid ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
+        [options]="this.service?.list()" optionValue="this" [optionLabel]="'report_year'" [optionValue]="'report_year'"
+        placeholder="Select the year" [scrollHeight]="'112px'" (ngModelChange)="onSelectChange($event)"
+        [(ngModel)]="body().selectValue" class="!text-[13px] w-full">
+        <ng-template let-item pTemplate="item">
+          <div class="flex align-items-center">
+            <span class="font-semibold">{{ item.report_year }} </span>
+            @if (item.has_reported === 1) {
+            <span class="ml-1 font-normal">- Already reported</span>
+            }
+          </div>
+        </ng-template>
+
+        <ng-template let-selected pTemplate="selectedItem">
+          <div class="flex items-center block whitespace-normal break-words gap-2">
+            <span class="font-semibold">{{ selected.report_year }} </span>
+            @if (selected.has_reported === 1) {
+            -
+            <span class="font-normal">Already reported</span>
+            }
+          </div>
+        </ng-template>
+      </p-select>
+
+      @if (isInvalid) {
+      <div class="flex items-center gap-1 mt-2 text-[#E69F00] text-sm">
+        <i class="material-symbols-rounded -mt-2 !text-base">warning</i>
+        <span>This field is required</span>
+      </div>
+      }
+      @if (showReportedWarning) {
+      <div class="flex items-center text-start gap-1 mt-2 text-[#E69F00] text-sm">
+        <i class="material-symbols-rounded -mt-2.5 mr-0.5 !text-base">warning</i>
+        <span>
+          Since there is already an approved version for {{ body().selectValue }}, this new update will overwrite the
+          existing version once it
+          is approved.
+        </span>
+      </div>
+      }
+    </div>
+    }
+    @if (alert.commentLabel) {
+    @if (alert.commentAsTextArea) {
+    <div class="w-full mt-4 text-left">
+      <label for="global-alert-comment" class="font-semibold text-[16px] text-[#153C71] block mb-2">
+        {{ alert.commentLabel }}
+        @if (alert.commentRequired) {
+        <span class="text-red-500">*</span>
+        }
+      </label>
+      <textarea id="global-alert-comment" rows="5"
+        class="w-full border-1 border-gray-500 rounded-md resize-none text-[14px] p-2" [value]="body().commentValue"
+        [placeholder]="alert.placeholder ?? ''" (input)="onCommentInput($event)"></textarea>
+    </div>
+    } @else {
+    <app-input [label]="alert.commentLabel" [signal]="body" [placeholder]="alert.placeholder ?? ''"
+      optionValue="commentValue" [style]="{ width: '100%', textAlign: 'start' }" autoComplete="off"
+      [isRequired]="alert.commentRequired || false">
+    </app-input>
+    }
+    }
+    @if (!alert.hasNoButton) {
+    <div class="flex gap-4 w-full place-content-center text-center">
+      @if (!alert.hasNoCancelButton) {
+      <p-button [label]="alert.cancelCallback?.label" (onClick)="alert.cancelCallback?.event?.(); closeAlert($index)"
+        variant="outlined"
+        [style]="{ borderRadius: '13px', paddingLeft: '16px', paddingRight: '16px', border: '2px solid #035BA9', height: '38px' }" />
+      }
+      @if (alert.confirmCallback?.event && !alert.generalButton) {
+      <p-button [label]="alert.confirmCallback?.label" (onClick)="
+                alert.confirmCallback?.event?.({
+                  comment: this.body().commentValue,
+                  selected: body().selectValue !== undefined ? body().selectValue + '' : undefined
+                });
+                closeAlert($index)
+              "
+        [disabled]="(alert.selectorRequired && !this.body().selectValue) || (alert.commentRequired && !this.body().commentValue)"
+        [style]="{
+                backgroundColor: alert.buttonColor,
+                borderColor: alert.buttonColor,
+                borderRadius: '13px',
+                paddingLeft: '20px',
+                paddingRight: '20px',
+                height: '38px'
+              }" />
+      }
+      @if (alert.generalButton) {
+      <button
+        class="text-white font-[500] h-12 w-full text-[16px] bg-[#035BA9] cursor-pointer rounded-xl flex items-center justify-center gap-3"
+        (click)="
+                alert.confirmCallback?.event?.({
+                  comment: this.body().commentValue,
+                  selected: body().selectValue !== undefined ? body().selectValue + '' : undefined
+                });
+                closeAlert($index)
+              "
+        [disabled]="(alert.selectorRequired && !this.body().selectValue) || (alert.commentRequired && !this.body().commentValue)">
+        @if (alert.buttonIconClass) {
+        <i [class]="alert.buttonIconClass"></i>
+        }
+        <span>{{ alert.confirmCallback?.label }}</span>
+      </button>
+      }
+      @for (callback of alert.callbacks; track $index) {
+      <p-button label="{{ callback.label }}" (onClick)="callback?.event(); closeAlert($index)" />
+      }
+    </div>
+    }
+  </div>
+</div>
+}

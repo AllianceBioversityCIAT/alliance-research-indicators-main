@@ -1,0 +1,20 @@
+.container {
+  display: grid;
+  grid-template-columns: 322px 1fr;
+  max-width: none;
+  width: 100%;
+}
+
+.result-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.result-content router-outlet + * {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-x: hidden;
+}

@@ -1,0 +1,101 @@
+// Pill tabs — match design: light inactive pills + navy active pill
+$tab-navy: #345b8f;
+$tab-inactive-bg: #f4f5f7;
+$tab-inactive-border: #b8c4d4;
+$tab-text: $tab-navy;
+$tab-container-bg: #eef1f4;
+$tab-container-border: #c5d0dc;
+
+.local-container {
+  gap: 8px;
+  display: flex;
+  align-items: center;
+  position: relative;
+
+  .scroll-button {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff;
+    border-radius: 50%;
+    border: 1px solid $tab-inactive-border;
+    cursor: pointer;
+    z-index: 2;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &.left {
+      margin-right: 4px;
+    }
+
+    &.right {
+      margin-left: 4px;
+    }
+
+    .material-symbols-rounded {
+      font-size: 18px;
+      color: $tab-navy;
+      font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24;
+      transition: color 0.2s ease;
+    }
+  }
+
+  .filters-content {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    white-space: nowrap;
+    scroll-behavior: smooth;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    flex: 1;
+    padding: 2px 0;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    .filters {
+      font-family: 'Space Grotesk', sans-serif;
+      color: $tab-text;
+      font-size: 10px;
+      font-weight: 450;
+      line-height: 1.2;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
+      cursor: not-allowed;
+      transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        border-color 0.2s ease,
+        opacity 0.2s ease;
+      border: 1px solid $tab-inactive-border;
+      border-radius: 8px;
+      background-color: $tab-inactive-bg;
+      opacity: 0.45;
+      pointer-events: none;
+
+      &.able {
+        opacity: 1;
+        pointer-events: auto;
+        cursor: pointer;
+      }
+
+      &.active {
+        background-color: $tab-navy;
+        border-color: $tab-navy;
+        color: #fff;
+        box-shadow: none;
+        opacity: 1;
+      }
+    }
+  }
+}

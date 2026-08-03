@@ -1,0 +1,34 @@
+<div class="flex flex-wrap gap-y-2">
+  @if (hasField('project_lead_description')) {
+  <div class="flex items-center pr-5">
+    <span class="font-['Space_Grotesk'] text-sm font-normal leading-[18px] text-[#8D9299]">Principal investigator</span>
+    <i class="pi pi-arrow-right px-2 text-xs text-[#8D9299]" aria-hidden="true"></i>
+    <span class="font-['Space_Grotesk'] text-[13px] font-[450] leading-[18px] text-[#345B8F]">{{
+      project.project_lead_description }}</span>
+  </div>
+  }
+  @if (hasField('levers') || hasField('lever')) {
+  <div class="flex items-center pr-5">
+    <span class="font-['Space_Grotesk'] text-sm font-normal leading-[18px] text-[#8D9299]">Lever</span>
+    <i class="pi pi-arrow-right px-2 text-xs text-[#8D9299]" aria-hidden="true"></i>
+    <span class="font-['Space_Grotesk'] text-[13px] font-[450] leading-[18px] text-[#345B8F]">{{ getLeverName()
+      }}</span>
+  </div>
+  }
+  @if (hasField('start_date')) {
+  <div class="flex items-center pr-5">
+    <span class="font-['Space_Grotesk'] text-sm font-normal leading-[18px] text-[#8D9299]">Start date</span>
+    <i class="pi pi-arrow-right px-2 text-xs text-[#8D9299]" aria-hidden="true"></i>
+    <span class="font-['Space_Grotesk'] text-[13px] font-[450] leading-[18px] text-[#345B8F]">{{ project.start_date |
+      date: 'dd/MM/yyyy' }}</span>
+  </div>
+  }
+  @if (hasField('end_date')) {
+  <div class="flex items-center pr-5">
+    <span class="font-['Space_Grotesk'] text-sm font-normal leading-[18px] text-[#8D9299]">End date</span>
+    <i class="pi pi-arrow-right px-2 text-xs text-[#8D9299]" aria-hidden="true"></i>
+    <span class="font-['Space_Grotesk'] text-[13px] font-[450] leading-[18px] text-[#345B8F]">{{ project.end_date |
+      date: 'dd/MM/yyyy' }}</span>
+  </div>
+  }
+</div>

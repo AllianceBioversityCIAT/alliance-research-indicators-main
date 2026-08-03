@@ -1,0 +1,80 @@
+<div
+  class="grid h-[calc(100%-60px)] w-[70vw] max-w-[1300px] md:overflow-x-hidden px-12 {{allModalsService.submitResultOrigin() !== 'latest' ? 'py-5' : ''}}">
+
+  @if (allModalsService.submitResultOrigin() === 'latest') {
+  <div class="-mx-12 mb-6">
+    <app-oicr-header [data]="headerData()" [showTag]="true" [showDownload]="true"></app-oicr-header>
+  </div>
+  }
+  <h3 class="text-[16px] font-semibold text-[#153C71] mb-2">Select a review action</h3>
+
+  <div class="flex justify-center space-x-6 xl:space-x-12 xl:pt-2" role="radiogroup"
+    aria-label="Select a review action">
+    @for (option of submittionOptions(); track option.key; let i = $index) {
+    <label class="relative xl:max-w-[250px] flex flex-col items-center p-6 rounded-lg text-center {{
+            option.disabled 
+              ? 'cursor-not-allowed opacity-50' 
+              : 'cursor-pointer focus-within:outline-none focus-within:ring-2 focus-within:ring-[#1689CA] focus-within:ring-offset-2'
+          }} {{
+            option.selected ? 'border-[#1689CA]/20 border-1 bg-[#79D9FF]/8' : 'bg-white'
+          }}" [attr.data-option-key]="option.key" [attr.aria-label]="option.label + ': ' + option.description"
+      [attr.aria-disabled]="option.disabled" (keydown)="onOptionKeydown($event, option, i)"
+      (click)="selectOption(option)" (focus)="onOptionFocus(option)">
+      <input type="radio" name="reviewAction" [value]="option.key" [checked]="option.selected" class="sr-only"
+        (change)="selectOption(option)">
+      <div
+        class="absolute top-2.5 right-3 w-3.5 h-3.5 rounded-full border-1 border-[#B9C0C5] flex items-center justify-center">
+        @if (option.selected) {
+        <div class="w-3.5 h-3.5 bg-[#1689CA] border-[#B9C0C5] rounded-full"></div>
+        }
+      </div>
+
+      <i class="pi !text-[30px] {{ option.icon }} {{ option.color }}"></i>
+      <span class="font-semibold text-[15px] text-[#4C5158]">{{ option?.label }}</span>
+      <p class="text-[12px] text-[#4c5158] flex-1 flex items-center justify-center text-center">
+        {{ option?.description }}
+      </p>
+    </label>
+    }
+  </div>
+
+  @if (submissionService.statusSelected()?.message && allModalsService.submitResultOrigin() !== 'latest') {
+  <p class="text-[15px] text-[#4c5158] my-5">
+    {{ submissionService.statusSelected()?.message }}
+  </p>
+  }
+
+  @if (allModalsService.submitResultOrigin() === 'latest' && submissionService.statusSelected()?.statusId === 10) {
+  <div class=" mt-6">
+    <div class="w-full">
+      <app-select class="!text-[16px]" label="Assign a MEL Regional Expert" [isRequired]="true" [signal]="form"
+        [optionValue]="{ body: 'mel_regional_expert', option: 'user_id' }" optionLabel="full_name"
+        serviceName="allianceStaffByGroup" [scrollHeight]="'220px'"
+        placeholder="Select the MEL Regional Expert"></app-select>
+    </div>
+
+    <div class="flex flex-col md:flex-row gap-5">
+      <div class="flex-1 xl:max-w-[200px]">
+        <app-input label="OICR No" helperText="Internal code assigned by SPRM." [isRequired]="true"
+          [validateEmpty]="true" [optionValue]="'oicr_internal_code'" [signal]="form"
+          placeholder="e.g. LAC-2501"></app-input>
+      </div>
+      <div class="flex-1">
+        <app-input label="SharePoint Folder Link" helperText="SPRM SharePoint Folder Link" pattern="url"
+          [optionValue]="'sharepoint_link'" [signal]="form" placeholder="Paste the SharePoint folder link"></app-input>
+      </div>
+    </div>
+  </div>
+  }
+
+  @if (submissionService.statusSelected()?.commentLabel) {
+  <label for="comments"
+    class="font-semibold text-[16px] text-[#153C71] block mb-2 {{ allModalsService.submitResultOrigin() === 'latest' ? 'mt-6' : '' }}">
+    {{ submissionService.statusSelected()?.commentLabel }}
+    <span class="text-red-500">*</span>
+  </label>
+  <textarea id="comments" rows="5" pTextarea autoResize="false"
+    class="w-full border-1 border-gray-500 rounded-md resize-none" [value]="submissionService.comment()"
+    [placeholder]="submissionService.statusSelected()?.placeholder || ''" (input)="setComment($event)"></textarea>
+  }
+</div>

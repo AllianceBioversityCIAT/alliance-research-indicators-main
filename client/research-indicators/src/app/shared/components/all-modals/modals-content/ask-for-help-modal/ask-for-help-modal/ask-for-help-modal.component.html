@@ -1,0 +1,52 @@
+<div class="px-12 pt-12 2xl:pt-12 flex flex-col gap-6 reduce-gap">
+  <div class="flex items-center bg-[#e8ebed] border-l-[5px] border-l-[#074b86] gap-5 px-5">
+    <span class="text-[#074b86] material-symbols-rounded">info</span>
+    <h3 class="text-[#777c83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+      If you are experiencing technical issues or need guidance on how to report research-related information in STAR,
+      you can use this form to ask
+      for support.
+    </h3>
+  </div>
+
+  <div class="flex flex-col gap-6 reduce-gap">
+    <div class="flex flex-col gap-1 2xl:gap-2">
+      <h2 class="label pb-2">Please select the type of support you need<span class="text-[14px] text-[#CF0808]">*</span>
+      </h2>
+      <p-select optionLabel="title" optionValue="value" placeholder="Select Support Type" [options]="this.supportTypes"
+        [(ngModel)]="body().type" class="text-[14px] text-[#4C5158]" [disabled]="loading()">
+      </p-select>
+    </div>
+
+    <div class="flex flex-col gap-1 2xl:gap-2">
+      <div class="flex justify-between flex-col md:flex-row">
+        <h2 class="label pb-2">
+          Provide as much detail as possible so we can assist you effectively<span
+            class="text-[14px] text-[#CF0808]">*</span>
+        </h2>
+        <p class="mt-2"
+          style="font-family: 'Barlow', sans-serif; font-weight: 500; font-style: normal; font-size: 12px; line-height: 100%; color: #8d9299">
+          Characters entered:
+          <span
+            [ngClass]="{ 'text-green-700': body().message.length >= 25, 'text-red-700': body().message.length < 25 }">{{
+            body().message.length
+            }}</span>
+          / Minimum required: 25
+        </p>
+      </div>
+
+      <div class="input-container !mb-0">
+        <textarea pTextarea id="name" aria-describedby="name-help" autocomplete="off" [(ngModel)]="body().message"
+          placeholder="" class="w-full text-[14px] text-[#4C5158] font-['Barlow']" [disabled]="loading()"
+          rows="5"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex mt-4 mb-10">
+    <button class="bg-[#035BA9] text-sm text-white  px-6 py-2.5 rounded-xl rounded-[14px] font-medium {{
+        !this.validateForm() || loading() ? 'bg-[#E8EBED] !text-[#8D9299] cursor-not-allowed' : 'cursor-pointer'
+      }}" (click)="this.sendRequest()" [disabled]="!this.validateForm() || loading()">
+      Send feedback
+    </button>
+  </div>
+</div>

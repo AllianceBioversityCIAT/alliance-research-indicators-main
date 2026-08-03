@@ -1,0 +1,87 @@
+<div class="w-full border border-[#E8EBED] rounded-[8px] overflow-hidden">
+  <div class="flex items-center bg-white justify-between border-b border-[#E8EBED] w-full p-4">
+    <div class="text-[#112F5C] text-[15px] uppercase font-bold">Add the people involved in this result</div>
+    <p-button styleClass="!rounded-[8px] !text-[12px] !py-1 !max-h-[27px]" size="small"
+      icon="pi pi-user-plus !text-[12px]" [label]="'Add author / contact person'" (keydown.enter)="addClicked.emit()"
+      (click)="addClicked.emit()">
+    </p-button>
+  </div>
+
+  <p-table [value]="rows || []" [showCurrentPageReport]="false" [paginator]="false"
+    [tableStyle]="{ 'min-width': '100%' }" [sortField]="'id'" [sortOrder]="1"
+    styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows">
+    <ng-template pTemplate="header">
+      <tr>
+        <th class="!text-[#112F5C] !bg-[#FCFCFC]" [pSortableColumn]="'id'" scope="col">
+          <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px] p-1.5">
+            No.
+            <p-sortIcon field="id"></p-sortIcon>
+          </div>
+        </th>
+        <th class="!text-[#112F5C] !bg-[#FCFCFC]" [pSortableColumn]="'name'" scope="col">
+          <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px]">
+            Name
+            <p-sortIcon field="name"></p-sortIcon>
+          </div>
+        </th>
+        <th class="!text-[#112F5C] !bg-[#FCFCFC]" [pSortableColumn]="'position'" scope="col">
+          <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px]">
+            Position
+            <p-sortIcon field="position"></p-sortIcon>
+          </div>
+        </th>
+        <th class="!text-[#112F5C] !bg-[#FCFCFC]" [pSortableColumn]="'affiliation'" scope="col">
+          <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px]">
+            Affiliation
+            <p-sortIcon field="affiliation"></p-sortIcon>
+          </div>
+        </th>
+        <th class="!text-[#112F5C] !bg-[#FCFCFC]" [pSortableColumn]="'email'" scope="col">
+          <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px]">
+            Email
+            <p-sortIcon field="email"></p-sortIcon>
+          </div>
+        </th>
+        <th class="!text-[#112F5C] !bg-[#FCFCFC]" [pSortableColumn]="'role'" scope="col">
+          <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px]">
+            Role
+            <p-sortIcon field="role"></p-sortIcon>
+          </div>
+        </th>
+        <th class="!text-[#112F5C] !bg-[#FCFCFC]" scope="col">
+          <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px]">
+            Actions
+          </div>
+        </th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-row let-i="rowIndex">
+      <tr>
+        <td>{{ i + 1 }}</td>
+        <td>{{ row.name || '-' }}</td>
+        <td>{{ row.position || '-' }}</td>
+        <td>{{ row.affiliation || '-' }}</td>
+        <td>{{ row.email || '-' }}</td>
+        <td>{{ row.role || '-' }}</td>
+        <td>
+          <button type="button" class="p-button p-button-text p-1 !bg-[#FFD5D5]" pTooltip="Remove author"
+            tooltipPosition="top" (click)="deleteClicked.emit(row)" (keydown.enter)="deleteClicked.emit(row)">
+            <i class="pi pi-trash text-[#CF0808]"></i>
+          </button>
+        </td>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="7" class="text-center p-6">
+          <div class="flex flex-col items-center gap-4 bg-surface-ground p-3 pb-4 rounded-xl">
+            <p class="text-[#4C5158] leading-4 text-center text-[14px] max-w-[800px]">
+              No people have been added yet. Start by clicking “Add contact person” to include those involved in this
+              result.
+            </p>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>

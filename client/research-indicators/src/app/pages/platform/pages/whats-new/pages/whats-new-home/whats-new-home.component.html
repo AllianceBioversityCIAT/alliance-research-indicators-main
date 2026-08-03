@@ -1,0 +1,65 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-5">
+    <div class="content-section w-full">
+      <div class="mb-10 flex w-full min-w-0 flex-col rounded-[10px] bg-[#fcfcfc] p-[30px]">
+        <div class="flex flex-col gap-1 px-2 pb-6">
+          <div class="mb-0 break-all font-['Inter'] text-[17px] font-bold leading-[18px] text-[#112F5C]">
+            Release Notes
+          </div>
+          <p class="mt-0.5 font-['Barlow'] text-[14px] font-light leading-[17px] text-[#777c83]">
+            Product updates and improvements for the STAR platform.
+          </p>
+        </div>
+
+        @if (whatsNewService.notionDataLoading()) {
+        <div class="flex flex-col gap-3 px-2 pb-8">
+          <h2 class="m-0 font-['Inter'] text-[14px] font-semibold leading-[18px] text-[#112F5C]">Most recent</h2>
+          <div class="grid w-full min-w-0 grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-2 2xl:grid-cols-3">
+            @for (item of [1, 2, 3]; track item) {
+            <p-skeleton width="100%" height="280px" [class]="item === 3 ? 'hidden 2xl:block' : ''" />
+            }
+          </div>
+        </div>
+        <div class="grid w-full min-w-0 grid-cols-1 gap-3.5 px-2 pb-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          @for (item of [1, 2, 3, 4, 5, 6, 7, 8]; track item) {
+          <p-skeleton width="100%" height="280px" />
+          }
+        </div>
+        } @else if (!whatsNewService.notionData()?.results?.length) {
+        <p class="m-0 px-2 font-['Barlow'] text-[13px] font-light leading-[17px] text-[#777c83]">
+          No published release notes are available right now.
+        </p>
+        } @else {
+        @if (whatsNewService.latestReleaseNotes().length) {
+        <div class="flex flex-col gap-3 px-2 pb-8">
+          <h2 class="m-0 font-['Inter'] text-[14px] font-semibold leading-[18px] text-[#112F5C]">Most recent</h2>
+          <div class="grid w-full min-w-0 grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-2 2xl:grid-cols-3">
+            @for (item of whatsNewService.latestReleaseNotes(); track item.id) {
+            <app-release-note-card [item]="item" />
+            }
+          </div>
+        </div>
+        }
+
+        @if (whatsNewService.archiveReleaseNotes().length) {
+        <div class="flex flex-col gap-3 px-2">
+          <h2 class="m-0 font-['Inter'] text-[14px] font-semibold leading-[18px] text-[#112F5C]">All releases</h2>
+          <div class="grid w-full min-w-0 grid-cols-1 gap-5 pb-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            @for (item of whatsNewService.archiveReleaseNotes(); track item.id) {
+            <app-release-note-card [item]="item" />
+            }
+          </div>
+
+          @if (whatsNewService.canLoadMoreArchive()) {
+          <div class="flex justify-center pb-2 pt-2">
+            <p-button label="Load more" [outlined]="true" severity="secondary"
+              [loading]="whatsNewService.notionDataLoadingMore()" (onClick)="loadMoreArchive()" />
+          </div>
+          }
+        </div>
+        }
+        }
+      </div>
+    </div>
+  </div>
+</div>

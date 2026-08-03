@@ -1,0 +1,38 @@
+<div class="input-container">
+  @if (label) {
+    <label class="label inline-block" for="username"
+      >{{ label }}
+      @if (isRequired) {
+        <span class="text-red-500">*</span>
+      }
+    </label>
+  }
+  @if (description) {
+    <small class="description" for="username">{{ description }}</small>
+  }
+  @if (currentResultIsLoading()) {
+    <p-skeleton width="100%" height="2.8rem" styleClass="mb-2" />
+  } @else {
+    <p-calendar
+      styleClass="w-full"
+      [(ngModel)]="signal()[optionValue]"
+      (ngModelChange)="setValue($event)"
+      [inputStyle]="isInvalid() ? { border: '2px solid #E69F00' } : {}"
+      [minDate]="minDate"
+      [maxDate]="maxDate"
+      [disabled]="disabled"
+      [readonlyInput]="readonly"
+      [dateFormat]="dateFormat"
+      [placeholder]="placeholder"
+      appendTo="body" />
+  }
+
+  @if (!this.inputValid().valid) {
+    @if (isInvalid()) {
+      <div class="flex items-center gap-1 -mt-1.5 text-[#E69F00] text-sm">
+        <i class="material-symbols-rounded !text-base">warning</i>
+        <span>{{ this.inputValid().message }}</span>
+      </div>
+    }
+  }
+</div>

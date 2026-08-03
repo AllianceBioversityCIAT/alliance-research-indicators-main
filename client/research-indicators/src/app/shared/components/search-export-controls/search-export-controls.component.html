@@ -1,0 +1,28 @@
+<div class="flex gap-3 items-center justify-between w-full">
+  <div class="relative w-[25rem]">
+    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+      <i class="pi pi-search text-[#6B7280] !text-[12px]"></i>
+    </span>
+    <input pInputText type="text" [ngModel]="searchValue" (input)="onInputChange($event)"
+      (keydown.enter)="onEnter($event)" [placeholder]="searchPlaceholder"
+      class="w-full !pl-9 !rounded-[8px] py-2 border !max-h-[27px] !text-[12px] !py-1 !border-[#B9C0C5] !text-[#6B7280] rounded-lg" />
+  </div>
+
+  <div class="flex gap-3 items-center">
+    <div class="relative">
+      <p-button
+        styleClass="!rounded-[8px] !text-[12px] !flex !items-center !justify-center  !max-h-[27px] !bg-white !text-[#035BA9] !border-[#035BA9]"
+        [label]="badge ? applyLabel + ' (' + badge + ')' : applyLabel" icon="pi pi-filter !text-[10px] !pt-0.5"
+        size="small" (keydown.enter)="apply.emit()" (click)="apply.emit()"></p-button>
+
+      @if (showOverlayDot) {
+      <div class="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
+      }
+    </div>
+
+    @if (showClear) {
+    <p-button styleClass="!text-[12px] !text-[#777C83]" label="Clear Filters" [text]="true" size="small"
+      severity="secondary" (keydown.enter)="clear.emit()" (click)="clear.emit()"></p-button>
+    }
+  </div>
+</div>

@@ -1,0 +1,54 @@
+<div class="input-container">
+  @if (label) {
+    <label class="label" for="username">{{ label }}</label>
+  }
+  @if (description) {
+    <small class="description" for="username" [innerHTML]="description"></small>
+  }
+</div>
+<div class="items">
+  <ng-template #defaultTemplate let-list> {{ list[this.optionLabel] }} </ng-template>
+  @if (currentResultIsLoading()) {
+    <p-skeleton width="100%" height="41px" styleClass="mb-2" />
+  } @else {
+    <p-multiSelect
+      [style]="{ width: '100%' }"
+      [loading]="this.loadingList()"
+      [options]="this.listInstance()"
+      [filter]="!this.service?.isOpenSearch()"
+      [filterBy]="this.optionLabel"
+      [optionLabel]="this.optionLabel"
+      [showToggleAll]="false"
+      [optionValue]="this.optionValue"
+      placeholder="Select items"
+      [(ngModel)]="this.body().value"
+      (onChange)="this.setValue($event)"
+      [virtualScroll]="true"
+      [virtualScrollItemSize]="41"
+      [emptyMessage]="'No results found. Try different keywords.'">
+      <ng-template pTemplate="header">
+        <div class="p-dropdown-header">
+          <div class="p-input-icon-left p-fluid">
+            <i class="pi pi-search"></i>
+            <input
+              #filter
+              type="text"
+              class="p-inputtext p-component"
+              (input)="onFilter({ filter: filter.value })"
+              (click)="$event.stopPropagation()"
+              placeholder="Search..." />
+          </div>
+        </div>
+
+        @if (this.loadingList()) {
+          <i class="pi pi-spin pi-spinner" style="font-size: 1.5rem; margin-left: 10px; color: #007bff"></i>
+        }
+      </ng-template>
+      <ng-template let-value pTemplate="selectedItems"> {{ this.body().value?.length }} items selected </ng-template>
+
+      @if (!this.hideSelected) {
+        <ng-template let-item pTemplate="item"><span [innerHTML]="item[this.optionLabel]"></span></ng-template>
+      }
+    </p-multiSelect>
+  }
+</div>

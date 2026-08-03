@@ -1,0 +1,212 @@
+# Execution Log — Bilateral / Mapping drives the Pool Funding tag
+
+## 1. Document Control
+
+- **Spec id:** 2026-07-mapping-drives-pool-funding-tag
+- **Spec path:** docs/specs/bilateral-module/mapping-drives-pool-funding-tag
+- **Branch:** AC-1594-bilateral-module-v2 (baseline HEAD at start: `ff4b7e78`)
+- **Process:** JCSPECS Leader → Implementer → Reviewer triad (`.agents/`)
+- **Created:** 2026-07-01
+- **Last updated:** 2026-07-01
+
+---
+
+## 2. Task Execution History
+
+### T-01 — Shared helper: effective pool-funding SQL fragment — ✅ PASS (attempt 1 of 3)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-100, R-BIL-105 (foundation)
+- **Implementer attempts:** 1
+
+#### Attempt 1
+
+- **Files changed (new):**
+  - `server/researchindicators/src/domain/shared/utils/pool-funding.util.ts`
+  - `server/researchindicators/src/domain/shared/utils/pool-funding.util.spec.ts`
+- **Implementer verification (from `server/researchindicators`):**
+  - `npx eslint` on both new files → exit 0 (clean).
+  - New spec → 2 tests pass, 1 inline snapshot pass (exact predicate for alias `'ac'` + parameterization with alias `'contract'`).
+  - Full `src/domain/shared/utils` suite → 22 suites / 131 tests pass.
+- **Reviewer verdict:** `STATUS: PASS` — "T-01 conforms exactly to tasks.md T-01 and design.md §5: the helper returns the specified OR/EXISTS predicate as a pure, alias-parameterized string builder in the two new `shared/utils/` files only (correct placement per D-pf-4 / src/CLAUDE.md §3.3); snapshot + parameterization tests present; no migrations, endpoints, or unrelated tracked code touched." Reviewer independently re-ran the spec (2 tests + 1 snapshot pass) and eslint (exit 0), and confirmed the referenced schema (`bilateral_project_mapping` migration 1779190000011 with `idx_bpm_agreement`, `agresso_contracts.agreement_id` / `is_pool_funding_contributor`) exists in-repo.
+
+#### Decisions made
+
+- Helper implemented exactly as the design.md §5 code block (multi-line template literal); the snapshot pins that exact shape.
+- Doc comment added stating the alias must be a trusted literal (never request input), per T-01 implementation note.
+- `// @sdd-spec bilateral-module/mapping-drives-pool-funding-tag` traceability comment added to the util file.
+
+#### Issues encountered (environmental, not task defects)
+
+1. **Pre-existing repo-wide lint error (unrelated to this spec):**
+   `src/domain/entities/bilateral/bilateral.service.ts:205` — `'activePortfolio' is assigned a value but never used` (`@typescript-eslint/no-unused-vars`). Leader verified via `git show HEAD` that the unused variable is committed at baseline HEAD `ff4b7e78` (science-program filtering work). It pre-dates T-01, is outside this spec's scope, and currently makes repo-wide `npm run lint` exit non-zero. Follow-up owner: bilateral squad (fix = use it in `deriveSciencePrograms`-adjacent logic or prefix `_`).
+2. **`npm run lint` side effects:** the script runs `eslint --fix`, which auto-reformats two unrelated tracked files (`agresso-contract.repository.ts:343`, `bilateral.service.ts` — formatting only, no semantic change). These are lint artifacts, not Implementer edits; left out of the T-01 commit.
+
+- **Final verification result:** PASS — task-scope lint clean, new spec green, shared-utils suite green, Reviewer PASS on first attempt.
+
+---
+
+### T-02 — find-contracts: derive projection, filter, and ordering — ✅ PASS (attempt 1 of 3)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-100, R-BIL-101, R-BIL-102, R-BIL-105
+- **Implementer attempts:** 1
+
+#### Attempt 1
+
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.ts` — import of `effectivePoolFundingContributorSql` + three edits inside `getContracts`: (a) inner-subquery projection (`:497`) now `${helper('ac')} AS is_pool_funding_contributor` (outer select alias untouched); (b) `poolFundingContributorFilter` (`:394-397`) now `AND ${helper('ac')} = 0|1`, feeding both count (`:441`) and main (`:520`) queries; (c) order fieldMap entry (`:344-345`) now the helper. `@sdd-spec` traceability marker added at the filter builder.
+  - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts` — one `orderBy` assertion updated from the old raw column to `` `${effectivePoolFundingContributorSql('ac')} ASC ` `` (no coverage removed).
+- **Implementer verification (from `server/researchindicators`):**
+  - `npx eslint` on both touched files → exit 0.
+  - `npx jest src/domain/entities/agresso-contract src/domain/shared/utils/pool-funding.util.spec.ts` → 5 suites / 100 tests pass.
+  - Full `npm test` → 291 suites / 1780 tests pass (pre-existing Jest worker teardown warning only).
+- **Reviewer verdict:** `STATUS: PASS` — all three edits use the T-01 helper with the projected alias preserved (R-BIL-100), the single filter const derives both count and main queries with the boolean→0|1 mapping kept (R-BIL-101), ordering uses the helper (R-BIL-102), pure OR with correlated EXISTS and no LEFT JOIN / DISTINCT change (R-BIL-105, D-pf-1). Reviewer independently re-ran eslint (exit 0) and the agresso-contract suite (4 suites / 98 tests pass), verified the controller→service→repository chain, and confirmed the diff contains exactly the described edits.
+
+#### Decisions made
+
+- Live-DB behavioral ACs (D504 etc.) are validated by the SQL construction here and get runtime assertions in T-04 (per design §10).
+- Spec assertion for ordering now pins the helper output instead of hardcoding the predicate — stays in sync with the single source of truth.
+
+#### Issues encountered / discoveries
+
+1. **Doc erratum (fixed 2026-07-01):** design.md §2/§7 and requirements.md §7 labeled the find-contracts chain as `service.findContracts → repository.findAllContracts`. The real chain is `AgressoContractController.findContracts` (`@Get('find-contracts')`, `:304`) → `service.findAgressoContracts` → `repository.getContracts`. The `service.findContracts → repository.findAllContracts` chain backs the ROOT `GET /api/agresso/contracts` endpoint instead. Docs corrected (constitution rule: fix the wrong doc, don't drift). The task's edit sites (`:343`, `:392-394`, projection) were correct for the real find-contracts path.
+2. **Scope gap escalated (OQ-2 / RB-4):** the root `GET /api/agresso/contracts` endpoint (`findAllContracts`) also exposes an `is_pool_funding_contributor` filter (`:107-108`) and returns `ac.*` — both still raw-column semantics. R-BIL-100/101 literally target `find-contracts` only, so this was NOT changed; escalated to PO as requirements.md OQ-2 (bring in scope vs. document raw-by-design).
+3. Pre-existing `bilateral.service.ts:205` lint error unchanged (RB-5); `bilateral.service.ts` was not touched.
+
+- **Final verification result:** PASS — file-scoped lint clean, module suite green, full suite 291/1780 green, Reviewer PASS on first attempt.
+
+---
+
+### T-03 — results read path: derive the projection — ✅ PASS (attempt 1 of 3)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-103
+- **Implementer attempts:** 1
+
+#### Attempt 1
+
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/results/repositories/result.repository.ts` — helper import (`:18`) + single projection edit in `findPoolFundingAlignmentContext` (`:205-207`): `COALESCE(ac.is_pool_funding_contributor, FALSE)` → `${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor`, with an `-- @sdd-spec` SQL line comment as traceability marker. `?` binding, JOINs, and the `PoolFundingAlignmentContext` interface untouched.
+- **Implementer verification (from `server/researchindicators`):**
+  - `npx eslint` on the file → clean.
+  - `npx jest result.repository.spec.ts pool-funding.util.spec.ts` → 2 suites / 47 tests pass.
+  - Full `npm test` → 291 suites / 1780 tests pass.
+- **Reviewer verdict:** `STATUS: PASS` — exact application of design.md §5 step 4; alias `ac` correct (RB-1 closed); projected alias preserved; embedded `-- ` comment is valid, newline-terminated MySQL syntax that cannot swallow the next line; LEFT JOIN null-contract case evaluates to 0, identical to the old `COALESCE(..., FALSE)`. Reviewer independently re-ran eslint (clean) and both suites (47 tests + 1 snapshot pass).
+
+#### Decisions made
+
+- RB-1 (alias uncertainty) resolved during Leader pre-check and confirmed by Reviewer: alias is `ac`.
+- `result.repository.spec.ts` exists but does not cover `findPoolFundingAlignmentContext`; no assertion pinned the old SQL, so no test edits. Method-level/runtime coverage lands in T-05 (per dependency graph T-03 → T-05).
+
+#### Issues encountered
+
+- None. `bilateral.service.ts` untouched (RB-5 unchanged).
+
+- **Final verification result:** PASS — lint clean, suites green, Reviewer PASS on first attempt.
+
+---
+
+### T-05 — Tests: results parity + mapping lifecycle — ✅ PASS (attempt 1 of 3)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-103, R-BIL-104, R-BIL-105
+- **Implementer attempts:** 1 (ran in parallel with T-04; different files, no conflicts)
+
+#### Attempt 1
+
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/results/repositories/result.repository.spec.ts` — helper import + new `describe('findPoolFundingAlignmentContext')` with 6 tests: effective projection & old-COALESCE-gone (R-BIL-103 AC.1); `?` param binding; first-row / null return contract; string-identical parity with find-contracts via the shared helper import (R-BIL-103 AC.2); pure-OR branch semantics — manual-tag branch, active-mapping branch gated on `bpm.is_active = 1`, OR with no suppress path (R-BIL-104 AC.1/AC.2, R-BIL-105 AC.1/AC.2). Load-bearing assertions derive from the imported helper, never hardcoded.
+- **Implementer verification:** file-scoped eslint clean; `npx jest result.repository.spec.ts pool-funding.util.spec.ts` → 53/53 pass; full `npm run test:cov` → 291 suites / 1790 tests green, global coverage stmts 81.91% / branches 74.12% / funcs 83.5% / lines 81.8% (≥ 60% gate).
+- **Reviewer verdict:** `STATUS: PASS` — tests-only diff; appends after the existing suite reusing the established `querySpy` pattern with no existing test modified; requirement coverage confirmed; parity assertion is a valid unit-level guarantee because both repositories embed the same helper output. Reviewer independently re-ran eslint (clean) and jest (53/53). Non-blocking note: the branch-semantics test intentionally pins predicate substrings as a semantic guard (a helper change removing `is_active` gating or the pure OR would rightly fail).
+
+#### Decisions made
+
+- **TEST-datasource integration cases skipped ("where practical" clause):** `ARI_TEST_MYSQL_*` points to a remote host unreachable from this environment (port 3306 connection failed); `src/CLAUDE.md §9` forbids MySQL in pure unit tests. Runtime lifecycle check (D504 create→true / deactivate→false) is explicitly deferred to **T-06 manual verification** — T-06 must execute it before spec close-out.
+
+#### Issues encountered
+
+- None. Concurrent T-04 work caused no cross-file interference (full-suite run green with both changesets present).
+
+- **Final verification result:** PASS — Reviewer PASS on first attempt.
+
+---
+
+### T-04 — Tests: Projects table projection + filter + ordering — ✅ PASS (attempt 1 of 3)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-100, R-BIL-101, R-BIL-102
+- **Implementer attempts:** 1 (ran in parallel with T-05; different files, no conflicts)
+
+#### Attempt 1
+
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts` — `// R-BIL-102 AC.1` annotation on the pre-existing pinned orderBy case + 4 new `getContracts` tests: effective projection with exactly-once predicate count and a raw-projection regex guard (R-BIL-100 AC.1–AC.4); filter true asserted on BOTH count and main queries with old-raw-filter absence (R-BIL-101 AC.1); filter false same (`= 0`, R-BIL-101 AC.3); filter absent → predicate never used as WHERE filter. All assertions compare against the imported helper output.
+- **Implementer verification:** file-scoped eslint clean; `npx jest src/domain/entities/agresso-contract` → 102 tests pass; full `npm run test:cov` → 291 suites / 1790 tests green, coverage 81.91% stmts / 81.8% lines (touched files: repository 95.16% stmts, helper 100%). Fail-safe verified out-of-band: simulated raw-column restoration breaks both guards.
+- **Reviewer verdict:** `STATUS: PASS` — call signatures match the real `getContracts(filter?, user?, orderFields?, direction?, pagination?, query?)`; requirement coverage confirmed; the restoration regex genuinely trips on the raw line and does not false-match the helper's `COALESCE(...)` or the outer `paginated_contracts.` line; R-BIL-101 AC.2 inherently covered by the effective-predicate `= 1` comparison at SQL-construction level; no existing test weakened; tests-only diff. Reviewer independently re-ran eslint (clean) and jest (102 pass).
+
+#### Decisions made
+
+- Same TEST-datasource deferral as T-05 (remote host unreachable; `src/CLAUDE.md §9`): pure query-string coverage; end-to-end value check falls to T-06 manual verification.
+
+#### Issues encountered
+
+- None.
+
+- **Final verification result:** PASS — Reviewer PASS on first attempt.
+
+---
+
+### T-06 — Swagger note, perf EXPLAIN, and manual verification — 🟡 PARTIAL (code ✅ PASS attempt 1; runtime checks pending user)
+
+- **Date:** 2026-07-01
+- **Requirements covered:** R-BIL-101 (docs), NFR-BIL-100 (pending)
+- **Implementer attempts:** 1
+
+#### Attempt 1 — Part 1: Swagger description (COMPLETE)
+
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.ts` — the find-contracts `pool-funding-contributor` `@ApiQuery` description (`:398-404`) updated to: *"Filter by pool-funding contribution. Effective value: manual tag OR an active bilateral project mapping — contracts with an active bilateral mapping are included even without the manual tag."* Decorator structure (name/required/type) intact; text-only.
+  - The controller has TWO independent inline `pool-funding-contributor` `@ApiQuery` blocks (root `@Get()` at `:75-80` and find-contracts). Only find-contracts was edited; the root endpoint's text intentionally unchanged (OQ-2 raw-column semantics preserved).
+- **Implementer verification:** file-scoped eslint clean; `npx jest src/domain/entities/agresso-contract` → 102/102 pass (controller spec does not assert Swagger text).
+- **Reviewer verdict:** `STATUS: PASS` — exactly one description changed on the right endpoint; root block untouched; `@ApiTags`/`@ApiBearerAuth`/`@ApiOperation` undisturbed; no behavior change; independent eslint + jest re-runs green.
+
+#### Part 2a: EXPLAIN index check — ✅ DONE (user-authorized run, 2026-07-02)
+
+- The user ran the read-only script (`SHOW INDEX` + 2× `EXPLAIN`) against CORE (`alliancereportingdb`).
+- **`SHOW INDEX`:** `idx_bpm_agreement` (on `agresso_agreement_id`), `uk_bpm_active_agreement`, `idx_bpm_clarisa_project`, PRIMARY — all present as designed.
+- **`EXPLAIN` (count + main queries, filter=true):** every `bpm` row is `select_type: DEPENDENT SUBQUERY` with `possible_keys: idx_bpm_agreement` but `key: null`, `type: ALL`, `rows: 5` — the optimizer skips the index because `bilateral_project_mapping` currently holds ~5 rows and a full scan of 5 rows is cheaper than an index lookup; it will switch to `ref` access as the table grows. The `type: ALL` on `agresso_contracts` (4018 rows) is pre-existing find-contracts behavior, not introduced by this spec.
+- **Verdict (NFR-BIL-100):** intent met — the index exists and is applicable (`possible_keys`), and there is no read-path regression at current data volume. The literal "EXPLAIN shows index use" criterion is deferred by the optimizer's cost model, not by a missing/inapplicable index. **Follow-up:** re-run EXPLAIN when `bilateral_project_mapping` grows materially (e.g. >1k rows) to confirm the switch to `ref`.
+
+#### Part 2b: manual D504 verification — ✅ DONE (2026-07-02, user-authorized, local instance :3001 → CORE DB)
+
+All checks executed by the Leader with explicit user approval; server running locally on port 3001:
+
+1. `GET /api/agresso/contracts/find-contracts?contract-code=D504` → `is_pool_funding_contributor: true` (active mapping, no manual tag) — R-BIL-100 AC.1 / the originating D504 scenario. ✅
+2. Filter checks (read-only): `pool-funding-contributor=true&contract-code=D504` → 1 row (D504, true); `pool-funding-contributor=false&contract-code=D504` → 0 rows — R-BIL-101 AC.1/AC.3 live. ✅
+3. Lifecycle round-trip (user approved mutation of shared CORE data): `PATCH /api/bilateral-project-mappings/11/deactivate` → 200, `is_active: false`; find-contracts then returned `is_pool_funding_contributor: false` (R-BIL-104 AC.1) ✅. Mapping re-created via `POST /api/bilateral-project-mappings` (D504 → CLARISA 22, DESIRA) → 201, **new id 12**; find-contracts returned `true` again ✅. Net data state: D504 badge restored; old mapping 11 remains soft-deleted history.
+4. Swagger: `/swagger-json` shows the new description on find-contracts' `pool-funding-contributor` and the unchanged raw-tag text on the root endpoint (OQ-2 intact). ✅
+
+**T-06 status: COMPLETE.** These checks also close the runtime lifecycle items deferred from T-04/T-05.
+
+- **Connectivity:** CORE MySQL (`ARI_MYSQL_HOST=192.168.20.210`, db `alliancereportingdb`) IS TCP-reachable from this machine (`nc -z` succeeded) — the earlier "unreachable" expectation applied to the TEST host only.
+- **Blocker:** executing queries against the shared CORE DB requires explicit user authorization; the Implementer's read-only mysql2 script was correctly denied by the permission layer, and the Leader declined to run it on a teammate's request (permission boundary). **Not an environmental failure — an authorization gate.**
+- **Ready for the user:**
+  1. Read-only EXPLAIN script prepared by the Implementer (session scratchpad, `explain.mjs`): `SHOW INDEX` on `bilateral_project_mapping` + `EXPLAIN` on the count and main-inner queries with the pool-funding filter. **Pass criterion (NFR-BIL-100):** the `bpm` row shows the `idx_bpm_agreement` key (typically `type=ref` / DEPENDENT SUBQUERY).
+  2. Manual D504 check against a running instance: `GET /api/agresso/contracts/find-contracts?contract-code=D504` → `is_pool_funding_contributor: true` (mapping id 11, no manual tag); deactivate mapping 11 → `false`; re-activate afterwards.
+  3. Swagger UI spot-check at `/swagger` for the updated description.
+- **These items also close out the runtime lifecycle checks deferred from T-04/T-05.**
+
+---
+
+## 3. Summary — SPEC COMPLETE (2026-07-02)
+
+- **T-01…T-06 ✅ all complete.** Every Reviewer audit passed on the first attempt (zero rework loops). Runtime verification (EXPLAIN + D504 lifecycle + Swagger) executed 2026-07-02 with user authorization.
+- Commits: `ba4a7d12` (T-01), `85c3f663` (T-02), `44b8c57e` (T-03), `2a33e768` (T-05), `9fcccebf` (T-04), `983c03aa` (T-06 Swagger), `e9a9c1f1` (EXPLAIN evidence), + final close-out commit.
+- Requirements: R-BIL-100…105 verified (unit + live); NFR-BIL-100 verified with the small-table caveat (re-check EXPLAIN as `bilateral_project_mapping` grows).
+- **Remaining follow-ups (outside execution):**
+  - Rollout comms (design §11): notify STAR team + MEL/PO on deploy that mapped contracts now surface the badge automatically; code-only deploy, backout = git revert.
+  - OQ-2 (PO decision): root `GET /api/agresso/contracts` still serves raw-column pool-funding semantics.
+  - RB-5: pre-existing `bilateral.service.ts:205` unused `activePortfolio` lint error (outside spec; bilateral squad).
+  - D-pf-5 drift note: OpenSearch document still indexes the raw column (out of scope by decision).
+  - Data note: D504's active mapping is now **id 12** (id 11 soft-deleted during lifecycle verification).

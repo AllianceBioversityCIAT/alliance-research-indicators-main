@@ -1,0 +1,88 @@
+<div class="container">
+  <div class="flex items-center justify-center min-h-11 min-w-11 h-11 w-11 max-h-11 max-w-11 rounded-full bg-[#7cb580]">
+    <div class="font-[400] text-[22px] leading-5 text-white tracking-[1.5px]">
+      {{ historyItem().created_by_object.first_name[0] }}{{ historyItem().created_by_object.last_name[0] }}
+    </div>
+  </div>
+
+  <div class="info-content">
+    <div class="text-content">
+      <span class="title">{{ historyItem().created_by_object.first_name }} {{ historyItem().created_by_object.last_name
+        }}
+        <span class="description-text">&nbsp;has moved the result to&nbsp;</span>
+        <span class="title capitalize">{{ historyItem().to_status?.name ?? ''
+          }}</span>
+      </span>
+    </div>
+    <div class="status-content">
+      <app-custom-tag [statusId]="historyItem().from_status_id" [statusName]="historyItem().from_status?.name ?? ''"
+        [statusColor]="historyItem().from_status?.config?.color?.text ?? ''"
+        [statusBackground]="historyItem().from_status?.config?.color?.background ?? ''"
+        [statusBorder]="historyItem().from_status?.config?.color?.border ?? ''" [icon]="true"
+        [iconName]="historyItem().from_status?.config?.icon?.name ?? ''"
+        [iconColor]="historyItem().from_status?.config?.icon?.color ?? ''"
+        [tooltip]="historyItem().from_status?.description ?? ''"></app-custom-tag>
+      <i class="pi pi-arrow-right !text-[12px] text-[#777C83]"></i>
+      <app-custom-tag [statusId]="historyItem().to_status_id" [statusName]="historyItem().to_status?.name ?? ''"
+        [statusColor]="historyItem().to_status?.config?.color?.text ?? ''"
+        [statusBackground]="historyItem().to_status?.config?.color?.background ?? ''"
+        [statusBorder]="historyItem().to_status?.config?.color?.border ?? ''" [icon]="true"
+        [iconName]="historyItem().to_status?.config?.icon?.name ?? ''"
+        [iconColor]="historyItem().to_status?.config?.icon?.color ?? ''"
+        [tooltip]="historyItem().to_status?.description ?? ''" [maxWidth]="'120px'"></app-custom-tag>
+    </div>
+    @if (historyItem().submission_comment && historyItem().submission_comment !== '' && historyItem().submission_comment
+    !==
+    null) {
+    <span class="text-[#4C5158] py-1"> <span class="font-bold">Comment:</span> {{ historyItem().submission_comment }}
+    </span>
+    }
+    <div class="date-content flex flex-nowrap items-center gap-2">
+      <span class="date">
+        @if (showCustomDateAndEdit()) {
+        {{ customDateFormatted() ?? '—' }}
+        } @else {
+        {{ updatedAtFormatted() ?? '—' }}
+        }
+      </span>
+      @if (canEditTimestamp()) {
+      <button type="button"
+        class="pencil-edit flex flex-shrink-0 items-center justify-center text-[#035BA9] hover:opacity-80 transition-opacity bg-[#D9E1EB] rounded-[5px] p-0.5"
+        (click)="openEditModal($event)" (keydown.enter)="openEditModal($event)" aria-label="Edit status change date">
+        <i class="material-symbols-rounded !text-[16px]">edit</i>
+      </button>
+      }
+    </div>
+  </div>
+</div>
+
+@if (isEditPanelVisible()) {
+<div class="fixed z-[100] p-5 bg-white border border-[#E4EAEE] rounded-lg shadow-lg min-w-[280px]"
+  [style.top]="panelStyle()!.top" [style.left]="panelStyle()!.left" (keydown.escape)="closeEditModal()">
+  <h3 id="edit-date-title" class="label mb-4 !font-[500]">Edit Status Change Date</h3>
+  <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-1">
+      <label class="label !text-[13px]" for="edit-status-date">Update Date</label>
+      <p-calendar id="edit-status-date" [ngModel]="editDate()" (ngModelChange)="editDate.set($event)"
+        [dateFormat]="editCalendarFormats().dateFormat" [showTime]="false" styleClass="w-full edit-date-calendar"
+        inputStyleClass="w-full edit-date-calendar-input" appendTo="body" />
+    </div>
+    <div class="flex flex-col gap-1">
+      <label class="label !text-[13px]" for="edit-status-time">Update Time ({{ editTimezoneLabel() }})</label>
+      <p-calendar id="edit-status-time" [ngModel]="editTime()" (ngModelChange)="editTime.set($event)" [timeOnly]="true"
+        [hourFormat]="editCalendarFormats().hourFormat" [dateFormat]="editCalendarFormats().timeFormat"
+        styleClass="w-full edit-date-calendar" inputStyleClass="w-full edit-date-calendar-input" appendTo="body" />
+    </div>
+  </div>
+  <div class="flex justify-star gap-3 mt-10">
+    <button type="button"
+      class="px-4 border-1 py-1 border-[#035BA9] text-[#035BA9] rounded-[10px] text-[14px] font-medium cursor-pointer hover:opacity-90"
+      (click)="closeEditModal()">Cancel</button>
+    <button type="button"
+      class="px-4 py-1 bg-[#035BA9] text-white rounded-[10px] text-[14px] font-medium cursor-pointer hover:opacity-90 disabled:opacity-50"
+      [disabled]="saving() || !editDate() || !editTime()" (click)="confirmEdit()">
+      {{ saving() ? 'Saving...' : 'Confirm' }}
+    </button>
+  </div>
+</div>
+}

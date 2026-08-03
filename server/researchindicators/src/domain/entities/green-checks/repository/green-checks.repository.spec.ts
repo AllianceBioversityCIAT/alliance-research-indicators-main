@@ -61,6 +61,20 @@ describe('GreenCheckRepository', () => {
     expect(repository.link_resultValidation('r.x')).toContain(
       'link_result_validation',
     );
+    expect(repository.poolFundingAlignmentValidation('r.x')).toContain(
+      'pool_funding_alignment_validation',
+    );
+  });
+
+  it('calculateGreenChecks always includes pool_funding_alignment', async () => {
+    findOneMock.mockResolvedValue({
+      indicator_id: IndicatorsEnum.POLICY_CHANGE,
+    });
+    queryMock.mockResolvedValueOnce([{}]);
+    await repository.calculateGreenChecks(1);
+    expect(queryMock.mock.calls[0][0] as string).toContain(
+      'pool_funding_alignment_validation(r.result_id) as pool_funding_alignment',
+    );
   });
 
   it('calculateGreenChecks includes policy_change for POLICY_CHANGE', async () => {

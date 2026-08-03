@@ -1,0 +1,114 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+
+  <div class="flex flex-col gap-5">
+    <div class="content-section">
+      <div class="flex flex-col bg-[#fcfcfc] rounded-[10px] p-[30px] mb-6">
+        <div class="font-['Space_Grotesk'] text-[14px] font-medium text-[#8d9299] uppercase mb-[30px]">
+          LINKS TO RESULT
+        </div>
+        <span class="text-[#153C71] !font-['Space_Grotesk'] text-[16px] leading-[20px] font-[500]">
+          Linked results
+        </span>
+
+        <div class="bg-white border border-[#E4EAEE] rounded-[18px] p-6 mt-3 flex justify-between items-center">
+          <div class="flex items-start gap-4">
+            <img [src]="'images/landing/search-feature.svg' | s3ImageUrl" class=" lg:w-[100px] w-[90px] p-2"
+              alt="Search feature" />
+
+            <div class="flex flex-col">
+              <span
+                class="text-[#153C71] text-[14px] !font-['Space_Grotesk'] leading-[20px] font-bold tracking-[0.03em] uppercase">
+                Search for existing results to link to this report
+              </span>
+              <p class="text-[#777C83] text-[15px] leading-[20px] mt-2 mb-0 max-w-[600px]">
+                Search for previously reported results that contribute to this one and link them to provide proper
+                context and traceability.
+              </p>
+            </div>
+          </div>
+
+          <button type="button" (click)="openSearchLinkedResults()" [disabled]="!submission.isEditableStatus()"
+            class="flex cursor-pointer items-center gap-2 bg-[#035BA9] ml-5 text-[#FFFFFF] pr-5 pl-6.5 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:text-[#A2A9AF]">
+            Search <i class="pi pi-search !text-[10px] -scale-x-100 "></i>
+          </button>
+        </div>
+
+        @if (loading()) {
+        <div class="flex justify-center items-center py-8">
+          <i class="pi pi-spin pi-spinner text-2xl text-[#035BA9]"></i>
+        </div>
+        } @else if (linkedResults().length > 0) {
+        <div class="mt-6">
+          <span class="text-[#777C83] text-[15px] leading-[20px] mb-4 block">
+            Selected results
+          </span>
+          @for (result of linkedResults(); track result.result_id) {
+          <div class="bg-[#F4F7F9] border border-[#E8EBED] px-4 py-3 flex justify-between items-center">
+            <div class="flex flex-col gap-2 flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <i [class]="getIndicatorIcon(result).icon + ' !text-[15px]'"
+                  [style.color]="getIndicatorIcon(result).color"></i>
+                <span class="text-[11px] text-[#8D9299] font-[400] !font-[Space_Grotesk] uppercase ">
+                  {{ result.indicators?.name }}
+                </span>
+              </div>
+              <p class="text-[#4C5158] font-[400] text-[14px] leading-4 font-[500] ">
+                {{ formatResultCode(result.result_official_code) }} -
+                {{ result.title }}
+              </p>
+              <div
+                class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#777C83] !font-['Space_Grotesk']">
+                @if (result.result_status?.result_status_id && result.result_status?.name) {
+                <app-custom-tag [statusId]="result.result_status!.result_status_id ?? ''"
+                  [statusName]="result.result_status!.name ?? ''"
+                  [statusColor]="result.result_status?.config?.color?.text ?? ''"
+                  [statusBackground]="result.result_status?.config?.color?.background ?? ''"
+                  [statusBorder]="result.result_status?.config?.color?.border ?? ''" [icon]="true"
+                  [iconName]="result.result_status?.config?.icon?.name ?? ''"
+                  [iconColor]="result.result_status?.config?.icon?.color ?? ''"
+                  [tooltip]="result.result_status?.description ?? ''" class="pr-1.5"
+                  [maxWidth]="'150px'"></app-custom-tag>
+                }
+                @if (result.result_contracts?.contract_id) {
+                <span class="text-[#8D9299] font-normal text-[12px] !font-['Space_Grotesk']">
+                  Reporting Project <i class="pi pi-arrow-right !text-[8px] text-[#777C83] pr-1.5 pl-1"></i>
+                  <span class="text-[#345B8F] uppercase font-semibold text-[11px]">{{
+                    result.result_contracts?.contract_id }}
+                    @if (result.result_contracts?.contract?.description) {
+                    {{ result.result_contracts?.contract?.description }}
+                    }
+                  </span>
+                </span>
+                }
+              </div>
+            </div>
+            @if (submission.isEditableStatus()) {
+            <button type="button" (click)="removeLinkedResult(result.result_id)"
+              class="flex-shrink-0 ml-4 cursor-pointer" [pTooltip]="'Remove linked result'">
+              <i class="pi pi-times-circle !text-[20px] text-[#CF0808]"></i>
+            </button>
+            }
+          </div>
+          }
+        </div>
+        } @else if (!loading()) {
+        <div class=" flex flex-col items-center justify-center py-12">
+          <img [src]="'images/no-results-found.png' | s3ImageUrl" alt="No linked results" class="w-[180px] mb-6" />
+          <span
+            class="text-[#153C71] text-[14px] !font-['Space_Grotesk'] leading-[20px] font-bold tracking-[0.03em] uppercase">
+            THERE ARE NOT LINKED RESULTS YET
+          </span>
+          <p class="text-[#777C83] text-[15px] leading-[20px] mt-1 max-w-[600px]">
+            Search for results to associate with this one.
+          </p>
+        </div>
+        }
+      </div>
+
+      <app-navigation-buttons [showSave]="true" [disableSave]="saving()" (back)="navigate('back')"
+        (next)="navigate('next')" (save)="saveData()">
+      </app-navigation-buttons>
+    </div>
+  </div>
+</div>

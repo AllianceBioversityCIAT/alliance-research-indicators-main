@@ -1,0 +1,15 @@
+:host ::ng-deep .p-select-panel {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
+}
+
+:host ::ng-deep .p-select-item {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+}

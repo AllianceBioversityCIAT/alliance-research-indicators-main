@@ -155,15 +155,16 @@ export class PrmsOpenSearchService
           `Successfully processed result ${findResult.result_id} from TIP.`,
         );
       } catch (error) {
+        const errorMessage = (error as Error).message ?? 'Unknown error';
         if (createNewResult) {
           this.logger.error(
-            `Error processing result ${createNewResult.result_id}, rolling back. Error: ${error.message}`,
+            `Error processing result ${createNewResult.result_id}, rolling back. Error: ${errorMessage}`,
           );
           await this._queryService.deleteFullResultById(
             createNewResult.result_id,
           );
         }
-        this.logger.error(`Error processing tip result: ${error.message}`);
+        this.logger.error(`Error processing tip result: ${errorMessage}`);
       }
       this._currentUser.clearSystemUser();
       this.logger.debug(
@@ -237,7 +238,8 @@ export class PrmsOpenSearchService
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
-      this.logger.error(`Error getting data from PRMS: ${error.message}`);
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(`Error getting data from PRMS: ${errorMessage}`);
     } finally {
       await this.prmsRepository.deleteTemporalResults(executionCode);
     }

@@ -17,6 +17,8 @@ import { ClarisaInitiativesModule } from '../entities/clarisa-initiatives/claris
 import { ClarisaImpactAreasModule } from '../entities/clarisa-impact-areas/clarisa-impact-areas.module';
 import { ClarisaGlobalTargetsModule } from '../entities/clarisa-global-targets/clarisa-global-targets.module';
 import { ClarisaSdgTargetsModule } from '../entities/clarisa-sdg-targets/clarisa-sdg-targets.module';
+import { ClarisaScienceProgramsModule } from '../entities/clarisa-science-programs/clarisa-science-programs.module';
+import { ClarisaProjectsModule } from '../projects/clarisa-projects.module';
 
 export const clarisaRoutes: Routes = [
   {
@@ -90,5 +92,14 @@ export const clarisaRoutes: Routes = [
   {
     path: 'global-targets',
     module: ClarisaGlobalTargetsModule,
+  },
+  {
+    path: 'science-programs',
+    module: ClarisaScienceProgramsModule,
+  },
+  {
+    // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.15
+    path: 'projects',
+    module: ClarisaProjectsModule,
   },
 ];

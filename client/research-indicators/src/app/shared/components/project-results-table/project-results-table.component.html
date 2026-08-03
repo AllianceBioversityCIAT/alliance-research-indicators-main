@@ -1,0 +1,59 @@
+<p-table class="w-full" #dt1
+  [value]="projectResultsTableService.resultList() | filterByTextWithAttr: 'full_name' : cacheService.projectResultsSearchValue()"
+  dataKey="id" [rows]="10" [rowsPerPageOptions]="[10, 25, 50]" [scrollHeight]="getScrollHeight()"
+  [loading]="projectResultsTableService.loading()" [paginator]="true"
+  [globalFilterFields]="['name', 'country.name', 'representative.name', 'status']" styleClass="custom-table">
+  <ng-template pTemplate="caption">
+    <div class="header">
+      <div class="search-box">
+        <i class="material-symbols-rounded">search</i>
+        <label class="sr-only" for="project-results-search-input">Search project results</label>
+        <input id="project-results-search-input" [(ngModel)]="cacheService.projectResultsSearchValue" type="text"
+          placeholder="Search by code, title or creator" />
+      </div>
+      <div class="options">
+        <p-button label="New Project Result" icon="pi pi-plus" severity="info" size="small"
+          styleClass="!rounded-[9px] !h-7.5 !text-[13px]" [style]="{ 'min-width': '95px' }"
+          (onClick)="openCreateResultForProject()" />
+      </div>
+    </div>
+  </ng-template>
+  <ng-template pTemplate="header" let-customer>
+    <tr>
+      @for (col of this.columns; track $index) {
+      <th [pSortableColumn]="col.attr" scope="col">
+        <div class="flex items-start gap-2">
+          {{ col.header }}
+          <p-sortIcon field="{{ col.attr }}"></p-sortIcon>
+        </div>
+      </th>
+      }
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="body" let-customer>
+    <tr>
+      @for (col of this.columns; track $index) {
+      <td [routerLink]="['/result', customer.result_official_code]" [attr.tabindex]="'0'">
+        @if (col.attr === 'statusName') {
+        <app-custom-tag [statusId]="customer.result_status?.result_status_id"
+          [statusName]="customer.result_status?.name"></app-custom-tag>
+        } @else {
+        {{ col.pipe ? (customer[col.attr] | date: 'dd/MM/yyyy') : customer[col.attr] }}
+        }
+      </td>
+      }
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="emptymessage">
+    <td colspan="7" class="text-center p-2 bg-white">
+      <div class="flex flex-col items-center gap-4 bg-surface-ground p-6 rounded-xl">
+        <div class="flex flex-col items-center gap-1">
+          <img [src]="'/images/landing/projects.png' | s3ImageUrl" alt="Empty Projects" class="w-[180px] mb-3" />
+          <h2 class="text-[#112F5C] text-[16px] font-bold">PROJECT RESULTS LIST IS EMPTY</h2>
+          <p class="text-[#4C5158] leading-4 text-center text-[14px] max-w-[600px] pt-1">No results found for this
+            project at the moment.</p>
+        </div>
+      </div>
+    </td>
+  </ng-template>
+</p-table>

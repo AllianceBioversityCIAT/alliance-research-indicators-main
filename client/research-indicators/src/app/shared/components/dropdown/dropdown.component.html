@@ -1,0 +1,8 @@
+<div class="dropdown {{ position }}">
+  <div class="dropdown-button">
+    <ng-content select="[dropdown-button]"></ng-content>
+  </div>
+  <div class="dropdown-content" [style.transform-origin]="positionY + ' ' + positionX">
+    <ng-content select="[dropdown-content]"></ng-content>
+  </div>
+</div>

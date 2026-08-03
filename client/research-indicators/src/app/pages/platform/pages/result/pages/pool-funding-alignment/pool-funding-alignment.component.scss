@@ -1,0 +1,47 @@
+:host {
+  display: block;
+}
+
+// Section heading row — vertically center the info icon with the uppercase title (Issue 2).
+.pf-alignment-section-heading {
+  .section-title {
+    margin-bottom: 0;
+    line-height: 1;
+  }
+
+  &__icon {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--ac-grey-500);
+    cursor: help;
+  }
+}
+
+// REQ-BIL-ASR-03 (AC-03.2) — error highlight for SP chips the backend rejected
+// (unknown_sp_codes). Token-based (var(--ac-red-1) has light + dark variants), no
+// hex literal. Applied on the chip content wrapper inside the picker's #rows slot.
+.pf-sp-chip-rejected {
+  border-radius: 6px;
+  padding: 2px 6px;
+  border: 1px solid var(--ac-red-1);
+  color: var(--ac-red-1);
+}
+
+// AC-08.4 — stale saved-alignment read-only sub-view (display only, token-styled).
+.pf-stale-snapshot {
+  border: 1px solid var(--ac-grey-300);
+  background: var(--ac-grey-100);
+}
+
+.pf-stale-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 1px 8px;
+  font-size: 12px;
+  border: 1px solid var(--ac-orange-1);
+  color: var(--ac-orange-1);
+}

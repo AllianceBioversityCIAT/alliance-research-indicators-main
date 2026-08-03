@@ -1,0 +1,31 @@
+<div class="item-content">
+  <div class="information">
+    <div class="row">
+      <div>
+        <strong>{{ institution?.acronym }}</strong> - {{ institution?.name }}
+      </div>
+      <div class="metadata-container">
+        <div class="metadata-text">
+          <div class="metadata-title">Institution Type</div>
+          &nbsp; <i class="material-symbols-rounded"> arrow_forward </i>&nbsp;
+          <i class="institution-type-description">{{ institution?.institution_type?.name }}</i>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="metadata-text">
+          <div class="metadata-title">Headquarter</div>
+          &nbsp; <i class="material-symbols-rounded"> arrow_forward </i>&nbsp;
+          <img
+            width="25"
+            height="25"
+            [src]="environment.flagsUrl + institution?.isoAlpha2 + '.svg'"
+            [alt]="institution?.institution_type?.name"
+            [srcset]="environment.flagsUrl + institution?.isoAlpha2 + '.svg'"
+            [pTooltip]="institution?.institution_location_name"
+            tooltipPosition="right" />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

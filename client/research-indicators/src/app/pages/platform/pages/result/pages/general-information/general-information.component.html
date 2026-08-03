@@ -1,0 +1,63 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+  <div class="flex flex-col gap-5 w-full">
+    <div class="content-section w-full">
+      <div class="flex flex-col w-full bg-[#fcfcfc] rounded-[13px] p-[30px] mb-10 border border-[#e8ebed] bg-[#ffffff]">
+        <div class="section-title">GENERAL INFORMATION</div>
+        <div class="grid gap-[25px]">
+          <div class="flex flex-col">
+            <app-input label="Title"
+              helperText="Provide a clear, informative name for the result, for a non-specialist reader and without acronyms. Avoid abbreviations or (technical) jargon."
+              [isRequired]="true" [disabled]="!submission.isEditableStatus()" [validateEmpty]="true"
+              [signal]="this.body" optionValue="title" placeholder="Write the title"
+              [maxLength]="cache.currentMetadata().indicator_id !== 5 ? 30 : 15"></app-input>
+          </div>
+
+
+          @if (cache.currentMetadata().indicator_id !== 5) {
+          <div class="flex flex-col">
+            <app-textarea [isRequired]="true" [disabled]="!submission.isEditableStatus()" [rows]="5" label="Description"
+              [maxLength]="400" [signal]="this.body" [optionValue]="'description'" placeholder="Describe the result"
+              [helperText]="'Within a max. of 400 words, add further details to “what it is”, “what it does”, “by whom” and “for whom” presented in the title, avoiding repetition of it and acronyms.'"></app-textarea>
+          </div>
+          }
+          <div class="flex flex-col xl:flex-row gap-5">
+            <div class="flex-1 xl:max-w-[144px]">
+              <app-select label="Reporting year" helperText="Choose the year you are reporting data for."
+                [isRequired]="true" [disabled]="!submission.isEditableStatus()" [signal]="this.body"
+                [optionValue]="{ body: 'year', option: 'report_year' }" optionLabel="report_year" serviceName="getYears"
+                placeholder="Select the year"></app-select>
+            </div>
+
+            <div class="flex-1">
+              <app-select label="Main contact person"
+                helperText="Select the Alliance staff member linked to the result who is leading or executing the activity and can provide information if needed. Only one person can be selected."
+                [isRequired]="true" [disabled]="!submission.isEditableStatus()" [signal]="this.body"
+                [optionValue]="{ body: 'user_id', option: 'user_id' }" optionLabel="full_name" serviceName="userStaff"
+                placeholder="Select the main contact person"></app-select>
+            </div>
+          </div>
+
+          <div class="flex flex-col">
+            <h1 class="label mb-[10px]">Keywords</h1>
+            <small class="text-[#777c83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left mb-[7px]">
+              Press <strong>"Enter"</strong> to generate the keyword before saving it. Use relevant terms that describe
+              the content of your result.
+            </small>
+
+            <div class="card p-fluid pb-1 keywords-autocomplete">
+              <p-autocomplete [(ngModel)]="body().keywords" [disabled]="!submission.isEditableStatus()"
+                inputId="multiple-ac-2" multiple fluid [typeahead]="false" placeholder="Write the keywords" />
+              <small class="text-[#8D9299] text-[14px] pt-1 block">
+                Add relevant keywords to describe your result, making it easier to find and categorize. Max. 4 keywords.
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <app-navigation-buttons [showBack]="false" [showSave]="submission.isEditableStatus()"
+        [disableNext]="!body().title" [disableSave]="!body().title" (next)="saveData('next')" (save)="saveData()" />
+    </div>
+  </div>
+</div>

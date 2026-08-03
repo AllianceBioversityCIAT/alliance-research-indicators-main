@@ -1,0 +1,71 @@
+<div
+  class="mx-auto flex w-full max-w-[1750px] flex-col items-start justify-start px-[20px] py-[50px] md:px-[45px] lg:px-[65px] xl:px-[75px]">
+  <h2
+    class="uppercase text-[#8d9299] font-normal tracking-[0.24em] pb-[10px] text-[15px] leading-[20px] lg:text-[17px] lg:leading-[22px] xl:text-[20px] xl:leading-[24px]">
+    DISCOVER MORE
+  </h2>
+  <h1
+    class="font-bold text-left text-[#112F5C] text-[28px] leading-[30px] lg:text-[35px] lg:leading-[40px] xl:text-[45px] xl:leading-[50.42px]">
+    Search for Projects and Results
+  </h1>
+
+  <p
+    class="text-left text-[18px] font-[400] text-[#4C5158] leading-[28px] lg:text-[20px] py-4 xl:text-[22px] max-w-[640px]">
+    View both your own results and those of others. Explore successful projects, gain insights, and find inspiration all
+    in one place.
+  </p>
+</div>
+
+<div class="mt-[70px] w-full bg-[length:100%_100%] bg-[position:center_top] bg-no-repeat"
+  [style.background-image]="'url(' + ('images/landing/discover-background.png' | s3ImageUrl) + ')'">
+  <div
+    class="mx-auto flex w-full max-w-[1750px] flex-col items-start justify-start gap-[25px] px-[20px] md:px-[45px] lg:px-[65px] xl:px-[75px]">
+    <div class="relative mx-auto -mt-[70px] w-full">
+      <img [src]="'images/landing/platform-1.svg' | s3ImageUrl" alt="discover-hero-1"
+        class="w-full transition-transform duration-300 ease-in-out delay-100 hover:-translate-y-2" />
+    </div>
+  </div>
+
+  <div
+    class="mx-auto mt-[100px] flex w-full max-w-[1750px] flex-col items-start justify-start gap-[25px] px-[20px] md:px-[45px] lg:px-[65px] xl:px-[75px]">
+    <div class="flex flex-col items-start justify-start xl:-mt-10 -mt-6">
+      <h2
+        class="uppercase font-normal tracking-[0.24em] pb-[10px] text-[15px] leading-[20px] text-white lg:text-[17px] lg:leading-[22px] xl:text-[20px] xl:leading-[24px]">
+        LEARN
+      </h2>
+      <h1
+        class="font-bold text-left text-white text-[28px] leading-[30px] lg:text-[35px] lg:leading-[40px] xl:text-[45px] xl:leading-[50.42px]">
+        About Indicators
+      </h1>
+    </div>
+
+    <div class="mt-[30px] grid grid-cols-1 gap-[25px] pb-[45px] md:grid-cols-2 lg:pb-[65px] xl:pb-[75px]">
+      @for (indicator of indicators; track $index) {
+      <div
+        class="flex flex-col gap-[10px] rounded-[12px] border-2 border-[#E8EBED] bg-white p-[25px] lg:gap-[12px] xl:gap-[15px]">
+        <div class="flex items-center gap-[15px]">
+          <i class="pi {{ indicator.icon }} !text-[35px] {{ indicator.type }}"></i>
+          <div class="gap-y-1">
+            <h2
+              class="text-left font-[space_grotesk] text-[15px] font-light leading-[28px] tracking-[0.24em] text-[#8D9299] lg:text-[16px] xl:text-[18px]">
+              {{ indicator.subtitle }}
+            </h2>
+            <p
+              class="!font-[sans-serif] text-left text-[18px] font-[600] uppercase leading-8 text-[#112F5C] lg:text-[20px] xl:text-[22px]">
+              {{ indicator.name }}
+            </p>
+          </div>
+        </div>
+        <p
+          class="mb-2 line-clamp-2 text-left text-[15px] font-light leading-[20px] text-[#4C5158] lg:text-[16px] xl:text-[18px]">
+          {{ indicator.description }}
+        </p>
+        <a class="inline-flex max-w-[80px] items-center border-b border-[#035BA9] text-left text-[13px] font-[400] text-[#035BA9] no-underline lg:max-w-[88px] xl:max-w-[98px] lg:text-[14px] xl:text-[16px]"
+          href="https://www.cgiar.org/indicators" target="_blank">
+          Learn more <i class="pi pi-arrow-right !text-[9px] pl-1.5 pt-0.5 xl:!text-[11px]"></i>
+        </a>
+      </div>
+      }
+    </div>
+  </div>
+</div>

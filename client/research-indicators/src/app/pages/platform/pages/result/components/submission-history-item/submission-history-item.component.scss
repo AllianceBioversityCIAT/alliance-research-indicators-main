@@ -1,0 +1,80 @@
+.container {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 25px;
+
+  .info-content {
+    display: grid;
+    gap: 7px;
+
+    .text-content {
+      display: flex;
+
+      .title {
+        font-family: Barlow, sans-serif;
+        font-weight: 500;
+        font-size: 15px;
+        line-height: 18px;
+        color: #345b8f;
+      }
+
+      .description-text {
+        font-family: Barlow, sans-serif;
+        font-weight: 350;
+        font-size: 15px;
+        line-height: 18px;
+        color: #345b8f;
+      }
+    }
+
+    .status-content {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      .material-symbols-rounded {
+        color: #8d9299;
+      }
+
+      .submitted-content {
+        border: 0.5px solid #7c9cb9 !important;
+      }
+
+      .editing-content,
+      .submitted-content {
+        display: flex;
+        align-items: center;
+        border: 0.5px solid #79d9ff;
+        border-radius: 6px;
+
+        .editing,
+        .submitted {
+          font-family: Barlow, sans-serif;
+          font-weight: 600;
+          font-size: 12px;
+          line-height: 15px;
+          color: #1689ca;
+          padding: 5px 10px;
+        }
+        .submitted {
+          color: #112f5c !important;
+        }
+      }
+    }
+  }
+
+  .date-content {
+    font-family: Barlow, sans-serif;
+    font-weight: 300;
+    font-size: 13px;
+    line-height: 15.6px;
+    color: #777c83;
+  }
+}
+
+:host ::ng-deep .edit-date-calendar-input.p-inputtext,
+:host ::ng-deep .edit-date-calendar .p-inputtext {
+  color: #4c5158 !important;
+  font-size: 13px !important;
+  font-family: Barlow, sans-serif !important;
+}

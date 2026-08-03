@@ -1,0 +1,315 @@
+<!-- Results Table -->
+<div class="flex flex-col {{roundedBottom ? 'rounded-b-lg' : ''}}">
+  @if (!hideFiltersToolbar) {
+  <div class="flex flex-col px-5 py-4 bg-white">
+    @if (resultEntryContext === 'results-center') {
+    <div class="mb-3">
+      <app-project-platform-filters [enableFilter]="true"
+        (platformClick)="onPlatformClick($event)"></app-project-platform-filters>
+    </div>
+    }
+    <div class="flex items-center justify-between w-full">
+      <app-search-export-controls [applyLabel]="'Apply Filters'"
+        [badge]="resultsCenterService.countTableFiltersSelected()"
+        [showOverlayDot]="!!resultsCenterService.countTableFiltersSelected()" [showClear]="true"
+        [searchValue]="this.resultsCenterService.searchInput()"
+        [searchPlaceholder]="'Find a result by code, title, creator or public link'"
+        (searchChange)="setSearchInputFilter($event)" (apply)="showFiltersSidebar()"
+        (clear)="this.resultsCenterService.clearAllFilters()">
+      </app-search-export-controls>
+
+      <div class="flex items-center gap-5">
+
+
+        @if (showNewProjectResultButton) {
+        <p-button label="New Project Result" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+          styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
+          (onClick)="openCreateResultForProject()">
+        </p-button>
+        }
+
+        <app-filters-action-buttons [showExportButton]="true" [exportLabel]="'Export metadata results'"
+          [isExportLoading]="isExporting()" [showViewToggleButtons]="false" [showConfigButton]="true"
+          (config)="showConfiguratiosnSidebar()" (export)="exportTable()">
+        </app-filters-action-buttons>
+      </div>
+    </div>
+
+    @if (shouldShowFilterMessage()) {
+    <div class="flex flex-wrap gap-2 mt-3 mb-1 items-center">
+      <span class="font-[450] text-[14px]" style="color: #8d9299; font-family: 'Space Grotesk', sans-serif">Results
+        filtered by</span>
+      <i class="pi pi-arrow-right !text-[12px]" style="color: #8d9299"></i>
+      @for (filter of getActiveFiltersExcludingIndicatorTab(); track filter.label + (filter.id || '')) {
+      <div class="flex items-center bg-[#E8EBED] rounded-xl px-3 py-1 gap-2">
+        <span class="text-[#4C5158] text-sm">{{ getFilterDisplayText(filter) }}</span>
+        <i class="pi pi-times-circle cursor-pointer text-[#6B7280] hover:text-[#111827]"
+          (keydown.enter)="resultsCenterService.removeFilter(filter.label, filter.id)"
+          (click)="resultsCenterService.removeFilter(filter.label, filter.id)"></i>
+      </div>
+      }
+    </div>
+    }
+  </div>
+  }
+
+  @if (resultsCenterService.loading()) {
+  <app-custom-progress-bar></app-custom-progress-bar>
+  } @else {
+  <div #tableRppScope class="rpp-dropup w-full border border-[#E8EBED] {{roundedBottom ? 'rounded-b-lg pb-1' : ''}}">
+    <p-table #dt2 [value]="resultsCenterService.resultsListForTable()" [paginator]="shouldShowPaginator()" [lazy]="true"
+      [first]="resultsCenterService.resultsTablePaginatorFirst()"
+      [rows]="resultsCenterService.resultsTablePaginatorRows()"
+      [totalRecords]="resultsCenterService.resultsTableTotalRecords()"
+      (onLazyLoad)="resultsCenterService.handleResultsTableLazyLoad($event)" [paginatorDropdownAppendTo]="tableRppScope"
+      [showCurrentPageReport]="shouldShowPaginator()" [scrollable]="true" [tableStyle]="{ 'min-width': '100%' }"
+      [rowsPerPageOptions]="[5, 10, 25, 50]"
+      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} results"
+      [sortField]="resultsCenterService.resultsTableSortField()"
+      [sortOrder]="resultsCenterService.resultsTableSortOrder()" [customSort]="true"
+      styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows">
+      <ng-template pTemplate="header">
+        <tr>
+          @for (column of getVisibleColumns(); track column.field) {
+          @if (!column.hideIf || !column.hideIf()) {
+          <th class="{{ column.minWidth }} {{ column.maxWidth }}   !text-[#112F5C]"
+            [pSortableColumn]="column?.hideFilterIf?.() ? '' : column.path" scope="col">
+            <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+              {{ column.header }}
+              @if (!column?.hideFilterIf?.()) {
+              <p-sortIcon field="{{ column.path }}"></p-sortIcon>
+              }
+            </div>
+          </th>
+          }
+          }
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-result>
+        <tr (keydown.enter)="openResult(result)" (click)="onTableRowClick($event, result)"
+          [attr.data-result-id]="result.result_official_code" [attr.data-platform]="result.platform_code"
+          class="cursor-pointer hover:surface-ground transition-colors duration-150 text-[14px]">
+          @for (column of getVisibleColumns(); track column.field) {
+          @if (!column.hideIf || !column.hideIf()) {
+          @if (column.field === 'status') {
+          <td class="{{ column.minWidth }} {{ column.maxWidth }} align-center w-0 max-w-full">
+            @if (result.platform_code === 'TIP' && result.external_link) {
+            <a target="_blank" (click)="$event.stopPropagation()" class="inline-block w-fit max-w-full"
+              style="color: inherit; text-decoration: none">
+              <app-custom-tag [statusId]="result.result_status.result_status_id" [tiny]="true"
+                [statusName]="result.result_status?.name"
+                [statusColor]="result.result_status?.config?.color?.text ?? ''"
+                [statusBackground]="result.result_status?.config?.color?.background ?? ''"
+                [statusBorder]="result.result_status?.config?.color?.border ?? ''" [icon]="true"
+                [iconName]="result.result_status?.config?.icon?.name ?? ''"
+                [iconColor]="result.result_status?.config?.icon?.color ?? ''"
+                [tooltip]="result.result_status?.description ?? ''" [maxWidth]="statusTagMaxWidth" [multiline]="true">
+              </app-custom-tag>
+            </a>
+            } @else {
+            <a [routerLink]="getResultRouteArray(result)" [queryParams]="getResultQueryParams(result)"
+              (click)="$event.stopPropagation()" class="inline-block w-fit max-w-full"
+              style="color: inherit; text-decoration: none; ">
+              <app-custom-tag [statusId]="result.result_status.result_status_id" [tiny]="true"
+                [statusName]="result.result_status?.name"
+                [statusColor]="result.result_status?.config?.color?.text ?? ''"
+                [statusBackground]="result.result_status?.config?.color?.background ?? ''"
+                [statusBorder]="result.result_status?.config?.color?.border ?? ''" [icon]="true"
+                [iconName]="result.result_status?.config?.icon?.name ?? ''"
+                [iconColor]="result.result_status?.config?.icon?.color ?? ''"
+                [tooltip]="result.result_status?.description ?? ''" [maxWidth]="statusTagMaxWidth" [multiline]="true">
+              </app-custom-tag>
+            </a>
+            }
+          </td>
+          } @else if (column.field === 'result_official_code') {
+          <td class="{{ column.maxWidth }} {{ column.minWidth }}">
+            <div
+              class="flex flex-col gap-0.5 items-center text-[13px] {{result.platform_code !== 'STAR' ? 'pt-1.5' : ''}}">
+              <div class="flex">
+                <span class="py-1 px-2 rounded-l-lg font-[600] min-w-[58px] max-w-[58px] text-center"
+                  [style.color]="getPlatformColors(result.platform_code)?.text"
+                  [style.background-color]="getPlatformColors(result.platform_code)?.background">
+                  {{ result.platform_code }}
+                </span>
+                <span class="text-[#4C5158] bg-[#E8EBED] py-1 px-2 rounded-r-lg min-w-[43px] text-center">
+                  {{ formatResultCode(result.result_official_code) }}
+                </span>
+              </div>
+              @if (result.platform_code !== 'STAR') {
+              <div class="flex items-center gap-1 text-[#B9C0C5] justify-center mt-0.5">
+                <i class="pi pi-eye !text-[11px]" aria-hidden="true"></i>
+                <span class="tracking-[0.24em] font-[space_grotesk] text-[10px] pl-1">READ ONLY</span>
+              </div>
+              }
+            </div>
+          </td>
+          } @else if (column.field === 'public_link') {
+          <td class="{{ column.minWidth }} {{ column.maxWidth }} align-center" (click)="$event.stopPropagation()"
+            (keydown.enter)="$event.stopPropagation()">
+            @if (showStarPdfReport(result)) {
+            @if (isStarPdfReportDisabled(result)) {
+            <span aria-hidden="true" class="inline-flex cursor-default opacity-40 text-[#777C83]">
+              <i class="pi pi-file-pdf !text-[18px]"></i>
+            </span>
+            } @else {
+            <button type="button" data-public-link-action (click)="openStarPdfReport(result); $event.stopPropagation()"
+              pTooltip="Open STAR PDF report" tooltipPosition="left"
+              [attr.aria-label]="'Open PDF report for STAR-' + result.result_official_code"
+              class="cursor-pointer border-0 bg-transparent p-0 text-[#035BA9]">
+              <i class="pi pi-file-pdf !text-[18px]"></i>
+            </button>
+            }
+            } @else if (result.public_link) {
+            <button type="button" data-public-link-action
+              (click)="openPublicLink(result.public_link); $event.stopPropagation()" [pTooltip]="result.public_link"
+              tooltipPosition="left"
+              [attr.aria-label]="(result.platform_code === 'STAR' ? 'Open PDF for ' : 'Open public link for ') + result.result_official_code"
+              class="cursor-pointer border-0 bg-transparent p-0 text-[#035BA9]">
+              <i class="pi pi-external-link !text-[16px]"></i>
+            </button>
+            } @else {
+            <span aria-hidden="true" class="inline-flex cursor-default opacity-40 text-[#777C83]">
+              <i class="pi pi-file-pdf !text-[18px]"></i>
+            </span>
+            }
+          </td>
+          } @else if (column.field === 'project') {
+          <td class="project-cell">
+            @let primaryContractId = getPrimaryContractId(result);
+            @if (primaryContractId) {
+            <a (keydown.enter)="$event.stopPropagation()"
+              class="project-link cursor-pointer hover:text-blue-800 hover:underline transition-colors duration-200"
+              [routerLink]="['/project-detail', primaryContractId]"
+              [queryParams]="resultEntryQueryParamsForNavigation()" (click)="$event.stopPropagation()">
+              {{ primaryContractId }}
+            </a>
+            } @else {
+            <span class="text-gray-500">Not provided</span>
+            }
+          </td>
+          } @else if (column.field === 'versions') {
+          <td>
+            @if (column.getValue) {
+            @let versions = column.getValue(result);
+            @let count = versions.length;
+            @let maxVisible = 4;
+            @let showMoreCount = count > maxVisible ? count - 3 : 0;
+            @let visibleYears = versions.slice(0, showMoreCount > 0 ? 3 : maxVisible);
+
+            @if (count > 0) {
+            <div (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()"
+              class="flex flex-wrap items-center gap-2 py-1">
+              @for (year of visibleYears; track year) {
+              <span (keydown.enter)="openResultByYear(result.result_official_code, year, result.platform_code)"
+                (click)="openResultByYear(result.result_official_code, year, result.platform_code)"
+                class="px-2 py-1 bg-[#F4F7F9] rounded-md text-[#1689CA] text-[11px] cursor-pointer">
+                {{ year }}
+              </span>
+              }
+              @if (showMoreCount > 0) {
+              <a #popoverTarget class="text-[#035BA9] cursor-pointer text-[11px] underline"
+                (click)="popover.toggle($event)">
+                +{{ showMoreCount }} more
+              </a>
+
+              <p-popover #popover [baseZIndex]="10000" [appendTo]="'self'"
+                styleClass="rounded-lg p-1 -ml-4 text-center">
+                <div class="mb-3 text-[14px] text-[#112F5C]">Approved Versions</div>
+                <div class="grid grid-cols-2 gap-2">
+                  @for (year of versions; track year) {
+                  <span (keydown.enter)="openResultByYear(result.result_official_code, year, result.platform_code)"
+                    (click)="openResultByYear(result.result_official_code, year, result.platform_code)"
+                    class="px-2 py-1 bg-[#F4F7F9] rounded-md text-[#1689CA] text-[11px] cursor-pointer">
+                    {{ year }}
+                  </span>
+                  }
+                </div>
+              </p-popover>
+              }
+            </div>
+            } @else {
+            <span>None</span>
+            }
+            }
+          </td>
+          } @else {
+          <td [class]="column.minWidth + ' ' + column.maxWidth" [class.break-words]="column.field === 'title'"
+            lang="es">
+            <a [routerLink]="getResultRouteArray(result)" [queryParams]="getResultQueryParams(result)"
+              (click)="$event.stopPropagation()" class="block w-full h-full"
+              style="color: inherit; text-decoration: none">
+              <div class="overflow-hidden line-clamp-3 xl:line-clamp-2">
+                {{ column.getValue ? column.getValue(result) : '-' }}
+              </div>
+            </a>
+          </td>
+          }
+          }
+          }
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        @if (hideFiltersToolbar && emptyMessage) {
+        <tr>
+          <td [attr.colspan]="getVisibleColumns().length" class="text-center p-8">
+            <div class="flex flex-col items-center gap-2">
+              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+                <i class="pi pi-inbox text-3xl text-blue-500"></i>
+              </div>
+              <span class="text-900 font-semibold m-0 text-[14px]">{{ emptyMessage }}</span>
+
+            </div>
+          </td>
+        </tr>
+        } @else if (!hideFiltersToolbar) {
+        @if (resultsCenterService.countFiltersSelected()) {
+        <tr>
+          <td [attr.colspan]="getVisibleColumns().length" class="text-center p-8">
+            <div class="flex flex-col items-center gap-4 bg-surface-ground p-6 rounded-xl">
+              <div class="flex flex-col items-center gap-2">
+                <div class="w-16 h-16 flex items-center justify-center rounded-xl bg-primary-50">
+                  <i class="pi pi-filter-slash text-3xl text-primary-500"></i>
+                </div>
+                <span class="text-900 font-semibold m-0 text-[14px]">No Results Found</span>
+                <p class="text-600 text-center m-0 max-w-[30rem] leading-relaxed">
+                  We couldn't find any results matching your current filters. Try adjusting your search criteria or
+                  clearing the filters.
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <p-button label="Clear All Filters" icon="pi pi-filter-slash" severity="primary" [outlined]="true"
+                  (keydown.enter)="resultsCenterService.clearAllFilters()"
+                  (click)="resultsCenterService.clearAllFilters()">
+                </p-button>
+              </div>
+            </div>
+          </td>
+        </tr>
+        } @else {
+        <tr>
+          <td [attr.colspan]="getVisibleColumns().length" class="text-center p-8">
+            <div class="flex flex-col items-center gap-4 bg-surface-ground p-6 rounded-xl">
+              <div class="flex flex-col items-center gap-2">
+                <div class="w-16 h-16 flex items-center justify-center rounded-xl bg-blue-50">
+                  <i class="pi pi-inbox text-3xl text-blue-500"></i>
+                </div>
+                <h2 class="text-900 font-semibold m-0">No Results Available</h2>
+                <p class="text-600 text-center m-0 max-w-[30rem] leading-relaxed">
+                  There are currently no results in the database. New results will appear here once they are added to
+                  the
+                  system.
+                </p>
+              </div>
+            </div>
+          </td>
+        </tr>
+        }
+        }
+      </ng-template>
+    </p-table>
+  </div>
+  }
+</div>
+
+<p-menu #menu [popup]="true" [model]="menuItems"></p-menu>

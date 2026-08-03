@@ -1,8 +1,16 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryColumn,
+} from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { Result } from '../../results/entities/result.entity';
 import { PolicyType } from '../../policy-types/entities/policy-type.entity';
 import { PolicyStage } from '../../policy-stages/entities/policy-stage.entity';
+import { ResultPoolFundingIndicatorMapping } from '../../bilateral/entities/result-pool-funding-indicator-mapping.entity';
 
 @Entity('result_policy_change')
 export class ResultPolicyChange extends AuditableEntity {
@@ -44,4 +52,10 @@ export class ResultPolicyChange extends AuditableEntity {
   )
   @JoinColumn({ name: 'policy_stage_id' })
   policy_stage!: PolicyStage;
+
+  @OneToMany(
+    () => ResultPoolFundingIndicatorMapping,
+    (mapping) => mapping.result_policy_change,
+  )
+  pool_funding_indicator_mappings?: ResultPoolFundingIndicatorMapping[];
 }

@@ -1,0 +1,29 @@
+<div class="container">
+  <div class="faq-header">
+    <h2 class="faq-header-subtitle">FRECUENTLY</h2>
+    <h1 class="faq-header-title">Asked Questions</h1>
+  </div>
+
+  <div class="content">
+    <p-accordion [value]="activePanel() ?? []">
+      <div class="accordions">
+        @for (faqItem of faqList(); let i = $index; track faqItem.question) {
+        <p-accordion-panel [value]="i">
+          <p-accordion-header class="custom-header">
+            <ng-template #toggleicon let-active="active">
+              @if (active) {
+              <i class="pi pi-minus text-[#777C83]"></i>
+              } @else {
+              <i class="pi pi-plus text-[#777C83]"></i>
+              }
+            </ng-template>
+            {{ faqItem.question }}</p-accordion-header>
+          <p-accordion-content>
+            <p [innerHTML]="faqItem.answer" class="px-2 pb-3"></p>
+          </p-accordion-content>
+        </p-accordion-panel>
+        }
+      </div>
+    </p-accordion>
+  </div>
+</div>

@@ -1,0 +1,41 @@
+<div class="login-container">
+  <div class="login-content" [style.background-image]="'url(' + ('texture-bg.png' | s3ImageUrl) + ')'">
+    <div class="login-form">
+      <div class="logo-section">
+        <img [src]="'/logo-star-ciat.png' | s3ImageUrl" alt="Alliance Biodiversity & CIAT" width="100%" />
+      </div>
+
+      <h2 class="login-title">Log in to your STAR platform</h2>
+
+      <p class="login-description">Use your organization email to easily connect</p>
+
+      <button class="cgiar-btn" (click)="redirectToCognito()">
+        <img [src]="'/cgiar-logo.png' | s3ImageUrl" alt="CGIAR" class="cgiar-icon" />
+        Continue with your CGIAR account
+      </button>
+
+      <div class="login-divider"></div>
+
+      <div class="support-info">
+        <p class="support-description">Need help? Contact Alliance IT Support at</p>
+        <a class="support-email" href="mailto:alliance-itsupport&#64;cgiar.org">alliance-itsupport&#64;cgiar.org</a>
+      </div>
+
+      <p class="terms-info">
+        By continuing, you acknowledge that you understand and agree to the
+        <a
+          href="https://cgiar-prms.notion.site/Legal-terms-1eef2712247880d7a703d082a65108af"
+          class="terms-link"
+          target="_blank"
+          rel="noopener noreferrer">
+          Terms &amp; Conditions
+        </a>
+      </p>
+    </div>
+
+    <div class="back-section">
+      <button class="back-btn" routerLink="/"><i class="pi pi-angle-double-left back-icon"></i> Go back to landing page</button>
+    </div>
+  </div>
+  <div class="bg-image-section" [style.background-image]="'url(' + ('login-cover.png' | s3ImageUrl) + ')'"></div>
+</div>

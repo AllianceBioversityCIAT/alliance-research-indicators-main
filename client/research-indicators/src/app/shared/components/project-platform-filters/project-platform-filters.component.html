@@ -1,0 +1,21 @@
+<div class="flex w-full flex-wrap gap-2">
+  @for (platform of platformOptions; track platform.platform_code) {
+  <button type="button"
+    class="relative inline-flex items-center justify-center border-0 bg-transparent p-0 transition-opacity"
+    [class.cursor-pointer]="enableFilter" [class.hover\:opacity-80]="enableFilter"
+    [class.cursor-default]="!enableFilter" [disabled]="!enableFilter"
+    (click)="onPlatformClick(platform, $event)"
+    [attr.aria-label]="enableFilter ? 'Filter by ' + platform.name : null"
+    [attr.aria-pressed]="enableFilter ? isPlatformFiltered(platform) : null">
+    <span
+      class="inline-flex min-w-[58px] items-center justify-center rounded-lg px-2 py-1 font-['Barlow'] text-[13px] font-semibold"
+      [style.color]="getPlatformColors(platform.platform_code)?.text"
+      [style.background-color]="getPlatformColors(platform.platform_code)?.background">
+      {{ platform.platform_code }}
+    </span>
+    @if (isPlatformFiltered(platform)) {
+    <span class="absolute -bottom-1 left-0 right-0 h-0.5 rounded-sm bg-[#035BA9]"></span>
+    }
+  </button>
+  }
+</div>

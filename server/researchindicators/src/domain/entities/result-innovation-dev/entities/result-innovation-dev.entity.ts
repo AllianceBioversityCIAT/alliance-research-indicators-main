@@ -15,6 +15,7 @@ import { InnovationDevAnticipatedUser } from '../../innovation-dev-anticipated-u
 import { DisseminationQualification } from '../../dissemination-qualifications/entities/dissemination-qualification.entity';
 import { ExpansionPotential } from '../../expansion-potentials/entities/expansion-potential.entity';
 import { ResultInnovationToolFunction } from '../../result-innovation-tool-function/entities/result-innovation-tool-function.entity';
+import { ResultPoolFundingIndicatorMapping } from '../../bilateral/entities/result-pool-funding-indicator-mapping.entity';
 
 @Entity('result_innovation_dev')
 export class ResultInnovationDev extends AuditableEntity {
@@ -270,4 +271,10 @@ export class ResultInnovationDev extends AuditableEntity {
       resultInnovationToolFunction.resultInnovationDev,
   )
   result_innovation_tool_functions!: ResultInnovationToolFunction[];
+
+  @OneToMany(
+    () => ResultPoolFundingIndicatorMapping,
+    (mapping) => mapping.result_innovation_dev,
+  )
+  pool_funding_indicator_mappings?: ResultPoolFundingIndicatorMapping[];
 }

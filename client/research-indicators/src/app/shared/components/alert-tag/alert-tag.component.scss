@@ -1,0 +1,26 @@
+.alert-container {
+  display: flex;
+  align-items: center;
+  background-color: #e8ebed;
+  border-left: 5px solid #074b86;
+  gap: 20px;
+  padding: 0 20px;
+
+  .icon {
+    color: #074b86;
+  }
+
+  h3 {
+    margin: 15px 0;
+  }
+
+  .alert-text {
+    color: #777c83;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 17px;
+    text-align: left;
+    justify-content: center;
+  }
+}

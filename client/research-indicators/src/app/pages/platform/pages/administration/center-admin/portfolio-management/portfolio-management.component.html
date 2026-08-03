@@ -1,0 +1,178 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-[18px]">
+    <div class="content-section w-full">
+      <section class="flex w-full min-w-0 flex-col gap-[18px]">
+        <div class="flex flex-col gap-[2px]">
+          <h1 class="m-0 font-['Barlow'] text-[17px] font-bold leading-normal text-[#112F5C]">Portfolio management</h1>
+          <p class="m-0 max-w-3xl font-['Barlow'] text-[14px] leading-[1.2] text-[#777C83]">
+            Create and maintain the portfolios used to support the Alliance strategy periods and their related system
+            adjustments.
+          </p>
+        </div>
+
+        <div class="flex flex-col mb-3">
+          <div class="flex flex-col px-5 py-4 bg-white">
+            <div class="flex items-center justify-between w-full">
+              <div class="flex gap-3 items-center justify-between w-full">
+                <div class="relative w-[25rem]">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <i class="pi pi-search text-[#6B7280] !text-[12px]" aria-hidden="true"></i>
+                  </span>
+                  <input pInputText type="text" id="portfolio-table-search" [ngModel]="tableSearch()"
+                    (ngModelChange)="setTableSearch($event)"
+                    placeholder="Find a portfolio by name, description or dates" aria-label="Search portfolios"
+                    class="w-full !pl-9 !rounded-[8px] py-2 border !max-h-[27px] !text-[12px] !py-1 !border-[#B9C0C5] !text-[#6B7280] rounded-lg" />
+                </div>
+
+                <div class="flex gap-3 items-center">
+                  @if (hasTableSearch()) {
+                  <p-button styleClass="!text-[12px] !text-[#777C83]" label="Clear search" [text]="true" size="small"
+                    severity="secondary" (keydown.enter)="clearTableSearch()" (click)="clearTableSearch()"></p-button>
+                  }
+
+                  <p-button label="Create portfolio" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+                    styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
+                    (onClick)="startCreate()">
+                  </p-button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          @if (loadError()) {
+          <p class="px-5 py-6 text-sm text-[#B00020] bg-white border border-[#E8EBED]">We could not load portfolios.
+            Please refresh the page.</p>
+          } @else {
+          @if (loading()) {
+          <app-custom-progress-bar></app-custom-progress-bar>
+          }
+          <div #tableRppScope class="rpp-dropup w-full border border-[#E8EBED]">
+            <p-table [value]="filteredPortfolios()" [loading]="loading()" [scrollable]="true" [tableStyle]="tableStyle()"
+              styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="name"
+                    [style]="fixedColumnStyle(columnWidths.name)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Portfolio name
+                      <p-sortIcon field="name"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" [style]="descriptionColumnStyle()">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Portfolio description
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="start_year"
+                    [style]="fixedColumnStyle(columnWidths.startDate)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Start date
+                      <p-sortIcon field="start_year"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="end_year"
+                    [style]="fixedColumnStyle(columnWidths.endDate)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      End date
+                      <p-sortIcon field="end_year"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" [style]="fixedColumnStyle(columnWidths.actions)">
+                    <div class="flex items-center justify-center font-[500] leading-tight text-[14px] text-center">
+                      Actions
+                    </div>
+                  </th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-portfolio>
+                <tr class="hover:surface-ground transition-colors duration-150 text-[14px] text-[#4C5158]">
+                  <td [style]="fixedColumnStyle(columnWidths.name)">
+                    <div class="w-full min-w-0 overflow-hidden truncate" [appTruncatedTooltip]="portfolio.name || '—'"
+                      tooltipPosition="top">
+                      {{ portfolio.name || '—' }}
+                    </div>
+                  </td>
+                  <td class="break-words" [style]="descriptionColumnStyle()">
+                    <div class="w-full min-w-0 overflow-hidden line-clamp-2"
+                      [appTruncatedTooltip]="portfolio.description || '—'" tooltipPosition="top">
+                      {{ portfolio.description || '—' }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.startDate)">
+                    <div class="w-full min-w-0 overflow-hidden truncate"
+                      [appTruncatedTooltip]="portfolio.start_year ? '' + portfolio.start_year : '—'" tooltipPosition="top">
+                      {{ portfolio.start_year || '—' }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.endDate)">
+                    <div class="w-full min-w-0 overflow-hidden truncate"
+                      [appTruncatedTooltip]="portfolio.end_year ? '' + portfolio.end_year : '—'" tooltipPosition="top">
+                      {{ portfolio.end_year || '—' }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.actions)">
+                    <div class="flex items-center justify-center gap-2">
+                      <button type="button" (click)="startEdit(portfolio)" aria-label="Edit portfolio"
+                        pTooltip="Edit portfolio" tooltipPosition="top"
+                        class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[#D9E1EB] p-[2px] hover:bg-[#D9E1EB] transition-colors duration-150">
+                        <i class="pi pi-pencil !text-[12px] text-[#035BA9]"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td colspan="5" class="text-center p-8">
+                    <div class="flex flex-col items-center gap-2">
+                      <div class="w-16 h-16 flex items-center justify-center rounded-xl bg-blue-50">
+                        <i class="pi pi-inbox text-3xl text-blue-500"></i>
+                      </div>
+                      <h2 class="text-900 font-semibold m-0">
+                        @if (hasTableSearch()) {
+                        No portfolios match your search
+                        } @else {
+                        No portfolios found
+                        }
+                      </h2>
+                      <p class="text-600 text-center m-0 max-w-[30rem] leading-relaxed">
+                        @if (hasTableSearch()) {
+                        Try adjusting your search criteria or clear the search to see all portfolios.
+                        } @else {
+                        There are currently no portfolios to display.
+                        }
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          </div>
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<app-modal modalName="portfolioManagement" [clearModal]="clearModal">
+  <div class="grid w-[min(760px,80vw)] grid-cols-1 gap-5 px-10 py-8 md:grid-cols-2">
+    <app-input label="Portfolio name" [signal]="form" optionValue="name" [isRequired]="true"
+      placeholder="Write the portfolio name" class="w-full md:col-span-2"></app-input>
+    <app-textarea label="Portfolio description" [signal]="form" optionValue="description" [isRequired]="true"
+      placeholder="Write the portfolio description" class="w-full md:col-span-2" styleClass="w-full" [rows]="4"
+      [maxLength]="500">
+    </app-textarea>
+    <div class="w-full">
+      <app-calendar-input label="Start date" [signal]="form" [isRequired]="true" optionValue="start_year"
+        [maxDate]="form().end_year" [disabled]="!canEditPortfolioDates()" placeholder="Select the start date">
+      </app-calendar-input>
+    </div>
+    <div class="w-full">
+      <app-calendar-input label="End date" [signal]="form" [isRequired]="true" optionValue="end_year"
+        [minDate]="form().start_year" [disabled]="!canEditPortfolioDates()" placeholder="Select the end date">
+      </app-calendar-input>
+    </div>
+
+  </div>
+</app-modal>

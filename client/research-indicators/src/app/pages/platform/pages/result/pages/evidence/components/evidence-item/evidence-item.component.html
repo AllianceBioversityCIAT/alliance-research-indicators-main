@@ -1,0 +1,67 @@
+<ng-template #requiredMessage>
+  <div class="flex items-center gap-1 text-[#E69F00] text-[14px]">
+    <i class="material-symbols-rounded !text-base">warning</i>
+    <span>This field is required</span>
+  </div>
+</ng-template>
+
+<div class="relative flex flex-col gap-4">
+  <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1 2xl:gap-2">
+      <div class="flex items-center justify-between space-x-2 text-[13px] text-sm text-gray-600 mb-[20px]">
+        <div class="flex items-center">
+          <h3
+            class="font-['Space_Grotesk'] font-normal text-[12px] leading-[100%] tracking-[0.24em] align-bottom text-[#8d9299] uppercase">
+            Evidence #{{ evidenceNumber ?? 1 }}
+          </h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <p-checkbox id="is_private" [disabled]="!submission.isEditableStatus()" [(ngModel)]="body().is_private"
+            binary="true" styleClass="w-4 h-4" />
+
+          <label for="is_private"
+            class="font-['Barlow'] font-normal text-[11px] leading-[100%] tracking-[0%] text-[#4B5563] cursor-pointer select-none">
+            Tag link as private
+          </label>
+
+          @if (submission.isEditableStatus()) {
+          <div class="cursor-pointer text-[#CF0808] pl-8 flex items-center justify-center" (click)="deleteEvidence()"
+            (keydown.enter)="deleteEvidence()">
+            <i class="pi pi-times-circle !text-[17px]"></i>
+          </div>
+          }
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <h2 class="label">Evidence link <span class="text-red-500">*</span></h2>
+      </div>
+
+      <input pInputText id="evidence_url" aria-describedby="evidence_url" [(ngModel)]="body().evidence_url" type="url"
+        [disabled]="!submission.isEditableStatus()" (ngModelChange)="setValue($event)" class="w-full"
+        [style]="(!validateWebsite(body().evidence_url) || isFieldInvalid()) && submission.isEditableStatus() ? { border: '2px solid #E69F00' } : {}"
+        [class.ng-invalid]="!validateWebsite(body().evidence_url)" placeholder="Paste the evidence link" />
+    </div>
+    @if (isFieldInvalid()) {
+    <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    } @else if (!validateWebsite(body().evidence_url) && submission.isEditableStatus()) {
+    <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+      <i class="material-symbols-rounded !text-base">warning</i>
+      <span>Please enter a valid URL</span>
+    </div>
+    }
+  </div>
+  <div class="flex flex-col gap-1">
+    <label for="evidence_description" class="label">
+      Evidence description <span class="text-red-500">*</span>
+    </label>
+    <textarea rows="7" pTextarea autoResize="false" [disabled]="!submission.isEditableStatus()"
+      id="evidence_description" [(ngModel)]="body().evidence_description"
+      [style]="isDescriptionMissing ? { border: '2px solid #E69F00 !important' } : { border: '1px solid #d0d4e4 !important' }"
+      (ngModelChange)="setValue($event)" placeholder="Write the evidence description"></textarea>
+
+    @if (isDescriptionMissing) {
+    <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+  </div>
+</div>

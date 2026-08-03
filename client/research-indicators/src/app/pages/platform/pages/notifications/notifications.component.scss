@@ -1,0 +1,41 @@
+.container {
+  margin: 30px 40px;
+
+  .tabView {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e8ebed;
+
+    .filters {
+      justify-content: center;
+      display: inline-flex;
+      gap: 10px;
+      background-color: #e8ebed;
+      padding: 10px;
+      border-radius: 10px;
+      border: 0.5px solid #b0c4dd;
+      margin-bottom: 40px;
+    }
+
+    .filter-button {
+      justify-content: center;
+      color: #345b8f;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 9px;
+      font-weight: 500;
+      line-height: 11px;
+      letter-spacing: 4px;
+      background-color: transparent;
+      border: none;
+      padding: 8px 20px;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background-color 0.3s;
+    }
+
+    .filter-button.active {
+      background-color: #345b8f;
+      color: #ffffff;
+    }
+  }
+}

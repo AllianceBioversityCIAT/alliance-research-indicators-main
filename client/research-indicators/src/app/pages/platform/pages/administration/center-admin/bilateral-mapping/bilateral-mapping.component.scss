@@ -1,0 +1,136 @@
+// @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-03, T-BIL-CAM-05)
+// All colors use design tokens (var(--ac-*)) — no hex literals (NF-04 / implementer.md hard rule).
+
+// ── Table ──────────────────────────────────────────────────────────────────────
+
+.bil-map-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--ac-grey-200);
+  }
+
+  th {
+    background-color: var(--ac-grey-100);
+    white-space: nowrap;
+  }
+}
+
+// Keyboard-focusable rows (NF-02 / §9)
+.bil-map-row {
+  cursor: default;
+  transition: background-color 0.12s ease;
+
+  &:focus,
+  &:focus-visible {
+    outline: 2px solid var(--ac-light-blue-300);
+    outline-offset: -2px;
+    background-color: var(--ac-grey-100);
+  }
+
+  &:hover {
+    background-color: var(--ac-grey-100);
+  }
+}
+
+// ── Source badges (token-based, no hex) ───────────────────────────────────────
+
+.bil-source-badge {
+  border: 1px solid var(--ac-grey-300);
+  color: var(--ac-grey-800);
+  background-color: var(--ac-grey-100);
+
+  &--MANUAL {
+    background-color: var(--ac-primary-blue-100);
+    color: var(--ac-primary-blue-600);
+    border-color: var(--ac-primary-blue-200);
+  }
+
+  &--AI_SUGGESTED {
+    background-color: var(--ac-green-100);
+    color: var(--ac-green-600);
+    border-color: var(--ac-green-200);
+  }
+
+  &--AI_AUTO {
+    background-color: var(--ac-light-blue-100);
+    color: var(--ac-light-blue-500);
+    border-color: var(--ac-light-blue-200);
+  }
+}
+
+// ── Active/inactive badges ────────────────────────────────────────────────────
+
+.bil-status-badge {
+  border-width: 1px;
+  border-style: solid;
+
+  &--active {
+    background-color: var(--ac-green-100);
+    color: var(--ac-green-600);
+    border-color: var(--ac-green-200);
+  }
+
+  &--inactive {
+    background-color: var(--ac-grey-200);
+    color: var(--ac-grey-700);
+    border-color: var(--ac-grey-300);
+  }
+}
+
+// ── Error block (list) ────────────────────────────────────────────────────────
+
+.bil-error-block {
+  border-color: var(--ac-red-1);
+  background-color: var(--ac-grey-100);
+}
+
+// ── Dialog form styles (T-BIL-CAM-05) ────────────────────────────────────────
+
+// Read-only AGRESSO field in EDIT mode (NF-04 / §4.5)
+.bil-readonly-field {
+  border: 1px solid var(--ac-grey-300);
+  background-color: var(--ac-grey-100);
+  color: var(--ac-grey-700);
+  min-height: 38px;
+}
+
+// Science-Program allocation preview (AC-05.2)
+.bil-sp-preview {
+  border: 1px solid var(--ac-grey-200);
+  background-color: var(--ac-grey-100);
+}
+
+// Inline save-error block (AC-05.5 / AC-05.6 / AC-06.3)
+.bil-save-error-block {
+  border: 1px solid var(--ac-red-1);
+  background-color: var(--ac-grey-200);
+}
+
+// ── Picker option labels (lazy-search pickers) ────────────────────────────────
+// Long contract labels WRAP (max 2 lines) instead of using `nowrap`, which would
+// force the option list wider than the trigger → horizontal scroll + a shifted
+// dialog. Wrapping keeps everything within the panel width. Full text via `title`.
+.bil-picker-option-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+// The selected value shown in the trigger stays single-line + ellipsis so a long
+// contract never overflows the (fixed-width) trigger.
+.bil-picker-selected-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}

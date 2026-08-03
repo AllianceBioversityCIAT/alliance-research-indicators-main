@@ -228,6 +228,24 @@ describe('GreenChecksService', () => {
 
       expect(dto.completness).toBe(false);
     });
+
+    it('should keep completness true when only the visual-only pool_funding_alignment check fails', async () => {
+      // pool_funding_alignment is informational: it must never lower
+      // completness (and therefore never block the submit flow).
+      calculateGreenChecks.mockResolvedValue({
+        general_information: true,
+        alignment: true,
+        geo_location: true,
+        partners: true,
+        evidences: true,
+        pool_funding_alignment: false,
+      });
+
+      const dto = await service.findByResultId(7);
+
+      expect(dto.completness).toBe(true);
+      expect(dto.pool_funding_alignment).toBe(false);
+    });
   });
 
   describe('statusManagement', () => {

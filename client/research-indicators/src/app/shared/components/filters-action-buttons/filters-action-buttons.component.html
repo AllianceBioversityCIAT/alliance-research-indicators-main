@@ -1,0 +1,24 @@
+<div class="flex gap-3 items-center">
+
+  @if (showExportButton) {
+  <p-button icon="pi pi-file-excel !text-[12px]"
+    styleClass="!rounded-[8px] !text-[12px] !py-1 !max-h-[27px] !min-w-[180px] !bg-white !text-[#035BA9] !border-[#035BA9]"
+    (keydown.enter)="!isExportLoading && export.emit()" (click)="!isExportLoading && export.emit()"
+    [label]="isExportLoading ? '' : exportLabel" class="p-button-outlined" [outlined]="true"
+    [disabled]="isExportLoading" [loading]="isExportLoading"></p-button>
+  }
+  @if (showViewToggleButtons) {
+  <p-button styleClass="!rounded-[4px] !text-[12px] !p-0 !max-h-[27px] view-toggle-btn" icon="pi pi-bars" size="small"
+    [text]="!isTableView" [outlined]="isTableView" severity="secondary" (keydown.enter)="tableView.emit()"
+    (click)="tableView.emit()"></p-button>
+
+  <p-button styleClass="!rounded-[4px] !text-[12px] !p-0 !max-h-[27px] view-toggle-btn" icon="pi pi-th-large"
+    size="small" [text]="isTableView" [outlined]="!isTableView" severity="secondary" (keydown.enter)="cardView.emit()"
+    (click)="cardView.emit()"></p-button>
+  }
+
+  @if (showConfigButton) {
+  <p-button styleClass="!rounded-[8px] !p-0 !max-w-[30px] !max-h-[27px] !border-none" icon="pi pi-cog !text-[17px]"
+    size="small" [outlined]="true" (keydown.enter)="config.emit()" (click)="config.emit()"></p-button>
+  }
+</div>

@@ -1,0 +1,51 @@
+<div class="input-container flex flex-col" [class.gap-4]="depth() === 0" [class.gap-3]="depth() > 0">
+  @for (node of nodes(); track node.pathKey) {
+  @if (node.type === 'group') {
+  <section class="flex flex-col gap-3 py-1">
+    <h3 class="m-0 text-[14px] font-[700] capitalize px-2.5 text-[#112F5C]">
+      {{ formatLabel(node.key) }}
+    </h3>
+    <app-json-structure-editor [nodes]="node.children" [values]="values()" [disabled]="disabled()"
+      (fieldChange)="fieldChange.emit($event)" class="pb-1 px-2.5" />
+    <div class="border-t border-[#eef1f3] bg-white pt-2"> </div>
+  </section>
+  }
+  }
+
+  @if (nonBooleanLeafNodes().length || booleanLeafNodes().length) {
+  <div class="flex flex-col gap-1 pr-2.5" [style.margin-left.px]="depth() * 10">
+    @if (nonBooleanLeafNodes().length) {
+    <div class="grid w-full grid-cols-1 gap-[12px] md:grid-cols-2 lg:grid-cols-3">
+      @for (node of nonBooleanLeafNodes(); track node.pathKey) {
+      <div class="flex w-full min-w-0 flex-col">
+        @if (node.valueType === 'null') {
+        <app-input [label]="formatLabel(node.key)" [signal]="fieldBody(node.pathKey, node.valueType)"
+          optionValue="value" [disabled]="true" placeholder="null" />
+        } @else if (node.valueType === 'number') {
+        <app-input [label]="formatLabel(node.key)" [signal]="fieldBody(node.pathKey, node.valueType)"
+          optionValue="value" type="number" [disabled]="disabled()" />
+        } @else {
+        <app-input [label]="formatLabel(node.key)" [signal]="fieldBody(node.pathKey, node.valueType)"
+          optionValue="value" [disabled]="disabled()" />
+        }
+      </div>
+      }
+    </div>
+    }
+
+    @if (booleanLeafNodes().length) {
+    <div class="grid w-full grid-cols-1 gap-[12px] md:grid-cols-2 lg:grid-cols-3">
+      @for (node of booleanLeafNodes(); track node.pathKey) {
+      <div class="flex w-full min-w-0 items-center gap-2">
+        <p-checkbox [binary]="true" [inputId]="'json-field-' + node.pathKey" [ngModel]="asBoolean(node.pathKey)"
+          (ngModelChange)="onBooleanChange(node.pathKey, $event)" [disabled]="disabled()" />
+        <label class="text-[14px] font-[400] text-[#4C5158] mt-0.5 cursor-pointer" [for]="'json-field-' + node.pathKey">
+          {{ formatLabel(node.key) }}
+        </label>
+      </div>
+      }
+    </div>
+    }
+  </div>
+  }
+</div>

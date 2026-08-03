@@ -1,0 +1,76 @@
+<div class="body">
+  @if (forceIndicatorFilter || !this.resultsCenterService.resultsFilter()['indicator-codes-tabs']?.length) {
+  <app-multiselect #indicatorSelect label="Indicator" [signal]="this.resultsCenterService.tableFilters"
+    optionLabel="name" optionValue="indicator_id" signalOptionValue="indicators" serviceName="getAllIndicators"
+    [scrollHeight]="forceIndicatorFilter ? '180px' : '270px'" placeholder="Select indicators"
+    [optionFilter]="indicatorOptionFilter">
+  </app-multiselect>
+  }
+  <app-multiselect #statusSelect label="Status" [signal]="this.resultsCenterService.tableFilters" optionLabel="name"
+    optionValue="result_status_id" signalOptionValue="statusCodes" serviceName="allResultStatus"
+    placeholder="Select statuses">
+  </app-multiselect>
+
+  @if (!hideProjectFilter) {
+  <div #containerRef>
+    <app-multiselect #projectSelect label="Project" [signal]="this.resultsCenterService.tableFilters"
+      optionLabel="select_label" optionValue="agreement_id" signalOptionValue="contracts" serviceName="contracts"
+      [scrollHeight]="'290px'" [itemHeight]="60" placeholder="Select projects">
+      <ng-template #item let-item>
+        <div class="flex flex-col gap-2 text-[14px]" [pTooltip]="item?.description">
+          <p class="text-[#4C5158] font-[400] line-clamp-2">
+            <b>{{ item?.agreement_id }} -</b>
+            {{ item?.description }}
+          </p>
+        </div>
+      </ng-template>
+
+      <ng-template #selectedItems let-value>
+        @if (value?.length > 0) {
+        <div class="flex items-center gap-2">
+          <span> {{ value?.length }} project{{ value?.length === 1 ? '' : 's' }} selected </span>
+        </div>
+        }
+      </ng-template>
+
+      <ng-template #rows let-contract>
+        <div class="flex-col flex w-full">
+          <div class="text-[15px] text-[#4C5158] font-[600]">{{ contract.agreement_id }} - {{ contract.description }}
+          </div>
+
+          <div class="flex justify-between pt-2 xl:pt-0">
+            <div class="flex gap-x-5 justify-between">
+              <div class="flex items-center">
+                <span class="font-normal text-[13px] text-[#777c83] font-['Space_Grotesk'] leading-4">Principal
+                  investigator</span>
+                <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+                <span class="text-[13px] uppercase leading-[18px] text-[#345b8f] font-['Space_Grotesk']">{{
+                  contract.project_lead_description
+                  }}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </ng-template>
+    </app-multiselect>
+  </div>
+  }
+
+  <app-multiselect #yearSelect label="Year" [signal]="this.resultsCenterService.tableFilters" optionLabel="report_year"
+    optionValue="report_year" signalOptionValue="years" serviceName="getYears" placeholder="Select years">
+  </app-multiselect>
+
+  <app-multiselect #sourceSelect label="Source" [signal]="this.resultsCenterService.tableFilters" optionLabel="name"
+    optionValue="platform_code" signalOptionValue="sources" serviceName="sourceFilterOptions"
+    placeholder="Select sources" [scrollHeight]="'180px'">
+    <ng-template #item let-item>
+      <div class="flex items-center gap-2">
+        @if (item.image) {
+        <img [src]="item.image | s3ImageUrl" [alt]="item.name" class="w-7 h-7 object-contain flex-shrink-0" />
+        }
+        <span>{{ item.name }}</span>
+      </div>
+    </ng-template>
+  </app-multiselect>
+</div>

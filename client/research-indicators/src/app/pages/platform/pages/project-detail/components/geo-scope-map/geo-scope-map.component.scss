@@ -1,0 +1,25 @@
+.geo-scope-map__canvas {
+  :global(.mapboxgl-ctrl-bottom-left),
+  :global(.mapboxgl-ctrl-bottom-right) {
+    z-index: 1;
+  }
+}
+
+:host ::ng-deep .geo-scope-popup {
+  font-family: Barlow, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #112f5c;
+
+  strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+}
+
+:host ::ng-deep .mapboxgl-popup-content {
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(17 47 92 / 12%);
+}

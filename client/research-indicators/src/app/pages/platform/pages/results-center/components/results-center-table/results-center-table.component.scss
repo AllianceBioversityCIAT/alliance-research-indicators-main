@@ -1,0 +1,56 @@
+.hyphens-auto {
+  hyphens: manual;
+  word-break: break-word;
+}
+
+:host ::ng-deep .p-datatable {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+:host ::ng-deep .p-datatable-table {
+  width: 100% !important;
+  min-width: 100% !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
+:host ::ng-deep .p-datatable-wrapper {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+:host ::ng-deep .p-paginator {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  width: 100% !important;
+  background: white !important;
+  padding: 10px 20px !important;
+  margin-top: auto !important;
+}
+
+:host ::ng-deep .p-datatable .p-paginator {
+  border-top: 1px solid #e8ebed !important;
+}
+
+:host ::ng-deep .p-paginator .p-paginator-current {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+
+:host ::ng-deep .p-paginator .p-paginator-pages {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+:host ::ng-deep .p-paginator .p-paginator-first,
+:host ::ng-deep .p-paginator .p-paginator-prev,
+:host ::ng-deep .p-paginator .p-paginator-next,
+:host ::ng-deep .p-paginator .p-paginator-last {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}

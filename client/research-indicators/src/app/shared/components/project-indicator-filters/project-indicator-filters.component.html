@@ -1,0 +1,26 @@
+<div class="flex w-full flex-wrap gap-3">
+  @for (indicator of processedIndicators; track indicator.indicator?.indicator_id) {
+  <div
+    class="relative box-border flex min-w-0 w-[135px] max-w-[135px] flex-[0_0_135px] flex-col gap-1.5 rounded-lg border border-[#E8EBED] bg-[#F9F9F9] p-2"
+    [class.cursor-pointer]="enableFilter" [class.transition-opacity]="enableFilter"
+    [class.hover\:opacity-80]="enableFilter" [class.pb-1.5]="isIndicatorFiltered(indicator)"
+    (click)="onIndicatorClick(indicator, $event)" (keydown.enter)="onIndicatorClick(indicator, $event)"
+    [attr.tabindex]="enableFilter ? 0 : -1" [attr.role]="enableFilter ? 'button' : null"
+    [attr.aria-label]="enableFilter ? 'Filter by ' + indicator.indicator.name : null">
+    <div class="flex min-w-0 items-start gap-[5px]">
+      <i class="pi {{ indicator.indicator.icon_src }} {{ indicator.indicator.icon_src === 'pi-users' || indicator.indicator.icon_src === 'pi-sun' ? '!text-[15px]' : '!text-[12.5px]' }} {{
+            indicator.indicator.indicator_type_id === 1 ? '!text-[#7CB580]' : '!text-[#F58220]'
+          }}">
+      </i>
+      <span
+        class="min-w-0 flex-1 overflow-visible whitespace-nowrap font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4 text-[#8D9299]"
+        [title]="indicator.indicator.name">{{ formatIndicatorLabel(indicator.indicator.name) }}</span>
+    </div>
+    <span class="font-['Space_Grotesk'] text-lg font-[550] leading-5 text-[#112F5C]">{{ indicator.count_results
+      }}</span>
+    @if (isIndicatorFiltered(indicator)) {
+    <div class="absolute -bottom-1 left-0 right-0 h-0.5 rounded-sm bg-[#035BA9]"></div>
+    }
+  </div>
+  }
+</div>

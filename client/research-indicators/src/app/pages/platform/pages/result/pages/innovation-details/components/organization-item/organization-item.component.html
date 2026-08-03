@@ -1,0 +1,104 @@
+<ng-template #requiredMessage>
+  <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+    <i class="material-symbols-rounded !text-[12px]">warning</i>
+    <span class="!text-[14px]">This field is required</span>
+  </div>
+</ng-template>
+
+<div class="relative flex flex-col gap-4 bg-[#F4F7F9] border border-[#E8EBED] flex-col p-5">
+  <div class="flex justify-between gap-1">
+    <span class="text-[13px] text-[#8D9299] font-['Space_Grotesk'] tracking-widest">ORGANIZATION # {{ organizationNumber
+      ?? 1 }}</span>
+
+    @if (submission.isEditableStatus()) {
+    <div class="cursor-pointer text-[#CF0808]" (click)="deleteOrganization()" (keydown.enter)="deleteOrganization()">
+      <i class="pi pi-times-circle !text-[16px] pr-1"></i>
+    </div>
+    }
+  </div>
+
+  <div class="flex flex-col gap-1">
+    <div class="flex items-center space-x-2 text-[14px] text-[#4C5158] pb-4">
+      <p-checkbox id="is_organization_known" [disabled]="!submission.isEditableStatus()"
+        [ngModel]="body().is_organization_known" (onChange)="onCheckboxChange($event)" binary="true"
+        styleClass="w-4 h-4" />
+      <label for="is_organization_known"> Is the organization known? </label>
+    </div>
+
+    @if (body().is_organization_known) {
+    <div class="flex flex-col gap-[18px] my-3">
+      <div class="flex items-center bg-[#e8ebed] border-l-[5px] border-l-[#074b86] gap-3 px-3">
+        <i class="text-[#074b86] !text-[18px] pi pi-exclamation-circle"></i>
+        <h3 class="text-[#777c83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+          Can't find the institution you need? Request to add it
+          <span (keydown.enter)="setSectionAndOpenModal('Partners')" (click)="setSectionAndOpenModal('Partners')"
+            class="text-[#2792ce] cursor-pointer underline">here</span>.
+        </h3>
+      </div>
+    </div>
+
+    <h2 class="text-[14px] font-[600] text-[#4C5158] pb-1">Organization<span class="text-[14px] text-[#CF0808]">*</span>
+    </h2>
+    <p-select [disabled]="!submission.isEditableStatus()" [scrollHeight]="'218px'" [optionLabel]="'html_full_name'"
+      placeholder="Select the organization" class="text-[14px]" [(ngModel)]="body().institution_id"
+      [style]="institutionMissing ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
+      [optionValue]="'institution_id'" (onChange)="onInstitutionChange($event.value)" [options]="filteredInstitutions()"
+      [filter]="true" [filterBy]="'html_full_name'" [virtualScroll]="true" [virtualScrollItemSize]="38"
+      [virtualScrollOptions]="{ itemSize: 38 }">
+      <ng-template pTemplate="item" let-institution>
+        <div class="flex items-center block whitespace-normal break-words gap-2">
+          <div [innerHTML]="institution.html_full_name"></div>
+        </div>
+      </ng-template>
+      <ng-template pTemplate="selectedItem" let-institution>
+        <div class="flex items-center block whitespace-normal break-words gap-2">Organization selected</div>
+      </ng-template>
+    </p-select>
+    @if (body().institution_id) {
+    <app-partner-selected-item [institution]="getSelectedInstitution()" class="mt-4 bg-[#e8ebed] p-4 pt-5" />
+    }
+    @if (institutionMissing) {
+    <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+    }
+    @if (!body().is_organization_known) {
+    <h2 class="label text-[#4C5158]">Organization type<span class="text-[14px] text-[#CF0808]">*</span></h2>
+
+    <p-select [disabled]="!submission.isEditableStatus()" [scrollHeight]="'218px'"
+      placeholder="Select the organization type" class="text-[14px]" [optionLabel]="'name'"
+      [(ngModel)]="body().institution_type_id"
+      [style]="organizationMissing ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
+      [optionValue]="'code'" (onChange)="onInstitutionTypeChange($event.value)" [options]="institutionService.list()">
+    </p-select>
+
+    @if (organizationMissing) {
+    <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+
+    @if (showSubTypeSelect()) {
+    <h2 class="label pt-4 text-[#4C5158]">Subtype<span class="text-[14px] text-[#CF0808]">*</span></h2>
+
+    <p-select [disabled]="!submission.isEditableStatus()" placeholder="Select the organization subtype"
+      [scrollHeight]="'218px'" class="text-[14px]" [optionLabel]="'name'" [(ngModel)]="body().sub_institution_type_id"
+      [style]="subTypeMissing ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
+      [optionValue]="'code'" [options]="subTypesService.list(body().institution_type_id ?? undefined)">
+    </p-select>
+
+    @if (subTypeMissing) {
+    <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+    }
+
+    @if (body().institution_type_id === 78) {
+    <input pInputText id="institution_type_custom_name" aria-describedby="institution_type_custom_name"
+      [(ngModel)]="body().institution_type_custom_name" placeholder="Specify other"
+      [disabled]="!submission.isEditableStatus()" (ngModelChange)="setValue($event)" class="w-full mt-3 text-[14px]"
+      [style]="isFieldInvalid() && submission.isEditableStatus() ? { border: '2px solid #E69F00' } : {}"
+      [class.ng-invalid]="isFieldInvalid()" />
+    @if (isFieldInvalid()) {
+    <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+    }
+    }
+  </div>
+</div>

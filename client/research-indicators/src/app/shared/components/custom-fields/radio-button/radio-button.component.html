@@ -1,0 +1,38 @@
+<div class="options input-container">
+  @if (label) {
+    <label class="label inline-block {{ centerOptions ? ' mb-2' : '' }}" for="username"
+      ><span [innerHTML]="label"></span>
+      @if (isRequired) {
+        <span class="text-red-500">*</span>
+      }
+    </label>
+  }
+  @if (description) {
+    <small class="description">{{ description }}</small>
+  }
+
+  <div class="flex {{ spaceX }} {{ direction === 'vertical' ? 'flex-col' : 'flex-row' }}">
+    @for (item of this.service.list(); track $index) {
+      <div class="option {{ direction === 'vertical' ? 'pr-0' : 'pr-1' }}">
+        <p-radioButton
+          [name]="getUniqueName()"
+          value="{{ item[optionValue.option] }}"
+          (ngModelChange)="setValue(item[optionValue.option])"
+          [(ngModel)]="this.body().value"
+          [disabled]="disabled"
+          [inputId]="getUniqueId(item)"
+          [class]="isInvalid() ? 'warning-radio' : ''" />
+          <span class="option-label ml-2" [innerHTML]="item[optionLabel]"></span>
+      </div>
+    }
+  </div>
+  @if (helperText) {
+    <span class="block text-[14px] text-[#8D9299]" [innerHTML]="helperText"></span>
+  }
+  @if (isInvalid()) {
+    <div class="flex items-center gap-1 {{ helperText ? '-mt-1' : '' }} text-[#E69F00] text-sm">
+      <i class="material-symbols-rounded !text-base">warning</i>
+      <span>This field is required</span>
+    </div>
+  }
+</div>

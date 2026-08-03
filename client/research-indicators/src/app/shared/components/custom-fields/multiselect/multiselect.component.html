@@ -1,0 +1,139 @@
+@let list = this.signal()[this.signalOptionValue];
+<div class="input-container">
+  @if (label) {
+  <label class="label inline-block flex items-center" for="username">{{ label }}
+    @if (_isRequired()) {
+    <span class="text-red-500">*</span>
+    }
+  </label>
+  }
+  @if (description) {
+  <small class="description" for="username" [innerHTML]="description"></small>
+  }
+</div>
+<div class="items">
+  <ng-template #defaultTemplate let-list> {{ list[this.optionLabel] }} </ng-template>
+  @if (currentResultIsLoading()) {
+  <p-skeleton width="100%" height="41px" styleClass="mb-2" />
+  } @else {
+  <div>
+    <p-multiSelect [style]="isInvalid() ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
+      [loading]="this.loadingSig()" [options]="this.availableOptions()" [filter]="!this.service?.isOpenSearch()"
+      [filterBy]="this.filterBy || this.optionLabel" [optionLabel]="this.optionLabel" [showToggleAll]="false"
+      [optionValue]="this.optionValue" [(ngModel)]="this.body().value" (ngModelChange)="this.setValue($event)"
+      [disabled]="disabled" [virtualScroll]="effectiveVirtualScroll()" [placeholder]="placeholder"
+      [virtualScrollItemSize]="virtualScrollEstimateSize()" [scrollHeight]="effectiveScrollHeight()"
+      [panelStyle]="multiselectPanelStyle" [appendTo]="appendTo" (onPanelShow)="onMultiselectPanelShow()"
+      (onPanelHide)="onMultiselectPanelHide()">
+      @if (this.service?.isOpenSearch()) {
+      <ng-template pTemplate="header">
+        <div class="p-dropdown-header">
+          <div class="p-input-icon-left p-fluid">
+            <i class="pi pi-search"></i>
+            <label class="sr-only" for="multiselect-open-search-input">Search options</label>
+            <input #filter id="multiselect-open-search-input" type="text" class="p-inputtext p-component"
+              (input)="onFilter({ filter: filter.value })" (click)="$event.stopPropagation()" placeholder="Search..." />
+          </div>
+        </div>
+      </ng-template>
+      }
+      @if (!this.hideSelected) {
+      <ng-template let-value pTemplate="selectedItems">
+        @if (selectedItems) {
+        <ng-container *ngTemplateOutlet="selectedItems; context: { $implicit: value }"></ng-container>
+        } @else {
+        {{ selectedOptions().length > 0 ? selectedOptions().length + ' items selected' : '' }}
+        }
+      </ng-template>
+
+      <ng-template let-item pTemplate="item">
+        <div class="flex w-full min-w-0 items-start whitespace-normal break-words gap-2">
+          @if (this.item) {
+          <ng-container *ngTemplateOutlet="this.item; context: { $implicit: item }"></ng-container>
+          } @else {
+          @if (serviceName === 'sdgs') {
+          <div class="flex-col flex w-full">
+            <div
+              class="flex items-center pt-1 xl:pt-0.5 text-[14px] leading-[18px] text-[#4C5158] gap-x-1 font-['Barlow'] font-[600]">
+              @if (item.icon) {
+              <img [src]="item.icon" [alt]="item.short_name" class="w-[35px] h-[35px] mr-2 rounded-[3px]" />
+              }
+              @if (item.description) {
+              <span class="text-[#4C5158] font-[600]">
+                SDG {{ item.short_name?.split(':')[0] }} -
+                <span class="font-normal">{{ item.short_name?.split(':')[1]?.trim() }} </span></span>
+              }
+            </div>
+          </div>
+          } @else {
+          <div class="flex align-items-center gap-2">
+            @if (this.flagAttributes.isoAlpha2) {
+            <img width="25" height="25" [src]="environment.flagsUrl + item[this.flagAttributes.isoAlpha2] + '.svg'"
+              [alt]="item[this.flagAttributes.institution_location_name]"
+              [srcset]="environment.flagsUrl + item[this.flagAttributes.isoAlpha2] + '.svg'"
+              [pTooltip]="item[this.flagAttributes.institution_location_name]" tooltipPosition="right" />
+            }
+            <span [innerHTML]="item[this.optionLabel]"></span>
+          </div>
+          }
+          }
+        </div>
+      </ng-template>
+      }
+    </p-multiSelect>
+  </div>
+  }
+
+  @if (!this.currentResultIsLoading() && isInvalid()) {
+  <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+    <i class="material-symbols-rounded !text-base">warning</i>
+    <span>This field is required</span>
+  </div>
+  }
+
+  @if (!this.hideSelected && !this.hideTemplate) {
+  @if (this.currentResultIsLoading() || !(this.optionsSig().length)) {
+  @for (row of list; track trackSelectedOptionRow($index, row)) {
+  <p-skeleton width="100%" height="41px" styleClass="mb-2" />
+  }
+  } @else {
+  @if (helperText) {
+  <span class="block text-[14px] mt-1.5 text-[#8D9299]" [innerHTML]="helperText"></span>
+  }
+  @if (textSpan && selectedOptions().length) {
+  <span class="block text-[14.5px] pb-3 pt-6 text-[#777C83]">{{ textSpan }}</span>
+  }
+  <div class="selected-items {{ !textSpan && selectedOptions().length ? 'mt-6' : '' }}"
+    [class.show-scroll]="!this.disabledSelectedScroll" [class.columns-xl]="columnsOnXl"
+    [class.columns-xl-3]="columnsOnXl && columnsOnXlCount === 3"
+    [class.selected-items--stack-gap]="hideRemoveIcon"
+    [class.selected-items--custom-surface]="!!selectedItemsSurfaceColor.trim()"
+    [style.--multiselect-selected-surface]="selectedItemsSurfaceColor.trim() || null">
+    @for (row of selectedOptions(); track trackSelectedOptionRow($index, row)) {
+    <div class="item  {{ dark ? ' !bg-[#e8ebed] !border-[#c6cdd1]/40' : 'abc-grey-100' }}"
+      [class.item--full-row]="hideRemoveIcon">
+      <div class="selected-row-main">
+        <ng-container *ngTemplateOutlet="rows || defaultTemplate; context: { $implicit: row }"></ng-container>
+      </div>
+      @if (!hideRemoveIcon) {
+      @if (removeCondition(row) && !this.disabled) {
+      @if (!row.disabled) {
+      <button type="button"
+        class="multiselect-row-remove shrink-0 cursor-pointer border-0 bg-transparent p-0 leading-none text-[#CF0808] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#CF0808]/30 rounded"
+        (click)="removeOption(row)" (keydown.enter)="removeOption(row)" aria-label="Remove">
+        <i class="pi pi-times-circle !text-[20px]"></i>
+      </button>
+      }
+      } @else {
+      <span class="inline-flex shrink-0 text-[#A2A9AF]" [pTooltip]="removeTooltip" tooltipPosition="top"
+        [attr.aria-label]="removeTooltip || 'Cannot remove'">
+        <i class="pi pi-times-circle !text-[20px]" aria-hidden="true"></i>
+      </span>
+      }
+      }
+    </div>
+    }
+  </div>
+  }
+  }
+</div>

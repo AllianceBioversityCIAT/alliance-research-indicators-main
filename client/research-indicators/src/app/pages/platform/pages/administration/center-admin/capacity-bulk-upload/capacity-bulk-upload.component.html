@@ -1,0 +1,22 @@
+<div class="bulk-upload-page flex min-h-0 w-full flex-col overflow-hidden" style="height: calc(100vh - 118px)">
+  <section class="flex h-full min-h-0 flex-col overflow-hidden" aria-label="Capacity Development bulk upload">
+    @if (loadError()) {
+    <div class="flex min-h-0 flex-1 items-center justify-center p-6 text-center text-[15px] leading-relaxed">
+      <p class="m-0 max-w-md text-[#8D9299]">
+        The bulk upload tool could not be loaded. Please try again later or contact support if the problem continues.
+      </p>
+    </div>
+    } @else if (missingUrl()) {
+    <div class="flex min-h-0 flex-1 items-center justify-center text-center text-[15px] leading-relaxed">
+      <p class="m-0 max-w-md">
+        Bulk upload is not available: no embed URL was returned from configuration.
+      </p>
+    </div>
+    } @else {
+    @if (safeEmbedUrl(); as embed) {
+    <iframe class="h-full min-h-0 w-full flex-1 border-0" title="Capacity Development bulk upload"
+      [src]="embed"></iframe>
+    }
+    }
+  </section>
+</div>

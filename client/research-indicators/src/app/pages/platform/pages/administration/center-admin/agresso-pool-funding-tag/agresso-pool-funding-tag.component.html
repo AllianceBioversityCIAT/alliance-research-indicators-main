@@ -1,0 +1,99 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-5">
+    <div class="content-section w-full">
+      <div class="agresso-pf flex w-full min-w-0 flex-col bg-[#fcfcfc] p-[30px] mb-10 rounded-[10px] gap-6">
+        <div class="font-['Inter'] text-[17px] font-bold leading-[18px] text-[#173f6f] mb-0 break-all px-2">
+          AGRESSO Pool Funding Tag
+        </div>
+
+        @if (saveSuccess()) {
+          <p class="rounded border border-[#B8E0C8] bg-[#EEF8F1] px-3 py-2 text-sm text-[#1B5E20]"
+            data-testid="save-success">Your changes have been saved.</p>
+        }
+
+        <!-- Card 1 — Contract lookup -->
+        <section class="lookup-card flex flex-col gap-2 p-4 rounded border border-[#E0E4E8]">
+          <label for="contractCodeInput" class="text-sm font-semibold text-[#173F6F]">Contract code</label>
+          <div class="flex gap-2 items-start">
+            <input pInputText id="contractCodeInput" type="text"
+              class="flex-1"
+              [ngModel]="contractCode()"
+              (ngModelChange)="contractCode.set($event)"
+              [disabled]="loading() || saving()"
+              placeholder="e.g. AC-1594"
+              data-testid="contract-code-input"
+              (keydown.enter)="onLookup()" />
+            <p-button label="Look up"
+              [disabled]="!contractCode().trim() || loading() || saving()"
+              (onClick)="onLookup()"
+              data-testid="look-up-button"></p-button>
+          </div>
+          @if (inlineError()) {
+            <small role="alert" aria-live="polite" class="text-[#B00020] text-sm" data-testid="inline-error">
+              {{ inlineError() }}
+            </small>
+          }
+        </section>
+
+        <!-- Card 2 — Contract summary (only when loaded) -->
+        @if (contract(); as c) {
+          <section class="summary-card flex flex-col gap-3 p-4 rounded border border-[#E0E4E8]" data-testid="summary-card">
+            <div class="text-sm font-semibold text-[#173F6F]">Contract</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              <div><span class="text-[#4C5158]">Code:</span> <span class="text-[#173F6F]">{{ c.agreement_id || '—' }}</span></div>
+              <div><span class="text-[#4C5158]">Funding type:</span> <span class="text-[#173F6F]">{{ c.funding_type || '—' }}</span></div>
+              <div class="sm:col-span-2"><span class="text-[#4C5158]">Description:</span> <span class="text-[#173F6F]">{{ c.description || '—' }}</span></div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-[#4C5158]">Current Pool Funding tag:</span>
+              @if (c.is_pool_funding_contributor) {
+                <app-custom-tag statusId="pool-funding" statusName="Pool Funding" [tiny]="true"
+                  data-testid="current-pool-funding-tag"></app-custom-tag>
+              } @else {
+                <span class="text-sm text-[#4C5158]" data-testid="current-pool-funding-empty">Not set</span>
+              }
+            </div>
+            @if (!isBilateral()) {
+              <small class="text-[#B00020] text-sm" data-testid="not-bilateral-hint">
+                This contract is not bilateral — the Pool Funding tag cannot be set.
+              </small>
+            }
+          </section>
+
+          <!-- Card 3 — Override -->
+          <section class="override-card flex flex-col gap-3 p-4 rounded border border-[#E0E4E8]"
+            [class.opacity-60]="!isBilateral() || saving()"
+            data-testid="override-card">
+            <div class="text-sm font-semibold text-[#173F6F]">Override</div>
+            <div class="flex items-center gap-2">
+              <p-checkbox inputId="newValueToggle" [binary]="true"
+                [ngModel]="newValue()"
+                (ngModelChange)="newValue.set($event)"
+                [disabled]="!isBilateral() || saving()"
+                data-testid="new-value-toggle"></p-checkbox>
+              <label for="newValueToggle" class="text-sm cursor-pointer">
+                Mark this contract as a Pool Funding contributor
+              </label>
+            </div>
+            <label for="justificationInput" class="text-sm text-[#4C5158]">
+              Justification (optional, up to {{ justificationMaxLength }} chars)
+            </label>
+            <textarea pTextarea id="justificationInput" rows="3"
+              [ngModel]="justification()"
+              (ngModelChange)="onJustificationInput($event)"
+              [disabled]="!isBilateral() || saving()"
+              [attr.maxlength]="justificationMaxLength"
+              data-testid="justification-input"></textarea>
+            <div class="flex justify-end">
+              <p-button label="Save" severity="primary"
+                [disabled]="!canSave() || saving()"
+                [loading]="saving()"
+                (onClick)="onSave()"
+                data-testid="save-button"></p-button>
+            </div>
+          </section>
+        }
+      </div>
+    </div>
+  </div>
+</div>

@@ -6,6 +6,7 @@ import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { AlianceManagementApp } from '../../../tools/broker/aliance-management.app';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
+import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 import { AgressoContractStatus } from '../../../shared/enum/agresso-contract.enum';
@@ -488,6 +489,11 @@ describe('AgressoContractRepository', () => {
           field: OrderFieldsEnum.COUNT_RESULTS,
           expected: 'contract_total_results ASC ',
         },
+        {
+          // R-BIL-102 AC.1 — ordering uses the effective predicate, not the raw column
+          field: OrderFieldsEnum.POOL_FUNDING_CONTRIBUTOR,
+          expected: `${effectivePoolFundingContributorSql('ac')} ASC `,
+        },
       ];
       testCases.forEach(({ field, expected }) => {
         const direction = expected.includes('DESC') ? 'DESC' : 'ASC';
@@ -749,6 +755,93 @@ describe('AgressoContractRepository', () => {
         (repository.query as jest.Mock).mock.calls[0][0] as string,
       ).toContain('AND pfc.id IS NULL');
       expect(out.data).toHaveLength(1);
+    });
+
+    // @sdd-spec bilateral-module/mapping-drives-pool-funding-tag
+    // The effective predicate is compared against the imported helper output so the
+    // OR/EXISTS text is never hardcoded here; if the helper changes, these follow it.
+    it('should project the effective pool-funding predicate, not the raw column', async () => {
+      // R-BIL-100 AC.1–AC.4 — a single effective predicate
+      // (COALESCE(...)=1 OR EXISTS(... is_active = 1)) drives every flag outcome.
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.getContracts();
+
+      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      const predicate = effectivePoolFundingContributorSql('ac');
+
+      expect(sql).toContain(`${predicate} AS is_pool_funding_contributor`);
+      // The predicate appears exactly once (the projection) when no filter is applied.
+      expect(sql.split(predicate).length - 1).toBe(1);
+      // Fails if the raw-column projection is restored in the inner select.
+      expect(sql).not.toMatch(/^\s*ac\.is_pool_funding_contributor,\s*$/m);
+    });
+
+    it('should filter with the effective predicate on both count and main queries when pool-funding is true', async () => {
+      // R-BIL-101 AC.1 — mapping-derived contracts are included in the "true" set.
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ total: '1' }])
+        .mockResolvedValueOnce([]);
+
+      await repository.getContracts(
+        { is_pool_funding_contributor: true } as any,
+        undefined,
+        undefined,
+        undefined,
+        { page: 1, limit: 10 },
+      );
+
+      const countSql = (repository.query as jest.Mock).mock
+        .calls[0][0] as string;
+      const mainSql = (repository.query as jest.Mock).mock
+        .calls[1][0] as string;
+      const predicate = effectivePoolFundingContributorSql('ac');
+
+      expect(countSql).toContain(`AND ${predicate} = 1`);
+      expect(mainSql).toContain(`AND ${predicate} = 1`);
+      // Fails if the old raw-column filter is restored (tasks.md T-04 acceptance).
+      expect(countSql).not.toContain('AND ac.is_pool_funding_contributor =');
+      expect(mainSql).not.toContain('AND ac.is_pool_funding_contributor =');
+    });
+
+    it('should filter with the effective predicate on both count and main queries when pool-funding is false', async () => {
+      // R-BIL-101 AC.3 — mapping-derived contracts are excluded from the "false" set
+      // because the predicate (not the raw column) is what gets compared to 0.
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ total: '0' }])
+        .mockResolvedValueOnce([]);
+
+      await repository.getContracts(
+        { is_pool_funding_contributor: false } as any,
+        undefined,
+        undefined,
+        undefined,
+        { page: 1, limit: 10 },
+      );
+
+      const countSql = (repository.query as jest.Mock).mock
+        .calls[0][0] as string;
+      const mainSql = (repository.query as jest.Mock).mock
+        .calls[1][0] as string;
+      const predicate = effectivePoolFundingContributorSql('ac');
+
+      expect(countSql).toContain(`AND ${predicate} = 0`);
+      expect(mainSql).toContain(`AND ${predicate} = 0`);
+      expect(countSql).not.toContain('AND ac.is_pool_funding_contributor =');
+      expect(mainSql).not.toContain('AND ac.is_pool_funding_contributor =');
+    });
+
+    it('should not add the pool-funding predicate as a filter when it is absent', async () => {
+      // R-BIL-100 / R-BIL-101 — with no filter param the predicate is only projected,
+      // never used as a WHERE filter (so an unfiltered query keeps every contract).
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.getContracts({ contract_code: 'X' } as any);
+
+      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      const predicate = effectivePoolFundingContributorSql('ac');
+
+      expect(sql).not.toContain(`AND ${predicate} = `);
     });
   });
 

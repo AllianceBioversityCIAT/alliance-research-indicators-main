@@ -1,0 +1,31 @@
+@for (notification of filterNotifications; track $index) {
+  <div class="container">
+    <div class="elipse"></div>
+    <div class="avatar">
+      <p-avatar [label]="notification.initials" [style]="{ color: 'white', 'background-color': notification.avatarColor }" styleClass="mr-2" size="large" shape="circle"></p-avatar>
+    </div>
+    <div class="notification-info">
+      <div class="notification-title">
+        <strong>{{ notification.name }}</strong>
+        @if (type === 'update') {
+          <span>{{ notification.verb }}</span>
+        }
+        <strong>{{ notification.actionText }}</strong>
+        <span>{{ notification.result }}</span>
+        @if (notification.info) {
+          <span>{{ notification.info }}</span>
+        }
+      </div>
+      <div class="notification-time">{{ notification.time }}</div>
+    </div>
+    @if (type === 'request') {
+      <div class="buttons">
+        <p-button label="Review" [rounded]="true" size="small" />
+        <p-button label="Decline" [rounded]="true" size="small" [outlined]="true" severity="danger" />
+      </div>
+    }
+    <div class="more-content">
+      <span class="material-symbols-rounded">more_vert</span>
+    </div>
+  </div>
+}

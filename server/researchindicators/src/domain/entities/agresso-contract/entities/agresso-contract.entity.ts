@@ -1,12 +1,14 @@
-import { Entity, Column, OneToMany } from 'typeorm';
+import { Entity, Column, OneToMany, Index } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { AgressoContractCountry } from '../../agresso-contract-countries/entities/agresso-contract-country.entity';
 import { UserAgressoContract } from '../../user-agresso-contracts/entities/user-agresso-contract.entity';
 import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
 import { ClarisaSdg } from '../../../tools/clarisa/entities/clarisa-sdgs/entities/clarisa-sdg.entity';
 import { PooledFundingContract } from '../../pooled-funding-contracts/entities/pooled-funding-contract.entity';
+import { OpenSearchProperty } from '../../../tools/open-search/decorators/opensearch-property.decorator';
 
 @Entity('agresso_contracts')
+@Index('idx_agresso_contract_pool_funding', ['is_pool_funding_contributor'])
 export class AgressoContract extends AuditableEntity {
   @Column('varchar', {
     primary: true,
@@ -125,6 +127,16 @@ export class AgressoContract extends AuditableEntity {
     nullable: true,
   })
   funding_type?: string;
+
+  @Column('boolean', {
+    name: 'is_pool_funding_contributor',
+    default: false,
+    nullable: false,
+  })
+  @OpenSearchProperty({
+    type: 'boolean',
+  })
+  is_pool_funding_contributor!: boolean;
 
   @Column('decimal', {
     precision: 20,

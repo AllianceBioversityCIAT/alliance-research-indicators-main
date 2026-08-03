@@ -3,8 +3,8 @@
 > **Parent guide:** [`../../../CLAUDE.md`](../../../CLAUDE.md). Read it first.
 > **Constitutional baseline:**
 > - [`../../../docs/prd.md`](../../../docs/prd.md)
-> - [`../../../docs/system-design/design.md`](../../../docs/system-design/design.md)
-> - [`../../../docs/detailed-design/detailed-design.md`](../../../docs/detailed-design/detailed-design.md)
+> - [`../../../docs/ux-ui/design.md`](../../../docs/ux-ui/design.md)
+> - [`../../../docs/trd/trd.md`](../../../docs/trd/trd.md)
 > - [`../../../docs/specs/general-setup/`](../../../docs/specs/general-setup/) (spec templates)
 >
 > This file is the **working manual for code-level changes inside `src/`**. It does not restate intent (PRD), platform feel (system design), or full conventions (detailed design) — it tells you *where things live* and *how to add or change them without breaking baseline rules*.
@@ -202,6 +202,6 @@ npm run migration:revert
 
 - Add or change a feature → write a spec under `docs/specs/<module>/<feature>/` using the templates in `docs/specs/general-setup/`.
 - Question about intent → `docs/prd.md`.
-- Question about API/admin/socket surface → `docs/system-design/design.md`.
-- Question about implementation conventions in detail → `docs/detailed-design/detailed-design.md`.
+- Question about API/admin/socket surface → `docs/ux-ui/design.md`.
+- Question about implementation conventions in detail → `docs/trd/trd.md`.
 - Question about the admin SSR panel itself → `src/admin/README-REACT.md`.

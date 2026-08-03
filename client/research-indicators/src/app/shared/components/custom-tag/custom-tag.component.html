@@ -1,0 +1,17 @@
+<div class="inline-flex items-center min-w-0 px-2.5 py-0.5 border-1 rounded-[16px] font-medium uppercase  {{
+  (textSizePx !== null && textSizePx !== undefined) ? '' : (!tiny ? 'text-[12px]' : 'xl:text-[12px] text-[9px]')
+}}" [style.border-color]="statusBorder ?? getColors().border" [style.color]="statusColor ?? getColors().text"
+  [style.max-width]="maxWidth || null" style="width: min-content;"
+  [style.font-size.px]="(textSizePx !== null && textSizePx !== undefined) ? textSizePx : null">
+  @if (icon) {
+  <i class="pi {{iconName ? iconName : 'pi-exclamation-circle'}} shrink-0 xl:!text-[12px] !text-[10px] pl-1.5 "
+    [style.color]="iconColor ?? statusColor" [style.transform]="'rotate(180deg)'" [pTooltip]="tooltip"
+    tooltipPosition="right"></i>
+  }
+  <span
+    class="font-semibold {{+statusId === 12 || +statusId === 13 ? '!min-w-[58px]' : ''}} {{statusId !== 4 ? '!min-w-[45px]' : ''}}"
+    [class.leading-4]="!multiline" [class.leading-snug]="multiline" [class.min-w-0]="!!maxWidth || multiline"
+    [class.truncate]="!!maxWidth && !multiline" [class.whitespace-nowrap]="!multiline"
+    [class.whitespace-normal]="multiline" [class.break-words]="multiline"
+    [class.text-left]="multiline" [class.line-clamp-2]="multiline && !!maxWidth">{{ statusName }}</span>
+</div>

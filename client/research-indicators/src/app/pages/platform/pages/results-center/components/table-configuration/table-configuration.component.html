@@ -1,0 +1,11 @@
+<div cdkDropList class="filter-list" (cdkDropListDropped)="drop($event)">
+  @for (filter of auxiliaryColumns(); track filter) {
+    <div class="item-container" cdkDrag>
+      <div class="content">
+        <span class="column-name">{{ filter.header }}</span>
+      </div>
+
+      <span class="material-symbols-rounded" style="color: #777c83"> drag_indicator </span>
+    </div>
+  }
+</div>

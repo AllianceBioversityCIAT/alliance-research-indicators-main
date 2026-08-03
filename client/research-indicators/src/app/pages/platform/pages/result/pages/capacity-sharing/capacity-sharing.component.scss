@@ -1,0 +1,29 @@
+.button-container {
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  gap: 32px;
+  margin-bottom: 24px;
+
+  @media (min-width: 1024px) and (max-width: 1439px) {
+    flex-wrap: wrap;
+    flex-direction: row;
+    gap: 32px;
+
+    > * {
+      flex: 0 0 calc(50% - 16px);
+      max-width: calc(50% - 16px);
+    }
+  }
+
+  @media (min-width: 1440px) {
+    flex: 1;
+    flex-wrap: nowrap;
+    flex-direction: row;
+    gap: 16px;
+  }
+
+  @media (min-width: 1536px) {
+    gap: 32px;
+  }
+}

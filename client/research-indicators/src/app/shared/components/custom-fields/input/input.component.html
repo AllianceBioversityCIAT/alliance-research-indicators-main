@@ -1,0 +1,76 @@
+<div class="input-container">
+  @if (label) {
+    <div class="flex items-center justify-between w-full">
+      <label class="label inline-block flex items-center" for="username">
+        {{ label }}
+        @if (isRequired) {
+          <span class="text-red-500">*</span>
+        }
+      </label>
+      @if (maxLength) {
+        <app-word-counter [value]="'' + (body().value || '')" [maxWords]="maxLength"></app-word-counter>
+      }
+    </div>
+  }
+  @if (description) {
+    <small class="description" for="username">{{ description }}</small>
+  }
+  @if (currentResultIsLoading()) {
+    <p-skeleton width="100%" height="2.8rem" styleClass="mb-2" />
+  } @else {
+    <div>
+      @if (type === 'text') {
+        <input
+          appSaveOnWriting
+          pInputText
+          id="username"
+          class="text-[14px]"
+          [placeholder]="placeholder"
+          [class]="this.inputValid().class"
+          [style]="(!this.inputValid().valid || showMaxReachedMessage()) ? { border: '2px solid #E69F00' } : {}"
+          aria-describedby="username-help"
+          [disabled]="disabled"
+          [(ngModel)]="this.body().value"
+          (keydown)="
+            shouldPreventInput($event, body().value || null)
+              ? $event.preventDefault()
+              : shouldPreventTextInput($event)
+                ? $event.preventDefault()
+                : null
+          "
+          [autocomplete]="autoComplete"
+          (ngModelChange)="setValue($event)" />
+      } @else if (type === 'number') {
+        <p-inputNumber
+          [min]="min"
+          [max]="max"
+          class="w-full {{ isInvalid() || showMaxReachedMessage() ? 'border-2 rounded-[8px] border-[#E69F00]' : '' }}"
+          [placeholder]="placeholder"
+          [(ngModel)]="this.body().value"
+          (ngModelChange)="setValue($event)"
+          [disabled]="disabled"
+          [showButtons]="true"
+          [style]="isInvalid() || showMaxReachedMessage() ? { border: '2px solid #E69F00 !important' } : {}"
+          inputId="minmax-buttons" />
+      }
+      @if (helperText) {
+        <div class="flex items-center gap-1 mt-1 text-[#8D9299] text-[14px]">
+          <span class="leading-4" [innerHTML]="helperText"></span>
+        </div>
+      }
+
+      @if (!this.inputValid().valid) {
+        <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+          <i class="material-symbols-rounded !text-base">warning</i>
+          <span>{{ this.inputValid().message }}</span>
+        </div>
+      }
+      @if (showMaxReachedMessage()) {
+        <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+          <i class="material-symbols-rounded !text-base">warning</i>
+          <span>Maximum reached</span>
+        </div>
+      }
+    </div>
+  }
+</div>

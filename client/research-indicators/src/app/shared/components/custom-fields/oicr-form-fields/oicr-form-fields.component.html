@@ -1,0 +1,178 @@
+@let canEditOicr = this.rolesService.canEditOicr();
+<div class="grid gap-[15px]">
+  <!-- Main Contact Person (optional) -->
+  @if (showMainContactPerson) {
+  <div class="flex flex-col">
+    <app-select label="Main contact person"
+      helperText="Pick a contact person from the Alliance staff database who is associated with the result and can provide information as needed. Only one person can be selected."
+      [isRequired]="true" [signal]="body"
+      [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12  || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 7 || this.createResultManagementService.statusId() === 11"
+      [optionValue]="mainContactPersonOptionValue" optionLabel="full_name" serviceName="userStaff"
+      placeholder="Select the main contact person">
+    </app-select>
+  </div>
+  }
+
+  <!-- OICR No and Tagging in a row -->
+  <div class="flex flex-col xl:flex-row gap-4">
+    @if (showOicrNo) {
+    <div class="flex-1 xl:max-w-[428px]">
+      <app-input [isRequired]="true" label="OICR No" helperText="Internal code assigned by SPRM." [signal]="body"
+        [disabled]="isOicrNoDisabled" placeholder="e.g. LAC-2501" [optionValue]="oicrNoOptionValue">
+      </app-input>
+    </div>
+    }
+
+    <app-select label="Tagging" [isRequired]="true" class="flex-1" [helperText]="taggingHelperText" [signal]="body"
+      [optionValue]="taggingOptionValue" optionLabel="name" serviceName="tags"
+      [disabled]="this.createResultManagementService.editingOicr()" [disableFilter]="true" scrollHeight="132px"
+      placeholder="Select the tagging">
+    </app-select>
+  </div>
+
+  <!-- OICR Selection (conditional) -->
+  @if (showOicrSelection()) {
+  <div class="flex flex-col">
+    <app-select label="Select existing OICR" helperText="Select an OICR previously reported in the Alliance."
+      [signal]="body" [optionValue]="oicrOptionValue" optionLabel="title" serviceName="oicrResults" [isRequired]="true"
+      [customFilterBy]="'external_id,title,maturity_level,report_year'" (selectEvent)="onSelectOicr($event)"
+      placeholder="Select OICR" scrollHeight="310px" [disabled]="this.createResultManagementService.editingOicr()"
+      [hideSelected]="false" textSpan="OICR selected">
+      <!-- Item template -->
+      <ng-template #item let-item>
+        <div class="flex flex-col gap-2 text-[14px] w-full min-w-0" pTooltip="{{ item?.title }}">
+          <p class="text-[#4C5158] font-[400] w-full overflow-hidden whitespace-nowrap text-ellipsis">
+            <b>{{ item?.external_id }} -</b>
+            {{ item?.title }}
+          </p>
+
+          <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#777C83] !font-['Space_Grotesk']">
+            <button
+              class="uppercase max-w-24 text-[10px] font-semibold px-2 py-1 rounded-lg border border-[#7CB580] text-[#358540]">
+              Published
+            </button>
+            Maturity level <i class="pi pi-arrow-right !text-[8px] text-[#777C83] pl-1"></i>
+            <span class="text-[#345B8F] uppercase">{{ item?.maturity_level }}</span>
+            <span class="text-[#B9C0C5]">|</span>
+            Reporting year <i class="pi pi-arrow-right !text-[8px] text-[#777C83] pl-1"></i>
+            <span class="text-[#345B8F]">{{ item?.report_year }}</span>
+            @if (item?.handle_link) {
+            <span class="text-[#B9C0C5] shrink-0">|</span>
+            <span class="flex items-center gap-1 shrink-0">
+              CGSpace link <i class="pi pi-arrow-right !text-[8px] text-[#777C83] pl-1"></i>
+              <a [href]="item?.handle_link" target="_blank" class="text-[#1689CA] underline break-all">{{
+                item?.handle_link }}</a>
+            </span>
+            }
+          </p>
+        </div>
+      </ng-template>
+
+      <!-- Rows template -->
+      <ng-template #rows let-item>
+        <div class="flex justify-between min-h-[82px] text-[14px] w-full min-w-0 px-2 py-0.5">
+          <div class="w-auto flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-chart-pie !text-[12px] text-[#F58220]"></i>
+              <span class="text-[11px] text-[#8D9299] font-[400] !font-[Space_Grotesk]">OICR</span>
+            </div>
+            <div class="flex">
+              <p class="text-[#4C5158] font-[500] flex leading-4">{{ item?.external_id }} -{{ item?.title }}</p>
+            </div>
+            <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#777C83] !font-['Space_Grotesk']">
+              <button
+                class="uppercase max-w-24 text-[10px] font-semibold px-2 py-1 rounded-lg border border-[#7CB580] text-[#358540]">
+                Published
+              </button>
+              Maturity level <i class="pi pi-arrow-right !text-[8px] text-[#777C83] pl-1"></i>
+              <span class="text-[#345B8F] uppercase">{{ item?.maturity_level }}</span>
+              <span class="text-[#B9C0C5]">|</span>
+              Reporting year <i class="pi pi-arrow-right !text-[8px] text-[#777C83] pl-1"></i>
+              <span class="text-[#345B8F]">{{ item?.report_year }}</span>
+              @if (item?.handle_link) {
+              <span class="text-[#B9C0C5] shrink-0">|</span>
+              <span class="flex items-center gap-1 shrink-0">
+                CGSpace link <i class="pi pi-arrow-right !text-[8px] text-[#777C83] pl-1"></i>
+                <a [href]="item?.handle_link" target="_blank" class="text-[#1689CA] underline break-all">{{
+                  item?.handle_link }}</a>
+              </span>
+              }
+            </p>
+          </div>
+          <div class="flex w-[28px] justify-end items-center">
+            @if (!this.createResultManagementService.editingOicr()) {
+            <i class="pi pi-times-circle !text-[18px] text-[#CF0808] pl-1" (keydown.enter)="clearOicrSelection()"
+              (click)="clearOicrSelection()"></i>
+            }
+          </div>
+        </div>
+      </ng-template>
+
+      <!-- Selected item template -->
+      <ng-template #selectedItemTemplate let-selected>
+        <span>OICR selected</span>
+      </ng-template>
+    </app-select>
+  </div>
+  }
+
+  <!-- Maturity Level -->
+  @if (showMaturityLevel) {
+  <div class="flex flex-col">
+    <app-select label="Maturity of change reported" class="flex-1" [helperText]="maturityLevelHelperText"
+      [isRequired]="true" [signal]="body" [optionValue]="maturityLevelOptionValue" optionLabel="name"
+      serviceName="maturityLevels" scrollHeight="132px" placeholder="Select an option">
+      <!-- Selected item template -->
+      <ng-template #selectedItemTemplate let-value>
+        <div class="flex items-center gap-2 text-[##4C5158]">
+          <span class="font-[600]">
+            {{ value?.name }}: <span class="font-['Barlow'] font-normal">{{ value?.description }}</span></span>
+        </div>
+      </ng-template>
+
+      <!-- Item template -->
+      <ng-template #item let-item>
+        <div class="flex items-center gap-2 text-[##4C5158]">
+          <span class="font-[600]">
+            {{ item?.name }}: <span class="font-['Barlow'] font-normal">{{ item?.description }}</span></span>
+        </div>
+      </ng-template>
+    </app-select>
+  </div>
+  }
+
+  <!-- Outcome/Impact Statement -->
+  <div class="flex flex-col">
+    <app-textarea [rows]="5" [isRequired]="true"
+      [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10  || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 7 || this.createResultManagementService.statusId() === 11"
+      label="Elaboration of outcome/impact statement"
+      helperText="For the preliminary submission, a brief description (1–3 sentences) of the outcome/impact is sufficient."
+      [maxLength]="400" [signal]="body" [optionValue]="outcomeImpactOptionValue"
+      placeholder="Write the elaboration of outcome / impact statement"></app-textarea>
+
+    @if (isElaborationTextExceedingLimit()) {
+    <div class="flex items-center gap-1 -mt-1 text-[#E69F00]">
+      <i class="material-symbols-rounded !text-[15px]">warning</i>
+      <span class="!text-[14px] leading-5">{{ getElaborationLimitMessage() }}</span>
+    </div>
+    }
+  </div>
+
+  <!-- Short Outcome/Impact Statement -->
+  @if (showShortOutcome) {
+  <div class="flex flex-col">
+    <app-textarea [isRequired]="true" [rows]="5" label="Short Outcome/Impact Statement"
+      [helperText]="shortOutcomeHelperText" [maxLength]="80"
+      [aiAssistantFunction]="aiAssistantFunctionForShortOutcome.bind(this)" [isAiDisabled]="isShortOutcomeAiDisabled()"
+      [isAiLoading]="isAiLoading() || isTyping()" [aiError]="aiError()" [onRetry]="onRetryAi.bind(this)" [signal]="body"
+      [optionValue]="shortOutcomeOptionValue" placeholder="Write the short outcome"></app-textarea>
+  </div>
+  }
+
+  @if (!isOicrNoDisabled && showGeneralComment) {
+  <div class="flex flex-col">
+    <app-textarea [rows]="5" label="Comments, questions or anything else?" [maxLength]="3000" [signal]="body"
+      [optionValue]="generalCommentOptionValue" placeholder="Write the comments"></app-textarea>
+  </div>
+  }
+</div>

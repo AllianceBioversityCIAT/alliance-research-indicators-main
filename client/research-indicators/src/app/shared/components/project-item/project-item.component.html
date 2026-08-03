@@ -1,0 +1,78 @@
+<a class="card" [class.header-project-details]="isHeader">
+  <div class="card-content">
+    <div class="organization-identifier">
+      <div class="project">
+        <div class="project-id flex items-center gap-2 flex-wrap">
+          <label class="project-id" for="username">{{ project.agreement_id }}</label>
+          @if (isHeader && isPoolFunding) {
+            <span aria-hidden="true" style="color: var(--ac-grey-500);">·</span>
+            <span class="contributing-to-pool-funding"
+                  data-testid="pool-funding-inline-label">CONTRIBUTING TO POOL FUNDING</span>
+          }
+        </div>
+        <label class="project-name" for="username">{{ project.projectDescription && project.projectDescription + ' - '
+          }} {{ project.description }}</label>
+      </div>
+    </div>
+    <div class="project-info -mt-1">
+      <div class="principal-investigator flex items-center gap-2">
+        <app-custom-tag [statusId]="getStatusDisplay().statusId" [statusName]="getStatusDisplay().statusName"
+          [tiny]="true"> </app-custom-tag>
+        @if (isPoolFunding && !isHeader) {
+          <app-custom-tag statusId="pool-funding" statusName="Pool Funding" [tiny]="true"
+            data-testid="pool-funding-tag"></app-custom-tag>
+        }
+      </div>
+      @if (hasField('project_lead_description')) {
+      <div class="principal-investigator">
+        <span class="project-title">Principal investigator</span>
+        <i class="pi pi-arrow-right !text-[12px] px-2 !text-[#8D9299]"></i>
+        <label class="project-data" for="username">{{ project.project_lead_description }}</label>
+      </div>
+      }
+      @if (hasField('levers') || hasField('lever')) {
+      <div class="principal-investigator">
+        <span class="project-title">Lever</span>
+        <i class="pi pi-arrow-right !text-[12px] px-2 !text-[#8D9299]"></i>
+        <label class="project-data" for="username">{{ getLeverName() }}</label>
+      </div>
+      }
+      @if (hasField('start_date')) {
+      <div class="start-date">
+        <span class="project-title">Start date</span>
+        <i class="pi pi-arrow-right !text-[12px] px-2 !text-[#8D9299]"></i>
+        <label class="project-data" for="username">{{ project.start_date | date: 'dd/MM/yyyy' }}</label>
+      </div>
+      }
+      @if (hasField('end_date')) {
+      <div class="end-date">
+        <span class="project-title">End date</span>
+        <i class="pi pi-arrow-right !text-[12px] px-2 !text-[#8D9299]"></i>
+        <label class="project-data" for="username">{{ project.end_date | date: 'dd/MM/yyyy' }}</label>
+      </div>
+      }
+    </div>
+    <div class="project-indicators w-full flex flex-wrap gap-3 gap-y-6">
+      @for (indicator of processedIndicators; track indicator.indicator?.indicator_id) {
+      <div
+        class="indicator {{ enableIndicatorFilter ? 'cursor-pointer hover:opacity-80 transition-opacity' : '' }} {{ isIndicatorFiltered(indicator) ? 'indicator-filtered' : '' }}"
+        (click)="onIndicatorClick(indicator, $event)" (keydown.enter)="onIndicatorClick(indicator, $event)"
+        [attr.tabindex]="enableIndicatorFilter ? 0 : -1" [attr.role]="enableIndicatorFilter ? 'button' : null"
+        [attr.aria-label]="enableIndicatorFilter ? 'Filter by ' + indicator.indicator.name : null">
+        <div class="indicator-number-container">
+          <i class="pi {{ indicator.indicator.icon_src }} {{ indicator.indicator.icon_src === 'pi-users' || indicator.indicator.icon_src === 'pi-sun' ? '!text-[15px]' : '!text-[12.5px]' }} {{
+                (indicator.indicator.indicator_type_id === 1 ? 'output' : 'outcome') + '-icon'
+              }}">
+          </i>
+          <label class="indicator-type" for="username" [title]="indicator.indicator.name">{{
+            formatIndicatorLabel(indicator.indicator.name) }}</label>
+        </div>
+        <label class="indicator-number" for="username">{{ indicator.count_results }}</label>
+        @if (isIndicatorFiltered(indicator)) {
+        <div class="indicator-filter-line"></div>
+        }
+      </div>
+      }
+    </div>
+  </div>
+</a>

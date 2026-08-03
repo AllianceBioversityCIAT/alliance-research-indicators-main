@@ -1,0 +1,68 @@
+@let hss = this.cache.hasSmallScreen();
+<div [ngStyle]="{
+    paddingLeft: cache.isSidebarCollapsed() ? '97px' : '282px'
+  }"
+  class="section-header w-full pl-8  left-0  {{ hss ? 'p-[10px] mt-[50px]' : 'p-[0px] mt-[70px]' }} calc(100% - 65px) !z-10 "
+  id="section-sidebar">
+  <div class="flex gap-7">
+    @if (breadcrumb().length > 0) {
+    <div class=" {{ hss ? 'text-[14px]' : 'text-[14px]' }} text-slate-600 font-small md:py-2">
+      @for (item of breadcrumb(); track $index) {
+      @if ($index > 0) {
+      <i class="pi pi-chevron-right text-[#777C83] mx-2 !text-[12px]"></i>
+      }
+
+      @if (item.route && $index < breadcrumb().length - 1) { <a [routerLink]="item.route"
+        class="text-[#777C83] hover:underline cursor-pointer !font-[space_grotesk]" [pTooltip]="item.tooltip"
+        tooltipPosition="bottom">
+        {{ item.label }}
+        </a>
+        } @else {
+        <span class="text-[#035BA9] !font-[space_grotesk]" [pTooltip]="item.tooltip" tooltipPosition="bottom">
+          {{ item.label }}
+        </span>
+        }
+        }
+    </div>
+    } @else {
+    <div class=" {{ hss ? 'text-[15px]' : 'text-[16px]' }} text-slate-600 font-small md:py-2">
+      {{ welcomeMessage() }}
+    </div>
+    }
+  </div>
+
+  @if (this.cache.showSectionHeaderActions()) {
+  <div class="buttons-container rs-gap-x-[15]">
+    <div class="flex items-center gap-1">
+      @if (cache.currentMetadata().indicator_id === 5) {
+      <app-download-oicr-template [onlyIcon]="true"></app-download-oicr-template>
+      }
+      @if (showStarPdfReport()) {
+      @if (starPdfReportDisabled()) {
+      <span aria-hidden="true" class="inline-flex px-2 opacity-40 text-[#777C83]">
+        <i class="pi pi-file-pdf !text-[17px]"></i>
+      </span>
+      } @else {
+      <p-button variant="text" pTooltip="Open STAR PDF report" tooltipPosition="left" (onClick)="openStarPdfReport()"
+        [attr.aria-label]="'Open PDF report for ' + cache.currentResultId()">
+        <ng-template pTemplate="icon">
+          <i class="pi pi-file-pdf text-[#035BA9] !text-[17px]"></i>
+        </ng-template>
+      </p-button>
+      }
+      }
+      <p-button variant="text" pTooltip="Submission history" tooltipPosition="left"
+        (onClick)="cache.showSubmissionHistory.set(true)">
+        <ng-template pTemplate="icon">
+          <i class="material-symbols-rounded text-[#035BA9] !text-[21px]">overview</i>
+        </ng-template>
+      </p-button>
+      @if (showDeleteOption()) {
+      <p-menu #menu [model]="items()" [popup]="true" [appendTo]="'body'" />
+      <p-button (onClick)="menu.toggle($event)" [text]="true" size="small" icon="pi pi-ellipsis-v"
+        class="!text-[#112F5C]" [style]="{ color: '#112F5C' }" />
+      }
+    </div>
+  </div>
+  }
+</div>

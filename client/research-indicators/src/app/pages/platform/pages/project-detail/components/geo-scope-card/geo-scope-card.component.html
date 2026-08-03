@@ -1,0 +1,56 @@
+<app-project-dashboard-card class="h-full w-full" title="Top geographic scope"
+  description="Distribution of geographic reach for results linked to this primary project." iconClass="pi pi-globe"
+  [compact]="true" [loading]="service.loading()" [error]="service.loadError()" [empty]="isEmpty()"
+  emptyMessage="No geographic scope data was found for this project." (retry)="service.update()">
+  <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(280px,.5fr)_minmax(0,1.6fr)]">
+    <div class="flex h-full min-w-0 items-stretch">
+      <app-geo-scope-map [countries]="service.topCountries()"></app-geo-scope-map>
+    </div>
+
+    <div class="flex min-w-0 flex-col gap-4 px-6">
+      @if (visibleSummaryMetrics().length) {
+      <ul
+        class="m-0 grid list-none grid-cols-2 gap-x-5 gap-y-1.5 border-y border-[#e8ebed] py-2 p-0 md:grid-cols-5 mb-4">
+        @for (metric of visibleSummaryMetrics(); track metric.key) {
+        <li class="flex min-w-0 items-baseline justify-between gap-2 md:justify-start">
+          <span class="truncate font-['Barlow'] text-[11px] font-medium uppercase tracking-[0.04em] text-[#777C83]">{{
+            metric.label }}</span>
+          <strong class="font-['Barlow'] text-[15px] font-semibold leading-none tabular-nums text-[#112F5C]">{{
+            metric.value
+            }}</strong>
+        </li>
+        }
+      </ul>
+      }
+
+      <div class="grid min-w-0 grid-cols-1 gap-16 lg:grid-cols-3">
+        @if (topRegions().length) {
+        <div class="min-w-0">
+          <h3 class="mb-2 mt-0 font-['Barlow'] text-xs font-semibold uppercase tracking-[0.04em] text-[#112F5C]">Top
+            regions</h3>
+          <app-project-dashboard-card variant="list" [items]="topRegions()" layout="rows-partners" barHeightClass="h-4"
+            [itemHeightPx]="18"></app-project-dashboard-card>
+        </div>
+        }
+
+        @if (topCountryItems().length) {
+        <div class="min-w-0">
+          <h3 class="mb-2 mt-0 font-['Barlow'] text-xs font-semibold uppercase tracking-[0.04em] text-[#112F5C]">Top
+            countries</h3>
+          <app-project-dashboard-card variant="list" [items]="topCountryItems()" layout="rows-partners"
+            barHeightClass="h-4" [itemHeightPx]="18"></app-project-dashboard-card>
+        </div>
+        }
+
+        @if (topSubNationalItems().length) {
+        <div class="min-w-0">
+          <h3 class="mb-2 mt-0 font-['Barlow'] text-xs font-semibold uppercase tracking-[0.04em] text-[#112F5C]">Top
+            sub-national levels</h3>
+          <app-project-dashboard-card variant="list" [items]="topSubNationalItems()" layout="rows-partners"
+            barHeightClass="h-4" [itemHeightPx]="18"></app-project-dashboard-card>
+        </div>
+        }
+      </div>
+    </div>
+  </div>
+</app-project-dashboard-card>

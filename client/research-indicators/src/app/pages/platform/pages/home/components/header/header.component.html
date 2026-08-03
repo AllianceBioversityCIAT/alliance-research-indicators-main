@@ -1,0 +1,12 @@
+<section class="home-header">
+  <div class="home-header__illustration" aria-hidden="true">
+    <img [src]="'images/home/home.png' | s3ImageUrl" alt="" class="home-header__illustration-img" />
+  </div>
+  <div class="home-header__content pb-2">
+    <div class="home-header__logo-row -ml-3.5">
+      <img [src]="'STAR-Hor.png' | s3ImageUrl" alt="STAR" class="home-header__logo" />
+    </div>
+    <h1 class="home-header__heading title">{{ message()?.title }}</h1>
+    <p class="home-header__sub description">{{ message()?.description }}</p>
+  </div>
+</section>

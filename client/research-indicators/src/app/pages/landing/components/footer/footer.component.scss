@@ -1,0 +1,19 @@
+.gap-footer {
+  gap: 10px;
+  @media (min-width: 800px) {
+    gap: 25px;
+  }
+
+  @media (min-width: 900px) {
+    gap: 56px;
+  }
+  @media (min-width: 1024px) {
+    gap: 100px;
+  }
+  @media (min-width: 1200px) {
+    gap: 144px;
+  }
+  @media (min-width: 1400px) {
+    gap: 200px;
+  }
+}

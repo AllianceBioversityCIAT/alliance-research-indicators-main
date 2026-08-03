@@ -1,0 +1,47 @@
+<div class="status-dropdown-container relative inline-block">
+  <div
+    class="inline-flex items-center px-2.5 py-0.5 border-1 rounded-[16px] text-[12px] font-medium uppercase text-center cursor-pointer"
+    [style.border-color]="cache.currentMetadata().result_status?.config?.color?.border"
+    (keydown.enter)="toggleDropdown($event)" [style.color]="cache.currentMetadata().result_status?.config?.color?.text"
+    (click)="toggleDropdown($event)">
+    <span class="font-semibold">{{ statusName }}</span>
+    <span class="font-[300] text-[#B9C0C5] px-2">|</span>
+    <i class="pi pi-chevron-down !text-[10px] pt-0.5 !text-[#8D9299]" [class.pi-chevron-up]="isOpen()"></i>
+  </div>
+
+  @if (isOpen()) {
+  <div class="absolute top-full left-0 py-2 bg-white border border-[#E4EAEE] rounded-lg shadow-lg z-50 min-w-[200px]">
+    @for (status of getAvailableStatuses(); track status.id) {
+    <div class="flex items-center gap-2.5 py-2 px-5 transition-colors"
+      [class.cursor-pointer]="!isStatusOptionDisabled(status)"
+      [class.hover:bg-[#F4F7F9]]="!isStatusOptionDisabled(status)"
+      [class.cursor-not-allowed]="isStatusOptionDisabled(status)"
+      [class.opacity-50]="isStatusOptionDisabled(status)"
+      [pTooltip]="getStatusOptionTooltip(status)" tooltipPosition="right"
+      [tooltipDisabled]="!isStatusOptionDisabled(status)"
+      (click)="selectStatus(status.id, $event)" (keydown.enter)="selectStatus(status.id, $event)">
+      <div class="w-4 h-4 flex items-center justify-center">
+        @if (status.transition_direction === 'unknown' && status.result_status_id === 15) {
+        <div class="p-1.5 bg-[#FFF3F3] rounded-sm flex items-center justify-center">
+          <i class="pi pi-times-circle !text-[13px] text-[#cf0808]"></i>
+        </div>
+        } @else if (status.transition_direction === 'unknown' && status.result_status_id === 11) {
+        <div class="p-1.5 bg-[#FFF6ED] rounded-sm flex items-center justify-center">
+          <i class="pi pi-minus-circle !text-[13px] text-[#e69f00]"></i>
+        </div>
+        } @else if (status.transition_direction === 'backward' || status.direction === 'previous') {
+        <div class="p-1.5 bg-[#E8EBED] rounded-sm flex items-center justify-center">
+          <i class="pi pi-arrow-left !text-[12px] text-[#212121]"></i>
+        </div>
+        } @else if (status.transition_direction === 'forward' || status.direction === 'next') {
+        <div class="p-1.5 bg-[#E8EBED] rounded-sm flex items-center justify-center">
+          <i class="pi pi-arrow-right !text-[12px] text-[#212121]"></i>
+        </div>
+        }
+      </div>
+      <span class="text-[14px] text-[#4C5158] px-2 !font-[400]">{{ status.name }}</span>
+    </div>
+    }
+  </div>
+  }
+</div>

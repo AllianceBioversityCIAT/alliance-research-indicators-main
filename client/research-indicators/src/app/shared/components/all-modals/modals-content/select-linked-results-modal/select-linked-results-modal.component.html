@@ -1,0 +1,228 @@
+<div class="flex flex-col px-10 py-4 border-t border-[#E8EBED]">
+  <div class="pt-4">
+    <span class="text-[#153C71] font-['Space_Grotesk'] text-[18px] leading-[20px] font-semibold mb-2">RESULTS
+      TABLE</span>
+    <p class="text-[#4C5158] text-[13px] mb-4">Search and select the results that you want to link.</p>
+  </div>
+
+  <div class="flex items-center justify-between w-full p-4 bg-white border border-[#E4EAEE]">
+    <app-search-export-controls [applyLabel]="'Apply Filters'"
+      [badge]="resultsCenterService.countTableFiltersSelected()"
+      [showOverlayDot]="!!resultsCenterService.countTableFiltersSelected()" [showClear]="true"
+      [searchValue]="resultsCenterService.searchInput()"
+      [searchPlaceholder]="'Find a result by code, title, creator or public link'"
+      (searchChange)="setSearchInputFilter($event)" (apply)="showFiltersSidebar()" (clear)="clearFilters()">
+    </app-search-export-controls>
+
+    <app-filters-action-buttons [showViewToggleButtons]="false" [showConfigButton]="false" [showExportButton]="false">
+    </app-filters-action-buttons>
+  </div>
+
+  @if (resultsCenterService.loading()) {
+  <app-custom-progress-bar></app-custom-progress-bar>
+  }
+
+  <div class="w-full border border-[#E4EAEE] rounded-[18px] border-t-0 overflow-visible">
+    <p-table #dt2 [value]="resultsCenterService.list()" [paginator]="true" [lazy]="true"
+      [first]="resultsCenterService.resultsTablePaginatorFirst()"
+      [rows]="resultsCenterService.resultsTablePaginatorRows()"
+      [totalRecords]="resultsCenterService.resultsTableTotalRecords()" (onLazyLoad)="handleLinkedTableLazyLoad($event)"
+      [paginatorDropdownAppendTo]="'body'" class="border-0 rounded-[18px]" [scrollHeight]="getScrollHeight()"
+      [showCurrentPageReport]="true" [scrollable]="true" [tableStyle]="{ 'min-width': '100%' }"
+      [rowsPerPageOptions]="[5, 10, 25, 50]"
+      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} results"
+      [sortField]="resultsCenterService.resultsTableSortField()"
+      [sortOrder]="resultsCenterService.resultsTableSortOrder()" [customSort]="true"
+      styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows">
+      <ng-template pTemplate="header">
+        <tr>
+          <th class="!text-[#112F5C] min-w-[60px]" scope="col">
+            <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px] xl:text-[16px]">
+              Select
+            </div>
+          </th>
+          @for (column of resultsCenterService.tableColumns(); track column.field) {
+          @if (column.field !== 'versions' && (!column.hideIf || !column.hideIf())) {
+          <th class="{{ column.minWidth }} {{ column.maxWidth }} !text-[#112F5C]"
+            [pSortableColumn]="column?.hideFilterIf?.() ? '' : column.path" scope="col">
+            <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px] ">
+              {{
+              column.field === 'project'
+              ? 'Project'
+              : column.field === 'lever'
+              ? 'Lever'
+              : column.field === 'year'
+              ? 'Year'
+              : column.header
+              }}
+              @if (!column?.hideFilterIf?.()) {
+              <p-sortIcon field="{{ column.path }}"></p-sortIcon>
+              }
+            </div>
+          </th>
+          }
+          }
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-result>
+        <tr class="hover:surface-ground transition-colors duration-150 text-[14px] xl:text-[16px]">
+          <td>
+            <div class="flex justify-center">
+              <p-checkbox [binary]="true" [ngModel]="isSelected(result)" (ngModelChange)="toggleSelection(result)"
+                (click)="$event.stopPropagation()" (keydown.enter)="toggleSelection(result); $event.stopPropagation()">
+              </p-checkbox>
+            </div>
+          </td>
+          @for (column of resultsCenterService.tableColumns(); track column.field) {
+          @if (column.field !== 'versions' && (!column.hideIf || !column.hideIf())) {
+          @if (column.field === 'status') {
+          <td>
+            @if (isNonStarPlatform(result)) {
+            <button type="button" (click)="openResultInfoModal(result); $event.stopPropagation()"
+              class="block cursor-pointer border-none bg-transparent p-0 text-inherit">
+              <app-custom-tag [statusId]="result.result_status.result_status_id"
+                [statusColor]="result.result_status?.config?.color?.text ?? ''"
+                [statusBackground]="result.result_status?.config?.color?.background ?? ''"
+                [statusBorder]="result.result_status?.config?.color?.border ?? ''" [tiny]="true"
+                [statusName]="result.result_status?.name" [icon]="true"
+                [iconName]="result.result_status?.config?.icon?.name ?? ''"
+                [iconColor]="result.result_status?.config?.icon?.color ?? ''"
+                [tooltip]="result.result_status?.description ?? ''">
+              </app-custom-tag>
+            </button>
+            } @else {
+            <a [href]="getResultHref(result)" target="_blank" (click)="$event.stopPropagation()" class="block"
+              style="color: inherit; text-decoration: none" rel="noopener noreferrer">
+              <app-custom-tag [statusId]="result.result_status.result_status_id"
+                [statusColor]="result.result_status?.config?.color?.text ?? ''"
+                [statusBackground]="result.result_status?.config?.color?.background ?? ''"
+                [statusBorder]="result.result_status?.config?.color?.border ?? ''" [tiny]="true"
+                [statusName]="result.result_status?.name" [icon]="true"
+                [iconName]="result.result_status?.config?.icon?.name ?? ''"
+                [iconColor]="result.result_status?.config?.icon?.color ?? ''"
+                [tooltip]="result.result_status?.description ?? ''">
+              </app-custom-tag>
+            </a>
+            }
+          </td>
+          } @else if (column.field === 'result_official_code') {
+          <td>
+            <div
+              class="flex flex-col gap-0.5 items-center text-[13px] {{result.platform_code !== 'STAR' ? 'pt-1.5' : ''}}">
+              <div class="flex">
+                <span class="py-1 px-2 rounded-l-lg font-[600] min-w-[50px] max-w-[50px] text-center"
+                  [style.color]="getPlatformColors(result.platform_code)?.text"
+                  [style.background-color]="getPlatformColors(result.platform_code)?.background">
+                  {{ result.platform_code }}
+                </span>
+                <span class="text-[#4C5158] bg-[#E8EBED] py-1 px-2 rounded-r-lg min-w-[43px] text-center">
+                  {{ formatResultCode(result.result_official_code) }}
+                </span>
+              </div>
+              @if (result.platform_code !== 'STAR') {
+              <div class="flex items-center gap-1 text-[#B9C0C5] justify-center mt-0.5">
+                <i class="pi pi-eye !text-[11px]" aria-hidden="true"></i>
+                <span class="tracking-[0.24em] font-[space_grotesk] text-[10px] pl-1">READ ONLY</span>
+              </div>
+              }
+            </div>
+          </td>
+          } @else if (column.field === 'public_link') {
+          <td (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+            @if (result.public_link) {
+            <button type="button" data-public-link-action
+              (click)="openPublicLink(result.public_link); $event.stopPropagation()" [pTooltip]="result.public_link"
+              tooltipPosition="left" [attr.aria-label]="'Open public link for ' + result.result_official_code"
+              class="cursor-pointer border-0 bg-transparent p-0 text-[#035BA9]">
+              <i class="pi pi-external-link !text-[16px]"></i>
+            </button>
+            } @else {
+            <span>None</span>
+            }
+          </td>
+          } @else if (column.field === 'project') {
+          <td>
+            @if (result.result_contracts?.contract_id) {
+            <a [href]="getProjectHref(result.result_contracts.contract_id)" target="_blank" rel="noopener noreferrer"
+              (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()"
+              class="cursor-pointer hover:text-blue-800 hover:underline transition-colors duration-200"
+              style="color: inherit; text-decoration: none">
+              {{ result.result_contracts.contract_id }}
+            </a>
+            } @else {
+            <span class="text-gray-500">Not provided</span>
+            }
+          </td>
+          } @else {
+          <td [class]="column.minWidth + ' ' + column.maxWidth" [class.break-words]="column.field === 'title'"
+            lang="es">
+            @if (isNonStarPlatform(result)) {
+            <button type="button" (click)="openResultInfoModal(result); $event.stopPropagation()"
+              class="block w-full h-full cursor-pointer border-none bg-transparent p-0 text-inherit text-left">
+              <div class="overflow-hidden line-clamp-3 xl:line-clamp-2">
+                {{ column.getValue ? column.getValue(result) : '-' }}
+              </div>
+            </button>
+            } @else {
+            <a [href]="getResultHref(result)" target="_blank" (click)="$event.stopPropagation()"
+              class="block w-full h-full" style="color: inherit; text-decoration: none" rel="noopener noreferrer">
+              <div class="overflow-hidden line-clamp-3 xl:line-clamp-2">
+                {{ column.getValue ? column.getValue(result) : '-' }}
+              </div>
+            </a>
+            }
+          </td>
+          }
+          }
+          }
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        @if (!resultsCenterService.loading()) {
+        <tr>
+          <td [attr.colspan]="resultsCenterService.tableColumns().length + 1" class="text-center p-8">
+            <div class="flex flex-col items-center gap-4 bg-surface-ground p-6 rounded-xl">
+              <div class="flex flex-col items-center gap-2">
+                <div class="w-16 h-16 flex items-center justify-center rounded-xl bg-blue-50">
+                  <i class="pi pi-inbox text-3xl text-blue-500"></i>
+                </div>
+                <h2 class="text-900 font-semibold m-0">No Results Available</h2>
+                <p class="text-600 text-center m-0 max-w-[30rem] leading-relaxed">
+                  There are currently no results in the database. New results will appear here once they are added to
+                  the
+                  system.
+                </p>
+              </div>
+            </div>
+          </td>
+        </tr>
+        }
+      </ng-template>
+    </p-table>
+  </div>
+</div>
+
+
+<div class="flex items-center justify-between px-10 py-4 border-t border-[#E8EBED] bg-white rounded-b-[30px]">
+  <span class="text-[#777C83] text-[16px] !font-[space_grotesk]">
+    Selected
+    <i class="pi pi-arrow-right !text-[12px] pr-2 pl-1" style="color: #777C83"></i>
+
+    <span class="text-[#345B8F]">{{ selectedCount() }} {{ selectedCount() === 1 ? 'result' : 'results' }} </span>
+  </span>
+  <div class="flex gap-3">
+    <button type="button" (click)="saveSelection()"
+      class="bg-[#035BA9] text-[16px] font-medium text-white disabled:bg-[#E8EBED] disabled:text-[#A2A9AF] px-7 py-2 rounded-[14px] cursor-pointer disabled:cursor-not-allowed flex items-center gap-2">
+      Save selection
+      <i class="pi pi-arrow-right !text-[12px] pt-1"></i>
+    </button>
+  </div>
+</div>
+
+@if (resultsCenterService.showFiltersSidebar()) {
+<app-section-sidebar [title]="'Table Filters'" [description]="'Filter your table data by applying custom criteria.'"
+  [showSignal]="resultsCenterService.showFiltersSidebar" confirmText="Apply filters" (confirm)="onFiltersConfirm()"
+  customHeight="h-auto" customTopOffset="60px" customBottomOffset="71px">
+  <app-table-filters-sidebar [indicatorHiddenIds]="[5]" [forceIndicatorFilter]="true"></app-table-filters-sidebar>
+</app-section-sidebar>
+}

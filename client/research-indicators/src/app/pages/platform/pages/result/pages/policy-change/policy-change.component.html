@@ -1,0 +1,56 @@
+<div class="app-page-wrapper">
+  <app-form-header />
+  <div class="flex flex-col gap-5">
+    <div class="flex flex-col bg-[#fcfcfc] rounded-[13px] p-[30px] mb-5 border border-[#e8ebed] bg-[#ffffff]">
+      <div class="section-title">POLICY CHANGE DETAILS</div>
+
+      <div class="grid grid-cols-12 gap-5">
+        <div class="col-span-6">
+          <app-radio-button [isRequired]="true" label="Policy Type" [signal]="body"
+            [disabled]="!submission.isEditableStatus()" [serviceName]="'policyTypes'" [optionLabel]="'name'"
+            [optionValue]="{ body: 'policy_type_id', option: 'id' }"></app-radio-button>
+        </div>
+        <div class="col-span-6">
+          <app-radio-button [isRequired]="true" label="Stage in Policy Process" [signal]="body"
+            [disabled]="!submission.isEditableStatus()" [serviceName]="'policyStages'" [optionLabel]="'name'"
+            [optionValue]="{ body: 'policy_stage_id', option: 'id' }"></app-radio-button>
+        </div>
+        <div class="col-span-12">
+          <app-textarea label="Evidence for stage" [isRequired]="true" description="Description."
+            [disabled]="!submission.isEditableStatus()" [signal]="this.body" [optionValue]="'evidence_stage'"
+            placeholder="Write the evidence" [maxLength]="200"></app-textarea>
+        </div>
+        <div class="col-span-12">
+          <app-multiselect label="Whose policy is this? (implementing organizations)" [isRequired]="true"
+            [signal]="body" optionLabel="html_full_name" optionValue="institution_id"
+            [disabled]="!submission.isEditableStatus()" [removeCondition]="canRemove"
+            signalOptionValue="implementing_organization" serviceName="institutions"
+            placeholder="Select the organizations">
+            <ng-template #rows let-institution>
+              <app-partner-selected-item [institution]="institution"></app-partner-selected-item>
+            </ng-template>
+          </app-multiselect>
+        </div>
+
+        <div class="col-span-6">
+          <app-select
+            pTooltip="The field is disabled because there are no results of the type Innovation Development Output."
+            tooltipPosition="top" label="Link to a reported Innovation Development output" [disabled]="true"
+            [signal]="body" [optionLabel]="'title'"
+            [optionValue]="{ body: 'innovation_development', option: 'result_id' }" [serviceName]="'innoDevOutput'"
+            placeholder="Select the Innovation Development"></app-select>
+        </div>
+        <div class="col-span-6">
+          <app-select pTooltip="The field is disabled because there are no results of the type Innovation Use."
+            tooltipPosition="top"
+            label="Link to a reported Innovation Use &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+            [signal]="body" [disabled]="true" [optionLabel]="'title'"
+            [optionValue]="{ body: 'innovation_use', option: 'result_id' }" [serviceName]="'innoUseOutput'"
+            placeholder="Select the Innovation Use"></app-select>
+        </div>
+      </div>
+    </div>
+
+    <app-navigation-buttons (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
+  </div>
+</div>

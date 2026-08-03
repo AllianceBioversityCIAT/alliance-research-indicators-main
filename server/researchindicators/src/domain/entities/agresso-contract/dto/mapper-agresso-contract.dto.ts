@@ -21,6 +21,7 @@ export class RawgressoContractDto {
   public lever_full_name: string;
   public lever_other_names: string;
   public is_science_program: boolean;
+  public is_pool_funding_contributor: boolean;
   public funding_type: string;
   public ubwClientDescription: string;
 
@@ -86,6 +87,7 @@ export class MappedContractsDto {
   public indicators: AgressoContractIndicatorObjectDto[];
   public levers: AgressoContractLeverDto;
   public is_science_program: boolean;
+  public is_pool_funding_contributor: boolean;
   public funding_type: string;
   public ubwClientDescription: string;
 
@@ -105,6 +107,9 @@ export class MappedContractsDto {
         ? Number(rawData.contract_total_results)
         : Number(rawData.count_results) || 0;
     this.is_science_program = Boolean(rawData.is_science_program);
+    this.is_pool_funding_contributor = Boolean(
+      rawData.is_pool_funding_contributor,
+    );
     this.funding_type = rawData.funding_type;
     this.ubwClientDescription = rawData.ubwClientDescription;
     if (!isEmpty(indicators)) {

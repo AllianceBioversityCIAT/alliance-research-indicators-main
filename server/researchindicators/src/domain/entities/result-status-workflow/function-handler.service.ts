@@ -11,6 +11,7 @@ import { transactionManager } from '../../shared/utils/orm.util';
 import { MessageMicroservice } from '../../tools/broker/message.microservice';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
+import { VISUAL_ONLY_GREEN_CHECKS } from '../green-checks/dto/find-green-checks.dto';
 import { isEmpty } from '../../shared/utils/object.utils';
 import { ResultOicr } from '../result-oicr/entities/result-oicr.entity';
 import { StaffGroupsEnum } from '../staff-groups/enum/staff-groups.enum';
@@ -319,6 +320,9 @@ export class StatusWorkflowFunctionHandlerService {
     let completness = true;
 
     for (const key in greenChecks) {
+      // Visual-only checks (e.g. pool_funding_alignment) are informational
+      // and must never block the submit flow.
+      if (VISUAL_ONLY_GREEN_CHECKS.has(key)) continue;
       completness = completness && greenChecks[key];
     }
 

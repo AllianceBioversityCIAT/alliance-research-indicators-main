@@ -1,0 +1,109 @@
+<div class="container justify-self-center p-6">
+  @if (this.getOsResultService.loading()) {
+    <app-custom-progress-bar></app-custom-progress-bar>
+  } @else {
+    @if (this.getOsResultService.list().length > 0) {
+      <div class="header-container pt-4 pb-2">
+        <div class="header">
+          <span class="title-text"
+            >THERE ARE <span class="number-results">{{ this.getOsResultService.list().length }}</span> RESULTS FOR YOUR SEARCH</span
+          >
+          <span class="description-text">You searched "{{ this.cache.searchAResultValue() }}"</span>
+        </div>
+        <div class="button">
+          <p-button
+            label="Explore other results"
+            styleClass="!text-[12px] !h-10 !px-3 !font-[400] !border-[#1689CA] !bg-[#1689CA] !rounded-[15px]"
+            size="small"
+            [disabled]="true"
+            pTooltip="This feature is under construction">
+            <ng-template pTemplate="icon">
+              <img [src]="'construction.png' | s3ImageUrl" width="20" height="20" alt="Under construction" />
+            </ng-template>
+          </p-button>
+        </div>
+      </div>
+    }
+
+    <div>
+      @if (this.getOsResultService.list().length === 0) {
+        <div class="no-results-container">
+          <div class="no-results-content">
+            <img [src]="'images/no-results-found.png' | s3ImageUrl" alt="" />
+            <div class="title-text-no-results">NO RESULTS FOUND FOR YOUR SEARCH</div>
+            <div class="description-text">
+              You searched "{{ this.cache.searchAResultValue() }}". Please check the entered term or try using different keywords.
+            </div>
+          </div>
+        </div>
+        <div class="explore-other-results-button">
+          <p-button label="Explore other results" size="small" [disabled]="true" pTooltip="This feature is under construction">
+            <ng-template pTemplate="icon">
+              <img [src]="'construction.png' | s3ImageUrl" width="20" height="20" alt="Under construction" />
+            </ng-template>
+          </p-button>
+        </div>
+      } @else {
+        <div class="w-full analyze-result-content bg-white border-[#E8EBED] border-1">
+          @for (item of this.getOsResultService.list() | slice: first() : first() + rows(); track $index) {
+            <div
+              (click)="openResult(item)"
+              (keydown.enter)="openResult(item)"
+              class="p-[25px] bg-[#FCFCFC] border border-[#E8EBED] cursor-pointer rounded-tl-none rounded-tr-none w-full">
+              <div class="flex items-center pb-[0.5px] justify-start gap-[5px]">
+                <i class="material-symbols-rounded" [class]="getIndicatorTypeIcon(item.indicator.name).class" style="font-size: 20px">{{
+                  getIndicatorTypeIcon(item.indicator.name).icon
+                }}</i>
+                <p class="text-[13px] !font-['Space_Grotesk'] text-[#777C83]">{{ item.indicator.name | uppercase }}</p>
+              </div>
+              <p class="text-[20px] font-semibold pb-2.5 text-[#112F5C]" #titleText>
+                {{ item.title }}
+              </p>
+
+              @if (item.description) {
+                <p class="text-[16px] font-[400] leading-[17px] pb-2.5 text-[#777C83]">{{ item.description }}</p>
+              }
+
+              <div class="flex items-center justify-start flex-wrap gap-[35px]">
+                @if (item.result_official_code) {
+                  <div class="flex items-center justify-start flex-wrap gap-[10px]">
+                    <p class="text-[13px] font-[500] text-[#8d9299] !font-['Space_Grotesk']">Result Code</p>
+                    <i class="pi pi-arrow-right !text-[11px] !text-[#8D9299]"></i>
+                    <span class="text-[13px] font-semibold text-[#345B8F] capitalize">{{ item.result_official_code }}</span>
+                  </div>
+                }
+
+                @if (item.keywords.length > 0) {
+                  <div class="flex items-center justify-center">
+                    <div class="flex items-center flex-wrap gap-[10px]">
+                      <p class="text-[13px] font-[500] text-[#8d9299] !font-['Space_Grotesk']">Keywords</p>
+                      <i class="pi pi-arrow-right !text-[11px] !text-[#8D9299]"></i>
+                      @for (keyword of item.keywords; track $index) {
+                        <span class="text-[13px] font-normal text-[#4C5158] px-[10px] py-[5px] rounded-[14px] bg-[#E8EBED] capitalize">{{
+                          keyword
+                        }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      @if (getOsResultService.list().length > 0) {
+        <div class="flex justify-end w-full py-2 bg-white border-t-[#E8EBED] border-transparent border-1">
+          <p-paginator
+            (onPageChange)="onPageChange($event)"
+            [first]="first()"
+            [rows]="rows()"
+            [totalRecords]="getOsResultService.list().length"
+            [showCurrentPageReport]="true"
+            [showJumpToPageDropdown]="false"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords}" />
+        </div>
+      }
+    </div>
+  }
+</div>

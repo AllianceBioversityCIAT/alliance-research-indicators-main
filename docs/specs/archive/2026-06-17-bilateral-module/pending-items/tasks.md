@@ -1,0 +1,539 @@
+# Tasks — Bilateral / Pending items (v2: CLARISA-source SPs + admin-owned project mapping)
+
+- **Module:** bilateral
+- **Spec id:** 2026-05-bilateral-pending-items
+- **Status:** not-started
+- **Owner:** ARI backend team
+- **Linked requirements:** [`./requirements.md`](./requirements.md)
+- **Linked design:** [`./design.md`](./design.md)
+- **Linked proposal:** [`./proposal.md`](./proposal.md) (v2 consolidated, commit `a8d58256`)
+- **Last updated:** 2026-05-25
+
+---
+
+## 1. Task numbering
+
+Tasks numbered `T-15.N` to mark them Phase 1.5 — between Phase 0–2 (T-00..T-20 in parent `../tasks.md`) and Phase 3+ (T-21..T-38). Higher numbers do not imply higher priority — see dependency graph in §2.
+
+| Task | Title | Maps to | Status |
+| --- | --- | --- | --- |
+| T-15.1 | Catalog-aware validation on PATCH alignment | R-BIL-070 | [x] done (2026-05-26) |
+| T-15.2 | Source-based read-only gate | R-BIL-071 (modifies R-BIL-015 / R-BIL-034) | [x] done (2026-05-26) |
+| T-15.3 | Migration: rename `lever_code` → `sp_code` | R-BIL-073 | [x] done (2026-05-26) |
+| T-15.4 | Migration: add `icon_key` to catalog | R-BIL-074 | [x] done (2026-05-26) |
+| T-15.6 | Sibling `*.spec.ts` coverage | NFR-BIL-070 | [x] done (2026-05-26) |
+| T-15.7 | Apply all migrations to dev / staging / production | R-BIL-075, NFR-BIL-072 | [~] in progress — dev done; staging+prod queued for DevOps (see [`./rollout-checklist.md`](./rollout-checklist.md)) |
+| T-15.8 | Doc updates (parent design, tasks, frontend-handoff) | NFR-BIL-071 | [x] done (2026-05-26) |
+| T-15.9 | Re-price Phase 3+ tasks (T-21..T-38) | (operational) | [x] done (2026-05-26) |
+| T-15.10 | `ClarisaProjectsService` tool + 5-min cache | R-BIL-076 (data source) | [x] done (2026-05-26) |
+| T-15.11 | `GET .../pool-funding-alignment/science-programs` endpoint + service | R-BIL-076 + R-BIL-078 | [x] done (2026-05-26) |
+| T-15.12 | `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint | R-BIL-077 | [x] done (2026-05-27) — **read superseded 2026-06-10** by [`../toc-mapping-v2/`](../toc-mapping-v2/); code retirement gated on its T-10 |
+| T-15.13 | Migration + entity for `bilateral_project_mapping` | R-BIL-079 | [x] done (2026-05-25) |
+| T-15.14 | `BilateralProjectMappingService` + controller + DTOs | R-BIL-080 (REST) + R-BIL-078 (lookup helper) | [x] done (2026-05-26) |
+| T-15.15 | Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry | R-BIL-080 (UI) | [x] done (2026-05-26) |
+| T-15.16 | AI-assisted mapping suggestions | (forward-compat, deferred) | deferred |
+| T-15.17 | Migration: fix `result_pool_funding_alignment` partial-unique | (operational — pre-existing bug surfaced during T-15.1 / T-15.3 smoke) | [x] done (2026-05-26) |
+
+T-15.5 (v1 periodic sync) DROPPED — see proposal §14 changelog.
+
+---
+
+## 2. Dependency graph
+
+```mermaid
+graph TD
+  T13[T-15.13 mapping table migration]
+  T10[T-15.10 CLARISA projects tool]
+  T14[T-15.14 mapping admin service+controller]
+  T15[T-15.15 admin SSR page]
+  T11[T-15.11 per-result SP endpoint]
+  T1[T-15.1 PATCH validation]
+  T2[T-15.2 source-based read-only]
+  T3[T-15.3 column rename migration]
+  T4[T-15.4 icon_key migration]
+  T6[T-15.6 sibling specs]
+  T7[T-15.7 rollout]
+  T8[T-15.8 doc updates]
+  T9[T-15.9 re-price Phase 3+]
+  T12[T-15.12 PRMS ToC endpoint - done]
+  T16[T-15.16 AI assist - DEFERRED]
+
+  T13 --> T14
+  T13 --> T7
+  T10 --> T11
+  T10 --> T14
+  T14 --> T15
+  T14 --> T11
+  T11 --> T1
+  T3 --> T7
+  T4 --> T7
+  T2 -.->|parallel| T1
+  T6 -.->|parallel| many
+  T1 --> T8
+  T2 --> T8
+  T11 --> T8
+  T13 --> T8
+  T14 --> T8
+  T15 --> T8
+  T7 -.->|after migrations land| many
+  T9 -.->|independent| T9
+  T12 -.->|done — AOW derived from CLARISA| T12
+  T16 -.->|deferred| T16
+```
+
+---
+
+## 3. Task list
+
+### T-15.1 — Catalog-aware validation on PATCH alignment
+
+- **Requirements covered:** R-BIL-070
+- **Files touched:**
+  - `src/domain/entities/bilateral/bilateral.service.ts` — extend `normalizeLeverCodes` to async path, reuse `getScienceProgramsForResult` (T-15.11) to compute the catalog set, throw `BadRequestException` with `errors = { unknown_sp_codes }`.
+  - `src/domain/entities/bilateral/bilateral.service.spec.ts` — add the 4 scenarios from R-BIL-070.
+- **Description:** Replace the static-catalog lookup wired in `5d48b27b` with the per-result list from R-BIL-076. Skip validation when `has_contribution=false`. Validation reads the catalog once per request (no N+1).
+- **Implementation notes:**
+  - Reuses `BilateralService.getScienceProgramsForResult` — DO NOT re-implement the chain in the validator.
+  - When the result is unmapped, the per-result list is `[]`; non-empty `sp_codes` therefore rejects with 400 (per R-BIL-070 scenario 4).
+- **Acceptance / done check:**
+  - [x] AC.1–AC.4 from R-BIL-070 pass.
+  - [x] `npm test -- bilateral.service.spec` passes (focused spec `bilateral.service.normalizeLeverCodes.spec.ts`).
+  - [x] Manual: PATCH with `sp_codes:["SP99"]` against a mapped result returns 400 with the structured `errors` payload.
+- **Dependencies:** T-15.11 (the per-result SP endpoint must exist).
+- **Estimated effort:** S
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.1 entry. 4 unit tests + live smoke against CSICAP 19792. Surfaces a pre-existing alignment-table partial-unique bug noted as separate follow-up.
+
+---
+
+### T-15.2 — Source-based read-only gate
+
+- **Requirements covered:** R-BIL-071 (modifies R-BIL-015 / R-BIL-034)
+- **Files touched:**
+  - `src/domain/entities/bilateral/bilateral.service.ts` — `getAlignment` computes `is_read_only` as union; add private `assertPrmsSourceWritable(context)` helper called at the top of `updateAlignment`, `upsertContribution`, `deleteContribution`.
+  - `src/domain/entities/bilateral/bilateral.service.spec.ts` — 4 scenarios from R-BIL-071.
+  - `src/domain/entities/bilateral/dto/update-pool-funding-alignment.dto.ts` — update `AlignmentResponse.is_read_only` doc string.
+- **Description:** Server-side architectural gate, runs BEFORE role/owner checks. PRMS-sourced results read as read-only; writes throw 409 with the new description even for `SYSTEM_ADMIN`. Existing R-BIL-015 synced gate continues to fire for STAR-sourced + synced.
+- **Implementation notes:**
+  - `ResultRepository.findPoolFundingAlignmentContext` already returns `platform_code`; reuse — do not add a new query.
+  - The 409 description text MUST match R-BIL-071 wording exactly (FE may key off it).
+- **Acceptance / done check:**
+  - [x] AC.1–AC.4 from R-BIL-071 pass.
+  - [x] `npm test -- bilateral.service.spec` passes (focused spec `bilateral.service.sourceReadOnlyGate.spec.ts`).
+  - [x] Manual: GET PRMS-sourced result 28731 → `is_read_only:true`; PATCH it as SYSTEM_ADMIN bypass → 409 with the locked R-BIL-071 wording.
+- **Dependencies:** none.
+- **Estimated effort:** S
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.2 entry. Gate placed BEFORE the contributor-eligibility check so PRMS results always surface the source-gate 409 instead of leaking "not a contributor".
+
+---
+
+### T-15.3 — Migration: rename `lever_code` → `sp_code`
+
+- **Requirements covered:** R-BIL-073
+- **Files touched:**
+  - `src/db/migrations/<ts>-renameLeverCodeToSpCodeOnAlignmentSp.ts`:
+    - UP: `ALTER TABLE result_pool_funding_alignment_sp CHANGE COLUMN lever_code sp_code VARCHAR(50) NOT NULL` + index rename.
+    - DOWN: inverse.
+  - `src/domain/entities/bilateral/entities/result-pool-funding-alignment-sp.entity.ts` — rename property, update `@Column({name: 'sp_code'})`, update `@Index('idx_..._sp', ['sp_code'])`.
+  - `src/domain/entities/bilateral/repositories/result-pool-funding-alignment.repository.ts` — references update, ensure `selected_levers[].lever_code` is populated from the renamed column.
+  - `src/domain/entities/bilateral/repositories/result-pool-funding-alignment-sp.repository.ts` — references update.
+  - `src/domain/entities/bilateral/bilateral.service.ts` — write paths use `sp_code` instead of `lever_code`.
+- **Description:** Pure rename. Data preserved. Public API unchanged (`selected_levers[].lever_code` still populated for back-compat; `UpdatePoolFundingAlignmentDto.lever_codes` deprecated field stays).
+- **Implementation notes:**
+  - Verify post-change: `grep -r "lever_code" src/domain/entities/bilateral/` returns only the deprecated DTO field.
+- **Acceptance / done check:**
+  - [x] Migration applies forward; existing data preserved (verified via live GET round-trip).
+  - [x] `npm run migration:revert` runs cleanly; re-apply is idempotent.
+  - [x] GET alignment still populates `selected_levers[]` and `selected_science_programs[]` (API contract preserved via SQL alias).
+  - [x] `npm run lint` + `npm test` pass.
+- **Dependencies:** none.
+- **Estimated effort:** M
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.3 entry. Indicator-mapping table (`result_pool_funding_indicator_mapping.lever_code`) intentionally NOT renamed — separate column, separate follow-up.
+
+---
+
+### T-15.4 — Migration: add `icon_key` to catalog
+
+- **Requirements covered:** R-BIL-074
+- **Files touched:**
+  - `src/db/migrations/<ts>-addIconKeyToScienceProgram.ts`:
+    - UP: `ALTER TABLE clarisa_science_programs ADD COLUMN icon_key VARCHAR(64) NULL` + `UPDATE clarisa_science_programs SET icon_key = official_code WHERE icon_key IS NULL`.
+    - DOWN: `ALTER TABLE clarisa_science_programs DROP COLUMN icon_key`.
+  - `src/domain/tools/clarisa/entities/clarisa-science-programs/entities/clarisa-science-program.entity.ts` — add `@Column({nullable:true}) icon_key?: string | null`.
+  - `src/domain/tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service.ts` — no change (returns full entity).
+  - `src/domain/entities/bilateral/bilateral.service.ts` — `toSelectedSciencePrograms` enrichment adds `icon_key` from catalog.
+  - `src/domain/entities/bilateral/dto/update-pool-funding-alignment.dto.ts` — `SelectedScienceProgramResponse` gains `icon_key?: string | null` and `allocation?: number | null`.
+- **Description:** Adds one column to the catalog. Seeded `icon_key = official_code` for all 13 rows. Drop the v1 `reporting_enabled` + `prms_id` (out of v2 scope).
+- **Acceptance / done check:**
+  - [x] Migration applies; 13 rows have `icon_key = official_code`.
+  - [x] `GET /api/tools/clarisa/science-programs` returns `icon_key` on every entry.
+  - [x] `GET .../pool-funding-alignment/science-programs` carries `icon_key` on each `science_programs[]` entry.
+  - [x] Migration reverts cleanly.
+- **Dependencies:** none.
+- **Estimated effort:** S
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.4 entry.
+
+---
+
+### T-15.6 — Sibling `*.spec.ts` coverage
+
+- **Requirements covered:** NFR-BIL-070
+- **Files touched:**
+  - `src/domain/entities/bilateral/bilateral.service.spec.ts` — covers `getAlignment`, `updateAlignment`, `normalizeLeverCodes`, `toSelectedSciencePrograms`, `listIndicators`, `upsertContribution`, `deleteContribution`, `getScienceProgramsForResult`, `getHlosByScienceProgramsForResult`.
+  - `src/domain/entities/bilateral/bilateral.controller.spec.ts` — handler-level + guard presence.
+  - `src/domain/tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service.spec.ts` — `findAll` (active filter, sort), `findByCode`.
+  - `src/domain/tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.controller.spec.ts` — 200 + 404 paths.
+- **Description:** Backfill specs that were deferred in `5d48b27b`. Required by `src/CLAUDE.md` §9. Coverage target ≥ 70% on bilateral module.
+- **Implementation notes:**
+  - Mock `ClarisaScienceProgramsService`, `BilateralProjectMappingService`, `ClarisaProjectsService`, `PrmsTocService`, repositories with `jest.fn()` providers.
+- **Acceptance / done check:**
+  - [x] All four spec files exist with passing tests (canonical `bilateral.service.spec.ts` + new `bilateral.controller.spec.ts` + new `clarisa-science-programs.service.spec.ts` + new `clarisa-science-programs.controller.spec.ts`). Existing focused specs (T-15.1 / T-15.2 / T-15.11) kept as-is — they own the deep R-BIL-070 / R-BIL-071 / R-BIL-076 scenarios.
+  - [x] Module-level coverage: bilateral 80.42% stmts / 80.29% lines; bilateral-project-mapping 86.73% / 87.91%; clarisa-science-programs 75% / 76.92%. All above the 70% NFR-BIL-070 target.
+- **Dependencies:** can land in parallel with T-15.1 / T-15.2 / T-15.11 / T-15.14.
+- **Estimated effort:** M
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.6 entry.
+
+---
+
+### T-15.7 — Apply all migrations to dev / staging / production
+
+- **Requirements covered:** R-BIL-075, NFR-BIL-072
+- **Files touched:** none (operational).
+- **Description:** Apply migrations in order to dev → staging → production: `1779190000010` (may already be on dev) → `<T-15.3 rename>` → `<T-15.4 icon_key>` → `<T-15.13 mapping table>`. After each env, smoke-test `GET /api/tools/clarisa/science-programs` returns 200 with 13 rows AND `GET /api/v2/results` returns 200 (DI sanity check).
+- **Implementation notes:**
+  - Use `npm run migration:execute` against deployed `dist/`.
+  - Off-peak window per ops runbook.
+  - Have `npm run migration:revert` rollback path ready.
+- **Acceptance / done check:**
+  - [x] All four migrations applied on dev; smoke 200 + 13 rows + every `icon_key` populated; `/api/v2/results` 200; `/api/bilateral-project-mappings` 200; per-result picker verified on result 19792 (CSICAP).
+  - [ ] Same on staging — see [`./rollout-checklist.md`](./rollout-checklist.md) §4.2.
+  - [ ] Same on production — see [`./rollout-checklist.md`](./rollout-checklist.md) §4.3.
+- **Dependencies:** T-15.3, T-15.4, T-15.13.
+- **Estimated effort:** S per env
+- **Owner:** DevOps (paired with ARI backend)
+- **Status:** [~] in progress (2026-05-26) — dev leg complete; staging + prod queued. Rollout commands, smokes, rollback sequence, sign-off blocks, and per-env safety-export instructions captured in [`./rollout-checklist.md`](./rollout-checklist.md).
+
+---
+
+### T-15.8 — Doc updates
+
+- **Requirements covered:** NFR-BIL-071
+- **Files touched:**
+  - `docs/specs/bilateral-module/design.md` — new §3.6 "CLARISA-source SPs + admin mapping" and §3.7 "Source-based read-only gate", cross-linked here.
+  - `docs/specs/bilateral-module/tasks.md` — new §10 "Phase 1.5 deltas" pointing to this sub-spec, listing T-15.1..15.16 with current status; §11 "Re-price log" entry per T-15.9.
+  - `docs/specs/bilateral-module/frontend-handoff.md` — §4.2 updated for the new union semantic of `is_read_only`; §4.3 updated for the new 400 validation; §4.6 rewritten — picker source is now `GET .../pool-funding-alignment/science-programs`, deprecate `/api/tools/clarisa/science-programs` for picker use; new §4.7 for HLO endpoint; new §4.8 for admin module pointer; §12 changelog entry.
+- **Description:** Keep parent specs aligned with code after Phase 1.5 lands. Doc/code drift is exactly what root `CLAUDE.md` §1 warns against.
+- **Implementation notes:**
+  - Land AFTER code for T-15.1, T-15.2, T-15.11, T-15.13, T-15.14, T-15.15 is merged.
+- **Acceptance / done check:**
+  - [x] Parent `design.md` has §3.6 (CLARISA-source SPs + admin mapping) + §3.7 (source-based read-only gate).
+  - [x] Parent `tasks.md` has §14 (Phase 1.5 deltas — pending-items sub-spec) + §15 (Re-price log) entries. (Numbered §14/§15 rather than the spec-idealized §10/§11 because the parent already had §10–§13; appending preserved existing cross-refs.)
+  - [x] `frontend-handoff.md` §4.2 (union `is_read_only`) + §4.3 (catalog-aware 400) + §4.6 (rewritten — per-result picker; legacy catalog demoted to fallback) + new §4.7 (HLO endpoint stub) + new §4.8 (admin module pointer) + §12 changelog reflect Phase 1.5 behavior.
+- **Dependencies:** T-15.1, T-15.2, T-15.11, T-15.13, T-15.14, T-15.15.
+- **Estimated effort:** S
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.8 entry.
+
+---
+
+### T-15.9 — Re-price Phase 3+ tasks
+
+- **Requirements covered:** (operational, no R-ID)
+- **Files touched:**
+  - `docs/specs/bilateral-module/tasks.md` — update `Status` on T-21..T-38; add §11 "Re-price log" entry dated 2026-05-25 with each task's current status and blocker; mark T-31 narrowed (catalog covered by T-15.11; only indicators-per-SP scope remains via the PRMS ToC proxy in T-15.12).
+- **Description:** Walk Phase 3–6 task list, refresh statuses, list current external blockers (T-21 D-push-auth, T-22 D-source-w3, T-23 OQ-US5-3/6), and re-scope T-31.
+- **Acceptance / done check:**
+  - [x] Every T-21..T-38 has a current `Status:` line pointing back to parent `tasks.md` §15 re-price log (no longer the generic "pending").
+  - [x] §15 re-price log entry exists for 2026-05-25 (landed under T-15.8; covers every T-21..T-38 line + the T-31 / T-32 collapse rationale).
+  - [x] T-31 carries the "scope narrowed — HLO surface now via T-15.12" note (inline status + §15 row).
+- **Dependencies:** none.
+- **Estimated effort:** S
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.9 entry.
+
+---
+
+### T-15.10 — `ClarisaProjectsService` tool + 5-min cache
+
+- **Requirements covered:** R-BIL-076 (data source), NFR-BIL-073 (resilience)
+- **Files touched:**
+  - `src/domain/tools/clarisa/projects/clarisa-projects.module.ts`
+  - `src/domain/tools/clarisa/projects/clarisa-projects.service.ts` — methods `listBilateralProjects()`, `findProjectById(id: number)`. Cache: `{data, fetchedAt}`, TTL 5 min. On upstream error with warm cache → serve cache + log warn; cold cache → `ServiceUnavailableException`.
+  - `src/domain/tools/clarisa/projects/clarisa-projects.service.spec.ts` — happy, cache hit, warm-cache-on-error, cold-503.
+  - `src/domain/tools/clarisa/projects/dto/clarisa-project.types.ts` — TypeScript types matching CLARISA `/api/projects` (project, mapping, global_unit_object, cgiar_entity_type_object, portfolio_object).
+- **Description:** Thin HTTP wrapper over CLARISA `/api/projects`. Reuses existing `ARI_CLARISA_HOST` + Basic auth. Singleton-scoped — no `CurrentUserUtil`.
+- **Implementation notes:**
+  - Filter to `source_of_funding === "Bilateral"` inside `listBilateralProjects()`; raw `fetchAll()` is private.
+  - Mark singleton on the class doc comment per parent design.md §3.4 Constraint A.
+- **Acceptance / done check:**
+  - [ ] `listBilateralProjects()` returns only Bilateral projects after first call.
+  - [ ] Second call within 5 min hits cache (verified via mock spy).
+  - [ ] Upstream error + warm cache → serves cache + LoggerUtil.warn line.
+  - [ ] Upstream error + cold cache → throws `ServiceUnavailableException` (envelope status 503).
+- **Dependencies:** none.
+- **Estimated effort:** M
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.10 entry. 7 unit tests cover filter, cache hit, warm-cache-on-error, cold-503. Reuses existing `Clarisa` connection (Bearer token via `auth/login`) instead of Basic auth — both work, Bearer matches the rest of the codebase.
+
+---
+
+### T-15.11 — `GET .../pool-funding-alignment/science-programs` endpoint + service
+
+- **Requirements covered:** R-BIL-076 + R-BIL-078
+- **Files touched:**
+  - `src/domain/entities/bilateral/bilateral.controller.ts` — new `@Get('science-programs')` handler under existing `pool-funding-alignment` controller; `@Version('1')`; `@ApiTags('Bilateral')` + `@ApiOperation` + `@ApiOkResponse`.
+  - `src/domain/entities/bilateral/bilateral.service.ts` — new method `getScienceProgramsForResult(resultId, resultCode)`. Chain: result → agreement_id → `BilateralProjectMappingService.findActiveByAgreementId` → if null return `mapping_status: "unmapped"`, else `ClarisaProjectsService.findProjectById` → filter (`Confirmed`, `activePortfolio`) → map + enrich from `clarisa_science_programs`.
+  - `src/domain/entities/bilateral/bilateral.module.ts` — import `BilateralProjectMappingModule`, `ClarisaProjectsModule`.
+  - `src/domain/entities/bilateral/dto/bilateral-science-programs.response.dto.ts` — new DTO shape per design §6.1.
+  - `src/domain/entities/bilateral/bilateral.service.spec.ts` — scenarios from R-BIL-076 + R-BIL-078.
+- **Description:** Wire the per-result SP picker source. Returns 200 always (unmapped is a valid state). The `activePortfolio` filter is env-driven via `ARI_BILATERAL_ACTIVE_PORTFOLIO` (default `"P25"`).
+- **Acceptance / done check:**
+  - [ ] All 4 R-BIL-076 scenarios pass.
+  - [ ] R-BIL-078 scenarios (single active, no active, inactive ignored) pass.
+  - [ ] Endpoint appears in `/swagger` under `Bilateral` tag with `BilateralSciencePrograms` response shape.
+  - [ ] Manual: tag CSICAP (D527 → CLARISA project ID), hit the endpoint, see only the project's SPs.
+- **Dependencies:** T-15.10, T-15.14 (lookup helper).
+- **Estimated effort:** M
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.11 entry + Pivot Record #2 (URL path uses existing `pool-funding-alignment/` namespace, not idealized `/bilateral/`). 8 unit tests + live end-to-end smoke against CSICAP `19792` (D527 → CLARISA project 1 → SP09 25% + SP10 75% returned with color enrichment).
+
+---
+
+### T-15.12 — `PrmsTocService` + `GET .../pool-funding-alignment/hlos-indicators` endpoint
+
+> **🗄️ Archived — superseded (2026-06-10).** The read this task shipped (PRMS `(SP, AOW)`-pair fan-out, `aow_status` + `pairs[]`) was replaced by the lambda-toc level-based catalog read — see [`../toc-mapping-v2/`](../toc-mapping-v2/) (D-V2-1..D-V2-8; OQ-V2-9 → new table `result_pool_funding_toc_alignment`). **Lineage note:** the AOW-from-`cgiar-entities` work below (T-15.12-rev / D-PI-14) fed the superseded read only and is retired at the toc-mapping-v2 **T-10 cutover** — code deletion (`domain/tools/prms-toc/`, `ARI_PRMS_TOC_HOST`, AOW fan-out remnants) is **gated** on a recorded cutover-verified note (R-BIL-098 AC.2). Until then `PrmsTocService` remains in code, unused by the hlos read flow. `ClarisaCgiarEntitiesService` / `getAreasOfWorkBySp` stay live (only this flow's usage goes).
+
+- **Requirements covered:** R-BIL-077 + NFR-BIL-073
+- **Files touched (as built):**
+  - `src/domain/tools/prms-toc/prms-toc.module.ts`
+  - `src/domain/tools/prms-toc/prms-toc.service.ts` — methods `getTocResults(program, areaOfWork)` + `getTocResultsForPairs(pairs)`. Cache key: composite `${program}-${areaOfWork}`; TTL 5 min; same warm-on-error / cold-503 pattern as `ClarisaProjectsService`. (T-15.12-rev: a per-pair **404 now returns a cached empty payload**, not a 503 — we enumerate every AOW of an SP and most have no ToC.)
+  - `src/domain/tools/prms-toc/prms-toc.service.spec.ts` — 13 tests covering happy path, cache hit, per-pair keying, whitespace trimming, missing-input 503, missing-host 503, warm-cache-on-error, cold-503, empty-payload guard, batch helper (order preservation + empty input).
+  - `src/domain/tools/prms-toc/dto/prms-toc.types.ts` — TypeScript shapes matching the live upstream (envelope, payload, outcomes/outputs/indicators/targets-by-center).
+  - `src/domain/entities/bilateral/bilateral.controller.ts` — new `@Get('hlos-indicators')` handler.
+  - `src/domain/entities/bilateral/bilateral.service.ts` — new `getHlosIndicatorsForResult(resultId, resultCode)`; constructor deps on `PrmsTocService` + `ClarisaCgiarEntitiesService`. (T-15.12-rev: the private `derivePairsFromProjectMappings(project)` helper was replaced by `deriveScienceProgramCodes(project)` — see revision note below.)
+  - `src/domain/entities/bilateral/dto/bilateral-hlos-indicators.response.dto.ts` — response shape with `aow_status` discriminator.
+  - `src/domain/shared/utils/env.utils.ts` — new `PRMS_TOC_HOST` getter (no `PRMS_TOC_AUTH` — test endpoint has no auth).
+  - `src/domain/tools/clarisa/projects/dto/clarisa-project.types.ts` — surfaces `parent_id` on `ClarisaGlobalUnit`; documents `prefix` semantics on `ClarisaCgiarEntityType`.
+  - `src/domain/entities/bilateral/bilateral.service.getHlosIndicatorsForResult.spec.ts` — focused scenarios.
+  - `src/domain/entities/bilateral/bilateral.module.ts` — imports `PrmsTocModule` (+ `ClarisaCgiarEntitiesModule`, T-15.12-rev).
+  - `.env.example` — documents `ARI_PRMS_TOC_HOST=https://prtest-back.ciat.cgiar.org`.
+  - **(T-15.12-rev, 2026-05-28)** `src/domain/tools/clarisa/cgiar-entities/{clarisa-cgiar-entities.service.ts, .module.ts, .service.spec.ts, dto/clarisa-cgiar-entity.types.ts}` — new SP→AOW catalog tool.
+- **Description:** Wires the HLO/indicator panel data source. Endpoint takes no extra params from the FE. The **Science Program** comes from the mapped CLARISA project's `project_mappings_array[]` (level-1 SP entries); each SP's **Areas of Work** come from the `cgiar-entities` catalog (D-PI-14). Each SP × its AOWs is one `(program, areaOfWork)` pair; fans out one PRMS call per pair, cached, and drops pairs PRMS has no data for. Always returns 200; the FE drives empty-state UX from `aow_status` (`unmapped` / `no_aow_mappings` / `has_aow`).
+- **Implementation notes:**
+  - PRMS upstream observed (2026-05-27): `GET https://prtest-back.ciat.cgiar.org/api/public-results-framework/toc-results?program=<SP>&areaOfWork=<AOW>`. Both params required (400 without `areaOfWork`); no auth observed on the test host.
+  - **AOW source — SUPERSEDED (T-15.12-rev / D-PI-14, 2026-05-28).** Originally (D-PI-13) AOW was read from the project's `project_mappings_array[]` level-2 entries via `parent_id` → SP. That mechanism is unusable: all AOW entries share global `parent_id` 267 (= SP01), so across all 299 production projects it yielded only `SP01-AOW06`, which PRMS test lacks. AOW is now sourced from `GET /api/cgiar-entities?version=2` (`ClarisaCgiarEntitiesService`), where each AOW names its parent SP by **code**. `no_aow_mappings` now also covers "PRMS has ToC data for none of the derived pairs".
+  - URL stays under `pool-funding-alignment/` (not the idealized `/bilateral/`) — matches Pivot Record #2 from T-15.11.
+  - Resilience: 5-min in-memory TTL, warm-cache-on-error serves stale, cold cache failures translate to 503 envelope.
+- **Acceptance / done check:**
+  - [x] Endpoint returns 200 with the three `aow_status` shapes documented above.
+  - [x] PRMS upstream unreachable + cold cache → 503 with `"PRMS ToC temporarily unreachable"`.
+  - [x] `ARI_PRMS_TOC_HOST` missing → 503 with `"PRMS ToC integration not configured"`.
+  - [x] Sibling specs added: `prms-toc.service.spec.ts` (13) + `bilateral.service.getHlosIndicatorsForResult.spec.ts` (6). Existing focused specs (T-15.1 / T-15.2 / T-15.11 / T-15.6) green after provider mock added.
+  - [x] Full jest suite: 279 suites / 1580 tests green.
+  - [x] `npx eslint --fix` on touched files → clean.
+  - [x] Swagger: `/swagger` will show the new endpoint under the `Bilateral` tag with the locked operation summary.
+- **Dependencies:** T-15.10 (CLARISA projects tool — already done), T-15.14 (mapping lookup — already done).
+- **Estimated effort:** M (delivered)
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-27) — see [`./execution.md`](./execution.md) T-15.12 entry.
+
+---
+
+### T-15.13 — Migration + entity for `bilateral_project_mapping`
+
+- **Requirements covered:** R-BIL-079
+- **Files touched:**
+  - `src/db/migrations/<ts>-createBilateralProjectMapping.ts` — table + indexes + generated column for partial-unique (per D-PI-9).
+  - `src/domain/entities/bilateral-project-mapping/entities/bilateral-project-mapping.entity.ts` — extends `AuditableEntity`; columns per design §5.1.
+  - `src/domain/entities/bilateral-project-mapping/enum/mapping-source.enum.ts` — `MANUAL | AI_SUGGESTED | AI_AUTO`.
+  - `src/domain/entities/bilateral-project-mapping/repositories/bilateral-project-mapping.repository.ts` — basic `extends Repository<...>` shell.
+  - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.module.ts` — registers `TypeOrmModule.forFeature([...])` + repository; exports.
+- **Description:** Creates the new join table. MySQL partial-unique emulated via a generated column `active_agreement_id` + unique index. Auditable rows; soft-delete via `is_active`.
+- **Implementation notes:**
+  - Verify generated-column unique behavior locally: two inserts with same `agresso_agreement_id` + `is_active=true` second attempt fails.
+- **Acceptance / done check:**
+  - [ ] Migration applies forward.
+  - [ ] Two active rows for same `agresso_agreement_id` → DB rejects second insert.
+  - [ ] `npm run migration:revert` runs cleanly.
+- **Dependencies:** none (unblocks downstream).
+- **Estimated effort:** M
+- **Owner:** ARI backend
+- **Status:** [x] done — see [`./execution.md`](./execution.md) T-15.13 entry. Partial-unique behavior verified via manual MySQL exercise (3 inserts + 1 deactivate).
+
+---
+
+### T-15.14 — `BilateralProjectMappingService` + controller + DTOs
+
+- **Requirements covered:** R-BIL-080 (REST surface) + R-BIL-078 (lookup helper)
+- **Files touched:**
+  - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.ts` — CRUD + `findActiveByAgreementId(agreementId)` lookup helper + `deactivate(id, user, notes?)`.
+  - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.controller.ts` — `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)` + `RolesGuard`; routes `GET`, `POST`, `PATCH /:id`, `PATCH /:id/deactivate`. Versioned `/api/bilateral-project-mappings`.
+  - `src/domain/entities/bilateral-project-mapping/dto/create-bilateral-project-mapping.dto.ts`
+  - `src/domain/entities/bilateral-project-mapping/dto/update-bilateral-project-mapping.dto.ts`
+  - `src/domain/entities/bilateral-project-mapping/dto/list-bilateral-project-mappings.query.dto.ts`
+  - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.spec.ts` — create (happy + 409 partial-unique conflict), update, deactivate, lookup helper.
+  - `src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.controller.spec.ts` — role allow/deny + happy paths.
+  - `src/domain/routes/main.routes.ts` — register the new sub-resource path (`/api/bilateral-project-mappings`).
+- **Description:** Singleton-scoped (no `CurrentUserUtil` / `ResultsUtil`). All writes audited. `create` wraps insert in a transaction + select-for-update on the active row to make the 409 conflict deterministic. `findActiveByAgreementId` is reused by T-15.11.
+- **Acceptance / done check:**
+  - [ ] R-BIL-080 scenarios pass: create / deactivate / role-deny / partial-unique 409.
+  - [ ] R-BIL-078 scenarios pass: single active, none, inactive ignored.
+  - [ ] Endpoints appear in `/swagger`.
+- **Dependencies:** T-15.13.
+- **Estimated effort:** L
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.14 entry + Pivot Record #1 (path moved from `/api/admin/bilateral-project-mappings` to `/api/bilateral-project-mappings`). 21 unit tests + full end-to-end CRUD smoke (create / 409 conflict / list / deactivate / re-create after deactivate) green.
+
+---
+
+### T-15.15 — Admin SSR page `/admin/bilateral-project-mappings` + sidebar entry
+
+- **Requirements covered:** R-BIL-080 (UI)
+- **Files touched:**
+  - `src/admin/controllers/admin.controller.ts` — new `@Get('bilateral-project-mappings')` SSR handler.
+  - `src/admin/services/admin.service.ts` — new method `listBilateralProjectMappings(query)` that calls `BilateralProjectMappingService.list`.
+  - `src/admin/client/src/pages/BilateralProjectMappings/BilateralProjectMappingsList.tsx` — paginated table per design §8.1.
+  - `src/admin/client/src/pages/BilateralProjectMappings/BilateralProjectMappingForm.tsx` — create/edit form with AGRESSO + CLARISA project pickers + SP allocation preview.
+  - `src/admin/client/src/pages/BilateralProjectMappings/index.tsx` — route entry.
+  - `src/admin/client/src/App.tsx` — register the new route + sidebar entry.
+  - `src/admin/client/src/components/Sidebar.tsx` — add "Bilateral › Project mappings" entry (or whatever the existing sidebar conventions name it).
+- **Description:** Admin SSR pages per `src/admin/README-REACT.md`. AGRESSO picker: `GET /api/v1/agresso/contracts?pool-funding-contributor=true` (existing). CLARISA picker: small wrapper around `ClarisaProjectsService.listBilateralProjects()` (included in this task or as a sibling admin endpoint `GET /api/admin/clarisa-projects?source_of_funding=Bilateral&search=...`).
+- **Implementation notes:**
+  - Use `ui-ux-pro-max` skill for the form layout + table design (loaded at implementation time).
+  - Use existing admin layout components; don't introduce a new design system.
+  - SP allocation preview is read-only; uses `selectedProject.project_mappings_array` filtered to active portfolio.
+- **Acceptance / done check:**
+  - [x] `/api/admin/bilateral-project-mappings` SSRs the list (3 existing inactive D527 rows visible).
+  - [x] CENTER_ADMIN / SYSTEM_ADMIN can create a mapping end-to-end in dev via the form — picker payload + write path verified live.
+  - [x] Deactivate flow works (already smoked end-to-end during T-15.14; UI button hits the same endpoint).
+  - [x] Role gate: RolesGuard enforces server-side at the REST surface; sidebar entry visible to all (no client-side role hiding in this rev — see Pivot Record #3).
+- **Dependencies:** T-15.14.
+- **Estimated effort:** L
+- **Owner:** ARI backend
+- **Skills used:** (existing bootstrap-based admin shell — no design-system skills loaded; kept consistent with Users/Settings page conventions).
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.15 entry + side-discovery on admin SSR `basename` fix that unblocks every existing admin page.
+
+---
+
+### T-15.16 — AI-assisted mapping suggestions (DEFERRED)
+
+- **Requirements covered:** (forward-compat for R-BIL-079 / R-BIL-080)
+- **Description:** Backlog task. Add a "Suggest from AI" button on the admin edit form that calls an LLM/embedding service with AGRESSO contract metadata + CLARISA project candidates and returns ranked matches. Operator confirms or rejects; on confirm, row is created with `source = AI_SUGGESTED` and `confidence_score` populated.
+- **Dependencies:** OQ-RV-8 (provider + workflow scoping).
+- **Estimated effort:** L (deferred)
+- **Owner:** TBA
+- **Status:** deferred
+- **Note:** Not in scope for first cut. Schema in T-15.13 is forward-compatible (`source` + `confidence_score` columns).
+
+---
+
+### T-15.17 — Migration: fix `result_pool_funding_alignment` partial-unique
+
+- **Requirements covered:** (operational — no R-ID; carried-forward bug)
+- **Files touched:**
+  - `src/db/migrations/1779190000014-fixResultPoolFundingAlignmentPartialUnique.ts` — DROP the plain unique → ADD STORED GENERATED `active_result_id` → ADD UNIQUE on the generated column. Same D-PI-9 pattern as `bilateral_project_mapping`.
+  - `src/domain/entities/bilateral/entities/result-pool-funding-alignment.entity.ts` — remove the stale `@Index('uq_result_pool_funding_alignment_result_active', ['result_id', 'is_active'], {unique:true})` decorator (it was the truth before the migration; misleading after). Generated column intentionally NOT mapped on the entity.
+- **Description:** Pre-existing partial-unique emulation bug surfaced during T-15.1 / T-15.3 live smokes. The original UNIQUE on `(result_id, is_active)` reads as "at most one row per (result, active-state)" — fails on the second deactivation because both rows would have `(result_id, 0)`. The intended semantic is "at most one ACTIVE row per result", which is what the D-PI-9 pattern (used by `bilateral_project_mapping`) actually enforces.
+- **Implementation notes:**
+  - Forward path is clean. DOWN is best-effort: only safe immediately after UP, before any deactivate+re-create operator activity. Once the table holds ≥ 2 deactivated rows for any result, `ADD UNIQUE INDEX` on the old shape throws 1062 and the migration transaction rolls back; new index + generated column remain in place. This is the correct safety posture — rolling back would otherwise require silently picking which deactivated row to delete. Documented in the migration's DOWN comment.
+  - Coordinate with the rollout in `./rollout-checklist.md` — this migration becomes the 5th in the Phase 1.5 batch and inherits the same per-env smoke sequence.
+- **Acceptance / done check:**
+  - [x] Migration applies forward on dev.
+  - [x] Reproduce the previously-failing PATCH (was 500 `Duplicate entry '17936-0'`) → now returns 200.
+  - [x] PATCH `has_contribution: false` + subsequent PATCH cycles all return 200.
+  - [x] 60/60 bilateral tests still passing.
+- **Dependencies:** none (independent of Phase 1.5 work — but lands as part of the same wave).
+- **Estimated effort:** S
+- **Owner:** ARI backend
+- **Status:** [x] done (2026-05-26) — see [`./execution.md`](./execution.md) T-15.17 entry. Rollout checklist updated to include this migration as step 5.
+
+---
+
+## 4. Standard task categories — coverage map
+
+| Category | Covered by |
+| --- | --- |
+| Schema migrations | T-15.3, T-15.4, T-15.13, T-15.17 |
+| Entity | T-15.3, T-15.4, T-15.13 |
+| DTO | T-15.4, T-15.11, T-15.12, T-15.14 |
+| Repository | T-15.3, T-15.13 |
+| Service | T-15.1, T-15.2, T-15.10, T-15.11, T-15.12, T-15.14 |
+| Controller | T-15.11, T-15.12, T-15.14 |
+| Route registration | T-15.14 (main routes) |
+| Guards / pipes / decorators | (reuses existing `RolesGuard`) |
+| Integration adjustments | T-15.10 (CLARISA projects), T-15.12 (PRMS ToC) |
+| Cron | n/a (no cron in v2 — D-PI-7) |
+| Unit tests | T-15.1, T-15.2, T-15.6, T-15.10, T-15.11, T-15.12, T-15.14 |
+| E2E tests | extends `test/bilateral.e2e-spec.ts` + new `test/bilateral-project-mappings.e2e-spec.ts` under T-15.14 |
+| Admin SSR | T-15.15 |
+| Docs | T-15.8 |
+| Rollout | T-15.7 |
+
+---
+
+## 5. Testing expectations
+
+| Task | Test files | Notes |
+| --- | --- | --- |
+| T-15.1 | `bilateral.service.spec.ts` | 4 scenarios from R-BIL-070. |
+| T-15.2 | `bilateral.service.spec.ts` | 4 scenarios from R-BIL-071. SYSTEM_ADMIN-on-PRMS denial covered. |
+| T-15.3 | migration tests | up/down preserves rows. |
+| T-15.4 | migration tests + `clarisa-science-programs.service.spec.ts` | column visibility + seed value. |
+| T-15.6 | 4 sibling spec files | ≥ 70% bilateral module coverage. |
+| T-15.10 | `clarisa-projects.service.spec.ts` | cache hit + warm-on-error + cold-503. |
+| T-15.11 | `bilateral.service.spec.ts` | R-BIL-076 + R-BIL-078 scenarios. |
+| T-15.12 | `prms-toc.service.spec.ts` + `bilateral.service.getHlosIndicatorsForResult.spec.ts` | 13 + 6 scenarios — happy path, cache hit, per-pair keying, warm-on-error, cold-503, missing-host 503, pair-derivation from CLARISA, AOW filtering. |
+| T-15.13 | migration tests | partial-unique enforced. |
+| T-15.14 | service + controller + e2e (new `test/bilateral-project-mappings.e2e-spec.ts`) | create / 409 / update / deactivate / role allow+deny. |
+| T-15.15 | (manual + Playwright if available) | end-to-end create + deactivate flow in dev. |
+
+A task is NOT done until:
+- `npm run lint` passes.
+- `npm test` passes locally.
+- New endpoints appear in `/swagger`.
+- Migrations apply forward AND revert cleanly.
+
+---
+
+## 6. Execution conventions
+
+- One PR per task ideally; T-15.6 may bundle the four spec files.
+- PR title format: `<type>(bilateral): T-15.N — <subject>` matching Phase 0–2 history.
+- Branch from `AC-1594-bilateral-module-v2`.
+- Merge sequence is the dependency graph order, not author convenience.
+- Never edit a migration after merge.
+- Always include Swagger updates in the same PR as service-level behavior changes.
+
+---
+
+## 7. Risks & blockers log
+
+| # | Date | Risk / Blocker | Mitigation | Owner | Status |
+| --- | --- | --- | --- | --- | --- |
+| RB-1 | 2026-05-25 | PRMS ToC endpoint URL/auth/payload is unknown (OQ-RV-2). | Ship T-15.12 in interim 503 mode; refine when OQ-RV-2 closes. | PRMS team | closed 2026-05-27 — URL supplied, no auth on test host, T-15.12 shipped end-to-end. |
+| RB-2 | 2026-05-25 | Renaming `lever_code` could surface hidden consumers. | Pre-merge grep + `git log -S lever_code`. | ARI backend | open |
+| RB-3 | 2026-05-25 | OQ-PI-2 (hard-reject `is_active=false`) carried from v1; could change T-15.1 behavior post-merge. | Default to D-PI-6 (accept any row); follow-on PR if OQ resolves differently. | ARI backend | open |
+| RB-4 | 2026-05-25 | T-15.7 production rollout needs DevOps coordination. | Schedule off-peak; backout via `migration:revert`. | DevOps | open |
+| RB-5 | 2026-05-25 | Operator burden of 200+ manual mappings at launch. | Launch with admin UI; track weekly; accelerate T-15.16 or CSV import if needed. | MEL PO | open |
+| RB-6 | 2026-05-25 | CLARISA `/api/projects` returns 1 MB today; latency may degrade at scale. | Filter on the server side + 5-min cache; revisit per OQ-RV-6. | ARI backend | open |
+| RB-7 | 2026-05-25 | Deactivation orphans persisted alignment rows (OQ-RV-9). | Default: leave persisted rows alone, mark stale on next read; revisit when OQ closes. | MEL PO + ARI backend | open |
+
+---
+
+## 8. Done definition
+
+The spec is complete when:
+- [ ] T-15.1, T-15.2, T-15.3, T-15.4, T-15.6, T-15.7, T-15.8, T-15.9, T-15.10, T-15.11, T-15.13, T-15.14, T-15.15 are `done`.
+- [x] T-15.12 is `done` — OQ-RV-2 closed in practice 2026-05-27 (PRMS team-supplied URL works without auth on the test host).
+- [ ] All R-BIL-070..080 acceptance criteria are checked.
+- [ ] NFR-BIL-070..073 verification passes.
+- [ ] Coverage ≥ 60% global, ≥ 70% bilateral + bilateral-project-mapping.
+- [ ] Swagger documents all new endpoints + new 400 / 409 codes.
+- [ ] Open questions OQ-RV-2..9 are either resolved (moved to D-PI-N decisions) or carried forward as a new spec.
+- [ ] Parent `bilateral-module/design.md`, `tasks.md`, `frontend-handoff.md` updated per T-15.8.
+- [ ] Rollout completed on dev + staging + production per T-15.7.
+- [ ] At least one bilateral_project_mapping created end-to-end via the admin SSR page on dev.

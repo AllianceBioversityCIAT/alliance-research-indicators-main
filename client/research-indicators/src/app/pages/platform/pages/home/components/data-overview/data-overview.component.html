@@ -1,0 +1,64 @@
+<div class="local-container data-overview--sidebar">
+  <div class="sidebar-stack">
+    <section class="sidebar-card sidebar-section sidebar-section--status">
+      <h2 class="sidebar-section__title">My results by status</h2>
+
+      @if (showChart()) {
+      <div class="chart-container">
+        <ul class="status-bars">
+          @for (item of chartLegend(); track item.result_status_id) {
+          <li class="status-bar-row">
+            <a class="status-bar-link" [routerLink]="['/results-center']" [queryParams]="statusRowQueryParams(item)"
+              [attr.aria-label]="'View My Results filtered by ' + item.label">
+              <span class="status-bar-label" [title]="item.label">{{ item.label }}</span>
+              <div class="status-bar-track" aria-hidden="true">
+                <div class="status-bar-fill" [style.width.%]="barFillPercent(item.value)"
+                  [style.background-color]="item.color"></div>
+              </div>
+              <span class="status-bar-value">{{ item.value }}</span>
+            </a>
+          </li>
+          }
+        </ul>
+      </div>
+      } @else {
+      <div class="no-results-yet-2">
+        <img [src]="'images/home/no-results-yet.png' | s3ImageUrl" alt="" />
+        <div class="column">
+          <span class="title">No results yet</span>
+          <span class="description">It looks like you haven't created any results yet. Start now and unlock the
+            potential of your research.</span>
+        </div>
+      </div>
+      }
+    </section>
+
+    <section class="sidebar-card sidebar-section sidebar-section--indicators">
+      <h2 class="sidebar-section__title">My results by indicator</h2>
+
+      @if (showIndicatorList()) {
+      <div class="indicators">
+        @for (indicator of indicatorList(); track indicator.indicator_id) {
+        <a class="indicator" [routerLink]="['/results-center']" [queryParams]="{ indicatorTab: indicator.indicator_id }"
+          [attr.data-index]="$index">
+          <div class="indicator-head">
+            <i class="indicator-icon icon-color-{{ indicator.icon_src }} pi {{ indicator.icon_src }}"></i>
+            <span class="indicator-type">{{ indicator.name }}</span>
+          </div>
+          <span class="indicator-number">{{ indicator.amount_results }}</span>
+        </a>
+        }
+      </div>
+      } @else {
+      <div class="no-results-yet-2">
+        <img [src]="'images/home/no-results-yet.png' | s3ImageUrl" alt="" />
+        <div class="column">
+          <span class="title">No results yet</span>
+          <span class="description">It looks like you haven't created any results yet. Start now and unlock the
+            potential of your research.</span>
+        </div>
+      </div>
+      }
+    </section>
+  </div>
+</div>

@@ -63,4 +63,27 @@ export class AdminController {
     const html = await this.reactRenderer.render(req.url, initialData);
     res.send(html);
   }
+
+  /**
+   * Bilateral Project Mappings Page
+   * URL: /admin/bilateral-project-mappings
+   *
+   * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.15 / R-BIL-080 (UI)
+   *
+   * SSR-renders the first page of the mapping list; the React page then
+   * fetches its own refresh + picker data client-side via /api/...
+   * endpoints. Auth + role gating is enforced server-side by RolesGuard
+   * on /api/bilateral-project-mappings; this SSR route is only the shell.
+   */
+  @Get('bilateral-project-mappings')
+  async bilateralProjectMappings(@Req() req: Request, @Res() res: Response) {
+    const mappings = await this.adminService.listBilateralProjectMappings({
+      page: 1,
+      limit: 20,
+    });
+
+    const initialData = { mappings };
+    const html = await this.reactRenderer.render(req.url, initialData);
+    res.send(html);
+  }
 }

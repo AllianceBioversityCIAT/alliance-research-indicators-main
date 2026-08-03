@@ -1,0 +1,442 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-5">
+    <div class="content-section w-full">
+      <div class="bilateral-mapping flex w-full min-w-0 flex-col abc-white-2 p-[30px] mb-10 rounded-[10px] gap-6">
+
+        <!-- Page title + New Mapping button (T-BIL-CAM-05) -->
+        <div class="flex flex-wrap items-center justify-between gap-4 px-2">
+          <h1 class="font-['Inter'] fs-[17] font-bold leading-[18px] atc-primary-blue-600 m-0 break-all">
+            Bilateral Mapping
+          </h1>
+          <p-button
+            label="New mapping"
+            icon="pi pi-plus !text-[12px]"
+            severity="primary"
+            size="small"
+            styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]"
+            (onClick)="openCreateDialog()"
+            data-testid="new-mapping-btn"
+            aria-label="Create a new bilateral mapping">
+          </p-button>
+        </div>
+
+        <!-- Search + filters bar (AC-04.1 / AC-04.2 / AC-04.3) -->
+        <div class="flex flex-wrap items-center gap-3 px-2">
+          <!-- Search input -->
+          <div class="flex flex-col gap-1 flex-1 min-w-[180px]">
+            <label for="bilMapSearch" class="text-sm font-medium atc-grey-800">Search</label>
+            <input
+              pInputText
+              id="bilMapSearch"
+              type="search"
+              class="w-full"
+              placeholder="Agreement ID or project name…"
+              [ngModel]="search()"
+              (ngModelChange)="onSearchInput($event)"
+              aria-label="Search by agreement ID or project name"
+              data-testid="search-input" />
+          </div>
+
+          <!-- Active-state filter (AC-04.2) -->
+          <div class="flex flex-col gap-1 min-w-[150px]">
+            <label for="bilMapActiveFilter" class="text-sm font-medium atc-grey-800">Status</label>
+            <p-select
+              inputId="bilMapActiveFilter"
+              [options]="activeOptions"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="activeFilter()"
+              (ngModelChange)="onActiveFilterChange($event)"
+              aria-label="Filter by active status"
+              data-testid="active-filter">
+            </p-select>
+          </div>
+
+          <!-- Source filter (AC-04.3) -->
+          <div class="flex flex-col gap-1 min-w-[170px]">
+            <label for="bilMapSourceFilter" class="text-sm font-medium atc-grey-800">Source</label>
+            <p-select
+              inputId="bilMapSourceFilter"
+              [options]="sourceOptions"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="sourceFilter()"
+              (ngModelChange)="onSourceFilterChange($event)"
+              aria-label="Filter by mapping source"
+              data-testid="source-filter">
+            </p-select>
+          </div>
+        </div>
+
+        <!-- States (NF-06: every async path resolves to one of these) -->
+        @if (loading()) {
+          <!-- Loading state -->
+          <div class="flex items-center gap-2 px-2 py-4" data-testid="loading-state" aria-live="polite">
+            <i class="pi pi-spinner pi-spin atc-primary-blue-400" aria-hidden="true"></i>
+            <span class="text-sm atc-grey-800">Loading mappings…</span>
+          </div>
+
+        } @else if (loadError()) {
+          <!-- Error state (AC-03.3) -->
+          <div
+            class="flex flex-col gap-3 rounded border px-4 py-4 bil-error-block"
+            role="alert"
+            aria-live="assertive"
+            data-testid="error-state">
+            <p class="m-0 text-sm font-semibold atc-red-1">
+              We could not load bilateral mappings. Please try again.
+            </p>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 self-start rounded-[13px] abc-primary-blue-400 px-4 py-2 text-sm atc-white-1 cursor-pointer"
+              (click)="load()"
+              data-testid="retry-button">
+              <i class="pi pi-refresh" aria-hidden="true"></i>
+              Retry
+            </button>
+          </div>
+
+        } @else if (rows().length === 0) {
+          <!-- Empty state (AC-03.4) -->
+          <div class="flex flex-col items-center gap-2 py-10 text-center" data-testid="empty-state">
+            <i class="pi pi-inbox text-3xl atc-grey-500" aria-hidden="true"></i>
+            <p class="m-0 text-sm atc-grey-800">No mappings found. Try adjusting your search or filters.</p>
+          </div>
+
+        } @else {
+          <!-- Table (AC-03.1) -->
+          <div class="w-full overflow-x-auto">
+            <p-table
+              [value]="rows()"
+              [tableStyle]="{ 'min-width': '700px' }"
+              styleClass="bil-map-table"
+              data-testid="mappings-table"
+              aria-label="Bilateral project mappings">
+
+              <ng-template pTemplate="header">
+                <tr>
+                  <th class="!text-[#112F5C]" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Agreement ID</div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">CLARISA Project</div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Source</div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Confidence</div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Status</div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Last Updated</div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Actions</div>
+                  </th>
+                </tr>
+              </ng-template>
+
+              <ng-template pTemplate="body" let-row>
+                <tr tabindex="0" class="bil-map-row" data-testid="mapping-row">
+                  <!-- AGRESSO agreement ID -->
+                  <td class="text-sm atc-grey-900 font-medium">
+                    {{ row.agresso_agreement_id }}
+                  </td>
+
+                  <!-- CLARISA project short name + (id) -->
+                  <td class="text-sm atc-grey-900">
+                    @if (row.clarisa_project_short_name) {
+                      {{ row.clarisa_project_short_name }}
+                      <span class="atc-grey-700">(id {{ row.clarisa_project_id }})</span>
+                    } @else {
+                      <span class="atc-grey-700">id {{ row.clarisa_project_id }}</span>
+                    }
+                  </td>
+
+                  <!-- Source badge -->
+                  <td>
+                    <span
+                      class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bil-source-badge bil-source-badge--{{ row.source }}"
+                      [attr.data-source]="row.source">
+                      {{ sourceLabel(row.source) }}
+                    </span>
+                  </td>
+
+                  <!-- Confidence — only shown when source !== MANUAL (AC-03.1) -->
+                  <td class="text-sm atc-grey-800" data-testid="confidence-cell">
+                    @if (showConfidence(row)) {
+                      <span data-testid="confidence-value">
+                        {{ row.confidence_score !== null && row.confidence_score !== undefined ? (row.confidence_score | number: '1.0-2') : '—' }}
+                      </span>
+                    } @else {
+                      <span class="atc-grey-500" data-testid="confidence-hidden">—</span>
+                    }
+                  </td>
+
+                  <!-- Active state badge -->
+                  <td>
+                    @if (row.is_active) {
+                      <span
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bil-status-badge bil-status-badge--active"
+                        data-testid="active-badge">
+                        Active
+                      </span>
+                    } @else {
+                      <span
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bil-status-badge bil-status-badge--inactive"
+                        data-testid="inactive-badge">
+                        Inactive
+                      </span>
+                    }
+                  </td>
+
+                  <!-- Last updated -->
+                  <td class="text-sm atc-grey-700">
+                    {{ row.updated_at | date: 'dd MMM yyyy' }}
+                  </td>
+
+                  <!-- Row actions (T-BIL-CAM-05: Edit; T-BIL-CAM-06: Deactivate) -->
+                  <td class="flex items-center gap-1">
+                    <button
+                      pButton
+                      type="button"
+                      icon="pi pi-pencil"
+                      class="p-button-text p-button-sm"
+                      (click)="openEditDialog(row)"
+                      [attr.aria-label]="'Edit mapping for ' + row.agresso_agreement_id"
+                      data-testid="edit-btn">
+                    </button>
+                    @if (row.is_active) {
+                      <!-- AC-07.2: confirmation is shown before the request fires -->
+                      <button
+                        pButton
+                        type="button"
+                        icon="pi pi-ban"
+                        class="p-button-text p-button-sm p-button-danger"
+                        (click)="requestDeactivate(row)"
+                        aria-label="Deactivate mapping"
+                        data-testid="deactivate-btn">
+                      </button>
+                    }
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          </div>
+
+          <!-- Paginator (AC-03.2) -->
+          @if (meta(); as m) {
+            <p-paginator
+              [rows]="limit()"
+              [totalRecords]="m.total"
+              [first]="(page() - 1) * limit()"
+              (onPageChange)="onPageChange($event)"
+              [showCurrentPageReport]="true"
+              currentPageReportTemplate="Showing {first} to {last} of {totalRecords} mappings"
+              data-testid="paginator">
+            </p-paginator>
+          }
+        }
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create / Edit Dialog (T-BIL-CAM-05) ────────────────────────────────── -->
+<!-- @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (AC-05.x / AC-06.x) -->
+<p-dialog
+  [header]="dialogMode() === 'create' ? 'New Bilateral Mapping' : 'Edit Bilateral Mapping'"
+  [(visible)]="dialogOpen"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [style]="{ width: '560px' }"
+  [closable]="true"
+  (onHide)="closeDialog()"
+  appendTo="body"
+  data-testid="mapping-dialog"
+  aria-labelledby="bilMapDialogTitle">
+
+  <div class="flex flex-col gap-5">
+
+    <!-- Pickers loading state -->
+    @if (optionsLoading()) {
+      <div class="flex items-center gap-2 py-2" aria-live="polite">
+        <i class="pi pi-spinner pi-spin atc-primary-blue-400" aria-hidden="true"></i>
+        <span class="text-sm atc-grey-800">Loading options…</span>
+      </div>
+    }
+
+    <!-- AGRESSO contract picker (CREATE) / read-only display (EDIT) -->
+    <div class="flex flex-col gap-1">
+      <label for="bilMapAgressoPicker" class="text-sm font-medium atc-grey-800">
+        AGRESSO Contract <span class="atc-red-1" aria-hidden="true">*</span>
+      </label>
+
+      @if (dialogMode() === 'create') {
+        <!-- AC-05.1: selectable bilateral contracts — lazy server-side search via (onFilter).
+             scrollHeight caps the overlay panel to eliminate double/oversized scroll.
+             resetFilterOnHide clears the typed term when the panel closes so the next
+             open starts fresh. emptyFilterMessage guides the user while the list is empty. -->
+        <p-select
+          inputId="bilMapAgressoPicker"
+          [options]="agressoOptions()"
+          [optionLabel]="'agreement_id'"
+          optionValue="agreement_id"
+          [ngModel]="selectedAgreement()"
+          (ngModelChange)="selectedAgreement.set($event)"
+          placeholder="Select AGRESSO contract…"
+          [filter]="true"
+          filterBy="agreement_id,description"
+          [showClear]="true"
+          [loading]="optionsLoading() || agressoOptionsLoading()"
+          [scrollHeight]="'240px'"
+          [resetFilterOnHide]="true"
+          emptyFilterMessage="Type to search contracts…"
+          (onFilter)="onAgressoFilter($event.filter)"
+          styleClass="w-full"
+          appendTo="body"
+          panelStyleClass="bil-mapping-picker-panel"
+          aria-required="true"
+          data-testid="agresso-picker">
+          <ng-template pTemplate="selectedItem" let-opt>
+            @if (opt) {
+              <span class="bil-picker-selected-label" [title]="agressoOptionLabel(opt)">{{ agressoOptionLabel(opt) }}</span>
+            }
+          </ng-template>
+          <ng-template pTemplate="item" let-opt>
+            <span
+              class="bil-picker-option-label"
+              [title]="agressoOptionLabel(opt)">
+              {{ agressoOptionLabel(opt) }}
+            </span>
+          </ng-template>
+        </p-select>
+      } @else {
+        <!-- AC-06.1 / AC-OQ-2: AGRESSO agreement is immutable on edit — read-only display -->
+        <div
+          class="bil-readonly-field rounded px-3 py-2 text-sm atc-grey-900"
+          id="bilMapAgressoPicker"
+          aria-readonly="true"
+          data-testid="agresso-readonly">
+          {{ editingAgreementId() }}
+        </div>
+        <p class="m-0 text-xs atc-grey-600">The AGRESSO contract cannot be changed after creation.</p>
+      }
+    </div>
+
+    <!-- CLARISA project picker (AC-05.2 / AC-06.1) -->
+    <div class="flex flex-col gap-1">
+      <label for="bilMapClarisaPicker" class="text-sm font-medium atc-grey-800">
+        CLARISA Project <span class="atc-red-1" aria-hidden="true">*</span>
+      </label>
+      <!-- AC-05.2 / AC-06.1: CLARISA project picker — lazy server-side search via (onFilter).
+           Same scrollHeight + resetFilterOnHide treatment as the AGRESSO picker. -->
+      <p-select
+        inputId="bilMapClarisaPicker"
+        [options]="clarisaOptions()"
+        optionLabel="short_name"
+        optionValue="id"
+        [ngModel]="selectedProjectId()"
+        (ngModelChange)="selectedProjectId.set($event)"
+        placeholder="Select CLARISA project…"
+        [filter]="true"
+        filterBy="short_name"
+        [showClear]="true"
+        [loading]="optionsLoading() || clarisaOptionsLoading()"
+        [scrollHeight]="'240px'"
+        [resetFilterOnHide]="true"
+        emptyFilterMessage="Type to search projects…"
+        (onFilter)="onClarisaFilter($event.filter)"
+        styleClass="w-full"
+        appendTo="body"
+        panelStyleClass="bil-mapping-picker-panel"
+        aria-required="true"
+        data-testid="clarisa-picker">
+      </p-select>
+
+      <!-- Science-Program allocation preview (AC-05.2) — shown when a project is selected -->
+      @if (selectedProject(); as project) {
+        @if (project.science_programs && project.science_programs.length > 0) {
+          <div class="bil-sp-preview mt-1 rounded px-3 py-2 flex flex-col gap-1" data-testid="sp-preview">
+            <p class="m-0 text-xs font-semibold atc-grey-700">Science Program allocations:</p>
+            <ul class="list-none m-0 p-0 flex flex-col gap-1" aria-label="Science Program allocations">
+              @for (sp of project.science_programs; track sp.code) {
+                <li class="text-xs atc-grey-800 flex items-center justify-between gap-2">
+                  <span>{{ sp.name || sp.code || '—' }}</span>
+                  @if (sp.allocation !== undefined && sp.allocation !== null) {
+                    <span class="font-medium atc-primary-blue-600">{{ sp.allocation | number: '1.0-1' }}%</span>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Notes (optional, max 500 chars) -->
+    <div class="flex flex-col gap-1">
+      <label for="bilMapNotes" class="text-sm font-medium atc-grey-800">
+        Notes <span class="text-xs atc-grey-500">(optional)</span>
+      </label>
+      <textarea
+        pTextarea
+        id="bilMapNotes"
+        rows="3"
+        class="w-full"
+        [maxlength]="notesMaxLength"
+        placeholder="Add notes about this mapping…"
+        [ngModel]="notes()"
+        (ngModelChange)="onNotesInput($event)"
+        aria-label="Mapping notes"
+        data-testid="notes-input">
+      </textarea>
+      <p class="m-0 text-xs atc-grey-500 text-right">{{ notes().length }}/{{ notesMaxLength }}</p>
+    </div>
+
+    <!-- Inline save error (role="alert" — surfaces 409 / 400 message from result.message) -->
+    @if (saveError()) {
+      <div
+        class="bil-save-error-block rounded px-3 py-3"
+        role="alert"
+        aria-live="assertive"
+        data-testid="save-error">
+        <p class="m-0 text-sm atc-red-1">
+          <i class="pi pi-exclamation-triangle mr-2" aria-hidden="true"></i>
+          {{ saveError() }}
+        </p>
+      </div>
+    }
+
+  </div>
+
+  <!-- Dialog footer -->
+  <ng-template pTemplate="footer">
+    <div class="flex justify-end gap-3">
+      <button
+        pButton
+        type="button"
+        label="Cancel"
+        class="p-button-outlined p-button-secondary"
+        (click)="closeDialog()"
+        data-testid="dialog-cancel-btn">
+      </button>
+      <button
+        pButton
+        type="button"
+        [label]="saving() ? 'Saving…' : 'Save'"
+        [disabled]="!canSave()"
+        [loading]="saving()"
+        (click)="onSave()"
+        data-testid="dialog-save-btn"
+        [attr.aria-disabled]="!canSave()">
+      </button>
+    </div>
+  </ng-template>
+
+</p-dialog>

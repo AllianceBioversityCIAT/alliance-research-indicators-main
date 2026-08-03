@@ -42,6 +42,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </li>
           <li>
             <Link
+              to="/admin/bilateral-project-mappings"
+              className={isActive('/admin/bilateral-project-mappings')}
+              onClick={onClose}
+            >
+              <i className="fas fa-handshake"></i>
+              <span>Bilateral mappings</span>
+            </Link>
+          </li>
+          <li>
+            <Link
               to="/admin/settings"
               className={isActive('/admin/settings')}
               onClick={onClose}

@@ -63,6 +63,10 @@ export class GreenCheckRepository {
     return `link_result_validation(${result_key}) as link_result`;
   }
 
+  poolFundingAlignmentValidation(result_key: string) {
+    return `pool_funding_alignment_validation(${result_key}) as pool_funding_alignment`;
+  }
+
   async calculateGreenChecks(result_id: number): Promise<FindGreenChecksDto> {
     const indicator: IndicatorsEnum = await this.dataSource
       .getRepository(Result)
@@ -108,6 +112,7 @@ export class GreenCheckRepository {
                 ,${this.geoLocationValidation(result_key)}
                 ,${this.partnersValidation(result_key)}
                 ,${this.evidencesValidation(result_key)}
+                ,${this.poolFundingAlignmentValidation(result_key)}
                 ${spesificQuery}
             FROM results r
             WHERE r.result_id = ?

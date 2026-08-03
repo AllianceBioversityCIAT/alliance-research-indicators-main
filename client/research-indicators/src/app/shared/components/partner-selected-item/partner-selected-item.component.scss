@@ -1,0 +1,64 @@
+.item-content {
+  display: grid;
+  justify-content: space-between;
+  grid-template-columns: auto auto;
+  align-items: center;
+  width: 100%;
+  gap: 20px;
+
+  .information {
+    display: flex;
+    flex-wrap: wrap;
+    color: #4c5158;
+    font-family: Barlow, sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 16px;
+
+    .row {
+      display: grid;
+      grid-column: 1;
+
+      .metadata-container {
+        display: flex;
+        gap: 10px;
+      }
+
+      .divider {
+        margin: 10px 0;
+        height: 16px;
+        width: 2px;
+        background-color: #e5e5e5;
+      }
+
+      .metadata-text {
+        display: flex;
+        align-items: center;
+        color: #777c83;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 13px;
+        font-weight: 400;
+        line-height: 14px;
+
+        i {
+          color: #777c83;
+          font-size: 13px;
+          font-weight: 400;
+          line-height: 14px;
+        }
+
+        .metadata-title {
+          margin-bottom: 0 !important;
+          font-weight: normal;
+          font-size: 13px;
+          align-items: center;
+        }
+
+        .institution-type-description {
+          color: #345b8f;
+          text-transform: uppercase;
+        }
+      }
+    }
+  }
+}
