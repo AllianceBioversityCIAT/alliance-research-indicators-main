@@ -1,6 +1,8 @@
 # Proposal — Degree chart shows no data on the Project Dashboard
 
-> **Status: open defect report, not yet diagnosed.** Raised by the owner on **2026-08-03** during the DC-8 visual pass on `indicator-metadata-charts`, immediately before that spec was archived. Written down so the finding survives a branch switch — **it is not a validated root cause.**
+> **Status: DIAGNOSED and specified — 2026-08-03.** Root cause is **neither H1 nor H2** below. Live evidence from contract `A100` (`STAR-3422`: Group / **Engagement** / Long-term / **PhD**) showed the record was captured *with* a degree and dropped *by the report*: the Q2 degree branch carries a `session_type_id = Training` predicate that the **capture rule never had**. See `./requirements.md` §1. **§4's discriminating query is no longer needed** — the screenshots settled it. §3's ruled-out list still holds and was re-confirmed.
+>
+> _Original framing, kept as the point-in-time record:_ open defect report, not yet diagnosed. Raised by the owner on **2026-08-03** during the DC-8 visual pass on `indicator-metadata-charts`, immediately before that spec was archived. Written down so the finding survives a branch switch — **it is not a validated root cause.**
 
 ---
 
@@ -13,9 +15,9 @@
 | Raised | 2026-08-03 by d.casanas@cgiar.org |
 | Source | DC-8 owner visual check on `project-detail/:id/project-dashboard` |
 | Parent | `docs/specs/archive/2026-08-03-project-dashboard--indicator-metadata-charts/` — chart #10, **R-IMC-006** |
-| Surfaces | Server (`agresso-contract` reports) and/or Client (`project-dashboard`) — **not yet determined** |
+| Surfaces | **Server** (`agresso-contract` Q2 degree branch) + **Client** (card copy only) — determined 2026-08-03 |
 | Branch at time of report | `AC-1672-Add-New-Dashboard-Charts-Based-on-Project-Indicator` |
-| Status | **Open — needs Step 3's discriminating query before anything is designed** |
+| Status | **Specified** — `requirements.md` / `design.md` / `tasks.md` drafted 2026-08-03. Supersedes **R-IMC-006 AC.1** |
 
 ## 2. Observed
 
