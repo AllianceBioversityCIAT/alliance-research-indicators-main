@@ -5,14 +5,14 @@ import { IndicatorMetadataReportsRepository } from './indicator-metadata-reports
 import { buildPrimaryContractResultsScopeSql } from '../utils/primary-contract-results.util';
 import { SessionFormatEnum } from '../../session-formats/enums/session-format.enum';
 import { SessionLengthEnum } from '../../session-lengths/enum/session-lengths.enum';
-import { SessionTypeEnum } from '../../session-types/enum/session-type.enum';
 
 /**
  * Doubles policy (`tasks.md` §4): **seeded fixtures over a mocked
  * `DataSource.query`**, plus targeted SQL-text assertions read straight off
  * `dataSource.query.mock.calls[0]` for the semantics a mocked `DataSource`
- * cannot otherwise gate — the union-level `ORDER BY`, the degree
- * conjunction's two predicates, an `INNER JOIN` per lookup (not `LEFT JOIN`,
+ * cannot otherwise gate — the union-level `ORDER BY`, the degree branch's
+ * single Long-term predicate (R-DCE-001 — supersedes the old Training +
+ * Long-term conjunction), an `INNER JOIN` per lookup (not `LEFT JOIN`,
  * which would readmit NULL-metadata-id rows), and each branch's own
  * `'<section>' AS section` literal, pinned to its own join column so a
  * cross-wired discriminator reddens even though both literals remain
@@ -21,7 +21,7 @@ import { SessionTypeEnum } from '../../session-types/enum/session-type.enum';
  * `utils/primary-contract-results.util.spec.ts:24-33`, not a query
  * snapshot. What they do NOT re-prove is that the SQL is *correct* against
  * the real schema — join columns, label columns, and the degree
- * conjunction's row-level effect were proven by real-schema execution in
+ * predicate's row-level effect were proven by real-schema execution in
  * T-03/T-04 (`execution.md` § T-03+T-04). This spec gates what a
  * mocked-DataSource unit test *can* actually see: the generated SQL text
  * itself, per-section grouping/bucketing, `Number()` coercion of MySQL's
@@ -311,14 +311,13 @@ describe('IndicatorMetadataReportsRepository', () => {
       dataSource.query.mockResolvedValue(rows);
     });
 
-    it('binds all 7 parameters in the exact SQL placeholder order (DC-12)', async () => {
+    it('binds all 6 parameters in the exact SQL placeholder order — degree keeps only its Long-term operand (R-DCE-001; DC-A gate: a predicate removed without its parameter shifts every later value and reddens here)', async () => {
       await repository.getCapacitySharingMetadata(contractId);
 
       expect(dataSource.query).toHaveBeenCalledTimes(1);
       const [, params] = dataSource.query.mock.calls[0];
       expect(params).toEqual([
         contractId,
-        SessionTypeEnum.TRAINING,
         SessionLengthEnum.LONG_TERM,
         SessionFormatEnum.INDIVIDUAL,
         SessionFormatEnum.GROUP,
@@ -327,21 +326,19 @@ describe('IndicatorMetadataReportsRepository', () => {
       ]);
     });
 
-    it("binds the degree conjunction's two operands to SessionTypeEnum.TRAINING and SessionLengthEnum.LONG_TERM at their own placeholder positions (DC-2 parameter-binding gate)", async () => {
+    it("binds the degree branch's single Long-term operand to SessionLengthEnum.LONG_TERM at the placeholder position the SQL declares for it (R-DCE-001 supersedes the old Training + Long-term conjunction; DC-A parameter-binding gate)", async () => {
       await repository.getCapacitySharingMetadata(contractId);
 
       const [, params] = dataSource.query.mock.calls[0];
       // The WHERE clause's `AND` itself executes in SQL, out of reach for a
-      // mocked DataSource — it is real-schema-proven in T-03/T-04
-      // (execution.md § T-03+T-04: G228 loose 6 → strict 2; A1618 excludes
-      // an Engagement/MSc row; global loose 54 → strict 36). What a
-      // mocked-DataSource spec *can* gate is that the two operands are
-      // bound at the positions the SQL declares for them — dropping either
-      // condition from the query would also drop its param, shifting or
-      // shortening this array and reddening this assertion (verified in
-      // the mutation pass, `execution.md` § T-07).
-      expect(params[1]).toBe(SessionTypeEnum.TRAINING);
-      expect(params[2]).toBe(SessionLengthEnum.LONG_TERM);
+      // mocked DataSource — the stale-degree guard's row-level effect is
+      // real-schema-proven in T-03/T-04 (execution.md § T-03+T-04). What a
+      // mocked-DataSource spec *can* gate is that the retained operand is
+      // bound at the position the SQL declares for it — dropping the
+      // predicate without dropping its param would shift every later value
+      // in this array, reddening this assertion (verified in the mutation
+      // pass, `execution.md` § T-07).
+      expect(params[1]).toBe(SessionLengthEnum.LONG_TERM);
     });
 
     it('embeds the shared primary-contract scoping predicate verbatim — no locally invented scoping join (requirements.md §4.2, R-IMC-001 AC.4)', async () => {
@@ -351,17 +348,11 @@ describe('IndicatorMetadataReportsRepository', () => {
       expect(sql).toContain(buildPrimaryContractResultsScopeSql());
     });
 
-    it('gates the degree conjunction\'s two predicates, the union-level ORDER BY, an INNER JOIN per lookup, and each branch\'s own section literal pinned to its own join/aggregate column (Reviewer remediation attempt 2: DC-2, R-IMC-001 AC.2 "excluded" half)', async () => {
+    it("gates the degree branch's single Long-term predicate (and the absence of the superseded session-type predicate), the union-level ORDER BY, an INNER JOIN per lookup, and each branch's own section literal pinned to its own join/aggregate column (R-DCE-001; DC-A/DC-B gate)", async () => {
       await repository.getCapacitySharingMetadata(contractId);
 
       const [sql] = dataSource.query.mock.calls[0];
       const squashed = sql.replace(/\s+/g, ' ').trim();
-
-      // DC-2: the degree branch is a two-condition conjunction — each
-      // predicate asserted separately (not one joined string), so dropping
-      // either one on its own reddens, not only dropping both together.
-      expect(squashed).toContain('AND f.session_type_id = ?');
-      expect(squashed).toContain('AND f.session_length_id = ?');
 
       // Union-level ORDER BY, applied once to the whole union.
       expect(squashed).toContain('ORDER BY section, count DESC, id ASC');
@@ -387,6 +378,16 @@ describe('IndicatorMetadataReportsRepository', () => {
       expect(branches[2]).toContain(
         'INNER JOIN degrees l ON l.degree_id = f.degree_id',
       );
+      // R-DCE-001 (DD-1): the report follows the form — the degree branch
+      // keeps only its stale-degree guard (`session_length_id = Long-term`)
+      // and drops the superseded `session_type_id = Training` predicate.
+      // Asserted as two separate expectations, not one joined string, so
+      // either one drifting back onto the branch reddens on its own — this
+      // is the DC-A/DC-B gate: a `Training` predicate re-added without its
+      // positional param would shift every later value in `params` instead
+      // of erroring, which is why the whole-array assertion above exists.
+      expect(branches[2]).toContain('AND f.session_length_id = ?');
+      expect(branches[2]).not.toContain('AND f.session_type_id = ?');
 
       expect(branches[3]).toContain("'gender_individual' AS section");
       expect(branches[3]).toContain(
@@ -413,7 +414,7 @@ describe('IndicatorMetadataReportsRepository', () => {
       );
     });
 
-    it('buckets each of the 7 branches into its own section, ordered count DESC / id ASC — including the DC-2 "stale degree" scenario', async () => {
+    it('buckets each of the 7 branches into its own section, ordered count DESC / id ASC — including the DC-B "stale degree" scenario', async () => {
       const result = await repository.getCapacitySharingMetadata(contractId);
 
       expect(result.session_format).toEqual([
@@ -424,15 +425,16 @@ describe('IndicatorMetadataReportsRepository', () => {
         { id: 1, name: 'Training', count: 7 },
         { id: 2, name: 'Engagement', count: 3 },
       ]);
-      // `degree`'s single row models the R-IMC-006 scenario: a fixture with
-      // an Engagement/MSc row and a Short-term/MSc row is proven, on live
-      // data, to leave exactly one qualifying row (MSc=1, not 2) once the
-      // two-condition conjunction runs. This repository only ever sees the
-      // SQL's *already filtered* output — the Engagement/MSc and
-      // Short-term/MSc rows are excluded upstream and never appear in the
-      // resolved rows above — so this assertion proves the repository
+      // `degree`'s single row models the R-DCE-001 stale-degree guard
+      // (DD-1 supersedes R-IMC-006 AC.1, but AC.2 survives): a fixture with
+      // a Short-term/MSc row is proven, on live data, to be excluded once
+      // the retained `session_length_id = Long-term` predicate runs — the
+      // superseded `session_type_id = Training` predicate plays no part.
+      // This repository only ever sees the SQL's *already filtered* output
+      // — the Short-term/MSc row is excluded upstream and never appears in
+      // the resolved rows above — so this assertion proves the repository
       // buckets that already-filtered row without corrupting or
-      // duplicating it; the conjunction's own enforcement is
+      // duplicating it; the predicate's own enforcement is
       // real-schema-gated (execution.md § T-03+T-04).
       expect(result.degree).toEqual([{ id: 3, name: 'MSc', count: 1 }]);
       expect(result.gender_individual).toEqual([
@@ -478,6 +480,26 @@ describe('IndicatorMetadataReportsRepository', () => {
           { id: 3, name: 'Non-binary', count: 0 },
         ],
       });
+    });
+
+    it('buckets a degree row sourced from an Engagement + Long-term record into sections.degree exactly as before (R-DCE-001 — the STAR-3422/A100 scenario; pins that the repository applies no post-query session-type filter of its own)', async () => {
+      // Models requirements.md §1 / R-DCE-001's first scenario: the SQL's
+      // own (now single) predicate is what admits or excludes this row —
+      // that row-level effect is real-schema-proven, not this mocked spec's
+      // job. What this pins is the repository layer itself: it does not
+      // re-derive or re-check `session_type` in TypeScript before
+      // bucketing, so whatever the query hands back for the `degree`
+      // branch — Training-sourced or Engagement-sourced alike — lands in
+      // `sections.degree` unchanged. A post-query filter re-introduced here
+      // would silently exclude this row again without the SQL ever
+      // changing, which the DC-A/DC-B SQL-text assertions above cannot see.
+      dataSource.query.mockResolvedValueOnce([
+        { section: 'degree', id: '5', name: 'PhD', count: '1' },
+      ]);
+
+      const result = await repository.getCapacitySharingMetadata(contractId);
+
+      expect(result.degree).toEqual([{ id: 5, name: 'PhD', count: 1 }]);
     });
   });
 });

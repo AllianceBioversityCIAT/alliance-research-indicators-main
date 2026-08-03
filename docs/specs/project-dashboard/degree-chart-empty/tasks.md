@@ -43,15 +43,15 @@ T-03 (client note copy) — independent, no dependency
   - Update the fixture comments that cite the old R-IMC-006 conjunction — they will otherwise describe a rule the file no longer asserts. **Leave the DC-12 positional-hazard comment intact**; it is still the reason the array is asserted whole.
   - Do **not** touch the `session_format`, `session_type`, `gender_individual`, or `gender_group` assertions.
 - **Acceptance / done check:**
-  - [ ] `npm test -- --silent indicator-metadata-reports.repository.spec` **FAILS**
-  - [ ] The failure output names the `session_type_id` / `params` expectations — not an unrelated error, typo, or import failure
-  - [ ] `git diff --stat` shows **only** the `.spec.ts` file
+  - [x] `npm test -- --silent indicator-metadata-reports.repository.spec` **FAILS** — `3 failed, 12 passed, 15 total`
+  - [x] The failure output names the `session_type_id` / `params` expectations — not an unrelated error, typo, or import failure — Reviewer independently derived production's `['A9001', 1, 2, 1, 2, 2, 2]` binding from the unmodified source and matched it to the printed "Received"; also counted 15 `it()` blocks against `3/12/15`, ruling out a zeroed file (`execution.md` § T-01)
+  - [x] `git diff --stat` shows **only** the `.spec.ts` file — 1 file, +55 / −33
 - **Evidence that does NOT count:**
   - A red suite whose failure is a compile error, a bad import, or a mistyped enum. That is a broken test, not a reproduced bug — read the failure text, do not just read the exit code.
   - Skipping this task and writing the assertions inside T-02. A test never seen red is **not** a regression test; per `design.md` §10 that outcome is reported as **inconclusive**, never as a pass.
 - **Skills:** `nestjs-expert`, `tdd`
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** **[x] done** — Reviewer PASS on attempt 1, 2026-08-03, plus a Leader-initiated lint-hygiene addendum (dead import + 2 prettier quote errors; red confirmed unchanged). See `execution.md` § T-01.
 
 ---
 
