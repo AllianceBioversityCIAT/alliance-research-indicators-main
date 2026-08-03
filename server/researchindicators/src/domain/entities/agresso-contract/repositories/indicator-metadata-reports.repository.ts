@@ -8,7 +8,6 @@ import {
 } from '../dto/reports-indicator-metadata.dto';
 import { SessionFormatEnum } from '../../session-formats/enums/session-format.enum';
 import { SessionLengthEnum } from '../../session-lengths/enum/session-lengths.enum';
-import { SessionTypeEnum } from '../../session-types/enum/session-type.enum';
 import { buildPrimaryContractResultsScopeSql } from '../utils/primary-contract-results.util';
 
 /**
@@ -241,18 +240,21 @@ export class IndicatorMetadataReportsRepository {
    * Branches (uniform `(section, id, name, count)` shape, discriminator first):
    *  1. `session_format`    — grouped by `session_format_id`, joined to `session_formats`.
    *  2. `session_type`      — grouped by `session_type_id`, joined to `session_types`.
-   *  3. `degree`            — R-IMC-006: the two-condition conjunction
-   *                           `session_type_id = TRAINING AND session_length_id = LONG_TERM`,
-   *                           joined to `degrees`. Deliberately **NOT**
-   *                           `degree_id IS NOT NULL` — the form clears the field via
-   *                           `clearDegreeIdIfNotLongTerm`, but historical rows switched
-   *                           away from long-term retain a **stale** `degree_id`.
-   *                           Measured live: the loose filter matches **54** rows, the
-   *                           conjunction **36** — an 18-row over-count
-   *                           (`execution.md` § T-01). Training is resolved **by id**
-   *                           (seed migration `1727119632564`), never by `name`, because
-   *                           `session_types.name` is `TEXT` and a label edit would
-   *                           silently empty this chart with no error.
+   *  3. `degree`            — R-DCE-001 (supersedes R-IMC-006 AC.1): a single
+   *                           `session_length_id = LONG_TERM` predicate,
+   *                           joined to `degrees`. The report follows the
+   *                           form's own capture rule — the form requires a
+   *                           degree for **any** long-term session, not only
+   *                           Training — so the `session_type_id = TRAINING`
+   *                           conjunct that previously discarded qualifying
+   *                           Engagement records is removed. Deliberately
+   *                           **NOT** `degree_id IS NOT NULL` — the form
+   *                           clears the field via
+   *                           `clearDegreeIdIfNotLongTerm`, but historical
+   *                           rows switched away from long-term retain a
+   *                           **stale** `degree_id`; the retained
+   *                           `session_length_id = LONG_TERM` predicate is
+   *                           what still guards against that.
    *  4. `gender_individual` — individual-format rows grouped by `gender_id`, joined to
    *                           `gender` (singular table, join column **`gender_id`** —
    *                           `gender.id` does not exist).
@@ -314,7 +316,6 @@ export class IndicatorMetadataReportsRepository {
       INNER JOIN contract_results cr ON cr.result_id = f.result_id
       INNER JOIN degrees l ON l.degree_id = f.degree_id
       WHERE f.is_active = TRUE
-        AND f.session_type_id = ?
         AND f.session_length_id = ?
       GROUP BY l.degree_id, l.name
 
@@ -369,7 +370,6 @@ export class IndicatorMetadataReportsRepository {
 
     const params = [
       contractId,
-      SessionTypeEnum.TRAINING,
       SessionLengthEnum.LONG_TERM,
       SessionFormatEnum.INDIVIDUAL,
       SessionFormatEnum.GROUP,

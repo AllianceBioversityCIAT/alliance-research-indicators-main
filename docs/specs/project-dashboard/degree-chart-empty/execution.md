@@ -257,4 +257,134 @@ added:    expect(params[1]).toBe(SessionLengthEnum.LONG_TERM);
 
 No spec-conformance rework. One lint-hygiene addendum, described above. The `design.md` §9 budget of one review round holds for T-01.
 
-<!-- T-02 entry follows -->
+---
+
+### T-02 — Remove the `Training` predicate and its positional parameter
+
+| Field | Value |
+| --- | --- |
+| Final status | **PASS** |
+| Date | 2026-08-03 |
+| Implementer attempts | **1** |
+| Requirements covered | R-DCE-001, NFR-DCE-001, NFR-DCE-002 |
+| Defect classes gated | DC-A, DC-B, DC-C |
+| Implementer | `akili-implementer` (T2 / `sonnet`), effort `high`, skills `nestjs-expert` + `systematic-debugging` |
+| Reviewer | `akili-reviewer` (T3 / `opus`, read-only) — `author ≠ auditor` satisfied on both axes |
+
+**Leader note on effort and review mode.** The effort dial nominates `max` for correctness-critical work, and it also forbids `max` on a cheaper tier (escalate the tier instead). Neither was chosen: effort was set to **`high`**, keeping the single-Reviewer lens-checklist mode. Reasoning — `xhigh`/`max` would have triggered parallel lens reviewers, i.e. 2–4 agents auditing a **three-line** production diff whose safety net was already built and independently proven two-sided by T-01. The proof burden for this task sits in the committed gate, not in the review. Recorded so the deviation from the dial's nominal reading is auditable.
+
+#### Attempt 1
+
+**Files changed:** `server/.../agresso-contract/repositories/indicator-metadata-reports.repository.ts` only.
+
+**Production lines removed — three, zero added:**
+
+| Line | Change | `design.md` §2 row |
+| --- | --- | --- |
+| `import { SessionTypeEnum } …` | deleted (dead once the param goes) | authorized by T-02's notes and §2's closing sentence |
+| `AND f.session_type_id = ?` | deleted from the `degree` branch's `WHERE` | row 1 |
+| `SessionTypeEnum.TRAINING,` | deleted from `params` — array 7 → 6 | row 2 |
+
+Plus the doc-comment rewrite above `getCapacitySharingMetadata` (row 3, exempt from the line count).
+
+Final `params`: `[contractId, LONG_TERM, INDIVIDUAL, GROUP, GROUP, GROUP]` — six entries, matching `design.md` §5 exactly.
+
+**Verification** (all from `server/researchindicators/`)
+
+| Command | Result |
+| --- | --- |
+| `npm test -- --silent indicator-metadata-reports.repository.spec` | **PASS**, 15/15 — the same command, unedited, that was red in T-01 |
+| `npm test -- --silent` (full server suite) | **PASS — 325 suites / 2088 tests**, 1 snapshot |
+| `npm run lint -- --quiet` | clean; `git status` after showed only the intended file — `--fix` touched nothing else |
+
+**Mutation check (KZ-004 falsifiability) — passed, and it discriminated correctly**
+
+| Step | Result |
+| --- | --- |
+| Re-add `AND f.session_type_id = ?` **without** restoring its param | Suite **RED**, 14 passed / 1 failed |
+| Which assertion caught it | `expect(branches[2]).not.toContain('AND f.session_type_id = ?')` at `:390` — the SQL-text negative |
+| Which assertion did **not** | The whole-`params` array assertion stayed **green**: the 6-entry array is untouched by this particular mutation |
+| Restore and re-run | **PASS** 15/15, plus a confirming full-suite run at 325/2088 |
+
+This is exactly the discrimination T-01's Reviewer predicted, and it matters more than a bare red/green: **falsifiability is established across the pair, not by either task alone.** The whole-`params` assertion's gating power was proven by T-01's red (`Received` carried 7 entries with `1` inserted at index 1); the SQL-text negative's was proven by this mutation. Both directions of the DC-A hazard are now demonstrated red rather than argued.
+
+**Reviewer verdict: `STATUS: PASS`**
+
+> T-02 implements R-DCE-001 exactly — the degree branch is now a single `session_length_id = LONG_TERM` predicate with its positional parameter removed in lockstep, and I verified the 6 placeholders against the 6-entry `params` array by tracing the SQL text myself across all seven branches, including the CTE's single `?`. Q2's shape, DD-2, DD-3, and the §9 tripwire all hold; the mutation check is a genuine falsifiability proof and, combined with T-01's red, demonstrates both sides of the DC-A gate.
+
+**DC-A verified by independent trace, not by accepting the report** (KZ-008 — recording what was executed). The Reviewer enumerated every `?` in Q2 in emission order and mapped each to its bound value:
+
+| # | Placeholder site | Bound value |
+| --- | --- | --- |
+| 0 | `primary-contract-results.util.ts:42` — `rc.contract_id = ?` in the CTE (exactly one `?`; called without `includeGeoScope`, which adds none) | `contractId` |
+| 1 | `repository.ts:319` — degree branch `AND f.session_length_id = ?` | `SessionLengthEnum.LONG_TERM` |
+| 2 | `:332` — `gender_individual` `AND f.session_format_id = ?` | `SessionFormatEnum.INDIVIDUAL` |
+| 3 | `:344` — `gender_group` Male | `SessionFormatEnum.GROUP` |
+| 4 | `:355` — `gender_group` Female | `SessionFormatEnum.GROUP` |
+| 5 | `:366` — `gender_group` Non-binary | `SessionFormatEnum.GROUP` |
+
+Six placeholders, six params, aligned. Branches 1, 2 and 5–7 carry no placeholder (`WHERE f.is_active = TRUE` only). A grep across server `src` returns **zero** remaining production references to `session_type_id = ?` or `SessionTypeEnum.TRAINING` — the sole hit is the spec's own negative assertion at `:390`. That independently re-confirms `design.md` §7's reversion-challenge grep, which had claimed exactly two occurrences, both in this `params` array.
+
+**NFR-DCE-001 (query shape) confirmed untouched:** CTE call, `UNION ALL` count still 7, `INNER JOIN degrees`, `GROUP BY l.degree_id, l.name`, union-level `ORDER BY section, count DESC, id ASC`, the bucketing loop, `toEntry`/`rowCountsBySection`, and the `_debug` per-section log line at `:402-406` all byte-identical. Still one `dataSource.query` round-trip (pinned by `toHaveBeenCalledTimes(1)`). A predicate was removed from an existing `WHERE` — no fan-out added.
+
+**DD-2 / DD-3 confirmed:** no `degree_id IS NOT NULL` anywhere (NULL exclusion still rests on `INNER JOIN degrees`); no `OR session_length_id IS NULL` (NULL-length rows stay excluded).
+
+**DC-C confirmed adequate.** The three degree-adjacent sibling consumers (`agresso-contract.service.spec.ts:581-582, 727, 795-815`) assert the repository's `degree` value is forwarded from a mock, so they are structurally insensitive to a SQL change and correctly needed no edit. Nothing in the sibling specs asserted training-only semantics, so no assertion "should have changed but didn't". Full suite plus the zero-hit grep is sufficient for a change confined to one branch's `WHERE`.
+
+**Budget tripwire not breached** (`design.md` §9): three non-comment production lines, all inside §2 rows 1–3. The "no inline `WHERE`-clause comment exists to update" report was verified correct — `design.md` §1's `-- Training` annotation is illustrative only. Recorded as a no-op rather than silently skipped, which is the right handling.
+
+#### ADVISORY (4R lenses — recorded, never gating; no task minted)
+
+**RISK — the deleted resolve-by-id rationale still governs the *surviving* predicate.** The doc-comment rewrite dropped two sentences. One (the live measurement: loose 54 rows vs conjunction 36, an 18-row over-count) is **correctly** deleted as newly false. The other is not so simple:
+
+> _Retracted text, quoted rather than overwritten:_ "Training is resolved **by id** (seed migration `1727119632564`), never by `name`, because `session_types.name` is `TEXT` and a label edit would silently empty this chart with no error."
+
+The Leader raised this at review time as possible information loss, since the hazard is a property of the **enum-vs-TEXT-name choice**, not of Training — and it applies identically to the retained `SessionLengthEnum.LONG_TERM`. The Reviewer's independent judgement, which the Leader accepts:
+
+- **Not a conformance issue.** T-02's notes authorize rewriting the bullet that "describes the degree branch as a two-condition conjunction," and the sentence sat inside that bullet, worded wholly about Training. Left in place it would be a dangling rationale for a predicate that no longer exists — the exact drift the instruction exists to prevent. Nothing in `requirements.md`, `design.md` §8, or T-02 requires preserving it, and the code still resolves by id, so no behaviour or convention was weakened.
+- **But the substance survives the wording.** The hazard now governs the one remaining operand with no comment recording why the id is used. `session_lengths.name` carries the same label-edit exposure as `session_types.name`, and the failure mode is a silently empty chart — the same class of defect this entire spec was opened to fix.
+
+**Disposition: recorded, not acted on.** Restoring a generalized version would widen an approved task on advisory evidence, which the *Advisory Never Becomes A Task* rule closes off. Deferred to `/akili-archive`'s constitution sync, with the Reviewer's suggested wording preserved for whoever picks it up: *"the operand is bound by seeded id, never by `name` — a label edit would silently empty this chart with no error."*
+
+#### Issues encountered
+
+None. First-attempt PASS. The `design.md` §9 budget of **1 review round** holds across all three tasks.
+
+---
+
+## 3. Summary — all tasks complete
+
+| Task | Status | Attempts | Reviewer | Surface |
+| --- | --- | --- | --- | --- |
+| T-01 — invert degree assertions, observe red | **[x]** | 1 (+ lint-hygiene addendum) | PASS | server (spec only) |
+| T-02 — remove `Training` predicate + param | **[x]** | 1 | PASS | server (production) |
+| T-03 — reword the card's filter-scope note | **[x]** | 1 | PASS | client (copy) |
+
+**Budget outcome vs. `design.md` §9**
+
+| Metric | Expected | Actual |
+| --- | --- | --- |
+| Tasks | 3 | **3** |
+| Net LOC changed | ~45 (production ~4) | production **3**; total ~90 across spec + copy + comments |
+| Review rounds | 1 | **1** — no rework attempt consumed on any task |
+
+No HALT, no `FATAL_FAIL`, no Pivot, no budget breach, no spec-conformance FAIL. One Leader-initiated lint-hygiene addendum on T-01 (outside the rework ceiling by construction — it was a `CLAUDE.md` §4.3 convention breach, not a conformance FAIL).
+
+**The chain of evidence that makes this fix trustworthy, in order:**
+
+1. T-01's gate was observed **red** against unmodified production code, with the red independently verified genuine (production's `['A9001', 1, 2, 1, 2, 2, 2]` binding traced from source and matched to the printed `Received`; 15 `it()` blocks counted against `3 failed, 12 passed, 15 total` to rule out a zeroed file).
+2. T-02 turned that same command, unedited, **green** at 15/15.
+3. The **mutation check** re-broke it deliberately and the correct assertion caught it — proving the gate gates rather than merely passing.
+4. The full server suite (325/2088) and full client suite (306/6391) confirm no collateral damage.
+5. A zero-hit grep confirms no residual `session_type_id` predicate or `SessionTypeEnum.TRAINING` anywhere in production.
+
+**What remains, and it is not automatable.** Per `requirements.md` §6 **DC-E** and `tasks.md` §3, no jest gate can prove the real screen renders. The manual owner gate is still open:
+
+| Check | Expected |
+| --- | --- |
+| `GET /api/agresso/contracts/reports/full?contract-id=A100` | `degree` contains `PhD` (from `STAR-3422`) — no longer `[]` |
+| `project-detail/A100/project-dashboard` → Degree card | renders the bar; the empty state is gone |
+| Card note vs. applied SQL | the sentence describes **long-term + has a degree**, and that is what the query does — **DC-D's known blind spot**, human-verified by design |
+| A second contract with familiar Degree numbers | counts may **rise** — long-term engagements and historical imports now qualify. Expected (`design.md` §7), **not** a new defect |
+
+The fourth row is worth stating plainly to anyone reviewing the change: a Degree count going **up** on a familiar project is the fix working, not a regression.

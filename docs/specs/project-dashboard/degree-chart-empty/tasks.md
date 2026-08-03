@@ -2,7 +2,7 @@
 
 - **Module:** agresso (server) + project-dashboard (client)
 - **Spec id:** 2026-08-degree-chart-empty
-- **Status:** not-started
+- **Status:** **code complete** — 3/3 tasks `[x]`, all Reviewer PASS on first attempt, 0 rework rounds (`execution.md`). **The manual owner gate in §3 is still open** and is required before this spec closes.
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** `./requirements.md`
 - **Linked design:** `./design.md`
@@ -69,17 +69,18 @@ T-03 (client note copy) — independent, no dependency
   - Keep everything else byte-identical: the CTE, `INNER JOIN degrees`, `GROUP BY`, the union-level `ORDER BY`, bucketing, and the `_debug` per-section log line.
   - **Do not** add `AND f.degree_id IS NOT NULL` (DD-2) and **do not** admit NULL `session_length_id` (DD-3).
 - **Acceptance / done check:**
-  - [ ] `npm test -- --silent indicator-metadata-reports.repository.spec` **PASSES** — the same command that was red in T-01, unedited
-  - [ ] `npm test -- --silent` (full server suite) passes with **no other spec file modified** — DC-C
-  - [ ] `npm run lint -- --quiet` clean. ⚠️ the script carries `--fix` and **mutates files** — re-check `git status` after
-  - [ ] Production diff is **≤ 4 lines** excluding comments. More than that means the diagnosis was incomplete → **stop and escalate** (`design.md` §9 tripwire)
+  - [x] `npm test -- --silent indicator-metadata-reports.repository.spec` **PASSES** — the same command that was red in T-01, unedited — 15/15
+  - [x] `npm test -- --silent` (full server suite) passes with **no other spec file modified** — DC-C — 325 suites / 2088 tests
+  - [x] `npm run lint -- --quiet` clean. ⚠️ the script carries `--fix` and **mutates files** — re-check `git status` after — clean, `--fix` touched nothing
+  - [x] Production diff is **≤ 4 lines** excluding comments — **3** (SQL predicate, `params` entry, dead import); tripwire not hit
+  - [x] **Mutation check passed** — re-adding the predicate without its param reddened `expect(branches[2]).not.toContain('AND f.session_type_id = ?')` at `:390` (the SQL-text negative; the `params` array assertion correctly stayed green), then restored to 15/15. Both sides of the DC-A gate are now demonstrated red across T-01 + T-02 (`execution.md` § T-02)
 - **Evidence that does NOT count:**
   - The targeted spec passing while the full suite is unrun. The edited string is shared by all seven union branches; collateral damage shows up in sibling specs, not this one.
   - **Mutation check (falsifiability, KZ-004):** re-add `AND f.session_type_id = ?` **without** its param and confirm the suite goes red. If it stays green, the DC-A gate is not actually gating and T-01 must be fixed before this task can be called done. Restore afterwards.
-- **Dependencies:** T-01 (must be red first)
+- **Dependencies:** T-01 (must be red first) — satisfied: T-01's red was observed and committed at `1e50dddc` before this task ran
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** **[x] done** — Reviewer PASS on attempt 1, 2026-08-03 (`execution.md` § T-02)
 
 ---
 
