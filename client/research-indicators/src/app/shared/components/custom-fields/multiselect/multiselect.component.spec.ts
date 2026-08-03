@@ -1653,5 +1653,26 @@ describe('MultiselectComponent', () => {
       expect(() => realComponent.setValue([1])).not.toThrow();
       expect(realComponent.signal().group.trainee_organization_representative.length).toBe(1);
     });
+
+    it('R-MNP-006 AC.2 — the template skeleton list (selectedOptions()) matches the nested selection count while options are still loading', () => {
+      realComponent.signal = signal({
+        group: { is_attending_organization: true, trainee_organization_representative: [] }
+      });
+      realComponent.signalOptionValue = 'group.trainee_organization_representative';
+
+      // `optionsSig()` defaults to an empty signal because `ngOnInit` (which binds it
+      // via `bindServiceSignals`/`loadData`) never runs against this bare `TestBed.inject`
+      // instance — this is exactly the loading branch the skeleton `@for` renders for
+      // (`currentResultIsLoading() || !optionsSig().length`, multiselect.component.html:95).
+      expect(realComponent.optionsSig().length).toBe(0);
+
+      realComponent.setValue([1, 2]);
+
+      // multiselect.component.html:1 now derives `list` — the skeleton `@for`'s only
+      // consumer — from `this.selectedOptions()`. Assert that value's length directly,
+      // since the mockless (real UtilsService) TestBed here has no component fixture
+      // to read the rendered DOM skeleton count from.
+      expect(realComponent.selectedOptions().length).toBe(2);
+    });
   });
 });

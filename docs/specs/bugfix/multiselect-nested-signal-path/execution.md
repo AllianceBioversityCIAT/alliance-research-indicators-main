@@ -235,3 +235,59 @@ Decision 3 is carried into T-02's brief as a named hard requirement with an inst
   - [x] Not a targeted run only in the spec's sense — the mutation-kill supplies the falsifiability evidence; **blast radius remains T-05's gate** (KZ-003), correctly deferred
 - **Issues encountered:** none. No rework, no spec ambiguity, no pivot.
 - **Decisions made:** the `!Array.isArray` treatment of non-plain intermediate segments (adjudicated above) is now the component's documented behavior for that edge.
+- **Commit:** `0561ace5` — `[SPEC:bugfix/multiselect-nested-signal-path] fix(multiselect): write selections through the dotted signal path`.
+
+---
+
+### T-03 — Path-resolve the template's literal-key read
+
+- **Status:** **PASS** on attempt 1 (1 Implementer attempt, 1 Reviewer round)
+- **Date:** 2026-08-03
+- **Requirements covered:** R-MNP-006 (AC.1, AC.2)
+- **Skills assigned:** `angular-developer` — matches the task's list, no deviation
+- **Effort:** `high` (above the `medium` default — the edit is one line, but the task explicitly bars "it compiles" as evidence, so the *verification* carried the difficulty)
+
+#### Attempt 1 — Reviewer PASS
+
+- **Files changed:** `multiselect.component.html` (1 line) and `multiselect.component.spec.ts` (+21, pure append) — `2 files changed, 22 insertions(+), 1 deletion(-)`. `multiselect.component.ts` untouched.
+
+- **The change.**
+  ```
+  - @let list = this.signal()[this.signalOptionValue];
+  + @let list = this.selectedOptions();
+  ```
+  `list`'s only real consumer is the skeleton-row `@for` at `multiselect.component.html:96`. Line 15's `<ng-template #defaultTemplate let-list>` is an unrelated shadowing template variable and was left untouched, per the task.
+
+- **Leader scope authorization (deviation from the task's "Files touched", recorded as required).** `tasks.md` T-03 lists only the `.html`, but its done criteria demand evidence beyond a passing build. The existing spec harness uses `TestBed.inject(MultiselectComponent)` with **no component fixture**, so a rendered-DOM skeleton count is unreachable without restructuring it. I authorized a small targeted assertion in `multiselect.component.spec.ts` instead, forbidding any modification of existing cases, and instructed the Reviewer not to fail it as out-of-scope but to judge whether it is small, targeted, non-destructive, and actually probative. Rationale: `tasks.md` T-03 sanctions *"Exercise the loading branch **or** assert the count directly"* — this takes the second branch, so it satisfies the stated gate rather than widening it.
+
+- **Verification.** `npx jest --coverage=false -t "Nested signal path write-through" --verbose` from `client/research-indicators` → **8 passed / 0 failed**. T-01's seven approved cases all still green; the new eighth case is `R-MNP-006 AC.2 — the template skeleton list (selectedOptions()) matches the nested selection count while options are still loading`.
+
+- **Implementer's verification of the load-state claim** (which the brief asked it to check rather than assume): `selectedOptions()` (`multiselect.component.ts:176-183`) reads only the path-resolved signal state and does **not** gate on `optionsSig()`; `optionsSig()`/`optionsDisabled()` affect only each item's `disabled` flag, never the array length. So with `optionsSig()` empty — exactly the loading state the skeleton branch serves — the row count still equals the selection count.
+
+- **Implementer `Not Done / Assumptions` (verbatim):** *"The DOM-level skeleton row count (rendered `<p-skeleton>` elements) was not verified — the spec harness has no component fixture, and per the Leader's brief this was not to be restructured; it is explicitly deferred to T-05's browser script."* **Leader disposition:** not outstanding scope. The task's own gate offers "assert the count directly" as an alternative to exercising the branch, and that is what was done; the DOM-level confirmation was already assigned to T-05 by the spec. Recorded rather than carried as debt.
+
+- **Reviewer verdict: `STATUS: PASS`.** Summary (verbatim): *"Line 1 is path-resolved (AC.1 met directly), and the shape change at `:96` is provably inert — `:112` already iterates `selectedOptions()` with the identical track expression, the track key is preserved bit-for-bit by the spread, and the loop body never reads `row`; the flat path and the previously-`undefined` nested path both change only for the better. AC.2's new assertion is the sanctioned 'assert the count directly' rather than 'it compiles' — with the caveat, which the Implementer disclosed accurately, that it pins the *value* `list` is bound to and not the binding itself, so a revert of line 1 would only be caught by T-05's browser script 2."*
+
+  Findings behind the PASS:
+
+  | # | Point | Finding |
+  | --- | --- | --- |
+  | AC.1 | Line 1 no longer indexes by raw path | **Met.** Reviewer independently confirmed all three `list` occurrences (1, 15, 96) and that **no other literal-key indexing of `signal()` survives anywhere in the template** — the defect class is now fully eliminated from this file, which was R-MNP-006's whole purpose. |
+  | AC.2 | Count evidence | **Qualifies as the sanctioned "assert the count directly", not the barred "it compiles".** The test pins the loading-branch precondition (`optionsSig().length === 0`, matching the `@if` at `:95`) and then the bound value's length. Since line 1 binds `list` to exactly that value and `@for` emits one row per element, the asserted number *is* the skeleton row count — a runtime state assertion. |
+  | **Shape change at `:96`** | The main behavioral risk I flagged | **Inert, with the decisive evidence already in-file:** `multiselect.component.html:112` **already** iterates `selectedOptions()` with the byte-identical `track trackSelectedOptionRow($index, row)` expression. T-03 introduces no new pattern — it makes `:96` *consistent with* `:112`. `trackSelectedOptionRow` → `optionRowTrackKeyFromRow` reads only `row[this.optionValue]` (`:308-321`), and the spread in `selectedOptions()` preserves that key verbatim, so track keys are bit-identical to the old raw items: no new NG0955 duplicate-key exposure, and any duplicates that would fire now would have fired before. Identity churn is inert — `@for` reconciles by track key, not reference, and the loop body (`<p-skeleton …/>`) never references `row`. |
+  | Flat path | R-MNP-004's "unchanged" promise across ~25 sites | **No regression.** `map` preserves length; the added `disabled` key is unread at `:96`; and `@let` is **template-scoped** — not visible to projected content or to consumers' templates — so no call site can depend on the old identity or on `disabled`'s absence. Existing flat assertions (`:1633-1644`) untouched and green. |
+  | Previously-`undefined` nested case | Was it relied on? | **Strict improvement, no new exposure.** Both old and new expressions dereference `this.signal()` unguarded (`getNestedProperty`'s single-segment branch is `obj[splitted[0]]`, no `?.`, `utils.service.ts:44`), so the throw surface is identical. The old value could be `undefined`/non-array; the new one is always an array via `Array.isArray(items) ? items : []`. Nothing could have relied on the `undefined`: the loop body ignores `row`, and `selectedOptions()` was **already** invoked on effectively every render path (`isInvalid()` at `:20`/`:87`, plus `:45`, `:103`, `:106`, `:112`), so hoisting it to line 1 cannot introduce a throw that was not already reachable. |
+  | `strictTemplates` | Type-checking | **Clean.** `selectedOptions` is a public `computed` returning `any[]`, so `list: any[]` and `row: any` satisfy `trackSelectedOptionRow(index: number, row: unknown)`. The line-15 shadowing arrangement is unchanged — the variable *name* at line 1 is the same, only the initializer moved. |
+  | Spec addition | Small, targeted, non-destructive? | **Yes.** Pure append after case 7; the seven approved cases byte-identical. Placement inside the T-01 `describe` is **required, not merely convenient** — that block is the only one providing the real `UtilsService` (`:1558`), and under a mocked `getNestedProperty` returning `[]` the assertion would be vacuous. No contamination: TestBed reset per case, no spy, no shared-mock mutation. `expect(optionsSig().length).toBe(0)` is a legitimate precondition pin — it *is* an accident of the harness, but asserting it means a future default that populated `optionsSig` fails loudly instead of silently un-testing the loading branch. Inline comment line references verified accurate. |
+  | Scope | DD-2 discipline | **Clean.** `multiselect.component.ts` untouched (T-02's `writeAtPath` intact); line 15 untouched; all DD-2-protected methods untouched; `UtilsService` untouched; nothing folded in. |
+
+- **Recorded caveat (Reviewer, not an advisory and not a defect).** AC.2's assertion pins the *value* `list` is bound to, not the *binding itself* — the dynamic leg (length = 2) and the static leg (`list` ← `selectedOptions()`) are separate, so reverting line 1 to the literal-key read would leave this test green. `tasks.md` T-03 imposes no red-first/mutation-kill obligation (that is scoped to T-01/T-02), so no criterion is violated. **The only gate that would catch a line-1 revert remains T-05's browser script 2** — noted here so the residual risk is on the record rather than assumed covered.
+
+- **`ADVISORY`:** none raised for this task.
+
+- **Final verification (T-03 done criteria):**
+  - [x] Line 1 no longer indexes the signal by raw `signalOptionValue`
+  - [x] Skeleton row count during loading equals selected-item count for a nested path — asserted at the bound-value level; DOM-level count explicitly deferred to T-05 per the task's own design
+  - [x] `#defaultTemplate let-list` at `:15` untouched
+  - [x] T-01's block still green (7/7 original + 1 new = 8/8)
+- **Issues encountered:** none. No rework, no spec ambiguity, no pivot.

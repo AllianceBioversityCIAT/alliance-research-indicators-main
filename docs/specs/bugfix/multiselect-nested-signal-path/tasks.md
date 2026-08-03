@@ -2,7 +2,7 @@
 
 - **Module:** client — `shared/components/custom-fields/multiselect`
 - **Spec id:** 2026-08-multiselect-nested-signal-path
-- **Status:** in-progress — T-01…T-02 `[x]`; T-03…T-05 `[ ]`
+- **Status:** in-progress — T-01…T-03 `[x]`; T-04…T-05 `[ ]`
 - **Owner:** d.casanas@cgiar.org
 - **Depth:** **Lite** + **Bug Mode**
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
@@ -119,7 +119,9 @@ Skipping step 1 throws *"Cannot configure the test module when the test module h
 
 ---
 
-### T-03 — Path-resolve the template's literal-key read
+### [x] T-03 — Path-resolve the template's literal-key read
+
+> **Executed 2026-08-03 — PASS on attempt 1.** Line 1 is now `@let list = this.selectedOptions();`. Reviewer confirmed no literal-key indexing of `signal()` survives anywhere in the template, and that the shape change at `:96` is inert because `:112` already iterates `selectedOptions()` with the identical track expression. Block green 8/8 (7 original + 1 new AC.2 case). **Residual risk on the record:** the AC.2 assertion pins the bound value, not the binding — a revert of line 1 would only be caught by T-05's browser script 2. Audit trail: [`./execution.md`](./execution.md).
 
 - **Requirements covered:** R-MNP-006
 - **Design references:** §7.1.1, §2 hop ⑤
