@@ -73,7 +73,8 @@
   </div>
   @if (cache.currentMetadata().indicator_id !== 5 && cache.currentMetadata().status_id !== 6 &&
   cache.currentMetadata().status_id !== 7 &&
-  cache.currentMetadata().status_id !== 8) {
+  cache.currentMetadata().status_id !== 8 &&
+  !cache.isExternalResult()) {
   @if ((roles.isAdmin() && !cache.currentMetadata().is_principal_investigator) && cache.currentMetadata().status_id !==
   5
   && cache.currentMetadata().status_id !== 4) {

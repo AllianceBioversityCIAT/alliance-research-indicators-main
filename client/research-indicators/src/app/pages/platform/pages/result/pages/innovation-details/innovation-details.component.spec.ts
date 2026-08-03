@@ -49,6 +49,7 @@ class CacheServiceMock {
   showSectionHeaderActions = jest.fn().mockReturnValue(false);
   hasSmallScreen = jest.fn().mockReturnValue(false);
   isSidebarCollapsed = jest.fn().mockReturnValue(false);
+  isExternalResult = jest.fn().mockReturnValue(false);
 }
 class ActionsServiceMock {
   saveCurrentSection = jest.fn();
@@ -610,4 +611,28 @@ describe('InnovationDetailsComponent', () => {
     await comp.saveData('next');
     expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'partners'], { queryParams: undefined, replaceUrl: true });
   }));
+
+  describe('innovation-readiness step buttons (F-5)', () => {
+    function getStepButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('button[aria-label^="Seleccionar nivel"]'));
+    }
+
+    it('are enabled when the result is editable (default)', () => {
+      submission.isEditableStatus.mockReturnValue(true);
+      fixture.detectChanges();
+
+      const buttons = getStepButtons();
+      expect(buttons.length).toBeGreaterThan(0);
+      buttons.forEach(btn => expect(btn.disabled).toBe(false));
+    });
+
+    it('are disabled when the result is not editable (e.g. an external result)', () => {
+      submission.isEditableStatus.mockReturnValue(false);
+      fixture.detectChanges();
+
+      const buttons = getStepButtons();
+      expect(buttons.length).toBeGreaterThan(0);
+      buttons.forEach(btn => expect(btn.disabled).toBe(true));
+    });
+  });
 });

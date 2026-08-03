@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
-import { HttpStatus } from '@nestjs/common';
+import { ConflictException, HttpStatus } from '@nestjs/common';
 import { ResultUsersController } from './result-users.controller';
 import { ResultUsersService } from './result-users.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
@@ -18,9 +18,19 @@ describe('ResultUsersController', () => {
     deleteAuthorContactByResultIdAndKey: jest.fn(),
   };
   const mockFormat = jest.fn();
+  const mockResultsUtil: {
+    resultId: number;
+    platformCode: string;
+    setup: jest.Mock;
+  } = {
+    resultId: 5,
+    platformCode: 'STAR',
+    setup: jest.fn().mockResolvedValue(undefined),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockResultsUtil.platformCode = 'STAR';
     (ResponseUtils.format as jest.Mock) = mockFormat;
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultUsersController],
@@ -29,10 +39,7 @@ describe('ResultUsersController', () => {
         SetUpInterceptor,
         {
           provide: ResultsUtil,
-          useValue: {
-            resultId: 5,
-            setup: jest.fn().mockResolvedValue(undefined),
-          },
+          useValue: mockResultsUtil,
         },
         mockPortfolioUtilProvider,
         { provide: CurrentUserUtil, useValue: {} },
@@ -84,4 +91,28 @@ describe('ResultUsersController', () => {
       mockService.deleteAuthorContactByResultIdAndKey,
     ).toHaveBeenCalledWith(5, 12);
   });
+
+  it('deleteAuthorContactUserByResultId still deletes when platform_code is missing/empty (treated as STAR)', async () => {
+    mockResultsUtil.platformCode = '';
+    const deleted = {};
+    mockService.deleteAuthorContactByResultIdAndKey.mockResolvedValue(deleted);
+    mockFormat.mockReturnValue({});
+    await controller.deleteAuthorContactUserByResultId(12);
+    expect(
+      mockService.deleteAuthorContactByResultIdAndKey,
+    ).toHaveBeenCalledWith(5, 12);
+  });
+
+  it.each(['TIP', 'PRMS', 'AICCRA'])(
+    'deleteAuthorContactUserByResultId rejects with 409 for a %s-sourced result without touching the service',
+    async (platformCode) => {
+      mockResultsUtil.platformCode = platformCode;
+      await expect(
+        controller.deleteAuthorContactUserByResultId(12),
+      ).rejects.toThrow(ConflictException);
+      expect(
+        mockService.deleteAuthorContactByResultIdAndKey,
+      ).not.toHaveBeenCalled();
+    },
+  );
 });
