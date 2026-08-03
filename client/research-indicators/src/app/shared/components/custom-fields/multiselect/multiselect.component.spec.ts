@@ -1542,4 +1542,116 @@ describe('MultiselectComponent', () => {
       expect(spy).not.toHaveBeenCalled();
     });
   });
+
+  describe('Nested signal path write-through (bugfix regression)', () => {
+    let realComponent: MultiselectComponent;
+
+    beforeEach(async () => {
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        providers: [
+          MultiselectComponent,
+          { provide: ElementRef, useValue: new ElementRef(document.createElement('div')) },
+          { provide: ActionsService, useValue: mockActionsService },
+          { provide: ServiceLocatorService, useValue: mockServiceLocator },
+          { provide: CacheService, useValue: mockCacheService },
+          UtilsService,
+          { provide: AllModalsService, useValue: mockAllModalsService }
+        ]
+      }).compileComponents();
+
+      realComponent = TestBed.inject(MultiselectComponent);
+      realComponent.optionValue = 'id';
+    });
+
+    afterEach(() => {
+      TestBed.resetTestingModule();
+    });
+
+    it('R-MNP-001 AC.1 — setValue on a nested path creates no dotted top-level key', () => {
+      realComponent.signal = signal({
+        group: { is_attending_organization: true, trainee_organization_representative: [] }
+      });
+      realComponent.signalOptionValue = 'group.trainee_organization_representative';
+
+      realComponent.setValue([1, 2]);
+
+      expect(Object.keys(realComponent.signal()).some(key => key.includes('.'))).toBe(false);
+    });
+
+    it('R-MNP-001 AC.2 — nested selection is readable and clears required-invalid state', () => {
+      realComponent.signal = signal({
+        group: { is_attending_organization: true, trainee_organization_representative: [] }
+      });
+      realComponent.signalOptionValue = 'group.trainee_organization_representative';
+      realComponent.isRequired = true;
+
+      realComponent.setValue([1, 2]);
+
+      expect(realComponent.selectedOptions().length).toBe(2);
+      expect(realComponent.isInvalid()).toBe(false);
+    });
+
+    it('R-MNP-001 AC.3 — sibling keys under the nested parent survive the write', () => {
+      realComponent.signal = signal({
+        group: { is_attending_organization: true, trainee_organization_representative: [] }
+      });
+      realComponent.signalOptionValue = 'group.trainee_organization_representative';
+
+      realComponent.setValue([1, 2]);
+
+      expect(realComponent.signal().group.is_attending_organization).toBe(true);
+    });
+
+    it('R-MNP-002 AC.1 — selection survives effect flush (body stays [1, 2])', () => {
+      realComponent.signal = signal({
+        group: { is_attending_organization: true, trainee_organization_representative: [] }
+      });
+      realComponent.signalOptionValue = 'group.trainee_organization_representative';
+
+      realComponent.setValue([1, 2]);
+      TestBed.flushEffects();
+
+      expect(realComponent.body().value).toEqual([1, 2]);
+    });
+
+    it('R-MNP-003 — clear() empties the nested path and leaves no dotted key', () => {
+      realComponent.signal = signal({
+        group: {
+          is_attending_organization: true,
+          trainee_organization_representative: [{ id: 1 }, { id: 2 }]
+        }
+      });
+      realComponent.signalOptionValue = 'group.trainee_organization_representative';
+
+      realComponent.clear();
+
+      expect(realComponent.signal().group.trainee_organization_representative).toEqual([]);
+      expect(Object.keys(realComponent.signal()).some(key => key.includes('.'))).toBe(false);
+    });
+
+    it('R-MNP-004 AC.1/2/4 — flat-path write is unchanged: populated, new root reference, single-segment shape', () => {
+      realComponent.signal = signal({ flat_field: [] });
+      realComponent.signalOptionValue = 'flat_field';
+      const beforeRoot = realComponent.signal();
+
+      realComponent.setValue([1, 2]);
+
+      expect(realComponent.signal().flat_field.length).toBe(2);
+      expect(realComponent.selectedOptions().length).toBe(2);
+      expect(realComponent.signal()).not.toBe(beforeRoot);
+      expect(Object.keys(realComponent.signal()).sort()).toEqual(['flat_field']);
+    });
+
+    it('R-MNP-005 AC.1/2 — missing or null intermediate segment does not throw', () => {
+      realComponent.signal = signal({});
+      realComponent.signalOptionValue = 'group.trainee_organization_representative';
+      expect(() => realComponent.setValue([1])).not.toThrow();
+      expect(realComponent.signal().group.trainee_organization_representative.length).toBe(1);
+
+      realComponent.signal = signal({ group: null });
+      expect(() => realComponent.setValue([1])).not.toThrow();
+      expect(realComponent.signal().group.trainee_organization_representative.length).toBe(1);
+    });
+  });
 });
