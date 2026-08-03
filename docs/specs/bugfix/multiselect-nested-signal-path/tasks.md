@@ -2,7 +2,7 @@
 
 - **Module:** client — `shared/components/custom-fields/multiselect`
 - **Spec id:** 2026-08-multiselect-nested-signal-path
-- **Status:** in-progress — T-01 `[x]`; T-02…T-05 `[ ]`
+- **Status:** in-progress — T-01…T-02 `[x]`; T-03…T-05 `[ ]`
 - **Owner:** d.casanas@cgiar.org
 - **Depth:** **Lite** + **Bug Mode**
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
@@ -83,7 +83,9 @@ Skipping step 1 throws *"Cannot configure the test module when the test module h
 
 ---
 
-### T-02 — Write through the path in `setValue` and `clear`
+### [x] T-02 — Write through the path in `setValue` and `clear`
+
+> **Executed 2026-08-03 — PASS on attempt 1.** Private `writeAtPath` clone-then-assign helper; `setValue` and `clear` swapped to it. T-01's block green 7/7. Mutation-kill performed: reverted → RED, restored → GREEN. All four invariants I-1…I-4 Reviewer-verified against the code, including I-2, which has no test coverage. Audit trail: [`./execution.md`](./execution.md).
 
 - **Requirements covered:** R-MNP-001, R-MNP-002, R-MNP-003, R-MNP-004, R-MNP-005
 - **Design references:** §7.1 (+ invariants I-1…I-4), §9 DD-1, DD-2, DD-4

@@ -132,4 +132,106 @@
   - [ ] Manual mutation-kill (revert the single `setValue` write line, confirm red, restore) — **deferred to T-02 by design**: it can only run once the fix has turned the block green. Carried forward as an explicit T-02 obligation.
 - **Requirements covered by this task:** R-MNP-001 (AC.1/2/3), R-MNP-002 (AC.1), R-MNP-003, R-MNP-004 (AC.1/2/4), R-MNP-005 (AC.1/2), NFR-MNP-001.
 - **Issues encountered:** one Reviewer FAIL (case 7 unfalsifiable), fixed in a 2-line remediation. No spec ambiguity, no pivot, no environment blocker.
-- **Commit:** `[SPEC:bugfix/multiselect-nested-signal-path] test(multiselect): nested-path regression block, real UtilsService (RED)`
+- **Commit:** `a798fd37` — `[SPEC:bugfix/multiselect-nested-signal-path] test(multiselect): nested-path regression block, real UtilsService (RED)`. Husky hooks ran; `--no-verify` not used.
+
+#### Approval gate after T-01 — user decisions (2026-08-03)
+
+Approval Mode is `gated`, so the continue/pause gate stopped for the user. Three decisions were taken:
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 1 | Continue to T-02? | **Continue.** |
+| 2 | §10 budget tripwire — 112 test LOC against ~90 allocated, spec projected ~20% over the ~110 total | **Overrun accepted, execution continues.** Rationale on the record: the excess is entirely verification surface, the production allocation (~20 LOC) is untouched, and 2 of the excess lines exist *because* a Reviewer FAIL made a case falsifiable. §10 was **not** re-baselined — the stated numbers stay as the spec's original estimate and this note is the accepted delta. |
+| 3 | Invariant I-2 has no automated guard anywhere (advisory 3 above) | **Enforce through the T-02 Implementer brief and the T-02 Reviewer audit only.** No test added, no task minted, spec not reopened. I-2 was already inside T-02's approved scope (`tasks.md` T-02 invariants table, `design.md` §7.1), so this is enforcement of existing scope rather than a widening. The user was explicitly offered the spec-reopening route and declined it. |
+
+Decision 3 is carried into T-02's brief as a named hard requirement with an instruction to quote the proving lines, and into the T-02 Reviewer's audit list.
+
+---
+
+### T-02 — Write through the path in `setValue` and `clear`
+
+- **Status:** **PASS** on attempt 1 (1 Implementer attempt, 1 Reviewer round)
+- **Date:** 2026-08-03
+- **Requirements covered:** R-MNP-001, R-MNP-002, R-MNP-003, R-MNP-004, R-MNP-005
+- **Skills assigned:** `angular-developer` — matches the task's list, no deviation. `systematic-debugging` was considered and **not** assigned: the root cause was already diagnosed in the proposal and the design prescribes the fix, so the task is implementation against known invariants rather than investigation.
+- **Effort:** `xhigh` (above the T2 `medium` default — a data-loss defect in a component 30 callers render, with four invariants each breakable while still passing every AC). `max` was not used: the tier↔effort rule forbids `max` on a T2 model.
+
+#### Attempt 1 — Reviewer PASS
+
+- **Files changed:** `client/research-indicators/src/app/shared/components/custom-fields/multiselect/multiselect.component.ts` — `1 file changed, 27 insertions(+), 5 deletions(-)`.
+- **The change.** A new `private writeAtPath(current, path, value)` clone-then-assign helper, plus two single-line call swaps:
+
+  ```ts
+  private writeAtPath(current: any, path: string, value: any): any {
+    const [key, ...rest] = path.split('.');
+
+    if (rest.length === 0) {
+      return { ...current, [key]: value };
+    }
+
+    const existingSegment = current?.[key];
+    const segment =
+      existingSegment && typeof existingSegment === 'object' && !Array.isArray(existingSegment) ? existingSegment : {};
+
+    return {
+      ...current,
+      [key]: this.writeAtPath(segment, rest.join('.'), value)
+    };
+  }
+  ```
+
+  `setValue`: `nextState = { ...current, [this.signalOptionValue]: nextItems };` → `nextState = this.writeAtPath(current, this.signalOptionValue, nextItems);`
+  `clear`: the three-line literal-key spread → `this.signal.update(prev => this.writeAtPath(prev, this.signalOptionValue, []));`
+
+- **Verification, step 1 — targeted suite.** `npx jest --coverage=false -t "Nested signal path write-through"` from `client/research-indicators` → **7 passed / 0 failed** (`Tests: 6391 skipped, 7 passed, 6398 total`). All seven T-01 cases green, including the two that were green by design.
+
+- **Verification, step 2 — mutation-kill (the falsifiability check carried forward from T-01; performed, not assumed).** This repo configures no mutation-testing tool, so this manual check is the substitute (KZ-004):
+  1. Reverted the single `setValue` write line to the buggy literal-key form → re-ran → **observed RED**: `Tests: 4 failed, 6391 skipped, 3 passed, 6398 total`, including `Cannot read properties of undefined (reading 'trainee_organization_representative')` at the R-MNP-005 case — real failures, not a TestBed setup error.
+  2. Restored the fix.
+  3. Re-ran → **observed GREEN again**: 7 passed.
+
+  With T-01's red having been observed *before* any production change, the red-before-green ordering proof (NFR-MNP-001, KZ-001) is complete in both directions.
+
+- **Implementer `Not Done / Assumptions` (verbatim):** *"For a non-plain-object, non-null, non-array intermediate segment (e.g. a string or number sitting where an object is expected) I chose to treat it as absent and overwrite it with `{}`, matching the spirit of `setNestedPropertyWithReduce`'s `??=` convention (which only guards `null`/`undefined`, but no spec scenario populates a non-object segment, so this is an unexercised edge). This is a routine judgment call, not a widening of scope — it introduces no new behavior for any tested case."* Adjudicated below; not outstanding scope, so it does not block `[x]`.
+
+- **Reviewer verdict: `STATUS: PASS`.** Summary (verbatim): *"All four §7.1 invariants hold against the actual code — including I-2, which I verified by reading `setValue`'s scope directly (`multiselect.component.ts:405` `let nextState`, reassigned at `:423`, no shadowing, `signal.update` synchronous, every `writeAtPath` branch returns an object, so the `:427` emission cannot be `undefined`). DD-1/DD-4 are satisfied (fresh root on every path, `setNestedPropertyWithReduce` neither called nor modified, `prevItems` still read pre-write), no in-place mutation occurs at any depth, DD-2's untouchable methods are byte-identical, and the undesigned `!Array.isArray` clause is an unexercised, spec-conformant, documented judgment call — no nested call site has an array-typed intermediate segment."*
+
+  Findings behind the PASS, by audit point:
+
+  | # | Point | Finding |
+  | --- | --- | --- |
+  | I-1 | Single-segment reduces to exactly `{ ...current, [key]: value }` | **Holds.** `rest.length === 0` returns that literal with no extra branch. Both pre-existing flat assertions (`multiselect.component.spec.ts:427-431`, `:508`) use `signalOptionValue = 'testField'` and take exactly that branch. T-01's `:1643` additionally pins the key set. |
+  | **I-2** | `nextState` reassigned from the helper | **Holds — verified by reading the code, not the docstring.** `let nextState: any;` at `:405`; bare assignment at `:423`; no `const`/`let`/parameter re-declaration anywhere in the `signal.update` callback; `writeAtPath` never mentions `nextState`. `WritableSignal.update` runs its callback **synchronously**, so the assignment lands before the `queueMicrotask` at `:427`. Emission cannot be `undefined` — every `writeAtPath` return path is an object literal, so the only route to `undefined` is the helper throwing, which propagates out of `setValue` before the microtask is queued. Non-load-bearing extra margin: all three nested OICR sites bind `(selectEvent)="onSelect()"` and discard `$event` (`create-oicr-form.component.html:325, 340, 399`). |
+  | I-3 | Missing / `null` segment created as a plain object | **Holds.** Falsy `existingSegment` → `{}`. `current?.[key]` also survives a `null`/`undefined` root. |
+  | I-4 | Existing segment keeps its other keys | **Holds at every depth**, not just level 1: for `a.b.c` the result is `{ ...root, a: { ...root.a, b: { ...root.a.b, c: value } } }`. Max real depth in this repo is 2. |
+  | DD-1/DD-4 | Fresh root; mutating helper not reused | **Holds.** Every branch returns a fresh object literal, so single-segment and nested paths both produce a new root (`OnPush` + `selectEvent`). `writeAtPath` calls nothing from `UtilsService`; `utils.service.ts` is byte-identical to `main`. `prevItems` still read at `:409` from `current` before the write at `:423` — and since `writeAtPath` never mutates `current`, **the ordering is no longer load-bearing at all**, which is precisely DD-1's stated reason for choosing this shape over mutate-then-spread. |
+  | Aliasing | No in-place mutation at any depth | **Clean.** `writeAtPath` contains no assignment statement of any kind — it only reads `current?.[key]` and builds spreads. `existingSegment` is passed by reference into the recursion but used solely as a spread source, so the previous root's segments are never written through. This is a strict improvement over the sibling writers `removeOption` (`:448`) and the `onChange` effect (`:193`), which DD-1 documents as still mutating. Objects off the path keep identity — `design.md` §7.1 verbatim, by design rather than by accident. |
+  | `clear()` | Nested, flat, and the trailing `body.set` | **Correct on all three.** Nested → `{ ...prev, group: { ...prev.group, trainee_organization_representative: [] } }` (R-MNP-003, no dotted key). Flat → `{ ...prev, testField: [] }`, keeping `:508` green. `this.body.set({ value: null })` correctly untouched: it is the model-binding reset and it now *agrees* with `syncBodyWithSignal`, which on the next flush independently observes an empty path and sets the same value — changing it would be redundant **and** a DD-2 violation. |
+  | DD-2 | Untouchable methods | **Byte-identical to `main`:** `selectedOptions` (`:176`), `onChange` (`:186`), `syncBodyWithSignal` (`:230`), `setBodyFromSignal` (`:434`), `removeOption` (`:440`). `UtilsService` untouched and uncalled by the helper. Template, spec file, and all call sites untouched (`1 file changed`). No folded-in cleanup. |
+  | §7.2 | Helper stays private | **Holds.** `private writeAtPath` on the component; nothing added to `UtilsService`. |
+  | Strict TS | Three `any`s | **Consistent, not a loosening.** `noUncheckedIndexedAccess` is not set, so `const [key, ...rest]` gives `key: string` and the computed-key writes type-check with no non-null assertion. The `any`s match the immediate context (`@Input() signal: WritableSignal<any>` at `:67`, `setValue`'s `current: any`, `nextState: any`) and the file-level `/* eslint-disable @typescript-eslint/no-explicit-any */` at line 1, which predates this change. No `tsconfig` edit, no new `eslint-disable`, no `@ts-ignore`. |
+  | Recursion | Termination and edge inputs | **Bounded.** `rest` shrinks one segment per call, so termination is structural. `signalOptionValue = ''` → `['']` → single-segment branch → `{ ...current, '': value }`, **byte-for-byte the old behavior** for that input (the old code also used a computed key), so no regression; `getNestedProperty` reads `obj['']` symmetrically. Trailing dot `'a.'` → `{ a: { '': value } }`, no throw. Neither shape occurs at any call site. |
+
+- **Adjudication of the `!Array.isArray` clause** (the Implementer's disclosed judgment call, which the design does not specify). The Reviewer ruled it **spec-conformant, unexercised, and documented** — and the Leader accepts that ruling on the reasoning given:
+  - R-MNP-005 mandates one explicit rule for a segment that *"does not resolve to a **plain** object"*. An array is not a plain object, so classifying it as non-plain and creating `{}` is *inside* the requirement rather than around it. The scenario's "MUST NOT overwrite a segment that exists and is a non-empty object" reads against this only under a `typeof` sense of "object", which the requirement's own title ("non-**object** intermediate segments") and its plain-object wording exclude.
+  - **Reachability checked, not assumed.** The intermediate segments at all 8 nested call sites are `group` (`get-cap-sharing.interface.ts:45` → `GroupTraining`), `knowledge_sharing_form` (`get-innovation-details.interface.ts:14`), and `step_two`/`step_three` (`oicr-creation.interface.ts:8-9`) — every one object-shaped, none array-typed, including the three OICR property-binding sites at `create-oicr-form.component.html:331, 344, 404`. The edge cannot currently be reached.
+  - It is also the **safer** of the two options: mirroring `??=` exactly would keep an array and then assign a string key onto it (`arr['countries'] = value`), producing a shape `JSON.stringify` silently drops from the PATCH payload — a data-loss failure mode of the same family as the bug being fixed.
+  - The docstring states the chosen rule, so the next maintainer is not left inferring it.
+
+- **Reviewer's two non-blocking observations** (recorded here; the Reviewer explicitly declined to raise them as advisories since neither is a spec violation):
+  1. For `knowledge_sharing_form.tool_function_id` the intermediate is a `KnowledgeSharingForm` **class instance**, so the spread converts it to a plain object. Harmless: the class is field-only with no methods, no `instanceof` check exists anywhere in the client, and the root was already being spread to a plain object before this fix.
+  2. The emitted `nextState` for nested paths now carries the real field instead of the dotted key — the intended fix. Its downstream OICR consumers are **T-04's** scope.
+
+- **`ADVISORY`:** none raised for this task.
+
+- **Code traceability.** No separate `// @akili-spec` marker was added. The helper's own docstring already carries the spec reference (*"see design.md DD-1"*), which satisfies the traceability intent, and editing a production file after a Reviewer PASS would invalidate the audited diff. Recorded as a deliberate Leader decision rather than an omission.
+
+- **Final verification (T-02 done criteria):**
+  - [x] T-01's block is green — 7/7
+  - [x] `prevItems` still read from the pre-write state (`:409` before `:423`), Reviewer-verified
+  - [x] No method outside `setValue` / `clear` / the new private helper touched — `git diff --stat` shows `1 file changed, 27 insertions(+), 5 deletions(-)`; the five DD-2 methods confirmed byte-identical
+  - [x] Mutation-kill performed with all three outcomes observed
+  - [x] I-2 satisfied, verified by direct scope reading rather than by the Implementer's claim
+  - [x] Not a targeted run only in the spec's sense — the mutation-kill supplies the falsifiability evidence; **blast radius remains T-05's gate** (KZ-003), correctly deferred
+- **Issues encountered:** none. No rework, no spec ambiguity, no pivot.
+- **Decisions made:** the `!Array.isArray` treatment of non-plain intermediate segments (adjudicated above) is now the component's documented behavior for that edge.

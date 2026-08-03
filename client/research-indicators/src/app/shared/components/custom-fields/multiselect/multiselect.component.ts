@@ -370,11 +370,33 @@ export class MultiselectComponent implements OnInit, OnChanges {
     if (this.service?.isOpenSearch()) this.service.update(event.filter);
   }
 
+  /**
+   * Clones the spine of `path` — the root plus every intermediate segment —
+   * and assigns `value` at the leaf, returning a **new** root reference.
+   * A missing or non-object intermediate segment is created as a plain
+   * object; an existing intermediate segment keeps its other keys. Mirrors
+   * `UtilsService.setNestedPropertyWithReduce`'s `acc[key] ??= {}` convention
+   * without its in-place mutation (see design.md DD-1).
+   */
+  private writeAtPath(current: any, path: string, value: any): any {
+    const [key, ...rest] = path.split('.');
+
+    if (rest.length === 0) {
+      return { ...current, [key]: value };
+    }
+
+    const existingSegment = current?.[key];
+    const segment =
+      existingSegment && typeof existingSegment === 'object' && !Array.isArray(existingSegment) ? existingSegment : {};
+
+    return {
+      ...current,
+      [key]: this.writeAtPath(segment, rest.join('.'), value)
+    };
+  }
+
   clear() {
-    this.signal.update(prev => ({
-      ...prev,
-      [this.signalOptionValue]: []
-    }));
+    this.signal.update(prev => this.writeAtPath(prev, this.signalOptionValue, []));
     this.body.set({ value: null });
   }
 
@@ -398,7 +420,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
         return merged as any;
       });
 
-      nextState = { ...current, [this.signalOptionValue]: nextItems };
+      nextState = this.writeAtPath(current, this.signalOptionValue, nextItems);
       return nextState;
     });
 
