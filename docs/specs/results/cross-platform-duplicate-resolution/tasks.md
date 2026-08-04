@@ -68,7 +68,7 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
 ### T-01 — Derive the FK inventory and delete-function baseline from the live schema
 
 - **Requirements covered:** R-RES-003, R-RES-004, §5 data requirements
-- **Files touched:** `docs/specs/results/cross-platform-duplicate-resolution/fk-inventory.md` (new, evidence artifact)
+- **Files touched:** `fk-inventory.md` (evidence artifact) + `fk-inventory.gen.js` (the generator, vendored so T-02 can re-derive with one command)
 - **Description:** Dump the live `full_delete_result_version` definition and enumerate every FK referencing `results` and every cross-result FK, from `information_schema`. Produce the authoritative table list T-02 and T-05 consume. This task exists because the first revision of this spec derived the same facts from a TypeORM entity walk and an unsorted `grep | tail`, and got the migration baseline, the link-direction handling, and the table list all wrong.
 - **Implementation notes:**
   - `SELECT k.TABLE_NAME, k.COLUMN_NAME, r.DELETE_RULE FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.REFERENTIAL_CONSTRAINTS r … WHERE k.REFERENCED_TABLE_NAME = 'results'` — plus the same with `REFERENCED_COLUMN_NAME = 'result_id'` and `REFERENCED_TABLE_NAME <> 'results'` for cross-result shapes.
@@ -76,11 +76,12 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Read-only. `SELECT`/`SHOW` only. The shared dev DB is not disposable.
   - Expected (measured 2026-08-04, for regression comparison only, **not** as the answer): 38 FKs / 37 `NO ACTION` + 1 `CASCADE`; 35 DELETE targets; 7 uncovered `NO ACTION` tables + `project_indicators_results` (CASCADE) + `TEMP_result_external_oicrs` (no FK).
 - **Acceptance / done check:**
-  - [ ] The artifact lists every FK with its `DELETE_RULE`, and the uncovered set as a computed difference.
-  - [ ] The live function definition is recorded verbatim with its byte length.
-  - [ ] Any divergence from the expected figures is called out explicitly with the cause.
+  - [x] The artifact lists every FK with its `DELETE_RULE`, and the uncovered set as a computed difference.
+  - [x] The live function definition is recorded verbatim with its byte length (7,325 B).
+  - [x] Any divergence from the expected figures is called out explicitly with the cause.
 - **What disqualifies the evidence:** an inventory produced from entities, migrations, or this document's numbers instead of `information_schema`. **If the uncovered set differs from the 7 named tables, stop and escalate** — the schema moved and the whole delete path needs re-derivation (§14 tripwire).
-- **Dependencies:** none · **Effort:** S · **Status:** todo
+- **Result (2026-08-04):** **38** FKs / **37** `NO ACTION` + **1** `CASCADE`; **35** function DELETE targets; uncovered `NO ACTION` = the **7** expected tables; uncovered `CASCADE` = `project_indicators_results`; **5** cross-result shapes. **Divergence: none — the §14 tripwire does not fire and T-02 may proceed.** One correction made during the task: the "carries `result_id`, no FK" enumeration initially included 17 **views** (`report_*`, `vw_results_dashboard_*`), which would have put `DELETE FROM vw_…` into the migration; filtering on `TABLE_TYPE = 'BASE TABLE'` leaves exactly `TEMP_result_external_oicrs` (326 rows), the one table the design already named.
+- **Dependencies:** none · **Effort:** S · **Status:** **done**
 - **Skills:** `nestjs-expert`
 
 ---
