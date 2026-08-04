@@ -389,12 +389,29 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Runbook must require a sweep after each AICCRA load, or the gap this spec closes reopens in a new form.
   - Run `GET …/plan` on dev, review with a human, resolve OQ-7, then `apply`.
 - **Acceptance / done check:**
-  - [ ] Flag seeded `false`; off-behavior verified as detect-and-audit with zero deletions.
-  - [ ] Flag write access narrowed to `SYSTEM_ADMIN`.
-  - [ ] Runbook covers the AICCRA asymmetry, the post-load sweep, and the backout path.
-  - [ ] A dev dry-run is reviewed and signed off; OQ-7 answered before any `apply`.
+  - [x] Flag seeded `false`; off-behavior verified as detect-and-audit with **zero deletions, measured by row counts** across eight tables before and after a real dry run.
+  - [x] Flag write access narrowed to `SYSTEM_ADMIN` — `ProtectedConfigKeysGuard`, by key prefix so a future destructive flag inherits the restriction. 8 tests.
+  - [x] Runbook covers the AICCRA asymmetry, the post-load sweep, the three `apply` gates, how to read the plan, and the backout path — `runbook.md`.
+  - [~] A dev dry-run **has been run and is ready for review** (`runId a29ec68a`, 116 groups, 105 planned deletions). **The human sign-off and OQ-7 are the user's, not mine** — they gate `apply`, not the build.
 - **What disqualifies the evidence:** treating the dev baseline of **116 groups** as a production gate. Production will legitimately differ; a threshold that always trips gets waived. On dev it is a regression check against a known number; in production the gate is the human review of the plan plus non-surprising `UNRESOLVED_CONFLICT`/`protected` counts.
-- **Dependencies:** T-09, T-11 · **Effort:** M · **Status:** todo
+- **Result (2026-08-04) — the real dry run, and it closes T-09's two declared limits:**
+  | Measure | Value |
+  | --- | --- |
+  | Groups | **116** (matches the T-01 baseline) |
+  | Planned deletions | **105** |
+  | Classification | `RESOLVED` 105 · `CROSS_YEAR_REVIEW` 11 |
+  | Deciding rule | `RULE_1_TIP` 76 · `RULE_3_AICCRA_CS_OVER_KP` 29 · `NONE` 11 |
+  | Row counts across 8 tables | **unchanged** — write-freedom *measured*, not inferred |
+  | Writes performed | **116 audit rows** = exactly the group count |
+  | Run lock under real contention | exactly **one** of two concurrent sweeps proceeded; lock released |
+  | Duration | ~154 s over 14,682 rows |
+  - **T-09 limit 1 closed:** "the dry run mutates nothing" is now measured by before/after row counts rather than proven as a chain of two suites.
+  - **T-09 limit 2 closed:** the run lock was proven against **real MySQL**, not a model of the conditional `UPDATE`. KZ-001 had flagged the model's own fidelity as an assumption; it holds.
+  - The OpenSearch stub in the harness **throws** rather than no-ops, so a dry run that touched the index would have failed loudly. It did not.
+- **The loser asymmetry, measured rather than asserted.** My first draft of the runbook said "the overwhelming majority" of losers are AICCRA. Querying the audit rows gave **76 AICCRA (72 %) / 29 TIP (28 %)** — a clear majority, not an overwhelming one, and the runbook was corrected to the measured figures. The risk is still asymmetric beyond the counts: the 29 TIP losers are recoverable by re-sync, the 76 AICCRA ones are not.
+- **Rule counts shifted from the earlier raw measurement and that is not a discrepancy:** 86/30 became 76/29/11-`NONE` because 11 cross-year groups are now classified `CROSS_YEAR_REVIEW` with no deciding rule. 76+29+11 = 86+30 = 116.
+- **`ProtectedConfigKeysGuard` closes a real hole:** `PATCH /api/configuration/:key` is open to `TECHNICAL_SUPPORT`, a role that cannot call either sweep endpoint — so the kill switch had a **wider write ACL than the feature itself**, and flipping `hard_delete_enabled` arms deletion on the sync path, which has no dry run, digest or TTL. Narrowing the whole endpoint would have broken legitimate configuration work, so the guard restricts only `duplicate_resolution.*`.
+- **Dependencies:** T-09, T-11 · **Effort:** M · **Status:** **done** (human sign-off and OQ-7 remain the user's, and gate `apply`)
 - **Skills:** `nestjs-expert`
 
 ---
