@@ -3,6 +3,7 @@ import { ResultsService } from './results.service';
 import { ResultsController } from './results.controller';
 import { ResultRepository } from './repositories/result.repository';
 import { DuplicateCandidateRepository } from './repositories/duplicate-candidate.repository';
+import { ResultDuplicateResolutionLogService } from './result-duplicate-resolution-log.service';
 import { ResultKeywordsModule } from '../result-keywords/result-keywords.module';
 import { ResultLeversModule } from '../result-levers/result-levers.module';
 import { ResultContractsModule } from '../result-contracts/result-contracts.module';
@@ -93,9 +94,15 @@ import { AiReportsModule } from '../ai-reports/ai-reports.module';
     ResultsService,
     ResultRepository,
     DuplicateCandidateRepository,
+    ResultDuplicateResolutionLogService,
     AiRoarMiningApp,
     AlianceManagementApp,
   ],
-  exports: [ResultsService, ResultRepository, DuplicateCandidateRepository],
+  exports: [
+    ResultsService,
+    ResultRepository,
+    DuplicateCandidateRepository,
+    ResultDuplicateResolutionLogService,
+  ],
 })
 export class ResultsModule {}

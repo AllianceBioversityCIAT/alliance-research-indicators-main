@@ -181,11 +181,10 @@ export class PrmsOpenSearchService
     const executionCode = uuidv4();
     const currentCode: { current: number } = { current: null };
     const resultSaved: number[] = [];
-    const counters: CounterResults = {
-      createdRecords: 0,
-      updatedRecords: 0,
-      errorRecords: 0,
-    };
+    // Use the constructor rather than an object literal so a new counter cannot
+    // be forgotten here — omittedDuplicateRecords was, and the sync summary then
+    // silently lost every omission.
+    const counters: CounterResults = new CounterResults();
     try {
       const syncProcessLog = await this.syncProcessLogService.initiateSync(
         SyncProcessEnum.PRMS_INTEGRATION,

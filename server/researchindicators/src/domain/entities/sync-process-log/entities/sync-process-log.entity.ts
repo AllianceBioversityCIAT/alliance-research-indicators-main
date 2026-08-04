@@ -55,4 +55,19 @@ export class SyncProcessLog extends AuditableEntity {
     type: 'bigint',
   })
   error_records!: number;
+
+  /**
+   * Incoming rows skipped because a higher-priority cross-platform duplicate
+   * exists (R-RES-009 AC.2).
+   *
+   * Without a durable column the count incremented in memory and was discarded
+   * at the end of the run, so an omission was invisible in the sync summary — the
+   * thing operators actually read.
+   */
+  @Column({
+    name: 'omitted_duplicate_records',
+    type: 'bigint',
+    default: 0,
+  })
+  omitted_duplicate_records!: number;
 }

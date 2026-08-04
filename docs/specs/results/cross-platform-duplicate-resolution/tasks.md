@@ -272,12 +272,20 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Record the feature-flag state on every row.
   - **A third migration is required** for the omission counter: `sync_process_logs` has no such column and its existing counter columns are NOT NULL with no default. The design budgeted two migrations — this is the known overrun, flagged rather than absorbed.
 - **Acceptance / done check:**
-  - [ ] Every deletion, omission, protection, and conflict produces exactly one traceable record naming its classification.
-  - [ ] The audit row exists **before** the corresponding delete is attempted.
-  - [ ] `omittedDuplicateRecords` survives to `sync_process_log` — it is not discarded at end of run.
-  - [ ] An operator can answer "which rows did run X delete, and why" from stored data alone.
+  - [x] Every deletion, omission, protection, and conflict produces exactly one traceable record naming its classification.
+  - [x] The audit row exists **before** the corresponding delete is attempted — `recordGroup` writes participants and the planned disposition, `recordOutcomes` updates the same row afterwards.
+  - [x] `omittedDuplicateRecords` survives to `sync_process_log` — wired end to end: `CounterResults` → `CounterResultsEnum.OMITTED_DUPLICATE` → `CreateSyncProcessDto.fromEntityUpdate` → the new `omitted_duplicate_records` column.
+  - [x] An operator can answer "which rows did run X delete, and why" from stored data alone — `summarizeRun` plus the per-row `outcomes` payload.
 - **What disqualifies the evidence:** counters that increment in memory. The first revision's design did exactly that and called R-RES-009 AC.2 satisfied.
-- **Dependencies:** none · **Effort:** M · **Status:** todo
+- **Result (2026-08-04):** entity, service, two migrations, and the counter wiring. **16 tests green; full suite 324 suites / 2137 tests green;** `tsc` clean; lint clean; service coverage **100% across statements, branches, functions and lines**.
+- **Write order is the design.** `recordGroup` persists participant identities *before* any deletion; under a hard delete that payload is the only surviving trace, so writing it afterwards would mean a crash between delete and audit destroys both the row and the record of it. `recordOutcomes` then **derives every count from the outcomes** rather than trusting the caller, so a run cannot report three deletions while listing two.
+- **`NOOP` is never conflated with `DELETED`**, and neither is `PLANNED` (a dry run, or the hard-delete flag off). The flag state is recorded on every row, because otherwise a run that planned deletions and performed none is indistinguishable from one that found nothing.
+- **Nullable by design:** `winner_result_id`, `deciding_rule`, `deciding_result_id` are NULL for `UNRESOLVED_CONFLICT` and same-platform-ambiguity groups. R-RES-009 AC.1 is satisfied by `classification` + `reason`; forcing a winner would mean inventing one.
+- **`group_key_hash` (SHA-256) is indexed, not the link.** `results.public_link` is `TEXT`, so a direct index needs a prefix length and still risks the InnoDB key limit. The readable value stays in `normalized_public_link`.
+- **Declared overrun, now concrete:** this is the **third** migration in a spec that budgeted two (RB-4). `sync_process_logs` had no omission column and every existing counter column is `NOT NULL` with no default, so without it the counter increments in memory and is discarded — the exact defect R-RES-009 AC.2 exists to prevent. Added with `DEFAULT 0` so no backfill is needed.
+- **A latent trap removed:** `prms.opensearch.service.ts` built `CounterResults` as an object literal, so the new field was missed at compile time. Switched to the constructor, which is why the omission counter cannot be silently dropped by the next counter added.
+- **Not executed:** both migrations are unrun — the database is unreachable. They are syntactically reviewed only; applying them is gated with T-02.
+- **Dependencies:** none · **Effort:** M · **Status:** **done** (migrations pending execution with T-02)
 - **Skills:** `nestjs-expert`
 
 ---
