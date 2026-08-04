@@ -336,11 +336,16 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - `jwr.middleware.ts` was in neither the file list nor the budget of the previous revision — this task is the correction.
   - Do **not** widen the JWT `exclude` list.
 - **Acceptance / done check:**
-  - [ ] The middleware stamps a distinguishable auth-type for both paths, asserted separately.
-  - [ ] A machine-token request to either sweep endpoint → `403`, **exercised through the real middleware**, not a mocked context.
-  - [ ] A ROAR `SYSTEM_ADMIN` request still succeeds.
+  - [x] The middleware stamps a distinguishable auth-type for **all three** paths (machine token, ROAR JWT, local bypass), asserted separately — including an assertion that the two values are **not equal**, since `request.user` remains shape-identical between them.
+  - [x] A machine-token request → `403`, **exercised through the real middleware**: the test runs `JwtMiddleware.use()` with a real base64 `{client_id, client_secret}` header and feeds the resulting request object into the real guard. The marker the guard reads is the one the middleware wrote, in the same test.
+  - [x] A ROAR `SYSTEM_ADMIN` request still succeeds — asserted for the *same* `sec_user_id` that is denied over a machine token, so the difference is provably the auth path and not the roles.
 - **What disqualifies the evidence:** a unit test that injects a synthetic "machine-token principal" into a mocked execution context. That test **passes against a guard reading a flag production never sets** — the silent-no-op class, on the authorization gate of an irreversible mass delete. The assertion must traverse `JwtMiddleware`.
-- **Dependencies:** none · **Effort:** M · **Status:** todo
+- **Result (2026-08-04):** `shared/enum/request-auth-type.enum.ts`, `shared/guards/deny-machine-token.guard.ts` (+ spec), and the marker stamped in all three `JwtMiddleware` paths. **13 tests green; full suite 326 suites / 2168 tests green;** `tsc` clean; lint clean; guard coverage **100% across statements, branches, functions and lines**. The pre-existing `jwr.middleware.spec.ts` still passes unchanged.
+- **The guard fails closed.** An absent or unrecognised marker is **denied**, not allowed. If a future refactor of `JwtMiddleware` stops stamping the auth type, the endpoint breaks loudly instead of quietly accepting every principal — the failure direction that matters on a path that deletes production rows. Two tests cover that, and a third asserts the two `403` messages differ so an operator can tell which case they hit.
+- **`JwtMiddleware` was not in the design's file list or budget** — the previous revision asserted the control existed. It is now touched, and the change is three one-line assignments plus an import: no behavior change to any existing path, which is why the existing middleware spec needed no edits.
+- **Not yet applied to a route.** The guard is the mechanism; **T-09 attaches it** to the two sweep endpoints alongside `@Roles(SYSTEM_ADMIN)`, which is why the dependency graph has T-10 → T-09. Until then no route is protected by it — and no route needing it exists yet.
+- **OQ-8 is unaffected.** This guard closes the *route-level* hole. The underlying exposure — four `app_secrets` rows with zero `app_secret_host_list` entries, so the origin check is skipped, one resolving to a `System Admin` — is independent of this spec and still needs an owner.
+- **Dependencies:** none · **Effort:** M · **Status:** **done** (attached to routes in T-09)
 - **Skills:** `nestjs-expert`
 
 ---
