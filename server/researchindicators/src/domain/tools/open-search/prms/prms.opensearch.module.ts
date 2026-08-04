@@ -8,6 +8,7 @@ import { PooledFundingContractsModule } from '../../../entities/pooled-funding-c
 import { ClarisaLeversModule } from '../../clarisa/entities/clarisa-levers/clarisa-levers.module';
 import { SyncProcessLogModule } from '../../../entities/sync-process-log/sync-process-log.module';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
+import { ResultOpenSearchModule } from '../results/result.opensearch.module';
 import { DuplicateResolutionRunner } from '../../../shared/services/duplicate-resolution-runner.service';
 import { StarRelationshipService } from '../../../shared/services/star-relationship.service';
 import { PrmsRepository } from './repositories/prms.repository';
@@ -25,6 +26,7 @@ import { PrmsRepository } from './repositories/prms.repository';
   imports: [
     HttpModule,
     ResultsModule,
+    ResultOpenSearchModule,
     ResultKnowledgeProductModule,
     PooledFundingContractsModule,
     ClarisaLeversModule,

@@ -17,6 +17,8 @@ import {
   DuplicateRowOutcomeRecord,
 } from '../../entities/results/entities/result-duplicate-resolution-log.entity';
 import { ResultDuplicateResolutionLogService } from '../../entities/results/result-duplicate-resolution-log.service';
+import { OpenSearchResultApi } from '../../tools/open-search/results/result.opensearch.api';
+import { ElasticOperationEnum } from '../../tools/open-search/dto/elastic-operation.dto';
 
 /** `app_config` key gating destructive execution. */
 export const HARD_DELETE_ENABLED_KEY =
@@ -83,6 +85,7 @@ export class DuplicateResolutionRunner {
     private readonly queryService: QueryService,
     private readonly starRelationships: StarRelationshipService,
     private readonly auditLog: ResultDuplicateResolutionLogService,
+    private readonly openSearchResults: OpenSearchResultApi,
   ) {}
 
   /**
@@ -204,6 +207,9 @@ export class DuplicateResolutionRunner {
           const anyDeleted = results.some(
             (outcome) => outcome.status === ResultDeleteStatus.DELETED,
           );
+          if (anyDeleted) {
+            await this.removeFromSearchIndex(plan.targetIds);
+          }
           finalOutcomes[index] = {
             ...finalOutcomes[index],
             outcome: anyDeleted
@@ -266,6 +272,30 @@ export class DuplicateResolutionRunner {
         `Could not read ${HARD_DELETE_ENABLED_KEY}; hard deletion stays disabled.`,
       );
       return false;
+    }
+  }
+
+  /**
+   * Removes deleted results from the search index.
+   *
+   * Without this the search surface keeps returning a `result_id` that no longer
+   * exists — a phantom worse than the duplicate it replaced. A failure here is
+   * logged and does NOT change the row's outcome: the database is the system of
+   * record, and a stale index is repaired by a reindex, so reporting the deletion
+   * as failed would be the wrong signal.
+   */
+  private async removeFromSearchIndex(resultIds: number[]): Promise<void> {
+    for (const resultId of resultIds) {
+      try {
+        await this.openSearchResults.uploadSingleToOpenSearch(
+          { result_id: resultId } as never,
+          ElasticOperationEnum.DELETE,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Result ${resultId} was deleted but could not be removed from the search index: ${(error as Error).message}. A reindex will repair it.`,
+        );
+      }
     }
   }
 

@@ -24,6 +24,7 @@ const build = (options: {
   protectedIds?: number[];
   deleteStatus?: ResultDeleteStatus;
   deleteThrows?: boolean;
+  openSearchThrows?: boolean;
 }) => {
   order.length = 0;
 
@@ -84,13 +85,29 @@ const build = (options: {
     logNotableOutcomes: jest.fn(),
   };
 
+  const openSearchResults = {
+    uploadSingleToOpenSearch: jest.fn(async () => {
+      order.push('opensearch');
+      if (options.openSearchThrows) throw new Error('index unavailable');
+      return undefined;
+    }),
+  };
+
   const runner = new DuplicateResolutionRunner(
     dataSource,
     queryService as never,
     starRelationships as never,
     auditLog as never,
+    openSearchResults as never,
   );
-  return { runner, queryService, starRelationships, auditLog, dataSource };
+  return {
+    runner,
+    queryService,
+    starRelationships,
+    auditLog,
+    dataSource,
+    openSearchResults,
+  };
 };
 
 const participant = (
@@ -147,7 +164,13 @@ describe('DuplicateResolutionRunner — order is the safety property', () => {
 
     await runner.applyGroup(input());
 
-    expect(order).toEqual(['guard', 'audit', 'delete']);
+    expect(order).toEqual([
+      'guard',
+      'audit',
+      'delete',
+      'opensearch',
+      'opensearch',
+    ]);
   });
 
   it('guards the whole expanded family, not the loser seed row', async () => {
@@ -298,6 +321,35 @@ describe('DuplicateResolutionRunner — failures are recorded, never rethrown', 
         expect.objectContaining({ outcome: DuplicateRowOutcome.FAILED }),
       ]),
     );
+  });
+});
+
+describe('DuplicateResolutionRunner — search index removal', () => {
+  it('removes every deleted family member from the index', async () => {
+    // Otherwise search keeps returning a result_id that no longer exists — a
+    // phantom worse than the duplicate it replaced.
+    const { runner, openSearchResults } = build({});
+
+    await runner.applyGroup(input());
+
+    expect(openSearchResults.uploadSingleToOpenSearch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not touch the index when nothing was deleted', async () => {
+    const { runner, openSearchResults } = build({ hardDelete: 'false' });
+    await runner.applyGroup(input());
+    expect(openSearchResults.uploadSingleToOpenSearch).not.toHaveBeenCalled();
+  });
+
+  it('still reports the row DELETED when index removal fails', async () => {
+    // The database is the system of record; a stale index is repaired by a
+    // reindex. Reporting the deletion as failed would be the wrong signal.
+    const { runner } = build({ openSearchThrows: true });
+
+    const report = await runner.applyGroup(input());
+
+    expect(report.deleted).toBe(1);
+    expect(report.failed).toBe(0);
   });
 });
 

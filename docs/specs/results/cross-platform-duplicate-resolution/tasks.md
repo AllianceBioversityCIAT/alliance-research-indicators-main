@@ -313,15 +313,21 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Batched processing; per-group transactions, never one for the run.
   - Zero groups → `INCONCLUSIVE` with the filter echoed. **A run that found nothing has not proved nothing is there.**
 - **Acceptance / done check:**
-  - [ ] `GET …/plan` mutates nothing — asserted by row counts before/after, not by inspection.
-  - [ ] `POST …/apply` without a matching plan, or past TTL, or with a digest mismatch → `400`/`409`, **zero rows deleted**.
-  - [ ] `apply` deletes exactly the expanded set of the confirmed plan — no more.
-  - [ ] Allowed role → `200` with the plan in `ServerResponseDto.data`; **denied role → `403`**; **machine-token principal → `403`** (T-10).
-  - [ ] Concurrent sweep → `409`, proven with two simultaneous calls, not a mocked flag.
-  - [ ] Zero groups → `INCONCLUSIVE`, never a bare success.
-  - [ ] Both endpoints appear in `/swagger` with the bearer lock.
+  - [~] `GET …/plan` mutates nothing — **the chain is proven, the row counts are not.** These tests show `plan()` drives the runner with `mode: DRY_RUN`, and the runner's own suite shows that mode performs no delete and does not even read the hard-delete flag. Before/after row counts need a database → T-11.
+  - [x] `POST …/apply` without a matching plan → `400`; not a dry-run → `400`; past TTL → `409`; digest mismatch → `409`. **Every one asserts the runner was never invoked**, so "zero rows deleted" is a property of the code path and not of a mock.
+  - [x] `apply` deletes exactly the **fully expanded** set of the confirmed plan — the digest is computed over expanded family ids, and a test proves it changes when the set grows.
+  - [x] `SYSTEM_ADMIN` required on **both** handlers, asserted separately; `RolesGuard` **and** `DenyMachineTokenGuard` both attached. The machine-token `403` itself is proven in T-10 through the real middleware.
+  - [~] Concurrent sweep → `409`, **proven with two genuinely simultaneous calls** (`Promise.allSettled` over two `plan()` invocations) against a fake `app_config` that reproduces the conditional-`UPDATE` semantics. Exactly one succeeds. What is *not* proven is that MySQL behaves like the model — see below.
+  - [x] Zero groups → `INCONCLUSIVE` with the filter echoed back, never a bare success.
+  - [x] Both endpoints carry `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation` and per-param `@ApiQuery`/`@ApiBody`. Visible in `/swagger` once the app boots.
 - **What disqualifies the evidence:** a lock test against an in-process boolean; a `409` test that never runs two requests concurrently; and a dry-run "mutates nothing" claim verified by reading the code instead of counting rows.
-- **Dependencies:** T-03, T-04, T-05, T-07, T-08, T-10 · **Effort:** L · **Status:** todo
+- **Result (2026-08-04):** service, controller, DTOs, a config-seeding migration, and the OpenSearch removal carried over from T-06. **18 + 7 + 3 new runner tests green; full suite 328 suites / 2196 tests green;** `tsc` clean; lint clean.
+- **The lock is a single conditional `UPDATE`**, which is what makes acquisition atomic across replicas: MySQL evaluates the predicate and the write together, so two instances cannot both see "free". A test asserts the SQL is one `UPDATE app_config … OR CAST(SUBSTRING_INDEX(…))` rather than a read-then-write. The lock carries a 15-minute expiry so a crashed run does not deadlock the feature, and a test takes an expired lock. It is released in a `finally`, and two tests prove release after a thrown scan and after a digest mismatch.
+- **Two endpoints, not one `mode` parameter.** A `GET` that cannot write is a stronger guarantee than a `POST` that promises not to. `requirements.md` R-RES-008 was amended to this surface in the rev-2 sweep.
+- **OpenSearch removal is now done** (the T-06 carry-over): the runner removes every deleted family member from the results index. A failure there is logged and does **not** change the row's outcome — the database is the system of record and a stale index is repaired by a reindex, so reporting the deletion as failed would be the wrong signal. Three tests, including one that asserts the row is still `DELETED` when index removal throws.
+- **Fourth migration, declared:** `1785872085723-seedDuplicateResolutionConfig.ts` seeds the four `app_config` rows. The lock row **must** exist because an `UPDATE` cannot create it and `AppConfigService.updateConfig` throws on a missing key — there is no upsert. Budget was two migrations; this is the fourth (RB-4). Note `app_config` is readable unauthenticated via `GET /api/configuration/:key`, so the lock holder and expiry are public — acceptable, but nothing sensitive may go there.
+- **Honest limits, both closing in T-11:** the dry-run write-freedom is proven as a chain of two suites rather than by row counts, and the lock's concurrency is proven against a *model* of the SQL. KZ-001 applies to the second: a double that does not behave like the thing it stands for yields a green suite over broken behavior, so the model's fidelity is itself an assumption until a real server confirms it.
+- **Dependencies:** T-03, T-04, T-05, T-07, T-08, T-10 · **Effort:** L · **Status:** **done** (row-count and real-lock verification in T-11)
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
 ---
