@@ -4,6 +4,8 @@ import { DataSource } from 'typeorm';
 import { SaveResultService } from './save-all-sections.service';
 import { ResultsService } from '../../entities/results/results.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
+import { DuplicateCandidateRepository } from '../../entities/results/repositories/duplicate-candidate.repository';
+import { DuplicateResolutionRunner } from './duplicate-resolution-runner.service';
 import { QueryService } from '../utils/query.service';
 import { CurrentUserUtil } from '../utils/current-user.util';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
@@ -28,6 +30,8 @@ describe('SaveResultService', () => {
   let resultsService: jest.Mocked<ResultsService>;
   let knowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
   let queryService: jest.Mocked<QueryService>;
+  let duplicateCandidates: any;
+  let resolutionRunner: any;
   let currentUser: jest.Mocked<CurrentUserUtil>;
 
   const minimalResultDto = (): ExternalMappersDto => {
@@ -122,7 +126,26 @@ describe('SaveResultService', () => {
         {
           provide: QueryService,
           useValue: {
-            deleteFullResultById: jest.fn().mockResolvedValue(undefined),
+            deleteFullResultById: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: DuplicateCandidateRepository,
+          useValue: {
+            findCandidatesForIncoming: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: DuplicateResolutionRunner,
+          useValue: {
+            applyGroup: jest.fn().mockResolvedValue({
+              auditRecordId: 1,
+              outcomes: [],
+              deleted: 0,
+              protectedRows: 0,
+              failed: 0,
+              hardDeleteEnabled: true,
+            }),
           },
         },
         {
@@ -139,6 +162,8 @@ describe('SaveResultService', () => {
     resultsService = module.get(ResultsService);
     knowledgeProductService = module.get(ResultKnowledgeProductService);
     queryService = module.get(QueryService);
+    duplicateCandidates = module.get(DuplicateCandidateRepository);
+    resolutionRunner = module.get(DuplicateResolutionRunner);
     currentUser = module.get(CurrentUserUtil);
   });
 
@@ -510,101 +535,160 @@ describe('SaveResultService', () => {
     });
   });
 
-  describe('duplicateResultValidation', () => {
-    it('should omit PRMS when TIP duplicate exists for the same public link', async () => {
-      resultRepoHandle.find.mockResolvedValue([
-        {
-          result_id: 99,
-          platform_code: ReportingPlatformEnum.TIP,
-          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-        },
-      ]);
-
-      const result = await service.duplicateResultValidation({
-        platformCode: ReportingPlatformEnum.PRMS,
-        publicLink: 'https://example.org/doc',
-        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-        reportYearId: 2024,
-      });
-
-      expect(result.shouldOmit).toBe(true);
-      expect(result.resultsToDelete).toEqual([]);
-      expect(resultRepoHandle.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            public_link: 'https://example.org/doc',
-          }),
-        }),
-      );
+  describe('buildDuplicateGroup', () => {
+    const candidate = (
+      resultId: number,
+      platformCode: ReportingPlatformEnum,
+      indicatorId: IndicatorsEnum,
+    ) => ({
+      resultId,
+      resultOfficialCode: resultId * 10,
+      platformCode,
+      indicatorId,
+      reportYearId: 2024,
+      rawPublicLink: 'https://example.org/doc',
+      normalizedPublicLink: 'example.org/doc',
     });
 
-    it('should mark PRMS duplicate for deletion when incoming TIP wins', async () => {
-      resultRepoHandle.find.mockResolvedValue([
-        {
-          result_id: 88,
-          platform_code: ReportingPlatformEnum.PRMS,
-          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-        },
-      ]);
-
-      const result = await service.duplicateResultValidation({
-        platformCode: ReportingPlatformEnum.TIP,
-        publicLink: 'https://example.org/doc',
-        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-        reportYearId: 2024,
-      });
-
-      expect(result.shouldOmit).toBe(false);
-      expect(result.resultsToDelete).toEqual([88]);
-    });
-
-    it('should skip deduplication when only external_link would match', async () => {
-      const result = await service.duplicateResultValidation({
-        platformCode: ReportingPlatformEnum.TIP,
+    it('skips deduplication entirely when there is no public link', async () => {
+      const group = await service.buildDuplicateGroup({
         publicLink: null,
-        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
         reportYearId: 2024,
+        platformCode: ReportingPlatformEnum.TIP,
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
       });
 
-      expect(result).toEqual({
-        shouldOmit: false,
-        resultsToDelete: [],
-        protectedFromDeletion: [],
-      });
-      expect(resultRepoHandle.find).not.toHaveBeenCalled();
+      expect(group.resolution).toBeNull();
+      expect(group.incomingIsLoser).toBe(false);
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
     });
 
-    it('should protect duplicates referenced in link_results.other_result_id', async () => {
-      resultRepoHandle.find.mockResolvedValue([
-        {
-          result_id: 77,
-          platform_code: ReportingPlatformEnum.PRMS,
-          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-        },
+    it('collapses the incoming payload and findResult into ONE participant', async () => {
+      // Counting them separately put two same-platform rows in the group for one
+      // physical row and fired the ambiguity branch on every routine re-sync.
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        candidate(
+          5,
+          ReportingPlatformEnum.TIP,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        ),
+        candidate(
+          6,
+          ReportingPlatformEnum.AICCRA,
+          IndicatorsEnum.INNOVATION_DEV,
+        ),
       ]);
-      linkResultRepoHandle.find.mockResolvedValue([{ other_result_id: 77 }]);
 
-      const result = await service.duplicateResultValidation({
-        platformCode: ReportingPlatformEnum.TIP,
+      const group = await service.buildDuplicateGroup({
         publicLink: 'https://example.org/doc',
-        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
         reportYearId: 2024,
+        platformCode: ReportingPlatformEnum.TIP,
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        findResult: { result_id: 5, result_official_code: 50 } as any,
       });
 
-      expect(result.resultsToDelete).toEqual([]);
-      expect(result.protectedFromDeletion).toEqual([77]);
+      expect(group.participants).toHaveLength(2);
+      expect(
+        group.participants.filter((p: any) => p.resultId === 5),
+      ).toHaveLength(1);
+      // The participant carries the stored id with the incoming platform/indicator.
+      expect(group.participants[0]).toMatchObject({
+        resultId: 5,
+        platformCode: ReportingPlatformEnum.TIP,
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      });
+    });
+
+    it('marks the incoming row a loser when a higher-priority duplicate is stored', async () => {
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        candidate(
+          99,
+          ReportingPlatformEnum.TIP,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        ),
+      ]);
+
+      const group = await service.buildDuplicateGroup({
+        publicLink: 'https://example.org/doc',
+        reportYearId: 2024,
+        platformCode: ReportingPlatformEnum.PRMS,
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      });
+
+      expect(group.incomingIsLoser).toBe(true);
+      expect(group.resolution!.winner!.resultId).toBe(99);
+    });
+
+    it('carries the stored losing row into the resolution when the incoming row wins', async () => {
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        candidate(
+          88,
+          ReportingPlatformEnum.PRMS,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        ),
+      ]);
+
+      const group = await service.buildDuplicateGroup({
+        publicLink: 'https://example.org/doc',
+        reportYearId: 2024,
+        platformCode: ReportingPlatformEnum.TIP,
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      });
+
+      expect(group.incomingIsLoser).toBe(false);
+      expect(group.resolution!.losers.map((l: any) => l.resultId)).toEqual([
+        88,
+      ]);
+    });
+
+    it('produces no deletable losers for a contradictory group', async () => {
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        candidate(
+          70,
+          ReportingPlatformEnum.AICCRA,
+          IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+        ),
+        candidate(
+          71,
+          ReportingPlatformEnum.TIP,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        ),
+      ]);
+
+      const group = await service.buildDuplicateGroup({
+        publicLink: 'https://example.org/doc',
+        reportYearId: 2024,
+        platformCode: ReportingPlatformEnum.TIP,
+        indicatorId: IndicatorsEnum.INNOVATION_DEV,
+      });
+
+      expect(group.resolution!.classification).toBe('UNRESOLVED_CONFLICT');
+      expect(group.resolution!.losers).toEqual([]);
+      expect(group.incomingIsLoser).toBe(false);
     });
   });
 
   describe('saveAllSections duplicate handling', () => {
-    it('should skip PRMS save when a higher-priority duplicate exists', async () => {
+    const storedCandidate = (
+      resultId: number,
+      platformCode: ReportingPlatformEnum,
+      indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT,
+    ) => ({
+      resultId,
+      resultOfficialCode: resultId * 10,
+      platformCode,
+      indicatorId,
+      reportYearId: 2024,
+      rawPublicLink: 'https://example.org/doc',
+      normalizedPublicLink: 'example.org/doc',
+    });
+
+    it('skips the save and counts an omission when a higher-priority duplicate exists', async () => {
       resultRepoHandle.findOne.mockResolvedValue(null);
-      resultRepoHandle.find.mockResolvedValue([
-        {
-          result_id: 55,
-          platform_code: ReportingPlatformEnum.TIP,
-          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-        },
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(55, ReportingPlatformEnum.TIP),
       ]);
       const counters = new CounterResults();
       const dto = minimalResultDto();
@@ -614,10 +698,165 @@ describe('SaveResultService', () => {
 
       expect(resultsService.createResult).not.toHaveBeenCalled();
       expect(counters[CounterResultsEnum.CREATED]).toBe(0);
+      // Previously an omission was counted nowhere, so the reported bug could look
+      // handled while the duplicate survived.
+      expect(counters[CounterResultsEnum.OMITTED_DUPLICATE]).toBe(1);
       expect(currentUser.clearSystemUser).toHaveBeenCalled();
     });
 
-    it('should not deduplicate when incoming row has only external_link', async () => {
+    it("REGRESSION: submits the losing row's OWN stored family for deletion", async () => {
+      // The reported bug. A stored PRMS row for link L loses to TIP; on every
+      // later PRMS sync the old code excluded it from candidates and returned, so
+      // the duplicate survived forever while OMITTED_DUPLICATE made it look
+      // handled. Red before the fix.
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 500,
+        result_official_code: 7001,
+      });
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(500, ReportingPlatformEnum.PRMS),
+        storedCandidate(600, ReportingPlatformEnum.TIP),
+      ]);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, prmsExtraData(counters));
+
+      expect(counters[CounterResultsEnum.OMITTED_DUPLICATE]).toBe(1);
+      expect(resolutionRunner.applyGroup).toHaveBeenCalledTimes(1);
+      const applied = resolutionRunner.applyGroup.mock.calls[0][0];
+      expect(applied.resolution.losers.map((l: any) => l.resultId)).toEqual([
+        500,
+      ]);
+      expect(applied.resolution.winner.resultId).toBe(600);
+    });
+
+    it('REGRESSION: never hands the group winner to the deletion loop', async () => {
+      // Because the incoming payload and findResult are one participant, a stored
+      // row that prevails cannot be scheduled for deletion. The previous design
+      // keyed on "incoming is not the winner" and deleted findResult regardless.
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 700,
+        result_official_code: 7002,
+      });
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(700, ReportingPlatformEnum.TIP),
+        storedCandidate(
+          800,
+          ReportingPlatformEnum.AICCRA,
+          IndicatorsEnum.INNOVATION_DEV,
+        ),
+      ]);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, tipExtraData(counters));
+
+      const applied = resolutionRunner.applyGroup.mock.calls[0][0];
+      expect(applied.resolution.winner.resultId).toBe(700);
+      expect(
+        applied.resolution.losers.map((l: any) => l.resultId),
+      ).not.toContain(700);
+      expect(applied.resolution.losers.map((l: any) => l.resultId)).toEqual([
+        800,
+      ]);
+      expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('resolves a routine re-sync normally rather than declining it as same-system', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 900,
+        result_official_code: 7003,
+      });
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(900, ReportingPlatformEnum.TIP),
+        storedCandidate(901, ReportingPlatformEnum.PRMS),
+      ]);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, tipExtraData(counters));
+
+      const applied = resolutionRunner.applyGroup.mock.calls[0][0];
+      expect(applied.resolution.classification).toBe('RESOLVED');
+      expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+      expect(counters[CounterResultsEnum.OMITTED_DUPLICATE]).toBe(0);
+    });
+
+    it('runs the deletion step only AFTER the winner is written', async () => {
+      const order: string[] = [];
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockImplementation(async () => {
+        order.push('create');
+        return { result_id: 10, result_official_code: 7004 } as any;
+      });
+      resolutionRunner.applyGroup.mockImplementation(async () => {
+        order.push('delete');
+        return {
+          auditRecordId: 1,
+          outcomes: [],
+          deleted: 1,
+          protectedRows: 0,
+          failed: 0,
+          hardDeleteEnabled: true,
+        };
+      });
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(1000, ReportingPlatformEnum.PRMS),
+      ]);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, tipExtraData(new CounterResults()));
+
+      expect(order).toEqual(['create', 'delete']);
+    });
+
+    it('a throwing deletion step leaves the winner stored and does not roll it back', async () => {
+      // The catch in saveAllSections deletes the result it just created. A
+      // duplicate-cleanup failure must never reach it.
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 11,
+        result_official_code: 7005,
+      } as any);
+      resolutionRunner.applyGroup.mockRejectedValue(
+        new Error('audit write failed'),
+      );
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(1100, ReportingPlatformEnum.PRMS),
+      ]);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, tipExtraData(counters));
+
+      expect(counters[CounterResultsEnum.CREATED]).toBe(1);
+      expect(counters[CounterResultsEnum.ERROR]).toBe(0);
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+    });
+
+    it('does not run the deletion step when the save failed', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockRejectedValue(new Error('boom'));
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(1200, ReportingPlatformEnum.PRMS),
+      ]);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, tipExtraData(counters));
+
+      expect(counters[CounterResultsEnum.ERROR]).toBe(1);
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
+    });
+
+    it('does not deduplicate when the incoming row has only external_link', async () => {
       resultRepoHandle.findOne.mockResolvedValue(null);
       const counters = new CounterResults();
       const dto = minimalResultDto();
@@ -630,8 +869,11 @@ describe('SaveResultService', () => {
 
       await service.saveAllSections(dto, tipExtraData(counters));
 
-      expect(resultRepoHandle.find).not.toHaveBeenCalled();
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
       expect(resultsService.createResult).toHaveBeenCalled();
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
     });
   });
 

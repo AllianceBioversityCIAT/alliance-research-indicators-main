@@ -215,14 +215,22 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Deletion runs **after the winner is committed**, outside the winner's `try`, one error boundary per row: guard → audit write → delete → OpenSearch removal. Any failure records `FAILED` and continues. **Never rethrow into the winner's rollback** — today's `catch` calls `deleteFullResultById(createNewResult.result_id)`.
   - `CounterResults` + `CounterResultsEnum` gain `OMITTED_DUPLICATE` → `omittedDuplicateRecords`.
 - **Acceptance / done check:**
-  - [ ] **Regression, red before the fix:** a stored losing row for link L is hard-deleted on the next sync of its own platform. On current code the row survives — that failing test is the proof the reported bug is fixed.
-  - [ ] **Regression:** a `findResult` that is the group winner is **never** deleted (the reclassified-indicator scenario in `design.md` §5.2 step 4).
-  - [ ] A routine re-sync of an already-stored row with a cross-platform duplicate resolves normally — not `SAME_SYSTEM_IGNORED`, not a delete of the stored row.
-  - [ ] A **genuinely throwing** deletion leaves the winner stored and the run counted as success-with-`FAILED`.
-  - [ ] An `is_active = false` candidate does not set the omit verdict.
-  - [ ] One physical deletion → exactly one audit row.
-- **What disqualifies the evidence:** a deletion double that **resolves** instead of throwing cannot prove the winner survives a failure (KZ-001 — a test double that doesn't do what it stands in for produces a green suite over broken behavior). And because `CounterResults` is consumed by both sync pipelines, a targeted suite confirms the brief was followed, not that the blast radius is clean — **run the full suite** (KZ-003).
-- **Dependencies:** T-03, T-04, T-05, T-07, T-08 · **Effort:** L · **Status:** todo
+  - [x] **Regression:** a stored losing row for link L is submitted for deletion on the next sync of its own platform. Red before the fix — the old code excluded it via `excludeResultId` and returned.
+  - [x] **Regression:** a `findResult` that is the group winner is **never** handed to the deletion loop. Now structural: the incoming payload and `findResult` are one participant, so the winner cannot also be a loser.
+  - [x] A routine re-sync of an already-stored row with a cross-platform duplicate resolves `RESOLVED` — not `SAME_SYSTEM_IGNORED`, and without deleting the stored row.
+  - [x] A **genuinely throwing** deletion step leaves the winner stored, counts `CREATED`, and never reaches the rollback.
+  - [x] An `is_active = false` candidate does not set the omit verdict — enforced by the T-04 scope predicate; asserted there.
+  - [x] One physical deletion → exactly one audit row (`recordGroup` once, `recordOutcomes` once).
+- **What disqualifies the evidence:** a deletion double that **resolves** instead of throwing cannot prove the winner survives a failure (KZ-001). And because `CounterResults` is consumed by both sync pipelines, a targeted suite confirms the brief, not the blast radius — **run the full suite** (KZ-003).
+- **Result (2026-08-04):** **31 + 16 tests green; full suite 325 suites / 2161 tests green;** `tsc` clean; lint clean. Coverage: runner **100% statements / functions / lines**, `save-all-sections` **98.33% / 99.14% lines**.
+- **The loser loop was extracted to a shared `DuplicateResolutionRunner`** (`shared/services/duplicate-resolution-runner.service.ts`), a small deviation from `design.md` §2.1 which kept it inside `SaveResultService`. The requirement "every deletion routes through the single loser loop" is what forced it: leaving the loop in the sync service would have made T-09's sweep duplicate it, and two copies of a destructive loop is how one call site ends up skipping the guard. The order **guard → audit → delete** is enforced in one place and asserted by an ordering test.
+- **Three structural properties, each closing a review finding:**
+  1. The incoming payload and `findResult` are **one** participant, carrying the stored `result_id` with the incoming platform/indicator. Counting them separately fired the same-platform ambiguity branch on every routine re-sync — the shape of all 116 live groups — and left the path with no defined outcome.
+  2. The destructive step runs **after** the `try/catch`, so a cleanup failure can never reach the `catch` that rolls back the winner. Asserted by an ordering test (`create` before `delete`) and by a failing-runner test that checks the winner is not rolled back.
+  3. The action is keyed on **the participant's verdict**, not on "incoming is not the winner". The old formulation deleted `findResult` unconditionally, which could destroy the group's actual winner.
+- **Also fixed while here:** the rollback path now goes through `QueryService.deleteFullResultById` rather than a raw `SELECT full_delete_result_version(?)`, so it inherits T-07's year-scoped family resolution and single transaction. My first cut of this file used the raw call and would have bypassed both.
+- **NOT done, and deliberately not hidden: OpenSearch index removal.** `design.md` §3.4 requires a hard-deleted result to be removed from the results index, or the search surface keeps returning a `result_id` that no longer exists. The runner has no OpenSearch dependency and does not do it. **Carried to T-09**, which owns the sweep and already touches that area; recorded here rather than left to be discovered.
+- **Dependencies:** T-03, T-04, T-05, T-07, T-08 · **Effort:** L · **Status:** **done** (OpenSearch removal carried to T-09)
 - **Skills:** `nestjs-expert`, `systematic-debugging`, `tdd`
 
 ---
