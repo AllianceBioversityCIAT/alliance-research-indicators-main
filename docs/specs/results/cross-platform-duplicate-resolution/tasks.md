@@ -97,10 +97,15 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - `result_pool_funding_indicator_mapping` also needs its **cross-result** columns cleared (`result_capacity_sharing_id`, `result_knowledge_product_id`, `result_policy_change_id`, `result_innovation_dev_id`), not only its owning `result_id` — otherwise a surviving pool-funding result keeps a reference to a deleted sub-row.
   - `down()` restores the T-01 dumped definition verbatim.
 - **Acceptance / done check:**
-  - [ ] `npm run migration:dev:execute` applies cleanly; `npm run migration:revert` restores the dumped definition byte-for-byte.
-  - [ ] Every table in T-01's uncovered set appears in the new body.
+  - [ ] `npm run migration:dev:execute` applies cleanly; `npm run migration:revert` restores the dumped definition byte-for-byte. — **BLOCKED, awaiting a human decision** (see below)
+  - [x] Every table in T-01's uncovered set appears in the new body — verified in the **stored** definition, not just the source file.
 - **What disqualifies the evidence:** a clean apply proves the SQL parses, **not** that coverage is complete — only T-11's seeded e2e proves that. Do not mark done on the migration running.
-- **Dependencies:** T-01 · **Effort:** M · **Status:** todo
+- **Progress (2026-08-04):** migration written at `src/db/migrations/1785866413438-completeFullDeleteResultVersion.ts`, generated from the **live** function body so `down()` restores it verbatim and `up()` cannot drift through transcription. Verified: TypeScript compiles clean; four generator self-checks pass (presence, placement before `DELETE FROM results`, mapping-before-`result_knowledge_products`, `_sp`-before-parent); and the SQL was **executed under a temporary function name** against the real schema — it parsed, every table and column resolved, the stored definition carried **44** DELETE targets (up from 35) with all 9 additions present, the temporary function was dropped, and `full_delete_result_version` was never touched.
+- **Two deviations from `design.md` §3.2, both recorded there:**
+  1. The cross-result columns of `result_pool_funding_indicator_mapping` are **not** cleared. Those rows belong to a surviving result; nulling them strips that result's indicator link. T-05 protects instead, and an untouched FK fails loudly if the guard has a gap.
+  2. **`result_pool_funding_alignment_sp` was added** — a transitive dependency (75 rows, `NO ACTION`) that does not reference `results`, so T-01's one-level inventory did not name it and the live function omitted it. **Completing the function needs the transitive closure of the FK graph.** T-11's seed must cover the transitive set.
+- **Blocked on:** applying and reverting against the **shared** dev database. `CLAUDE.md` makes schema operations there a human decision, and a mid-flight failure between `DROP FUNCTION` and `CREATE FUNCTION` would leave every caller of the delete path broken. The `TEST` datasource is on a different host and is unreachable from this environment, so it cannot stand in. **Needs either an explicit go-ahead on dev, or a reachable TEST/local database.**
+- **Dependencies:** T-01 · **Effort:** M · **Status:** **blocked** (implementation complete and validated; execution gated)
 - **Skills:** `nestjs-expert`
 
 ---

@@ -222,7 +222,12 @@ Additions, in FK-dependency order before the `results` row:
 
 **Method obligation.** The table list must be re-derived from `information_schema` at implementation time, not from this list and **never from a TypeORM entity walk** — `result_cap_sharing_ip` has no entity, which is exactly why rev 1 missed it. The query is in `docs/specs/results/cross-platform-duplicate-resolution/` task notes. Verification is an e2e hard delete of a fully-populated seeded result on the `TEST` datasource.
 
-`result_pool_funding_indicator_mapping` also needs its **cross-result** columns cleared (`result_capacity_sharing_id`, `result_knowledge_product_id`, `result_policy_change_id`, `result_innovation_dev_id`), not only its owning `result_id` — otherwise a surviving pool-funding result keeps a reference to a deleted sub-row. The table is empty today; the ordering must be right before it is not.
+**Amended during T-02 — the cross-result columns are deliberately NOT cleared.** This section originally required clearing `result_pool_funding_indicator_mapping`'s `result_capacity_sharing_id` / `result_knowledge_product_id` / `result_policy_change_id` / `result_innovation_dev_id` alongside its owning `result_id`. Implementation showed that to be the wrong call: those rows belong to a **different, surviving** result, all four columns are nullable, and nulling them would silently strip that result's indicator link — the row's entire purpose. T-05 treats a cross-result reference as **protecting**, so the state should never be reached; and if the guard ever has a gap, the untouched FK raises errno 1451 and fails **loudly**. On an irreversible path a loud failure beats silent mutation of someone else's data. Only the owning direction is deleted.
+
+**Ordering discovered in T-02, and it is load-bearing:**
+
+- `result_pool_funding_indicator_mapping` (owning direction) must be deleted **before** the sub-table deletes, because it holds FKs into `result_capacity_sharing`, `result_knowledge_products`, `result_policy_change` and `result_innovation_dev` — all of which the function deletes early. Placing it late would make those earlier statements raise errno 1451.
+- **`result_pool_funding_alignment_sp` must be deleted before its parent `result_pool_funding_alignment`.** It is a **transitive** dependency (75 rows, `ON DELETE NO ACTION`) that does **not** reference `results`, so T-01's one-level inventory correctly does not name it, and it was absent from the live function. **Method refinement: completing the delete function needs the transitive closure of the FK graph, not one level of it.** T-11's seed must cover the transitive set, not just T-01's table list.
 
 ### 3.3 `result_duplicate_resolution_log`
 
