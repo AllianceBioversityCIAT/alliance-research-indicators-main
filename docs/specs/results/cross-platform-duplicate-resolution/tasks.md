@@ -239,13 +239,24 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Read the family set **inside** the transaction (`FOR UPDATE`) — a concurrent `SP_versioning` snapshot created between read and delete is orphaned, the exact permanent-invisibility failure this task prevents.
   - Inspect the function's **return value**: it returns `FALSE` rather than raising when the row is absent, so a no-op would otherwise be audited as `DELETED`.
 - **Acceptance / done check:**
-  - [ ] Family expansion never crosses `report_year_id`.
-  - [ ] A forced failure on the second family member rolls the whole family back — the live row is still present.
-  - [ ] Snapshots are deleted before the live row.
-  - [ ] A `FALSE` return is recorded as `NOOP`, never `DELETED`.
-  - [ ] Each of the four existing callers has a stated decision and a test naming it.
+  - [x] Family expansion never crosses `report_year_id` — asserted over a **constructed** multi-year family, plus a NULL-year case so a NULL seed cannot sweep in rows that have a year.
+  - [~] A forced failure on the second family member rolls the whole family back — **the propagation is asserted** (the error leaves the `transaction` callback, which is what makes TypeORM roll back, and no further member is attempted). **Whether MySQL actually rolls the DML back needs a database — T-11.**
+  - [x] Snapshots are deleted before the live row.
+  - [x] A `FALSE` return is recorded as `NOOP`, never `DELETED` — plus NULL and empty-result-set cases.
+  - [x] Each of the four existing callers has a stated decision and a test naming it.
 - **What disqualifies the evidence:** measured 0 multi-year families today, so a passing suite over current data proves nothing about the year scope — the test must **construct** a multi-year family.
-- **Dependencies:** T-02 · **Effort:** M · **Status:** todo
+- **Result (2026-08-04):** **24 tests green; full suite 323 suites / 2122 tests green;** `tsc` clean; lint clean; coverage **98.11% statements / 100% lines / 100% functions / 85.18% branches** (the remainder are default-parameter branches).
+- **Blast-radius decision, per caller.** Year scoping is a **fix for all four**, not a regression in three: every caller wants "this row and its versions", never "every year of this official code". One test names each call site.
+  | Caller | Intent | Verdict |
+  | --- | --- | --- |
+  | `results.service.ts` bulk `delete-results-by-parameters` | the operator selected specific rows | narrowing correct — expanding across years deletes rows they did not select |
+  | `results.service.ts` AI-report rollback | undo what this pass created | narrowing correct |
+  | `prms.opensearch.service.ts` sync rollback | undo what this pass created | narrowing correct |
+  | `save-all-sections.service.ts` winner rollback | undo what this pass created | narrowing correct — its own lookup already keys on `report_year_id` |
+- **An unverified assumption, made visible instead of silent.** Year scoping assumes a snapshot carries its live row's `report_year_id`. **I could not verify that** (the database went unreachable), and if it were false the scope would *exclude* snapshots and leave the orphans this task exists to prevent. So `resolveResultDeleteScope` returns `siblingIdsOutsideReportYear` — the rows year scoping excluded — which goes on the audit record. **A non-empty list on a live seed is the tripwire:** it either shows a legitimate other-year row, or reveals that snapshots are stored under a different year, in which case stop and re-derive rather than delete. Confirm in T-11 with a seeded multi-year family.
+- **Also fixed:** `deleteLogicalResultById` / `deleteFullResultById` now return `ResultDeleteOutcome[]` instead of `void`. Existing callers ignore the value, so this is additive, and it is what lets T-08 record `NOOP` rather than reporting a deletion that did not happen.
+- **A misleading test caught in this task:** one case was named "treats a missing return value as NOOP" while asserting `DELETED`, and passed because the *mock* substituted `1` for `undefined`. It was testing the fixture, not the service. Replaced with explicit NULL and empty-result-set cases that exercise the real fallback.
+- **Dependencies:** T-02 · **Effort:** M · **Status:** **done** (rollback behavior confirmed in T-11)
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
 
 ---
