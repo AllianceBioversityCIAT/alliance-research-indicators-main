@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -213,6 +214,26 @@ export class ResultStatusWorkflowService {
     );
   }
 
+  // @sdd-spec docs/specs/results-center/external-results-readonly-view — R-RC-012
+  //
+  // Guard against status changes on results synced from an external platform
+  // (TIP/PRMS/AICCRA). The transactional Result.update() below unconditionally
+  // bumps Result.updated_at (TypeORM @UpdateDateColumn), which this same spec
+  // repurposes as the "last synced" date on external results (R-RC-008) —
+  // letting an unrelated status transition slip through would silently
+  // invalidate that display. A missing/empty platform_code is treated as
+  // STAR (matches the client's isExternalResult convention), so this does
+  // not change behavior for STAR results.
+  private _assertStarSourceWritable(
+    platformCode: string | null | undefined,
+  ): void {
+    if (platformCode && platformCode !== 'STAR') {
+      throw new ConflictException(
+        'Status changes are not permitted for results synced from an external platform',
+      );
+    }
+  }
+
   async changeStatus(
     resultId: number,
     toStatusId: number,
@@ -227,6 +248,8 @@ export class ResultStatusWorkflowService {
     if (!result) {
       throw new NotFoundException('Result not found');
     }
+
+    this._assertStarSourceWritable(result.platform_code);
 
     const transitionStatus = await this.dataSource
       .getRepository(ResultStatusWorkflow)

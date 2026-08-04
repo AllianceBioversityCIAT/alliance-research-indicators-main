@@ -8,6 +8,7 @@ import { GetInstitutionsService } from '@shared/services/control-list/get-instit
 import { GetInstitutionTypesService } from '@shared/services/control-list/get-institution-types.service';
 import { GetClarisaInstitutionsSubTypesService } from '@shared/services/get-clarisa-institutions-subtypes.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
+import { CacheService } from '@shared/services/cache/cache.service';
 import { CheckboxChangeEvent } from 'primeng/checkbox';
 
 describe('OrganizationItemComponent', () => {
@@ -19,6 +20,7 @@ describe('OrganizationItemComponent', () => {
   let institutionTypesService: jest.Mocked<GetInstitutionTypesService>;
   let subTypesService: jest.Mocked<GetClarisaInstitutionsSubTypesService>;
   let allModalsService: jest.Mocked<AllModalsService>;
+  let cacheService: jest.Mocked<CacheService>;
 
   const createInstitution = (partial?: Partial<InstitutionType>): InstitutionType => {
     return Object.assign(new InstitutionType(), partial);
@@ -58,6 +60,11 @@ describe('OrganizationItemComponent', () => {
       // @ts-expect-error - partial mock
     } as jest.Mocked<AllModalsService>;
 
+    const mockCacheService: jest.Mocked<CacheService> = {
+      isExternalResult: jest.fn().mockReturnValue(false)
+      // @ts-expect-error - partial mock
+    } as jest.Mocked<CacheService>;
+
     await TestBed.configureTestingModule({
       imports: [OrganizationItemComponent],
       providers: [
@@ -65,7 +72,8 @@ describe('OrganizationItemComponent', () => {
         { provide: GetInstitutionsService, useValue: mockInstitutionsService },
         { provide: GetInstitutionTypesService, useValue: mockInstitutionTypesService },
         { provide: GetClarisaInstitutionsSubTypesService, useValue: mockSubTypesService },
-        { provide: AllModalsService, useValue: mockAllModalsService }
+        { provide: AllModalsService, useValue: mockAllModalsService },
+        { provide: CacheService, useValue: mockCacheService }
       ]
     }).compileComponents();
 
@@ -77,6 +85,7 @@ describe('OrganizationItemComponent', () => {
     institutionTypesService = TestBed.inject(GetInstitutionTypesService) as jest.Mocked<GetInstitutionTypesService>;
     subTypesService = TestBed.inject(GetClarisaInstitutionsSubTypesService) as jest.Mocked<GetClarisaInstitutionsSubTypesService>;
     allModalsService = TestBed.inject(AllModalsService) as jest.Mocked<AllModalsService>;
+    cacheService = TestBed.inject(CacheService) as jest.Mocked<CacheService>;
 
     // Default inputs
     component.index = 0;
@@ -328,6 +337,24 @@ describe('OrganizationItemComponent', () => {
 
     it('should set section and open modal', () => {
       component.setSectionAndOpenModal('Partners');
+      expect(allModalsService.setPartnerRequestSection).toHaveBeenCalledWith('Partners');
+      expect(allModalsService.openModal).toHaveBeenCalledWith('requestPartner');
+    });
+
+    it('should not open the modal for an external result', () => {
+      cacheService.isExternalResult.mockReturnValue(true);
+
+      component.setSectionAndOpenModal('Partners');
+
+      expect(allModalsService.setPartnerRequestSection).not.toHaveBeenCalled();
+      expect(allModalsService.openModal).not.toHaveBeenCalled();
+    });
+
+    it('should still open the modal for a STAR result', () => {
+      cacheService.isExternalResult.mockReturnValue(false);
+
+      component.setSectionAndOpenModal('Partners');
+
       expect(allModalsService.setPartnerRequestSection).toHaveBeenCalledWith('Partners');
       expect(allModalsService.openModal).toHaveBeenCalledWith('requestPartner');
     });

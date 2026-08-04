@@ -47,7 +47,11 @@ function getYearFromUrl(router: Router): string | null {
 function getPlatformFromUrl(router: Router): string | null {
   const url = router.url;
 
-  const platformAlternation = [PLATFORM_CODES.PRMS, PLATFORM_CODES.STAR, PLATFORM_CODES.TIP]
+  // Derive from PLATFORM_CODES rather than listing codes here: a hardcoded subset
+  // silently omitted AICCRA, so /result/AICCRA-123 matched neither this regex nor the
+  // numeric fallback below, no reportingPlatforms param was sent, and the server fell
+  // back to platform_code='STAR' — surfacing as "Result not found" on every service.
+  const platformAlternation = Object.values(PLATFORM_CODES)
     .map(code => code.replace(/[-/\\^$*+?.()|[\]{}]/g, ''))
     .join('|');
   const platformRegex = new RegExp(`result/(${platformAlternation})-(\\d+)`);

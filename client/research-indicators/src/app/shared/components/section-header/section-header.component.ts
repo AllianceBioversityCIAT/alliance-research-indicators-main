@@ -55,6 +55,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   private currentResult = signal<{ title?: string; project_id?: string }>({});
   private currentResultId = signal('');
   showDeleteOption = computed(() => {
+    if (this.cache.isExternalResult()) return false;
     const statusId = this.cache.currentMetadata()?.status_id;
     return statusId === 5 || statusId === 7 || (statusId === 4 && this.cache.isMyResult()) || this.rolesService.isAdmin();
   });
@@ -77,6 +78,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
           confirmCallback: {
             label: 'Delete result',
             event: () => {
+              if (this.cache.isExternalResult()) return;
               (async () => {
                 this.actions.showGlobalAlert({
                   severity: 'processing',

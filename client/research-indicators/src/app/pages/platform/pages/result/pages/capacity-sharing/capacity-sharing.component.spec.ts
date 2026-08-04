@@ -69,6 +69,7 @@ class CacheServiceMock {
   hasSmallScreen = jest.fn().mockReturnValue(false);
   isSidebarCollapsed = jest.fn().mockReturnValue(false);
   loadingCurrentResult = { set: jest.fn() };
+  isExternalResult = jest.fn().mockReturnValue(false);
 }
 
 const activatedRouteMock = {
@@ -363,6 +364,24 @@ describe('CapacitySharingComponent', () => {
     });
 
     it('setSectionAndOpenModal should set section and open modal', () => {
+      component.setSectionAndOpenModal('Capacity Sharing');
+
+      expect(allModalsService.setPartnerRequestSection).toHaveBeenCalledWith('Capacity Sharing');
+      expect(allModalsService.openModal).toHaveBeenCalledWith('requestPartner');
+    });
+
+    it('setSectionAndOpenModal should not open the modal for an external result (covers both template call sites, since they share this method)', () => {
+      (component.cache as unknown as CacheServiceMock).isExternalResult.mockReturnValue(true);
+
+      component.setSectionAndOpenModal('Capacity Sharing');
+
+      expect(allModalsService.setPartnerRequestSection).not.toHaveBeenCalled();
+      expect(allModalsService.openModal).not.toHaveBeenCalled();
+    });
+
+    it('setSectionAndOpenModal should still open the modal for a STAR result', () => {
+      (component.cache as unknown as CacheServiceMock).isExternalResult.mockReturnValue(false);
+
       component.setSectionAndOpenModal('Capacity Sharing');
 
       expect(allModalsService.setPartnerRequestSection).toHaveBeenCalledWith('Capacity Sharing');

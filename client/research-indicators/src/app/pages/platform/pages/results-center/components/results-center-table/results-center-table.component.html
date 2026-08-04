@@ -198,7 +198,7 @@
             @let visibleYears = versions.slice(0, showMoreCount > 0 ? 3 : maxVisible);
 
             @if (count > 0) {
-            <div (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()"
+            <div data-version-link (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()"
               class="flex flex-wrap items-center gap-2 py-1">
               @for (year of visibleYears; track year) {
               <span (keydown.enter)="openResultByYear(result.result_official_code, year, result.platform_code)"
