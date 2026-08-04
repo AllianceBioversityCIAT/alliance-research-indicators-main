@@ -185,13 +185,19 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Evaluate for **every** id in the resolved deletion target set, not just the loser's seed — family expansion adds ids the guard would otherwise never see.
   - Inactive STAR links: behavior is **gated on OQ-7**. Implement the protecting branch behind a config-read so the decision is a flip, not a rewrite.
 - **Acceptance / done check:**
-  - [ ] STAR link via `other_result_id` → protected. STAR link via `result_id` → protected (currently unchecked).
-  - [ ] Mirror-to-mirror link → **not** protected.
-  - [ ] A `project_indicators_results` reference → protected.
-  - [ ] A STAR link on an **expanded family sibling** protects the whole family.
-  - [ ] Measured baseline: 19 dedup-scope rows are STAR-referenced via `other_result_id`; a run reporting 0 protected rows over live data is a red flag, not a success.
+  - [x] STAR link via `other_result_id` → protected. STAR link via `result_id` → protected (the direction never checked before).
+  - [x] Mirror-to-mirror link → **not** protected — the counterpart is constrained to `STAR` in both queries, asserted structurally including that the two directions join on **opposite** columns.
+  - [x] A `project_indicators_results` reference → protected.
+  - [x] A STAR link on an **expanded family sibling** protects the whole family.
+  - [~] Measured baseline of 19 STAR-referenced rows — **the query shape was validated against live data** during the T-01/design measurements (19 via `other_result_id`, 0 via `result_id`, 7 inactive), and the shipped queries use that same join shape, but **the shipped code itself has not been run against a database.** Confirmed by the T-12 dry-run.
 - **What disqualifies the evidence:** unit tests alone. Over-protection and under-protection both pass a mocked repository; the 19-row live baseline in the T-12 dry-run is what confirms the query shape.
-- **Dependencies:** T-01 · **Effort:** M · **Status:** todo
+- **Result (2026-08-04):** `star-relationship.service.ts` + spec. **17 tests green; full suite 323 suites / 2109 tests green;** `tsc` clean; lint clean; coverage **100% statements / branches / functions / lines**. Registered in both modules that provide `SaveResultService` so T-06 can inject it.
+- **Design notes:**
+  - `is_active` is **not** filtered in SQL. Both active and inactive links are returned and the flag decides, which keeps inactive links visible in the audit record and makes the OQ-7 decision a **config flip rather than a query change**. A test asserts the SQL contains no `is_active =`.
+  - **The OQ-7 default protects inactive links**, which is deliberately *more* conservative than R-RES-004 as written (active links only). While OQ-7 is open the default errs toward retaining: a soft-deleted STAR link is recoverable today and would stop being so, and under-deletion is the recoverable error. A missing config row protects; an unreadable config protects. **R-RES-004 should be amended when OQ-7 closes.**
+  - `inactiveLinkOnlyResultIds` isolates exactly the rows whose fate changes when OQ-7 resolves — a row that also has an active link is excluded, because the decision does not affect it.
+  - `project_indicators_results` is queried raw: it has no TypeORM entity and appears in no migration, existing only in the live schema. Being `ON DELETE CASCADE` it raises no error, which makes it the quietest data-loss path in the feature.
+- **Dependencies:** T-01 · **Effort:** M · **Status:** **done**
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
 
 ---

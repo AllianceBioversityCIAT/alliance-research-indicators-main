@@ -10,6 +10,7 @@ import { ResultKnowledgeProductModule } from '../../entities/result-knowledge-pr
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
 import { SyncProcessLogModule } from '../../entities/sync-process-log/sync-process-log.module';
 import { SaveResultService } from '../../shared/services/save-all-sections.service';
+import { StarRelationshipService } from '../../shared/services/star-relationship.service';
 import { PrmsOpenSearchModule } from '../open-search/prms/prms.opensearch.module';
 import { ClarisaSdgsModule } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.module';
 
@@ -30,6 +31,7 @@ import { ClarisaSdgsModule } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs
     TipIntegrationService,
     TipIntegrationRepository,
     SaveResultService,
+    StarRelationshipService,
   ],
   exports: [TipIntegrationRepository, TipIntegrationService],
 })
