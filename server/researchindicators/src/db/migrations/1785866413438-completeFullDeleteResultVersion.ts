@@ -44,7 +44,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * shows the SQL parses. It is the seeded end-to-end delete in T-11, whose seed
  * must cover T-01's full enumeration.
  */
-export class CompleteFullDeleteResultVersion1785866413438 implements MigrationInterface {
+export class CompleteFullDeleteResultVersion1785866413438
+  implements MigrationInterface
+{
   name = 'CompleteFullDeleteResultVersion1785866413438';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

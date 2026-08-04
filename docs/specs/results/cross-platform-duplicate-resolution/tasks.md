@@ -122,13 +122,21 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Same-platform survivors leave **those rows** untouched while still deleting a cross-platform row that lost to every survivor.
   - Return the deciding `result_id` alongside the rule — R-RES-009 AC.1 and the audit schema both require it.
 - **Acceptance / done check:**
-  - [ ] `{AICCRA CS, TIP KP, TIP non-KP}` → `UNRESOLVED_CONFLICT`, `toDelete` **empty**.
-  - [ ] `{AICCRA CS, AICCRA non-CS, TIP KP}` → `UNRESOLVED_CONFLICT`, `toDelete` **empty**.
-  - [ ] `{TIP, AICCRA non-CS}` → AICCRA is the only loser. `{AICCRA CS, TIP KP}` → TIP KP is the only loser.
-  - [ ] Same-platform-only group → no winner, no loser, no omission.
-  - [ ] Every case asserts the **complete partition**, and every case is re-run over a permuted participant array with an identical result (R-RES-002 AC.7).
+  - [x] `{AICCRA CS, TIP KP, TIP non-KP}` → `UNRESOLVED_CONFLICT`, `toDelete` **empty**.
+  - [x] `{AICCRA CS, AICCRA non-CS, TIP KP}` → `UNRESOLVED_CONFLICT`, `toDelete` **empty**.
+  - [x] `{TIP, AICCRA non-CS}` → AICCRA is the only loser. `{AICCRA CS, TIP KP}` → TIP KP is the only loser.
+  - [x] Same-platform-only group → no winner, no loser, no omission.
+  - [x] Every case asserts the **complete partition**, and every case is re-run over a permuted participant array with an identical result (R-RES-002 AC.7).
 - **What disqualifies the evidence:** a test that asserts only which row survives, or only that one named row is untouched. **That exact shape let this defect ship twice.** A (platform × indicator) member matrix is also insufficient — the defect needs three rows, so the matrix must enumerate *compositions*.
-- **Dependencies:** none · **Effort:** M · **Status:** todo
+- **Result (2026-08-04):** **42 tests, all green. Full suite 321 suites / 2076 tests green** (KZ-003 — this util is consumed by `SaveResultService`, which both sync pipelines use). `tsc` clean. Coverage **100% statements / 100% functions / 100% lines / 98.41% branches**.
+- **The algorithm changed during implementation.** `design.md` §5.1 specified the consistency gate as "a row that wins one pair and loses another". Tracing it showed that is **wrong**: in `{AICCRA CS, PRMS KP, TIP KP}` the order AICCRA > TIP > PRMS is a consistent total order in which TIP legitimately wins one pair and loses another, so that gate would have **refused a perfectly resolvable group**. The correct formulation is two separate gates, both implemented and tested:
+  - **Gate A (R-RES-005):** a losing row that shares a platform with a survivor cannot be deleted — that would "correct" a same-system duplicate.
+  - **Gate B (consistency):** no deletable row may beat a row that is kept. Deleting X while keeping Y when an approved rule says X prevails over Y is the actual contradiction.
+  Verified: both judge-reported compositions now delete nothing, and `{AICCRA CS, PRMS KP, TIP KP}` still resolves cleanly to AICCRA.
+- **API note:** the partition is `losers` ⊎ `untouched`, disjoint and complete; `survivors` is an informational subset of `untouched`. Every test asserts the partition covers each participant exactly once, which is what caught an early overlap in this design.
+- **Uncovered branch, declared:** one defensive branch (a winner that won no pair) is unreachable with the current rules — it would require a cycle among losers, and the platform-based rules are acyclic. Documented rather than covered with a contrived test.
+- **Back-compat:** `resolveDuplicateWinner` and `evaluateDuplicateResults` are retained as thin adapters over the group resolver so `SaveResultService` keeps compiling until T-06. They now **inherit both gates**, so the legacy path can no longer destroy a prevailing row either. Two legacy expectations inverted because Rule 3 narrowed to Knowledge Product (OQ-1) and are marked `(OQ-1)` in the spec.
+- **Dependencies:** none · **Effort:** M · **Status:** **done**
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---
