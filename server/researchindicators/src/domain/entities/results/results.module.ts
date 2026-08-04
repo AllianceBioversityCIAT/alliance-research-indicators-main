@@ -2,6 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import { ResultsController } from './results.controller';
 import { ResultRepository } from './repositories/result.repository';
+import { DuplicateCandidateRepository } from './repositories/duplicate-candidate.repository';
 import { ResultKeywordsModule } from '../result-keywords/result-keywords.module';
 import { ResultLeversModule } from '../result-levers/result-levers.module';
 import { ResultContractsModule } from '../result-contracts/result-contracts.module';
@@ -91,9 +92,10 @@ import { AiReportsModule } from '../ai-reports/ai-reports.module';
   providers: [
     ResultsService,
     ResultRepository,
+    DuplicateCandidateRepository,
     AiRoarMiningApp,
     AlianceManagementApp,
   ],
-  exports: [ResultsService, ResultRepository],
+  exports: [ResultsService, ResultRepository, DuplicateCandidateRepository],
 })
 export class ResultsModule {}

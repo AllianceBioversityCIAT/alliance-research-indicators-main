@@ -152,12 +152,23 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Candidates: `is_active = TRUE`, `is_snapshot = FALSE`, `platform_code IN (PRMS, TIP, AICCRA)`, non-empty normalized link. Prefer `COALESCE(is_snapshot, FALSE)` — both columns are nullable with no DB default, and a single NULL silently shrinks the candidate set.
   - Sync path filters to the incoming `report_year_id`; the sweep does not, and classifies multi-year groups `CROSS_YEAR_REVIEW`.
 - **Acceptance / done check:**
-  - [ ] Links differing only by scheme / `www.` / trailing slash / `dx.doi.org` / surrounding whitespace **match**.
-  - [ ] Links differing only in **path case** or in a non-empty query parameter do **not** match (this fails without the explicit collation).
-  - [ ] `is_active = false` and `is_snapshot = true` rows are never candidates.
-  - [ ] Same-`platform_code` rows are never returned as cross-platform candidates.
+  - [~] Links differing only by scheme / `www.` / trailing slash / `dx.doi.org` / surrounding whitespace **match** — **pending, needs a reachable database.**
+  - [~] Links differing only in **path case** or in a non-empty query parameter do **not** match — **pending, needs a reachable database.**
+  - [x] `is_active = false` and `is_snapshot = true` rows are never candidates — asserted structurally, including `COALESCE` on both nullable flags.
+  - [x] Same-`platform_code` rows are never returned as cross-platform candidates — the grouping requires `COUNT(DISTINCT platform_code) > 1`.
 - **What disqualifies the evidence:** a spec that asserts normalization symmetry but never asserts a **case-differing pair does not match** — that is the one assertion the collation defect fails, and it is invisible to every other test.
-- **Dependencies:** none · **Effort:** M · **Status:** todo
+- **Progress (2026-08-04):** `public-link-normalizer.util.ts` (the single normalization expression + scope predicate), `duplicate-candidate.repository.ts` (sync lookup, sweep group scan, batched member fetch), registered in `ResultsModule`. **16 structural tests green; full suite 322 suites / 2092 tests green; `tsc` clean.**
+- **Design refinement:** the normalization lives in a shared util rather than inside the repository (`design.md` §2.1 placed it in the repository), following the `pool-funding.util.ts` precedent for a shared SQL fragment whose whole purpose is that it "never drifts between callers". Symmetry is now **structural**: the same expression is applied to the stored column and the bound parameter, so there is no second implementation and no TypeScript normalizer at all — the audit record takes the SQL-computed key.
+- **Two real defects the structural tests caught in my own first implementation:**
+  1. **Operand blow-up to 1,728 repetitions.** Built from nested `IF`/`RIGHT`/`LEFT`, every step re-embedded its input several times and multiplied: a SQL string hundreds of kilobytes long needing 1,728 bound parameters per query. Rebuilt on `REGEXP_REPLACE` and `TRIM(TRAILING …)`, which take their argument once — now **4** operand uses. A regression test caps it at 8.
+  2. **A literal `?` in the SQL.** `IN ('?', '#')` and the regex quantifiers in `https?://` / `(www\.)?` each put a literal `?` into the SQL text, and mysql2 does not reliably skip `?` inside quoted SQL — it would consume them as bind placeholders and **silently shift every subsequent parameter**. Replaced with `CHAR(63)`/`CHAR(35)` and alternation. A test now asserts the expression contains no `?` at all.
+- **Blocked on:** the two behavioral criteria. A 16-case adversarial table (plus a negative control proving the collation is load-bearing) ran green against the live dev database earlier — **but that was against the pre-rewrite expression, so the result does not transfer.** The database became unreachable (`ETIMEDOUT`, private-range host — likely a VPN drop) before the rewritten expression could be re-verified. The gate is preserved as a runnable script, `verify-normalization.js`, next to `fk-inventory.gen.js`:
+  ```
+  cd server/researchindicators && node -r ts-node/register/transpile-only \
+    ../../docs/specs/results/cross-platform-duplicate-resolution/verify-normalization.js
+  ```
+  It exits non-zero on any failure, so it can gate CI. The standing assertion still belongs in T-11.
+- **Dependencies:** none · **Effort:** M · **Status:** **blocked** (implementation and structural tests complete; behavioral verification pending connectivity)
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 ---
