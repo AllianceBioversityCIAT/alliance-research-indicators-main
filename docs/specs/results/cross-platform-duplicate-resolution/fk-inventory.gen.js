@@ -13,21 +13,27 @@ const fs = require('fs');
 const OUT =
   require('path').join(__dirname, 'fk-inventory.md');
 
-// Figures recorded in design.md §0.3, for divergence reporting only — never as the answer.
+/**
+ * Figures for divergence reporting only — never the answer.
+ *
+ * These are the POST-FIX expectations, valid once migration
+ * 1785866413438-completeFullDeleteResultVersion has been applied. The pre-fix
+ * baseline that motivated it was 35 DELETE targets and 7 uncovered NO ACTION
+ * tables (bulk_upload_results, result_cap_sharing_ip, result_review_history, the
+ * three result_pool_funding_*, temp_result_ai); that state is preserved in git at
+ * commit fa4d5839 and narrated in tasks.md T-01/T-02.
+ *
+ * `project_indicators_results` is expected to stay uncovered permanently: it is
+ * the one ON DELETE CASCADE foreign key, and D-dup-16 treats it as a PROTECTING
+ * relationship rather than a deletion target — a hard delete would silently
+ * destroy rows the soft delete preserved.
+ */
 const EXPECTED = {
   fks: 38,
   noAction: 37,
   cascade: 1,
-  fnTargets: 35,
-  uncoveredNoAction: [
-    'bulk_upload_results',
-    'result_cap_sharing_ip',
-    'result_pool_funding_alignment',
-    'result_pool_funding_indicator_mapping',
-    'result_pool_funding_toc_alignment',
-    'result_review_history',
-    'temp_result_ai',
-  ],
+  fnTargets: 44,
+  uncoveredNoAction: [],
 };
 
 (async () => {

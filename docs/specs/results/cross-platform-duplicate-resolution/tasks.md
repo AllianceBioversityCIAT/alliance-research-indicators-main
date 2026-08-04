@@ -97,15 +97,16 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - `result_pool_funding_indicator_mapping` also needs its **cross-result** columns cleared (`result_capacity_sharing_id`, `result_knowledge_product_id`, `result_policy_change_id`, `result_innovation_dev_id`), not only its owning `result_id` — otherwise a surviving pool-funding result keeps a reference to a deleted sub-row.
   - `down()` restores the T-01 dumped definition verbatim.
 - **Acceptance / done check:**
-  - [ ] `npm run migration:dev:execute` applies cleanly; `npm run migration:revert` restores the dumped definition byte-for-byte. — **BLOCKED, awaiting a human decision** (see below)
+  - [x] `npm run migration:dev:execute` applies cleanly; `npm run migration:revert` restores the dumped definition byte-for-byte. **Verified by a full round trip on dev (2026-08-04):** function body 7,295 → 8,851 on apply, back to **7,295** on revert, 8,851 again on re-apply, with the audit table, counter column and config rows disappearing and returning alongside. A backout path that has never been executed is not a backout path.
   - [x] Every table in T-01's uncovered set appears in the new body — verified in the **stored** definition, not just the source file.
 - **What disqualifies the evidence:** a clean apply proves the SQL parses, **not** that coverage is complete — only T-11's seeded e2e proves that. Do not mark done on the migration running.
 - **Progress (2026-08-04):** migration written at `src/db/migrations/1785866413438-completeFullDeleteResultVersion.ts`, generated from the **live** function body so `down()` restores it verbatim and `up()` cannot drift through transcription. Verified: TypeScript compiles clean; four generator self-checks pass (presence, placement before `DELETE FROM results`, mapping-before-`result_knowledge_products`, `_sp`-before-parent); and the SQL was **executed under a temporary function name** against the real schema — it parsed, every table and column resolved, the stored definition carried **44** DELETE targets (up from 35) with all 9 additions present, the temporary function was dropped, and `full_delete_result_version` was never touched.
 - **Two deviations from `design.md` §3.2, both recorded there:**
   1. The cross-result columns of `result_pool_funding_indicator_mapping` are **not** cleared. Those rows belong to a surviving result; nulling them strips that result's indicator link. T-05 protects instead, and an untouched FK fails loudly if the guard has a gap.
   2. **`result_pool_funding_alignment_sp` was added** — a transitive dependency (75 rows, `NO ACTION`) that does not reference `results`, so T-01's one-level inventory did not name it and the live function omitted it. **Completing the function needs the transitive closure of the FK graph.** T-11's seed must cover the transitive set.
-- **Blocked on:** applying and reverting against the **shared** dev database. `CLAUDE.md` makes schema operations there a human decision, and a mid-flight failure between `DROP FUNCTION` and `CREATE FUNCTION` would leave every caller of the delete path broken. The `TEST` datasource is on a different host and is unreachable from this environment, so it cannot stand in. **Needs either an explicit go-ahead on dev, or a reachable TEST/local database.**
-- **Dependencies:** T-01 · **Effort:** M · **Status:** **blocked** (implementation complete and validated; execution gated)
+- **Applied 2026-08-04** with `npm run migration:dev:execute`, on the owner's instruction. Before applying, the migration's `down()` body was confirmed **byte-identical** to the live definition (7,295 chars, DEFINER-stripped), so the rollback was exact rather than approximate.
+- **Post-apply state, measured:** **44** DELETE targets (was 35); all 9 additions present; **zero** `NO ACTION` FK tables remain uncovered. `project_indicators_results` stays uncovered **by design** — it is the one `CASCADE` FK and D-dup-16 treats it as a protecting relationship, not a deletion target. `fk-inventory.md` was regenerated against the post-fix schema and reports no divergence.
+- **Dependencies:** T-01 · **Effort:** M · **Status:** **done**
 - **Skills:** `nestjs-expert`
 
 ---
@@ -152,8 +153,8 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - Candidates: `is_active = TRUE`, `is_snapshot = FALSE`, `platform_code IN (PRMS, TIP, AICCRA)`, non-empty normalized link. Prefer `COALESCE(is_snapshot, FALSE)` — both columns are nullable with no DB default, and a single NULL silently shrinks the candidate set.
   - Sync path filters to the incoming `report_year_id`; the sweep does not, and classifies multi-year groups `CROSS_YEAR_REVIEW`.
 - **Acceptance / done check:**
-  - [~] Links differing only by scheme / `www.` / trailing slash / `dx.doi.org` / surrounding whitespace **match** — **pending, needs a reachable database.**
-  - [~] Links differing only in **path case** or in a non-empty query parameter do **not** match — **pending, needs a reachable database.**
+  - [x] Links differing only by scheme / `www.` / trailing slash / `dx.doi.org` / surrounding whitespace **match** — verified against the live database, **12 of 12** match cases.
+  - [x] Links differing only in **path case** or in a non-empty query parameter do **not** match — verified, **6 of 6** differ cases, including an accented path and path case inside a handle.
   - [x] `is_active = false` and `is_snapshot = true` rows are never candidates — asserted structurally, including `COALESCE` on both nullable flags.
   - [x] Same-`platform_code` rows are never returned as cross-platform candidates — the grouping requires `COUNT(DISTINCT platform_code) > 1`.
 - **What disqualifies the evidence:** a spec that asserts normalization symmetry but never asserts a **case-differing pair does not match** — that is the one assertion the collation defect fails, and it is invisible to every other test.
@@ -162,13 +163,13 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
 - **Two real defects the structural tests caught in my own first implementation:**
   1. **Operand blow-up to 1,728 repetitions.** Built from nested `IF`/`RIGHT`/`LEFT`, every step re-embedded its input several times and multiplied: a SQL string hundreds of kilobytes long needing 1,728 bound parameters per query. Rebuilt on `REGEXP_REPLACE` and `TRIM(TRAILING …)`, which take their argument once — now **4** operand uses. A regression test caps it at 8.
   2. **A literal `?` in the SQL.** `IN ('?', '#')` and the regex quantifiers in `https?://` / `(www\.)?` each put a literal `?` into the SQL text, and mysql2 does not reliably skip `?` inside quoted SQL — it would consume them as bind placeholders and **silently shift every subsequent parameter**. Replaced with `CHAR(63)`/`CHAR(35)` and alternation. A test now asserts the expression contains no `?` at all.
-- **Blocked on:** the two behavioral criteria. A 16-case adversarial table (plus a negative control proving the collation is load-bearing) ran green against the live dev database earlier — **but that was against the pre-rewrite expression, so the result does not transfer.** The database became unreachable (`ETIMEDOUT`, private-range host — likely a VPN drop) before the rewritten expression could be re-verified. The gate is preserved as a runnable script, `verify-normalization.js`, next to `fk-inventory.gen.js`:
+- **Verified 2026-08-04 against the shipped expression** — the earlier 16-case run had been against the pre-rewrite version and did not transfer, so it was re-run once the database came back: **19 of 19 green**, including the **negative control**, which is the assertion that matters most. With `COLLATE utf8mb4_bin` the path-case pair differs; **with the collation stripped it matches** — proving the collation is load-bearing and not decorative, because without it two distinct publications would collapse into one group and one would be hard-deleted. The scan also returned exactly **116** cross-platform groups, matching the T-01 baseline. The gate stays runnable in one command:
   ```
   cd server/researchindicators && node -r ts-node/register/transpile-only \
     ../../docs/specs/results/cross-platform-duplicate-resolution/verify-normalization.js
   ```
   It exits non-zero on any failure, so it can gate CI. The standing assertion still belongs in T-11.
-- **Dependencies:** none · **Effort:** M · **Status:** **blocked** (implementation and structural tests complete; behavioral verification pending connectivity)
+- **Dependencies:** none · **Effort:** M · **Status:** **done**
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 ---
