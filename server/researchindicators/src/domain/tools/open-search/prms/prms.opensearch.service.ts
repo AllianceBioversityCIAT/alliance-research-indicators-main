@@ -247,21 +247,23 @@ export class PrmsOpenSearchService
         const response = await firstValueFrom(
           this.httpService.get<SearcherResponseDto>(prmsUrl),
         ).then((response) => response.data);
-        response.data.forEach(async (item) => {
-          await this.dataSource
-            .getRepository(SyncStagingRecordsEntity)
-            .save({
-              execution_code: executionCode,
-              code: parseInt(item.result_code),
-              year: parseInt(item.year),
-              data: item,
-            })
-            .catch((error) => {
-              this.logger.error(
-                `Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`,
-              );
-            });
-        });
+        await Promise.all(
+          response.data.map(async (item) => {
+            await this.dataSource
+              .getRepository(SyncStagingRecordsEntity)
+              .save({
+                execution_code: executionCode,
+                code: parseInt(item.result_code),
+                year: parseInt(item.year),
+                data: item,
+              })
+              .catch((error) => {
+                this.logger.error(
+                  `Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`,
+                );
+              });
+          }),
+        );
 
         if (page >= response.totalPages) {
           keepGoing = false;
