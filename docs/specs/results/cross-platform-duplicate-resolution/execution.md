@@ -353,3 +353,240 @@ So the coverage evidence is *strong but not conclusive*. **Only T-11's seeded de
 - T-11 remains `[~]`; its e2e must gain a case asserting a snapshot under a different year is not orphaned.
 - No TRD ADR is overturned — this is spec-level, so no superseding ADR is required.
 - **Nothing was deleted.** All validation was read-only except one delete inside a transaction that was rolled back and verified.
+
+---
+
+## T-13 — Attempt 1: Reviewer **FAIL** (2 lenses, both independently confirming the same 2 issues)
+
+- **Status:** `[~]` — **PIVOT**, not a rework. Attempts 2 and 3 were deliberately **not** spent (see the Pivot Record below).
+- **Date:** 2026-08-05
+- **Task:** T-13 — PRMS sync path: populate the payload handle and resolve incoming identity
+- **Implementer attempts:** 1
+- **Review mode:** parallel lens reviewers (effort `xhigh` + data-loss surface), 2 lenses: *spec conformance + correctness*, and *risk / data-loss + resilience*
+- **Skills assigned:** `nestjs-expert`, `systematic-debugging`, **`tdd`** — `tdd` added by the Leader over the task's list, because T-13's done-condition is itself red-green ("the D11 regression test fails on `main` and passes here")
+
+### Files changed in attempt 1 (uncommitted, left in the working tree)
+
+| File | Change |
+| --- | --- |
+| `tools/open-search/prms/prms.opensearch.service.ts` | `processData` now calls the previously-dead `processKnowledgeProduct` for KP items |
+| `tools/open-search/prms/dto/prms-response.dto.ts` | added `result_knowledge_product_array?: PrmsKnowledgeProductDto[]` to `ResultResponseMapper` (**not** in T-13's declared file list) |
+| `shared/utils/publication-identity.util.ts` | **new** — in-memory identity resolver (`normalizeIdentityCandidate`, `isHandleFormatIdentity`, `resolveIncomingPublicationIdentity`) |
+| `shared/services/save-all-sections.service.ts` | resolves identity via the util before building the duplicate group; refusal skips the check |
+| 3 spec files | `publication-identity.util.spec.ts` (new, 21 tests), `prms.opensearch.service.spec.ts` (+3), `save-all-sections.service.spec.ts` (+3, and **2 pre-existing tests rewritten**) |
+
+### Implementer verification evidence
+
+`npm test -- --silent` → **330 suites / 2253 tests passed** · `npx tsc --noEmit` clean · `npm run lint -- --quiet` clean. Coverage: `publication-identity.util.ts` 100% stmt / 80% branch · `save-all-sections.service.ts` 98.4% / 90.7% · `prms.opensearch.service.ts` 98.9% / 87.5%. Red-before-green claimed and reported confirmed for AC.10, the D11 regression, AC.9, AC.2.
+
+**The green suite is not the finding here.** Both defects below are invisible to it, and one of them is invisible *by construction* — which is the point.
+
+### Reviewer FAIL issue 1 — the mapper call is **not** inert, and the task's approval rested on that premise
+
+Both lenses independently traced it. `processKnowledgeProduct` writes **four** things, not the two the diff's comment enumerates: `body.external_link` (restored at `:406` ✔), `body.evidence` (the intended target ✔), and — unenumerated — **`body.knowledgeProduct`** with `type = knowledge_product_type` and `citation = handle` (`prms.opensearch.service.ts:279-280`).
+
+`result.knowledgeProduct` has a **live production reader on this same sync path**: `save-all-sections.service.ts:277-280` → `ResultKnowledgeProductService.update` → `UPDATE result_knowledge_products SET citation = ?, type = ?` (`result-knowledge-product.service.ts:34-48`). Before the diff the field was always `undefined` for PRMS, so `update` took the `isEmpty` read-only branch. After it, every PRMS KP sync issues that UPDATE.
+
+**Measured by the Leader on dev (read-only), confirming the reviewers exactly:**
+
+| `result_knowledge_products` | KP rows | `citation` populated |
+| --- | --- | --- |
+| TIP | 8,476 | **8,476** |
+| PRMS | **2,388** | **0** |
+
+So design §0.5's provenance baseline ("rows whose `result_knowledge_products.citation` is populated: 0 of 2,387") is **exact and still true today** — and the diff would destroy it on the next sync, overwriting `citation` on 2,388 PRMS rows with the handle and `type` with PRMS's raw string. That baseline is the evidence that the stored corpus did not come from this mapper, and it is the DC-10 discriminator `judgment.md` JD3-S-06 names as available-but-unused. Aggravator: the loop reuses one `ResultKnowledgeProduct`, so a multi-KP item persists only the **last** element's `type`/`citation` — the very shape R-RES-010 AC.9 refuses for the delete decision is still silently written here.
+
+- **Violated rule:** `tasks.md` §T-13 implementation notes ("The mapper change is **additive and inert** … changes no existing behaviour"); `design.md` §5.2 ("its blast radius is nil"); `requirements.md` R-RES-010 + OQ-12, which put new data writes out of scope.
+- Not a delete or index path (`ResultKnowledgeProduct` carries no `@OpenSearchProperty`), so the blast radius is a column overwrite, not row loss.
+
+### Reviewer FAIL issue 2 — AC.10's payload key was assumed, and it is **wrong**
+
+The diff added `result_knowledge_product_array` to `ResultResponseMapper` and asserted AC.10 against a fixture using that same key — the Implementer authored both sides, so the test could not discriminate. Both reviewers flagged it as uncorroborated and named the same alternative carrier (`ResultResponseMapper.evidences: EvidencesMapper[] {link, description}`, declared and read by nothing). Neither could corroborate the key from the repo.
+
+**The Leader resolved it against real data rather than spending a rework attempt on a guess.** See the Pivot Record.
+
+### ADVISORY (recorded, non-gating, and explicitly NOT new tasks)
+
+- **Drift:** the new TS `normalizeIdentityCandidate` is a second normalization implementation — the exact thing T-04 removed ("no second implementation and no TypeScript normalizer at all"). Three measured divergences from `normalizedPublicLinkSql`, **all failing toward under-detection**: MySQL `TRIM` strips ASCII space only vs JS `.trim()` stripping all Unicode whitespace; SQL strips *all* trailing `?`/`#` vs the TS regex stripping exactly one; `LOWER()` vs `toLowerCase()` differ on some non-ASCII hosts. T-15 owns the reconciliation, since it adds the SQL form beside it.
+- **Resilience:** the multi-handle refusal counts *evidence rows*, not *distinct normalized identities*, so two identical handles refuse a row that resolves to exactly one identity — the in-memory twin of the `DISTINCT` defect T-15 must fix on the stored side (JD3-S-04).
+- **Default-open:** `resolveIncomingPublicationIdentity`'s final branch treats any non-PRMS platform as "identity is `public_link`". Bounded today by the candidate query's `platform_code IN (PRMS, TIP, AICCRA)`, but an explicit allow-list would fail closed.
+- **Refusal has no durable trace** (only a `logger.warn`) — no AC requires one, and it is at parity with the resolver's own `UNRESOLVED_CONFLICT`. T-15 adds `identitySource`/`identityCount`; worth a decision there rather than an omission.
+- **Verified clean by the risk lens, for the record:** the refusal path is genuinely inert (zero candidate query, zero omission, zero deletion — traced to source, not to doubles); ordering leaves `public_link = pdf_link` / `external_link = prms_link` intact; **no uncovered branch is on a path that can delete a row**; all null/empty/malformed inputs fail closed; `hard_delete_enabled` defaults false and gates the sync path too, so neither issue is live data loss while the flag is off.
+- **Scope hygiene:** the two rewritten pre-existing tests were judged by the conformance lens to have **preserved and slightly strengthened** their discriminating power (both were PRMS+`public_link` fixtures the corrected rule makes structurally unresolvable, so a rewrite was unavoidable; assertions kept verbatim, fixture link changed to a non-matching value, and TIP/AICCRA `public_link` coverage was not collaterally lost). `prms-response.dto.ts` is edited but absent from T-13's declared file list.
+
+---
+
+## Pivot Record: T-13
+
+**The spec's prescribed fix is falsified. `design.md` §5.2 step 0, `requirements.md` R-RES-010 and `tasks.md` T-13 all state the remedy is "one call — `processData` must invoke `processKnowledgeProduct`". That call cannot produce a handle, because the field it reads does not exist on the PRMS wire payload.**
+
+This is the **fourth instance of this spec's recurring root cause** and it is one level up from rev 3's: rev 3 corrected a claim about a *method* (`processKnowledgeProduct` is never called) but inherited, unexamined, the assumption that the method reads a field the payload actually carries. Locally true, false on the path that runs.
+
+### Measured on dev, 2026-08-05, read-only (`SELECT` only, no DDL, no DML)
+
+Source: `sync_staging_records.data` — the PRMS searcher response stored **verbatim** (`prms.opensearch.service.ts:211-226`), i.e. the actual wire payload, 13,507 rows staged.
+
+| Measurement | Result |
+| --- | --- |
+| Staged rows carrying `result_knowledge_product_array` | **0 of 13,507** |
+| Staged rows carrying `evidences` | present |
+| Payload families sharing the table | **two** — the PRMS searcher family (5,868 rows, has `indicator_category`/`pdf_link`/`prms_link`) and the **TIP** family (7,639 rows: `id, doi, link, name, citation, collection, access_status, review_status, publication_date …`; `tip-integration.service.ts:141` writes the same table) |
+| Rows containing `hdl.handle.net` anywhere | 8,791 of 13,507 — overwhelmingly the **TIP** family |
+| **PRMS-family rows carrying a handle** | **1,152** |
+| …of those, handle located in `evidences[]` | **1,134** |
+| …in `pdf_link` | **0** |
+| …in `knowledge_product_summary` | **0** |
+| **PRMS-family staged rows with `indicator_category.code = 6` (`ResultTypeEnum.KNOWLEDGE_PRODUCT`)** | **0** — codes present are 5, 7, 8, 1, 2, 4 only (verified for code **6**, the payload's KP code; ARI's `IndicatorsEnum.KNOWLEDGE_PRODUCT = 3` is the post-homologation value) |
+| Stored live non-snapshot PRMS results with `indicator_id = 3` | **2,388** |
+
+### What this establishes, and what it does not
+
+**Established:** `result_knowledge_product_array` is not on the PRMS wire payload, in any of 13,507 real staged rows. Attempt 1 is therefore a **total silent no-op** — `isEmpty(undefined)` returns early, `dto.evidence` stays `undefined`, and PRMS resolves no identity — while the whole suite stays green, because the fixture supplies the field the wire does not. DC-7 verbatim, on the platform R-RES-010 exists for.
+
+**Established:** where handles *do* arrive in PRMS-family payloads, they are in **`evidences[]`** (1,134 of 1,152), never in `pdf_link`. `ResultResponseMapper` already declares `evidences: EvidencesMapper[] { link, description }` and **nothing reads it**. That is also the field that would make the two sides genuinely symmetric — the stored side reads `result_evidences.evidence_url`, so an incoming side reading `evidences[].link` is the same evidence concept rather than a parallel one.
+
+**NOT established, and this is the caveat that must not be smoothed over:** the staged snapshot contains **zero PRMS Knowledge Product rows**, so a PRMS *KP* payload has not been observed at all. The 1,152 handle-bearing PRMS rows are all non-KP — which is precisely DC-10's "a handle on a non-KP row is a citation, not this result's own publication" population. So `evidences[].link` is a **measured candidate, not a confirmed answer**, and adopting it without observing a real PRMS KP payload would repeat this spec's own failure mode a fifth time.
+
+Three readings of the zero-KP observation, which this data cannot separate: (a) PRMS does not send KP results through this endpoint at all; (b) this snapshot predates or filters KP; (c) KP rows were consumed and cleared (`deleteTemporalResults` truncates per run).
+
+**Consistent with the spec's own RB-9.** RB-9 already records that the 2,792-row stored PRMS evidence corpus has **no maintained writer** and came from a legacy bulk load. "The PRMS sync path has never carried handles" is exactly what that implies — the pivot corroborates a finding the spec already made and did not follow to its conclusion.
+
+### Consequences
+
+- **T-13 cannot be completed as specified.** Marked `[~]`. Attempts 2 and 3 deliberately unspent — rework cannot fix a wrong field name in the spec's own remedy.
+- **`apply` against real data remains blocked**, now by RB-7 *and* an unresolved T-13. Nothing changes for safety at rest: `hard_delete_enabled` defaults false.
+- **T-15 is unaffected and remains eligible** — it is the stored-side `UNION`, independent of T-13 (per the §2 dependency graph, they run in parallel; only T-12 needs both).
+- **Attempt 1's diff is uncommitted and left in the working tree**, carrying the confirmed Issue-1 data mutation. It must not be committed or synced from as-is.
+- No TRD ADR is overturned — this is spec-level.
+- **Nothing was written to any database.** All Leader verification was `SELECT` only.
+
+### Candidate directions — for the owner's decision, not chosen here
+
+1. **Map identity from `item.evidences[].link`**, filtered to handle-format, and drop `processKnowledgeProduct` from the plan entirely. Uses a declared, zero-reader field of the real payload; makes both sides read the same evidence concept; sidesteps Issue 1 completely (no `knowledgeProduct` write). **Requires first observing a real PRMS KP payload** to confirm the handle arrives there for KP rows.
+2. **Keep `processKnowledgeProduct` but isolate its writes** (restore `result.knowledgeProduct` after the call) *and* correct the field name to whatever a real KP payload carries. Preserves the spec's shape; still blocked on the same observation, and keeps a mapper whose parameter type is a raw DB record the searcher response is unlikely to embed.
+3. **Establish the KP payload first, then decide** — capture one live PRMS KP payload (`GET ${ARI_SEARCH_PRMS_URL}/result?size=1…` for a KP result, or read `sync_staging_records` mid-run during a sync that includes KP), record the observed keys in the spec, and pick 1 or 2 on evidence. This is the only option that does not guess.
+4. **Reconsider whether the sync path can carry PRMS identity at all.** If PRMS genuinely never sends KP results through this endpoint, R-RES-010's incoming side is unreachable by design and RB-7's premise changes: the sweep would be the only PRMS path, making OQ-12 (persist `dto.evidence`) load-bearing rather than deferred.
+
+**Recommendation:** direction 3 as the immediate next step, since 1, 2 and 4 all hinge on the same single unobserved fact, and this spec has now been wrong four times by reasoning about a payload instead of looking at one.
+
+### Pivot Record: T-13 — RESOLVED BY OBSERVATION (2026-08-05, live payload)
+
+The owner directed "observe the payload first". Done, read-only `GET` against `ARI_SEARCH_PRMS_URL` (the same URL `getData` builds at `prms.opensearch.service.ts:210`, no auth header, no writes). **The unobserved fact is now observed, and it decides the direction.**
+
+**First, a correction to the measurements above.** They tested `indicator_category.code = 3`. That was the wrong constant: the payload carries **`ResultTypeEnum`, where `KNOWLEDGE_PRODUCT = 6`**; `3` is ARI's `IndicatorsEnum` value *after* homologation (`homologation/indicator.homologation.ts:11`). Re-verified explicitly: **0 staged rows carry code 6** either, so every conclusion above stands unchanged — but the label was wrong and is corrected in place. Recorded because this spec's whole history is mislabelled fields, and an audit record that repeats the error is worthless.
+
+**The staging snapshot was simply unrepresentative.** Live page 1 is **49 of 50 KP items** — PRMS sends Knowledge Products through this endpoint abundantly. The staged corpus held non-KP runs, which is why KP looked absent. Reading absence of data as absence of the thing would have been a fifth instance of this spec's root cause.
+
+#### Measured over 400 live items (277 KP, 123 non-KP), 8 pages
+
+| Property | Result |
+| --- | --- |
+| `result_knowledge_product_array` present on a KP item | **absent** — attempt 1 was conclusively a no-op |
+| **`knowledge_product_summary.handle` present and non-empty** | **277 / 277** |
+| …matching the canonical handle format | **277 / 277** |
+| Distinct handle-format links in a KP's `evidences[]` | **exactly 1, on all 277** |
+| Evidence handle equals `knowledge_product_summary.handle` | **277 / 277** |
+| KP rows carrying an **extra** handle in `evidences[]` | **0** |
+| KP rows with no summary handle but an evidence handle | **0** |
+| **non-KP** rows carrying a handle-format link in `evidences[]` | **41 / 123 (33 %)** |
+| `pdf_link` in handle format | **0 / 400** |
+
+Observed KP shape (`result_code` 28731):
+
+```
+knowledge_product_summary: {"handle": "https://hdl.handle.net/10568/181394"}
+evidences:                 [{"link": "https://hdl.handle.net/10568/181394", "description": null}]
+pdf_link:                  "https://reporting.cgiar.org/reports/result-details/28731?phase=6"
+```
+
+#### What this determines
+
+**`knowledge_product_summary.handle` is the identity source, not `evidences[].link` and not `result_knowledge_product_array`.** Three reasons, each measured rather than argued:
+
+1. **100 % coverage and 100 % format compliance** across 277 KP items, with no fallback case (0 rows where the summary handle is missing but an evidence handle exists).
+2. **It is a scalar, so KP identity is 1:1 *by construction*, not by measurement.** R-RES-010 currently rests on "2,387 results, 2,387 distinct handles — 1:1 by measurement". Reading a scalar makes multi-identity **structurally unreachable** on the incoming side. This directly retires the premise behind **AC.9**, which justified the incoming multi-handle refusal as "live logic, not a net" because `processKnowledgeProduct` loops a `PrmsKnowledgeProductDto[]`. That array does not exist on the wire, so that justification is void — the refusal should be **kept as a defensive net but re-described**, not sold as live logic.
+3. **It avoids DC-10 structurally.** 33 % of live non-KP rows carry a handle in `evidences[]` — those are *cited* publications. `evidences[]` mixes the result's own handle with citations and attachments; `knowledge_product_summary` exists only for the result's own publication. Choosing it means the KP-only scope is a property of the field rather than a filter that must be remembered.
+
+**Also confirmed:** `pdf_link` is never handle-format (0/400), so **R-RES-010 AC.2 holds structurally** — PRMS's `public_link` cannot match a TIP/AICCRA handle by construction, exactly as the requirement asserts. One nuance worth recording: the observed `pdf_link` is a `reporting.cgiar.org/reports/result-details/…` URL, not the CGSpace pdf link §0.5 describes. That does not affect AC.2, but §0.5's characterization of the field's *content* is imprecise.
+
+**Attempt 1's salvage.** Per the owner's decision the mapper call, the `ResultResponseMapper` field, and the 3 mapper tests were **reverted** — they asserted a field the wire does not carry, and the call carried the Issue-1 data mutation. Retained and still valid: `publication-identity.util.ts` + its 21 tests, and the `save-all-sections.service.ts` identity wiring (its tests hand-build `dto.evidence`, so they legitimately prove the resolver). Post-revert: **330 suites / 2250 tests green**, `tsc` clean. With the mapper reverted the PRMS branch resolves `null`, which is behaviourally identical to the pre-T-13 state (PRMS matched nothing anyway) and therefore safe at rest. **R-RES-010 AC.10 is recorded as UNPROVEN in the spec file itself**, with a pointer, rather than left looking satisfied.
+
+#### Spec amendments this requires — NOT yet written, pending the owner's approval
+
+- **`requirements.md` R-RES-010** — identity table: PRMS source becomes `knowledge_product_summary.handle`, not `result_evidences.evidence_url` on the incoming side; AC.10 restated against the real field; **AC.9's justification corrected** (structurally unreachable via a scalar; refusal retained as a net); the "two sides have different sources" table updated — the incoming side is no longer "empty today", it is "populated but unread".
+- **`design.md` §5.2 step 0** — the fix is *not* "one call to `processKnowledgeProduct`". It is a small mapper addition reading `item.knowledge_product_summary?.handle` into `dto.evidence.evidence[]` (or straight to a dedicated field), with **no** call to `processKnowledgeProduct`, whose `knowledgeProduct` write is the Issue-1 hazard. §0.5's `pdf_link` characterization corrected.
+- **`design.md` §3.1.1 / T-15** — the stored side still reads `result_evidences.evidence_url`; the incoming side now reads a different field. The two are no longer the same concept, so **the SQL/in-memory equivalence T-15 was going to assert must be re-scoped** to "both select the same handle for the same result", not "both apply the same predicate to the same field".
+- **`tasks.md` T-13** — rewritten around the corrected field; the `processKnowledgeProduct` revival is removed from scope entirely.
+- **RB-9** — the "static corpus, no maintained writer" risk is *confirmed and explained*: the sync path never carried the handle because nothing read this field.
+
+---
+
+## T-13 (rev 4) — Attempt 1: Reviewer **PASS** ✅ (both lenses)
+
+- **Status:** `[x]` — **done**
+- **Date:** 2026-08-05
+- **Task:** T-13 — PRMS sync path: read the publication handle and resolve incoming identity (**re-scoped after the pivot**)
+- **Attempt numbering:** attempt **1 of the re-scoped task**. The pivot invalidated the original task, so the 3-attempt ceiling restarted rather than continuing from the pre-pivot attempt.
+- **Review mode:** parallel lens reviewers (effort `xhigh` + data-loss surface) — *spec conformance + correctness* and *risk / data-loss + resilience*. **Both returned `STATUS: PASS`.**
+- **Skills:** `nestjs-expert`, `systematic-debugging`, `tdd` (`tdd` added by the Leader over the task's list — the done-condition is red-green)
+
+### Files changed
+
+| File | Change |
+| --- | --- |
+| `tools/open-search/prms/dto/prms-response.dto.ts` | added `KnowledgeProductSummaryMapper { handle }` + `ResultResponseMapper.knowledge_product_summary` — the field that is on the wire and was never modelled |
+| `tools/open-search/prms/prms.opensearch.service.ts` | `processData` reads `item.knowledge_product_summary?.handle` for KP items and carries it into `dto.evidence.evidence[]`. **No `processKnowledgeProduct` call.** Also removed a pre-existing redundant assignment pair — see the record correction below |
+| `shared/utils/publication-identity.util.ts` | **survives from attempt 1** — no logic change; doc comments corrected to the rev-4 model (asymmetry retired, refusal re-described as a net) |
+| `shared/services/save-all-sections.service.ts` | **survives from attempt 1, untouched this round** |
+| 3 spec files | +5 net tests (4 in `prms.opensearch.service.spec.ts`, 1 in `save-all-sections.service.spec.ts`); `publication-identity.util.spec.ts` descriptions updated, 21 assertions unchanged |
+
+### Verification — measured by the Leader, not taken from the report
+
+| Check | Result |
+| --- | --- |
+| `npm test -- --silent` (from `server/researchindicators`) | **330 suites / 2255 tests passed** |
+| `npm run test:cov -- --silent` | **global 84.11 % stmts · 75.98 % branch · 84.95 % funcs · 84.14 % lines** — clear of the 60 % floor |
+| `npx tsc --noEmit` | clean |
+| `npm run lint -- --quiet` | clean, zero file mutations |
+| Touched-file coverage | `save-all-sections.service.ts` 98.42/90.69 · `publication-identity.util.ts` 100/80 · `prms.opensearch.service.ts` 98.87/88.23 |
+
+**The test-count arithmetic was independently reconciled**, because the conformance lens flagged it as not closing and had no execution tools to settle it. Per-file `it()` counts: `prms.opensearch.service.spec.ts` 24 at HEAD → 24 after the revert (which removed attempt 1's 3) → **28** now (**+4**); `save-all-sections.service.spec.ts` 32 at HEAD → 35 after the revert (attempt 1's 3 survived) → **36** now (**+1**). So rev 4 adds **5** tests: 2250 + 5 = **2255**, exactly as reported and as measured. **The Implementer's figure was correct and the Reviewer's expected 2258 was not** — it counted +8 against HEAD (right) but applied that delta to the post-revert baseline of 2250 (wrong), mixing two baselines. Recorded because "the numbers didn't add up" is otherwise the kind of loose end that reads as a defect later.
+
+### What the reviewers established independently (the claims that were NOT accepted on report)
+
+1. **The carrier writes no `result_evidences` row.** Both lenses enumerated every production reader of `ExternalMappersDto.evidence`: the new resolver call, plus `processKnowledgeProduct` (private, zero production callers). `updateResultEvidences` — the only DB writer of `result_evidences` — has exactly two callers (`results.service.ts:939`, AI/bulk, which passes a *different* plural field on a different DTO; and `result-evidences.controller.ts:46`, STAR authoring). Neither is reachable from a sync. **OQ-12's deferral holds.**
+2. **`dto.knowledgeProduct` provably stays `undefined`.** `processData`'s full write set was enumerated; `knowledgeProduct` is never assigned. Attempt 1's 2,388-row `UPDATE result_knowledge_products` is absent, and a test pins it.
+3. **The read is reached on the real path (DC-7 re-check).** Staging round-trips the payload verbatim (`save({data: item})` → `SELECT ptr.data`), `IndicatorHomologation["6"]` → `IndicatorsEnum.KNOWLEDGE_PRODUCT`, and the mapper gate compares the **post-homologation** constant — the same value later written to `createResult.indicator_id` and read by the resolver. Both ends agree; the 6-vs-3 trap is avoided on both sides.
+4. **AC.10 part 1 genuinely bites.** Remove the new mapper block and `out[0].evidence` is `undefined` → `identity: null` → red. The fixture shape matches the recorded live shape verbatim, so this round's test is *not* the "fixture supplies a field the wire lacks" failure that made attempt 1 a no-op.
+5. **No over-detection is reachable from the JS normalization mirror.** `buildDuplicateGroup` hands the **raw** handle to SQL, which normalizes both the stored column and the bound parameter; the mirror's only output is a boolean admission gate. Every known TS↔SQL divergence lands on that boolean, so it can only ever under-detect. Deletion families also expand by `result_official_code + platform_code` (+ year for live rows), never by publication link, so a changed identity field cannot widen a family.
+6. **DC-10 holds structurally** — two independent KP gates (mapper and resolver), no `else`, and no fallback to `evidences[]` or `pdf_link`.
+
+### Record correction — a false provenance claim, caught and not admitted as fact
+
+The Implementer removed a second `result.public_link = item?.pdf_link; result.external_link = item?.prms_link;` pair from `processData` and described it as *"dead duplicate left over from the reverted attempt-1 call"*. **That attribution is false.** `git show HEAD` confirms **both pairs existed before any of today's work** — design §0.5 itself cites "lines 326 and 383". It was pre-existing production code, deleted outside the declared scope, with its provenance inferred rather than checked.
+
+The correct record: **removed a pre-existing redundant re-assignment; verified behaviour-neutral; now pinned by the AC.10 test.** Neutrality was derived three times independently (Leader + both lenses): both loop `continue`s occur *before* the surviving pair at `:326-327`; the only intervening branch (`if (!isEmpty(item?.created_by))`) cannot skip backwards; there is no `try`/`catch` in the loop body, so a throwing `await` aborts `processData` entirely and the `result` is never pushed; nothing between the two sites receives the `result` DTO; and both pairs assigned identical expressions from identical sources.
+
+Both lenses adjudicated this **advisory, not FAIL** — the normative requirement (`requirements.md` §7: `public_link = pdf_link` and `external_link = prms_link` "stay exactly as they are") holds and is now test-pinned, and a rework cycle whose only product is restoring dead code buys nothing. **Recorded prominently because this spec's four failures were all confident, unchecked claims about this file**, and letting a fifth into the audit trail costs more than the code did.
+
+### Leader-side spec drift, found by the Implementer and fixed
+
+The Implementer's `Not Done` field correctly flagged that the Leader's amendments had covered R-RES-010 and §5.2 but left **`requirements.md` §7** and **`design.md` §12/§14** still prescribing the falsified `processKnowledgeProduct` call. Fixed before the reviewers read those files: §7 rewritten, the §14 T-13 budget row corrected, §5.2's multi-identity cost row corrected, and **D-dup-22 struck through and superseded by D-dup-23** rather than edited in place (decisions are superseded, never rewritten). Worth noting that the *worker* caught the *Leader's* drift — the `Not Done` field earned its mandate here.
+
+### ADVISORY findings — recorded, non-gating, and explicitly NOT new tasks
+
+- **⚠️ C (the one that needs a human decision): T-13 is NOT inert until the hard-delete flag flips.** `hard_delete_enabled` gates **deletion only**. `incomingIsLoser` skips the create/update and counts `OMITTED_DUPLICATE` regardless of the flag (`save-all-sections.service.ts:180-187`). So on the first PRMS sync after this merges, the ~2,249 measured PRMS↔TIP counterparts stop having status, general info, `public_link`, alignments and geoscope refreshed, while remaining live visible rows. This is design §5.2 step 4 **as written** — not a violation — but any statement that "T-13 is inert until the flag is enabled" is false, and the rollout runbook (T-12's artifact) should say so. **Surfaced to the user as a decision; not actioned, because an advisory may not mint or widen a task.**
+- **D — audit forensics gap until T-15.** The incoming PRMS participant's persisted `rawPublicLink` is now the handle while the row's own `public_link` is a `reporting.cgiar.org` link, and the `identitySource` column R-RES-009 AC.4 requires does not exist until T-15. Under a hard delete an operator would see a link that appears nowhere on the deleted row. Already encoded — T-12 depends on T-15 — but it sharpens *why*.
+- **A — the inertness pin is outcome-based.** Re-adding `processKnowledgeProduct(item.result_knowledge_product_array, …)` would still pass it, because the absent array makes the method return early (which is exactly why attempt 1 was a no-op, so there is no mutation to catch in that shape). A `jest.spyOn` asserting the banned method is never invoked would pin the **ban** rather than one of its symptoms.
+- **E — one seam left uncovered end-to-end:** `bulkSaveAllSections`'s pass-through from `processData` output to `saveAllSections`. Covered in both halves, not across the hop — the exact seam class this spec keeps failing on.
+- **F — pre-existing, out of scope:** `item.indicator_category.code` is dereferenced unguarded at `prms.opensearch.service.ts:316`, so one malformed item throws out of `processData` and aborts the whole sync batch.
+- **Readability:** ~34 lines of comment guard ~10 lines of new mapper code, much of it restating measurements that live in the spec and will drift on a fifth amendment. The load-bearing parts are the `processKnowledgeProduct` ban and the two-enum note.
+- **Minor:** `normalizeIdentityCandidate` calls `.trim()` after an `isEmpty` guard, so a non-string `handle` (277/277 are strings today) would throw a `TypeError`, caught by `saveAllSections`'s `try` and counted `ERROR` for that one row — cannot abort a batch.
+
+### Requirements covered
+
+R-RES-010 AC.1, AC.2, AC.5, AC.9, **AC.10 (both parts — the mapper test AND the recorded live observation)**; R-RES-001 AC.6.
+
+### Outstanding after T-13 — none owed by this task
+
+The Implementer's remaining `Not Done` items are all genuinely out of scope: AC.10 part 2 was closed by the Leader's own live observation earlier this session; RB-10's re-measurement and T-14/T-15 are separate tasks; `apply` remains blocked by OQ-7, OQ-8, OQ-11 and T-11 independently of T-13.
