@@ -1,7 +1,10 @@
 import { DataSource } from 'typeorm';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
-import { ResultDeleteStatus } from '../utils/query.service';
+import {
+  ResultDeleteRefusalReason,
+  ResultDeleteStatus,
+} from '../utils/query.service';
 import {
   DuplicateGroupClassification,
   DuplicateRule,
@@ -46,6 +49,7 @@ const build = (options: {
       reportYearId: 2024,
       targetIds: [id, id + 1],
       siblingIdsOutsideReportYear: [],
+      refusalReason: null,
     })),
     deleteFullResultById: jest.fn(async (id: number) => {
       order.push('delete');
@@ -312,6 +316,21 @@ describe('DuplicateResolutionRunner — failures are recorded, never rethrown', 
     );
   });
 
+  it('records REFUSED, never NOOP, when the identity has more than one live row (T-07 pivot)', async () => {
+    // QueryService refuses rather than guesses when a snapshot's owning live
+    // row is undecidable. That refusal must not fall through to the generic
+    // "nothing deleted" NOOP branch — it needs manual handling, not silence.
+    const { runner } = build({ deleteStatus: ResultDeleteStatus.REFUSED });
+
+    const report = await runner.applyGroup(input());
+
+    expect(report.deleted).toBe(0);
+    const outcome = report.outcomes.find((e) => e.resultId === 20);
+    expect(outcome?.outcome).toBe(DuplicateRowOutcome.REFUSED);
+    expect(outcome?.outcome).not.toBe(DuplicateRowOutcome.NOOP);
+    expect(outcome?.reason).toContain('more than one live row');
+  });
+
   it('surfaces protections and failures through the log helper', async () => {
     const { runner, auditLog } = build({ deleteThrows: true });
     await runner.applyGroup(input());
@@ -321,6 +340,94 @@ describe('DuplicateResolutionRunner — failures are recorded, never rethrown', 
         expect.objectContaining({ outcome: DuplicateRowOutcome.FAILED }),
       ]),
     );
+  });
+});
+
+describe('DuplicateResolutionRunner — an ambiguous identity is REFUSED at plan time, not silently PLANNED', () => {
+  // Reviewer FAIL (attempt 1), issue 2: `scope.refusalReason` was discarded by
+  // both the plan-building loop and the delete-execution loop, so a refused
+  // loser was written to the audit table as PLANNED with an empty
+  // `expandedResultIds` — the dry-run artifact IS the DC-5 human gate, so
+  // this is a defect of the plan itself, not only of what apply would do.
+  const refusedScope = {
+    seedId: 20,
+    isSnapshot: false,
+    reportYearId: 2024,
+    targetIds: [] as number[],
+    siblingIdsOutsideReportYear: [21],
+    refusalReason: ResultDeleteRefusalReason.AMBIGUOUS_LIVE_ROWS,
+  };
+
+  it('marks the plan outcome REFUSED, even in DRY_RUN where the delete step never runs', async () => {
+    const { runner, queryService } = build({});
+    queryService.resolveResultDeleteScope.mockResolvedValueOnce(refusedScope);
+
+    const report = await runner.applyGroup({
+      ...input(),
+      context: {
+        runId: 'run-1',
+        source: DuplicateResolutionSource.SWEEP,
+        mode: DuplicateResolutionMode.DRY_RUN,
+      },
+    });
+
+    const outcome = report.outcomes.find((entry) => entry.resultId === 20);
+    expect(outcome?.outcome).toBe(DuplicateRowOutcome.REFUSED);
+    expect(outcome?.reason).toContain('manual handling');
+    expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+  });
+
+  it('writes REFUSED — never PLANNED — into the audit record before anything is deleted', async () => {
+    const { runner, auditLog, queryService } = build({});
+    queryService.resolveResultDeleteScope.mockResolvedValueOnce(refusedScope);
+
+    await runner.applyGroup(input());
+
+    const plannedOutcomes = auditLog.recordGroup.mock.calls[0][0]
+      .plannedOutcomes as { resultId: number; outcome: string }[];
+    const entry = plannedOutcomes.find((o) => o.resultId === 20);
+    expect(entry?.outcome).toBe(DuplicateRowOutcome.REFUSED);
+    expect(
+      plannedOutcomes.some((o) => o.outcome === DuplicateRowOutcome.PLANNED),
+    ).toBe(false);
+  });
+
+  it('never attempts the delete at apply time for a refused plan, and stays REFUSED', async () => {
+    // Reviewer FAIL (attempt 2): a "self-heal" re-attempt for an already
+    // REFUSED plan deleted a family the STAR guard never evaluated (its
+    // targetIds is `[]` by construction), that the audit record did not
+    // list, and that OpenSearch was never told about. The apply loop must
+    // skip a REFUSED plan entirely — the plan-time REFUSED outcome survives
+    // untouched into `recordOutcomes`, and a cleared ambiguity is picked up
+    // by the *next* plan run, where it is scoped, guarded, digested, and
+    // reviewed like every other deletion.
+    const { runner, queryService, auditLog } = build({ hardDelete: 'true' });
+    queryService.resolveResultDeleteScope.mockResolvedValueOnce(refusedScope);
+
+    const report = await runner.applyGroup(input());
+
+    expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+    const outcome = report.outcomes.find((entry) => entry.resultId === 20);
+    expect(outcome?.outcome).toBe(DuplicateRowOutcome.REFUSED);
+    expect(outcome?.reason).toContain('manual handling');
+    expect(report.deleted).toBe(0);
+
+    // The audit record (`recordOutcomes`, called after the apply loop) must
+    // carry the same REFUSED entry through untouched — never NOOP (which
+    // would mean the routine ran and found nothing) and never DELETED.
+    const recordedOutcomes = (auditLog.recordOutcomes as jest.Mock).mock
+      .calls[0][1] as {
+      resultId: number;
+      outcome: string;
+    }[];
+    const recordedEntry = recordedOutcomes.find((o) => o.resultId === 20);
+    expect(recordedEntry?.outcome).toBe(DuplicateRowOutcome.REFUSED);
+    expect(
+      recordedOutcomes.some((o) => o.outcome === DuplicateRowOutcome.NOOP),
+    ).toBe(false);
+    expect(
+      recordedOutcomes.some((o) => o.outcome === DuplicateRowOutcome.DELETED),
+    ).toBe(false);
   });
 });
 

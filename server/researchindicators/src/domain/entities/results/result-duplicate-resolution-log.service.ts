@@ -37,6 +37,16 @@ export type RunSummary = {
   protectedRows: number;
   failed: number;
   noop: number;
+  /**
+   * Derived from each record's `outcomes` JSON at read time — there is no
+   * `refused_count` column, and this needs none: unlike the other four
+   * counts, `REFUSED` was introduced (T-07 pivot) after those columns were
+   * added, and it would be the fifth migration for one boolean-shaped fact
+   * a JSON scan already answers. Without this, a refusal sat in `outcomes`
+   * but in none of the counts, and the counts stopped summing to the group's
+   * participant total — a false "everything is accounted for".
+   */
+  refused: number;
 };
 
 /**
@@ -146,6 +156,7 @@ export class ResultDuplicateResolutionLogService {
     let protectedRows = 0;
     let failed = 0;
     let noop = 0;
+    let refused = 0;
 
     for (const record of records) {
       byClassification[record.classification] =
@@ -154,6 +165,10 @@ export class ResultDuplicateResolutionLogService {
       protectedRows += Number(record.protected_count ?? 0);
       failed += Number(record.failed_count ?? 0);
       noop += Number(record.noop_count ?? 0);
+      refused += this.countOf(
+        record.outcomes ?? [],
+        DuplicateRowOutcome.REFUSED,
+      );
     }
 
     return {
@@ -164,6 +179,7 @@ export class ResultDuplicateResolutionLogService {
       protectedRows,
       failed,
       noop,
+      refused,
     };
   }
 
@@ -187,6 +203,11 @@ export class ResultDuplicateResolutionLogService {
       if (outcome.outcome === DuplicateRowOutcome.FAILED) {
         this.logger.warn(
           `Run ${runId}: deletion of result ${outcome.resultId} FAILED — ${outcome.reason ?? 'unknown error'}.`,
+        );
+      }
+      if (outcome.outcome === DuplicateRowOutcome.REFUSED) {
+        this.logger.warn(
+          `Run ${runId}: deletion of result ${outcome.resultId} REFUSED — ${outcome.reason ?? 'identity has more than one live row; snapshot ownership is undecidable'}. Needs manual handling.`,
         );
       }
       if (outcome.outcome === DuplicateRowOutcome.NOOP) {

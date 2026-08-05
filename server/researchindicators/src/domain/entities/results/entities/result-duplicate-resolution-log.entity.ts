@@ -29,6 +29,14 @@ export enum DuplicateRowOutcome {
   FAILED = 'FAILED',
   /** The routine reported the row was already gone. Never conflated with DELETED. */
   NOOP = 'NOOP',
+  /**
+   * Deletion was never attempted: the seed's identity has more than one live
+   * row, so which live row owns which snapshot is undecidable (T-07 pivot,
+   * 2026-08-04 — `version_id` is NULL on every snapshot measured). Refused
+   * rather than guessed. Never conflated with NOOP — a NOOP means the routine
+   * ran and found nothing; a REFUSED means the routine was never called.
+   */
+  REFUSED = 'REFUSED',
   /** Planned only — a dry run, or the hard-delete flag was off. */
   PLANNED = 'PLANNED',
   /** The prevailing row; not deleted. */

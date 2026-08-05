@@ -98,7 +98,10 @@ import { ClarisaSdg } from '../../tools/clarisa/entities/clarisa-sdgs/entities/c
 import { ResultUserAi } from '../result-users/entities/result-user-ai.entity';
 import { CreateResultConfigDto } from './dto/create-config.dto';
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
-import { QueryService } from '../../shared/utils/query.service';
+import {
+  QueryService,
+  ResultDeleteStatus,
+} from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
@@ -352,6 +355,11 @@ export class ResultsService {
       relations: { result_status: true },
     });
     if (isEmpty(results)) throw new NotFoundException('No results found');
+    // T-07 pivot per-caller verdict: a REFUSED row (its identity has more
+    // than one live row — snapshot ownership is undecidable) was NOT
+    // deleted, so it must not be reported to the operator as part of the
+    // "deleted" set.
+    const refusedResultIds = new Set<number>();
     for (const {
       result_id,
       platform_code,
@@ -361,10 +369,23 @@ export class ResultsService {
         `Deleting result ${result_id} from ${platform_code} with status [${result_status_id}] ${name}`,
       );
       if (!deleteResultsByParameters.testing) {
-        await this._queryService.deleteFullResultById(result_id);
+        const outcomes =
+          await this._queryService.deleteFullResultById(result_id);
+        if (
+          outcomes?.some(
+            (outcome) => outcome.status === ResultDeleteStatus.REFUSED,
+          )
+        ) {
+          refusedResultIds.add(result_id);
+          this.logger.warn(
+            `Result ${result_id} was NOT deleted: its identity has more than one live row, so snapshot ownership is undecidable. Needs manual handling.`,
+          );
+        }
       }
     }
-    return results;
+    return refusedResultIds.size
+      ? results.filter((result) => !refusedResultIds.has(result.result_id))
+      : results;
   }
 
   async createResult(
@@ -957,7 +978,22 @@ export class ResultsService {
         this.logger.error(
           `Error processing result ${resultExists.result_id}, rolling back. Error: ${error.message}`,
         );
-        await this._queryService.deleteFullResultById(resultExists.result_id);
+        // T-07 pivot per-caller verdict: a rollback can be REFUSED the same
+        // way any other delete can — the row's identity may already have a
+        // second live row. A silently retained row here is a live row the
+        // duplicate matcher will see again on the next run.
+        const rollbackOutcomes = await this._queryService.deleteFullResultById(
+          resultExists.result_id,
+        );
+        if (
+          rollbackOutcomes?.some(
+            (outcome) => outcome.status === ResultDeleteStatus.REFUSED,
+          )
+        ) {
+          this.logger.warn(
+            `Rollback of result ${resultExists.result_id} was REFUSED: its identity has more than one live row, so snapshot ownership is undecidable. Needs manual handling — the row was NOT removed.`,
+          );
+        }
       }
       const errorMessage = `Error processing AI result: ${typeof error.message == 'object' ? error.name : error.message}`;
       this.logger.error(errorMessage);

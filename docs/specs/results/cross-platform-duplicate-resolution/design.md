@@ -333,9 +333,43 @@ Resolution reads only `(platform, indicator)` per participant — never "who is 
 
 Three defects in the reused path, fixed here:
 
-- **Year scope.** `findResultFamilyIds` matches `{official_code, platform_code}` only. Zero families span multiple years today, so this is latent — but it is one data shape away from a same-year resolution destroying another year's live row, which would defeat R-RES-006, the spec's headline conservatism control, from the deletion side while the matching side stayed correct. `report_year_id` is added to the predicate.
+- **Year scope.** `findResultFamilyIds` matches `{official_code, platform_code}` only, one data shape away from a same-year resolution destroying another year's live row — which would defeat R-RES-006, the spec's headline conservatism control, from the deletion side while the matching side stayed correct. `report_year_id` is added to the predicate **for live rows only**. See §5.4.1: applying it to snapshots as well was a defect, corrected after measurement.
 - **Guard coverage.** The STAR check ran on the seed `result_id`, then expansion deleted siblings nobody checked. The guard now runs on **every** id in the resolved target set, and the audit row records the set.
 - **Ordering and atomicity.** `deleteFullResultById` issues one autocommitted `SELECT full_delete_result_version(?)` per family member, unordered. If the live row succeeds and a snapshot then fails, the live row is gone and orphan snapshots remain — and since every participant set filters `is_snapshot = false`, **no later run can ever see them**, while they keep a `public_link`. Family deletion is wrapped in one transaction with snapshots ordered **before** the live row, so a mid-family failure rolls back to a coherent state.
+
+#### 5.4.1 Year scope applies to live rows, **never** to snapshots (correction, 2026-08-04)
+
+The rule above originally scoped the *whole* family by `report_year_id`. **That was wrong, and the measurement below is why.** It was caught by the tripwire this design itself specified (`siblingIdsOutsideReportYear`), during T-11's validation.
+
+| Measure (dev, 2026-08-04) | Value |
+| --- | --- |
+| Snapshots total | **574** |
+| Snapshots no live row of their identity shares a `report_year_id` with | **469 (82 %)** |
+| → of those, a live row exists under a **different** year | **451** ← would be orphaned |
+| → of those, no live row exists at all | 18 (pre-existing, out of scope) |
+| Snapshots with `version_id` populated | **0 of 574** — no parent link exists in the schema |
+| Live rows | 14,108 |
+| Identities with **more than one** live row | **4** |
+
+The live row carries the *current* `report_year_id`; a snapshot retains the year it was taken for. So a fully year-scoped family **excludes a live row's own snapshots** — leaving them in `results` with no live counterpart, which is precisely the permanent-invisibility orphan the third bullet above exists to prevent. Four out of five snapshots are affected: the norm, not an edge case.
+
+The root cause is one filter applied to two structurally different kinds of row. **A snapshot is a *version* of a result, not a *reporting-year row* of it.**
+
+**Corrected scope for a live seed:**
+
+| Component | Predicate |
+| --- | --- |
+| `live_siblings` | same identity · `is_snapshot = FALSE` · **year-scoped** |
+| `snapshots` | same identity · `is_snapshot = TRUE` · **no year filter** |
+| `targetIds` | `snapshots` first, `live_siblings` last (ordering rule unchanged) |
+
+A snapshot seed still resolves to itself alone. This keeps the real fix — deleting a 2024 loser must not destroy the live 2025 row, since live rows stay year-scoped — while ending the orphaning.
+
+**Guard for the 4 ambiguous identities.** With more than one live row and no parent link, snapshot ownership is undecidable, so an unscoped sweep could destroy a *surviving* live row's version history. Those identities **refuse deletion and are flagged for manual handling** rather than guessed at. 4 of 14,108 is a precisely bounded exclusion, and guessing here is unrecoverable.
+
+**`siblingIdsOutsideReportYear` is narrowed to live rows.** As originally written it counts snapshots, so after this correction it would fire on nearly every delete and decay into noise — and a tripwire that always trips gets waived, the exact failure §11 warns about for the 116-group threshold.
+
+Rejected: sweeping every snapshot with no guard (destroys version history for the 4); and refusing whenever `siblingIdsOutsideReportYear` is non-empty (safe, but leaves 82 % of snapshots permanently undeletable).
 
 ---
 
@@ -435,6 +469,8 @@ Two deploys, not three — the backfill step is gone with the column.
 | **D-dup-14** | 08-04 | **The incoming payload and `findResult` are one participant.** Step 4 acts on that participant's verdict; every deletion routes through the single loser loop. | Counting them twice fired the same-platform branch on every routine re-sync; keying on "incoming is not the winner" could delete a `findResult` that was the group's winner, leaving nothing. |
 | **D-dup-15** | 08-04 | **Explicit `COLLATE utf8mb4_bin` on every normalized comparison and grouping.** | `public_link` is `utf8mb3_general_ci`; case *and* accent folding are implicit, which makes R-RES-001 AC.2 unsatisfiable and points the failure at over-deletion. Created by moving comparison from JS `===` into SQL. |
 | **D-dup-16** | 08-04 | **The `CASCADE` FK is a protecting relationship, not a non-issue.** | CASCADE destroys rows the soft delete preserves — the same class as the inactive STAR links already gated behind OQ-7, so it gets the same guard and audit treatment. |
+
+| **D-dup-17** | 08-04 | **Year scope applies to live rows only; snapshots attach by identity with no year filter. Identities with >1 live row refuse deletion.** Supersedes the year-scoping half of D-dup-10. | **Measured: 451 of 574 snapshots would have been orphaned** — the live row carries the current year while a snapshot keeps the year it was taken for, so a fully year-scoped family excludes a row's own snapshots. One filter had been applied to two different kinds of row: a snapshot is a *version*, not a *reporting-year row*. `version_id` is NULL on all 574, so no parent link exists; with 4 identities holding multiple live rows, ownership is undecidable there and is refused rather than guessed. Caught by this design's own `siblingIdsOutsideReportYear` tripwire. Full record in `execution.md` → *Pivot Record: T-07*. |
 
 ### 12.1 Reversion challenge — D-dup-2 (soft → hard delete)
 

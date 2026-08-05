@@ -127,6 +127,13 @@ export class DuplicateResolutionPlanGroup {
   toDelete!: number[];
 
   @ApiProperty({
+    type: [Number],
+    description:
+      'Loser seed ids retained because their identity has more than one live row, so snapshot ownership is undecidable (design.md §5.4.1). Never in `toDelete`; needs manual handling.',
+  })
+  refused!: number[];
+
+  @ApiProperty({
     type: String,
     nullable: true,
     description:

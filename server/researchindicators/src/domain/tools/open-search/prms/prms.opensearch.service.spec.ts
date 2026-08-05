@@ -6,7 +6,10 @@ import { PrmsOpenSearchService } from './prms.opensearch.service';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { ResultsService } from '../../../entities/results/results.service';
-import { QueryService } from '../../../shared/utils/query.service';
+import {
+  QueryService,
+  ResultDeleteStatus,
+} from '../../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { PooledFundingContractsService } from '../../../entities/pooled-funding-contracts/pooled-funding-contracts.service';
@@ -594,6 +597,32 @@ describe('PrmsOpenSearchService', () => {
       await service.mapToExternalCreateResultDto([basePayload()]);
 
       expect(queryService.deleteFullResultById).toHaveBeenCalledWith(888);
+    });
+
+    it('should warn, not throw, when the sync rollback delete is REFUSED', async () => {
+      // T-07 pivot per-caller verdict: `deleteFullResultById` resolves
+      // (never rejects) on a REFUSED outcome, so this catch block would
+      // otherwise proceed silently, leaving a live row on an ambiguous
+      // identity for the duplicate matcher to see again on the next run.
+      resultRepoHandle.findOne.mockResolvedValueOnce(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 889,
+        result_official_code: 56,
+      } as any);
+      resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('boom'));
+      queryService.deleteFullResultById.mockResolvedValueOnce([
+        { resultId: 889, status: ResultDeleteStatus.REFUSED },
+      ]);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.mapToExternalCreateResultDto([basePayload()]);
+
+      expect(queryService.deleteFullResultById).toHaveBeenCalledWith(889);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('889'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('manual handling'),
+      );
+      warnSpy.mockRestore();
     });
 
     it('should log and skip rollback when update fails without new result', async () => {

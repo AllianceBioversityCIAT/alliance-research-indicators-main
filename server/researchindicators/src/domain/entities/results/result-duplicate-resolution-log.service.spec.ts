@@ -239,6 +239,9 @@ describe('ResultDuplicateResolutionLogService — answering the operator', () =>
         protected_count: 0,
         failed_count: 0,
         noop_count: 0,
+        // A refusal has no dedicated count column — it is derived from the
+        // outcomes JSON at read time, unlike the other four counts.
+        outcomes: [{ resultId: 99, outcome: DuplicateRowOutcome.REFUSED }],
       },
       {
         classification: 'RESOLVED',
@@ -277,6 +280,7 @@ describe('ResultDuplicateResolutionLogService — answering the operator', () =>
       protectedRows: 1,
       failed: 1,
       noop: 1,
+      refused: 1,
     });
   });
 
@@ -285,13 +289,15 @@ describe('ResultDuplicateResolutionLogService — answering the operator', () =>
     const summary = await service.summarizeRun('run-empty');
     expect(summary.groups).toBe(0);
     expect(summary.deleted).toBe(0);
+    expect(summary.refused).toBe(0);
   });
 
-  it('tolerates missing counts on legacy rows', async () => {
+  it('tolerates missing counts on legacy rows, including a missing outcomes JSON', async () => {
     const { service } = buildService([{ classification: 'RESOLVED' }]);
     const summary = await service.summarizeRun('run-1');
     expect(summary.deleted).toBe(0);
     expect(summary.groups).toBe(1);
+    expect(summary.refused).toBe(0);
   });
 
   it('returns a run in insertion order', async () => {
@@ -357,5 +363,34 @@ describe('ResultDuplicateResolutionLogService — immediate operator signal', ()
 
     expect(warn.mock.calls[0][0]).toContain('must survive');
     expect(warn.mock.calls[1][0]).toContain('unknown error');
+  });
+
+  it('warns for a REFUSED row — never at the same level as a no-op (T-07 pivot)', async () => {
+    const { service } = buildService();
+    const logger = (
+      service as unknown as {
+        logger: {
+          warn: (message: string) => void;
+          debug: (message: string) => void;
+        };
+      }
+    ).logger;
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const debug = jest
+      .spyOn(logger, 'debug')
+      .mockImplementation(() => undefined);
+
+    service.logNotableOutcomes('run-3', [
+      {
+        resultId: 40,
+        outcome: DuplicateRowOutcome.REFUSED,
+        reason: 'more than one live row',
+      },
+    ]);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain('REFUSED');
+    expect(warn.mock.calls[0][0]).toContain('more than one live row');
+    expect(debug).not.toHaveBeenCalled();
   });
 });

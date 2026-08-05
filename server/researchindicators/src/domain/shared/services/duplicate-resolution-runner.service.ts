@@ -2,7 +2,11 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CgiarLogger } from '../utils/cgiar-logs/logs.util';
-import { QueryService, ResultDeleteStatus } from '../utils/query.service';
+import {
+  QueryService,
+  ResultDeleteRefusalReason,
+  ResultDeleteStatus,
+} from '../utils/query.service';
 import { StarRelationshipService } from './star-relationship.service';
 import {
   DuplicateGroupClassification,
@@ -80,6 +84,16 @@ export type ApplyGroupReport = {
 export class DuplicateResolutionRunner {
   private readonly logger = new CgiarLogger(DuplicateResolutionRunner.name);
 
+  /**
+   * Shared wording for an {@link ResultDeleteRefusalReason.AMBIGUOUS_LIVE_ROWS}
+   * refusal, so the plan-time reason (before anything is deleted) and the
+   * apply-time reason (after re-deriving under lock) read identically —
+   * an operator comparing the dry-run plan against the audit record should
+   * never see two different explanations for the same outcome.
+   */
+  private static readonly AMBIGUOUS_IDENTITY_REASON =
+    'Retained: this identity has more than one live row, so snapshot ownership is undecidable without a parent link. Refused rather than guessed — needs manual handling.';
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly queryService: QueryService,
@@ -114,6 +128,7 @@ export class DuplicateResolutionRunner {
       siblingIdsOutsideReportYear: number[];
       protectedIds: number[];
       protectingRelationships: unknown[];
+      refusalReason: ResultDeleteRefusalReason | null;
     }[] = [];
 
     for (const loser of resolution.losers) {
@@ -128,6 +143,7 @@ export class DuplicateResolutionRunner {
         siblingIdsOutsideReportYear: scope.siblingIdsOutsideReportYear,
         protectedIds: verdict.protectedResultIds,
         protectingRelationships: verdict.relationships,
+        refusalReason: scope.refusalReason ?? null,
       });
     }
 
@@ -152,22 +168,40 @@ export class DuplicateResolutionRunner {
           resultId: loser.resultId,
           outcome: DuplicateRowOutcome.OMITTED,
         })),
-      ...plans.map((plan) => ({
-        resultId: plan.loser.resultId,
-        outcome: plan.protectedIds.length
-          ? DuplicateRowOutcome.PROTECTED
-          : DuplicateRowOutcome.PLANNED,
-        reason: plan.protectedIds.length
-          ? `Retained: result(s) ${plan.protectedIds.join(', ')} are referenced by something that must survive.`
-          : undefined,
-        protectingRelationships: plan.protectedIds.length
-          ? plan.protectingRelationships
-          : undefined,
-        expandedResultIds: plan.targetIds,
-        siblingIdsOutsideReportYear: plan.siblingIdsOutsideReportYear.length
-          ? plan.siblingIdsOutsideReportYear
-          : undefined,
-      })),
+      ...plans.map((plan) => {
+        // A refused identity never reaches the protection check meaningfully
+        // (its targetIds is already empty), and it must never be written as
+        // PLANNED — this IS the dry-run artifact the DC-5 human gate reads,
+        // so a plan that says "will delete" for a row that will always
+        // refuse is a defect of the plan, not just of apply.
+        if (plan.refusalReason) {
+          return {
+            resultId: plan.loser.resultId,
+            outcome: DuplicateRowOutcome.REFUSED,
+            reason: DuplicateResolutionRunner.AMBIGUOUS_IDENTITY_REASON,
+            expandedResultIds: plan.targetIds,
+            siblingIdsOutsideReportYear: plan.siblingIdsOutsideReportYear.length
+              ? plan.siblingIdsOutsideReportYear
+              : undefined,
+          };
+        }
+        return {
+          resultId: plan.loser.resultId,
+          outcome: plan.protectedIds.length
+            ? DuplicateRowOutcome.PROTECTED
+            : DuplicateRowOutcome.PLANNED,
+          reason: plan.protectedIds.length
+            ? `Retained: result(s) ${plan.protectedIds.join(', ')} are referenced by something that must survive.`
+            : undefined,
+          protectingRelationships: plan.protectedIds.length
+            ? plan.protectingRelationships
+            : undefined,
+          expandedResultIds: plan.targetIds,
+          siblingIdsOutsideReportYear: plan.siblingIdsOutsideReportYear.length
+            ? plan.siblingIdsOutsideReportYear
+            : undefined,
+        };
+      }),
     ];
 
     // --- 2. Audit, before anything is removed -------------------------------
@@ -195,6 +229,19 @@ export class DuplicateResolutionRunner {
     ) {
       for (const plan of plans) {
         if (plan.protectedIds.length) continue;
+        // A plan already REFUSED at plan time (above) has `targetIds: []` by
+        // construction, so the STAR guard never evaluated the family a delete
+        // would actually destroy — that family was never passed to
+        // `StarRelationshipService`. Attempting the delete anyway would be an
+        // unguarded, unaudited "self-heal" the moment the ambiguity clears,
+        // which is not "flagged for manual handling" (design.md D-dup-17).
+        // Skip it: the plan-time REFUSED outcome survives untouched into
+        // `recordOutcomes`, and a cleared ambiguity is picked up by the
+        // *next* plan run, where it is scoped, guarded, digested, and
+        // reviewed like every other deletion.
+        if (plan.refusalReason) continue;
+        // Matches PLANNED only — a REFUSED plan is skipped above and never
+        // reaches `deleteFullResultById`.
         const index = finalOutcomes.findIndex(
           (outcome) =>
             outcome.resultId === plan.loser.resultId &&
@@ -207,6 +254,13 @@ export class DuplicateResolutionRunner {
           const anyDeleted = results.some(
             (outcome) => outcome.status === ResultDeleteStatus.DELETED,
           );
+          // REFUSED (the identity had more than one live row — T-07 pivot)
+          // must never fall through to NOOP: a NOOP means the routine ran and
+          // found nothing, a REFUSED means it was never called at all, and
+          // the row needs manual handling, not silence.
+          const refused = results.some(
+            (outcome) => outcome.status === ResultDeleteStatus.REFUSED,
+          );
           if (anyDeleted) {
             await this.removeFromSearchIndex(plan.targetIds);
           }
@@ -214,7 +268,12 @@ export class DuplicateResolutionRunner {
             ...finalOutcomes[index],
             outcome: anyDeleted
               ? DuplicateRowOutcome.DELETED
-              : DuplicateRowOutcome.NOOP,
+              : refused
+                ? DuplicateRowOutcome.REFUSED
+                : DuplicateRowOutcome.NOOP,
+            reason: refused
+              ? DuplicateResolutionRunner.AMBIGUOUS_IDENTITY_REASON
+              : finalOutcomes[index].reason,
           };
         } catch (error) {
           // Never rethrown. The caller's catch rolls back the winner, and a

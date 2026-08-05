@@ -18,6 +18,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultDeleteRefusalReason } from '../../shared/utils/query.service';
 import { DuplicateResolutionMode } from './entities/result-duplicate-resolution-log.entity';
 import {
   DuplicateResolutionService,
@@ -104,6 +105,7 @@ const build = (options: Options = {}) => {
       reportYearId: 2024,
       targetIds: [id, id + 1],
       siblingIdsOutsideReportYear: [],
+      refusalReason: null,
     })),
   };
 
@@ -139,7 +141,15 @@ const build = (options: Options = {}) => {
     auditLog as never,
   );
 
-  return { service, runner, candidates, auditLog, dataSource, config };
+  return {
+    service,
+    runner,
+    candidates,
+    auditLog,
+    dataSource,
+    config,
+    queryService,
+  };
 };
 
 const tipVsAiccra = [
@@ -196,6 +206,28 @@ describe('DuplicateResolutionService — plan', () => {
     const plan = await service.plan({});
 
     expect(plan.groups[0].toDelete).toEqual([]);
+    expect(plan.rowsToDelete).toBe(0);
+  });
+
+  it('lists a refused loser separately from toDelete, not silently as an all-clear RESOLVED group', async () => {
+    // Reviewer FAIL (attempt 1), issue 2: a refused loser's scope.targetIds is
+    // already empty, so it silently disappeared from `expandedToDelete` with
+    // no trace — the group reported RESOLVED with `toDelete: []` and no
+    // reason, indistinguishable from "there was truly nothing to delete".
+    const { service, queryService } = build({ groups: tipVsAiccra });
+    queryService.resolveResultDeleteScope.mockResolvedValueOnce({
+      seedId: 20,
+      isSnapshot: false,
+      reportYearId: 2024,
+      targetIds: [],
+      siblingIdsOutsideReportYear: [21],
+      refusalReason: ResultDeleteRefusalReason.AMBIGUOUS_LIVE_ROWS,
+    });
+
+    const plan = await service.plan({});
+
+    expect(plan.groups[0].toDelete).toEqual([]);
+    expect(plan.groups[0].refused).toEqual([20]);
     expect(plan.rowsToDelete).toBe(0);
   });
 

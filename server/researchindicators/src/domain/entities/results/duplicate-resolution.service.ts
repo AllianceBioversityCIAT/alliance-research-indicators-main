@@ -188,6 +188,7 @@ export class DuplicateResolutionService {
       participants: DuplicateCandidate[];
       resolution: ReturnType<typeof resolveDuplicateGroup>;
       expandedToDelete: number[];
+      refusedLoserIds: number[];
     }[]
   > {
     const keys = await this.candidates.findCrossPlatformGroupKeys({
@@ -203,6 +204,7 @@ export class DuplicateResolutionService {
       participants: DuplicateCandidate[];
       resolution: ReturnType<typeof resolveDuplicateGroup>;
       expandedToDelete: number[];
+      refusedLoserIds: number[];
     }[] = [];
 
     for (let index = 0; index < keys.length; index += GROUP_BATCH_SIZE) {
@@ -221,6 +223,7 @@ export class DuplicateResolutionService {
         });
 
         const expandedToDelete: number[] = [];
+        const refusedLoserIds: number[] = [];
         if (
           resolution.classification === DuplicateGroupClassification.RESOLVED
         ) {
@@ -229,6 +232,14 @@ export class DuplicateResolutionService {
             const scope = await this.queryService.resolveResultDeleteScope(
               loser.resultId,
             );
+            // A refused identity contributes nothing to the deletion set —
+            // its targetIds is already empty — but it must be surfaced
+            // separately, not silently absorbed into an all-clear RESOLVED
+            // group with an empty toDelete and no explanation.
+            if (scope.refusalReason) {
+              refusedLoserIds.push(loser.resultId);
+              continue;
+            }
             const verdict = await this.starRelationships.evaluate(
               scope.targetIds,
             );
@@ -243,6 +254,7 @@ export class DuplicateResolutionService {
           participants,
           resolution,
           expandedToDelete,
+          refusedLoserIds,
         });
       }
     }
@@ -258,6 +270,7 @@ export class DuplicateResolutionService {
       participants: DuplicateCandidate[];
       resolution: ReturnType<typeof resolveDuplicateGroup>;
       expandedToDelete: number[];
+      refusedLoserIds: number[];
     }[],
     appliedDigest: string | null,
   ): DuplicateResolutionPlan {
@@ -271,6 +284,11 @@ export class DuplicateResolutionService {
         (participant) => participant.resultId,
       ),
       toDelete: group.expandedToDelete,
+      // Surfaced separately from toDelete so the plan and the audit row
+      // agree with what apply will actually do: a refused loser is not
+      // deleted, but a RESOLVED group with an empty toDelete and no `refused`
+      // entry reads as "nothing to do" rather than "needs manual handling".
+      refused: group.refusedLoserIds,
       reason: group.resolution.reason ?? null,
     }));
 

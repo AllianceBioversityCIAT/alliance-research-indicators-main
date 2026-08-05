@@ -27,7 +27,7 @@ import {
   resolveDuplicateGroup,
 } from '../utils/duplicate-result-priority.util';
 import { isEmpty } from '../utils/object.utils';
-import { QueryService } from '../utils/query.service';
+import { QueryService, ResultDeleteStatus } from '../utils/query.service';
 import {
   DuplicateCandidate,
   DuplicateCandidateRepository,
@@ -426,6 +426,22 @@ export class SaveResultService {
     // resolution and the single transaction — a raw call would bypass both.
     await this._queryService
       .deleteFullResultById(resultId)
+      .then((outcomes) => {
+        // T-07 pivot per-caller verdict: a REFUSED rollback resolves without
+        // throwing, so the `.catch` below never sees it — the row is left in
+        // place and, without this check, silently. A silently retained
+        // result on an ambiguous identity is a live row the duplicate
+        // matcher will see again on the next run.
+        if (
+          outcomes?.some(
+            (outcome) => outcome.status === ResultDeleteStatus.REFUSED,
+          )
+        ) {
+          this.logger.warn(
+            `Rollback of result ${resultId} was REFUSED: its identity has more than one live row, so snapshot ownership is undecidable. Needs manual handling — the row was NOT removed.`,
+          );
+        }
+      })
       .catch((error: Error) =>
         this.logger.error(
           `Rollback of result ${resultId} failed: ${error.message}`,

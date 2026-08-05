@@ -28,7 +28,10 @@ import { Result } from '../../../entities/results/entities/result.entity';
 import { ResultStatusEnum } from '../../../entities/result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import { ResultsService } from '../../../entities/results/results.service';
-import { QueryService } from '../../../shared/utils/query.service';
+import {
+  QueryService,
+  ResultDeleteStatus,
+} from '../../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { PooledFundingContractsService } from '../../../entities/pooled-funding-contracts/pooled-funding-contracts.service';
@@ -160,9 +163,22 @@ export class PrmsOpenSearchService
           this.logger.error(
             `Error processing result ${createNewResult.result_id}, rolling back. Error: ${errorMessage}`,
           );
-          await this._queryService.deleteFullResultById(
-            createNewResult.result_id,
-          );
+          // T-07 pivot per-caller verdict: the rollback can be REFUSED like
+          // any other delete — resolves without throwing, so a silent miss
+          // here leaves a live row on an ambiguous identity in place.
+          const rollbackOutcomes =
+            await this._queryService.deleteFullResultById(
+              createNewResult.result_id,
+            );
+          if (
+            rollbackOutcomes?.some(
+              (outcome) => outcome.status === ResultDeleteStatus.REFUSED,
+            )
+          ) {
+            this.logger.warn(
+              `Rollback of result ${createNewResult.result_id} was REFUSED: its identity has more than one live row, so snapshot ownership is undecidable. Needs manual handling — the row was NOT removed.`,
+            );
+          }
         }
         this.logger.error(`Error processing tip result: ${errorMessage}`);
       }

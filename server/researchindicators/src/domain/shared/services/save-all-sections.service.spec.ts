@@ -6,7 +6,7 @@ import { ResultsService } from '../../entities/results/results.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { DuplicateCandidateRepository } from '../../entities/results/repositories/duplicate-candidate.repository';
 import { DuplicateResolutionRunner } from './duplicate-resolution-runner.service';
-import { QueryService } from '../utils/query.service';
+import { QueryService, ResultDeleteStatus } from '../utils/query.service';
 import { CurrentUserUtil } from '../utils/current-user.util';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
@@ -467,6 +467,36 @@ describe('SaveResultService', () => {
 
       expect(queryService.deleteFullResultById).toHaveBeenCalledWith(42);
       expect(counters[CounterResultsEnum.ERROR]).toBe(1);
+    });
+
+    it('should warn, not throw, when the rollback delete is REFUSED', async () => {
+      // T-07 pivot per-caller verdict: `deleteFullResultById` resolves
+      // (never rejects) on a REFUSED outcome, so the `.catch` on the
+      // rollback promise never sees it — without inspecting the resolved
+      // array, a rollback that left the row in place would be silent.
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 43,
+        result_official_code: 7002,
+      } as any);
+      resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('x'));
+      queryService.deleteFullResultById.mockResolvedValueOnce([
+        { resultId: 43, status: ResultDeleteStatus.REFUSED },
+      ]);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+      const counters = new CounterResults();
+
+      await service.saveAllSections(
+        minimalResultDto(),
+        prmsExtraData(counters),
+      );
+
+      expect(queryService.deleteFullResultById).toHaveBeenCalledWith(43);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('43'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('manual handling'),
+      );
+      warnSpy.mockRestore();
     });
 
     it('should throw when platform code is missing', async () => {
