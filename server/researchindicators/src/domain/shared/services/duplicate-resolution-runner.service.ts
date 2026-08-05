@@ -41,10 +41,29 @@ export type ApplyGroupInput = {
   /** Every participant, in the same shape the resolver consumed. */
   participants: (DuplicateGroupParticipant & {
     resultOfficialCode?: number | null;
-    rawPublicLink?: string | null;
+    /** Renamed from `rawPublicLink` (T-15) — a lie on a PRMS participant, whose raw value is an evidence URL, not `public_link`. */
+    rawIdentity?: string | null;
     normalizedPublicLink?: string | null;
+    /** Which field supplied the identity (R-RES-009 AC.4). */
+    identitySource?: string | null;
   })[];
   resolution: DuplicateGroupResolution;
+  /**
+   * `resultId`s `refuseMultiIdentityLosers` already pulled out of
+   * `resolution.losers` and INTO `resolution.untouched`, before this
+   * resolution ever reached the runner (R-RES-010 AC.8, design §5.1 step 8).
+   *
+   * Without this the refusal is unobservable end to end: `resolution.untouched`
+   * carries no marker of WHY a row landed there, so every caller that holds
+   * the group map (`DuplicateResolutionService.collectGroups`,
+   * `SaveResultService.buildDuplicateGroup`) MUST pass the same
+   * `refusedResultIds` {@link refuseMultiIdentityLosers} returned them, so the
+   * durable audit record can say REFUSED-for-multi-identity rather than a
+   * bare UNTOUCHED indistinguishable from a row no rule ever named. Optional
+   * only so an as-yet-unmigrated caller does not fail to compile; an absent
+   * list means "none refused for this reason", never "don't ask".
+   */
+  multiIdentityRefusedResultIds?: number[];
 };
 
 export type ApplyGroupReport = {
@@ -94,6 +113,18 @@ export class DuplicateResolutionRunner {
   private static readonly AMBIGUOUS_IDENTITY_REASON =
     'Retained: this identity has more than one live row, so snapshot ownership is undecidable without a parent link. Refused rather than guessed — needs manual handling.';
 
+  /**
+   * Wording for a {@link refuseMultiIdentityLosers} refusal (R-RES-010 AC.8,
+   * D-dup-20) — distinct from {@link AMBIGUOUS_IDENTITY_REASON} above, which
+   * is a DIFFERENT refusal (undecidable snapshot ownership, T-07). Naming the
+   * REASON, not just the outcome, is what lets an operator reading the audit
+   * table tell "this participant itself resolves to more than one
+   * publication" from "no rule ever named this row" — both would otherwise
+   * read as the same bare UNTOUCHED.
+   */
+  private static readonly MULTI_IDENTITY_REASON =
+    "Retained: this participant resolves to more than one publication identity, so it is UNRESOLVED_CONFLICT for itself (R-RES-010 AC.8). Refused rather than guessed — the group's other members still resolve normally.";
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly queryService: QueryService,
@@ -119,6 +150,15 @@ export class DuplicateResolutionRunner {
         participant,
         input.normalizedPublicLink,
       ),
+    );
+
+    // Every id `refuseMultiIdentityLosers` already moved into
+    // `resolution.untouched` before this resolution reached the runner —
+    // named here so the audit record can distinguish them from a row no
+    // rule ever named (both currently live in `resolution.untouched`
+    // indistinguishably otherwise).
+    const multiIdentityRefusedIds = new Set(
+      input.multiIdentityRefusedResultIds ?? [],
     );
 
     // --- 1. Guard, over each loser's fully expanded family ------------------
@@ -150,10 +190,18 @@ export class DuplicateResolutionRunner {
     const plannedOutcomes: DuplicateRowOutcomeRecord[] = [
       ...resolution.untouched
         .filter((row) => row.resultId !== resolution.winner?.resultId)
-        .map((row) => ({
-          resultId: row.resultId,
-          outcome: DuplicateRowOutcome.UNTOUCHED,
-        })),
+        .map((row) =>
+          row.resultId !== null && multiIdentityRefusedIds.has(row.resultId)
+            ? {
+                resultId: row.resultId,
+                outcome: DuplicateRowOutcome.REFUSED,
+                reason: DuplicateResolutionRunner.MULTI_IDENTITY_REASON,
+              }
+            : {
+                resultId: row.resultId,
+                outcome: DuplicateRowOutcome.UNTOUCHED,
+              },
+        ),
       ...(resolution.winner
         ? [
             {
@@ -361,8 +409,9 @@ export class DuplicateResolutionRunner {
   private static toSnapshot(
     participant: DuplicateGroupParticipant & {
       resultOfficialCode?: number | null;
-      rawPublicLink?: string | null;
+      rawIdentity?: string | null;
       normalizedPublicLink?: string | null;
+      identitySource?: string | null;
     },
     fallbackNormalizedLink: string,
   ): DuplicateParticipantSnapshot {
@@ -372,9 +421,15 @@ export class DuplicateResolutionRunner {
       platformCode: String(participant.platformCode),
       indicatorId: participant.indicatorId ?? null,
       reportYearId: participant.reportYearId ?? null,
-      rawPublicLink: participant.rawPublicLink ?? null,
+      // `DuplicateParticipantSnapshot.rawPublicLink` keeps its historical
+      // field name (unlike the repository's `DuplicateCandidate`, which
+      // renamed it to `rawIdentity` — see that type's doc) so this audit
+      // JSON shape does not change under already-written rows; only the
+      // SOURCE it is populated from changes.
+      rawPublicLink: participant.rawIdentity ?? null,
       normalizedPublicLink:
         participant.normalizedPublicLink ?? fallbackNormalizedLink,
+      identitySource: participant.identitySource ?? null,
     };
   }
 

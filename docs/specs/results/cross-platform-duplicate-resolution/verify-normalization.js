@@ -129,11 +129,25 @@ const withoutCollation = (sql) =>
   // T-01 measured 116 live cross-platform groups. A materially different count
   // means the normalization changed behavior or the data moved; on dev this is a
   // regression check against a known baseline, never a production gate.
+  // NOTE (T-15, 2026-08-05): `dedupScopeSql` was split in the identity UNION
+  // work — it now carries ONLY the platform-invariant `is_active`/
+  // `is_snapshot` predicate. The `platform_code IN (…)` + "has a usable
+  // public_link" half that used to live inside it is restored HERE, inline,
+  // so this script's own 116-group baseline (measured against `public_link`
+  // only, pre-T-15) stays apples-to-apples. This script intentionally does
+  // NOT exercise the PRMS evidence branch T-15 added — it is scoped to the
+  // `public_link` normalization invariant it was written to prove, not to
+  // the full identity model. Not re-run as part of T-15 (no live-DB
+  // measurement was taken for this task); the next run against dev should
+  // still see ~116, since T-15 changes WHICH FIELD supplies PRMS's identity,
+  // not this script's `public_link`-only query shape.
   const [groups] = await conn.query(
     `SELECT COUNT(*) AS n FROM (
        SELECT ${normalizedPublicLinkSql('r.public_link')} AS k
        FROM results r
        WHERE ${dedupScopeSql('r')}
+         AND r.platform_code IN ('PRMS', 'TIP', 'AICCRA')
+         AND r.public_link IS NOT NULL AND TRIM(r.public_link) <> ''
        GROUP BY k
        HAVING COUNT(DISTINCT r.platform_code) > 1) t`,
   );

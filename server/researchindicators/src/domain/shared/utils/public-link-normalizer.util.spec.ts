@@ -137,24 +137,20 @@ describe('dedupScopeSql', () => {
     expect(sql).toContain('COALESCE(r.is_snapshot, FALSE) = FALSE');
   });
 
-  it('restricts to the three in-scope platforms', () => {
-    const sql = dedupScopeSql('r');
-    expect(sql).toContain("r.platform_code IN ('PRMS', 'TIP', 'AICCRA')");
-    expect(sql).not.toContain('STAR');
-    expect(sql).not.toContain('BILATERAL');
-  });
-
-  it('excludes rows without a usable public link', () => {
-    const sql = dedupScopeSql('r');
-    expect(sql).toContain('r.public_link IS NOT NULL');
-    expect(sql).toContain("TRIM(r.public_link) <> ''");
-  });
-
   it('honours the alias it is given', () => {
     expect(dedupScopeSql('x')).toContain('COALESCE(x.is_active, TRUE) = TRUE');
     expect(hasUsablePublicLinkSql('x.public_link')).toContain(
       'x.public_link IS NOT NULL',
     );
+  });
+
+  it('no longer carries the platform or identity-presence predicate (rev 3 split)', () => {
+    // That half moved into each UNION branch in publication-identity.util.ts,
+    // because the identity SOURCE is per-platform — a single shared predicate
+    // here could not describe both `public_link` and `result_evidences`.
+    const sql = dedupScopeSql('r');
+    expect(sql).not.toContain('platform_code');
+    expect(sql).not.toContain('public_link');
   });
 
   it('never references external_link', () => {
@@ -164,5 +160,13 @@ describe('dedupScopeSql', () => {
     expect(normalizedPublicLinkSql('r.public_link')).not.toContain(
       'external_link',
     );
+  });
+});
+
+describe('hasUsablePublicLinkSql', () => {
+  it('excludes rows without a usable public link', () => {
+    const sql = hasUsablePublicLinkSql('r.public_link');
+    expect(sql).toContain('r.public_link IS NOT NULL');
+    expect(sql).toContain("TRIM(r.public_link) <> ''");
   });
 });

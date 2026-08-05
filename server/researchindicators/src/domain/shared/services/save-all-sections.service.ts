@@ -24,6 +24,7 @@ import {
   DuplicateGroupClassification,
   DuplicateGroupParticipant,
   DuplicateGroupResolution,
+  refuseMultiIdentityLosers,
   resolveDuplicateGroup,
 } from '../utils/duplicate-result-priority.util';
 import { isEmpty } from '../utils/object.utils';
@@ -38,13 +39,19 @@ import {
 } from '../../entities/results/entities/result-duplicate-resolution-log.entity';
 import { ResultDuplicateResolutionLogService } from '../../entities/results/result-duplicate-resolution-log.service';
 import { DuplicateResolutionRunner } from './duplicate-resolution-runner.service';
-import { resolveIncomingPublicationIdentity } from '../utils/publication-identity.util';
+import {
+  PublicationIdentitySource,
+  resolveIncomingPublicationIdentity,
+} from '../utils/publication-identity.util';
 
 /** A participant enriched with the payload the audit record needs. */
 type SyncParticipant = DuplicateGroupParticipant & {
   resultOfficialCode?: number | null;
-  rawPublicLink?: string | null;
+  /** Renamed from `rawPublicLink` (T-15) — see `DuplicateCandidate.rawIdentity`'s doc. */
+  rawIdentity?: string | null;
   normalizedPublicLink?: string | null;
+  /** Which field supplied the identity (R-RES-009 AC.4). */
+  identitySource?: string | null;
 };
 
 /**
@@ -111,6 +118,14 @@ export class SaveResultService {
     let participants: SyncParticipant[] = [];
     let normalizedPublicLink: string = null;
     let incomingIsLoser = false;
+    // resultIds `refuseMultiIdentityLosers` pulled out of `resolution.losers`
+    // for R-RES-010 AC.8. Hoisted alongside `resolution` for the same reason:
+    // discarding this (as attempt 1 did) makes the refusal invisible on the
+    // sync path — no warn, and no audit row when it is the ONLY reason
+    // `losers` ends up empty (`hasDeletableLosers` below would otherwise
+    // never call `applyGroup`, and under a hard delete the audit row is the
+    // only surviving trace).
+    let multiIdentityRefusedResultIds: number[] = [];
 
     try {
       const isAppliedVersion = result?.is_version_applied ?? false;
@@ -142,10 +157,12 @@ export class SaveResultService {
       // match, so it is never used. The identity FIELD is platform-dependent
       // (R-RES-010, design §5.2 step 0): TIP/AICCRA keep `public_link`
       // unchanged; PRMS's own `public_link` (its `pdf_link`) NEVER
-      // contributes an identity — PRMS resolves from
-      // `dto.evidence.evidence[]` instead, in memory, because the sync path
-      // runs before the row is saved and the stored-side SQL branch is not
-      // available yet for the incoming row.
+      // contributes an identity — PRMS resolves in memory instead, from
+      // `item.knowledge_product_summary.handle` (rev 4; carried into
+      // `dto.evidence.evidence[]` by `processData`, never from
+      // `processKnowledgeProduct`), because the sync path runs before the
+      // row is saved and the stored-side SQL branch is not available yet for
+      // the incoming row.
       const identityResolution = resolveIncomingPublicationIdentity({
         platformCode: extraData.platformCode,
         indicatorId: result.createResult.indicator_id,
@@ -176,6 +193,20 @@ export class SaveResultService {
       participants = group.participants;
       normalizedPublicLink = group.normalizedPublicLink;
       incomingIsLoser = group.incomingIsLoser;
+      multiIdentityRefusedResultIds = group.multiIdentityRefusedResultIds;
+
+      if (multiIdentityRefusedResultIds.length) {
+        // Mirrors the incoming-side refusal warn above (:169-171) — this is
+        // the STORED side (R-RES-010 AC.8): one of this group's stored
+        // participants itself resolves to more than one publication
+        // identity, so it was pulled out of `resolution.losers` and will
+        // never reach `deleteFullResultById`. Silent here is how the FAIL
+        // this attempt fixes happened: the runner never gets asked, and
+        // without this warn nothing on the sync path says so either.
+        this.logger.warn(
+          `Result(s) ${multiIdentityRefusedResultIds.join(', ')} refused for duplicate resolution: identity resolves to more than one publication (R-RES-010 AC.8). Skipping deletion; needs manual handling.`,
+        );
+      }
 
       if (incomingIsLoser) {
         // Do not create or update. The loser's own stored family, if any, is
@@ -303,7 +334,21 @@ export class SaveResultService {
     // ---- the destructive step, outside the winner's try --------------------
     // Reached only after the winner is durably stored (or after an omission, where
     // nothing was written). A failure here is recorded per row and never rethrown.
-    if (resolution && this.hasDeletableLosers(resolution)) {
+    //
+    // The multi-identity-refused check is a SEPARATE reason to reach
+    // `applyGroup`, not folded into `hasDeletableLosers`: `resolution.losers`
+    // already excludes a refused participant by the time it gets here
+    // (`refuseMultiIdentityLosers` ran inside `buildDuplicateGroup`), so a
+    // group whose ONLY loser was refused has an empty `losers` and
+    // `hasDeletableLosers` returns false — without this OR, `applyGroup`
+    // (and therefore the audit row) would never be reached for that group,
+    // and a safety branch that fired on a production row would leave no
+    // trace of having fired.
+    if (
+      resolution &&
+      (this.hasDeletableLosers(resolution) ||
+        multiIdentityRefusedResultIds.length)
+    ) {
       try {
         await this._resolutionRunner.applyGroup({
           context: {
@@ -319,6 +364,7 @@ export class SaveResultService {
           normalizedPublicLink,
           participants,
           resolution,
+          multiIdentityRefusedResultIds,
         });
       } catch (error) {
         // The runner already isolates per-row failures; this only catches a
@@ -366,6 +412,8 @@ export class SaveResultService {
     participants: SyncParticipant[];
     normalizedPublicLink: string | null;
     incomingIsLoser: boolean;
+    /** resultIds `refuseMultiIdentityLosers` refused for R-RES-010 AC.8. */
+    multiIdentityRefusedResultIds: number[];
   }> {
     const rawLink = params.publicLink?.trim();
     if (!rawLink) {
@@ -375,6 +423,7 @@ export class SaveResultService {
         participants: [],
         normalizedPublicLink: null,
         incomingIsLoser: false,
+        multiIdentityRefusedResultIds: [],
       };
     }
 
@@ -391,7 +440,15 @@ export class SaveResultService {
       reportYearId: params.reportYearId,
       resultOfficialCode:
         params.findResult?.result_official_code ?? params.officialCode ?? null,
-      rawPublicLink: rawLink,
+      rawIdentity: rawLink,
+      // The incoming identity source follows the same per-platform table as
+      // the stored side (R-RES-010, design §3.1.1): PRMS resolves from its
+      // evidence-shaped `dto.evidence.evidence[]` entry, TIP/AICCRA from
+      // `public_link` unchanged.
+      identitySource:
+        params.platformCode === ReportingPlatformEnum.PRMS
+          ? PublicationIdentitySource.HANDLE_EVIDENCE
+          : PublicationIdentitySource.PUBLIC_LINK,
     };
 
     const stored: SyncParticipant[] = candidates
@@ -406,8 +463,10 @@ export class SaveResultService {
         indicatorId: candidate.indicatorId,
         reportYearId: candidate.reportYearId,
         resultOfficialCode: candidate.resultOfficialCode,
-        rawPublicLink: candidate.rawPublicLink,
+        rawIdentity: candidate.rawIdentity,
         normalizedPublicLink: candidate.normalizedPublicLink,
+        identitySource: candidate.identitySource,
+        identityCount: candidate.identityCount,
       }));
 
     const normalizedPublicLink =
@@ -418,7 +477,23 @@ export class SaveResultService {
       rawLink;
 
     const participants = [incoming, ...stored];
-    const resolution = resolveDuplicateGroup(participants);
+    const rawResolution = resolveDuplicateGroup(participants);
+
+    // R-RES-010 AC.8 — the SAME per-participant refusal the sweep applies
+    // (`DuplicateResolutionService.collectGroups`). Before this repository
+    // method could ever return a PRMS row (T-15's UNION), a stored PRMS
+    // candidate here was structurally impossible; now that it can appear,
+    // an ambiguous one must be pulled out of `.losers` before anything
+    // downstream (`hasDeletableLosers`, the loser loop below) can act on it
+    // — the resolver never learns what `identityCount` means, so nothing
+    // else in this path will stop it.
+    //
+    // `refusedResultIds` MUST be returned, not discarded: it is what lets
+    // `saveAllSections` warn about the refusal and still reach `applyGroup`
+    // (and therefore the durable audit row) when it is the ONLY reason
+    // `resolution.losers` ends up empty.
+    const { resolution, refusedResultIds: multiIdentityRefusedResultIds } =
+      refuseMultiIdentityLosers(rawResolution);
 
     const incomingIsLoser = resolution.losers.some(
       (loser) => loser.resultId === incoming.resultId,
@@ -429,6 +504,7 @@ export class SaveResultService {
       participants,
       normalizedPublicLink,
       incomingIsLoser,
+      multiIdentityRefusedResultIds,
     };
   }
 

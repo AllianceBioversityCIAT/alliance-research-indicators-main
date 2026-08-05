@@ -17,6 +17,7 @@ import {
   CounterResultsEnum,
 } from '../../tools/tip-integration/dto/response-year-tip.dto';
 import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
+import { PublicationIdentitySource } from '../utils/publication-identity.util';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
@@ -570,14 +571,20 @@ describe('SaveResultService', () => {
       resultId: number,
       platformCode: ReportingPlatformEnum,
       indicatorId: IndicatorsEnum,
+      identityCount = 1,
     ) => ({
       resultId,
       resultOfficialCode: resultId * 10,
       platformCode,
       indicatorId,
       reportYearId: 2024,
-      rawPublicLink: 'https://example.org/doc',
+      rawIdentity: 'https://example.org/doc',
+      identitySource:
+        platformCode === ReportingPlatformEnum.PRMS
+          ? PublicationIdentitySource.HANDLE_EVIDENCE
+          : PublicationIdentitySource.PUBLIC_LINK,
       normalizedPublicLink: 'example.org/doc',
+      identityCount,
     });
 
     it('skips deduplication entirely when there is no public link', async () => {
@@ -698,6 +705,41 @@ describe('SaveResultService', () => {
       expect(group.resolution!.losers).toEqual([]);
       expect(group.incomingIsLoser).toBe(false);
     });
+
+    it('refuses a stored candidate with identityCount > 1 on its own (R-RES-010 AC.8) — reachable only once the PRMS branch can surface here (T-15)', async () => {
+      // Before T-15's identity UNION, `findCandidatesForIncoming` could never
+      // return a PRMS row at all, so this composition was structurally
+      // unreachable. Now that it can, an ambiguous stored PRMS candidate must
+      // never end up in `resolution.losers` — the SAME refusal the sweep
+      // applies, applied here because this function is the OTHER component
+      // that holds the group map (design §5.1 step 8).
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        candidate(
+          88,
+          ReportingPlatformEnum.PRMS,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          2,
+        ),
+      ]);
+
+      const group = await service.buildDuplicateGroup({
+        publicLink: 'https://example.org/doc',
+        reportYearId: 2024,
+        platformCode: ReportingPlatformEnum.TIP,
+        indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      });
+
+      expect(group.resolution!.losers.some((l: any) => l.resultId === 88)).toBe(
+        false,
+      );
+      expect(
+        group.resolution!.untouched.some((l: any) => l.resultId === 88),
+      ).toBe(true);
+      // Reviewer FAIL (attempt 2): the caller discarded this list entirely,
+      // which is exactly what let the sync path warn about nothing and skip
+      // `applyGroup` when this refusal is the ONLY reason `losers` is empty.
+      expect(group.multiIdentityRefusedResultIds).toEqual([88]);
+    });
   });
 
   describe('saveAllSections duplicate handling', () => {
@@ -705,14 +747,20 @@ describe('SaveResultService', () => {
       resultId: number,
       platformCode: ReportingPlatformEnum,
       indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      identityCount = 1,
     ) => ({
       resultId,
       resultOfficialCode: resultId * 10,
       platformCode,
       indicatorId,
       reportYearId: 2024,
-      rawPublicLink: 'https://example.org/doc',
+      rawIdentity: 'https://example.org/doc',
+      identitySource:
+        platformCode === ReportingPlatformEnum.PRMS
+          ? PublicationIdentitySource.HANDLE_EVIDENCE
+          : PublicationIdentitySource.PUBLIC_LINK,
       normalizedPublicLink: 'example.org/doc',
+      identityCount,
     });
 
     /**
@@ -793,6 +841,43 @@ describe('SaveResultService', () => {
         500,
       ]);
       expect(applied.resolution.winner.resultId).toBe(600);
+    });
+
+    it('Reviewer FAIL (attempt 2) fix — reaches applyGroup and warns even when the ONLY loser was refused for multi-identity, so an audit row still exists', async () => {
+      // The hazard named in the FAIL report: `resolveDuplicateGroup` puts the
+      // PRMS row in `losers`, then `refuseMultiIdentityLosers` pulls it back
+      // out into `untouched` because its `identityCount` is 2 — so
+      // `resolution.losers` is EMPTY by the time `hasDeletableLosers` runs,
+      // and without the OR this attempt adds, `applyGroup` (and therefore the
+      // durable audit row) is never reached: a safety branch fires on a
+      // production row and leaves no trace of having fired.
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 700,
+        result_official_code: 7001,
+      } as any);
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(88, ReportingPlatformEnum.PRMS, undefined, 2),
+      ]);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.saveAllSections(dto, tipExtraData(counters));
+
+      expect(resolutionRunner.applyGroup).toHaveBeenCalledTimes(1);
+      const applied = resolutionRunner.applyGroup.mock.calls[0][0];
+      // Behavioral, not shape-of-a-string: the resolution actually handed to
+      // the runner has NO deletable loser (88 was refused), yet the call
+      // happened anyway, carrying the refused id so the runner can tag it.
+      expect(applied.resolution.losers).toEqual([]);
+      expect(applied.multiIdentityRefusedResultIds).toEqual([88]);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('88'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('more than one publication'),
+      );
+      warnSpy.mockRestore();
     });
 
     it('D11 REGRESSION (R-RES-010 AC.1/AC.2/AC.10) — an incoming PRMS KP row whose principal handle evidence matches a stored TIP public_link is omitted, TIP prevailing', async () => {

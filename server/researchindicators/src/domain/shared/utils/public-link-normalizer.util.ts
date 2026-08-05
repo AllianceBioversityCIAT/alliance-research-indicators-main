@@ -149,16 +149,26 @@ export const hasUsablePublicLinkSql = (columnRef: string): string =>
   `${columnRef} IS NOT NULL AND TRIM(${columnRef}) <> ''`;
 
 /**
- * Row-scope predicate shared by the sync lookup and the sweep scan.
+ * Row-scope predicate shared by every identity branch (rev 3, design §3.1.2).
  *
- * `is_snapshot` and `is_active` are nullable with no database default, so both
- * are read through `COALESCE`: a single NULL would otherwise silently shrink the
- * candidate set, which reads as "nothing to do" rather than as a fault.
+ * Deliberately narrower than it once was: it now carries ONLY the platform-
+ * and identity-source-INVARIANT predicates — `is_active`/`is_snapshot`, read
+ * through `COALESCE` because both are nullable with no database default, and
+ * a single NULL would otherwise silently shrink the candidate set, which
+ * reads as "nothing to do" rather than as a fault.
+ *
+ * `platform_code IN (…)` and "does this row have a usable identity" used to
+ * live here too, but the identity SOURCE is per-platform (§3.1.1) — PRMS
+ * draws it from `result_evidences`, TIP/AICCRA from `public_link` — so a
+ * single presence predicate can no longer describe both. That half of the
+ * old predicate moved into each `UNION ALL` branch in
+ * `publication-identity.util.ts` (`publicLinkIdentityScopeSql`,
+ * `prmsHandleEvidenceScopeSql`), which is why this is a SPLIT rather than a
+ * narrowing of behavior: every row that was in scope before still is, just
+ * via a branch-local predicate instead of one shared here.
  *
  * @param alias Trusted SQL alias of the `results` table.
  */
 export const dedupScopeSql = (alias: string): string =>
   `COALESCE(${alias}.is_active, TRUE) = TRUE
-   AND COALESCE(${alias}.is_snapshot, FALSE) = FALSE
-   AND ${alias}.platform_code IN ('PRMS', 'TIP', 'AICCRA')
-   AND ${hasUsablePublicLinkSql(`${alias}.public_link`)}`;
+   AND COALESCE(${alias}.is_snapshot, FALSE) = FALSE`;

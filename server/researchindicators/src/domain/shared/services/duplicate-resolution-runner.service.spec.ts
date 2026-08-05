@@ -18,6 +18,7 @@ import {
   DuplicateResolutionRunner,
   HARD_DELETE_ENABLED_KEY,
 } from './duplicate-resolution-runner.service';
+import { PublicationIdentitySource } from '../utils/publication-identity.util';
 
 const order: string[] = [];
 
@@ -124,8 +125,12 @@ const participant = (
   indicatorId,
   reportYearId: 2024,
   resultOfficialCode: resultId ? resultId * 10 : null,
-  rawPublicLink: 'https://example.org/doc',
+  rawIdentity: 'https://example.org/doc',
   normalizedPublicLink: 'example.org/doc',
+  identitySource:
+    platformCode === ReportingPlatformEnum.PRMS
+      ? PublicationIdentitySource.HANDLE_EVIDENCE
+      : PublicationIdentitySource.PUBLIC_LINK,
 });
 
 const winner = participant(
@@ -205,6 +210,28 @@ describe('DuplicateResolutionRunner — order is the safety property', () => {
       decidingRule: DuplicateRule.RULE_1_TIP,
       decidingResultId: 10,
       classification: DuplicateGroupClassification.RESOLVED,
+    });
+  });
+
+  it("names each participant's identity source in the audit snapshot (R-RES-009 AC.4)", async () => {
+    // Under a hard delete this is the only way to reconstruct WHY a row was
+    // considered a member of its group. The field is renamed on the input
+    // (`rawIdentity`, T-15 — `rawPublicLink` would be a lie on a PRMS
+    // participant) but keeps its historical name on the OUTPUT snapshot.
+    const { runner, auditLog } = build({});
+
+    await runner.applyGroup(input());
+
+    const snapshots = (auditLog.recordGroup.mock.calls[0][0] as any)
+      .participants;
+    const loserSnapshot = snapshots.find((p: any) => p.resultId === 20);
+    expect(loserSnapshot).toMatchObject({
+      rawPublicLink: 'https://example.org/doc',
+      identitySource: PublicationIdentitySource.HANDLE_EVIDENCE,
+    });
+    const winnerSnapshot = snapshots.find((p: any) => p.resultId === 10);
+    expect(winnerSnapshot).toMatchObject({
+      identitySource: PublicationIdentitySource.PUBLIC_LINK,
     });
   });
 });
@@ -340,6 +367,85 @@ describe('DuplicateResolutionRunner — failures are recorded, never rethrown', 
         expect.objectContaining({ outcome: DuplicateRowOutcome.FAILED }),
       ]),
     );
+  });
+});
+
+describe('DuplicateResolutionRunner — a multi-identity refusal is observable, not a bare UNTOUCHED', () => {
+  // Reviewer FAIL (attempt 2): `refuseMultiIdentityLosers` already moved the
+  // ambiguous participant into `resolution.untouched` before this resolution
+  // ever reaches the runner, so — without `multiIdentityRefusedResultIds` —
+  // the runner cannot tell it apart from a row no rule ever named. This is
+  // the tripwire's OBSERVABILITY: proving the outcome and reason actually
+  // land in the durable audit record, not just that a number was computed
+  // somewhere upstream.
+  const refusedParticipant = participant(
+    30,
+    ReportingPlatformEnum.PRMS,
+    IndicatorsEnum.KNOWLEDGE_PRODUCT,
+  );
+
+  const groupWithMultiIdentityRefusal = {
+    ...resolvedGroup,
+    untouched: [winner, refusedParticipant],
+  };
+
+  it('tags the refused participant REFUSED with the multi-identity reason, in the plan outcomes AND in the report', async () => {
+    const { runner } = build({});
+
+    const report = await runner.applyGroup({
+      ...input(groupWithMultiIdentityRefusal),
+      multiIdentityRefusedResultIds: [30],
+    });
+
+    const outcome = report.outcomes.find((entry) => entry.resultId === 30);
+    expect(outcome?.outcome).toBe(DuplicateRowOutcome.REFUSED);
+    expect(outcome?.reason).toContain('more than one publication identity');
+    // Never conflated with the OTHER refusal reason (T-07's undecidable
+    // snapshot ownership) — an operator reading the table must be able to
+    // tell the two apart.
+    expect(outcome?.reason).not.toContain('live row');
+  });
+
+  it("writes the REFUSED entry into recordGroup's plannedOutcomes — the durable trace, not just the in-memory report", async () => {
+    const { runner, auditLog } = build({});
+
+    await runner.applyGroup({
+      ...input(groupWithMultiIdentityRefusal),
+      multiIdentityRefusedResultIds: [30],
+    });
+
+    const plannedOutcomes = auditLog.recordGroup.mock.calls[0][0]
+      .plannedOutcomes as { resultId: number; outcome: string }[];
+    const entry = plannedOutcomes.find((o) => o.resultId === 30);
+    expect(entry?.outcome).toBe(DuplicateRowOutcome.REFUSED);
+    expect(
+      plannedOutcomes.some(
+        (o) => o.resultId === 30 && o.outcome === DuplicateRowOutcome.UNTOUCHED,
+      ),
+    ).toBe(false);
+  });
+
+  it('never attempts a delete for a multi-identity-refused participant even with hard delete on', async () => {
+    const { runner, queryService } = build({ hardDelete: 'true' });
+
+    await runner.applyGroup({
+      ...input(groupWithMultiIdentityRefusal),
+      multiIdentityRefusedResultIds: [30],
+    });
+
+    expect(queryService.resolveResultDeleteScope).not.toHaveBeenCalledWith(30);
+    expect(queryService.deleteFullResultById).not.toHaveBeenCalledWith(30);
+  });
+
+  it('falls back to a bare UNTOUCHED when the caller passes no multiIdentityRefusedResultIds (backward compatible)', async () => {
+    const { runner } = build({});
+
+    const report = await runner.applyGroup(
+      input(groupWithMultiIdentityRefusal),
+    );
+
+    const outcome = report.outcomes.find((entry) => entry.resultId === 30);
+    expect(outcome?.outcome).toBe(DuplicateRowOutcome.UNTOUCHED);
   });
 });
 

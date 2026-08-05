@@ -129,7 +129,7 @@ export class DuplicateResolutionPlanGroup {
   @ApiProperty({
     type: [Number],
     description:
-      'Loser seed ids retained because their identity has more than one live row, so snapshot ownership is undecidable (design.md §5.4.1). Never in `toDelete`; needs manual handling.',
+      "Loser seed ids retained rather than deleted, for one of two reasons: their identity has more than one live row so snapshot ownership is undecidable (design.md §5.4.1), or the participant itself resolves to more than one publication identity (R-RES-010 AC.8). Never in `toDelete`; needs manual handling. This array does not itself distinguish the two reasons — the durable audit record (`result_duplicate_resolution_log.outcomes[].reason`) does, and `DuplicateResolutionPlan.rowsRefusedMultiIdentity` isolates the second reason's count for the §14 tripwire.",
   })
   refused!: number[];
 
@@ -160,6 +160,13 @@ export class DuplicateResolutionPlan {
 
   @ApiProperty({ type: Number })
   rowsToDelete!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      "Total participants refused because they resolve to more than one publication identity (R-RES-010 AC.8, D-dup-20). Per-RESULT, not per-group — AC.8 classifies the result UNRESOLVED_CONFLICT for itself while its group's other members may still resolve normally, so this is deliberately NOT folded into byClassification below. The dev tripwire (design.md §14, tasks.md T-15) expects this at 0; a non-zero count means live data moved into the refused shape and must be investigated, never waived.",
+  })
+  rowsRefusedMultiIdentity!: number;
 
   @ApiProperty({
     type: Object,

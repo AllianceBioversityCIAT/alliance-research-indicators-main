@@ -16,6 +16,7 @@ import {
 } from './repositories/duplicate-candidate.repository';
 import {
   DuplicateGroupClassification,
+  refuseMultiIdentityLosers,
   resolveDuplicateGroup,
 } from '../../shared/utils/duplicate-result-priority.util';
 import {
@@ -99,6 +100,7 @@ export class DuplicateResolutionService {
           normalizedPublicLink: group.normalizedPublicLink,
           participants: group.participants,
           resolution: group.resolution,
+          multiIdentityRefusedResultIds: group.multiIdentityRefusedIds,
         });
       }
 
@@ -167,6 +169,7 @@ export class DuplicateResolutionService {
           normalizedPublicLink: group.normalizedPublicLink,
           participants: group.participants,
           resolution: group.resolution,
+          multiIdentityRefusedResultIds: group.multiIdentityRefusedIds,
         });
       }
 
@@ -189,6 +192,14 @@ export class DuplicateResolutionService {
       resolution: ReturnType<typeof resolveDuplicateGroup>;
       expandedToDelete: number[];
       refusedLoserIds: number[];
+      /**
+       * The subset of `refusedLoserIds` refused specifically for R-RES-010
+       * AC.8 (D-dup-20) — kept apart from the merged, per-group `refused`
+       * shape above so the §14 tripwire can count PARTICIPANTS, not groups,
+       * and so this exact list can be handed to `runner.applyGroup` for the
+       * durable audit record to tag REFUSED rather than a bare UNTOUCHED.
+       */
+      multiIdentityRefusedIds: number[];
     }[]
   > {
     const keys = await this.candidates.findCrossPlatformGroupKeys({
@@ -205,6 +216,7 @@ export class DuplicateResolutionService {
       resolution: ReturnType<typeof resolveDuplicateGroup>;
       expandedToDelete: number[];
       refusedLoserIds: number[];
+      multiIdentityRefusedIds: number[];
     }[] = [];
 
     for (let index = 0; index < keys.length; index += GROUP_BATCH_SIZE) {
@@ -218,12 +230,25 @@ export class DuplicateResolutionService {
           (member) => member.normalizedPublicLink === key.normalizedPublicLink,
         );
         // The sweep flags cross-year groups for review rather than resolving them.
-        const resolution = resolveDuplicateGroup(participants, {
+        const rawResolution = resolveDuplicateGroup(participants, {
           flagCrossYear: true,
         });
 
+        // R-RES-010 AC.8 — a participant with more than one qualifying
+        // identity is refused FOR ITSELF, before anything below can act on
+        // it. This MUST happen here, not only in the reporting loop further
+        // down: `resolution` (not `rawResolution`) is what gets stored on
+        // `collected[]` and later handed to `runner.applyGroup` by both
+        // `plan()` and `apply()` — a caller that forgot this step would pass
+        // the RAW, unfiltered losers straight through, and the runner has no
+        // `identityCount` predicate of its own to catch it on the way to a
+        // hard delete. The resolver stays identity-blind by design; this is
+        // the "component holding the group map" the refusal belongs to.
+        const { resolution, refusedResultIds: multiIdentityRefusedIds } =
+          refuseMultiIdentityLosers(rawResolution);
+
         const expandedToDelete: number[] = [];
-        const refusedLoserIds: number[] = [];
+        const refusedLoserIds: number[] = [...multiIdentityRefusedIds];
         if (
           resolution.classification === DuplicateGroupClassification.RESOLVED
         ) {
@@ -255,6 +280,7 @@ export class DuplicateResolutionService {
           resolution,
           expandedToDelete,
           refusedLoserIds,
+          multiIdentityRefusedIds,
         });
       }
     }
@@ -271,6 +297,7 @@ export class DuplicateResolutionService {
       resolution: ReturnType<typeof resolveDuplicateGroup>;
       expandedToDelete: number[];
       refusedLoserIds: number[];
+      multiIdentityRefusedIds: number[];
     }[],
     appliedDigest: string | null,
   ): DuplicateResolutionPlan {
@@ -303,6 +330,17 @@ export class DuplicateResolutionService {
       0,
     );
 
+    // The §14 / T-15 tripwire (design.md §14, tasks.md T-15): a PARTICIPANT
+    // count, not a group count — AC.8 classifies the RESULT `UNRESOLVED_CONFLICT`
+    // for itself while its group's other members may still resolve normally,
+    // so folding this into `byClassification` (per-group) would misreport
+    // group counts. Reachable from the plan response itself, not only from
+    // the audit table, so the tripwire does not depend on a second query.
+    const rowsRefusedMultiIdentity = groups.reduce(
+      (total, group) => total + group.multiIdentityRefusedIds.length,
+      0,
+    );
+
     // A run that found nothing has not proved nothing is there: the filter may be
     // wrong, or the scan may be looking in the wrong place. Reporting a bare
     // success would be indistinguishable from a working, empty database.
@@ -318,6 +356,7 @@ export class DuplicateResolutionService {
       filters,
       groupCount: groups.length,
       rowsToDelete,
+      rowsRefusedMultiIdentity,
       byClassification,
       groups: planGroups,
       message:

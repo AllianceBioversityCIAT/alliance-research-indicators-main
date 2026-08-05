@@ -19,12 +19,14 @@ import { DataSource } from 'typeorm';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultDeleteRefusalReason } from '../../shared/utils/query.service';
+import { DuplicateGroupClassification } from '../../shared/utils/duplicate-result-priority.util';
 import { DuplicateResolutionMode } from './entities/result-duplicate-resolution-log.entity';
 import {
   DuplicateResolutionService,
   SWEEP_LOCK_KEY,
 } from './duplicate-resolution.service';
 import { DuplicateResolutionStatus } from './dto/duplicate-resolution.dto';
+import { PublicationIdentitySource } from '../../shared/utils/publication-identity.util';
 
 type Options = {
   groups?: { key: string; members: Record<string, unknown>[] }[];
@@ -39,14 +41,20 @@ const member = (
   indicatorId: IndicatorsEnum,
   normalizedPublicLink: string,
   reportYearId = 2024,
+  identityCount = 1,
 ) => ({
   resultId,
   resultOfficialCode: resultId * 10,
   platformCode,
   indicatorId,
   reportYearId,
-  rawPublicLink: `https://${normalizedPublicLink}`,
+  rawIdentity: `https://${normalizedPublicLink}`,
+  identitySource:
+    platformCode === ReportingPlatformEnum.PRMS
+      ? PublicationIdentitySource.HANDLE_EVIDENCE
+      : PublicationIdentitySource.PUBLIC_LINK,
   normalizedPublicLink,
+  identityCount,
 });
 
 const build = (options: Options = {}) => {
@@ -229,6 +237,173 @@ describe('DuplicateResolutionService — plan', () => {
     expect(plan.groups[0].toDelete).toEqual([]);
     expect(plan.groups[0].refused).toEqual([20]);
     expect(plan.rowsToDelete).toBe(0);
+  });
+
+  it("refuses a multi-identity participant on its own, while its group's other members still resolve (R-RES-010 AC.8)", async () => {
+    // {TIP (wins), PRMS identityCount=2 (would lose), AICCRA non-CS (loses)}.
+    // The PRMS row must be refused FOR ITSELF and never reach toDelete, while
+    // the AICCRA row — an unrelated participant, ambiguous on nothing — is
+    // still expanded and scheduled exactly as it would be without the PRMS
+    // row's ambiguity. Freezing the whole group would reverse D-dup-9.
+    const group = {
+      key: 'doi.org/10.1/multi',
+      members: [
+        member(
+          30,
+          ReportingPlatformEnum.TIP,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          'doi.org/10.1/multi',
+        ),
+        member(
+          40,
+          ReportingPlatformEnum.PRMS,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          'doi.org/10.1/multi',
+          2024,
+          2,
+        ),
+        member(
+          50,
+          ReportingPlatformEnum.AICCRA,
+          IndicatorsEnum.INNOVATION_DEV,
+          'doi.org/10.1/multi',
+        ),
+      ],
+    };
+    const { service } = build({ groups: [group] });
+
+    const plan = await service.plan({});
+
+    expect(plan.groups[0].winnerResultId).toBe(30);
+    expect(plan.groups[0].toDelete).toEqual([50, 51]);
+    expect(plan.groups[0].refused).toEqual([40]);
+    expect(plan.rowsToDelete).toBe(2);
+    // The FAIL this attempt fixes: a `refused: [40]` assertion on the group
+    // ALONE proved nothing was observable elsewhere. `byClassification` is
+    // per-group and this group is (correctly) still RESOLVED, so it can
+    // never carry this signal — the tripwire needs its OWN aggregate,
+    // reachable from the plan response.
+    expect(plan.rowsRefusedMultiIdentity).toBe(1);
+    expect(plan.byClassification[DuplicateGroupClassification.RESOLVED]).toBe(
+      1,
+    );
+    expect(
+      plan.byClassification[DuplicateGroupClassification.UNRESOLVED_CONFLICT],
+    ).toBeUndefined();
+  });
+
+  it('threads the refused resultId to the runner as multiIdentityRefusedResultIds, so the durable audit record can tag it REFUSED rather than a bare UNTOUCHED', async () => {
+    // Behavioral, not shape-of-a-string: proves the PLAN and the AUDIT INPUT
+    // agree on which participant was refused, closing the gap the FAIL
+    // report named — `resolution.untouched` alone cannot tell a
+    // multi-identity refusal apart from a genuinely untouched row unless
+    // this list travels alongside it.
+    const group = {
+      key: 'doi.org/10.1/multi',
+      members: [
+        member(
+          30,
+          ReportingPlatformEnum.TIP,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          'doi.org/10.1/multi',
+        ),
+        member(
+          40,
+          ReportingPlatformEnum.PRMS,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          'doi.org/10.1/multi',
+          2024,
+          2,
+        ),
+      ],
+    };
+    const { service, runner } = build({ groups: [group] });
+
+    await service.plan({});
+
+    expect(runner.applyGroup.mock.calls[0][0]).toMatchObject({
+      multiIdentityRefusedResultIds: [40],
+    });
+  });
+
+  it('never asks the STAR guard about a multi-identity loser — it is refused before resolveResultDeleteScope is even called', async () => {
+    const group = {
+      key: 'doi.org/10.1/multi',
+      members: [
+        member(
+          30,
+          ReportingPlatformEnum.TIP,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          'doi.org/10.1/multi',
+        ),
+        member(
+          40,
+          ReportingPlatformEnum.PRMS,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          'doi.org/10.1/multi',
+          2024,
+          2,
+        ),
+      ],
+    };
+    const { service, queryService } = build({ groups: [group] });
+
+    await service.plan({});
+
+    expect(queryService.resolveResultDeleteScope).not.toHaveBeenCalledWith(40);
+  });
+
+  it('passes the ADJUSTED resolution to the runner, so apply() can never delete a multi-identity loser', async () => {
+    // The real hazard this test guards: collectGroups() computing a correct
+    // `refused` report is not enough if the RAW, unfiltered resolution still
+    // reaches the runner — the runner has no identityCount predicate of its
+    // own and would hard-delete the row the moment the flag is on.
+    const group = {
+      key: 'doi.org/10.1/multi',
+      members: [
+        member(
+          30,
+          ReportingPlatformEnum.TIP,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          'doi.org/10.1/multi',
+        ),
+        member(
+          40,
+          ReportingPlatformEnum.PRMS,
+          IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          'doi.org/10.1/multi',
+          2024,
+          2,
+        ),
+      ],
+    };
+    const { service, runner } = build({
+      groups: [group],
+      reviewedRun: [
+        { mode: DuplicateResolutionMode.DRY_RUN, created_at: new Date() },
+      ],
+    });
+
+    const plan = await service.plan({});
+    runner.applyGroup.mockClear();
+    await service.apply({
+      runId: 'r',
+      confirmationDigest: plan.confirmationDigest,
+      filters: {},
+    });
+
+    const passedResolution = (runner.applyGroup.mock.calls[0][0] as any)
+      .resolution;
+    expect(
+      passedResolution.losers.some(
+        (loser: { resultId: number }) => loser.resultId === 40,
+      ),
+    ).toBe(false);
+    expect(
+      passedResolution.untouched.some(
+        (row: { resultId: number }) => row.resultId === 40,
+      ),
+    ).toBe(true);
   });
 
   it('reports INCONCLUSIVE, never a bare success, when nothing matched', async () => {

@@ -54,8 +54,24 @@ export type DuplicateParticipantSnapshot = {
   platformCode: string;
   indicatorId: number | null;
   reportYearId: number | null;
+  /**
+   * The raw value that produced the identity. Field name kept as
+   * `rawPublicLink` for this stored JSON shape even though, for a PRMS
+   * participant (T-15, R-RES-010), the value is a `result_evidences.
+   * evidence_url` handle, never `public_link` — `identitySource` below is
+   * what disambiguates it. Under a hard delete this JSON is the only
+   * surviving trace of the deleted row, so it is written before deletion,
+   * not derived from it after the fact.
+   */
   rawPublicLink: string | null;
   normalizedPublicLink: string | null;
+  /**
+   * Which field supplied the identity — `PUBLIC_LINK` or `HANDLE_EVIDENCE`
+   * (R-RES-009 AC.4). Under a hard delete this is the only way to
+   * reconstruct WHY a row was considered a member of its group. `null` only
+   * for historical rows written before this field existed.
+   */
+  identitySource?: string | null;
 };
 
 export type DuplicateRowOutcomeRecord = {

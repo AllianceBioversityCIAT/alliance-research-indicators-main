@@ -20,7 +20,24 @@
  *
  * Run from `server/researchindicators`:
  *
- *   npx ts-node -T ../../docs/specs/results/cross-platform-duplicate-resolution/run-dry-run.ts
+ *   NODE_PATH="$PWD/node_modules" TS_NODE_PROJECT="$PWD/tsconfig.json" \
+ *     npx ts-node -T ../../docs/specs/results/cross-platform-duplicate-resolution/run-dry-run.ts
+ *
+ * **Both env vars are required — corrected 2026-08-05 (T-15).** The plain
+ * `npx ts-node -T …` form this header used to prescribe cannot work:
+ *   - There is **no root `tsconfig.json`**, so ts-node finds no project config and
+ *     falls back to its own defaults, compiling TypeORM's decorators with the TC39
+ *     transform instead of legacy `experimentalDecorators`. It fails with
+ *     `TypeError: Cannot read properties of undefined (reading 'constructor')`
+ *     out of `auditable.entity.ts` — which reads like a code bug and is not one.
+ *   - This script lives under `docs/specs/`, so Node resolves `require` from the
+ *     *script's* directory and cannot find `dotenv/config`. `NODE_PATH` fixes that;
+ *     the sibling `verify-normalization.js` instead shims it in-file with
+ *     `module.paths.unshift(path.join(process.cwd(), 'node_modules'))`.
+ *
+ * Expect ~34 minutes against the remote dev database, not seconds: the sweep issues
+ * thousands of short queries and is **round-trip bound**, not query bound (measured
+ * 2026-08-05 — five PROCESSLIST samples found zero long-running queries).
  *
  * Exits non-zero if any row count moved, so it can gate CI.
  */

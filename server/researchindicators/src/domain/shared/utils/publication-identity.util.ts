@@ -62,43 +62,76 @@
  * the types below, and do not describe this asymmetry as a live, accepted
  * risk in a PR — it is retired.
  *
- * ## Extension point for T-15
+ * ## The SQL form (T-15)
  *
- * T-15 adds the SQL form of this same predicate (the stored-side query the
- * sweep will use) BESIDE the in-memory form above, in this same file, so both
- * forms are edited together and cannot drift apart — the same reason
- * `public-link-normalizer.util.ts` is the single home for the public-link
- * expression both the sync lookup and the sweep scan share. Nothing below is
- * structured around `public_link`, so that addition needs no rework here.
+ * T-15 adds the SQL form of this same predicate — the stored-side query the
+ * sweep and the sync lookup both read through
+ * `DuplicateCandidateRepository`'s identity `UNION ALL` (design §3.1.2) —
+ * BESIDE the in-memory form above, in this same file, so both forms are
+ * edited together and cannot drift apart. See
+ * {@link isHandleFormatIdentitySql}, {@link publicLinkIdentityScopeSql} and
+ * {@link prmsHandleEvidenceScopeSql} below.
+ *
+ * The two forms are no longer asserting the same equivalence rev 3 planned
+ * (§3.1.1): the stored side reads a `result_evidences` ROW, the in-memory
+ * form above reads a payload SCALAR. What both forms provably share instead
+ * is the canonical handle SHAPE — {@link HANDLE_FORMAT_PATTERN} in memory,
+ * {@link isHandleFormatIdentitySql} in SQL — derived from the one pattern
+ * source below so they cannot describe two different shapes
+ * (`publication-identity.util.spec.ts`'s "stored-vs-incoming handle-format
+ * agreement" suite proves this). Whether the STORED evidence handle and the
+ * INCOMING payload handle agree for a given real result is a fact about
+ * DATA, not about this code, and no unit test can establish it — that is
+ * T-14's job (measured baseline 2026-08-05: 277/277 live KP items).
  */
 
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
+import { EvidenceRoleEnum } from '../../entities/evidence-roles/enums/evidence-role.enum';
 import { isEmpty } from './object.utils';
+import {
+  hasUsablePublicLinkSql,
+  normalizedPublicLinkSql,
+} from './public-link-normalizer.util';
 
 /**
  * Canonical handle shape, applied to the NORMALIZED value:
  * `hdl.handle.net/<digits>/<digits>` exactly — no scheme, no `www.`, no
  * trailing slash, no extra path segments (R-RES-010, PRMS identity predicate
  * condition 4).
+ *
+ * Declared once as a bare pattern SOURCE, not as a JS `RegExp` literal,
+ * because {@link isHandleFormatIdentitySql} builds the SQL `REGEXP` form from
+ * this SAME string — one canonical shape feeding both the in-memory and the
+ * SQL predicate, so a future edit to "what counts as a handle" cannot change
+ * one side and silently leave the other testing something else. `[0-9]`
+ * rather than `\d`: MySQL 8's ICU-backed `REGEXP` supports Perl shorthand, but
+ * an explicit character class needs no version assumption to read correctly
+ * on either side.
  */
-const HANDLE_FORMAT_PATTERN = /^hdl\.handle\.net\/\d+\/\d+$/;
+const HANDLE_FORMAT_PATTERN_SOURCE = '^hdl\\.handle\\.net/[0-9]+/[0-9]+$';
+const HANDLE_FORMAT_PATTERN = new RegExp(HANDLE_FORMAT_PATTERN_SOURCE);
 
 /**
  * In-memory mirror of `normalizedPublicLinkSql`'s (`public-link-normalizer.util.ts`)
  * trim / scheme / `www.` / host-case / `dx.doi.org` / trailing-slash rules.
  *
  * This is NOT the cross-platform comparison itself — that still runs entirely
- * in SQL (`DuplicateCandidateRepository`, untouched by this task, per its hard
- * scope bound: no SQL form here) with the identical expression applied to
- * both sides, which is what makes R-RES-001 AC.6 ("the normalization applied
- * to a PRMS handle is byte-identical to the one applied to a TIP public_link")
- * true by construction: the raw handle string this file selects is handed to
- * the same SQL path a raw `public_link` would be. This mirror exists ONLY to
- * decide, in memory, whether one evidence entry's `evidence_url` is
- * handle-shaped before it is allowed to become an identity candidate at all —
- * a decision the SQL side never has to make because it only ever reads
- * `public_link`.
+ * in SQL, in `DuplicateCandidateRepository`'s identity `UNION ALL`, with the
+ * identical expression applied to both sides, which is what makes R-RES-001
+ * AC.6 ("the normalization applied to a PRMS handle is byte-identical to the
+ * one applied to a TIP public_link") true by construction: the raw handle
+ * string this file selects is handed to the same SQL path a raw `public_link`
+ * would be. **Rev 4 correction:** the SQL side is no longer "untouched by
+ * this task" and no longer "only ever reads `public_link`" — T-15 adds that
+ * SQL form BELOW, in this same file ({@link isHandleFormatIdentitySql},
+ * {@link publicLinkIdentityScopeSql}, {@link prmsHandleEvidenceScopeSql}),
+ * and its PRMS branch reads `result_evidences.evidence_url` and applies the
+ * identical handle-format filter this in-memory mirror exists to apply. This
+ * mirror still decides, in memory, whether one INCOMING evidence entry's
+ * `evidence_url` is handle-shaped before it is allowed to become an identity
+ * candidate at all — the stored side makes the equivalent decision in SQL,
+ * not none at all.
  *
  * Path case and non-empty query parameters are deliberately never folded —
  * folding either is over-matching, and over-matching here means a hard delete
@@ -223,3 +256,90 @@ export function resolveIncomingPublicationIdentity(params: {
   const rawLink = params.publicLink?.trim();
   return { identity: rawLink || null, refused: false };
 }
+
+// ---------------------------------------------------------------------------
+// SQL form (T-15) — the stored-side query `DuplicateCandidateRepository`
+// composes into its identity `UNION ALL` (design §3.1.2, §3.1.3).
+// ---------------------------------------------------------------------------
+
+/** Which field supplied a candidate's identity (R-RES-009 AC.4). */
+export enum PublicationIdentitySource {
+  PUBLIC_LINK = 'PUBLIC_LINK',
+  HANDLE_EVIDENCE = 'HANDLE_EVIDENCE',
+}
+
+/**
+ * SQL `REGEXP` form of {@link isHandleFormatIdentity}, tested against the
+ * ALREADY-NORMALIZED, binary-collated expression (never the raw column) —
+ * exactly like the in-memory form, which only ever tests
+ * {@link normalizeIdentityCandidate}'s output.
+ *
+ * The pattern text is escaped, not hand-copied: `HANDLE_FORMAT_PATTERN_SOURCE`
+ * contains one literal backslash before each `.` (`\.`, matching a literal
+ * dot). A MySQL single-quoted string literal itself interprets a backslash as
+ * an escape character, so surviving that layer needs the backslash DOUBLED in
+ * the SQL text — `.replace(/\\/g, '\\\\')` does exactly that and nothing
+ * else, so the regex the engine ultimately evaluates is byte-identical to the
+ * one {@link HANDLE_FORMAT_PATTERN} runs in memory (see this file's spec,
+ * "stored-vs-incoming handle-format agreement", which extracts this literal
+ * back out of the generated SQL and proves the round trip rather than
+ * asserting it by construction).
+ *
+ * No `?` appears in the pattern, so there is no mysql2 bind-placeholder risk
+ * (`public-link-normalizer.util.ts`'s operand-binding note).
+ */
+const HANDLE_FORMAT_SQL_PATTERN = HANDLE_FORMAT_PATTERN_SOURCE.replace(
+  /\\/g,
+  '\\\\',
+);
+
+export const isHandleFormatIdentitySql = (operand: string): string =>
+  `${normalizedPublicLinkSql(operand)} REGEXP '${HANDLE_FORMAT_SQL_PATTERN}'`;
+
+/**
+ * TIP/AICCRA branch scope (design §3.1.1 / §3.1.2): identity is
+ * `results.public_link`, unchanged, with NO format filter — R-RES-010 AC.6
+ * measured AICCRA at 315/584 handle-format, so a filter here would drop 269
+ * real rows out of scope.
+ *
+ * Deliberately does NOT include {@link dedupScopeSql} — that predicate is
+ * platform- and identity-source-INVARIANT (`is_active`/`is_snapshot`) and is
+ * applied once by the caller alongside this branch-local predicate, never
+ * duplicated into it.
+ */
+export const publicLinkIdentityScopeSql = (resultAlias: string): string =>
+  `${resultAlias}.platform_code IN ('TIP', 'AICCRA')
+   AND ${hasUsablePublicLinkSql(`${resultAlias}.public_link`)}`;
+
+/**
+ * PRMS branch scope (design §3.1.1 / §3.1.2) — the SQL mirror of
+ * {@link resolveIncomingPublicationIdentity}'s STORED-side conditions, all
+ * four conjunctive (R-RES-010):
+ *
+ *  1. KP-only (`indicator_id = 3`) — a handle on any other indicator is a
+ *     citation, not this result's own publication (DC-10);
+ *  2. `evidence_role_id = 1` (`EvidenceRoleEnum.PRINCIPAL_EVIDENCE`);
+ *  3. `COALESCE(is_private, FALSE) = FALSE`;
+ *  4. `COALESCE(is_active, TRUE) = TRUE` — measured to change nothing today
+ *     (2,792 rows either way), required anyway so a retracted evidence
+ *     cannot confer identity;
+ *  plus the handle-format filter, required on this branch only.
+ *
+ * The caller `JOIN`s `result_evidences` and MUST also `GROUP BY (result_id,
+ * normalized identity)` — this predicate alone does not deduplicate
+ * `result_evidences`' missing unique constraint on `(result_id,
+ * evidence_url)` (JD3-S-04); that is the repository's job, not this
+ * function's.
+ */
+export const prmsHandleEvidenceScopeSql = (params: {
+  resultAlias: string;
+  evidenceAlias: string;
+}): string => {
+  const { resultAlias, evidenceAlias } = params;
+  return `${resultAlias}.platform_code = 'PRMS'
+   AND ${resultAlias}.indicator_id = ${IndicatorsEnum.KNOWLEDGE_PRODUCT}
+   AND ${evidenceAlias}.evidence_role_id = ${EvidenceRoleEnum.PRINCIPAL_EVIDENCE}
+   AND COALESCE(${evidenceAlias}.is_private, FALSE) = FALSE
+   AND COALESCE(${evidenceAlias}.is_active, TRUE) = TRUE
+   AND ${isHandleFormatIdentitySql(`${evidenceAlias}.evidence_url`)}`;
+};

@@ -590,3 +590,156 @@ R-RES-010 AC.1, AC.2, AC.5, AC.9, **AC.10 (both parts — the mapper test AND th
 ### Outstanding after T-13 — none owed by this task
 
 The Implementer's remaining `Not Done` items are all genuinely out of scope: AC.10 part 2 was closed by the Leader's own live observation earlier this session; RB-10's re-measurement and T-14/T-15 are separate tasks; `apply` remains blocked by OQ-7, OQ-8, OQ-11 and T-11 independently of T-13.
+
+---
+
+## T-15 — Attempt 1: Reviewer **FAIL** (split lenses: conformance PASS, risk FAIL)
+
+- **Status:** `[~]` in progress — attempt 2 dispatched
+- **Date:** 2026-08-05
+- **Task:** T-15 — Stored-side identity `UNION` in the candidate repository
+- **Review mode:** parallel lens reviewers (effort `xhigh` + data-loss surface, per `/akili-execute` 4R table). Lens A *spec conformance + SQL correctness* → **PASS**. Lens B *risk / data-loss + over-deletion* → **FAIL**, one issue.
+- **Skills assigned:** `nestjs-expert`, `tdd`. **Deviation from the task list:** dropped `api-design-principles` — T-15 designs no endpoint; the work is SQL and repository shape. Added `tdd` because the ACs are table-driven negative cases where red-green earns its cost.
+- **Effort:** `xhigh` on attempt 1, **held at `xhigh` for attempt 2** rather than bumped to `max`: the Implementer runs on a T2 model and the tier↔effort rule forbids maxing a cheaper tier. The rework compensates with a fully specified remediation instead of more depth.
+
+### Files changed (attempt 1)
+
+16 files, 1,117 insertions / 83 deletions. Two-branch `UNION ALL` in `duplicate-candidate.repository.ts` across all three reads; SQL form added to `publication-identity.util.ts`; `dedupScopeSql` narrowed in `public-link-normalizer.util.ts`; `identityCount` + `refuseMultiIdentityLosers` in `duplicate-result-priority.util.ts`; refusal applied in `duplicate-resolution.service.ts` (sweep) and `save-all-sections.service.ts` (sync); `identitySource` through `duplicate-resolution-runner.service.ts` into `result-duplicate-resolution-log.entity.ts`; new `duplicate-candidate.repository.spec.ts`; five sibling specs updated.
+
+### Verification (Implementer-reported, Leader to re-measure before `[x]`)
+
+`npm test -- --silent` 331 suites / 2300 tests green (baseline 330 / 2255) · `npx tsc --noEmit` clean · `npm run lint -- --quiet` clean, formatting-only mutations.
+
+### The FAIL, and why the two lenses disagreed
+
+Lens B found the multi-identity refusal **fires but is unobservable**, so the tripwire built on it is **zero by construction** — DC-7's pathology aimed at the one branch standing between an ambiguous identity and an irreversible delete. Traced: `byClassification` derives from *group* classification, so the branch can never raise a non-zero `UNRESOLVED_CONFLICT`; the audit row records the refused participant as `UNTOUCHED` with no reason, though the runner already owns `REFUSED` + `AMBIGUOUS_IDENTITY_REASON` for the sibling refusal; the plan merges it into an untyped `refused: number[]`; and on the sync path, when the refusal empties `losers`, `hasDeletableLosers` returns false, `applyGroup` never runs, and **no audit row is written at all**.
+
+Lens A saw the sync-path silence and **downgraded it to advisory**, reasoning that *"'reported in full' is R-RES-009's surface (the sweep plan)"*. Lens B showed the sweep plan cannot distinguish it either, which removes lens A's stated ground for the downgrade. **Adjudicated in favour of lens B on evidence.** R-RES-010 AC.8 is in T-15's covered requirements and its normative text requires "reported in full" — in scope, valid, rework attempt consumed.
+
+**This is the case for parallel lenses rather than one checklist reviewer:** a single reviewer holding lens A's reasoning would have returned PASS, and the gate would have shipped unable to fire.
+
+### What lens A established independently (claims NOT accepted on report)
+
+1. **`GROUP BY` is *stronger* than the design's `DISTINCT` wording, not a weaker substitute.** `SELECT DISTINCT` over the projected columns includes `rawIdentity`, so two raw variants normalizing to one key (`…/141764` and `…/141764/`) would still emit two rows for one `result_id` — the exact JD3-S-04 failure. Grouping on the normalized alias collapses them. Design §3.1.2's phrase is faithfully implemented; **the design's own wording was the weaker specification.**
+2. All four AC.3 conditions conjunctive and **correctly polarised in both NULL directions**; `EvidenceRoleEnum.PRINCIPAL_EVIDENCE = 1` and `IndicatorsEnum.KNOWLEDGE_PRODUCT = 3` verified against the enums, not assumed.
+3. Binary collation resolves at **all five** comparison sites (branch-2 `GROUP BY`, `COUNT(DISTINCT)`, the group-key scan, the incoming equality, the member `IN`). R-RES-001 AC.2 is satisfiable.
+4. All three reads sit on the union — including `findCrossPlatformGroupKeys`, which *is* the group scan. No read left on the old `results`-only source.
+5. The agreement test's regex round-trip is real, not a tautology: the unescaping inverts MySQL's literal parsing exactly, and `REGEXP_REPLACE` cannot mis-capture the boolean predicate's literal.
+6. The resolver stays identity-blind; `refuseMultiIdentityLosers` is called only from the two components design §5.1 step 8 names.
+
+### Leader-side findings, measured rather than delegated
+
+- **`tasks.md` gave the wrong path for two files.** The utils live at `domain/shared/utils/`, not `shared/utils/`. Corrected in the brief before dispatch; a wrong path is how a worker invents a second file.
+- **The collation risk lens A could not measure is a measured non-issue.** Lens A raised that the `rawIdentity` UNION column might mix two collations of the same charset, raising `ER_CANT_AGGREGATE_2COLLATIONS` and breaking all three reads at runtime — invisible to a suite that mocks `query()`. Queried the dev schema: `results.public_link` and `result_evidences.evidence_url` are **both `utf8mb3` / `utf8mb3_general_ci`**, identical charset *and* collation, and a live UNION probe of the emitted shape returns rows. No `CAST` hardening needed; attempt 2 told explicitly not to add one.
+- **DC-2's "post-run verification query" does not exist.** T-15's implementation notes say to "pin DC-2's post-run verification query to the R-RES-010 identity". Searched every `.ts`/`.js`/`.sql` in `server/researchindicators` and the spec folder: **no artifact implements it.** DC-2 has only ever been a description in the `requirements.md` §3.0 table. This is the **fifth** instance of this spec's signature root cause — an instruction written on the assumption that code already exists — and the first caught by a worker before it cost an attempt. **Unresolved: awaiting the owner's decision** on whether it lands in T-14 (recommended — it is a post-run check against a populated DB, which is T-14's class), is authored inside T-15, or is recorded as owed. It gates `apply`, not the build.
+- **A false premise in the Leader's own brief, corrected by the Implementer.** The brief stated that `SaveResultService.buildDuplicateGroup` already handled the multi-identity refusal "from T-13". It did not: T-13 covered only the *incoming payload's own* scalar case. A **stored** PRMS candidate with `identityCount > 1` reaching the sync path was structurally impossible until this task added the PRMS branch to `findCandidatesForIncoming`, and became reachable the moment it did — leaving a path where a TIP/AICCRA sync run could hard-delete an ambiguous PRMS row with no refusal. Both lenses independently confirmed the hazard was real and that the applied fix closes it upstream of `incomingIsLoser`. Design §5.1 step 8 names both call sites, so this was in-scope work the brief mis-stated. **Recorded because the worker catching the Leader's error is the second time this spec has needed the `Not Done` field to do that** (T-13 rev 4 was the first).
+
+### ADVISORY findings — recorded, non-gating, NOT new tasks
+
+Carried into attempt 2 **only where they repair coverage T-15 already claims** (a test that cannot fail is not coverage on a path whose failure mode is irreversible deletion):
+
+- **The JD3-S-04 `GROUP BY` test cannot fail.** The spec splits the SQL on `UNION ALL`, so `branch2` also contains the outer group scan; deleting the PRMS branch's entire `GROUP BY` clause leaves all three assertions green.
+- **A vacuous ordering assertion** — `indexOf('REGEXP')` matches the normalizer's internal `REGEXP_REPLACE`, and `TRIM(` sits at offset ~6 of the `CAST((TRIM(TRAILING …` prefix, so it passes by construction.
+- **Collation asserted nowhere.** The guarantee is now *inherited* from the CTE projection rather than carried at each site. Correct today; a future branch silently returns to case/accent folding, whose failure direction is a hard delete of a distinct publication.
+- **`identityCount` parses fail-open.** `Number(row.identityCount)` → `NaN`, and `(NaN ?? 1) > 1` is `false`, so a projection regression makes the refusal **silently never fire while still being credited**.
+- **Three stale comments contradict rev 4**, including a fresh one describing PRMS's incoming source as `dto.evidence.evidence[]` — the claim R-RES-010 rev 4 retired. Both lenses flagged it; this is how the spec's root cause returns.
+
+Deliberately **not** carried (out of scope, recorded and dying here): the reverse 1:1 direction (`design.md:777` says no branch catches it; **T-14** owns the bidirectional assertion), the `identityCount` subquery's unmeasured cost (NFR-RES-002 sets no latency target; time it during the live run), and deleting the now-dead `normalizedPublicLinkMatchSql`.
+
+### Leader bookkeeping owed
+
+`tasks.md` T-15 "Files touched" omits `save-all-sections.service.ts`, `duplicate-resolution-runner.service.ts` and `duplicate-result-priority.util.ts` — all three required by design §5.1 step 8. The diff is right; the task list is stale.
+
+### Methodology deviation, recorded
+
+The diff was **persisted to a scratchpad file and pointed at**, rather than inlined into both Reviewer briefs. `/akili-execute` 2.3 says to always inline it, on the stated ground that a `Read`/`Grep`/`Glob`-only Reviewer cannot regenerate it — persisting satisfies that ground, and pointing twice instead of inlining 77 KB twice saved the Leader's output budget on a task with a 3-attempt loop to fund.
+
+---
+
+## T-15 — Attempt 2: Reviewer **PASS** ✅ (both lenses)
+
+- **Date:** 2026-08-05
+- **Attempt:** 2 of 3. **Attempt 3 deliberately unspent** — see *Advisories not actioned* below.
+- **Review mode:** two reviewers, chosen for different reasons. The attempt-1 risk lens was **resumed with its own trace intact** to judge whether its FAIL was genuinely closed (it had already walked the control flow to the delete call, so it was best placed to tell a real fix from one that only looks like it). A **fresh** lens was spawned on the two riskiest *new* edits, deliberately with no prior investment in the diff. **Both returned `STATUS: PASS`.**
+- **Effort:** held at `xhigh`, not bumped to `max` — the Implementer runs on a T2 model and the tier↔effort rule forbids maxing a cheaper tier. The compensation was a fully specified remediation, which was appropriate here: the failure was not under-thinking a hard problem, it was a gap nobody had named.
+
+### What changed
+
+`MULTI_IDENTITY_REASON` + `ApplyGroupInput.multiIdentityRefusedResultIds` in the runner, tagging refused rows `REFUSED` instead of a reasonless `UNTOUCHED`; `rowsRefusedMultiIdentity` threaded through `duplicate-resolution.service.ts` into the plan DTO; sync-path `warn` plus a widened `applyGroup` gate so a refusal-only-emptied `losers` still writes an audit row; `toCandidate` fail-closed on a non-finite `identityCount`; four vacuous-or-absent test assertions repaired; three stale comments corrected to the rev-4 model. Cumulative diff **17 files, 1,613 insertions / 102 deletions**.
+
+### Verification — measured by the Leader, not taken from the report
+
+| Check | Result |
+| --- | --- |
+| `npm test -- --silent` | **331 suites / 2310 tests passed** (attempt 1: 331 / 2300) |
+| `npx tsc --noEmit` | clean, exit 0 |
+| `npm run lint -- --quiet` | stable — the Implementer ran it twice, second pass produced zero further diffs; `git status` shows no unexpected files |
+
+### What the reviewers established independently
+
+1. **The widened `applyGroup` gate cannot reach a delete, and the proof is stronger than the question.** All deletion sits inside `for (const plan of plans)`, and `plans` is built exclusively from `resolution.losers` — empty in exactly the case the OR admits. Beyond that: `resolveDuplicateGroup`'s `none()` helper hard-codes `losers: []` for **every** non-`RESOLVED` classification, and `refuseMultiIdentityLosers` derives the refused ids only from `losers`. So a non-empty refused list **implies** `classification === RESOLVED` — the gate admits no classification `hasDeletableLosers` did not already admit, and cannot pull a `CROSS_YEAR_REVIEW` group into `applyGroup`. The refused row is unreachable via the loser loop, family/snapshot expansion, and STAR-guard scope resolution alike.
+2. **The audit entry survives the apply phase.** `finalOutcomes` only mutates entries found at a **loser's** id; a refused participant lives in `untouched` and is never a mutation candidate, so `recordOutcomes` rewrites the column with the `REFUSED` entry intact. Traced into `result-duplicate-resolution-log.service.ts`, not inferred from the diff.
+3. **The `throw`'s blast radius is bounded, and both lenses reached it independently.** `apply()` runs `collectGroups` to completion — every batch, every `toCandidate` — **before** the first `applyGroup`; `GROUP_BATCH_SIZE` batches the member *query*, not the deletes, and `collectGroups` performs no writes. So a malformed row in batch 40 of 48 throws with **zero rows deleted**, and the `finally` still releases the sweep lock. **The partially-applied-`apply` hazard the Leader raised does not exist on this code.** On the sync path it lands in the existing per-row `try` → `ERROR` counter, before `createResult`, so there is nothing to roll back.
+4. **`throw` beats the alternative the Leader offered.** Both lenses judged "refuse as ambiguous" *worse*: it is equally fail-closed but launders a **code defect** into the same `refused` channel as a legitimate **data** refusal — relocating attempt 1's observability collapse rather than avoiding it.
+5. **Every new assertion is revert-sensitive.** The resumed lens walked nine reverts and named the test that goes red for each, rather than accepting the Implementer's claim. Attempt 1's gap survived a green suite precisely because a `refused: [40]` assertion on the group alone could not see it.
+6. **The Leader's override of remediation (b) was correct, for a better reason than the Leader had.** The lens had offered folding refusals into `byClassification` *or* an explicit total; the Leader chose the total because `byClassification` is per-**group** while AC.8 is per-**result**. The lens added the decisive part: folding them would make the map **stop summing to `groupCount`** and corrupt the neighbouring `CROSS_YEAR_REVIEW`/`SAME_SYSTEM_IGNORED` counts that the *same* §14 paragraph depends on. **Recorded because the Leader's reasoning was incomplete and the worker's was not.**
+7. **One residual in the new collation coverage:** of six assertions (3 reads × 2 branches), five are genuinely branch-isolated; for `findCandidatesForIncoming` only, `branch2` also contains the outer re-normalized equality, so that single assertion is satisfiable without branch 2's own projection. Non-gating — the other five fail on the same revert.
+
+### ADVISORY findings — recorded, non-gating, and **not actioned**
+
+**Attempt 3 was deliberately left unspent.** Two independent PASSes were in hand and every remaining finding is **unreachable from today's code**. Burning the last attempt on unreachable branches would have left no margin had the dry-run surfaced something real. Advisories do not gate and may not widen a task; these are recorded and die here unless the owner promotes one.
+
+- **The fail-closed guard narrows the fail-open class rather than closing it.** `Number(null)` is `0`, which is finite, so a projection regression yielding NULL passes the guard and `(0 ?? 1) > 1` is `false` — the refusal silently never fires, which is the very pathology the guard's own comment claims to have closed. Unreachable today: `COUNT(DISTINCT …)` in a correlated scalar subquery is always ≥ 1. Suggested shape if ever promoted: `!Number.isInteger(identityCount) || identityCount < 1`.
+- **The observability gate can be desynchronized from the refusal.** It keys on `refusedResultIds.length`, and `refuseMultiIdentityLosers` drops null-id refusals from that list — so a null-`resultId` participant would empty `losers` while the gate stays falsy and the audit row disappears again: **attempt 1's FAIL through a different door.** Unreachable today because the incoming `SyncParticipant` never sets `identityCount`. Returning a refused-participant count alongside the ids would make desync impossible.
+- **⚠️ The one most likely to bite later: the `throw`'s safety rests on an ordering invariant that is neither stated nor tested** — "`collectGroups` completes before the first `applyGroup`". NFR-RES-002's batching pressure is exactly what would tempt a future change to interleave collection and application, at which point this throw becomes a **mid-apply abort**. No test covers the throw's blast radius on either caller, only the repository-level rejection.
+- **`toCandidate` throws a raw `Error` on an HTTP-reachable path**, against `server/researchindicators/src/CLAUDE.md` §6 (Nest HTTP exceptions, never raw `Error`). The finding lens declined to gate it — `GlobalExceptions` still envelopes it and the microservice sync path is the primary caller — and that judgment was accepted rather than re-litigated.
+- **On the sweep, a non-finite count surfaces as a 500 rather than the `INCONCLUSIVE` plan DC-7 asks failures to be legible as.** Nothing is deleted either way.
+- **On the save-failure path AC.8's "reported in full" is a log line, not a durable record** (`resolution = null` suppresses `applyGroup`). Correct in substance — nothing was deleted, so there is no irreversible act to trace.
+- **For T-12's runbook, not this task:** `rowsRefusedMultiIdentity` counts refusals **exercised**, not multi-identity rows **present**. An ambiguous row inside a `CROSS_YEAR_REVIEW` or `SAME_SYSTEM_IGNORED` group has empty `losers`, so nothing is refused and the counter reads 0 while the row exists. The runbook must not let `== 0` be read as "no multi-identity data exists"; the population question is §14's separate tripwire and belongs to **T-14**.
+
+### Doc sync performed (root guide: fix the document, never let it drift)
+
+- **`design.md` §14 and `tasks.md` T-15 named the tripwire's field `UNRESOLVED_CONFLICT`** — a count the multi-identity branch could never raise, so an operator following the runbook would have watched a field that always reads 0 for this branch. Both now name **`rowsRefusedMultiIdentity`**, with the reason for the rename and the "refusals exercised ≠ rows present" caveat recorded inline.
+- **`tasks.md` T-15 "Files touched" was wrong in two ways** — the util paths were `shared/utils/…` instead of `domain/shared/utils/…`, and four required files were missing although design §5.1 step 8 names both group-map components and the audit projection has one shared builder. Corrected, with the correction marked as such.
+
+### T-15 — Done-condition measured: dev dry-run (2026-08-05)
+
+**`runId 83c94039-8a84-4536-9e7d-5e324655dd65`** · digest `3d54f74f…a6a1650` · status `OK` · duration **2,019,267 ms (33.6 min)**
+
+| Measure | Value | §14 expectation |
+| --- | --- | --- |
+| Groups | **2,359** | ~2,359 ✅ |
+| Rows to delete | 2,314 | — |
+| Classification | `RESOLVED` 2,303 · `CROSS_YEAR_REVIEW` 56 | 56 cross-year matches §5.1 step 7 ✅ |
+| Deciding rule | `RULE_1_TIP` 2,269 · `NONE` 56 · `RULE_3_AICCRA_CS_OVER_KP` 30 · `RULE_2_AICCRA` 4 | — |
+| Row counts, 8 tables | **unchanged** | write-freedom measured ✅ |
+| Audit rows written | **2,359** = group count | the only write a dry run performs ✅ |
+| Run lock under real contention | exactly one of two proceeded; lock released | ✅ |
+| `RESOLVED` groups with nothing deletable | 0 | ✅ |
+
+**The per-platform assertion — the one that matters, and the one rev 2 lacked.** §14 is explicit that a plausible total with PRMS at zero is a failure, not a pass, so the audit rows were queried directly rather than inferring platforms from rule counts:
+
+| Platform | Participants | Groups involved | Identity source |
+| --- | --- | --- | --- |
+| TIP | 2,357 | 2,354 | `PUBLIC_LINK` 2,357 |
+| **PRMS** | **2,254** | **2,254** | **`HANDLE_EVIDENCE` 2,254** |
+| AICCRA | 121 | 121 | `PUBLIC_LINK` 121 |
+
+- **`groups involving PRMS` = 2,254**, against §14's expected ~2,254. **DC-9 is clear:** no platform in scope contributes zero identities.
+- **Zero PRMS participants resolved via `PUBLIC_LINK`, and zero TIP/AICCRA via `HANDLE_EVIDENCE`.** This confirms **R-RES-010 AC.2 on live data**, not in a unit test — the per-platform, per-side identity split behaves exactly as §3.1.1 specifies.
+- **`REFUSED` outcome rows = 0**, satisfying D-dup-20's "exactly 0 on dev". The count is now *capable* of being non-zero (attempt 2's fix); it is zero because the data is 1:1, not because the gate cannot fire.
+- Rev 2 reported **116 groups / 0 involving PRMS**. The same scan now returns **2,359 / 2,254** — the 95 % of the population rev 2 was blind to.
+
+**Two measurement defects in the Leader's own verification, recorded because a wrong query is how a false pass gets manufactured:**
+1. The first per-platform query read `$.platform_code` from the participants JSON, which is camelCase `$.platformCode`. It returned **`groups involving PRMS: 0`** — indistinguishable from DC-9 recurring. It was caught only because `identitySource` resolved in the same query and showed `HANDLE_EVIDENCE = 2254`, contradicting the zero. **A single-metric check would have reported the spec's worst-case failure and been believed.**
+2. The first dry-run invocation was reported by the shell as `exit code 0` while the harness had not run at all — the `| tail` pipe returned tail's status. Subsequent runs captured the real exit code explicitly.
+
+**Environment findings, both now recorded in T-14 so they are not rediscovered:**
+- **`run-dry-run.ts`'s documented command does not work.** Its header prescribes `npx ts-node -T …` from `server/researchindicators`; there is **no root `tsconfig.json`**, so ts-node finds no project config, falls back to its own defaults, and compiles TypeORM's decorators with the **TC39** transform instead of legacy `experimentalDecorators` → `TypeError: Cannot read properties of undefined (reading 'constructor')` from `auditable.entity.ts`. It also cannot resolve `dotenv/config`, because the script lives under `docs/specs/` and Node resolves from the script's directory. Working form: `NODE_PATH="$PWD/node_modules" TS_NODE_PROJECT="$PWD/tsconfig.json" npx ts-node -T …`. **`runbook.md` points operators at the broken form before an `apply`.**
+- **Duration is ~33 min, not ~154 s.** Diagnosed as **round-trip latency, not slow queries**: five samples of `information_schema.PROCESSLIST` over 12 s found **zero** long-running queries, with the harness connection showing `Sleep`/`TIME=0s` each time — i.e. thousands of short queries against a remote DB over the VPN. NFR-RES-002 sets **no** latency target, so this is not a spec failure, but the runbook must carry it before an `apply` is scheduled, and lens 2's suggested `EXPLAIN ANALYZE` (plus letting `findCrossPlatformGroupKeys` read `identity_candidates` instead of `identity_counted`, which pays for `identityCount` without selecting it) remains the first thing to try if it needs to be faster.
+
+**Owner decision recorded (2026-08-05):** DC-2's post-run verification query — which T-15's notes told the Implementer to "pin" and which **does not exist anywhere in the repo** — is **carried to T-14** as a fifth assertion, with both traps written down (write it over the R-RES-010 identity, never `public_link`; and it must not assert "zero unresolved cross-platform groups"). T-14's effort raised **S → M** because the query must be authored, not merely run.
+
+**Owner decision recorded (2026-08-05):** the stale untracked T-11 artifacts (`test/duplicate-resolution.e2e-spec.ts`, `test/support/`, 590 lines, authored before the T-07 pivot, never run and never reviewed) were **deleted** rather than committed. T-11 re-derives from the current spec when its datasource is reachable.
+
+**T-15 verdict: PASS on attempt 2, done-condition measured. Status `[x]`.**

@@ -81,6 +81,22 @@ export type DuplicateResultParticipant = {
 export type DuplicateGroupParticipant = DuplicateResultParticipant & {
   resultId: number | null;
   reportYearId?: number | null;
+  /**
+   * Distinct normalized publication identities this participant's `resultId`
+   * carries, across the WHOLE dedup-scope population (T-15,
+   * `DuplicateCandidateRepository`) — not just the rows a given query
+   * happened to return. Always 1 for a prospective incoming row and for
+   * TIP/AICCRA (a `results` row has exactly one `public_link`); only PRMS can
+   * exceed 1, because an evidence list can carry more than one qualifying
+   * handle (R-RES-010 AC.8).
+   *
+   * The resolver below never reads this field — it decides pairwise priority
+   * from `platformCode`/`indicatorId` alone and stays identity-blind (design
+   * §5.1 step 8). It exists purely as a carrier for
+   * {@link refuseMultiIdentityLosers}, applied by the callers that hold the
+   * group map, never inside `resolveDuplicateGroup` itself.
+   */
+  identityCount?: number;
 };
 
 /** Which approved rule decided a comparison. */
@@ -341,6 +357,49 @@ export function resolveDuplicateGroup(
       winnerIdx === null
         ? 'Several same-platform rows lose no pair; all survivors are kept and cross-platform losers are still resolved.'
         : undefined,
+  };
+}
+
+/**
+ * Pulls any identity-ambiguous loser OUT of `resolution.losers` before a
+ * caller acts on it (R-RES-010 AC.8, design §5.1 step 8).
+ *
+ * `resolveDuplicateGroup` stays identity-blind by design — it never learns
+ * `identityCount`'s meaning, only carries the field on the objects it is
+ * handed. This function is the "refusal" the design assigns to "the two
+ * components that hold the group map": the sweep (`DuplicateResolutionService`)
+ * and the sync path (`SaveResultService.buildDuplicateGroup`). Both MUST call
+ * this immediately after `resolveDuplicateGroup` and BEFORE the resolution is
+ * handed to anything that might expand a family, guard it, audit it, or
+ * delete it — a raw, unfiltered `resolution.losers` handed to
+ * `DuplicateResolutionRunner.applyGroup` would let an ambiguous PRMS row be
+ * hard-deleted the moment `hard_delete_enabled` is on, because the runner has
+ * no `identityCount` predicate of its own.
+ *
+ * The refusal is per-participant, never per-group (JD3-S-02): every other
+ * loser keeps whatever verdict the resolver gave it, including "still
+ * deleted" — freezing the whole group would reintroduce rev 1's
+ * under-deletion defect (JD-03/F-3).
+ */
+export function refuseMultiIdentityLosers(
+  resolution: DuplicateGroupResolution,
+): { resolution: DuplicateGroupResolution; refusedResultIds: number[] } {
+  const ambiguous = resolution.losers.filter(
+    (loser) => (loser.identityCount ?? 1) > 1,
+  );
+  if (!ambiguous.length) {
+    return { resolution, refusedResultIds: [] };
+  }
+
+  return {
+    resolution: {
+      ...resolution,
+      losers: resolution.losers.filter((loser) => !ambiguous.includes(loser)),
+      untouched: [...resolution.untouched, ...ambiguous],
+    },
+    refusedResultIds: ambiguous
+      .map((loser) => loser.resultId)
+      .filter((id): id is number => id !== null),
   };
 }
 
