@@ -2,6 +2,8 @@ export interface DocumentOverviewRequest {
   bucket_name: string;
   project_folder: string;
   user_id: string;
+  /** Optional free-text contextual resource (max 20,000 chars). Counts as one grounding resource. */
+  text?: string;
 }
 
 export interface DocumentOverviewSummaryRequest {

@@ -451,11 +451,37 @@ describe('ProjectDashboardComponent', () => {
       expect(component.showExecutiveOverview()).toBe(true);
     });
 
-    it('should hide executive overview for non-admin users when no data exists', async () => {
-      await setup('C-1', { isAdmin: false, emptyOverview: true });
+    it('should auto-generate a baseline overview on entry when no summary exists', async () => {
+      await setup('C-1', { emptyOverview: true });
+      // The auto-call awaits the fetch, then the generation — flush the extra async level.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
 
       expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenCalledWith('C-1');
-      expect(component.showExecutiveOverview()).toBe(false);
+      // Baseline auto-call sends no documents or text — just the project id.
+      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+      expect(component.executiveOverviewParagraphs()).toEqual([
+        'First overview paragraph.',
+        'Second overview paragraph.'
+      ]);
+      expect(component.showExecutiveOverview()).toBe(true);
+      expect(component.executiveOverviewLoading()).toBe(false);
+    });
+
+    it('should surface the executive overview for non-admin users after the baseline auto-generation', async () => {
+      await setup('C-1', { isAdmin: false, emptyOverview: true });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+      expect(component.canAccessGroundingSetup()).toBe(false);
+      expect(component.showExecutiveOverview()).toBe(true);
+    });
+
+    it('should not auto-generate a baseline overview when a stored summary already exists', async () => {
+      await setup();
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).not.toHaveBeenCalled();
     });
 
     it('should block grounding upload actions for non-admin users', async () => {
@@ -843,6 +869,116 @@ describe('ProjectDashboardComponent', () => {
       expect(component.overviewSourceDocuments()).toEqual([]);
       expect(component.executiveOverviewGeneratedAt()).toBeNull();
       expect(component.executiveOverviewLoading()).toBe(false);
+    });
+
+    it('should not auto-generate a baseline overview when the summary fetch fails', async () => {
+      await setup('C-1', { rejectOverviewFetch: true });
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('text contextual resource', () => {
+    it('should save a trimmed text resource that counts toward the resource limit', async () => {
+      await setup();
+      component.groundedDocuments.set([]);
+
+      component.openGroundingTextEditor();
+      expect(component.showGroundingTextEditor()).toBe(true);
+
+      component.groundingTextDraft.set('  Project context text.  ');
+      component.saveGroundingText();
+
+      expect(component.groundingText()).toBe('Project context text.');
+      expect(component.hasGroundingText()).toBe(true);
+      expect(component.showGroundingTextEditor()).toBe(false);
+      expect(component.totalGroundingResources()).toBe(1);
+      expect(component.hasGroundingResources()).toBe(true);
+    });
+
+    it('should cap the text draft input at 20,000 characters', async () => {
+      await setup();
+
+      component.onGroundingTextInput({ target: { value: 'x'.repeat(25_000) } } as unknown as Event);
+
+      expect(component.groundingTextDraft().length).toBe(20_000);
+    });
+
+    it('should not save an empty or whitespace-only text resource', async () => {
+      await setup();
+      component.groundingTextDraft.set('   ');
+
+      component.saveGroundingText();
+
+      expect(component.hasGroundingText()).toBe(false);
+    });
+
+    it('should enforce a maximum of three resources across documents and text', async () => {
+      await setup();
+      component.groundedDocuments.set([
+        { fileName: 'a.pdf', fileKey: 'folder/a.pdf' },
+        { fileName: 'b.pdf', fileKey: 'folder/b.pdf' }
+      ]);
+      component.groundingText.set('A text resource.');
+
+      expect(component.totalGroundingResources()).toBe(3);
+      expect(component.canUploadMoreGroundingDocs()).toBe(false);
+      expect(component.canAddGroundingText()).toBe(false);
+      expect(component.groundedDocumentsCountColor()).toBe('#CF0808');
+    });
+
+    it('should only allow one text resource at a time', async () => {
+      await setup();
+      component.groundingText.set('Existing text.');
+
+      expect(component.canAddGroundingText()).toBe(false);
+    });
+
+    it('should pass the text resource to the generation call', async () => {
+      await setup();
+      component.groundedDocuments.set([]);
+      component.groundingText.set('Grounding context text.');
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1', 'Grounding context text.');
+    });
+
+    it('should remove the text resource and reset the editor', async () => {
+      await setup();
+      component.groundingText.set('Text to remove.');
+      component.showGroundingTextEditor.set(true);
+      component.groundingTextDraft.set('Text to remove.');
+
+      component.removeGroundingText();
+
+      expect(component.hasGroundingText()).toBe(false);
+      expect(component.showGroundingTextEditor()).toBe(false);
+      expect(component.groundingTextDraft()).toBe('');
+    });
+
+    it('should cancel the text editor without saving', async () => {
+      await setup();
+      component.openGroundingTextEditor();
+      component.groundingTextDraft.set('Unsaved text.');
+
+      component.cancelGroundingText();
+
+      expect(component.showGroundingTextEditor()).toBe(false);
+      expect(component.groundingTextDraft()).toBe('');
+      expect(component.hasGroundingText()).toBe(false);
+    });
+
+    it('should block text resource actions for non-admin users', async () => {
+      await setup('C-1', { isAdmin: false });
+
+      component.openGroundingTextEditor();
+      expect(component.showGroundingTextEditor()).toBe(false);
+
+      component.groundingTextDraft.set('Attempted text.');
+      component.saveGroundingText();
+      expect(component.hasGroundingText()).toBe(false);
     });
   });
 });
