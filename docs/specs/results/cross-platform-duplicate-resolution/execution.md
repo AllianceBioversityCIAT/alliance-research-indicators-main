@@ -301,6 +301,51 @@ The attempt-2 blocking issue is closed **at the only reachable path**. Verified 
 
 **T-07 PASSES on attempt 3 of 3.** The pivot is closed: the 451-snapshot orphaning defect is fixed, the ambiguous-identity guard is exhaustive and matched to the matcher, and `REFUSED` is visible in the plan, the audit record, the logs and all four callers.
 
+Committed as `c139608c`.
+
+---
+
+## Session close — T-11 parked for manual validation (2026-08-04)
+
+The owner elected to validate T-11 manually in a later session. **Not critical now, but it is a release gate:** `apply` against real data is already blocked by OQ-7 and OQ-8, so nothing destructive can run regardless — T-11 gates turning the feature on, not the safety of the code at rest.
+
+### What the owner's manual validation already closed
+
+| Limit | Result |
+| --- | --- |
+| T-07 real MySQL rollback | ✅ delete inside a transaction, `ROLLBACK`, row restored |
+| T-07 snapshot `report_year_id` assumption | ✅ **disproved** — drove the pivot, now fixed |
+| T-05 STAR protection query shape | ✅ exercised against live data |
+| T-02 delete-function coverage | ⚠️ **partially** — see the caveat below |
+
+### ⚠️ Caveat on the coverage check — do not read it as full proof
+
+The `information_schema` query that returned **0 uncovered tables** matched table names against the function body with `ROUTINE_DEFINITION NOT LIKE CONCAT('%', TABLE_NAME, '%')`. Two blind spots:
+
+1. **Substring false-positives.** A table is reported covered if its name appears *anywhere* in the body — including as a substring of a longer table name. `result_pool_funding` would be reported covered by a `DELETE FROM result_pool_funding_indicator_mapping` line. Several tables in this schema nest that way.
+2. **One level only.** It enumerates FKs referencing `results` directly. It cannot see the **transitive** closure — the class that produced `result_pool_funding_alignment_sp` in T-02, a table that does not reference `results` at all and was invisible to T-01's one-level inventory.
+
+So the coverage evidence is *strong but not conclusive*. **Only T-11's seeded delete against real FK constraints closes it** — that is precisely why the task exists and why it is unmockable.
+
+### Artifacts on disk — untracked, unreviewed, and now partly STALE
+
+`server/researchindicators/test/duplicate-resolution.e2e-spec.ts` (590 lines) + `test/support/duplicate-resolution-seed.util.ts`, three rolled-back-transaction cases.
+
+**Treat as a draft, not as work to resume from unexamined.** They were authored *before* the pivot, against the old whole-family year-scoping rule that §5.4.1 has since replaced, and they never executed. Whoever picks T-11 up should re-derive them against the corrected scope rather than trust them.
+
+### What T-11 still owes
+
+- A seeded result with at least one row in **every** table T-01 enumerated — **including the transitive set** — hard-deleted with no errno 1451 and zero rows left in every child table. State the seeded table count; a thin seed makes a green run meaningless.
+- A case asserting a **snapshot under a different `report_year_id` is swept, not orphaned** (the pivot's regression, at e2e level).
+- A case asserting an **ambiguous identity (>1 live row) refuses** end to end.
+- Dry-run row-count invariance, scoped to seeded ids.
+
+**Target:** the dev DB with the transaction-and-always-rollback harness (no DDL — an implicit commit destroys the guarantee). The `TEST` datasource `alliance_main_automation` is **dead at the network level** and needs an infra owner; that is independent of this spec.
+
+### Spec status at session close
+
+**11 of 12 tasks `[x]`.** T-11 `[~]`. `apply` against real data blocked by OQ-7, OQ-8, and T-11.
+
 ### Consequences
 
 - **`apply` against real data stays blocked**, alongside the already-open OQ-7 and OQ-8.
