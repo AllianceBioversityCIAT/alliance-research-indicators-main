@@ -2,12 +2,13 @@
 
 - **Module:** results
 - **Spec id:** 2026-08-cross-platform-duplicate-resolution
-- **Status:** draft (**re-derived** after Judgment Day round 1 — see [`judgment.md`](./judgment.md))
+- **Status:** draft (**rev 3** — identity source corrected; rev 2 was re-derived after Judgment Day round 1, see [`judgment.md`](./judgment.md))
 - **Owner:** ARI server squad (David Casañas)
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked TRD:** [`../../../trd/trd.md`](../../../trd/trd.md)
-- **Last updated:** 2026-08-04
-- **Supersedes:** design.md rev 1 (2026-08-04), escalated by dual review with 8 severe findings
+- **Last updated:** 2026-08-05
+- **Supersedes:** design.md rev 1 (2026-08-04), escalated by dual review with 8 severe findings; **rev 2 (2026-08-04), whose §0.1 baseline measured the wrong column for PRMS**
+- **Rev 3 scope (2026-08-05):** §0.1 re-derived · new §0.5 · §3.1 identity model · §5.1 multi-group refusal · §5.2 in-memory identity · §7 · §10 · §11 tripwires & batching · D-dup-18…20 · §14 budget re-cut. Implements **R-RES-010**.
 
 ---
 
@@ -19,24 +20,24 @@ Rev 1 of this design derived its facts from TypeORM entities and a `grep` over m
 
 | Measurement | Value |
 | --- | --- |
-| Live rows in dedup scope (`is_active`, `is_snapshot = false`, PRMS/TIP/AICCRA, non-empty `public_link`) | TIP 8,476 · PRMS 4,357 · AICCRA 605 |
+| ~~Live rows in dedup scope~~ (rev 2: TIP 8,476 · PRMS 4,357 · AICCRA 605) | **Superseded — re-measured 2026-08-05 (JD3-S-07): TIP 8,474 · PRMS 3,947 · AICCRA 584.** The rev-2 PRMS figure was overstated by 410 rows. Re-measured directly: **3,947 live PRMS rows, of which 3,947 carry a non-empty `public_link` and 0 do not** — so D-dup-18's "0 of 3,947 are handle-format" covers **100%** of the live PRMS population, not a subset. |
 | STAR rows carrying a `public_link` | **0** — STAR can never be a duplicate participant |
 | `results` rows total | 14,682 |
-| **Cross-platform duplicate groups today** | **116** |
-| Platforms involved | **TIP ↔ AICCRA only. Zero groups involve PRMS.** |
-| Rows involved | 118 TIP + 116 AICCRA = 234 |
-| Decided by Rule 1 (TIP prevails) | **86 groups** |
-| Decided by Rule 3 (AICCRA CS over PRMS/TIP KP) | **30 groups** |
-| Groups with >1 row of the same platform | 1 (three rows) |
-| Groups spanning 2 report years | 11 (105 single-year) |
+| **Cross-platform duplicate groups — rev 2 baseline, `public_link` for all three platforms** | **116** ← *superseded, see §0.5* |
+| **Cross-platform duplicate groups — rev 3, corrected identity** | **2,359** |
+| Platforms involved | **PRMS ↔ TIP dominates** (2,249 pairs) · PRMS ↔ AICCRA 16 · TIP ↔ AICCRA 116 |
+| Groups involving PRMS | **2,254 of 2,359 (95%)** |
+| Groups spanning >1 report year | **56** (rev 2 measured 11) |
 | `is_snapshot IS NULL` / `is_active IS NULL` anywhere | **0** — the nullable-column hazard does not exist in data |
 | AICCRA rows already soft-deleted by the current buggy path (`is_active = 0`, status 8) | 21 |
 
-Two consequences reshape the whole spec:
+**The rev-2 rows of this table are retained deliberately.** They are not merely stale — they are the evidence for DC-9, and deleting them would erase the record of how a plausible number concealed a structural blind spot.
 
-**The problem is TIP↔AICCRA, not PRMS.** PRMS participates in zero duplicate groups. The sync path that matters is TIP's; the platform that needs a rules path is AICCRA's, exactly as the user reported. PRMS handling is inherited correctness, not the target.
+Two consequences reshape the whole spec — **both inverted in rev 3:**
 
-**OQ-1 governs 26% of the real cases.** The owner's narrow reading of Rule 3 (Knowledge Product only) decides 30 of the 116 groups in AICCRA's favour. Had the reading gone the other way the count would differ — this was a consequential decision, not a formality.
+**~~The problem is TIP↔AICCRA, not PRMS.~~ The problem is overwhelmingly PRMS↔TIP.** Rev 2 concluded PRMS participated in zero duplicate groups and therefore that *"PRMS handling is inherited correctness, not the target."* It participates in **2,254 of 2,359**. The conclusion was not a misreading of the data; the data was read from the wrong column (§0.5). AICCRA still needs a rules path — it has no sync pipeline — but it is now the *small* population, and the PRMS sync path is the one carrying nearly all deletion volume.
+
+**OQ-1's reach shrank; OQ-10's appeared.** Rule 3 (AICCRA CS over PRMS/TIP KP) governed 30 of 116 groups — 26% — under rev 2. Against 2,359 groups it governs a low single-digit percentage, because PRMS↔TIP is decided by Rule 1. The consequential scoping decision is no longer OQ-1 but **OQ-10**: confining PRMS identity to Knowledge Product leaves 370 detectable duplicates unresolved, and that is now the largest deliberate omission in the spec.
 
 ### 0.2 Normalization buys nothing — measured
 
@@ -89,16 +90,80 @@ Unchanged from rev 1 and confirmed by both judges — this part was always right
 - Rule 3 currently applies to any PRMS/TIP indicator, not just Knowledge Product.
 - `CounterResultsEnum` has no omission counter, and the `shouldOmit` early return skips the counter line entirely.
 
+### 0.5 D11 — the identity field was wrong for PRMS (rev 3, measured 2026-08-05)
+
+Read from source, then measured read-only against live dev. This is the finding that reshaped §0.1.
+
+**Source.** `PrmsOpenSearchService.processData` sets `result.public_link = item.pdf_link` (lines 326 and 383) and `result.external_link = item.prms_link`. The publication **handle** is written by `processKnowledgeProduct` into the evidence list — `evidence_url: knowledgeProduct.handle, evidence_description: 'Handled'` (line ~282). So `results.public_link` holds a CGSpace bitstream URL for PRMS, and the handle — the one identifier the other two platforms also store — lives in `result_evidences`.
+
+**Measured consequence.**
+
+| Platform | Live rows with `public_link` | Handle-format | Read as |
+| --- | --- | --- | --- |
+| TIP | 8,474 | **8,474 (100%)** | identity is `public_link` ✅ |
+| AICCRA | 584 | 315 (54%) | identity is `public_link`, **and must not be format-filtered** — a filter drops 269 rows |
+| PRMS | 3,947 | **0 (0%)** | `public_link` **cannot ever match** another platform ❌ |
+
+So for one of three platforms in scope, the comparison was structurally incapable of matching, and it reported the only thing it could: nothing. **116 groups, zero PRMS** — a number plausible enough to build a spec on.
+
+**PRMS identity, from evidence:**
+
+| Measurement | Value |
+| --- | --- |
+| PRMS live rows | 3,947 |
+| — with any evidence | 3,394 |
+| — with a qualifying handle identity (role 1 · non-private · active · handle-format) | **2,792** |
+| — of those, `indicator_id = 3` (KNOWLEDGE_PRODUCT) | **2,387 results / 2,387 handles — exactly 1:1** |
+| Non-KP results carrying a qualifying handle | 405 (ind 1: 136 · ind 2: 161 · ind 4: 37 · ind 6: 71) |
+| — of those, actually matching a live TIP/AICCRA row | **370** ← the measured cost of the KP scope (OQ-10) |
+
+**Why the scope is KP, decided by measurement rather than preference:**
+
+| Property | KP only (`indicator_id = 3`) | All indicators |
+| --- | --- | --- |
+| Groups found | 2,359 | 2,622 |
+| PRMS results with >1 handle | **0** | 154 |
+| PRMS results in >1 cross-platform group | **0** | 132 |
+| Cross-year groups to review | 56 | 260 |
+
+Every multi-identity row in the corpus is non-KP. On a KP row the handle *is* the result's publication; on a non-KP row it is a publication the result **cites**, and a hard delete driven by a citation is DC-10. The KP restriction is what makes group membership a **partition** — which is the precondition the pairwise resolver (§5.1) was designed against.
+
+**Two filters that look like controls and are not.** All 4,535 PRMS evidence rows are `evidence_role_id = 1` and **zero** are private — `ResultEvidencesService` hardcodes `PRINCIPAL_EVIDENCE` (`result-evidences.service.ts:82`). The role and privacy predicates are therefore **no-ops against today's data**. They are still written, because the columns exist and a future writer may use them, but the spec must not claim them as safety controls: **the handle-format filter is the only load-bearing predicate**, and it is what discriminates the handle from the non-handle attachment that KP rows carry alongside it.
+
+**One alternative closed by measurement.** `processKnowledgeProduct` also assigns `body.external_link = knowledgeProduct.handle`, which suggested `external_link` might carry the handle and avoid the join entirely. It does not: **0 of 3,947** live PRMS `external_link` values are handle-format. *Rev 3 first attributed this to `result.external_link = item.prms_link` overwriting it later in the same flow; the real reason is simpler and was found in round 3 — `processKnowledgeProduct` never runs, so `body.external_link = handle` never executes and there is nothing to overwrite (JD3-01).* The evidence join is the only stored identity source either way.
+
+**Where the 2,792 stored handle evidences came from — RESOLVED in round 2 (JD3-02).** No code on the PRMS sync path writes `result_evidences`: `SaveResultService.saveAllSections` contains no reference to evidence at all, and the only production writers are `ResultsService` (`results.service.ts:939`, the AI/bulk-upload path) and the STAR authoring controller (`result-evidences.controller.ts:46`). Neither is reachable from a PRMS sync.
+
+Measured provenance:
+
+| Measurement | Value |
+| --- | --- |
+| Creation window of all 2,387 KP handle evidences | **2026-07-23, 01:36:18 → 01:45:10 UTC** |
+| Distinct creation days | **1** |
+| `created_by` | original PRMS author user ids (1,061 rows `NULL`, remainder spread across ~human ids) |
+| Rows with `evidence_description = 'Handled'` (the mapper's marker) | **0** |
+| Rows whose `result_knowledge_products.citation` is populated | **0 of 2,387** |
+
+So the corpus is **a single bulk migration completed in nine minutes**, carrying authorship from the source system. Not the sync path, and — confirmed by the two zero rows above — not `processKnowledgeProduct` either, since both fields that method sets are empty. The stored identity corpus is **static by construction**, and this is now a measured fact rather than an inference.
+
+Two consequences the design must carry rather than assume away:
+
+1. **The stored corpus is static.** It will cover a shrinking share of PRMS results over time. This is the sweep's population, and it is exactly the 2,792 rows measured — not a growing set. OQ-12 is where the decision to leave it that way lives.
+2. **Without the payload fix, `apply` would make the problem permanent.** Deleting ~2,249 PRMS rows and letting PRMS re-sync them would re-create rows with **no** evidence — invisible to both the sweep and the sync path, duplicated against TIP again, and undetectable forever, while the audit log recorded a successful sweep. That is strictly worse than shipping nothing, and it is why T-13 (the mapper call) is a **prerequisite for `apply`**, not an enhancement.
+
+**Method lesson, and it is the second time this spec has learned it.** §0.2 varied six normalization levels and found no change — a real result that was silently scoped to one dimension of the matching rule, because it held the identity *field* fixed. Rev 1 derived schema facts from entity walks; rev 2 derived them from `information_schema` but derived the *identity* from an assumption (A3). **Varying one input of a matching rule proves nothing about its other inputs.** DC-9's gate is a per-platform identity assertion for exactly this reason: no amount of normalization testing can substitute for asking whether the field being read is the right field.
+
 ---
 
 ## 1. Goals & non-goals
 
 **Goals**
-1. Make the loser genuinely absent, safely and auditably — R-RES-003, R-RES-004, R-RES-009.
-2. Give AICCRA a rules path that needs no sync pipeline — R-RES-008. **116 groups are waiting for it.**
-3. Make winner selection a group-level decision that names *which row* satisfied each rule — R-RES-002.
-4. Stop soft-deleted and snapshot rows from poisoning the candidate set — R-RES-001.
-5. Close the two active hazards: incomplete STAR protection, and the non-existent machine-token gate.
+1. **Match PRMS on the identifier other platforms share — R-RES-010. 2,254 groups are invisible without it.**
+2. Make the loser genuinely absent, safely and auditably — R-RES-003, R-RES-004, R-RES-009.
+3. Give AICCRA a rules path that needs no sync pipeline — R-RES-008. 116 TIP↔AICCRA groups are waiting for it.
+4. Make winner selection a group-level decision that names *which row* satisfied each rule — R-RES-002.
+5. Stop soft-deleted and snapshot rows from poisoning the candidate set — R-RES-001.
+6. Close the two active hazards: incomplete STAR protection, and the non-existent machine-token gate.
 
 **Non-goals**
 - A persisted normalized link column, its index, or a backfill (§0.2: zero measured benefit).
@@ -112,7 +177,16 @@ Unchanged from rev 1 and confirmed by both judges — this part was always right
 
 ## 2. Architecture
 
-One pure resolution core, three callers: the TIP sync path, the PRMS sync path (inherited correctness), and a new admin sweep that is the AICCRA answer.
+One pure resolution core, three callers: the TIP sync path, **the PRMS sync path (rev 3: the dominant population, 2,254 of 2,359 groups — no longer "inherited correctness")**, and a new admin sweep that is the AICCRA answer.
+
+> **Terminology — two different things are called "identity" on this page (JD3-09). They must not be confused, because both drive hard deletes:**
+>
+> | Term | Means | Where |
+> | --- | --- | --- |
+> | **publication identity** | the normalized cross-platform matching key (`public_link` or handle evidence) | rev 3: §3.1, §5.1 step 8, `rawIdentity`, `identitySource`, `identityCount` |
+> | **family key** | `result_official_code` + `platform_code`, used to expand a result's family for deletion | §5.4.1, D-dup-17, and `query.service.ts:39` where it is fixed in code |
+>
+> Both have a refusal rule — "a result with >1 **publication identity** is refused" (§5.1 step 8) and "a **family key** with >1 live row refuses deletion" (§5.4.1) — and they are unrelated. Read every occurrence below with this table in hand; §5.4.1 and D-dup-17 use *family key* throughout.
 
 ```mermaid
 flowchart TB
@@ -162,7 +236,8 @@ flowchart TB
 
 | Path | Responsibility |
 | --- | --- |
-| `entities/results/repositories/duplicate-candidate.repository.ts` | All duplicate SQL. Owns the symmetric normalization expression, the `is_active`/`is_snapshot`/platform filters, and the group scan. One place, both callers. |
+| `entities/results/repositories/duplicate-candidate.repository.ts` | All duplicate SQL. Owns the identity `UNION` (§3.1.2), the symmetric normalization expression, the `is_active`/`is_snapshot`/platform filters, and the group scan. One place, both callers. |
+| **`shared/utils/publication-identity.util.ts`** (rev 3) | **The per-platform identity source.** Builds the two `UNION ALL` branches and the handle-format predicate, and exposes the in-memory equivalent used by the sync path (§5.2). Sole owner of "which field is the publication link" — deliberately separate from `public-link-normalizer.util.ts`, which stays platform-invariant. |
 | `entities/results/duplicate-resolution.service.ts` | The sweep: scan → resolve → classify → plan → apply. Owns the run lock and plan confirmation. |
 | `entities/results/duplicate-resolution.controller.ts` | Two admin endpoints (§4). |
 | `entities/results/dto/duplicate-resolution.dto.ts` | Query/body DTOs + plan shape. |
@@ -174,7 +249,8 @@ flowchart TB
 
 | Path | Change |
 | --- | --- |
-| `shared/utils/duplicate-result-priority.util.ts` | Pairwise → group resolver returning the winner **and the row that satisfied the rule**. Rule 3 narrowed to Knowledge Product. |
+| `shared/utils/duplicate-result-priority.util.ts` | Pairwise → group resolver returning the winner **and the row that satisfied the rule**. Rule 3 narrowed to Knowledge Product. **Rev 3: gains the multi-group refusal (§5.1 step 8).** |
+| `shared/utils/public-link-normalizer.util.ts` | **Rev 3: `dedupScopeSql` splits** — shared row scope stays, the platform + identity-presence predicate moves into the per-source branches (§3.1.2). Normalization itself is untouched. |
 | `shared/services/save-all-sections.service.ts` | Candidate filters; symmetric normalization; incoming loser's own family deleted; deletion moved out of the winner's `try`; per-row error boundary; omission counter. |
 | `shared/utils/query.service.ts` | `findResultFamilyIds` gains `report_year_id`; `deleteFullResultById` gains an ordered, wrapped execution path (§5.4). |
 | `tools/tip-integration/tip-integration.service.ts` | `findOptions` keyed on raw `public_link` — reconciled with the matching change (JD-W-03). |
@@ -200,11 +276,54 @@ Rev 1 certified three components as safe that are not. This revision **re-verifi
 
 ## 3. Data model
 
-### 3.1 `results`
+### 3.1 `results` + the identity model
 
-**No change.** Rev 1's normalized column, index, and backfill are dropped (§0.2).
+**No schema change.** Rev 1's normalized column, index, and backfill are dropped (§0.2). Rev 3 adds **no column and no migration** — it changes which existing column supplies the matching key for one platform.
 
-Matching uses a normalization expression applied symmetrically to both sides inside `DuplicateCandidateRepository`: `TRIM` → lowercase the scheme+host → strip scheme → strip `www.` → strip one trailing `/` → unify `dx.doi.org`→`doi.org` → strip an empty query/fragment. Conservative by construction: **no path-case folding** (handles are case-sensitive) and **no query-parameter stripping**. Measured to find the same 116 groups as a bare `TRIM`, so it is a hedge against future variance, not a detection mechanism — and it is cheap enough over 14,682 rows to need no index.
+#### 3.1.1 Identity source is per-platform; normalization is not
+
+Two concerns that rev 2 conflated into one expression, now separated:
+
+| Layer | Varies by platform? | Owner |
+| --- | --- | --- |
+| **Identity source** — which field holds the publication link | **Yes** | new `publication-identity.util.ts` |
+| **Normalization** — how a link becomes a comparison key | **No** | existing `public-link-normalizer.util.ts`, unchanged |
+
+Keeping normalization platform-invariant is load-bearing: a per-platform *source* is required by the data, but a per-platform *normalization* would reintroduce the asymmetry that rev 1 shipped (normalizing one side of the comparison only). The same expression applies to a PRMS handle from evidence and a TIP `public_link` — R-RES-001 AC.6 asserts it.
+
+| Platform | Source | Format filter |
+| --- | --- | --- |
+| TIP, AICCRA | `results.public_link` | **none** — AICCRA is 54% handle-format; a filter drops 269 rows (R-RES-010 AC.6) |
+| PRMS | `result_evidences.evidence_url` · `evidence_role_id = 1` · `COALESCE(is_private,FALSE)=FALSE` · `COALESCE(is_active,TRUE)=TRUE` · `indicator_id = 3` | **required**: normalized value `REGEXP '^hdl\.handle\.net/[0-9]+/[0-9]+$'` |
+
+#### 3.1.2 Query shape: `UNION ALL`, not `LEFT JOIN`
+
+The candidate set becomes **one row per (result, identity)** rather than one row per result. Two shapes were considered:
+
+| Shape | Rejected / chosen |
+| --- | --- |
+| `LEFT JOIN result_evidences` with a `CASE` picking the source per platform | **Rejected.** The join must not multiply TIP/AICCRA rows, so it needs a platform predicate inside the `ON` *and* in the `CASE` — the condition is stated twice and can drift. It also makes `hasUsableIdentity` unexpressible as a single predicate. |
+| **`UNION ALL` of two branches** — one per identity source | **Chosen.** Each branch owns its own scope predicate and reads exactly one source, so a platform can never draw identity from the wrong field, and the branches are independently testable. The PRMS branch is the only place `result_evidences` appears. |
+
+`dedupScopeSql(alias)` splits accordingly: the shared row-scope predicates (`is_active`, `is_snapshot`) stay in one helper, and the `platform_code IN (…)` + identity-presence predicate moves into each branch. **`hasUsablePublicLinkSql` no longer expresses "this row can be deduplicated"** for PRMS — it becomes branch-local, which is why the split is a rename rather than an added condition.
+
+**All three repository reads** take the union as their row source: `findCandidatesForIncoming` (`:97`), `findCrossPlatformGroupKeys` (`:125` — this *is* the group scan), and `findMembersByNormalizedLinks` (`:188`). *(JD3-07: an earlier draft said "all four … and the group scan", double-counting `findCrossPlatformGroupKeys`; §14's LOC figure was sized against that wrong list and is corrected below.)*
+
+`SELECT_COLUMNS` gains two fields:
+- **`identitySource`** (`PUBLIC_LINK` | `HANDLE_EVIDENCE`) — so the audit record can satisfy R-RES-009 AC.4. Under a hard delete it is the only way to reconstruct why a row was a group member.
+- **`identityCount`** — distinct normalized identities per `result_id`, the carrier for §5.1 step 8's refusal (JD3-04). Without it the refusal has no expressible input.
+
+`rawPublicLink` is renamed `rawIdentity` — the old name would be a lie on the PRMS branch.
+
+**The PRMS branch must be `DISTINCT` on `(result_id, normalized identity)` (JD3-S-04).** `UNION ALL` does not deduplicate, `result_evidences` carries **no unique constraint** on `(result_id, evidence_url)`, and the versioning stored procedures copy evidence rows wholesale (`1783029013035:505,518`). Two identical handle rows would otherwise put one `result_id` in a group twice — duplicate audit rows and a double hard-delete attempt for one physical row — or inflate `identityCount` into a spurious refusal that freezes real groups. The "2,387 results / 2,387 handles" measurement counts distinct handles and is blind to a duplicated evidence row, so this is not covered by that number.
+
+**Cost.** The PRMS branch joins ~4.5k evidence rows against ~3.9k PRMS rows; `evidence_url` is `text` so the format predicate cannot be indexed, exactly as with `public_link`. At this scale a scan remains free and no index is added (§0.2 reasoning carries over unchanged).
+
+#### 3.1.3 Normalization, unchanged from rev 2
+
+`TRIM` → lowercase the scheme+host → strip scheme → strip `www.` → strip one trailing `/` → unify `dx.doi.org`→`doi.org` → strip an empty query/fragment. Conservative by construction: **no path-case folding** (handles are case-sensitive) and **no query-parameter stripping**. Applied symmetrically to both sides of every comparison, whichever field supplied them.
+
+Because all three platforms use the canonical `hdl.handle.net` host (A5), this expression alone brings every identity to `hdl.handle.net/<prefix>/<suffix>` — **no handle-extraction step is needed**, and none is added. A CGSpace-hosted variant (`cgspace.cgiar.org/handle/…`) would *not* normalize to the same key; none exists today, and T-14 is the check that would catch its arrival.
 
 **The comparison MUST be explicitly binary-collated.** `results.public_link` is `utf8mb3_general_ci` (measured; the datasource default is `utf8mb4_unicode_520_ci`), and both collations fold **case and accents** — verified live: `'abc'='ABC'` → 1, `'jose'='josé'` → 1. A SQL `=` or `GROUP BY` on that column therefore folds path case no matter what the normalization expression does, which makes **R-RES-001 AC.2 unsatisfiable** and points the failure at **over-matching → hard delete of a distinct publication** (DC-5). Every comparison and grouping in the repository must carry an explicit `COLLATE utf8mb4_bin` (or `BINARY`) on the normalized expression.
 
@@ -290,19 +409,71 @@ The corrected resolver evaluates **pairwise over the group and requires a rule t
    | `{AICCRA CS, TIP KP, TIP INNOVATION_DEV}` | `AICCRA CS` wins vs KP, loses vs non-KP | deleted **both** `AICCRA CS` and `TIP KP` | nothing deleted |
    | `{AICCRA CS, AICCRA non-CS, TIP KP}` | `TIP KP` loses vs CS, wins vs non-CS | deleted `AICCRA non-CS` | nothing deleted |
 
-   **Measured cost: zero.** Over the 116 live cross-platform groups, **0 would be classified `UNRESOLVED_CONFLICT` and all 116 still resolve** — 115 hold at most one row per platform, and no group today mixes a Rule-3 pair with a Rule-1/2 pair. The branch is a safety net for a shape that is reachable (one group already holds three same-platform rows) but not yet present.
+   **~~Measured cost: zero.~~ NOT RE-MEASURED — rev-2 figure, superseded corpus (JD3-05/JD3-S-08).** The original reading was: *"over the 116 live cross-platform groups, 0 would be classified `UNRESOLVED_CONFLICT` and all 116 still resolve."* That corpus contained **no PRMS row**, so by construction it held no three-platform composition. Rev 3's own arithmetic — 2,249 + 16 + 116 = 2,381 pair memberships across 2,359 groups — makes roughly **11–22 three-platform groups** live, which is exactly the shape this gate reasons about. **The true cost over the 2,359-group corpus is unknown and MUST be measured before `apply`** (T-14). A stated-zero baseline that turns out non-zero is how the previous two revisions' tripwires got waived, and §14's production gate ("the `UNRESOLVED_CONFLICT` count being non-surprising") has no baseline until this number exists.
+
+   Note also that the gate's **wording** was corrected in rev 3: "wins ≥1 pair and loses ≥1 pair" fires on the middle element of any consistent total order, which the shipped resolver explicitly rejects (`duplicate-result-priority.util.ts:45-48`). See R-RES-002's consistency-gate paragraph — the normative text now follows the code's ordering semantics.
 
 5. If the group is consistent, every participant is **loses-only** or **never-loses**. Losers are exactly the loses-only rows. The winner is a never-loses row that won at least one pair.
 6. Several never-loses rows can survive together. If they are **same-platform**, that is same-system ambiguity: those rows are left untouched, **but cross-platform losers the group unambiguously produced are still deleted** — a row that lost to every survivor lost regardless of which survivor prevails, so its deletion is authorized (rev 1 froze the whole group and left genuine duplicates stored — JD-03/F-3). If never-loses rows span **platforms**, the rule set failed to decide a cross-platform pair: `UNRESOLVED_CONFLICT`, nothing deleted. The current rules decide every cross-platform pair, so this cannot fire today; it exists so a future rule change surfaces as a report rather than as arbitrary deletion.
 
    **Every row's fate must be asserted in tests, not only the row a prior revision got wrong.** Both defects above survived because the test and the narrative checked one row and left the others untraced (see §10).
-7. Groups spanning >1 `report_year_id` in the sweep → `CROSS_YEAR_REVIEW`, reported, never auto-deleted (11 groups today).
+7. Groups spanning >1 `report_year_id` in the sweep → `CROSS_YEAR_REVIEW`, reported, never auto-deleted (**56 groups today**; rev 2 measured 11).
+8. **Multi-identity refusal (rev 3, R-RES-010) — the PARTICIPANT is refused, not the group.** A result that resolves to more than one identity is classified `UNRESOLVED_CONFLICT` **for itself**: never deleted, never counted as an omission, reported in full. **Every other member of each group it touches resolves normally and is still deleted if it lost.**
 
-Resolution reads only `(platform, indicator)` per participant — never "who is incoming" — so R-RES-002 AC.7 order-independence holds by construction.
+   The pairwise resolver assumes membership is a **partition** — each row in exactly one group, so "this row lost" is a complete statement about its fate. Multi-identity turns membership into a **graph**, and the approved rules were never given a meaning over that shape. Refusing the ambiguous row is the same move as D-dup-13.
+
+   > **Corrected after round 3 (JD3-S-02).** The first draft refused **every group** the multi-identity row touched, which silently reversed §5.1 step 6 and D-dup-9 — "freeze *those rows only*, not the group" — and reintroduced rev 1's JD-03/F-3 defect of leaving genuine duplicates stored. Concretely, in `{PRMS-X(2 handles), AICCRA-CS, PRMS-Y}` the whole-group form kept PRMS-Y stored even though its loss is decided entirely without reference to X. One ambiguous row would have frozen every group it appeared in, giving an under-deletion whose blast radius is unbounded by the multi-identity count.
+
+   **Where this branch lives — not in the pure resolver (JD3-04).** `resolveDuplicateGroup(participants, options)` (`duplicate-result-priority.util.ts:207`) is pure over one group's participants, and `DuplicateGroupParticipant` (`:81-84`) carries only `resultId`/`platformCode`/`indicatorId`/`reportYearId` — no identity, no group key, no cross-group input. "This row also belongs to another group" is not expressible there. The carrier is therefore an explicit field: **both `UNION` branches project `identityCount`** (distinct normalized identities per `result_id`), it is added to `DuplicateGroupParticipant`, and the refusal is applied by the two components that hold the group map — `DuplicateResolutionService` (sweep) and `SaveResultService.buildDuplicateGroup` (sync). The resolver stays identity-blind, which is what §5.1's closing paragraph intends.
+
+   **Costs, split by side, because they differ (JD3-S-03):**
+
+   | Side | Cost |
+   | --- | --- |
+   | **Stored** | **Zero.** All 2,387 stored KP handles are 1:1. |
+   | **Incoming** | **Unmeasured, and reachable today.** `processKnowledgeProduct` loops over a `PrmsKnowledgeProductDto[]` (`:268-273`) pushing one handle per element (`:277-286`), so a two-KP PRMS item yields two identities in one payload. How often PRMS reports multi-KP items cannot be answered by any query against `results`. |
+
+   Rev 3 first called this "a standing net for data that does not yet exist". That was a stored-side measurement stated as a general claim: **the mapper can produce a multi-handle payload on any sync run**, so the sync path needs the branch as live logic, not as a net. §5.2 step 0 states the rule — refuse, create/update normally, count no omission, delete nothing, and **never resolve on the first handle found**.
+
+   **What the refusal is actually protecting against.** Under R-RES-002's rule table PRMS loses Rule 1, Rule 2 and Rule 3 — it **never wins a cross-platform pair** (measured counterparts: TIP 2,249, AICCRA 16). So a multi-identity PRMS row is loses-only everywhere and cannot be "the winner of group B destroyed by group A's verdict". The real hazard is narrower: a PRMS row pulled into a group by a handle it merely **cites** (DC-10), where deletion would be authorized by a membership that was never true. KP scoping is the primary mitigation; this branch is the backstop.
+
+Resolution reads only `(platform, indicator)` per participant — never "who is incoming" — so R-RES-002 AC.7 order-independence holds by construction. **The resolver never learns which field produced an identity**, and does not receive the identity itself; it sees participants plus `identityCount`. The rules therefore cannot acquire a platform dependency through the identity change.
 
 ### 5.2 Sync path
 
-1. Normalize the incoming link; empty → skip.
+**0. Resolve the incoming row's identity from the payload, in memory (rev 3).** The duplicate check runs *before* the result is saved, so the stored-side SQL branch is not available for the incoming row — its identity must come from the payload.
+
+> **Corrected after Judgment Day round 3 (JD3-01). The first draft of this step was built on dead code.**
+>
+> It claimed the payload "already carries" the handle in `ExternalMappersDto.evidence.evidence[]`, "populated by `processKnowledgeProduct` before `SaveResultService` is called". Verified against source: `processKnowledgeProduct` is `private` at `prms.opensearch.service.ts:263` and its only references in the repository are three `(service as any)` calls in its own spec file. **`processData` — the sole producer of the `ExternalMappersDto[]` handed to `bulkSaveAllSections` — never calls it and never assigns `result.evidence`.** The field is `undefined` for every PRMS payload.
+>
+> The error came from reading a sibling mapper's behaviour onto this one: **TIP's mapper does populate it** (`tip-integration.service.ts:340-352`). Nothing in production reads the field, so TIP's evidence is silently dropped too — it has one writer and zero readers.
+>
+> **Consequence had it shipped:** the PRMS sync path would resolve no identity, fall into step 1's "none → skip", and deduplicate nothing on the path §7 calls dominant — DC-7 reintroduced by the amendment whose purpose is to remove it. No declared gate would have caught it: T-14 asserts the *stored* side, `publication-identity.util.spec.ts` feeds a synthetic evidence list, and §10's e2e seeds DB rows and exercises the `UNION`, not the mapper. Hence **R-RES-010 AC.10**, which asserts a real `processData` output carries the handle.
+
+**The fix is one call, and it is additive (T-13).** `processData` must invoke `processKnowledgeProduct` for KP items. This is a mapper change — §7's earlier "the mapper is unchanged" no longer holds — but its blast radius is nil: `dto.evidence` has **zero production readers**, so populating it changes no existing behaviour until this spec's identity resolution reads it. `public_link = pdf_link` and `external_link = prms_link` are untouched.
+
+**Why the payload alone closes the hole, and persistence is deferred.** With the payload populated, a PRMS row that `apply` deleted and PRMS re-syncs resolves its identity in memory, is judged a loser, and is **omitted — never re-created**. That is what stops the sweep from making duplicates permanently undetectable (JD3-02). Persisting `dto.evidence` would additionally let the *sweep* see PRMS rows created after this change, but it would also write evidence for ~8,476 TIP results — outside this spec. See **OQ-12**; the accepted consequence is that the 2,792-row stored corpus is **static**, so sweep coverage of PRMS decays over time while sync-path coverage does not.
+
+| Incoming platform | Identity taken from |
+| --- | --- |
+| TIP, AICCRA | `dto.public_link` (unchanged) |
+| PRMS, `indicator_id = 3` | `dto.evidence.evidence[]` → entries whose normalized `evidence_url` is handle-format |
+| PRMS, other indicators | **none** — not a dedup participant |
+
+**The in-memory predicate is weaker than the SQL one.** The payload's evidence partials carry only `evidence_url` and `evidence_description` — no `evidence_role_id`, no `is_private`, **no `is_active`** — so the incoming side cannot apply those three filters. Today both sides agree anyway: all 4,535 stored PRMS evidence rows are role 1 and none is private. The writer that makes this so is `ResultEvidencesService.updateResultEvidences`, which hardcodes `PRINCIPAL_EVIDENCE` at **`result-evidences.service.ts:67`** (JD3-06 — an earlier draft cited line 82, which is the *read* filter inside `findPrincipalEvidence`; and note `is_private` **is** in that writer's field list, so the privacy predicate is empirically empty rather than structurally a no-op).
+
+**The asymmetry fails toward over-deletion, so it is stated as an accepted risk rather than as a safe simplification.** If any future writer stores a non-principal or private handle evidence, the SQL side denies that identity while the in-memory side grants it — and an incoming PRMS row judged a loser on an identity the sweep does not recognise routes `findResult`'s whole family into the hard-delete loop (§5.2 step 4). Three mitigations, and none is a CI gate:
+
+| Mitigation | Strength |
+| --- | --- |
+| `publication-identity.util.ts` owns both the SQL and in-memory forms, so they are edited together | Structural, but only against *intentional* divergence |
+| **T-14** asserts the stored-side invariant against live data | Real, but it is a **manual pre-`apply` check, not a gate** — it needs the populated dev corpus, and §10's own disqualifier makes it report `INCONCLUSIVE` in any normal CI run |
+| The handle-format filter, which applies identically to both sides | The only load-bearing predicate, and the only one both sides genuinely share |
+
+The honest statement is therefore: **the invariant is currently true, its writer is known, and its only enforcement is a human check before `apply`.** The provenance caveat of JD3-02 sharpens this — the writer named above is *not* on the PRMS sync path, so it does not explain the 2,792 stored rows; those have a legacy origin and no maintained writer at all.
+
+1. Normalize the incoming identity; none → skip (no deduplication, on any platform).
 2. Load candidates via the repository (symmetric normalization, same `report_year_id`, live non-snapshot rows). **`findResult` is not excluded** — rev 1's `excludeResultId` filter is what hid the loser's own row.
 3. Build the participant set. **The incoming payload and `findResult` are ONE participant, never two.** When `findResult` exists, the incoming payload *is* that row being updated: the participant carries `findResult`'s `result_id` and the **incoming** payload's `platform_code`/`indicator_id`, because the incoming data is the newer truth. When `findResult` is null, the participant is prospective and has no `result_id` yet.
 
@@ -383,8 +554,8 @@ None. API-only. An `/admin` page to drive dry-run → apply is a natural follow-
 
 | System | Change |
 | --- | --- |
-| TIP (`tip-integration.service.ts:184`) | The path that matters — 118 of the 234 duplicate rows are TIP. Omissions counted; deletions hard and audited. Its `findOptions` raw-link identity key is reconciled with the normalized matching so the sync cannot manufacture a same-platform duplicate that §5.1 step 2 then declines forever (JD-W-03). |
-| PRMS / OpenSearch (`prms.opensearch.service.ts:231`) | Zero duplicate groups involve PRMS. Inherited correctness only, plus index removal. |
+| TIP (`tip-integration.service.ts:184`) | Omissions counted; deletions hard and audited. Its `findOptions` raw-link identity key is reconciled with the normalized matching so the sync cannot manufacture a same-platform duplicate that §5.1 step 2 then declines forever (JD-W-03). **Rev 3: TIP is now overwhelmingly the *winner* side.** Its pair population is **2,365** — 2,249 PRMS↔TIP plus 116 TIP↔AICCRA — and it prevails under Rule 1 in all of the former. The pairs TIP **loses** are the Rule-3 ones inside TIP↔AICCRA (rev 2 measured Rule 3 as governing 30 of those 116 groups; **not re-measured under the rev-3 corpus**). *(JD3-S-05: an earlier draft said "2,249 of its 2,265 PRMS/AICCRA pairs" — 2,265 is 2,249 + 16, i.e. **PRMS's** two counterpart counts, and the 16 PRMS↔AICCRA pairs contain no TIP row. That reading understated where a TIP row actually gets hard-deleted, which is the one thing the runbook must not understate.)* |
+| PRMS / OpenSearch (`prms.opensearch.service.ts:231`) | **Rev 3 — the dominant path, not inherited correctness.** 2,254 of 2,359 groups involve PRMS and PRMS loses every cross-platform pair, so this is where nearly all deletion volume lands. The sync path resolves identity from `dto.evidence.evidence[]` (§5.2 step 0). **The mapper is unchanged** — `public_link = pdf_link` stays; this spec reads a different field rather than rewriting what PRMS stores. Hard-deleted results are removed from the OpenSearch index. |
 | AICCRA | No integration exists and none is added. The sweep is the answer, and **116 groups are waiting for it**. *Operational dependency:* the loader's runbook must require a sweep after each load, or this gap returns in a new form. |
 | Socket.IO / RabbitMQ / Dynamo / CLARISA / AGRESSO | Untouched. |
 
@@ -420,15 +591,22 @@ The audit table, not the logs, answers "did it actually delete the duplicates?" 
 | Suite | Target |
 | --- | --- |
 | `duplicate-result-priority.util.spec.ts` | **Composition** matrix, not a member matrix — and **every assertion names the fate of every row in the group, not just the row a prior revision got wrong.** Two revisions shipped a data-loss defect precisely because the test asserted one row was safe and left the others untraced. Each case therefore asserts the complete partition: winner, losers, untouched. Mandatory cases: `{AICCRA CS, TIP KP, TIP non-KP}` and `{AICCRA CS, AICCRA non-CS, TIP KP}` → both `UNRESOLVED_CONFLICT` with **`toDelete` empty**; `{TIP, AICCRA non-CS}` → AICCRA deleted; `{AICCRA CS, TIP KP}` → TIP KP deleted; same-platform-only → untouched; plus order-independence by permuting the participant array on every case. |
-| `duplicate-candidate.repository.spec.ts` | Symmetric normalization; inactive excluded; snapshot excluded; same-platform excluded. |
+| `duplicate-candidate.repository.spec.ts` | Symmetric normalization; inactive excluded; snapshot excluded; same-platform excluded. **Rev 3: the identity `UNION` — a PRMS row draws identity from evidence and NEVER from `public_link`; a TIP/AICCRA row draws from `public_link` and never joins `result_evidences`; an AICCRA non-handle `public_link` stays in scope (AC.6); `identitySource` is projected correctly on both branches.** |
+| **`publication-identity.util.spec.ts`** (rev 3) | The four negative cases of R-RES-010 AC.3 (private · non-principal role · inactive · non-handle-format), each contributing no identity; AC.4 (two principal evidences, one handle → exactly one identity); AC.5 (non-KP yields nothing); **and the SQL/in-memory equivalence** — the same evidence list must produce the same identity set through both forms, which is the assumption §5.2 step 0 rests on. |
 | `star-relationship.service.spec.ts` | Both directions × counterpart platform (STAR vs mirror) × active/inactive link; **and the expanded-family case** — a STAR link on a sibling id must protect. |
 | `save-all-sections.service.spec.ts` | The incoming loser's own stored family is deleted (JD-06 regression, **red before the fix**); a **genuinely throwing** deletion must not roll back the winner (KZ-001: a stub that resolves cannot prove this); inactive candidate does not block; three-way group. |
 | `query.service.spec.ts` | Family expansion is year-scoped; snapshots ordered before the live row; a mid-family failure rolls back. |
 | `duplicate-resolution.service.spec.ts` | dry-run writes nothing (row counts before/after); digest mismatch → 409; TTL expiry → 409; zero groups → `INCONCLUSIVE`; lock is out-of-process. |
 | `duplicate-resolution.controller.spec.ts` | Allowed role, denied role, **and machine-token principal → 403**. |
-| `test/` e2e | Hard delete of a fully-populated seeded result without errno 1451 (the only proof of §3.2 completeness — unmockable); dry-run row-count invariance. |
+| `duplicate-result-priority.util.spec.ts` (rev 3 addition) | **The three-platform composition `{AICCRA CS, PRMS KP, TIP KP}` — mandatory (JD3-05).** Rev 3 makes ~11–22 such groups live and the mandatory matrix contained no three-platform case, which is why the requirement/code divergence on the consistency gate went unnoticed. Assert the **complete partition** (AICCRA wins, TIP KP and PRMS KP both deleted) and assert that the group is **not** classified `UNRESOLVED_CONFLICT` — the ordering AICCRA > TIP > PRMS is consistent even though TIP wins one pair and loses another. |
+| `duplicate-resolution.service.spec.ts` + `save-all-sections.service.spec.ts` (rev 3) | **The multi-identity refusal (§5.1 step 8)**, tested where it now lives (JD3-04) — not in the pure resolver. Sweep side: a participant with `identityCount > 1` is never in any `toDelete`, **and the other members of its groups still resolve and are still deleted**. Sync side: a two-handle incoming payload creates/updates the row, counts no omission, deletes nothing, and does **not** resolve on the first handle. |
+| `prms.opensearch.service.spec.ts` (rev 3) | **R-RES-010 AC.10 — the precondition assertion.** A real `processData` run over a KP item with a populated `handle` yields a `dto.evidence.evidence[]` entry carrying that handle. This is the one test that would have caught JD3-01; every other rev-3 gate feeds a synthetic evidence list or seeds DB rows, and so is blind to whether the mapper produces one. |
+| `test/` e2e | Hard delete of a fully-populated seeded result without errno 1451 (the only proof of §3.2 completeness — unmockable); dry-run row-count invariance. **Rev 3: an end-to-end PRMS↔TIP group — a seeded PRMS KP row whose handle evidence matches a seeded TIP `public_link` — resolves with TIP as winner and the PRMS row deleted. This is the D11 regression and it is unmockable: it needs the real `UNION` against real rows.** |
+| **`test/` T-14 — live-data invariants** (rev 3) | The three assertions that are properties of **data**, not of code, and that no unit test can make. **(a)** DC-9: every platform in scope contributes a non-zero identity count, with the handle-format rate reported per platform. **(b)** Every PRMS evidence row is `evidence_role_id = 1` and non-private — the invariant §5.2 step 0's weaker in-memory predicate depends on. **(c)** KP handle identity is 1:1 (no PRMS KP result carries two handles) — the property that makes group membership a partition. Read-only. **A run that cannot reach a database reports `INCONCLUSIVE`, never a pass.** |
 
 Coverage: 60% floor; the pure resolver at or near 100% — it holds the business rules and costs nothing to cover.
+
+**What disqualifies T-14's evidence.** T-14 reads live data, so it can produce a green result that means nothing. It is **not** evidence if: the connection failed or the target database is empty (→ `INCONCLUSIVE`); the PRMS row count is zero (→ the corpus is not the one these numbers describe); or the handle-format rates differ materially from §0.5's table without an explained data change (→ the corpus moved, and the KP scope decision needs re-measuring before it can be trusted). Report the spread and stop — do not record a pass because the command exited `0`.
 
 ---
 
@@ -438,12 +616,29 @@ Two deploys, not three — the backfill step is gone with the column.
 
 1. **Deploy 1 (schema):** audit table + redefined delete function. Inert.
 2. **Deploy 2 (code):** resolution core, sync path, sweep endpoints. Hard delete on the **sync** path gated off by `app_config`, default off.
-3. **Verify by dry-run** on dev — 116 groups, human-reviewed. This is the DC-5/RK-1 gate, now carrying far less weight since normalization is no longer load-bearing.
+3. **Verify by dry-run** on dev — **2,359 groups** (rev 2 planned for 116), human-reviewed. This is the DC-5/RK-1 gate.
 4. `apply`, then enable the sync-path flag.
+
+**Rev 3 — `apply` is batched, not one sweep (OQ-11).** The reviewable artifact grew 20× with the group count, and a 2,359-group document reviewed in one sitting is a gate in name only. `apply` runs **filtered by `report-year`**, one year per confirmed plan, which the existing query filters already support with **no code change** — the digest and TTL apply per batch, so each batch is separately reviewed and separately confirmed. Order the batches oldest-year-first: the oldest data is the most settled, so the first batch is the cheapest place to discover a surprise.
+
+The **56 cross-year groups** are never auto-deleted (R-RES-006) and form a standing manual queue, five times rev 2's 11.
 
 **Feature flag, fully specified** (rev 1 left the off-behavior undefined, so the shipped default could have been indistinguishable from the bug — JD-W-06): key `duplicate_resolution.hard_delete_enabled`, default `false`. When **off**, the sync path resolves, counts `OMITTED_DUPLICATE`, writes the audit row, and **skips deletion entirely** — it does *not* fall back to a soft delete, because a soft delete is the reported bug. Off is therefore "detect and report, don't delete", the state is visible in the audit table, and the flag state is recorded on every audit row.
 
-**Backout:** code rollback restores current behavior; the schema is additive. Applied deletions are **not recoverable from ARI** — recovery is re-sync from TIP/PRMS (A1/A2), which is why `apply` has three gates and why AICCRA's 605 rows, which have no automatic re-sync, are the population to be most careful with. Notably 86 of 116 groups make **AICCRA** the loser under Rule 1 — the platform that cannot be re-synced automatically is the one losing most often. This asymmetry is the single most important thing for the operator to understand before running `apply`, and it belongs in the runbook.
+**Backout:** code rollback restores current behavior; the schema is additive. Applied deletions are **not recoverable from ARI** — recovery is re-sync from TIP/PRMS (A1/A2), which is why `apply` has three gates.
+
+**Rev 3 — the recoverability asymmetry is now the *reassuring* half of a much larger blast radius.** Rev 2's warning was that 86 of 116 groups made **AICCRA** the loser, and AICCRA has no automatic re-sync. That still holds and is still the sharpest edge. But the volume has moved: **PRMS is the loser in ~2,249 groups**, and PRMS *does* have an automatic sync (A2), so the overwhelming majority of what `apply` now deletes is re-syncable. Two things follow for the runbook, and they pull in opposite directions:
+
+| | Population | Recoverable? | Operator implication |
+| --- | --- | --- | --- |
+| PRMS losses | ~2,249 groups | **Yes — but only once T-13 ships** | High volume, low per-row risk. Re-sync re-creates the row; the sync path then resolves its identity **from the payload** and omits it, so the cleanup holds. **Without T-13 the re-created row carries no identity and the duplicate becomes permanently undetectable** — see below |
+| AICCRA losses | ~102 groups (86 of the 116 TIP↔AICCRA, plus 16 PRMS↔AICCRA) | **No** | Low volume, **irreversible per row**. Unchanged from rev 2 and still the population to be most careful with |
+
+The second row is why batching by year does not reduce the need for care: AICCRA rows are spread across batches, so every batch carries some irreversible deletions.
+
+**Ordering constraint discovered in round 3 (JD3-02) — T-13 gates `apply`, and this is the sharpest thing in the rollout.** Run `apply` before the mapper populates the payload and the sweep does not clean up, it **destroys the ability to ever detect the duplicate again**: the PRMS row is hard-deleted, PRMS re-syncs it, the re-created row has no handle evidence (nothing on the sync path writes one) and no payload identity (the mapper call is missing), so it is invisible to both the sweep and the sync path — a duplicate against TIP once more, now permanent, with a successful sweep in the audit log. That is strictly worse than never running the sweep at all.
+
+Rollout order is therefore **Deploy 1 (schema) → Deploy 2 (code, including T-13) → verify by dry-run → `apply` per year**. T-13 is not an enhancement to sequence conveniently; it is what makes `apply` recoverable.
 
 **Comms:** MEL/product (OQ-3), the AICCRA loader owner (runbook + the asymmetry above), DevOps (deploy ordering), security (the machine-token finding, which is a live exposure independent of this spec).
 
@@ -470,6 +665,12 @@ Two deploys, not three — the backfill step is gone with the column.
 | **D-dup-15** | 08-04 | **Explicit `COLLATE utf8mb4_bin` on every normalized comparison and grouping.** | `public_link` is `utf8mb3_general_ci`; case *and* accent folding are implicit, which makes R-RES-001 AC.2 unsatisfiable and points the failure at over-deletion. Created by moving comparison from JS `===` into SQL. |
 | **D-dup-16** | 08-04 | **The `CASCADE` FK is a protecting relationship, not a non-issue.** | CASCADE destroys rows the soft delete preserves — the same class as the inactive STAR links already gated behind OQ-7, so it gets the same guard and audit treatment. |
 
+| **D-dup-18** | **08-05** | **Identity source is per-platform; normalization stays platform-invariant.** PRMS identity = principal handle evidence; TIP/AICCRA = `public_link`, **unfiltered by format**. New `publication-identity.util.ts` owns the source; the normalizer is untouched. | **Measured: 0 of 3,947 PRMS `public_link` values are handle-format** — the matching key was structurally unable to match for one of three platforms, which is why rev 2 found 116 groups instead of 2,359. Splitting source from normalization keeps the symmetry property rev 1 got wrong. A format filter on `public_link` would drop **269 AICCRA rows** (54% handle-format), so it is confined to the PRMS branch. |
+| **D-dup-19** | **08-05** | **PRMS identity is confined to `indicator_id = 3` (KNOWLEDGE_PRODUCT), and ownership is corroborated by title agreement — not by uniqueness.** | **Measured: KP handles are 1:1 in both directions (2,387 results / 2,387 handles); every multi-identity row in the corpus is non-KP.** That bounds *ambiguity*. **Ownership** is a separate claim and rests on a separate measurement: **2,156 of 2,266 cross-platform pairs (95.1%) share an identical title.** *Round 2 (JD3-S-06): the first draft used the 1:1 figure to justify ownership, which it cannot — a row carrying one cited handle is fully consistent with 1:1. Both mapper-provided discriminators proved unavailable (`citation` empty for all 2,387; `evidence_description = 'Handled'` on zero rows), because `processKnowledgeProduct` never runs.* The KP scope also keeps group membership a **partition**, which the pairwise resolver requires. Costs, both explicit: **370 real duplicates left undetected** (OQ-10), and **110 title-disagreeing pairs as the residual DC-10 exposure**, reported as a distinct review section rather than absorbed into 2,359 groups. |
+| **D-dup-20** | **08-05** | **A participant with more than one identity is `UNRESOLVED_CONFLICT` in every group it belongs to.** | Multi-identity turns membership from a partition into a graph, and the approved rules have no meaning over that shape. Same move as D-dup-13. **Measured cost: zero live cases** — but unlike D-dup-13 the trigger is reachable by a *data* change alone (one extra handle evidence), so the branch is tested against a synthetic participant rather than left to a future rule change. |
+| **D-dup-22** | **08-05** | **`processData` must call `processKnowledgeProduct`, so the incoming payload carries the handle. T-13 is a prerequisite for `apply`.** Persisting `dto.evidence` is deferred (OQ-12). | **JD3-01/02.** The identity model was authored against a method that never runs — `processKnowledgeProduct` is referenced only by its own spec, and rev 3 read TIP's mapper behaviour onto PRMS. Without the call the sync path resolves no PRMS identity (DC-7 on the dominant path); without the sync path, `apply` deletes rows that re-sync as permanently undetectable duplicates. The payload is sufficient and costs nothing elsewhere: `dto.evidence` has **zero production readers**, so populating it is inert until this spec reads it. |
+| **D-dup-23** | **08-05** | **The multi-identity refusal applies to the PARTICIPANT, not the group, and lives in the sweep service + `buildDuplicateGroup`, carried by a projected `identityCount`.** | **JD3-04/JD3-S-02.** Whole-group refusal silently reversed D-dup-9 and reintroduced rev 1's JD-03/F-3 under-deletion. And the pure resolver's signature — one group's participants, no identity — structurally cannot host the branch, so assigning it there would have produced either a no-op or a half-applied refusal. |
+| **D-dup-21** | **08-05** | **`apply` is batched by `report-year`, oldest first.** | The human review of the plan is the only gate for DC-5, and it grew from a 116-group artifact to a 2,359-group one. Existing query filters already support this with **no code change**; digest + TTL apply per batch, so each is separately reviewed and confirmed. |
 | **D-dup-17** | 08-04 | **Year scope applies to live rows only; snapshots attach by identity with no year filter. Identities with >1 live row refuse deletion.** Supersedes the year-scoping half of D-dup-10. | **Measured: 451 of 574 snapshots would have been orphaned** — the live row carries the current year while a snapshot keeps the year it was taken for, so a fully year-scoped family excludes a row's own snapshots. One filter had been applied to two different kinds of row: a snapshot is a *version*, not a *reporting-year row*. `version_id` is NULL on all 574, so no parent link exists; with 4 identities holding multiple live rows, ownership is undecidable there and is refused rather than guessed. Caught by this design's own `siblingIdsOutsideReportYear` tripwire. Full record in `execution.md` → *Pivot Record: T-07*. |
 
 ### 12.1 Reversion challenge — D-dup-2 (soft → hard delete)
@@ -483,13 +684,27 @@ Two deploys, not three — the backfill step is gone with the column.
 
 **Outcome: proceed, with D-dup-6, D-dup-7, D-dup-10, D-dup-11 as blocking prerequisites, and OQ-7 resolved before `apply`.** The challenge earned its keep twice: in rev 1 it promoted the delete-function work from a one-line change; here it surfaced the 7 inactive STAR links that neither judge's severity ranking caught as blocking.
 
+### 12.2 Reversion challenge — D-dup-18 (PRMS `public_link` removed as an identity source)
+
+D-dup-18 **takes away** behavior the shipped code has: PRMS rows currently participate in matching via `public_link`. Challenge question: *what does removing it break?*
+
+| What PRMS `public_link` matching provided | Broken? | Evidence |
+| --- | --- | --- |
+| Cross-platform detection for PRMS | **No — it never provided any.** | Measured: **zero** normalized-key matches between any live PRMS `public_link` and any live TIP or AICCRA `public_link`. Checked explicitly against AICCRA's 269 **non-handle** links, the one population where a `pdf_link` collision was plausible. The path has never matched a row. |
+| PRMS↔PRMS same-system detection | No | Same-platform groups are `SAME_SYSTEM_IGNORED` — reported, never deleted (R-RES-005). Nothing is lost that was ever acted on. |
+| A fallback if evidence is missing | **Not a loss — a hazard avoided.** | A PRMS row with no handle evidence has no comparable identity. Falling back to `pdf_link` would compare a bitstream URL against other platforms' handles, which is the defect being fixed. 1,155 PRMS rows have no qualifying handle and correctly leave dedup scope. |
+
+**Outcome: proceed, no mitigation required.** This is the rare reversion that removes a code path with a measured zero blast radius. Worth noting *why* the challenge was still cheap to run: the same question asked of D-dup-2 (soft→hard delete) surfaced the 7 inactive STAR links that two judges missed, and the cost of asking is one query.
+
 ---
 
 ## 13. Open questions
 
 | id | Question | Owner | Needed by |
 | --- | --- | --- | --- |
-| OQ-3 | Report-year scope: 11 groups span 2 years and are reported, not deleted. Confirm. | MEL / product | before `apply` |
+| OQ-3 | Report-year scope: **56** groups span >1 year and are reported, not deleted (rev 2 measured 11). Confirm. | MEL / product | before `apply` |
+| **OQ-10** | **370 detectable PRMS duplicates left unresolved** by the KP scope (D-dup-19). Extend to non-KP indicators, at the price of 154 multi-identity rows, 132 multi-group refusals and DC-10 exposure? Recommend **hold at KP**, revisit as a separate spec once the KP sweep has run. | MEL / product | before rollout (non-blocking for `plan`) |
+| **OQ-11** | **Blast radius grew 22×.** `apply` now targets 2,254 PRMS-involving groups. Batching by `report-year` is the design's answer (D-dup-21) — confirm the operator accepts per-year confirmation, and note that AICCRA's irreversible rows are spread across every batch. | ARI ops | **blocks `apply`** |
 | OQ-4 | The 21 AICCRA rows already soft-deleted by the buggy path: leave, or hard-delete in the sweep? Assumed **leave**, excluded from matching. | ARI ops | before rollout |
 | **OQ-7** | **7 inactive STAR link rows** will be destroyed by a hard delete of their mirror. Extend protection to inactive links, or accept? Recommend **extend** — a soft-deleted link is recoverable today. | Engineering lead | **blocks `apply`** |
 | **OQ-8** | The live machine-token exposure (`app_secret_id 8` → `System Admin`, zero host restrictions) is a finding **independent of this spec**. Who owns remediating it? | Security / eng lead | before Deploy 2 |
@@ -501,19 +716,36 @@ Closed: OQ-1 (Rule 3 = KP only), OQ-2 (manual sweep), OQ-5 (hard delete), OQ-6 (
 
 ## 14. Budget
 
-| Metric | Rev 1 | **Rev 2** |
-| --- | --- | --- |
-| Tasks | 12 | **9** |
-| LOC | ~1,500 | **~1,050** (≈400 production, ≈650 tests) |
-| Migrations | 3 | **2** |
-| Review rounds | 3 | **2** |
+| Metric | Rev 1 | Rev 2 | **Rev 3 (delta only)** |
+| --- | --- | --- | --- |
+| Tasks | 12 | 9 | **+3** (T-13, T-14, T-15 — all three now defined below) |
+| LOC | ~1,500 | ~1,050 | **+~310** (≈140 production, ≈170 tests) |
+| Migrations | 3 | 2 | **+0 — no schema change** |
+| Review rounds | 3 | 2 | **+1 (spent: Judgment Day round 3)** |
 
-Smaller than rev 1 because measurement retired work rather than adding it: the normalized column, its index, and its backfill are gone (§0.2), and the performance NFRs they served are moot at 14,682 rows. What replaced them is cheaper and closes defects rev 1 would have shipped.
+**The three rev-3 tasks (JD3-08 — T-15 was previously counted and never defined):**
+
+| id | Scope | Why it is separable |
+| --- | --- | --- |
+| **T-13** | **The mapper call + payload identity.** `processData` calls `processKnowledgeProduct`; `publication-identity.util.ts` gains the in-memory identity form; `SaveResultService` resolves incoming PRMS identity and applies the multi-handle refusal (§5.2 step 0). **Prerequisite for `apply`** — without it `apply` makes duplicates permanently undetectable (§0.5). | Touches the PRMS ingestion path only; independently testable against a real `processData` output (R-RES-010 AC.10). |
+| **T-14** | **Live-data invariant check** (§10): per-platform cross-platform *matchability* (R-RES-001 AC.7), the role/privacy invariant, and KP 1:1 in **both** directions. Read-only; reports `INCONCLUSIVE` rather than passing when it cannot reach a populated DB. | A manual pre-`apply` gate, not CI — stated as such rather than implied to be automated. |
+| **T-15** | **The stored-side identity `UNION`**: `publication-identity.util.ts` SQL form, the `dedupScopeSql` split, `DISTINCT` on the PRMS branch, `identitySource`/`identityCount`/`rawIdentity` projection across the three reads, and the sweep-side refusal. | The sweep half; depends on nothing in T-13 and carries the whole 2,792-row legacy corpus. |
+
+LOC and production-line counts were re-cut after JD3-07 (three reads, not four) and JD3-04 (the `identityCount` projection and the refusal moving into two call sites rather than one util).
+
+Rev 2 was smaller than rev 1 because measurement retired work rather than adding it: the normalized column, its index, and its backfill are gone (§0.2), and the performance NFRs they served are moot at 14,682 rows.
+
+**Rev 3 adds little code and a great deal of consequence.** The production delta is ~110 lines — a new identity util, the `UNION` in four existing reads, one resolver branch, and the sync path's in-memory identity — with **no migration and no schema change**. The disproportion is the point: what changed is not the size of the implementation but the size of the population it acts on (116 → 2,359 groups), and that lands in the rollout, the runbook and the review artifact, not in the diff. Rev-2 sign-off does not carry over.
 
 Tripwires for `/akili-execute` — stop and escalate, do not push through:
 - The `information_schema` FK list at implementation time exceeds the 7 named tables → the schema moved; the whole delete path needs re-derivation.
 - The e2e hard delete raises errno 1451 → §3.2 is incomplete despite the re-derivation.
-- **On dev only:** a dry-run returns materially more or fewer than **116** groups → the normalization is behaving unexpectedly or the data moved; investigate before `apply`. This is a *dev regression check against a known baseline*, **not a production gate** — production will legitimately return a different count, and a threshold that always trips is a threshold that gets waived (the pathology DC-2 was reworded to avoid). The production gate is the human review of the plan itself, plus the `UNRESOLVED_CONFLICT` and `protected` counts being non-surprising for that environment.
+- **On dev only:** a dry-run returns materially more or fewer than **2,359** groups, or fewer than **2,254** involving PRMS → the identity resolution or the data moved; investigate before `apply`. This is a *dev regression check against a known baseline* (re-measured 2026-08-05), **not a production gate** — production will legitimately return a different count, and a threshold that always trips is a threshold that gets waived (the pathology DC-2 was reworded to avoid). The production gate is the human review of the plan itself, plus the `UNRESOLVED_CONFLICT` and `protected` counts being non-surprising for that environment.
+- **Any platform in scope contributes zero identities** → DC-9 has recurred on a different field. This is the tripwire whose absence let rev 2 ship a wrong baseline: a per-platform count, not a total, because the total looked fine.
+- **Any PRMS KP result resolves to more than one handle** → the 1:1 property behind D-dup-19 and the partition assumption no longer holds; the KP scope decision needs re-measuring before `apply`.
+- **Any handle resolves to more than one PRMS KP result** — the **reverse** direction, added in round 2 (JD3-S-09). Measured clean today: all 2,387 handles map to exactly one result, and **0** shared handles also match a TIP/AICCRA row. It needs its own tripwire because the failure is not benign and no branch catches it: in `{PRMS_A, PRMS_B, TIP}` the survivor is TIP, Gate A does not protect A and B (they share no platform with the survivor), so **both PRMS rows are hard-deleted** — and if the shared handle is a data error, a distinct publication is destroyed. The 1:1 assertion must be **bidirectional**; enforcing one direction leaves the other ending in a two-row irreversible deletion.
+- **Title agreement across PRMS↔counterpart pairs falls materially below 95%** → the ownership corroboration behind A6 is weakening, and DC-10's residual is growing. The 110 disagreeing pairs are the review population; a sharp rise means citations are entering the identity set.
+- **`UNRESOLVED_CONFLICT` from the multi-group branch is non-zero on dev** → expected to be exactly 0 (D-dup-20); a non-zero count means live data has moved into the shape the branch refuses.
 
 ---
 

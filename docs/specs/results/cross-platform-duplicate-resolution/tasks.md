@@ -5,23 +5,39 @@
 - **Status:** not-started
 - **Owner:** ARI server squad (David Casañas)
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
-- **Linked design:** [`./design.md`](./design.md) (rev 2, post-correction)
-- **Linked review ledger:** [`./judgment.md`](./judgment.md) — two rounds, 8 + 8 severe findings
-- **Last updated:** 2026-08-04
+- **Linked design:** [`./design.md`](./design.md) (**rev 3**, post-correction)
+- **Linked review ledger:** [`./judgment.md`](./judgment.md) — **three rounds**; round 3 ended `APPROVED` after 9 both-judge-confirmed findings, two of which invalidated the rev-3 draft's load-bearing code claims
+- **Last updated:** 2026-08-05
 
 ---
 
 ## 0. Read this before starting
 
-**This spec hard-deletes production rows. Recovery is a re-sync from the source platform — and AICCRA has no automatic sync.** 86 of the 116 live duplicate groups make **AICCRA** the loser, so the platform that cannot be re-synced is the one losing most often.
+**This spec hard-deletes production rows. Recovery is a re-sync from the source platform — and AICCRA has no automatic sync.**
+
+**Rev 3 changed the scale of that sentence by 20×.** Duplicate detection was reading `results.public_link` for PRMS, which holds the `pdf_link`, not the publication handle — so PRMS was structurally excluded and reported as clean. Re-measured under the corrected identity:
+
+| | Rev 2 believed | Measured (2026-08-05) |
+| --- | --- | --- |
+| Cross-platform groups | 116 | **2,359** |
+| Involving PRMS | **0** | **2,254 (95%)** |
+| Cross-year groups to review | 11 | **56** |
+
+Two consequences for whoever executes this:
+
+- **PRMS is now the dominant deletion population**, and it loses every cross-platform pair under the rules. AICCRA remains the *irreversible* population (~102 groups, no automatic re-sync) and is spread across every batch — so batching `apply` by year does not reduce the need for care.
+- **T-13 gates `apply`.** Running the sweep before the PRMS payload carries its handle would hard-delete rows that re-sync as *permanently undetectable* duplicates. Strictly worse than never sweeping. See T-13.
 
 Three things this task list inherits from a two-round adversarial review, each of which caught a data-loss defect that a passing test would have hidden:
 
 1. **Assert every row's fate, never just the row a previous attempt got wrong.** Two revisions shipped an over-deletion defect because the test asserted one row was safe and left the others untraced. Every resolver test asserts the complete partition: winner, losers, untouched.
 2. **Derive schema facts from `information_schema`, never from a TypeORM entity walk or a `grep` over migrations.** `result_cap_sharing_ip` holds a live FK and has no entity; `project_indicators_results` exists in no migration at all. Both were missed by entity-derived methods.
 3. **A green gate is not evidence unless the gate can see the defect.** Each task below states what **disqualifies** its evidence, not only what satisfies it.
+4. **A code fact is not established until its call path to production is traced** — the rev-3 lesson, and the third instance of the same root cause. Rev 1 read schema facts off entities; rev 2 read the identity field off an assumption; rev 3 read a mapper's behaviour off a method body **without checking anything calls it** (`processKnowledgeProduct` is referenced only by its own spec), and imported a sibling mapper's behaviour onto it. Each claim was true *locally* and false *on the path that runs*. When a task asserts "X already happens", grep for the call site before believing it.
 
-**Two open questions block the destructive step, not the build:** OQ-7 (7 inactive STAR links) and OQ-8 (live machine-token exposure). Tasks T-01…T-09 may proceed; `apply` against real data may not until both are answered.
+**Four open questions block the destructive step, not the build:** OQ-7 (7 inactive STAR links), OQ-8 (live machine-token exposure), **OQ-11** (blast radius grew 22× — batch `apply` by year), and **OQ-12** (whether to persist `dto.evidence`). Tasks T-01…T-15 may proceed; `apply` against real data may not until OQ-7, OQ-8 and OQ-11 are answered.
+
+**Two residual risks are accepted, not solved,** and must not be described as closed in any PR: DC-10's **110 title-disagreeing pairs** (a HITL review gate — ownership is not fully automatable) and the **in-memory/SQL predicate asymmetry** in T-13, which has no CI gate.
 
 ---
 
@@ -51,15 +67,23 @@ graph TD
   T10["T-10 · Machine-token block<br/>(JwtMiddleware marker + guard)"] --> T09
   T06 --> T11["T-11 · E2E: hard delete without errno 1451"]
   T09 --> T11
-  T09 --> T12["T-12 · Rollout: flag, runbook, dry-run review"]
+  T04 --> T15["T-15 · Stored-side identity UNION<br/>(PRMS handle from evidence)"]
+  T09 --> T15
+  T06 --> T13["T-13 · PRMS sync: payload handle<br/>+ incoming identity — GATES apply"]
+  T15 --> T14["T-14 · Live-data invariants<br/>(manual pre-apply gate)"]
+  T13 --> T12["T-12 · Rollout: flag, runbook, dry-run review"]
+  T14 --> T12
   T11 --> T12
 
   style T01 fill:#fce8e6,stroke:#d93025
   style T03 fill:#e8f0fe,stroke:#4285f4
+  style T13 fill:#fce8e6,stroke:#d93025
   style T12 fill:#fef7e0,stroke:#f9ab00
 ```
 
 No cycles. **T-01 gates every destructive task** — it is the method fix, and skipping it reproduces the failure of both prior revisions. T-03 and T-04 are pure and can start immediately in parallel with T-01.
+
+**Rev 3 adds a second hard gate: T-13 gates `apply`,** for a different reason than T-01. T-01 prevents a delete that *fails*; T-13 prevents a delete that *succeeds and cannot be undone or re-detected*. T-15 is the sweep half and is independent of T-13 — they can run in parallel — but **T-12 depends on both**, because the rollout's dry-run review needs the identity `UNION` (T-15) and its `apply` step needs the sync path (T-13).
 
 ---
 
@@ -424,13 +448,69 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
 
 ---
 
+### T-13 — PRMS sync path: populate the payload handle and resolve incoming identity
+
+- **Requirements covered:** R-RES-010 (AC.1, AC.2, AC.9, **AC.10**), R-RES-001 AC.6
+- **Files touched:** `tools/open-search/prms/prms.opensearch.service.ts`, `shared/utils/publication-identity.util.ts` (in-memory form), `shared/services/save-all-sections.service.ts`, + specs
+- **Description:** Make `processData` call `processKnowledgeProduct` so the PRMS payload carries the publication handle, then resolve the incoming row's identity from `dto.evidence.evidence[]` in `SaveResultService` (design §5.2 step 0). Apply the multi-handle refusal.
+- **Why this task exists, and why it gates `apply`:** rev 3 was authored believing the payload already carried the handle. It does not — `processKnowledgeProduct` is referenced only by its own spec, and the claim came from reading TIP's mapper onto PRMS (JD3-01). **Running `apply` without this task destroys the ability to ever detect the duplicate again**: the PRMS row is hard-deleted, PRMS re-syncs it, the new row has no evidence and no payload identity, so it is invisible to both the sweep and the sync path — permanently, with a successful sweep in the audit log. That is strictly worse than never sweeping.
+- **Implementation notes:**
+  - The mapper change is **additive and inert**: `dto.evidence` has **zero production readers** today, so populating it changes no existing behaviour until this task's identity resolution reads it. Do **not** touch `public_link = pdf_link` or `external_link = prms_link`.
+  - Identity source is KP-only (`indicator_id = 3`) and handle-format; the in-memory predicate cannot check `evidence_role_id`, `is_private` or `is_active` because the payload partials lack all three. That asymmetry is an **accepted risk** (design §5.2), not a simplification — do not silently "improve" it by inventing fields.
+  - **Multi-handle payload → refuse** (R-RES-010 AC.9): create/update the row, count no omission, delete nothing. **Never resolve on the first handle found.** A two-KP PRMS item produces two handles today (`processKnowledgeProduct` loops over an array), so this is live logic, not a net.
+- **Tests:** `prms.opensearch.service.spec.ts` — a real `processData` run over a KP item with a populated `handle` yields a `dto.evidence.evidence[]` entry carrying that handle (**AC.10**). `save-all-sections.service.spec.ts` — incoming PRMS KP row matching a stored TIP `public_link` is omitted with TIP as winner (**the D11 regression: red before this task, green after**); two-handle payload creates the row and deletes nothing; PRMS `public_link` never contributes an identity.
+- **Done when:** a PRMS KP payload carrying a handle is deduplicated against TIP on the sync path, and the D11 regression test fails on `main` and passes here.
+- **What disqualifies the evidence:** a test that constructs the DTO **by hand** and asserts identity resolution proves only the resolver, not the mapper — it is exactly the blind spot that let JD3-01 through, since every other rev-3 gate feeds a synthetic evidence list. AC.10 must exercise the **real `processData`**. Equally, a green `save-all-sections` suite with a hand-built `dto.evidence` is not evidence that PRMS sync works.
+- **Dependencies:** T-06 · **Effort:** M · **Status:** not-started
+- **Skills:** `nestjs-expert`, `systematic-debugging`
+
+---
+
+### T-14 — Live-data invariant check (manual pre-`apply` gate, not CI)
+
+- **Requirements covered:** R-RES-001 **AC.7**, DC-9, DC-10, A5, A6
+- **Files touched:** a read-only script under the spec folder, in the shape of the existing `verify-normalization.js`
+- **Description:** Assert the four properties that are facts about **data**, not about code, and that no unit test can make:
+  1. **Cross-platform matchability per platform (AC.7)** — each platform's normalized identity set must intersect at least one other's. **Not** a non-emptiness check: PRMS `public_link` was non-empty for 3,947/3,947 rows under rev 2 and matched nothing, so the earlier form of this AC would have passed the very defect it exists for (JD3-S-01).
+  2. **Role/privacy invariant** — every PRMS evidence row is `evidence_role_id = 1` and non-private. This is what the weaker in-memory predicate in T-13 depends on.
+  3. **KP handle 1:1 in BOTH directions** — no KP result with two handles, **and no handle with two KP results**. The reverse direction has no branch protecting it: in `{PRMS_A, PRMS_B, TIP}` the survivor is TIP and Gate A protects neither PRMS row, so both are hard-deleted (JD3-S-09).
+  4. **Title agreement rate** across PRMS↔counterpart pairs, with the disagreeing pairs listed. Baseline **2,156 of 2,266 (95.1%)**; the 110 disagreements are DC-10's residual review population.
+- **Implementation notes:** SELECT only; prints no credentials; run from `server/researchindicators` so it picks up that package's `.env` and `node_modules`. Compare against the baselines in `design.md` §0.5 and §14.
+- **Tests:** none — this *is* a check. It is not wired into CI.
+- **Done when:** it runs against dev, all four assertions pass, and its output is attached to the dry-run review artifact.
+- **What disqualifies the evidence:** **a run that cannot reach a populated database MUST report `INCONCLUSIVE`, never a pass.** Also inconclusive: a zero PRMS row count (the corpus is not the one these numbers describe), or handle-format/title-agreement rates differing materially from the §0.5 baselines with no explained data change — report the spread and stop rather than recording a pass because the process exited `0`. **This task is a manual gate, not an automated one**, and must not be described as CI coverage in any PR (JD3-S-08).
+- **Dependencies:** T-15 · **Effort:** S · **Status:** not-started
+- **Skills:** none (SQL + read-only script)
+
+---
+
+### T-15 — Stored-side identity `UNION` in the candidate repository
+
+- **Requirements covered:** R-RES-010 (AC.3–AC.8), R-RES-001 (AC.1–AC.6), R-RES-008, R-RES-009 AC.4
+- **Files touched:** `shared/utils/publication-identity.util.ts` (SQL form), `shared/utils/public-link-normalizer.util.ts` (`dedupScopeSql` split), `entities/results/repositories/duplicate-candidate.repository.ts`, `entities/results/duplicate-resolution.service.ts`, `entities/results/entities/result-duplicate-resolution-log.entity.ts`, + specs
+- **Description:** Replace the single `results`-only row source with the two-branch identity `UNION ALL` (design §3.1.2) across **all three** repository reads — `findCandidatesForIncoming` (`:97`), `findCrossPlatformGroupKeys` (`:125`, which *is* the group scan) and `findMembersByNormalizedLinks` (`:188`). Project `identitySource`, `identityCount`, and `rawIdentity` (renamed from `rawPublicLink`). Apply the multi-identity refusal in the sweep service.
+- **Implementation notes:**
+  - **`UNION ALL`, not `LEFT JOIN`** — a join needs the platform predicate stated twice (in `ON` and in a `CASE`) and can drift; each branch reads exactly one source.
+  - **The PRMS branch must be `DISTINCT` on `(result_id, normalized identity)`.** `UNION ALL` does not deduplicate, `result_evidences` has **no unique constraint** on `(result_id, evidence_url)`, and the versioning SPs copy evidence rows wholesale (`1783029013035:505,518`). Otherwise one `result_id` lands in a group twice → duplicate audit rows and a double hard-delete attempt, or an inflated `identityCount` that freezes real groups (JD3-S-04).
+  - **No format filter on `public_link`** — AICCRA is 54% handle-format and a filter drops 269 rows out of scope (R-RES-010 AC.6).
+  - **The refusal is per-participant, not per-group** — the other members of each group still resolve and are still deleted if they lost. Whole-group refusal reverses D-dup-9 and reintroduces rev 1's JD-03/F-3 under-deletion (JD3-S-02).
+  - Keep the pure resolver **identity-blind**: it receives participants plus `identityCount`, never an identity or a group key.
+  - **Carried from the review ledger (JD3-S-11):** add `identitySource` to §3.3's participant JSON so the audit entity can satisfy R-RES-009 AC.4, and pin **DC-2's post-run verification query** to the R-RES-010 identity — written over `public_link` it returns zero for PRMS by construction, recreating DC-9 inside DC-2's own gate.
+- **Tests:** `publication-identity.util.spec.ts` — the four AC.3 negative cases (private · non-principal role · inactive · non-handle-format), AC.4 (two principal evidences, one handle → exactly one identity), AC.5 (non-KP yields nothing), and **SQL/in-memory equivalence** with T-13's form. `duplicate-candidate.repository.spec.ts` — PRMS draws identity from evidence and never from `public_link`; TIP/AICCRA never join `result_evidences`; AICCRA non-handle `public_link` stays in scope; `identitySource`/`identityCount` project correctly on both branches. `duplicate-result-priority.util.spec.ts` — the mandatory three-platform composition `{AICCRA CS, PRMS KP, TIP KP}`, asserting the complete partition **and** that it is *not* `UNRESOLVED_CONFLICT`. `duplicate-resolution.service.spec.ts` — a participant with `identityCount > 1` is in no `toDelete` while its groups' other members still resolve.
+- **Done when:** a dev dry-run returns ~2,359 groups with ~2,254 involving PRMS, and every AC above is checked.
+- **What disqualifies the evidence:** a **total** group count is not evidence of correct identity resolution — the wrong field produced a plausible 116 under rev 2. Assert **per-platform** participation. A dry-run returning a number in the right ballpark with PRMS at zero is a **failure**, not a pass. And `UNRESOLVED_CONFLICT` from the multi-identity branch is expected to be **0** on dev; a non-zero count means live data moved into the refused shape and must be investigated, not waived.
+- **Dependencies:** T-04, T-09 · **Effort:** L · **Status:** not-started
+- **Skills:** `nestjs-expert`, `api-design-principles`
+
+---
+
 ## 4. Estimated size and PR strategy
 
 | | |
 | --- | --- |
-| Tasks | **12** (design budgeted 9 — see overrun below) |
-| Estimated LOC | **~1,250** (≈500 production, ≈750 tests) |
-| Migrations | **3** (design budgeted 2) |
+| Tasks | **15** (design budgeted 9 + 3 = 12 — see overrun below) |
+| Estimated LOC | **~1,560** (≈640 production, ≈920 tests) |
+| Migrations | **3** (design budgeted 2; **rev 3 adds none**) |
 
 **Budget overrun, declared rather than absorbed.** The design's 9-task / 2-migration budget did not include T-10 (the machine-token control has no attachment point, so `JwtMiddleware` must change) or T-08's third migration (`sync_process_logs` has no omission column and its counters are NOT NULL). Both were found in review round 2. Per `design.md` §14 this is a tripwire, not a silent absorption: **flagged here for the user's call on scope.**
 
@@ -441,9 +521,13 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
 | **PR 1 — Inventory & schema** (~250 LOC) | T-01, T-02, T-08 | Inert. Nothing reads the new table or function path yet, so it is reviewable purely on correctness of the enumeration. Review T-01's artifact **first** — every later PR trusts it. |
 | **PR 2 — Pure logic** (~350 LOC, mostly tests) | T-03, T-04 | No I/O, no destructive path. The highest-value review in the set: these two files decide which production row dies, and both are cheap to test exhaustively. Reviewer should read the composition matrix before the implementation. |
 | **PR 3 — Destructive path** (~450 LOC) | T-05, T-06, T-07, T-10 | Everything that can lose data, in one place, reviewed together. Out of scope for PR 1–2 reviewers. **This is the PR that needs the most careful eyes.** |
-| **PR 4 — Sweep, e2e, rollout** (~200 LOC) | T-09, T-11, T-12 | The AICCRA capability plus its proof and its human gate. |
+| **PR 4 — Sweep & e2e** (~200 LOC) | T-09, T-11 | The AICCRA capability plus its proof. |
+| **PR 5 — PRMS identity** (~310 LOC) | **T-13, T-14, T-15** | Rev 3. Kept as its own PR because it changes **which rows are candidates at all**, not how candidates are resolved — a reviewer needs to check the identity model, not re-check the rules. Review order: T-15's `UNION` first (it decides membership), then T-13 (it decides what the sync path sees), then T-14 (it decides whether the data still matches the spec's premises). |
+| **PR 6 — Rollout** (~60 LOC + docs) | T-12 | Flag, runbook, batched dry-run review. Last because its artifact is the DC-5 gate and it must describe the **post-rev-3** population, not the 116-group one. |
 
 Chained PR descriptions per `cognitive-doc-design`: each states what to review first, what is deliberately out of scope, and links the previous/next PR.
+
+**PR 5's description must state three things explicitly**, because each is a place a reviewer would otherwise assume more safety than exists: that T-14 is a **manual** gate and not CI coverage; that the in-memory/SQL predicate asymmetry is an **accepted risk** with no automated gate; and that DC-10's ownership property rests on a **95.1% title-agreement measurement** with 110 pairs left for human review.
 
 ---
 
@@ -456,6 +540,8 @@ Per `design.md` §10. Non-negotiables:
 - **Run the full suite for T-06.** `CounterResults` is consumed by both sync pipelines; a targeted suite confirms the brief, not the blast radius (KZ-003).
 - **T-10's `403` must traverse the real middleware.** A mocked context passes against a control that does not exist.
 - **T-11's seed must cover T-01's full enumeration**, and the PR must state the seeded table count.
+- **T-13's AC.10 must exercise the real `processData`.** A hand-built DTO proves the resolver, not the mapper — and that is precisely the blind spot that let JD3-01 reach a second review round, since every other rev-3 gate feeds a synthetic evidence list.
+- **Never assert a total where a per-platform count is the discriminator.** Rev 2's 116-group total looked healthy while PRMS contributed nothing. Identity assertions are per-platform (R-RES-001 AC.7), and a passing total with a zero platform is a failure.
 - Global coverage floor 60%; `duplicate-result-priority.util.ts` at or near 100% — it holds the business rules and costs nothing to cover.
 - Lean invocation: `npm test -- --silent`, `npm run test:e2e`. Failures print verbatim. Note `npm run lint` carries `--fix` and **mutates files** — re-check `git status` after.
 
@@ -481,16 +567,26 @@ Per `design.md` §10. Non-negotiables:
 | RB-4 | 2026-08-04 | Budget overrun: 12 tasks / 3 migrations vs 9 / 2 | Declared in §4 for a scope decision rather than absorbed | User | **open — awaiting call** |
 | RB-5 | 2026-08-04 | T-07 changes a helper with 4 non-dedup callers, incl. a bulk hard-delete endpoint | Per-caller decision named in the PR with a test each | Implementer | open |
 | RB-6 | 2026-08-04 | Two review rounds each shipped an over-deletion defect that the named gate would have passed | Every task states what **disqualifies** its evidence, not only what satisfies it | Implementer + Reviewer | mitigated |
+| **RB-7** | 2026-08-05 | **`apply` before T-13 makes duplicates permanently undetectable** — the deleted PRMS row re-syncs with no evidence and no payload identity, invisible to both sweep and sync path, while the audit log records success | T-13 declared a **prerequisite for `apply`**, not an enhancement; rollout order fixed in `design.md` §11 | Implementer | **open — blocks `apply`** |
+| **RB-8** | 2026-08-05 | **DC-10 ownership is not fully automatable.** Both mapper-provided discriminators are unavailable (`citation` empty on all 2,387; `evidence_description = 'Handled'` on zero rows). Ownership rests on **95.1% title agreement**, leaving **110 pairs** unverified | The 110 disagreeing pairs are reported as a **distinct review section** of the `plan` — a bounded HITL check rather than an unbounded property. T-14 tracks the rate | MEL / reviewer of the dry run | **open — accepted residual** |
+| **RB-9** | 2026-08-05 | **The stored PRMS identity corpus is static** — one bulk load on 2026-07-23 (01:36–01:45 UTC), no maintained writer. Sweep coverage of PRMS decays as new results arrive | OQ-12 records the deferred decision to persist `dto.evidence`; the sync path (T-13) covers new results at ingest, which is when duplicates arise | Engineering lead | open — non-blocking |
+| **RB-10** | 2026-08-05 | **R-RES-002's consistency gate and the shipped resolver disagreed**, harmlessly under rev 2 (no three-platform groups existed) and materially under rev 3 (~11–22 now do) | Requirement corrected to the code's ordering semantics; `{AICCRA CS, PRMS KP, TIP KP}` added to the mandatory composition matrix. **D-dup-13's "measured cost: zero" is a rev-2 figure and must be re-measured before `apply`** | Implementer | open — measurement owed |
+| **RB-11** | 2026-08-05 | Budget overrun grew: **15 tasks vs the 12 budgeted** (9 rev-2 + 3 rev-3) | Declared here rather than absorbed, per `design.md` §14. Rev 3 added no migrations | User | **open — awaiting call** |
 
 ---
 
 ## 8. Done definition
 
-- [ ] All `T-01`…`T-12` are `done`.
-- [ ] Every AC in `requirements.md` R-RES-001…009 and NFR-RES-001…005 is checked.
+- [ ] All `T-01`…`T-15` are `done`.
+- [ ] Every AC in `requirements.md` R-RES-001…**010** and NFR-RES-001…005 is checked.
 - [ ] Coverage green; `duplicate-result-priority.util.ts` at or near 100%.
 - [ ] Both endpoints documented in `/swagger` with the bearer lock.
 - [ ] Migrations apply forward and revert cleanly.
-- [ ] **OQ-7 and OQ-8 answered** before any `apply` against real data.
-- [ ] OQ-3, OQ-4, OQ-9 resolved into decisions or carried into a new spec.
-- [ ] A reviewed dev dry-run is signed off, and the runbook records the AICCRA recovery asymmetry.
+- [ ] **The D11 regression test fails on `main` and passes here** (T-13) — the Bug Mode requirement for rev 3.
+- [ ] **T-14 run against dev with all four invariants passing**, its output attached to the dry-run artifact, and `INCONCLUSIVE` treated as not-passing.
+- [ ] **A dev dry-run returns ~2,359 groups with ~2,254 involving PRMS.** A plausible total with PRMS at zero is a failure, not a pass.
+- [ ] **D-dup-13's `UNRESOLVED_CONFLICT` cost re-measured** over the 2,359-group corpus (RB-10) — the rev-2 "zero" does not carry over.
+- [ ] **OQ-7, OQ-8 and OQ-11 answered** before any `apply` against real data.
+- [ ] OQ-3, OQ-4, OQ-9, **OQ-10, OQ-12** resolved into decisions or carried into a new spec.
+- [ ] A reviewed dev dry-run is signed off; the runbook records the AICCRA recovery asymmetry **and the 110 title-disagreeing pairs as a named review section**.
+- [ ] **Rev-3 re-sign-off obtained** — sign-off given against rev 2's 234-row population does not carry to a 2,254-group one.
