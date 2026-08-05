@@ -139,6 +139,30 @@ export class EvidencesMapper {
   public description: string;
 }
 
+/**
+ * The KP result's OWN publication handle (R-RES-010, rev 4).
+ *
+ * Measured live on the PRMS searcher payload, 2026-08-05: present and
+ * handle-format on 277/277 Knowledge Product items
+ * (`indicator_category.code = 6`, `ResultTypeEnum.KNOWLEDGE_PRODUCT`), one
+ * handle per item, and identical to the single handle in that item's
+ * `evidences[]` on 277/277. Unlike `evidences[]` — which 41/123 live non-KP
+ * items also carry, for a handle the result merely CITES (DC-10) —
+ * this field exists only for the result's own publication, which is what
+ * makes the KP-only identity scope a property of the field rather than a
+ * filter that must be remembered. See
+ * `docs/specs/results/cross-platform-duplicate-resolution/execution.md` ->
+ * "Pivot Record: T-13 — RESOLVED BY OBSERVATION".
+ *
+ * NOT the same field as `result_knowledge_product_array` (declared above on
+ * `PrmsResponseDto`, a different, unrelated payload shape) — that field is
+ * absent from every real PRMS payload measured (0 of 13,507 staged rows) and
+ * must not be read for identity.
+ */
+export class KnowledgeProductSummaryMapper {
+  public handle: string;
+}
+
 export class PrimaryEntityMapper {
   public official_code: string;
   public name: string;
@@ -201,6 +225,7 @@ export class ResultResponseMapper {
   public contributing_centers: ContributingCenterMapper[];
   public contributing_partners: ContributingPartnerMapper[];
   public evidences: EvidencesMapper[];
+  public knowledge_product_summary: KnowledgeProductSummaryMapper;
   public primary_entity: PrimaryEntityMapper;
   public created_by: CreatedByMapper;
 }

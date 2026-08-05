@@ -715,17 +715,45 @@ describe('SaveResultService', () => {
       normalizedPublicLink: 'example.org/doc',
     });
 
-    it('skips the save and counts an omission when a higher-priority duplicate exists', async () => {
+    /**
+     * PRMS-KP fixture for the identity-resolution tests below (T-13 /
+     * R-RES-010). `minimalResultDto()` defaults to
+     * `indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT`, which is
+     * out of the KP-only identity scope — these tests need the KP indicator so
+     * the incoming row is actually a dedup participant.
+     */
+    const prmsKpDto = (): ExternalMappersDto => {
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      return dto;
+    };
+
+    it('skips the save and counts an omission when a higher-priority duplicate exists (identity resolved from PRMS evidence, not public_link)', async () => {
       resultRepoHandle.findOne.mockResolvedValue(null);
       duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
         storedCandidate(55, ReportingPlatformEnum.TIP),
       ]);
       const counters = new CounterResults();
-      const dto = minimalResultDto();
-      dto.public_link = 'https://example.org/doc';
+      const dto = prmsKpDto();
+      // PRMS's own public_link (its pdf_link) must never contribute an
+      // identity (R-RES-010 AC.2) — deliberately a different value from the
+      // matching one, so this cannot pass by the old, wrong field being read.
+      dto.public_link = 'https://cgspace.cgiar.org/bitstream/x.pdf';
+      dto.evidence = {
+        evidence: [
+          { evidence_url: 'https://hdl.handle.net/10568/141764' } as any,
+        ],
+      } as any;
 
       await service.saveAllSections(dto, prmsExtraData(counters));
 
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          publicLink: 'https://hdl.handle.net/10568/141764',
+        }),
+      );
       expect(resultsService.createResult).not.toHaveBeenCalled();
       expect(counters[CounterResultsEnum.CREATED]).toBe(0);
       // Previously an omission was counted nowhere, so the reported bug could look
@@ -748,8 +776,13 @@ describe('SaveResultService', () => {
         storedCandidate(600, ReportingPlatformEnum.TIP),
       ]);
       const counters = new CounterResults();
-      const dto = minimalResultDto();
-      dto.public_link = 'https://example.org/doc';
+      const dto = prmsKpDto();
+      dto.public_link = 'https://cgspace.cgiar.org/bitstream/x.pdf';
+      dto.evidence = {
+        evidence: [
+          { evidence_url: 'https://hdl.handle.net/10568/141764' } as any,
+        ],
+      } as any;
 
       await service.saveAllSections(dto, prmsExtraData(counters));
 
@@ -760,6 +793,143 @@ describe('SaveResultService', () => {
         500,
       ]);
       expect(applied.resolution.winner.resultId).toBe(600);
+    });
+
+    it('D11 REGRESSION (R-RES-010 AC.1/AC.2/AC.10) — an incoming PRMS KP row whose principal handle evidence matches a stored TIP public_link is omitted, TIP prevailing', async () => {
+      // Rev 3 was authored believing the sync path already compared PRMS's
+      // `public_link` against other platforms. It never can: PRMS stores a
+      // CGSpace pdf link there, which is never handle-format, so it can never
+      // match a TIP `public_link` that IS a handle. Before T-13 wired identity
+      // resolution to `dto.evidence.evidence[]`, `saveAllSections` passed
+      // `dto.public_link` straight through, so this exact scenario resolved no
+      // identity at all — no query, no omission, the PRMS row created as a
+      // fresh, undetectable duplicate. Red before this task, green after.
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(600, ReportingPlatformEnum.TIP),
+      ]);
+      const counters = new CounterResults();
+      const dto = prmsKpDto();
+      dto.public_link = 'https://cgspace.cgiar.org/bitstream/x.pdf';
+      dto.evidence = {
+        evidence: [
+          { evidence_url: 'https://hdl.handle.net/10568/141764' } as any,
+        ],
+      } as any;
+
+      await service.saveAllSections(dto, prmsExtraData(counters));
+
+      // The identity handed to the (unchanged) SQL match is the handle, never
+      // PRMS's own public_link.
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          publicLink: 'https://hdl.handle.net/10568/141764',
+        }),
+      );
+      expect(resultsService.createResult).not.toHaveBeenCalled();
+      expect(counters[CounterResultsEnum.OMITTED_DUPLICATE]).toBe(1);
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
+    });
+
+    it('R-RES-010 AC.5 (integration level) — a non-KP PRMS payload carrying a handle-format evidence resolves no identity, even though a live TIP row would match it', async () => {
+      // 41 of 123 live non-KP PRMS items carry a handle-format link in
+      // `evidences[]` (cited publications, DC-10). Identity is KP-only
+      // (`indicator_category.code = 6` on the wire); a non-KP item must never
+      // reach the SQL match on that handle, whatever it carries in
+      // `dto.evidence`.
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 3010,
+        result_official_code: 7012,
+      } as any);
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(600, ReportingPlatformEnum.TIP),
+      ]);
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_DEV;
+      dto.public_link = 'https://cgspace.cgiar.org/bitstream/x.pdf';
+      // Same handle the stored TIP candidate's normalized link matches on —
+      // if this resolved an identity, it would wrongly form a group.
+      dto.evidence = {
+        evidence: [
+          { evidence_url: 'https://hdl.handle.net/10568/141764' } as any,
+        ],
+      } as any;
+
+      await service.saveAllSections(dto, prmsExtraData(counters));
+
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalled();
+      expect(counters[CounterResultsEnum.OMITTED_DUPLICATE]).toBe(0);
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
+    });
+
+    it("R-RES-010 AC.2 — a PRMS result's public_link never contributes an identity, even when it textually equals a stored TIP row's link", async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 3000,
+        result_official_code: 7011,
+      } as any);
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        storedCandidate(600, ReportingPlatformEnum.TIP),
+      ]);
+      const counters = new CounterResults();
+      const dto = prmsKpDto();
+      // Equals the stored TIP candidate's link — if this were read as identity
+      // (the pre-T-13 bug), it would wrongly match.
+      dto.public_link = 'https://example.org/doc';
+      dto.evidence = undefined;
+
+      await service.saveAllSections(dto, prmsExtraData(counters));
+
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalled();
+      expect(counters[CounterResultsEnum.OMITTED_DUPLICATE]).toBe(0);
+    });
+
+    it('R-RES-010 AC.9 — a PRMS payload carrying two handle evidences is REFUSED: creates/updates the row, counts no omission, deletes nothing', async () => {
+      // Rev 4: this is a defensive net, not live logic. The real incoming
+      // source, `item.knowledge_product_summary.handle`, is a scalar, so
+      // `processData` can never actually feed this branch two entries today —
+      // the rev-3 justification ("`processKnowledgeProduct` loops a
+      // `PrmsKnowledgeProductDto[]`") does not hold, that array is not on the
+      // wire. Kept anyway because the branch costs nothing. Never resolve on
+      // the first handle found.
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 2000,
+        result_official_code: 7010,
+      } as any);
+      const counters = new CounterResults();
+      const dto = prmsKpDto();
+      // A truthy `public_link` too, so a naive fix that fell back to reading
+      // it would make `findCandidatesForIncoming` fire and this assertion
+      // would not discriminate the refusal from "no link at all".
+      dto.public_link = 'https://cgspace.cgiar.org/bitstream/x.pdf';
+      dto.evidence = {
+        evidence: [
+          { evidence_url: 'https://hdl.handle.net/10568/111111' },
+          { evidence_url: 'https://hdl.handle.net/10568/222222' },
+        ] as any,
+      } as any;
+
+      await service.saveAllSections(dto, prmsExtraData(counters));
+
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalled();
+      expect(counters[CounterResultsEnum.CREATED]).toBe(1);
+      expect(counters[CounterResultsEnum.OMITTED_DUPLICATE]).toBe(0);
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
     });
 
     it('REGRESSION: never hands the group winner to the deletion loop', async () => {

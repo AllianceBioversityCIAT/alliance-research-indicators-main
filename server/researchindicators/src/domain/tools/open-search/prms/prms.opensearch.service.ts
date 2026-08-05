@@ -33,6 +33,7 @@ import {
   ResultDeleteStatus,
 } from '../../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../../entities/result-knowledge-product/result-knowledge-product.service';
+import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { PooledFundingContractsService } from '../../../entities/pooled-funding-contracts/pooled-funding-contracts.service';
 import {
@@ -380,8 +381,51 @@ export class PrmsOpenSearchService
         }
       }
 
-      result.public_link = item?.pdf_link;
-      result.external_link = item?.prms_link;
+      // @akili-spec results/cross-platform-duplicate-resolution — T-13
+      // (rev 4, 2026-08-05). `processKnowledgeProduct` (below) is BANNED
+      // here and must stay that way: it reads
+      // `item.result_knowledge_product_array`, absent from every real PRMS
+      // payload measured (0 of 13,507 staged rows), and it also writes
+      // `body.knowledgeProduct`, which HAS a live production reader
+      // (`SaveResultService` -> `ResultKnowledgeProductService.update`) that
+      // would overwrite `result_knowledge_products.citation`/`type` on 2,388
+      // PRMS rows per sync (citation populated today: TIP 8,476/8,476, PRMS
+      // 0/2,388 — design §0.5's provenance baseline). Neither is touched
+      // below.
+      //
+      // The real field is `item.knowledge_product_summary.handle` — measured
+      // present, non-empty and handle-format on 277/277 live Knowledge
+      // Product items. `indicator` above is already the homologated
+      // `IndicatorsEnum` value derived from `item.indicator_category.code`
+      // (`ResultTypeEnum.KNOWLEDGE_PRODUCT = 6` on the wire, which
+      // `IndicatorHomologation` maps to `IndicatorsEnum.KNOWLEDGE_PRODUCT`
+      // (3) — NOT the same constant, and an earlier probe of this spec
+      // tested 3 directly against the raw payload and measured nothing), so
+      // comparing against `IndicatorsEnum.KNOWLEDGE_PRODUCT` here is
+      // equivalent to testing the raw code and does not repeat that
+      // mistake.
+      //
+      // The handle is carried into `dto.evidence.evidence[]` — the same
+      // carrier TIP's mapper uses (`tip-integration.service.ts:340-352`) and
+      // the only production reader of it on the sync path is the identity
+      // resolver this spec adds (`SaveResultService` reads
+      // `result.evidence?.evidence`; `ResultEvidencesService
+      // .updateResultEvidences` — the only DB writer of `result_evidences`
+      // reachable from a sync — is never called with it). This is the ONLY
+      // field written here: `public_link`/`external_link` stay
+      // `pdf_link`/`prms_link` and `dto.knowledgeProduct` stays `undefined`.
+      // See execution.md -> "Pivot Record: T-13 — RESOLVED BY OBSERVATION".
+      if (
+        indicator === IndicatorsEnum.KNOWLEDGE_PRODUCT &&
+        !isEmpty(item?.knowledge_product_summary?.handle)
+      ) {
+        result.evidence = {
+          ...result.evidence,
+          evidence: [
+            { evidence_url: item.knowledge_product_summary.handle },
+          ] as ResultEvidence[],
+        };
+      }
 
       result.createResult = {
         year: parseInt(item.year),

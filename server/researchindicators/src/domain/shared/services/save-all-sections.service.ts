@@ -38,6 +38,7 @@ import {
 } from '../../entities/results/entities/result-duplicate-resolution-log.entity';
 import { ResultDuplicateResolutionLogService } from '../../entities/results/result-duplicate-resolution-log.service';
 import { DuplicateResolutionRunner } from './duplicate-resolution-runner.service';
+import { resolveIncomingPublicationIdentity } from '../utils/publication-identity.util';
 
 /** A participant enriched with the payload the audit record needs. */
 type SyncParticipant = DuplicateGroupParticipant & {
@@ -136,11 +137,35 @@ export class SaveResultService {
         where: findOptions,
       });
 
-      // Cross-platform duplicate check. Matching is on `public_link` only —
-      // `external_link` points at the source platform portal and would never
-      // produce a reliable cross-platform match.
-      const group = await this.buildDuplicateGroup({
+      // Cross-platform duplicate check. `external_link` points at the source
+      // platform portal and would never produce a reliable cross-platform
+      // match, so it is never used. The identity FIELD is platform-dependent
+      // (R-RES-010, design §5.2 step 0): TIP/AICCRA keep `public_link`
+      // unchanged; PRMS's own `public_link` (its `pdf_link`) NEVER
+      // contributes an identity — PRMS resolves from
+      // `dto.evidence.evidence[]` instead, in memory, because the sync path
+      // runs before the row is saved and the stored-side SQL branch is not
+      // available yet for the incoming row.
+      const identityResolution = resolveIncomingPublicationIdentity({
+        platformCode: extraData.platformCode,
+        indicatorId: result.createResult.indicator_id,
         publicLink: result.public_link,
+        evidence: result.evidence?.evidence,
+      });
+
+      if (identityResolution.refused) {
+        // R-RES-010 AC.9: the payload itself carries more than one
+        // qualifying identity (e.g. a two-KP PRMS item). Never resolve on the
+        // first handle found — create/update normally below, count no
+        // omission, and skip the duplicate check entirely so nothing is
+        // submitted for deletion.
+        this.logger.warn(
+          `Result ${result.official_code} from ${this.platformCode(extraData.platformCode)} carries more than one publication identity; refusing duplicate resolution and processing it normally (no omission, no deletion).`,
+        );
+      }
+
+      const group = await this.buildDuplicateGroup({
+        publicLink: identityResolution.identity,
         reportYearId: result.createResult.year,
         platformCode: extraData.platformCode,
         indicatorId: result.createResult.indicator_id,
