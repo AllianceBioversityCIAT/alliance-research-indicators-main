@@ -31,7 +31,7 @@ export class SeedDuplicateResolutionConfig1785872085723
   private static readonly ROWS = [
     {
       key: 'duplicate_resolution.hard_delete_enabled',
-      value: 'true',
+      value: 'false',
       description:
         'When false the resolver detects, guards and audits duplicates but deletes nothing. It never falls back to a soft delete, because the soft delete is the defect this spec fixes.',
     },
