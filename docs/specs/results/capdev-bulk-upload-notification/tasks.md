@@ -152,7 +152,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-06 — `capdev-recipients.builder.ts` (pure)
-- **Status:** [ ]
+- **Status:** [x] — Reviewer PASS, attempt 1. Purity disqualifier verified in the spec file *and* the module. See `execution.md` → T-06.
 
 - **Requirements covered:** R-CBU-003, R-CBU-004
 - **Design refs:** §6.4
@@ -167,7 +167,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-07 — `capdev-metrics.formatter.ts` (pure)
-- **Status:** [ ]
+- **Status:** [x] — Reviewer PASS, attempt 1. Both inherited T-04 defects closed structurally. ⚠️ **Two spec-owner decisions (OD-1, OD-2) are open and block briefing T-08** — see `execution.md` §6.
 
 - **Requirements covered:** R-CBU-006
 - **Design refs:** §6.5, DD-4

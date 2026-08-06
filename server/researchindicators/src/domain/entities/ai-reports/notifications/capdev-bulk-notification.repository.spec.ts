@@ -201,7 +201,9 @@ describe('CapdevBulkNotificationRepository', () => {
 
     it('query count is O(groups): exactly one getRawMany call regardless of row count', async () => {
       mockQueryBuilder.getRawMany.mockResolvedValue(
-        Array.from({ length: 50 }, (_, i) => rowFor({ agreement_id: `C-${i}` })),
+        Array.from({ length: 50 }, (_, i) =>
+          rowFor({ agreement_id: `C-${i}` }),
+        ),
       );
 
       await repository.findGroups(1);
@@ -345,9 +347,7 @@ describe('CapdevBulkNotificationRepository', () => {
       expect(participantsCall?.[0]).toContain(
         'COALESCE(rcs.session_participants_total,',
       );
-      expect(participantsCall?.[0]).toContain(
-        'session_participants_male',
-      );
+      expect(participantsCall?.[0]).toContain('session_participants_male');
     });
 
     it('STRUCTURAL — groups by agreement_id', async () => {

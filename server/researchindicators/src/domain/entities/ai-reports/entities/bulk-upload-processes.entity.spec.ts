@@ -53,9 +53,7 @@ describe('BulkUploadProcesses entity metadata', () => {
   });
 
   it('total_female_participants is a bigint column', () => {
-    expect(getColumn('total_female_participants').options.type).toBe(
-      'bigint',
-    );
+    expect(getColumn('total_female_participants').options.type).toBe('bigint');
   });
 
   it('activity_start_date is a timestamp column', () => {

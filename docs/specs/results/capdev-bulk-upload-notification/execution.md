@@ -456,6 +456,133 @@ Per `/akili-execute` §2.4 the Leader **stopped and escalated rather than advanc
 
 ---
 
+### T-06 — `capdev-recipients.builder.ts` (pure)
+
+- **Final status:** ✅ **PASS** (Reviewer verdict, attempt 1 of 3)
+- **Date:** 2026-08-06
+- **Requirements covered:** R-CBU-003, R-CBU-004
+- **Design refs:** §6.4
+- **Implementer attempts:** 1
+- **Skills assigned:** `tdd` (as recommended — no Leader deviation)
+- **Effort:** `high` — pure, but the rule table is where defect class D1 lives (wrong recipients, cross-project CC leak), and R-CBU-003 AC.4's tier ordering is only testable if the tiers are genuinely ordered rather than coalesced.
+- **Review lens mode:** lens checklist (single Reviewer)
+
+#### Ran in parallel with T-07 — and the constitution says that is unsafe
+
+Root `CLAUDE.md`: *"Cross-package parallelism (one server task + one client task) is safe; two tasks in the same package are not."* The user asked for T-06 ‖ T-07, both server tasks.
+
+**Leader resolution:** the source files are genuinely disjoint; the only real collision is the test runner (shared `node_modules` and jest cache, where a concurrent full-suite run yields a *wrong* result, not a slow one). So each Implementer was instructed to run **only its own spec file** and explicitly forbidden `npm test` and `npm run lint`; the Leader ran the full suite **once, serially, after both reported**. Both modules are new with no importers, so blast radius was nil until that run. **KZ-003** is satisfied at the Leader level rather than per-worker: full suite went 325 → **327 suites**, 2106 → **2142 tests**, exactly +12 (T-06) +24 (T-07). Reviewers ran concurrently without restriction — they are read-only and contend for nothing.
+
+#### Attempt 1
+
+- **Files created:** `capdev-recipients.builder.ts`, `capdev-recipients.builder.spec.ts`
+- **Signature:** `build(group, fileContacts, sprmEmails, configuredCc) → { to, cc, salutation } | null`
+- **TDD evidence:** genuine red first — spec run before the module existed failed `TS2307: Cannot find module`. Then 12 tests green.
+- **Reviewer verdict:** `STATUS: PASS` — verified the disqualifier **in the spec file itself rather than from the report**, and extended the check to the module: its sole import (`cleanName`/`cleanText`) pulls only a TypeORM *type*, erased at compile time. Purity holds on both sides.
+
+#### What the Reviewer actually verified
+
+- **`to` is structurally incapable of holding a non-PI address** — `to: [piEmail]` is the single write, sourced only from `group?.pi?.email`; nothing reads `cc` back. No backfill path exists.
+- **The §6.4 asymmetry is two independent code paths** — the address gate is an early `return null`; the salutation is resolved separately and neither consults the other.
+- **Salutation is an ordered chain, not a coalesce**, and a *blank-but-present* tier-1 name falls through correctly rather than producing a whitespace salutation.
+- **Sanitisation order is literally normalise → validate → drop-if-in-`to` → dedupe**, with dedupe genuinely after the drop, both comparisons via `trim().toLowerCase()`.
+- **Contract partitioning is fail-closed** — a non-empty code matching nothing is excluded from *every* group, so the dangerous direction (a scoped contact leaking cross-group) is impossible.
+- **Test non-vacuity checked case by case**, not counted: the dedupe fixture carries three real casing variants across three sources and asserts `toEqual`, so it fails on broken dedupe, on case-sensitive dedupe, *and* on wrong-casing output.
+
+#### Decisions
+
+- **D-T06-a — the local `CapdevRecipientFileContact` interface is accepted, with a recorded hole.** The Implementer typed `fileContacts` locally rather than importing `AiContactDto`, to keep the pure module free of a `results` dependency. The Reviewer ruled the direction sound and not a spec deviation (neither T-06 nor §6.4 binds the parameter type) — but found it provides **zero drift protection**: both fields are optional, so `{}` satisfies the interface and *any* object is assignable. If T-01's `AiContactDto` renamed `contract_code`, T-09 would still compile and contract scoping would silently degrade to broadcast-to-every-group. It also corrected the Leader's premise: `ai-reports` **already** imports from `results` (`entities/bulk-upload-results.entity.ts:11`), so the module-boundary argument is weaker than the code comment implies. Recorded as advisory, not rework.
+
+#### Advisory (recorded, non-gating, no rework, no new task)
+
+1. **RISK — `contract_code` matching is case-sensitive** while emails are matched case-insensitively, and both arrive from the same user-supplied file. `"abc-123"` against agreement `"ABC-123"` is silently dropped from every group. Fail-closed, no spec text mandates otherwise, but the inconsistency will read as a bug later.
+2. **RISK — the drift hole above closes in one line** with a type-only conformance check in the spec (`import type { AiContactDto }` + an assignability assertion). Runtime purity untouched; a rename then breaks the build instead of silently broadcasting.
+3. **⚠️ RELIABILITY / forward-flag to T-09 — the debug log for dropped recipients has no owner.** Design §10 specifies a `recipient dropped | debug | the dropped raw value` signal and R-CBU-004 AC.4 requires it, but §6.4 fixes the return shape as `{to, cc, salutation}`, which carries **no record of what was dropped**. T-09 can only recompute the drop set by diffing its inputs against `cc`, which conflates invalid-address drops with dedupe drops. Not a T-06 defect — the signature is what the design binds — but T-09 must not discover it late.
+4. **RELIABILITY — two rule-table cells implemented but unexercised**, which sits awkwardly against the disqualifier's own rationale ("pure by design precisely so its rule table can be exhausted"): a whitespace-only PI email (R-CBU-003 AC.3 says "null/blank"; only null is tested), and a blank-but-present tier-1 name. Also unasserted: the R-CBU-004 CC source ordering (RA → PA → file → SPRM → configured), which the code honours but no test would notice being reordered.
+5. **READABILITY / D7 human-copy check — `cleanText` lowercases** (`object.utils.ts:126-128`), so a tier-2 salutation renders as *"Dear fallback description,"*. Conformant — §6.4 names `cleanText` explicitly — but it should land on the D7 gate rather than surprise a Project Leader.
+6. **READABILITY — interior padding survives:** `first_name: '  Jane  '` + `last_name: 'Doe'` yields `'Jane   Doe'`.
+7. **READABILITY — the export is the bare name `build`**, which reads as nothing at T-09's call site and would have collided with T-07 had it followed the same pattern. §6.4 writes `build(...)` as signature shorthand, not as a binding export name.
+
+#### Final verification
+
+`tsc` clean · full suite **327 suites / 2142 tests** (Leader, serial) · `npm run lint -- --quiet` **zero errors** after the formatting pass.
+
+---
+
+### T-07 — `capdev-metrics.formatter.ts` (pure)
+
+- **Final status:** ✅ **PASS** (Reviewer verdict, attempt 1 of 3) — **with a spec gap escalated to the user, see below**
+- **Date:** 2026-08-06
+- **Requirements covered:** R-CBU-006
+- **Design refs:** §6.5, DD-4
+- **Implementer attempts:** 1 (+1 scoped follow-up for a lint error)
+- **Skills assigned:** `tdd` (as recommended — no Leader deviation)
+- **Effort:** `high` — the two inherited T-04 defects both type-check cleanly and still break the email.
+- **Review lens mode:** lens checklist (single Reviewer)
+
+#### Attempt 1
+
+- **Files created:** `capdev-metrics.formatter.ts`, `capdev-metrics.formatter.spec.ts`, `dto/capdev-bulk-email-template.dto.ts`
+- **Signature:** `formatCapdevMetrics(metrics: CapdevBulkMetricsDto, countryNames: string[] | null | undefined): CapdevMetricsTemplateFields`
+- **TDD evidence:** genuine red first (`TS2307`), then 24 tests green.
+- **Reviewer verdict:** `STATUS: PASS`.
+
+#### The two inherited T-04 defects — both verified closed by exhaustion, not sampling
+
+1. **`"0"` truthiness.** `participantsCount` is only ever assigned inside the branch where `toPositiveFinite` returned `> 0`, so it cannot be `"0"`; every other path returns `''`. `percentageWomen` is `percentage > 0 ? String(percentage) : ''` — and since `NaN > 0` is `false`, this incidentally absorbs `NaN` too.
+2. **Half-range dates.** `startDate`/`endDate` are assigned in exactly one place, the destructure of `formatDateRange`, which returns the pair **atomically**. There is no second write path — the invariant is structural, not conventional.
+
+The Reviewer also traced every negative assertion to the guard it targets and confirmed each would go red if that guard were deleted (e.g. removing `toPositiveFinite` yields `"NaN"`; removing the `Number.isFinite` check yields `"Infinity"`). It noted `expect(x).not.toMatch(re)` **throws** on a non-string, so the sweep catches a literal `undefined` rather than passing over it.
+
+#### The adjudication — the Reviewer split the question rather than answering it flatly
+
+The Leader flagged that the Implementer extended suppression beyond R-CBU-006's text (which names exactly one trigger: *"omitted… when the participant total is `0`"`*) to cover any percentage that **rounds** to zero. The Reviewer's ruling:
+
+- **`female == 0`, `participants > 0` → sound (a).** Forced by the copy, not taste: T-04's template hardcodes `— {{percentageWomen}}% of whom were women, a most noteworthy figure`, so rendering `0` yields *"— 0% of whom were women, a most noteworthy figure"*. Exactly the render DD-4 exists to make an enumerable TS branch.
+- **`0 < female` but rounds to 0 → a genuine spec gap (c), escalate, do not rework.** *"Narrowing to the literal requirement produces a worse artifact, not a compliant one… A FAIL whose remediation is 'restore the embarrassing render' is a reviewer forcing a regression to satisfy a literalism."*
+
+Two facts moved it off FAIL: the extension is **documented, not silent** (stated in the DTO's binding contract at `capdev-bulk-email-template.dto.ts:56-63`) and the test is **named for what it is** ("rounds to zero"). It is reviewable behavior sitting in a spec gap, not smuggled behavior — but *"a test is not a requirement"*, and it must not stay that way.
+
+**The risk the Reviewer named, which the Leader had not:** the error direction. Suppressing a sub-1% women's share silently **flatters** the data for a gender-sensitive reporting organization. The honest-and-non-embarrassing option is a `"<1"` floor clause — which needs a copy change in T-04's template and is therefore a spec-owner decision.
+
+#### Follow-up — lint error, repaired in scope
+
+`npm run lint` left one hard error (`'key' is assigned a value but never used`, `capdev-metrics.formatter.spec.ts:32`) — the same spot the Reviewer independently flagged as *"a comment promising an assertion that is not there"*: `assertNoForbiddenTokens` documented the empty-string-not-zero contract but its loop only ran `FORBIDDEN_PATTERN`. The unused `key` was the symptom of an assertion never written.
+
+Repaired by making the helper **enforce what its comment claimed** (a `GUARDED_FIELDS` set + `expect(value).not.toBe('0')`), not by renaming to `_key` — which would have silenced the linter while leaving the helper lying. **Correctness detail the Leader put in the brief:** `trainingsCount` is legitimately allowed to be `"0"` because it is *unguarded* in the template (`{{trainingsCount}} trainings conducted`); applying the check uniformly would have broken a passing test for the wrong reason. Verified excluded.
+
+#### Decisions
+
+- **D-T07-a — `timeZone: 'UTC'` accepted, with the caveat recorded.** `result_capacity_sharing.start_date`/`end_date` are `@Column('timestamp')` (instants), and the TypeORM MySQL config sets no `timezone`, so mysql2 parses against the Node process TZ. UTC is *deterministic but not unconditionally faithful*: exactly right on a UTC-deployed container, and it can shift a month boundary backwards for a value written as local midnight in a UTC-positive zone. Nothing in the spec pins this; the code states the assumption honestly.
+- **D-T07-b — the DTO seam is clean for T-08.** The 10-field contract matches T-04's template variable-for-variable (verified against `capdev-bulk-summary.html`), and `CapdevMetricsTemplateFields` picks the six T-07 owns, leaving `projectLeadName`/`starLink`/`tokenOwnerName`/`tokenOwnerEmail` for T-06 and T-08 to spread in.
+
+#### Advisory (recorded, non-gating, no rework, no new task)
+
+1. **⚠️ RISK — escalate the rounds-to-zero rule into R-CBU-006.** Currently `capdev-metrics.formatter.spec.ts:115` is the only place this behavior is written down. Decide between suppression (current) and a `"<1"` floor clause (needs T-04 template copy). **Pending user decision.**
+2. **⚠️ RISK — no upper clamp on `percentageWomen`.** If `SUM(female)` exceeds `SUM(participants)` — possible when a row records `session_participants_total = 0` alongside a non-zero female count — the email renders *"— 150% of whom were women, a most noteworthy figure"*. The same defect class this module exists for, at the other end of the range, covered by no requirement.
+3. **⚠️ FORWARD-FLAG to T-08 — a contradiction inside R-CBU-006 that T-07 resolved correctly.** The metric table says countries render `"multiple countries"` when the set is empty (§6.5 agrees; T-07 implements it), but the "Degenerate metrics" **scenario** says the body omits the *country* clause too. These cannot both hold. T-07 followed the binding design. **T-08's rendered-body test for the degenerate scenario must expect `"across multiple countries"` to be present, or it will fail against a correct formatter.** The requirements sentence is what is wrong — see §6 below.
+4. **RELIABILITY — the negative sweep runs on one fixture.** `assertNoForbiddenTokens` is invoked only in the degenerate-scenario test; applying it to every case (or via `afterEach`) would make the gate hold for cases added later, at near-zero cost.
+5. **RELIABILITY — countries are filtered on trim but joined untrimmed.** `"Kenya"` and `"Kenya "` survive as two distinct entries and the join carries the trailing space.
+
+#### Final verification
+
+`tsc` clean · full suite **327 suites / 2142 tests** (Leader, serial) · `npm run lint -- --quiet` **zero errors**.
+
+---
+
+## 6. Open decisions blocking T-08
+
+Two items surfaced by the T-07 review that are **spec-owner calls, not Implementer or Reviewer calls**. Both should be settled before T-08 is briefed, because T-08's rendered-body assertions depend on them.
+
+| # | Decision | Why it cannot wait |
+| --- | --- | --- |
+| OD-1 | **R-CBU-006 contradicts itself on empty countries.** Metric table + §6.5 say render `"multiple countries"`; the "Degenerate metrics" scenario says omit the country clause. | T-08's degenerate-scenario test must assert one or the other. Written against the scenario sentence, it fails against a correct formatter. The Leader's recommendation: fix the requirements sentence to match the binding design, since T-07 already implements it and the design is unambiguous. |
+| OD-2 | **The rounds-to-zero suppression is only recorded in a test.** Suppress (current) or render a `"<1"` floor clause? | The floor clause needs a copy change in T-04's template, which is a seeded migration + its byte-equality mirror — cheap now, three coupled edits after T-08 binds to the current copy. Note the current behavior under-reports women's participation rather than over-reporting it. |
+
+*(Neither is a Pivot: the design is internally consistent and the implementation follows it. OD-1 is a defect in one requirements sentence; OD-2 is a gap the requirements never addressed.)*
+
+---
+
 ## 5. PR 1 (Foundation) — completion state
 
 All four foundation tasks have landed with a Reviewer PASS. Per `tasks.md` §3, PR 1 has **no runtime blast radius**: an additive DTO field, additive nullable columns, and seeded config/template rows that nothing calls yet.

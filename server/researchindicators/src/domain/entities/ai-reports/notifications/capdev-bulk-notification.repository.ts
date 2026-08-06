@@ -263,10 +263,7 @@ export class CapdevBulkNotificationRepository extends Repository<BulkUploadProce
       )
       .leftJoin('sec_users', 'su', 'su.sec_user_id = bup.created_by')
       .select('ac.agreement_id', 'agreement_id')
-      .addSelect(
-        'MAX(ac.project_lead_description)',
-        'project_lead_description',
-      )
+      .addSelect('MAX(ac.project_lead_description)', 'project_lead_description')
       .addSelect('MAX(pi.carnet)', 'pi_carnet')
       .addSelect('MAX(pi.first_name)', 'pi_first_name')
       .addSelect('MAX(pi.last_name)', 'pi_last_name')
@@ -309,11 +306,7 @@ export class CapdevBulkNotificationRepository extends Repository<BulkUploadProce
    */
   async findMetrics(processId: number): Promise<CapdevBulkMetricsDto[]> {
     const rawRows = await this.capdevSpineQuery(processId)
-      .leftJoin(
-        ResultCapacitySharing,
-        'rcs',
-        'rcs.result_id = bur.result_id',
-      )
+      .leftJoin(ResultCapacitySharing, 'rcs', 'rcs.result_id = bur.result_id')
       .select('ac.agreement_id', 'agreement_id')
       .addSelect('COUNT(DISTINCT bur.id)', 'trainings_count')
       .addSelect(
@@ -354,10 +347,7 @@ export class CapdevBulkNotificationRepository extends Repository<BulkUploadProce
         'GROUP_CONCAT(DISTINCT cc.name ORDER BY cc.name)',
         'country_names',
       )
-      .addSelect(
-        'GROUP_CONCAT(DISTINCT rcty.isoAlpha2)',
-        'iso_alpha2_list',
-      )
+      .addSelect('GROUP_CONCAT(DISTINCT rcty.isoAlpha2)', 'iso_alpha2_list')
       .groupBy('ac.agreement_id')
       .getRawMany<CapdevBulkCountriesRawRow>();
 
