@@ -2,6 +2,13 @@ import { forwardRef, Module } from '@nestjs/common';
 import { ResultsService } from './results.service';
 import { ResultsController } from './results.controller';
 import { ResultRepository } from './repositories/result.repository';
+import { DuplicateCandidateRepository } from './repositories/duplicate-candidate.repository';
+import { ResultDuplicateResolutionLogService } from './result-duplicate-resolution-log.service';
+import { DuplicateResolutionService } from './duplicate-resolution.service';
+import { DuplicateResolutionController } from './duplicate-resolution.controller';
+import { DuplicateResolutionRunner } from '../../shared/services/duplicate-resolution-runner.service';
+import { StarRelationshipService } from '../../shared/services/star-relationship.service';
+import { QueryService } from '../../shared/utils/query.service';
 import { ResultKeywordsModule } from '../result-keywords/result-keywords.module';
 import { ResultLeversModule } from '../result-levers/result-levers.module';
 import { ResultContractsModule } from '../result-contracts/result-contracts.module';
@@ -45,7 +52,7 @@ import { PortfoliosModule } from '../portfolios/portfolios.module';
 import { AiReportsModule } from '../ai-reports/ai-reports.module';
 
 @Module({
-  controllers: [ResultsController],
+  controllers: [ResultsController, DuplicateResolutionController],
   imports: [
     PortfolioHandlersModule,
     ResultKeywordsModule,
@@ -91,9 +98,20 @@ import { AiReportsModule } from '../ai-reports/ai-reports.module';
   providers: [
     ResultsService,
     ResultRepository,
+    DuplicateCandidateRepository,
+    ResultDuplicateResolutionLogService,
+    DuplicateResolutionService,
+    DuplicateResolutionRunner,
+    StarRelationshipService,
+    QueryService,
     AiRoarMiningApp,
     AlianceManagementApp,
   ],
-  exports: [ResultsService, ResultRepository],
+  exports: [
+    ResultsService,
+    ResultRepository,
+    DuplicateCandidateRepository,
+    ResultDuplicateResolutionLogService,
+  ],
 })
 export class ResultsModule {}

@@ -1,5 +1,6 @@
+// @sdd-spec results/cross-platform-duplicate-resolution
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, FindOptionsWhere, In } from 'typeorm';
+import { DataSource, FindOptionsWhere } from 'typeorm';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
 import {
   CounterResults,
@@ -8,7 +9,6 @@ import {
 import { CgiarLogger } from '../utils/cgiar-logs/logs.util';
 import { CurrentUserUtil } from '../utils/current-user.util';
 import { Result } from '../../entities/results/entities/result.entity';
-import { QueryService } from '../utils/query.service';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { ResultsService } from '../../entities/results/results.service';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
@@ -20,12 +20,12 @@ import {
 import { ResultLever } from '../../entities/result-levers/entities/result-lever.entity';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
-import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
 import {
-  DUPLICATE_RESULT_PLATFORMS,
-  DuplicateResultValidationResult,
-  evaluateDuplicateResults,
-  normalizePublicLink,
+  DuplicateGroupClassification,
+  DuplicateGroupParticipant,
+  DuplicateGroupResolution,
+  refuseMultiIdentityLosers,
+  resolveDuplicateGroup,
 } from '../utils/duplicate-result-priority.util';
 import { isEmpty } from '../utils/object.utils';
 import { ResultInstitutionsService } from '../../entities/result-institutions/result-institutions.service';
@@ -35,13 +35,51 @@ import { ResultPolicyChangeService } from '../../entities/result-policy-change/r
 import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
 import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
 import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
+import { QueryService, ResultDeleteStatus } from '../utils/query.service';
+import {
+  DuplicateCandidate,
+  DuplicateCandidateRepository,
+} from '../../entities/results/repositories/duplicate-candidate.repository';
+import {
+  DuplicateResolutionMode,
+  DuplicateResolutionSource,
+} from '../../entities/results/entities/result-duplicate-resolution-log.entity';
+import { ResultDuplicateResolutionLogService } from '../../entities/results/result-duplicate-resolution-log.service';
+import { DuplicateResolutionRunner } from './duplicate-resolution-runner.service';
+import {
+  PublicationIdentitySource,
+  resolveIncomingPublicationIdentity,
+} from '../utils/publication-identity.util';
+
+/** A participant enriched with the payload the audit record needs. */
+type SyncParticipant = DuplicateGroupParticipant & {
+  resultOfficialCode?: number | null;
+  /** Renamed from `rawPublicLink` (T-15) — see `DuplicateCandidate.rawIdentity`'s doc. */
+  rawIdentity?: string | null;
+  normalizedPublicLink?: string | null;
+  /** Which field supplied the identity (R-RES-009 AC.4). */
+  identitySource?: string | null;
+};
 
 /**
  * Persists externally-synced result sections (PRMS, TIP) into the `results` table.
  *
- * Before creating or updating a row, {@link duplicateResultValidation} enforces
- * cross-platform public-link deduplication between PRMS, TIP, and migrated AICCRA
- * data. See `duplicate-result-priority.util.ts` for the full rule set.
+ * Cross-platform duplicate resolution runs here, and two properties of how it runs
+ * are the whole point:
+ *
+ *  1. **The incoming payload and the stored row it updates are ONE participant.**
+ *     Counting them separately put two same-platform rows in the group for one
+ *     physical row, which fired the same-platform ambiguity branch on every routine
+ *     re-sync — the shape of every live duplicate group.
+ *  2. **Deletion happens after the winner is committed, outside the winner's
+ *     `try`.** The `catch` in this method deletes the result it just created; a
+ *     hard delete inside that block would let a duplicate-cleanup failure destroy
+ *     the row the cleanup was meant to protect.
+ *
+ * And the reported bug lives in the third: when the incoming row loses, **its own
+ * stored row is submitted for deletion**. The previous implementation excluded it
+ * from the candidate set and returned, so a stored losing row survived every
+ * subsequent sync while the omission counter made it look handled.
  */
 @Injectable()
 export class SaveResultService {
@@ -50,7 +88,6 @@ export class SaveResultService {
     private readonly _resultsUtil: ResultsUtil,
     private readonly dataSource: DataSource,
     private readonly _currentUser: CurrentUserUtil,
-    private readonly _queryService: QueryService,
     private readonly _resultsService: ResultsService,
     private readonly _resultKnowledgeProductService: ResultKnowledgeProductService,
     private readonly _resultInstitutionsService: ResultInstitutionsService,
@@ -59,14 +96,21 @@ export class SaveResultService {
     private readonly _resultCapacitySharingService: ResultCapacitySharingService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
     private readonly _resultIpRightsService: ResultIpRightsService,
-  ) { }
+    private readonly _queryService: QueryService,
+    private readonly _duplicateCandidates: DuplicateCandidateRepository,
+    private readonly _resolutionRunner: DuplicateResolutionRunner,
+  ) {}
 
   public async bulkSaveAllSections(
     results: ExternalMappersDto[],
     extraData?: ExtraData<ExternalMappersDto>,
   ) {
+    // One run id for the whole batch, so every audit row of a sync pass can be
+    // retrieved together.
+    const runId =
+      extraData?.runId ?? ResultDuplicateResolutionLogService.newRunId();
     for (const result of results) {
-      await this.saveAllSections(result, extraData);
+      await this.saveAllSections(result, { ...extraData, runId });
     }
   }
 
@@ -81,6 +125,22 @@ export class SaveResultService {
     );
     this._currentUser.setSystemUser(result.userData, true);
     let createNewResult: Result = null;
+
+    // Hoisted so the destructive step can run AFTER the winner is committed and
+    // OUTSIDE the try whose catch rolls the winner back.
+    let resolution: DuplicateGroupResolution = null;
+    let participants: SyncParticipant[] = [];
+    let normalizedPublicLink: string = null;
+    let incomingIsLoser = false;
+    // resultIds `refuseMultiIdentityLosers` pulled out of `resolution.losers`
+    // for R-RES-010 AC.8. Hoisted alongside `resolution` for the same reason:
+    // discarding this (as attempt 1 did) makes the refusal invisible on the
+    // sync path — no warn, and no audit row when it is the ONLY reason
+    // `losers` ends up empty (`hasDeletableLosers` below would otherwise
+    // never call `applyGroup`, and under a hard delete the audit row is the
+    // only surviving trace).
+    let multiIdentityRefusedResultIds: number[] = [];
+
     try {
       const isAppliedVersion = result?.is_version_applied ?? false;
       const findOptions: FindOptionsWhere<Result> = {
@@ -106,143 +166,182 @@ export class SaveResultService {
         where: findOptions,
       });
 
-      // Cross-platform duplicate check (Rules 1–4).
-      // Matching is done exclusively on `public_link` (official publication URL).
-      // `external_link` is platform-specific (TIP/AICCRA/PRMS portal) and must
-      // never be used for deduplication.
-      const duplicateValidation = await this.duplicateResultValidation({
+      // Cross-platform duplicate check. `external_link` points at the source
+      // platform portal and would never produce a reliable cross-platform
+      // match, so it is never used. The identity FIELD is platform-dependent
+      // (R-RES-010, design §5.2 step 0): TIP/AICCRA keep `public_link`
+      // unchanged; PRMS's own `public_link` (its `pdf_link`) NEVER
+      // contributes an identity — PRMS resolves in memory instead, from
+      // `item.knowledge_product_summary.handle` (rev 4; carried into
+      // `dto.evidence.evidence[]` by `processData`, never from
+      // `processKnowledgeProduct`), because the sync path runs before the
+      // row is saved and the stored-side SQL branch is not available yet for
+      // the incoming row.
+      const identityResolution = resolveIncomingPublicationIdentity({
         platformCode: extraData.platformCode,
-        publicLink: result.public_link,
         indicatorId: result.createResult.indicator_id,
-        reportYearId: result.createResult.year,
-        // When updating an existing row, exclude it from the duplicate set.
-        excludeResultId: findResult?.result_id,
+        publicLink: result.public_link,
+        evidence: result.evidence?.evidence,
       });
 
-      // Rule 1 & 2: skip creation/update when a higher-priority duplicate exists.
-      if (duplicateValidation.shouldOmit) {
-        this.logger.debug(
-          `Skipping result ${result.official_code} from ${this.platformCode(extraData.platformCode)} because a higher-priority duplicate exists for public link.`,
+      if (identityResolution.refused) {
+        // R-RES-010 AC.9: the payload itself carries more than one
+        // qualifying identity (e.g. a two-KP PRMS item). Never resolve on the
+        // first handle found — create/update normally below, count no
+        // omission, and skip the duplicate check entirely so nothing is
+        // submitted for deletion.
+        this.logger.warn(
+          `Result ${result.official_code} from ${this.platformCode(extraData.platformCode)} carries more than one publication identity; refusing duplicate resolution and processing it normally (no omission, no deletion).`,
         );
-        this._currentUser.clearSystemUser();
-        return;
       }
 
-      extraData.resultSaved?.push(result.official_code);
+      const group = await this.buildDuplicateGroup({
+        publicLink: identityResolution.identity,
+        reportYearId: result.createResult.year,
+        platformCode: extraData.platformCode,
+        indicatorId: result.createResult.indicator_id,
+        officialCode: result.official_code,
+        findResult,
+      });
+      resolution = group.resolution;
+      participants = group.participants;
+      normalizedPublicLink = group.normalizedPublicLink;
+      incomingIsLoser = group.incomingIsLoser;
+      multiIdentityRefusedResultIds = group.multiIdentityRefusedResultIds;
 
-      const snapshotMessage =
-        (isAppliedVersion ? 'is a snapshot' : 'is a live version') +
-        ' from year ' +
-        result.createResult.year;
+      if (multiIdentityRefusedResultIds.length) {
+        // Mirrors the incoming-side refusal warn above (:169-171) — this is
+        // the STORED side (R-RES-010 AC.8): one of this group's stored
+        // participants itself resolves to more than one publication
+        // identity, so it was pulled out of `resolution.losers` and will
+        // never reach `deleteFullResultById`. Silent here is how the FAIL
+        // this attempt fixes happened: the runner never gets asked, and
+        // without this warn nothing on the sync path says so either.
+        this.logger.warn(
+          `Result(s) ${multiIdentityRefusedResultIds.join(', ')} refused for duplicate resolution: identity resolves to more than one publication (R-RES-010 AC.8). Skipping deletion; needs manual handling.`,
+        );
+      }
 
-      if (!findResult) {
-        let officialCode: number;
-        if (extraData?.manageOfficialCode) {
-          officialCode = await this._resultsService.newOfficialCode(
+      if (incomingIsLoser) {
+        // Do not create or update. The loser's own stored family, if any, is
+        // handed to the single loser loop below — never deleted here, and never
+        // by a direct call.
+        this.logger.debug(
+          `Omitting result ${result.official_code} from ${this.platformCode(extraData.platformCode)}: a higher-priority duplicate prevails for this public link.`,
+        );
+        typeCounter = CounterResultsEnum.OMITTED_DUPLICATE;
+      } else {
+        extraData.resultSaved?.push(result.official_code);
+
+        const snapshotMessage =
+          (isAppliedVersion ? 'is a snapshot' : 'is a live version') +
+          ' from year ' +
+          result.createResult.year;
+
+        if (!findResult) {
+          let officialCode: number;
+          if (extraData?.manageOfficialCode) {
+            officialCode = await this._resultsService.newOfficialCode(
+              extraData?.platformCode,
+            );
+          } else {
+            officialCode = result.official_code;
+          }
+
+          createNewResult = await this._resultsService.createResult(
+            result.createResult,
             extraData?.platformCode,
+            {
+              notContract: true,
+              result_status_id: statusId,
+              validateTitle: false,
+              isSnapshot: isAppliedVersion,
+            },
+            officialCode,
           );
+          findResult = createNewResult;
+          this.logger.debug(
+            `Creating new result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}, ${snapshotMessage}`,
+          );
+          typeCounter = CounterResultsEnum.CREATED;
         } else {
-          officialCode = result.official_code;
+          await this._resultsService.updateInactiveResult(
+            findResult.result_id,
+            isAppliedVersion,
+          );
+          this.logger.debug(
+            `Updating result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}, ${snapshotMessage}`,
+          );
+          typeCounter = CounterResultsEnum.UPDATED;
         }
 
-        createNewResult = await this._resultsService.createResult(
-          result.createResult,
-          extraData?.platformCode,
-          {
-            notContract: true,
-            result_status_id: statusId,
-            validateTitle: false,
-            isSnapshot: isAppliedVersion,
-          },
-          officialCode,
-        );
-        findResult = createNewResult;
-        this.logger.debug(
-          `Creating new result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}, ${snapshotMessage}`,
-        );
-        typeCounter = CounterResultsEnum.CREATED;
-      } else {
-        await this._resultsService.updateInactiveResult(
+        await this._resultsUtil.setCurrentResult(findResult.result_id);
+
+        await this._resultsService.updateResultStatus(
           findResult.result_id,
-          isAppliedVersion,
+          statusId,
         );
-        this.logger.debug(
-          `Updating result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}, ${snapshotMessage}`,
+
+        await this.dataSource
+          .getRepository(Result)
+          .update(findResult.result_id, {
+            external_link: result?.external_link,
+            public_link: result?.public_link,
+            created_at: result.created_at,
+          });
+
+        await this._resultsService.updateGeneralInfo(
+          findResult.result_id,
+          result.generalInformation,
+          TrueFalseEnum.FALSE,
+          false,
+          false,
         );
-        typeCounter = CounterResultsEnum.UPDATED;
-      }
+        const tempAlignment = await this._resultsService.findResultAlignment(
+          findResult.result_id,
+        );
 
-      await this._resultsUtil.setCurrentResult(findResult.result_id);
-
-      await this._resultsService.updateResultStatus(
-        findResult.result_id,
-        statusId,
-      );
-
-      await this.dataSource.getRepository(Result).update(findResult.result_id, {
-        external_link: result?.external_link,
-        public_link: result?.public_link,
-        created_at: result.created_at,
-      });
-
-      await this._resultsService.updateGeneralInfo(
-        findResult.result_id,
-        result.generalInformation,
-        TrueFalseEnum.FALSE,
-        false,
-        false,
-      );
-      const tempAlignment = await this._resultsService.findResultAlignment(
-        findResult.result_id,
-      );
-
-      result.alignments.primary_levers = filterByUniqueKeyWithPriority(
-        mergeArraysWithPriority<ResultLever>(
-          tempAlignment.primary_levers,
-          result.alignments.primary_levers,
+        result.alignments.primary_levers = filterByUniqueKeyWithPriority(
+          mergeArraysWithPriority<ResultLever>(
+            tempAlignment.primary_levers,
+            result.alignments.primary_levers,
+            'lever_id',
+          ),
           'lever_id',
-        ),
-        'lever_id',
-        'is_primary',
-      ) as ResultLever[];
+          'is_primary',
+        ) as ResultLever[];
 
-      await this._resultsService.updateResultAlignment(
-        findResult.result_id,
-        result?.alignments,
-      );
+        await this._resultsService.updateResultAlignment(
+          findResult.result_id,
+          result?.alignments,
+        );
 
-      await this._resultsService.saveGeoLocation(
-        findResult.result_id,
-        result?.geoScope,
-      );
+        await this._resultsService.saveGeoLocation(
+          findResult.result_id,
+          result?.geoScope,
+        );
 
-      await this._resultInstitutionsService.updatePartners(
-        findResult.result_id,
-        result?.partners,
-      );
+        await this._resultInstitutionsService.updatePartners(
+          findResult.result_id,
+          result?.partners,
+        );
 
-      await this._resultEvidencesService.updateResultEvidences(
-        findResult.result_id,
-        result?.evidence,
-      );
+        await this._resultEvidencesService.updateResultEvidences(
+          findResult.result_id,
+          result?.evidence,
+        );
 
-      await this._resultKnowledgeProductService.update(
-        findResult.result_id,
-        result?.knowledgeProduct,
-      );
+        await this._resultKnowledgeProductService.update(
+          findResult.result_id,
+          result?.knowledgeProduct,
+        );
 
-      await this.saveIndicatorSpecificSections(findResult.result_id, result);
+        await this.saveIndicatorSpecificSections(findResult.result_id, result);
 
-      this.logger.log(
-        `Processed result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}.`,
-      );
-      this.logger.log(
-        `Successfully processed result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}.`,
-      );
-
-      // After a successful save, remove lower-priority duplicates (Rule 1 & 2).
-      // Rows protected by link_results (Rule 4) are logged but not deleted.
-      await this.deleteDuplicateResults(duplicateValidation);
+        this.logger.log(
+          `Successfully processed result ${findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}.`,
+        );
+      }
     } catch (error) {
       const errorMessage = (error as Error).message ?? 'Unknown error';
       this.logger.error(error);
@@ -250,21 +349,67 @@ export class SaveResultService {
         this.logger.error(
           `Error processing result ${createNewResult.result_id}, rolling back. Error: ${errorMessage}`,
         );
-        await this._queryService.deleteFullResultById(
-          createNewResult.result_id,
-        );
+        await this.rollbackCreatedResult(createNewResult.result_id);
       }
       this.logger.error(
         `Error processing ${this.platformCode(extraData?.platformCode)} result: ${errorMessage}`,
       );
       typeCounter = CounterResultsEnum.ERROR;
+      // A failed save means the group was never resolved into a durable state, so
+      // nothing is submitted for deletion.
+      resolution = null;
     } finally {
       this._resultsUtil.clearManually();
     }
+
+    // ---- the destructive step, outside the winner's try --------------------
+    // Reached only after the winner is durably stored (or after an omission, where
+    // nothing was written). A failure here is recorded per row and never rethrown.
+    //
+    // The multi-identity-refused check is a SEPARATE reason to reach
+    // `applyGroup`, not folded into `hasDeletableLosers`: `resolution.losers`
+    // already excludes a refused participant by the time it gets here
+    // (`refuseMultiIdentityLosers` ran inside `buildDuplicateGroup`), so a
+    // group whose ONLY loser was refused has an empty `losers` and
+    // `hasDeletableLosers` returns false — without this OR, `applyGroup`
+    // (and therefore the audit row) would never be reached for that group,
+    // and a safety branch that fired on a production row would leave no
+    // trace of having fired.
+    if (
+      resolution &&
+      (this.hasDeletableLosers(resolution) ||
+        multiIdentityRefusedResultIds.length)
+    ) {
+      try {
+        await this._resolutionRunner.applyGroup({
+          context: {
+            runId:
+              extraData?.runId ??
+              ResultDuplicateResolutionLogService.newRunId(),
+            source:
+              extraData?.platformCode === ReportingPlatformEnum.TIP
+                ? DuplicateResolutionSource.SYNC_TIP
+                : DuplicateResolutionSource.SYNC_PRMS,
+            mode: DuplicateResolutionMode.SYNC,
+          },
+          normalizedPublicLink,
+          participants,
+          resolution,
+          multiIdentityRefusedResultIds,
+        });
+      } catch (error) {
+        // The runner already isolates per-row failures; this only catches a
+        // failure of the audit write itself, which must not undo a good save.
+        this.logger.error(
+          `Duplicate resolution bookkeeping failed for public link ${normalizedPublicLink}: ${(error as Error).message}`,
+        );
+      }
+    }
+
     extraData.counters[typeCounter]++;
     this._currentUser.clearSystemUser();
     this.logger.debug(
-      `Finished processing result ${result.official_code ?? findResult.result_official_code} from ${this.platformCode(extraData?.platformCode)}.`,
+      `Finished processing result ${result.official_code ?? findResult?.result_official_code} from ${this.platformCode(extraData?.platformCode)}.`,
     );
   }
 
@@ -321,132 +466,163 @@ export class SaveResultService {
   }
 
   /**
-   * Determines whether an incoming sync row should be omitted and which stored
-   * duplicates may be deleted, based on cross-platform public-link rules.
+   * Builds the duplicate group for one incoming row and resolves it.
    *
-   * All platforms (PRMS, TIP, AICCRA) live in the same `results` table and are
-   * differentiated by `platform_code`. Duplicates are detected by matching
-   * `public_link` (official publication URL) within the same `report_year_id`.
-   *
-   * `external_link` is intentionally excluded: it points to the source platform
-   * portal (TIP, AICCRA, or PRMS) and would never produce reliable cross-platform
-   * matches.
-   *
-   * Linked business rules — see `duplicate-result-priority.util.ts`:
-   *  - Rule 1: TIP prevails over PRMS and AICCRA.
-   *  - Rule 2: AICCRA prevails over PRMS (when TIP is not involved).
-   *  - Rule 3: AICCRA Capacity Sharing prevails over any PRMS/TIP result.
-   *  - Rule 4: duplicates referenced in `link_results.other_result_id` are protected.
-   *
-   * @returns
-   *  - `shouldOmit`              → do not create or update the incoming result.
-   *  - `resultsToDelete`         → `result_id` values safe to remove after sync.
-   *  - `protectedFromDeletion`   → duplicates that lost but cannot be deleted (Rule 4).
+   * The incoming payload and `findResult` are collapsed into **one** participant:
+   * when a stored row is being updated, the participant carries that row's
+   * `result_id` with the incoming payload's platform and indicator, because the
+   * incoming data is the newer truth. Counting them as two put two same-platform
+   * rows in every routine re-sync and fired the ambiguity branch, leaving the path
+   * with no defined outcome.
    */
-  async duplicateResultValidation(params: {
-    platformCode: ReportingPlatformEnum;
+  async buildDuplicateGroup(params: {
     publicLink?: string | null;
-    indicatorId: IndicatorsEnum;
     reportYearId: number;
-    excludeResultId?: number;
-  }): Promise<DuplicateResultValidationResult> {
-    const normalizedLink = normalizePublicLink(params.publicLink);
-
-    // No public link means there is nothing to deduplicate against.
-    if (!normalizedLink) {
+    platformCode: ReportingPlatformEnum;
+    indicatorId: IndicatorsEnum;
+    officialCode?: number | null;
+    findResult?: Result | null;
+  }): Promise<{
+    resolution: DuplicateGroupResolution | null;
+    participants: SyncParticipant[];
+    normalizedPublicLink: string | null;
+    incomingIsLoser: boolean;
+    /** resultIds `refuseMultiIdentityLosers` refused for R-RES-010 AC.8. */
+    multiIdentityRefusedResultIds: number[];
+  }> {
+    const rawLink = params.publicLink?.trim();
+    if (!rawLink) {
+      // No public link means there is nothing to deduplicate against.
       return {
-        shouldOmit: false,
-        resultsToDelete: [],
-        protectedFromDeletion: [],
+        resolution: null,
+        participants: [],
+        normalizedPublicLink: null,
+        incomingIsLoser: false,
+        multiIdentityRefusedResultIds: [],
       };
     }
 
-    const resultRepository = this.dataSource.getRepository(Result);
-    const where = {
-      report_year_id: params.reportYearId,
-      platform_code: In([...DUPLICATE_RESULT_PLATFORMS]),
+    const candidates =
+      await this._duplicateCandidates.findCandidatesForIncoming({
+        publicLink: rawLink,
+        reportYearId: params.reportYearId,
+      });
+
+    const incoming: SyncParticipant = {
+      resultId: params.findResult?.result_id ?? null,
+      platformCode: params.platformCode,
+      indicatorId: params.indicatorId,
+      reportYearId: params.reportYearId,
+      resultOfficialCode:
+        params.findResult?.result_official_code ?? params.officialCode ?? null,
+      rawIdentity: rawLink,
+      // The incoming identity source follows the same per-platform table as
+      // the stored side (R-RES-010, design §3.1.1): PRMS resolves from its
+      // evidence-shaped `dto.evidence.evidence[]` entry, TIP/AICCRA from
+      // `public_link` unchanged.
+      identitySource:
+        params.platformCode === ReportingPlatformEnum.PRMS
+          ? PublicationIdentitySource.HANDLE_EVIDENCE
+          : PublicationIdentitySource.PUBLIC_LINK,
     };
 
-    // Match only on `public_link` — the single official publication identifier.
-    const candidates = await resultRepository.find({
-      where: {
-        ...where,
-        public_link: normalizedLink,
-      },
-      select: {
-        result_id: true,
-        platform_code: true,
-        indicator_id: true,
-      },
-    });
-
-    // Only cross-platform conflicts matter; same-platform rows are handled by
-    // the official-code lookup above, not by public-link deduplication.
-    const duplicates = candidates
-      .filter((candidate) => candidate.platform_code !== params.platformCode)
-      .filter((candidate) => candidate.result_id !== params.excludeResultId)
+    const stored: SyncParticipant[] = candidates
+      // The stored row being updated IS the incoming participant, not a second one.
+      .filter(
+        (candidate: DuplicateCandidate) =>
+          candidate.resultId !== params.findResult?.result_id,
+      )
       .map((candidate) => ({
-        resultId: candidate.result_id,
-        platformCode: candidate.platform_code as ReportingPlatformEnum,
-        indicatorId: candidate.indicator_id as IndicatorsEnum,
+        resultId: candidate.resultId,
+        platformCode: candidate.platformCode,
+        indicatorId: candidate.indicatorId,
+        reportYearId: candidate.reportYearId,
+        resultOfficialCode: candidate.resultOfficialCode,
+        rawIdentity: candidate.rawIdentity,
+        normalizedPublicLink: candidate.normalizedPublicLink,
+        identitySource: candidate.identitySource,
+        identityCount: candidate.identityCount,
       }));
 
-    if (!duplicates.length) {
-      return {
-        shouldOmit: false,
-        resultsToDelete: [],
-        protectedFromDeletion: [],
-      };
-    }
+    const normalizedPublicLink =
+      candidates.find(
+        (candidate) => candidate.resultId === params.findResult?.result_id,
+      )?.normalizedPublicLink ??
+      candidates[0]?.normalizedPublicLink ??
+      rawLink;
 
-    // Rule 4: a duplicate already linked as `other_result_id` must not be deleted,
-    // even when the incoming result has higher priority.
-    const duplicateIds = duplicates.map((duplicate) => duplicate.resultId);
-    const protectedRows = await this.dataSource.getRepository(LinkResult).find({
-      where: { other_result_id: In(duplicateIds) },
-      select: { other_result_id: true },
-    });
-    const protectedResultIds = [
-      ...new Set(protectedRows.map((row) => row.other_result_id)),
-    ];
+    const participants = [incoming, ...stored];
+    const rawResolution = resolveDuplicateGroup(participants);
 
-    // Delegate priority resolution to the pure util (Rules 1–3).
-    return evaluateDuplicateResults(
-      {
-        platformCode: params.platformCode,
-        indicatorId: params.indicatorId,
-      },
-      duplicates,
-      protectedResultIds,
+    // R-RES-010 AC.8 — the SAME per-participant refusal the sweep applies
+    // (`DuplicateResolutionService.collectGroups`). Before this repository
+    // method could ever return a PRMS row (T-15's UNION), a stored PRMS
+    // candidate here was structurally impossible; now that it can appear,
+    // an ambiguous one must be pulled out of `.losers` before anything
+    // downstream (`hasDeletableLosers`, the loser loop below) can act on it
+    // — the resolver never learns what `identityCount` means, so nothing
+    // else in this path will stop it.
+    //
+    // `refusedResultIds` MUST be returned, not discarded: it is what lets
+    // `saveAllSections` warn about the refusal and still reach `applyGroup`
+    // (and therefore the durable audit row) when it is the ONLY reason
+    // `resolution.losers` ends up empty.
+    const { resolution, refusedResultIds: multiIdentityRefusedResultIds } =
+      refuseMultiIdentityLosers(rawResolution);
+
+    const incomingIsLoser = resolution.losers.some(
+      (loser) => loser.resultId === incoming.resultId,
+    );
+
+    return {
+      resolution,
+      participants,
+      normalizedPublicLink,
+      incomingIsLoser,
+      multiIdentityRefusedResultIds,
+    };
+  }
+
+  /** Whether the group has any stored row the rules authorized deleting. */
+  private hasDeletableLosers(resolution: DuplicateGroupResolution): boolean {
+    return (
+      resolution.classification === DuplicateGroupClassification.RESOLVED &&
+      resolution.losers.some((loser) => loser.resultId !== null)
     );
   }
 
   /**
-   * Removes lower-priority duplicate rows after a successful sync.
+   * Removes a result created in this pass after a failure.
    *
-   * Deletion runs through {@link QueryService.deleteFullResultById}, which hard-deletes
-   * the seed row and, when it is live (`is_snapshot = false`), every snapshot/version
-   * that shares the same `result_official_code` + `platform_code`.
-   *
-   * Only runs on `resultsToDelete` — rows in `protectedFromDeletion` are kept
-   * because they are still referenced in `link_results.other_result_id` (Rule 4).
+   * Kept deliberately narrow: it undoes only what this pass created, and it is the
+   * ONLY delete on the error path. Duplicate cleanup never runs from here.
    */
-  private async deleteDuplicateResults(
-    validation: DuplicateResultValidationResult,
-  ) {
-    for (const resultId of validation.resultsToDelete) {
-      this.logger.debug(
-        `Deleting duplicate result ${resultId} superseded by higher-priority public link.`,
+  private async rollbackCreatedResult(resultId: number): Promise<void> {
+    // Goes through QueryService so the rollback inherits year-scoped family
+    // resolution and the single transaction — a raw call would bypass both.
+    await this._queryService
+      .deleteFullResultById(resultId)
+      .then((outcomes) => {
+        // T-07 pivot per-caller verdict: a REFUSED rollback resolves without
+        // throwing, so the `.catch` below never sees it — the row is left in
+        // place and, without this check, silently. A silently retained
+        // result on an ambiguous identity is a live row the duplicate
+        // matcher will see again on the next run.
+        if (
+          outcomes?.some(
+            (outcome) => outcome.status === ResultDeleteStatus.REFUSED,
+          )
+        ) {
+          this.logger.warn(
+            `Rollback of result ${resultId} was REFUSED: its identity has more than one live row, so snapshot ownership is undecidable. Needs manual handling — the row was NOT removed.`,
+          );
+        }
+      })
+      .catch((error: Error) =>
+        this.logger.error(
+          `Rollback of result ${resultId} failed: ${error.message}`,
+        ),
       );
-      await this._queryService.deleteLogicalResultById(resultId);
-    }
-
-    // Rule 4: warn when a duplicate could not be removed due to link_results usage.
-    for (const resultId of validation.protectedFromDeletion) {
-      this.logger.warn(
-        `Duplicate result ${resultId} was not deleted because it is referenced in link_results.other_result_id.`,
-      );
-    }
   }
 }
 
@@ -459,6 +635,8 @@ export type ExtraData<T extends object> = {
   statusMapper?: Record<number, ResultStatusEnum>;
   findOptions?: FindOptionsKeyMap<T>;
   manageOfficialCode?: boolean;
+  /** Shared by every audit row of one sync pass. */
+  runId?: string;
 };
 
 export type FindOptionsKeyMap<

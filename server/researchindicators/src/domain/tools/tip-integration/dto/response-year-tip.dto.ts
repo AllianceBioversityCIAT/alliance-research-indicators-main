@@ -82,11 +82,18 @@ export class CounterResults {
   createdRecords: number;
   updatedRecords: number;
   errorRecords: number;
+  /**
+   * Incoming rows skipped because a higher-priority cross-platform duplicate
+   * exists. Previously an omission was counted nowhere, so the reported bug could
+   * look handled while the duplicate survived every run.
+   */
+  omittedDuplicateRecords: number;
 
   constructor() {
     this.createdRecords = 0;
     this.updatedRecords = 0;
     this.errorRecords = 0;
+    this.omittedDuplicateRecords = 0;
   }
 }
 
@@ -94,4 +101,5 @@ export enum CounterResultsEnum {
   CREATED = 'createdRecords',
   UPDATED = 'updatedRecords',
   ERROR = 'errorRecords',
+  OMITTED_DUPLICATE = 'omittedDuplicateRecords',
 }

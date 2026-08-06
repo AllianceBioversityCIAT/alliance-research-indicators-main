@@ -47,7 +47,10 @@ import { ResultOicrService } from '../result-oicr/result-oicr.service';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { ResultEvidencesService } from '../result-evidences/result-evidences.service';
 import { ReportingPlatformEnum } from './enum/reporting-platform.enum';
-import { QueryService } from '../../shared/utils/query.service';
+import {
+  QueryService,
+  ResultDeleteStatus,
+} from '../../shared/utils/query.service';
 import { ResultLeverStrategicOutcomeService } from '../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 import { ResultLeverSdgTargetsService } from '../result-lever-sdg-targets/result-lever-sdg-targets.service';
 import { ResultKnowledgeProductService } from '../result-knowledge-product/result-knowledge-product.service';
@@ -1559,7 +1562,7 @@ describe('ResultsService', () => {
 
     beforeEach(() => {
       jest.clearAllMocks();
-      mockQueryService.deleteFullResultById.mockResolvedValue(undefined);
+      mockQueryService.deleteFullResultById.mockResolvedValue([]);
     });
 
     it('should throw NotFoundException when no results match the filters', async () => {
@@ -1629,6 +1632,34 @@ describe('ResultsService', () => {
       expect(mockQueryService.deleteFullResultById).toHaveBeenCalledTimes(2);
       expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(10);
       expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(20);
+    });
+
+    it('should exclude a REFUSED result from the returned set and warn, not report it as deleted', async () => {
+      // T-07 pivot per-caller verdict: a REFUSED delete resolves without
+      // throwing, so this bulk endpoint previously returned the full matched
+      // set to the operator as "deleted" even when a row's identity had more
+      // than one live row and was never actually touched.
+      mockMainRepo.find.mockResolvedValue(mockResults);
+      mockQueryService.deleteFullResultById.mockImplementation(
+        async (resultId: number) =>
+          resultId === 20
+            ? [{ resultId: 20, status: ResultDeleteStatus.REFUSED }]
+            : [{ resultId, status: ResultDeleteStatus.DELETED }],
+      );
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      const result = await service.deleteResultsByParameters({
+        resultIds: [10, 20],
+        testing: false,
+      } as any);
+
+      expect(result).toEqual([mockResults[0]]);
+      expect(result.map((r: any) => r.result_id)).not.toContain(20);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('20'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('manual handling'),
+      );
+      warnSpy.mockRestore();
     });
 
     it('should not delete results when testing is true', async () => {
@@ -3328,6 +3359,52 @@ describe('ResultsService', () => {
       expect((result as any).error).toBe(true);
       expect(resultMetadata).toHaveLength(1);
       expect(resultMetadata[0].error_message).toContain('AI error');
+    });
+
+    it('should warn, not throw, when the AI-report rollback delete is REFUSED', async () => {
+      // T-07 pivot per-caller verdict: this rollback resolves without
+      // throwing on a REFUSED outcome, so — unlike the exception-path test
+      // above — resultExists must actually be set (createResult succeeds)
+      // for this branch to execute at all.
+      const rawResult = {
+        title: 'Bulk Result',
+        status: ResultStatusEnum.SUBMITTED,
+        metadata: {},
+      } as any;
+
+      jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue({
+        result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2024 },
+        generalInformation: {},
+      } as any);
+      jest.spyOn(service, 'createResult').mockResolvedValue({
+        result_id: 42,
+        indicator_id: IndicatorsEnum.POLICY_CHANGE,
+      } as any);
+      jest
+        .spyOn(service, 'updateGeneralInfo')
+        .mockRejectedValue(new Error('downstream failure'));
+      mockQueryService.deleteFullResultById.mockResolvedValueOnce([
+        { resultId: 42, status: ResultDeleteStatus.REFUSED },
+      ]);
+      mockDataSource.getRepository.mockReturnValue({
+        findOne: jest.fn().mockResolvedValue(null),
+      } as any);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      const resultMetadata: any[] = [];
+      const result = await service.formalizeResult(
+        rawResult,
+        true,
+        resultMetadata,
+      );
+
+      expect((result as any).error).toBe(true);
+      expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(42);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('42'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('manual handling'),
+      );
+      warnSpy.mockRestore();
     });
 
     it('should throw error when not in bulk mode', async () => {
