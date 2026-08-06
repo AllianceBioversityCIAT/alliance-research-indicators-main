@@ -52,7 +52,7 @@ Run from `server/researchindicators/`, in this order:
 | --- | --- | --- | --- |
 | O-1 | T-02 | `npm run migration:dev:execute` | 9 nullable columns appear on `bulk_upload_processes`; existing rows keep NULLs |
 | O-2 | T-02 | `npm run migration:revert` | the 9 columns drop cleanly; no other change |
-| O-3 | T-03 | *(pending — seed `app_config` rows)* | to be filled when T-03 lands |
+| O-3 | T-03 | `npm run migration:dev:execute` then `npm run migration:revert` | two `app_config` rows appear (`EMAIL.CAPDEV_BULK_UPLOAD.ENABLED` = `'false'`, `EMAIL.CAPDEV_BULK_UPLOAD.CC_EMAIL` = `''`) with `is_active = 1`; revert deletes exactly those two |
 | O-4 | T-04 | *(pending — seed `sec_template` row)* | to be filled when T-04 lands |
 
 **Known blocker for this register:** `npm run migration:generate` is currently **non-functional** against the dev datasource — `alliancereportingdb.orm_metadata` does not exist, and there is pre-existing generated-column drift on `bilateral_project_mapping.active_agreement_id`. Unrelated to this spec and not fixed by it, but it blocks generation for every spec until someone owns it. This spec's migrations are hand-written in response (D-T02-a).
@@ -191,5 +191,72 @@ Both require a supervised human session against the shared dev MySQL. See §4 *O
 #### Final verification
 
 Full server unit suite green (322 suites / 2066 tests), `tsc` clean, scope confined to the 4 files the task names. Coverage floor unaffected (`*.entity.ts`, `*.enum.ts`, `db/migrations/**` are coverage-excluded per src guide §9).
+
+---
+
+### T-03 — Config enums + non-throwing accessors + seed migration
+
+- **Final status:** 🟡 **`[~]` — code PASS, DB evidence owed** (Reviewer `STATUS: PASS`, attempt 1 of 3)
+- **Date:** 2026-08-06
+- **Requirements covered:** R-CBU-009, R-CBU-004 (source 6)
+- **Design refs:** §6.3, §4.3, DD-5
+- **Implementer attempts:** 1
+- **Skills assigned:** `nestjs-expert`, `error-handling-patterns` (as recommended — no deviation)
+- **Effort:** **`high`** — *Leader deviation from the `medium` default.* Reason: this task's entire purpose is preventing a plausible-looking implementation (`try/catch` around a method that logs before it throws) whose defect is invisible in the return value. Under-thinking is the specific risk, so the dial went up rather than adding a skill.
+- **Review lens mode:** lens checklist
+- **Environment:** governed by the standing "write, don't apply" decision and D-T02-a (hand-written migration; generator broken).
+
+#### Attempt 1
+
+- **Files created/changed:**
+  - `src/domain/entities/app-config/enum/app-config-catergory.enum.ts` *(modified — +1 subcategory, +2 fields; existing filename typo `catergory` deliberately preserved)*
+  - `src/domain/shared/utils/env-app-config.util.ts` *(modified — private `tryGetConfig` + 2 accessors)*
+  - `src/domain/shared/utils/env-app-config.util.spec.ts` *(new — this util had no spec before; coverage moves up)*
+  - `src/db/migrations/1786044600000-insertCapdevBulkNotificationConfig.ts` *(new)*
+- **Implementer verification** (from `server/researchindicators/`):
+  - `npx tsc --noEmit -p tsconfig.json` → clean
+  - `npx jest --silent env-app-config` → **6/6 passed**
+  - `npm test -- --silent` → **323 suites / 2072 tests passed**
+- **Reviewer verdict:** `STATUS: PASS` — "`tryGetConfig` is a genuine parallel path that never touches the throwing `getConfig`, and the absent-row tests assert both no-throw and no-error-log through a prototype seam I verified is live (`CgiarLogger.error` is a real prototype method), so the Disqualifies clause is met in substance and not vacuously."
+
+#### Disqualifier adjudication — the seam was verified, not assumed
+
+The gate is that the absent-row test must prove **no error-level log fired**; the returned value alone is identical for the forbidden implementation. That makes the whole gate rest on whether `jest.spyOn(CgiarLogger.prototype, 'error')` is a live seam — if `error` were an instance/arrow property, the spy would never fire and all six `not.toHaveBeenCalled()` assertions would pass **vacuously**. That is exactly KZ-001 (High, 4 prior recurrences), so the Leader made it the first scrutiny point.
+
+Reviewer findings, verified at source:
+- `CgiarLogger.error` is an ordinary class method — an own, writable, configurable property of `CgiarLogger.prototype` (`cgiar-logs/logs.util.ts:31-38`). Not an instance field, not an arrow property.
+- `EnvAppConfigUtil` holds `new CgiarLogger(...)` as a field initializer (`:14`), and `this.logger.error(...)` resolves **through the prototype chain at call time** — so a spy installed in `beforeEach` intercepts an instance built later in the test body.
+- **The counterfactual holds**, which is the real point: had the Implementer written `try { await this.getConfig(...) } catch { return {value:false, defaulted:true} }`, `getConfig` would have hit `this.logger.error(...)` at `:44-47` *before* throwing, and the spy assertion would **fail**. The assertion genuinely discriminates between the correct and the forbidden implementation.
+- `tryGetConfig` (`:78-98`) is standalone: rebuilds `where`, calls `repository.findOne` directly. No delegation, no `try/catch`, no logger reference. Both accessors call only it.
+
+#### Other verified findings
+
+- **`is_active` — the seeded rows will be found.** `AuditableEntity.is_active` is `boolean, nullable: false, default: true` over `` `is_active` tinyint NOT NULL DEFAULT 1 `` (`1752097721168-addAppConfigTable.ts:8`). The seed omits the column, MySQL applies `1`, and TypeORM's `where.is_active = true` maps to `1`. Byte-for-byte the same filter the already-in-production `getConfig` uses. The "seeded row the accessor can never find → feature permanently unconfigurable" failure mode does **not** materialise.
+- **Key strings byte-identical.** Accessor `getKey([...])` and the migration's local `.join('.')` both yield `EMAIL.CAPDEV_BULK_UPLOAD.ENABLED` / `...CC_EMAIL`, matching §4.3.
+- **`select: false` on `field` is harmless** — it suppresses the column from the SELECT list, not the WHERE clause, and neither accessor filters on or reads `field`.
+- **Boolean parsing satisfies DD-5 in every branch:** absent → `false`, `'false'` → `false`, any unrecognised value → `false`. The fail-safe direction is correct throughout.
+- **Reserved-word bug not propagated.** The `AddNewEnvCl` exemplar's `down()` uses unquoted `key` (a MySQL reserved word → syntax error) and string interpolation. The Leader flagged it in the brief; this migration uses backtick-quoted `` `key` `` and bound `?` parameters in both directions.
+
+#### Decisions
+
+- **D-T03-a — `is_active` left implicit in the seed**, having *verified* (not assumed) the DB-level `DEFAULT 1`. Matches the exemplars.
+- **D-T03-b — the "unreadable config" half of R-CBU-009 is carried forward to T-09** (see advisory 1). Not fixed here: design §6.3, the binding contract for *this* task, scopes its constraint to the missing-row path only, and R-CBU-009 is jointly covered by T-03 + T-09.
+
+#### Owed evidence (blocks `[x]`)
+
+O-3 in §4 — `migration:dev:execute` + `migration:revert` against dev.
+
+#### Advisory (4R lenses — recorded, non-gating, no rework, no new task)
+
+1. **⚠️ RELIABILITY / forward-flag to T-09 — the "unreadable" half of R-CBU-009 is not implemented.** R-CBU-009 reads "Absent **or unreadable** config resolves to disabled", and this migration seeds that exact claim into the row's `description`. The code implements only the *absent* half: a rejected `repository.findOne` (DB/connection error) propagates out of `tryGetConfig`, contradicting its own JSDoc ("never raises") and the accessors' ("Does not throw"). **Failure direction is safe** — a throw can never mean "enabled" — which is why it does not gate. Resolution belongs to T-09: either add `.catch(() => null)` to the `tryGetConfig` return (one line, one test) **or** soften the two JSDoc claims and the seeded description to say "absent". Ordering consequence T-09 must weigh: with the flag read *after* `persistProcessMetrics` (§2.1), a throw here leaves metrics written but `notification_status` unwritten.
+2. **RELIABILITY — no positive control proves the `errorSpy` can fire.** The seam is live today (verified above), but if `CgiarLogger.error` ever becomes an instance/arrow property, all six assertions go silently vacuous with a green suite — KZ-001 deferred rather than present. ~6 lines would pin it permanently: one case exercising `EMAIL_READINESS_LEVEL_7_TO()` against `findOne → null` and asserting the spy **was** called.
+3. **READABILITY — `tryGetConfig` duplicates `getConfig`'s entire 15-line `where`-building block.** `getConfig` could delegate to it (`if (!config) { log; throw; }`) with identical behavior. Deliberately not raised as a FAIL issue: that edit touches the shared path used by `function-handler.service.ts:435`, outside T-03's file scope. Better as a follow-up than a rework.
+4. **RISK — the key string is constructed twice** (accessor via private `getKey`, migration via a local `.join('.')`). They agree today and share the enum source, but would diverge silently if the separator changed — and an already-applied migration's `down()` would then delete a key nobody owns. An exported `buildAppConfigKey(...)` would collapse it, if a third seed migration ever needs one.
+5. **OPERATIONS — `simple_value === 'true'` silently treats `'TRUE'`, `'1'`, `' true'` as disabled.** Correct as a fail-safe, but an operator flipping the kill switch by hand in MySQL gets no feedback that their value did not take. `.trim().toLowerCase() === 'true'` would remove the footgun without weakening the fail-safe.
+6. **READABILITY — cosmetic:** malformed JSDoc brace at `env-app-config.util.ts:162` — `` `{ value, defaulted} ` `` should be `` `{ value, defaulted }` ``.
+
+#### Final verification
+
+Full server unit suite green (323 suites / 2072 tests), `tsc` clean, scope confined to the 4 files the task names. `EnvAppConfigUtil` is already provided and exported by `global-utils.module.ts`, so T-09 needs no wiring from this task.
 
 ---

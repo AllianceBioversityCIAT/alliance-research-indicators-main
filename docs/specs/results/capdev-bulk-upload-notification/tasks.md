@@ -102,7 +102,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-03 — Config enums + **non-throwing** accessors + seed migration
-- **Status:** [ ]
+- **Status:** [~] — code complete, Reviewer PASS. Blocked on owed DB evidence O-3 (`execution.md` §4), per the user's "write, don't apply" decision.
 
 - **Requirements covered:** R-CBU-009, R-CBU-004 (source 6)
 - **Design refs:** §6.3, §4.3, DD-5

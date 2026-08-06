@@ -67,6 +67,36 @@ export class EnvAppConfigUtil {
     }
   }
 
+  /**
+   * Looks up a config row without throwing and without logging.
+   * A missing/inactive row is an ordinary miss (`null`) — the caller
+   * decides whether that miss deserves a default, a log, or both.
+   * Unlike `getConfig`, this method never raises and never calls the logger,
+   * because the absent-row path is the expected resting state of a
+   * default-off feature flag, not an application error.
+   */
+  private async tryGetConfig(
+    configWhere: FindOptionsWhere<AppConfigEntity>,
+  ): Promise<AppConfigEntity | null> {
+    const where: FindOptionsWhere<AppConfigEntity> = new AppConfigEntity();
+    where.is_active = true;
+
+    if (configWhere?.key) {
+      where.key = configWhere.key;
+    }
+    if (configWhere?.category) {
+      where.category = configWhere.category;
+    }
+    if (configWhere?.subcategory) {
+      where.subcategory = configWhere.subcategory;
+    }
+    if (configWhere?.field) {
+      where.field = configWhere.field;
+    }
+
+    return this.repository.findOne({ where });
+  }
+
   private getKey(string: string[]): string {
     return string.join('.');
   }
@@ -92,6 +122,68 @@ export class EnvAppConfigUtil {
       },
       type,
     );
+  }
+
+  /**
+   * Whether the CapDev bulk-upload notification kill switch is enabled.
+   * Defaults to `false` (disabled) when the row is absent — an absent
+   * config must never be read as "mail everyone" (R-CBU-009, DD-5).
+   * Does not throw and does not log; the caller (the notification
+   * service) decides whether the `defaulted` marker is worth a warn,
+   * because only it holds the batch/process context for that log line.
+   * @returns `{ value, defaulted }` — `defaulted` is `true` only when the
+   * row was absent, distinguishing "absent" from "present but false".
+   */
+  async CAPDEV_BULK_UPLOAD_ENABLED(): Promise<{
+    value: boolean;
+    defaulted: boolean;
+  }> {
+    const config = await this.tryGetConfig({
+      key: this.getKey([
+        AppConfigCategory.EMAIL,
+        AppConfigSubcategory.CAPDEV_BULK_UPLOAD,
+        AppConfigField.ENABLED,
+      ]),
+    });
+
+    if (!config) {
+      return { value: false, defaulted: true };
+    }
+
+    return { value: config.simple_value === 'true', defaulted: false };
+  }
+
+  /**
+   * Additional stakeholders to CC on the CapDev bulk-upload notification.
+   * Defaults to `[]` when the row is absent. Stored value is a
+   * comma-separated string; entries are trimmed and blanks are dropped so
+   * an empty/blank stored value yields `[]` rather than `['']`.
+   * Does not throw and does not log — see `CAPDEV_BULK_UPLOAD_ENABLED`.
+   * @returns `{ value, defaulted} ` — `defaulted` distinguishes an absent
+   * row from a present-but-empty one (both yield `value: []`).
+   */
+  async CAPDEV_BULK_UPLOAD_CC_EMAIL(): Promise<{
+    value: string[];
+    defaulted: boolean;
+  }> {
+    const config = await this.tryGetConfig({
+      key: this.getKey([
+        AppConfigCategory.EMAIL,
+        AppConfigSubcategory.CAPDEV_BULK_UPLOAD,
+        AppConfigField.CC_EMAIL,
+      ]),
+    });
+
+    if (!config) {
+      return { value: [], defaulted: true };
+    }
+
+    const value = (config.simple_value ?? '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+
+    return { value, defaulted: false };
   }
 }
 
