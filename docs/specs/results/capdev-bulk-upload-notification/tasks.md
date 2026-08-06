@@ -133,7 +133,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-05 — Notification repository: four grouped queries + two writes
-- **Status:** [ ]
+- **Status:** [~] — code PASS on both review lenses (reliability + risk); **O-6 owed**: the four queries have never been executed as SQL, and both Reviewers independently flagged a suspected `ER_FIELD_IN_ORDER_NOT_SELECT` in Q1's `GROUP_CONCAT(DISTINCT … ORDER BY …)`. Must resolve before T-09/T-10 wire it live. See `execution.md` → T-05.
 
 - **Requirements covered:** R-CBU-002, R-CBU-003, R-CBU-006, R-CBU-008
 - **Design refs:** §6.1

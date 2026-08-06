@@ -55,6 +55,7 @@ Run from `server/researchindicators/`, in this order:
 | O-3 | T-03 | `npm run migration:dev:execute` then `npm run migration:revert` | two `app_config` rows appear (`EMAIL.CAPDEV_BULK_UPLOAD.ENABLED` = `'false'`, `EMAIL.CAPDEV_BULK_UPLOAD.CC_EMAIL` = `''`) with `is_active = 1`; revert deletes exactly those two |
 | O-4 | T-04 | `npm run migration:dev:execute` then `npm run migration:revert` | the `capdev-bulk-upload-summary` row appears in `sec_template`; revert removes only it |
 | O-5 | T-04 | `_getTemplate(TemplateEnum.CAPDEV_BULK_UPLOAD_SUMMARY)` returns non-empty against dev | **the one claim static review cannot close** — it is also the only way to confirm the live `sec_template.is_active` column really carries `DEFAULT 1`, rather than merely being declared `default: true` on `AuditableEntity`. Three working precedents make it near-certain, not proven. |
+| O-6 | T-05 | Execute all four queries (`findGroups`, `findMetrics`, `findCountries`, `findUnattributedResultIds`) against dev MySQL | **Both Reviewers independently flagged the same suspected syntax defect.** `MULTI_PRIMARY_RESULT_IDS_SELECT` builds `GROUP_CONCAT(DISTINCT <CASE expr> ORDER BY bur.result_id)`, where the `ORDER BY` expression is not among the `DISTINCT` expressions — MySQL 5.7+ may reject this with `ER_FIELD_IN_ORDER_NOT_SELECT` (3065). If it does, **Q1 throws on every call and the entire notification stage fails with all 2,106 unit tests still green**. Must be resolved **before T-09/T-10 wire the repository into a live path**. Note: `.getQuery()` against a non-connected `DataSource` would catch column/alias typos but **not** this — only MySQL's parser can. |
 
 **Known blocker for this register:** `npm run migration:generate` is currently **non-functional** against the dev datasource — `alliancereportingdb.orm_metadata` does not exist, and there is pre-existing generated-column drift on `bilateral_project_mapping.active_agreement_id`. Unrelated to this spec and not fixed by it, but it blocks generation for every spec until someone owns it. This spec's migrations are hand-written in response (D-T02-a).
 
@@ -338,6 +339,109 @@ O-4 and **O-5** in §4. O-5 is notable: `_getTemplate` returning non-empty again
 #### Final verification
 
 Full server unit suite green (324 suites / 2073 tests), `tsc` clean, 126 insertions across exactly the 4 in-scope files. Nothing in the diff makes the `.html` runtime-reachable — its only reader is `fs.readFileSync` inside a `.spec.ts`; production still goes `TemplateService._getTemplate` → `sec_template`.
+
+---
+
+### T-05 — Notification repository: four grouped queries + two writes
+
+- **Final status:** 🟡 **`[~]` — code PASS on both review lenses, SQL-execution evidence owed (O-6)**
+- **Date:** 2026-08-06
+- **Requirements covered:** R-CBU-002, R-CBU-003, R-CBU-006, R-CBU-008
+- **Design refs:** §6.1 (binding), §3, §11
+- **Implementer attempts:** 1
+- **Skills assigned:** `nestjs-expert`, `tdd` (as recommended — no Leader deviation)
+- **Effort:** **`xhigh`** — Size L, correctness-critical SQL, three named Judgment-Day traps, and a `Disqualifies` clause aimed squarely at vacuous fixtures.
+- **Review lens mode:** **parallel lens reviewers** (2 × Opus, `author ≠ auditor` on both axes — Implementer was Sonnet). Lenses: **reliability** and **risk/test-fidelity**. Both returned `STATUS: PASS`.
+
+#### Leader ruling made *before* dispatch — the DB-less testing seam
+
+`design.md` §11 asks the repository unit test to prove *"Q1 returns one row per `agreement_id` for an N-result group"*. No database is reachable: there is no local DB, and dev MySQL still lacks T-02's nine columns because that migration is written-but-not-applied. A jest-mocked repository returning a canned array proves nothing about a `GROUP BY` — that is **KZ-001** verbatim, the spec's highest-severity active lesson at recurrence 4.
+
+The Leader resolved this in the brief rather than letting the Implementer discover it mid-task, mandating: (a) `createQueryBuilder` so the SQL is introspectable, never opaque `dataSource.query` strings; (b) an **exported pure** raw-row → group-DTO mapper, tested behaviorally on a fixture where one contract carries ≥3 results; (c) a **mandatory mutation test** — break the grouping, observe red, revert, observe green. Dialect substitution was explicitly ruled out (sqlite has no `ANY_VALUE` and differing `GROUP_CONCAT` semantics — a swap re-creates the very defect).
+
+#### Leader-added trap not present in the spec
+
+`design.md` §6.1 says the CapDev filter must be *"bound from `IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT`, never a literal `1`"*. The codebase contains **two** enum members with that exact name: `entities/indicators/enum/indicators.enum.ts` (`= 1`, correct) and `tools/open-search/prms/enum/rsult-type.enum.ts` (`= 5`). Importing the wrong one satisfies the spec's letter while silently filtering to the wrong indicator. The collision was passed into the brief; both Reviewers verified the correct import path.
+
+#### Attempt 1
+
+- **Files created (all new, 1,051 insertions, no deletions):**
+  - `src/domain/entities/ai-reports/notifications/capdev-bulk-notification.repository.ts` *(420)*
+  - `src/domain/entities/ai-reports/notifications/capdev-bulk-notification.repository.spec.ts` *(506)*
+  - `src/domain/entities/ai-reports/notifications/dto/capdev-bulk-group.dto.ts` *(125)*
+- **Implementer verification:** `tsc --noEmit` clean; `npm test -- --silent` → 325 suites / 2106 tests passed.
+- **Leader independent re-verification** (both Reviewers noted they could not execute anything — read-only tool allowlists): re-ran from `server/researchindicators/` after both verdicts landed, with no agent active. `tsc` clean, **325 suites / 2106 tests / 1 snapshot passed, 18.9 s**. Matches the Implementer's report exactly.
+- **Reviewer verdicts:** reliability `STATUS: PASS` — "all four named traps correctly handled… free of NULL/NaN/fan-out defects". Risk `STATUS: PASS` — "genuine defense-in-depth, not KZ-001".
+
+#### The central adjudication — is the mutation test load-bearing, or KZ-001 in disguise?
+
+The Implementer flagged this itself in `Not Done / Assumptions` and asked for it to be checked, which is the behavior the methodology wants. Its resolution: the QueryBuilder genuinely calls `.groupBy('ac.agreement_id')` **and** the mapper independently re-collapses by `agreement_id` in JS — a no-op against correct SQL, but the only thing a mutation test can exercise without a database.
+
+The risk lens adjudicated this squarely and **rescued it on a specific finding**: `spec.ts:175-178` pins `.groupBy` to the literal `'ac.agreement_id'`, so the two defects have two distinct failing tests — dropping the SQL `GROUP BY` fails the *structural* test, dropping the JS collapse fails the two ≥3-row tests. The design's "mandatory" `GROUP BY` therefore remains load-bearing under test. The Reviewer stated it would have **failed the task had that structural assertion been absent**, which is the right bar.
+
+`Disqualifies` clause **satisfied**: two fixtures carry three rows under one `agreement_id`. The 3-contract → 3-groups tests are built on one-row-per-contract fixtures and could not distinguish correct grouping alone — but the clause targets the collapse test, and that one complies.
+
+#### Convergent finding — the reason this task is `[~]` and not `[x]`
+
+**Both Reviewers, working blind to each other, independently identified the same defect as their highest-risk item and proposed the same one-line fix.** Two independent auditors converging on one specific suspected runtime throw is the strongest signal this run has produced. Recorded as **O-6** in §4.
+
+Neither could execute MySQL to confirm it, and neither escalated it to a FAIL — correctly, since `design.md` §6.1 does not mandate the `ORDER BY`, PR 2 is dead code, and the flag ships `false`. But the pairing with the reliability lens's second finding is what decides the checkbox: **no test in the suite ever compiles SQL.** The mocks only prove a string was handed to a `jest.fn()`, so a column typo, a bad alias, an `ONLY_FULL_GROUP_BY` violation, or O-6 itself all pass green. The four queries are, as written, entirely unverified *as SQL*.
+
+This is the same class of gap that holds T-02, T-03 and T-04 at `[~]`, and it is treated identically.
+
+#### Decisions
+
+- **D-T05-a — the defensive JS re-collapse is accepted as in-scope.** A raw-row → group-DTO mapper must exist regardless (Q1 returns ~20 aliases plus the multi-primary CSV); the only increment is keying the accumulator by `agreement_id` rather than pushing to an array — roughly four lines. Not unrequested code of consequence. It carries a maintenance tax, recorded as advisory R6.
+- **D-T05-b — tie-break implemented on both sides, deliberately.** The decision is SQL-side (a correlated subquery restricting `rc.result_contract_id` to `MIN(rc2.result_contract_id)` inside the join `ON`); the warning and the defensive collapse are mapper-side. The reliability lens verified the subquery is correctly correlated to the right outer row, admits exactly one `rc` row when an active primary exists and zero when none does — and that the zero case is precisely what Q4 picks up, so no row is silently dropped. It also confirmed TypeORM's alias replacement cannot corrupt it (`rc2`/`rc_dup` have no registered metadata; the `rc.` regex cannot match `rc2.`).
+- **D-T05-c — Leader deviation from the diff-inline rule, recorded.** `/akili-execute` Step 2.3 requires the git diff inline because a wrapper-restricted Reviewer has no `Bash` to regenerate it. With 1,051 lines of pure additions and two parallel Reviewers, inlining would have cost ~30k output tokens to convey files the Reviewers can `Read` directly. The diff was written to a scratchpad file and both Reviewers were pointed at it *and* at the three source paths. The rule's intent — the Reviewer has access to the exact change set — is satisfied; its literal form is not.
+- **D-T05-d — `caveman` not loaded for the briefs.** The command directs loading it for transient inter-agent output. For an `xhigh` correctness-critical task whose brief carries four named traps and a testing-seam mandate, clarity was judged to outweigh compression. Deviation recorded rather than taken silently.
+- **D-T05-e — Implementer `Not Done` items 2–5 resolved, none carried as owed scope.** `total_results` (item 2) is an all-indicators count no T-05 query computes and design assigns to T-09 orchestration — out of scope, not a gap. DTO snake_case naming (item 3) matches design prose and house convention; it is a forward contract for T-06/T-07, flagged below. The raw-table-name `sec_users` join (item 4) was verified correct by **both** lenses against the real precedent at `result-status-workflow.repository.ts:95`. Item 5 is a scope-compliance confirmation.
+
+#### Forward-flag to T-06 / T-07 — the consuming contract
+
+`capdev-bulk-group.dto.ts` fixes snake_case field names (`agreement_id`, `project_lead_description`, `pi`/`ra`/`pa`/`token_owner`). T-06's builder and T-07's formatter must consume exactly these. This is the Implementer's choice, made before either consumer existed — if T-06 wants a different shape, change it there and then, not after T-08 has also bound to it.
+
+#### Advisory (4R lenses — recorded, non-gating, no rework, no new task)
+
+Per `/akili-execute` §2.4, none of these may become a task in this spec. They are recorded and, apart from O-6's evidence obligation, they die here unless the user elects to reopen scope.
+
+**Reliability lens (8):**
+
+1. **⚠️ `GROUP_CONCAT(DISTINCT … ORDER BY …)` — see O-6.** Highest-value item. Cheapest fix: delete ` ORDER BY bur.result_id`; the ordering is required by nothing, since the mapper iterates the CSV and each warning logs individually.
+2. **No test compiles SQL** — see the checkbox rationale above. Suggested mitigation: build the QueryBuilder against a non-connected `DataSource` and assert on `.getQuery()`. *(Leader note: this would catch typos and bad aliases but **not** O-6 — `.getQuery()` emits a string, it does not invoke MySQL's parser. It narrows the gap; it does not close it.)*
+3. **Q3's `GROUP_CONCAT` runs at the default `group_concat_max_len` of 1024 bytes** and truncates silently mid-word. This codebase already treats that default as a hazard — `reports/repositories/star-results-export.repository.ts:47-51` raises it to 4 MB with `SET LOCAL`. A group spanning ~30+ country names would hit it.
+4. **Asymmetric `is_active` filtering** — Q3 filters `rcty.is_active = TRUE`; Q2 does not filter `rcs.is_active`, so a soft-deleted `result_capacity_sharing` row still contributes participants and date bounds. Not mandated either way by §6.1, but the inconsistency between adjacent queries is a latent wrong-number path for R-CBU-006.
+5. **`updateNotificationStatus` enforces nothing about R-CBU-008 AC.4** (`notification_sent_at` null whenever status is `SKIPPED`) — it rests entirely on T-09 calling it correctly. A one-line normalisation at the persistence boundary would make AC.4 true by construction.
+6. **Double-log risk at the T-05/T-09 seam** — `findGroups` both emits the multi-primary warn *and* returns `multiPrimaryWarnings`, while T-09 is scoped to "every §10 log line". Ownership should be settled before T-09, not after. Related: §10 wants the line to name the contract chosen by the tie-break, and the query never selects the winning `result_contract_id`.
+7. **`persistProcessMetrics` spreads a fully-optional interface into `update`** — an all-undefined payload makes TypeORM throw *"Cannot perform update query because update values are not defined"*.
+8. **Q4 can return duplicate `result_id`s** if one result appears on more than one `bulk_upload_results` row (`bur.id` is the PK, `result_id` is not unique). Its three exclusion filters are also present but unasserted by any test, unlike `findGroups`.
+
+**Risk lens (6):**
+
+- **R1 — O-6**, above. Recommended by this lens as an owed-evidence item rather than rework; adopted.
+- **R2 — a hole narrower than the one R-CBU-002 AC.3 exists to close.** Q1's spine inner-joins `agresso_contracts`, but Q4 filters only on `rc.result_contract_id IS NULL`. A result whose active primary contract has no `agresso_contracts` row falls out of Q1 and is reported by **neither** — no email, no warning.
+- **R3 — `toNumber` coerces an unparseable Q4 id to `0`**, so a malformed row logs as `result_id=0`, a plausible-looking but nonexistent result. `toNullableNumber` + filter would fail visibly.
+- **R4 — the one real pocket the mock hides:** nothing pins `MULTI_PRIMARY_RESULT_IDS_SELECT` into Q1's select list. If a refactor drops that `addSelect`, `multiPrimaryWarnings` goes permanently empty and every test still passes, because the behavioral warning test injects the column through the mock. Same for the `:isActive` binding.
+- **R5 — `spec.ts:295-302` is behaviorally identical to `spec.ts:246-249`** and its comment cites "the implementer's report", which is not a durable repo artifact. Adds no coverage.
+- **R6 — the JS re-collapse is a no-op in production**, so a future maintainer who correctly reasons "the SQL already groups, this Map is redundant" gets two red tests describing impossible behavior. The doc comment should state plainly that the SQL `GROUP BY` is the production mechanism, the Map is a test-observable safety net, and `spec.ts:175-178` is the actual gate.
+- **Test hygiene:** `jest.spyOn(…, '_warn')` has no `mockImplementation`, so it calls through and prints a real WARN line on every green run — against the "green costs one line" contract in `tasks.md` §4.
+
+#### Budget tripwire — **FIRED**, escalated to the user
+
+`design.md` §14 budgets the whole 12-task spec at ~1,450 LOC (≈750 production, ≈700 tests).
+
+| | Budgeted | Actual |
+| --- | --- | --- |
+| T-01 … T-04 (PR 1) | ~450 | **812** |
+| T-05 | — | **1,051** (545 production / 506 tests) |
+| **Running total, 5 of 12 tasks** | ~1,450 *(all 12)* | **1,863 — 128%** |
+| PR 2 (T-05 … T-08) | ~600 | 1,051 after **one** of four tasks |
+
+Per `/akili-execute` §2.4 the Leader **stopped and escalated rather than advancing to T-06**. Leader's read, offered as a hypothesis and not a finding: this is a mis-sized estimate rather than runaway scope. The production side is four grouped SQL builders plus a shared spine and two writes — plausibly what "Size L" means, against a ~750-LOC production budget covering *all twelve* tasks. The test side is where the DB-less constraint bit: proving grouping without a database required a structural layer *and* a behavioral mapper layer, roughly double what one integration test would have needed. Disposition is the user's call.
+
+#### Final verification
+
+`tsc --noEmit` clean; full server unit suite **325 suites / 2106 tests / 1 snapshot green** (18.9 s), re-run independently by the Leader from `server/researchindicators/` after both verdicts, with no agent active. 1,051 insertions across exactly the 3 in-scope files; `git status` shows nothing else touched. `npm run lint` deliberately **not** run — it carries `--fix` and mutates files outside the review surface; deferred to the pre-PR gate (`tasks.md` §8).
 
 ---
 
