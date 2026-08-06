@@ -173,7 +173,7 @@ PATCH /api/configuration/duplicate_resolution.hard_delete_enabled   { "simple_va
 
 ## 8. Reproducible verification
 
-Three scripts, each runnable in one command from `server/researchindicators`, each exiting non-zero on failure:
+Four scripts, each runnable in one command from `server/researchindicators`, each exiting non-zero on failure:
 
 ```bash
 # FK inventory + delete-function coverage, from information_schema
@@ -183,10 +183,26 @@ node ../../docs/specs/results/cross-platform-duplicate-resolution/fk-inventory.g
 node -r ts-node/register/transpile-only \
   ../../docs/specs/results/cross-platform-duplicate-resolution/verify-normalization.js
 
+# T-14 — the five live-data invariants. MANUAL pre-`apply` gate, never CI.
+# Exit 0 pass / 1 fail / 3 INCONCLUSIVE (not a pass) / 2 fatal.
+node -r ts-node/register/transpile-only \
+  ../../docs/specs/results/cross-platform-duplicate-resolution/verify-live-invariants.js
+
 # The dry run: row-count write-freedom, the real run lock, and the plan itself
 NODE_PATH=$PWD/node_modules TS_NODE_PROJECT=./tsconfig.json npx ts-node -T \
   --compiler-options '{"module":"commonjs","moduleResolution":"node"}' \
   ../../docs/specs/results/cross-platform-duplicate-resolution/run-dry-run.ts
 ```
 
-Last dev run of all three: **all green**, 116 groups, 105 rows to delete, zero row-count movement across eight tables, and the run lock correctly rejecting the second of two concurrent sweeps.
+> **Do not copy `run-dry-run.ts`'s own header for the other three.** It prescribes a bare `npx ts-node -T …`, which fails: there is no root `tsconfig.json`, so ts-node falls back to its defaults, compiles TypeORM's decorators under the TC39 transform, and `auditable.entity.ts` throws `TypeError: Cannot read properties of undefined (reading 'constructor')`. It also cannot resolve `dotenv/config`, because Node resolves from the script's own directory under `docs/specs/`. The `NODE_PATH`/`TS_NODE_PROJECT` form above is the working one; the `.js` harnesses shim it themselves via `module.paths`.
+
+**Last dev run.** Dry run **2026-08-05** (`runId 83c94039`): **2,359 groups · 2,254 involving PRMS · 2,314 rows to delete**, zero row-count movement across eight tables, 2,359 audit rows, and the run lock correctly rejecting the second of two genuinely concurrent sweeps. Duration **~33 min** — diagnosed as round-trip latency over the VPN, not slow queries (five `PROCESSLIST` samples found zero long-running queries); NFR-RES-002 sets no latency target, but **schedule an `apply` window accordingly**.
+
+**T-14 same day: 4 PASS · 1 FAIL · 1 INCONCLUSIVE.** Both non-passes are owner decisions, not build work — see `tasks.md` T-14:
+
+- **FAIL (2b)** — PRMS result `23607` (code 7232, 2023) stores handle `10568/131655` while the live payload supplies `10568/131889`; both are live TIP rows with the same title, so the sweep and the sync path would group it differently. One row in 2,387. **Decide before `apply`.**
+- **INCONCLUSIVE (A5)** — DC-2 is a post-run check and cannot pass before the first `apply`. Its negative control passes on the real corpus (2,314 planned losers detected on the 2,359-group dry run), so the query is proven able to fail. **Re-run `verify-live-invariants.js` after the first `apply`** — that is when A5 becomes meaningful.
+
+> **`rowsRefusedMultiIdentity == 0` does not mean "no multi-identity rows exist."** It counts refusals **exercised**. An ambiguous row inside a `CROSS_YEAR_REVIEW` or `SAME_SYSTEM_IGNORED` group has empty `losers`, so nothing is refused and the counter reads 0 while the row is still there. The population question is T-14's assertion 3, which measures it directly (2,387 results / 2,387 handles, clean in both directions).
+
+> **T-13 is NOT inert while `hard_delete_enabled` is off.** The flag gates **deletion only**. `incomingIsLoser` skips the create/update and counts `OMITTED_DUPLICATE` regardless of the flag, so on the first PRMS sync after T-13 merges, the ~2,249 PRMS↔TIP counterparts stop having status, general info, `public_link`, alignments and geoscope refreshed while remaining live, visible rows. This is design §5.2 step 4 as written — but plan for it rather than discovering it.

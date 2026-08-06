@@ -743,3 +743,45 @@ The diff was **persisted to a scratchpad file and pointed at**, rather than inli
 **Owner decision recorded (2026-08-05):** the stale untracked T-11 artifacts (`test/duplicate-resolution.e2e-spec.ts`, `test/support/`, 590 lines, authored before the T-07 pivot, never run and never reviewed) were **deleted** rather than committed. T-11 re-derives from the current spec when its datasource is reachable.
 
 **T-15 verdict: PASS on attempt 2, done-condition measured. Status `[x]`.**
+
+---
+
+## T-14 — Live-data invariant check: authored, run against dev (2026-08-05)
+
+**Verdict: 4 PASS · 1 FAIL · 1 INCONCLUSIVE.** Status `[~]` — blocked on two owner decisions, nothing further owed by the build. Full result table in [`tasks.md`](./tasks.md) → T-14.
+
+### What was built
+
+[`verify-live-invariants.js`](./verify-live-invariants.js), in the `verify-normalization.js` shape (`module.paths` shim, no `NODE_PATH`/`TS_NODE_PROJECT` needed). SELECT-only against MySQL, GET-only against the PRMS searcher. Exit `0` pass / `1` fail / **`3` inconclusive** / `2` fatal — INCONCLUSIVE is a distinct code precisely so a process exiting `0` cannot be read as "the gate ran and passed".
+
+**The design decision that matters: it asserts over the SHIPPED identity, never a re-derivation.** The whole `identity_candidates`/`identity_counted` CTE is lifted off `DuplicateCandidateRepository` at runtime — `private static` is a TypeScript-only marking. A gate that restates the identity in its own SQL can drift from the code it gates and then pass while production reads a different field, which is DC-9 wearing the gate's own clothes. This spec has now had **four** failures rooted in a claim about a field that was never checked against the field; the gate for that class must not itself contain an unchecked copy.
+
+### The FAIL — one real stored-vs-incoming divergence
+
+PRMS `23607` (code **7232**, 2023, KP, active): stored evidence handle `hdl.handle.net/10568/131655`, incoming payload handle `hdl.handle.net/10568/131889`. **Both are live TIP rows** — TIP `29293` (code 27262) and TIP `29307` (code 27276) — and all three rows share a title. The sweep would group the PRMS row with TIP 29293; the sync path would group it with TIP 29307.
+
+TIP wins under `RULE_1_TIP` in either grouping, so no distinct publication is at risk. What breaks is **traceability**: the audit record names a counterpart the other code path disagrees with, and after `apply` the re-synced row resolves into a different group than the one the log says was resolved. One row in 2,387 (0.04%). A3 is clean in both directions, so this is a cross-*source* disagreement rather than an ambiguity inside either source. **Owner's call, alongside the dry-run sign-off and OQ-7.**
+
+### Four findings the run produced that the spec did not have
+
+1. **The "277/277" baseline was a sample presented as a population.** `execution.md` recorded it correctly — *"measured over 400 live items (277 KP, 123 non-KP), 8 pages"* — but `design.md` §3.1.1 and `tasks.md` T-14 both carried it forward as **the** baseline with the sampling caveat dropped. The full corpus is **5,180 items · 2,388 KP · 2,387 with a handle**. Agreement is **99.96%**, not 100%. The caveat was lost in transcription between documents, not in measurement, and the corrected figures reconcile exactly against the 2,387 stored KP handle identities. Both documents corrected.
+
+2. **The searcher 500s reproducibly on page 5 at `size=1000`** — four consecutive attempts, same page, same failure; it is a server-side limit, not a cold start. A harness paging at 1000 would have silently capped the corpus at ~4,000 of 5,180 items and reported a **clean** agreement rate over 77% of the data — i.e. it would have missed result 23607 and passed. The harness pages at **500** (all 11 pages serve) and keeps a retry for genuine transients. This is the same failure shape as DC-9: a partial read that looks like a complete clean one.
+
+3. **A4 carried a measurement trap that reads as good news.** A whitespace/case-folded title comparison yields 98.6% against a 95.1% baseline — a 3.5-point apparent improvement in DC-10 ownership corroboration, with nothing about the data changed. The metric would have moved, not the corpus. The harness now reports **both**, and the **exact** rate (95.0%, reproducing the baseline to within one pair) is what the §14 tripwire is compared against.
+
+4. **A5's done-condition is unsatisfiable as written — a spec defect, not a run failure.** DC-2 is a **post-run** check; T-14 is a **pre-`apply`** gate. "All five assertions pass" can therefore never be true at the moment T-14 is needed. What is provable beforehand is that the query can detect a surviving loser at all, so the harness runs a **negative control** over the largest dry run — where every planned loser is still stored by definition — and finds **2,314**, exactly that run's own "rows to delete". Without that control the assertion would be zero-by-construction, which is the DC-7 pathology aimed at the one gate standing between an incomplete sweep and a false "all clean". **Proposed split (owner's call):** 5a "detection ability proven pre-`apply`" (PASS today) and 5b "zero surviving losers, re-run post-`apply`".
+
+### Two traps that were designed around rather than discovered
+
+Both came from T-15's carried notes and both held:
+
+- **DC-2 written over `public_link` returns zero for PRMS by construction**, recreating DC-9 inside DC-2's own gate. Written over the R-RES-010 identity instead.
+- **DC-2 must not assert "zero unresolved cross-platform groups"** — `CROSS_YEAR_REVIEW` (56 groups) and `SAME_SYSTEM_IGNORED` are correct permanent non-resolutions, so that form could only ever fail, and a gate that can only fail is a gate that gets waived. Scoped to `RESOLVED` groups only, with `PROTECTED`/`REFUSED`/`FAILED`/`NOOP` counted as deliberate retentions rather than folded into the fault count.
+
+### Incidental measurements, recorded so they are not rediscovered
+
+- **PRMS evidence corpus grew 4,535 → 5,607 rows (~24%)** since the §0.5 baseline. Both role/privacy predicates are still no-ops (0 violations); 18 rows are now `is_active = false` (reported, not asserted — the predicate exists so a retracted evidence cannot confer identity).
+- **`sync_staging_records` cannot serve assertion 2b.** It stores the searcher response verbatim, but its 13,507 staged rows hold **zero** `indicator_category.code = 6` items and `knowledge_product_summary` is JSON `null` on all 5,868 PRMS-shaped rows. This is the same snapshot whose "zero PRMS KP rows" the T-13 pivot noted. The incoming side must be read from the **live searcher**, which is why 2b is the only assertion that leaves the database.
+- **A1's per-platform split reconfirms R-RES-010 AC.2 on live data:** PRMS resolves **only** via `HANDLE_EVIDENCE` (2,387), TIP/AICCRA **only** via `PUBLIC_LINK` (8,474 / 584). No platform contributes zero identities; no platform fails to intersect another.
+- **A3 asserts the `identityCount` projection, not just the data.** `refuseMultiIdentityLosers` reads that column, so the harness checks the projected count against the set it observes independently — 0 disagreements. A clean 1:1 in the data means nothing if the number the refusal branch reads does not describe it.

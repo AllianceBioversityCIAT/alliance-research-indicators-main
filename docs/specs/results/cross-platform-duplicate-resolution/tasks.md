@@ -491,7 +491,7 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
 - **Description:** Assert the four properties that are facts about **data**, not about code, and that no unit test can make:
   1. **Cross-platform matchability per platform (AC.7)** — each platform's normalized identity set must intersect at least one other's. **Not** a non-emptiness check: PRMS `public_link` was non-empty for 3,947/3,947 rows under rev 2 and matched nothing, so the earlier form of this AC would have passed the very defect it exists for (JD3-S-01).
   2. **Role/privacy invariant** — every PRMS evidence row is `evidence_role_id = 1` and non-private. ~~This is what the weaker in-memory predicate in T-13 depends on.~~ **Rev 4: T-13 no longer depends on this** — the incoming side reads `knowledge_product_summary.handle`, not an evidence row, so there is no weaker predicate to prop up. Keep the check: it still guards the **stored** side's predicate (AC.3), which the sweep relies on. Its justification changed, its value did not.
-  2b. **Stored-vs-incoming handle agreement (NEW, rev 4)** — for PRMS KP results, the handle in `result_evidences` must equal the handle the payload would supply via `knowledge_product_summary.handle`. Baseline **277/277** on live KP items sampled 2026-08-05. This is the property T-15's re-scoped assertion needs and it is a fact about two systems agreeing, which only live data can establish.
+  2b. **Stored-vs-incoming handle agreement (NEW, rev 4)** — for PRMS KP results, the handle in `result_evidences` must equal the handle the payload would supply via `knowledge_product_summary.handle`. ~~Baseline **277/277** on live KP items sampled 2026-08-05.~~ **Corrected 2026-08-05 by this task's own run: 277 was a 400-item SAMPLE (8 pages × 50), not the population.** Full corpus is **5,180 items · 2,388 KP · 2,387 with a handle**, and agreement is **2,386/2,387 (99.96%)** — see the Result block. This is the property T-15's re-scoped assertion needs and it is a fact about two systems agreeing, which only live data can establish.
   3. **KP handle 1:1 in BOTH directions** — no KP result with two handles, **and no handle with two KP results**. The reverse direction has no branch protecting it: in `{PRMS_A, PRMS_B, TIP}` the survivor is TIP and Gate A protects neither PRMS row, so both are hard-deleted (JD3-S-09).
   4. **Title agreement rate** across PRMS↔counterpart pairs, with the disagreeing pairs listed. Baseline **2,156 of 2,266 (95.1%)**; the 110 disagreements are DC-10's residual review population.
   5. **DC-2's post-run verification query (NEW — carried here from T-15 by the owner's decision, 2026-08-05).** Zero groups classified `RESOLVED` that still have a **stored loser** after a run. **It does not exist yet:** T-15's implementation notes told the Implementer to "pin DC-2's post-run verification query to the R-RES-010 identity", and a search of every `.ts`/`.js`/`.sql` in `server/researchindicators` and this spec folder found **no artifact implementing it** — DC-2 has only ever been a description in the `requirements.md` §3.0 table. It lands here because it is a **post-run check against a populated database**, which is this task's class and not a unit-testable property. Two constraints carry over from T-15's notes and both are load-bearing:
@@ -501,8 +501,53 @@ No cycles. **T-01 gates every destructive task** — it is the method fix, and s
   - **The sibling harness's documented command does not work — do not copy it (found 2026-08-05 while running T-15's dry-run).** `run-dry-run.ts`'s header prescribes `npx ts-node -T …` from `server/researchindicators`, and that fails: there is **no root `tsconfig.json`**, so ts-node finds no project config, falls back to its own defaults, and compiles TypeORM's decorators with the **TC39** transform instead of the legacy `experimentalDecorators` one — `TypeError: Cannot read properties of undefined (reading 'constructor')` out of `auditable.entity.ts`. It also cannot resolve `dotenv/config`, because the script lives under `docs/specs/` and Node resolves from the script's directory. The working form sets both explicitly: `NODE_PATH="$PWD/node_modules" TS_NODE_PROJECT="$PWD/tsconfig.json" npx ts-node -T …`. Prefer the `.js` shape of `verify-normalization.js`, which already shims this with `module.paths.unshift(path.join(process.cwd(), 'node_modules'))`.
 - **Tests:** none — this *is* a check. It is not wired into CI.
 - **Done when:** it runs against dev, **all five** assertions pass, and its output is attached to the dry-run review artifact.
+
+#### Result — authored and run against dev, 2026-08-05: **4 PASS · 1 FAIL · 1 INCONCLUSIVE**
+
+Harness: [`verify-live-invariants.js`](./verify-live-invariants.js). Invocation (the `verify-normalization.js` shape, **not** `run-dry-run.ts`'s broken one), from `server/researchindicators`:
+
+```
+node -r ts-node/register/transpile-only \
+  ../../docs/specs/results/cross-platform-duplicate-resolution/verify-live-invariants.js
+```
+
+Read-only throughout: SELECT-only against MySQL, GET-only against the PRMS searcher. Exit codes are `0` pass / `1` fail / `3` inconclusive / `2` fatal — **INCONCLUSIVE is deliberately not a pass**, so a process that exits `0` cannot be mistaken for a gate that ran.
+
+**It asserts over the SHIPPED identity, not a re-derivation.** The whole `identity_candidates`/`identity_counted` CTE is lifted off `DuplicateCandidateRepository` at runtime (`private static` is compile-time only). A gate that restates the identity in its own SQL can drift from the code it gates and then pass while production reads a different field — DC-9 wearing the gate's own clothes.
+
+| # | Assertion | Verdict | Measured |
+| --- | --- | --- | --- |
+| **1** | Per-platform cross-platform matchability (R-RES-001 AC.7 / DC-9) | **PASS** | TIP 8,467 identities / **2,354** intersecting · AICCRA 541 / **121** · PRMS 2,387 / **2,254**. No platform contributes zero, none fails to intersect. PRMS resolves **only** via `HANDLE_EVIDENCE`, TIP/AICCRA **only** via `PUBLIC_LINK`. |
+| **2** | PRMS evidence role/privacy invariant (R-RES-010 AC.3) | **PASS** | 5,607 rows (baseline 4,535 — corpus grew ~24%); `evidence_role_id <> 1`: **0**; `is_private`: **0**; `is_active = false`: 18 (reported, not asserted). Both predicates remain no-ops, as §0.5 measured. |
+| **2b** | Stored-vs-incoming handle agreement | **FAIL** | **2,386 / 2,387 (99.96%)** — see below. |
+| **3** | KP handle 1:1 in **both** directions (JD3-S-09) | **PASS** | 2,387 results / 2,387 handles. Forward violations **0**, reverse violations **0**, and the `identityCount` **projection** agrees with the observed set on every row — the refusal is keyed off a number that actually describes the data. |
+| **4** | Title agreement, PRMS↔counterpart (A6 / DC-10) | **PASS** | 2,266 pairs (baseline 2,266). **Exact 2,152 / 95.0%** against the 95.1% baseline; case+whitespace-folded 2,234 / 98.6%. 32 folded disagreements are DC-10's residual review population. |
+| **5** | DC-2 — no `RESOLVED` group retains a stored loser | **INCONCLUSIVE** | No `APPLY` run exists yet. **Negative control PASSES on the real corpus:** over dry run `83c94039` (2,303 RESOLVED groups) the query finds **2,314** planned losers still stored — exactly that run's own "rows to delete". |
+
+**A4 carried a measurement trap that would have read as good news.** A whitespace/case-folded comparison yields 98.6%, which against a 95.1% baseline looks like a 3.5-point *improvement* in ownership corroboration while nothing about the data changed — the metric would have moved, not the corpus. The harness now reports **both**, and the exact rate (95.0%) is what the baseline and the §14 tripwire are compared against. It reproduces the baseline to within one pair, which is what makes the folded number safe to also show.
+
+**A5's done-condition is unsatisfiable as written, and that is a spec defect rather than a run failure.** DC-2 is a **post-run** check; T-14 is a **pre-`apply`** gate. Assertion 5 cannot pass before the first `apply` by construction, so "all five assertions pass" can never be true at the moment it is needed. What *is* provable beforehand is that the query can detect a surviving loser at all — the negative control — and that is what ran. **Proposed resolution (owner's call):** A5 splits into **5a** "the query's detection ability is proven pre-`apply`" (PASS today) and **5b** "zero surviving losers, re-run after the first `apply`". Recorded rather than waived, because the alternative is a gate that is quietly marked done while its assertion never executed.
+
+##### ⚠️ The FAIL (2b) — one real stored-vs-incoming divergence, and it needs an owner decision
+
+**PRMS result `23607`** — official code **7232**, year 2023, KP, active:
+
+| Side | Handle |
+| --- | --- |
+| **stored** (`result_evidences.evidence_url`, the sweep reads this) | `hdl.handle.net/10568/`**`131655`** |
+| **incoming** (`knowledge_product_summary.handle`, the sync path reads this) | `hdl.handle.net/10568/`**`131889`** |
+
+**Both handles exist as live TIP rows, and all three rows carry the same title:** TIP `29293` (code 27262, 2023) holds `131655`; TIP `29307` (code 27276, 2023) holds `131889`. So the two code paths would place this PRMS row in **two different groups** — the sweep pairs it with TIP 29293, the sync path with TIP 29307.
+
+- **Not a path to destroying a distinct publication.** TIP wins under `RULE_1_TIP` in either grouping, so the PRMS row is the loser either way and no TIP row is at risk.
+- **It is a traceability and re-detection defect.** The audit record would name a counterpart the other path disagrees with; and after `apply` hard-deletes PRMS 23607, the re-synced row resolves to `131889` — a *different* group than the one the audit log says was resolved.
+- **Scope is one row in 2,387 (0.04%).** The 1:1 assertions (A3) are clean in both directions, so this is a cross-*source* disagreement, not an ambiguity inside either source.
+
+**This is not the build's to close.** It is a data question — which handle is this result's actual publication — and it belongs with the dry-run sign-off and OQ-7. **Options, for the owner:** (a) correct the stored evidence row on dev so both sides agree, then re-run; (b) accept the single row as a known residual, record it beside the 110-pair DC-10 review population, and let `apply` proceed; (c) exclude result 23607 from the first `apply` by filter.
+
+- **Also found, and it is why the corpus number moved:** the searcher returns a **reproducible HTTP 500 on page 5 at `size=1000`** (four consecutive attempts, same page). A harness that paged at 1000 would silently cap the corpus at ~4,000 of 5,180 items and report a clean agreement rate over 77% of the data. The harness pages at **500** and carries a retry for genuine transients. The sync itself uses `size=50`, safely inside the limit.
 - **What disqualifies the evidence:** **a run that cannot reach a populated database MUST report `INCONCLUSIVE`, never a pass.** Also inconclusive: a zero PRMS row count (the corpus is not the one these numbers describe), or handle-format/title-agreement rates differing materially from the §0.5 baselines with no explained data change — report the spread and stop rather than recording a pass because the process exited `0`. **This task is a manual gate, not an automated one**, and must not be described as CI coverage in any PR (JD3-S-08).
-- **Dependencies:** T-15 · **Effort:** **M** (was S — raised 2026-08-05 when DC-2's query was carried here; it is a fifth assertion that has to be **authored**, not just run) · **Status:** not-started
+- **Dependencies:** T-15 · **Effort:** **M** (was S — raised 2026-08-05 when DC-2's query was carried here; it is a fifth assertion that has to be **authored**, not just run) · **Status:** **`[~]` harness authored and run; blocked on two owner decisions** — the 2b divergence on result 23607, and whether A5 splits into 5a/5b. Nothing further is owed by the build.
 - **Skills:** none (SQL + read-only script)
 
 ---
@@ -612,7 +657,7 @@ Per `design.md` §10. Non-negotiables:
 - [ ] Both endpoints documented in `/swagger` with the bearer lock.
 - [ ] Migrations apply forward and revert cleanly.
 - [ ] **The D11 regression test fails on `main` and passes here** (T-13) — the Bug Mode requirement for rev 3.
-- [ ] **T-14 run against dev with all four invariants passing**, its output attached to the dry-run artifact, and `INCONCLUSIVE` treated as not-passing.
+- [~] **T-14 run against dev with all ~~four~~ five invariants passing** ("four" was stale — DC-2 was carried in as a fifth on 2026-08-05), its output attached to the dry-run artifact, and `INCONCLUSIVE` treated as not-passing. **Run 2026-08-05: 4 PASS · 1 FAIL (2b, result 23607) · 1 INCONCLUSIVE (A5, unsatisfiable before an `apply` — see T-14's Result block).** `INCONCLUSIVE` is treated as not-passing, as required.
 - [x] **A dev dry-run returns ~2,359 groups with ~2,254 involving PRMS.** A plausible total with PRMS at zero is a failure, not a pass. **Measured 2026-08-05 (`runId 83c94039`): 2,359 groups, 2,254 involving PRMS.** Verified **per platform from the audit rows**, not inferred from rule counts — TIP 2,357 / PRMS 2,254 / AICCRA 121, with PRMS resolving **only** via `HANDLE_EVIDENCE` and TIP/AICCRA **only** via `PUBLIC_LINK`.
 - [x] **D-dup-13's `UNRESOLVED_CONFLICT` cost re-measured** over the 2,359-group corpus (RB-10) — the rev-2 "zero" does not carry over. **Re-measured 2026-08-05: still 0.** `byClassification` over the full corpus is `RESOLVED` 2,303 + `CROSS_YEAR_REVIEW` 56 = 2,359, with **no `UNRESOLVED_CONFLICT` at all** — so the consistency gate costs nothing on the 20×-larger population, and the §5.1 step 4 estimate of "roughly 11–22 three-platform groups" over-predicted. Multi-identity `REFUSED` rows are also **0**, and that count is now *capable* of being non-zero (T-15 attempt 2), so the zero is a property of the data rather than of the gate.
 - [ ] **OQ-7, OQ-8 and OQ-11 answered** before any `apply` against real data.
