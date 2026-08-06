@@ -18,7 +18,7 @@ From `design.md` §14. `/akili-execute` **stops and escalates** rather than cont
 | Signal | Budget |
 | --- | --- |
 | Tasks | 12 |
-| LOC | ~1,450 (≈750 production, ≈700 tests) |
+| LOC | **~4,600** — re-baselined 2026-08-06 after the tripwire fired at T-05 (original ~1,450). Basis and cause in `design.md` §14.1. |
 | Review rounds | 2 |
 
 ---
@@ -49,13 +49,13 @@ No cycles. T-01 through T-04 are mutually independent and parallelisable.
 
 ## 3. PR strategy
 
-~1,450 LOC exceeds the 400-LOC single-PR guidance. Three PRs, split so that **only the last one changes runtime behavior**:
+~4,600 LOC far exceeds the 400-LOC single-PR guidance. Three PRs, split so that **only the last one changes runtime behavior**. The `~LOC` column below is **re-baselined 2026-08-06** (`design.md` §14.1); every PR lands well above the guidance, so each PR description must state its real size up front rather than let a reviewer discover it:
 
 | PR | Tasks | ~LOC | Blast radius |
 | --- | --- | --- | --- |
-| **PR 1 — Foundation** | T-01 … T-04 | ~450 | **None at runtime.** Additive DTO field, additive columns, seeded config/template rows. Nothing calls any of it yet. |
-| **PR 2 — Engine** | T-05 … T-08 | ~600 | **None at runtime.** Repository + two pure modules + email assembly, fully unit-tested but unwired. |
-| **PR 3 — Activation** | T-09 … T-12 | ~400 | **The only PR with blast radius** — and it lands with the flag seeded `false`, so even merged it sends nothing until someone flips a row. |
+| **PR 1 — Foundation** | T-01 … T-04 | **812 actual** *(est. ~450)* | **None at runtime.** Additive DTO field, additive columns, seeded config/template rows. Nothing calls any of it yet. |
+| **PR 2 — Engine** | T-05 … T-08 | **~2,350** *(1,051 actual for T-05; est. ~600 for the PR)* | **None at runtime.** Repository + two pure modules + email assembly, fully unit-tested but unwired. |
+| **PR 3 — Activation** | T-09 … T-12 | ~1,500 *(est. ~400)* | **The only PR with blast radius** — and it lands with the flag seeded `false`, so even merged it sends nothing until someone flips a row. |
 
 Per `cognitive-doc-design` review-empathy: each PR description states what to review first, what is deliberately dead code until the next PR, and links previous/next.
 
@@ -133,7 +133,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-05 — Notification repository: four grouped queries + two writes
-- **Status:** [~] — code PASS on both review lenses (reliability + risk); **O-6 owed**: the four queries have never been executed as SQL, and both Reviewers independently flagged a suspected `ER_FIELD_IN_ORDER_NOT_SELECT` in Q1's `GROUP_CONCAT(DISTINCT … ORDER BY …)`. Must resolve before T-09/T-10 wire it live. See `execution.md` → T-05.
+- **Status:** [~] — code PASS on both review lenses (reliability + risk). The suspected `ER_FIELD_IN_ORDER_NOT_SELECT` in Q1's `GROUP_CONCAT` was fixed on user authorization. **O-6 still owed:** no test compiles SQL, so the four queries remain unverified *as SQL* — execute them against dev MySQL before T-09/T-10 wire the repository live. See `execution.md` → T-05.
 
 - **Requirements covered:** R-CBU-002, R-CBU-003, R-CBU-006, R-CBU-008
 - **Design refs:** §6.1

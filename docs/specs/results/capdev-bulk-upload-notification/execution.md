@@ -10,7 +10,7 @@
 - **Worker wrappers:** `.claude/agents/akili-implementer.md` (T2 `sonnet`) · `.claude/agents/akili-reviewer.md` (T3 `opus`, read-only) — author ≠ auditor enforced by configuration
 - **Approval mode:** *not recorded* in the spec's Document Control → default **interactive** (user gate after every task)
 - **Rework ceiling:** 3 attempts per task
-- **Budget tripwire** (`design.md` §14 / `tasks.md` §1): 12 tasks · ~1,450 LOC · 2 review rounds
+- **Budget tripwire** (`design.md` §14 / `tasks.md` §1): 12 tasks · **~4,600 LOC** · 2 review rounds — *re-baselined 2026-08-06 after the tripwire fired at T-05 and the user accepted the revision; original ~1,450. Cause and basis in `design.md` §14.1. The tripwire still binds against the new figure.*
 - **Commit standard:** `[SPEC:docs/specs/results/capdev-bulk-upload-notification] <type>(<module>): <subject>`
 - **Concurrency decision:** all 12 tasks target the **same package** (`server/researchindicators`). Per root `CLAUDE.md` → *Concurrency* ("two tasks in the same package are not [safe]") and `.agents/leader.md` → *Disjoint source files are necessary but not sufficient*, T-01…T-04 are **logically** independent but share `node_modules`, Jest cache, and build output. **Execution is serialized**, document order.
 - **Active Kaizen lessons in force:** KZ-001 (test-double fidelity — binds T-04/T-08), KZ-003 (full-suite run on shared-service change — binds T-12)
@@ -55,7 +55,7 @@ Run from `server/researchindicators/`, in this order:
 | O-3 | T-03 | `npm run migration:dev:execute` then `npm run migration:revert` | two `app_config` rows appear (`EMAIL.CAPDEV_BULK_UPLOAD.ENABLED` = `'false'`, `EMAIL.CAPDEV_BULK_UPLOAD.CC_EMAIL` = `''`) with `is_active = 1`; revert deletes exactly those two |
 | O-4 | T-04 | `npm run migration:dev:execute` then `npm run migration:revert` | the `capdev-bulk-upload-summary` row appears in `sec_template`; revert removes only it |
 | O-5 | T-04 | `_getTemplate(TemplateEnum.CAPDEV_BULK_UPLOAD_SUMMARY)` returns non-empty against dev | **the one claim static review cannot close** — it is also the only way to confirm the live `sec_template.is_active` column really carries `DEFAULT 1`, rather than merely being declared `default: true` on `AuditableEntity`. Three working precedents make it near-certain, not proven. |
-| O-6 | T-05 | Execute all four queries (`findGroups`, `findMetrics`, `findCountries`, `findUnattributedResultIds`) against dev MySQL | **Both Reviewers independently flagged the same suspected syntax defect.** `MULTI_PRIMARY_RESULT_IDS_SELECT` builds `GROUP_CONCAT(DISTINCT <CASE expr> ORDER BY bur.result_id)`, where the `ORDER BY` expression is not among the `DISTINCT` expressions — MySQL 5.7+ may reject this with `ER_FIELD_IN_ORDER_NOT_SELECT` (3065). If it does, **Q1 throws on every call and the entire notification stage fails with all 2,106 unit tests still green**. Must be resolved **before T-09/T-10 wire the repository into a live path**. Note: `.getQuery()` against a non-connected `DataSource` would catch column/alias typos but **not** this — only MySQL's parser can. |
+| O-6 | T-05 | Execute all four queries (`findGroups`, `findMetrics`, `findCountries`, `findUnattributedResultIds`) against dev MySQL | **Narrowed 2026-08-06 — the specific suspected defect is fixed; the general gap remains.** Both Reviewers independently flagged that `MULTI_PRIMARY_RESULT_IDS_SELECT` built `GROUP_CONCAT(DISTINCT <CASE expr> ORDER BY bur.result_id)`, whose `ORDER BY` expression is not among the `DISTINCT` expressions — a shape MySQL 5.7+ rejects with `ER_FIELD_IN_ORDER_NOT_SELECT` (3065). The user authorized the one-line deletion and it landed (commit below). **What is still owed:** no test in the suite compiles SQL, so a column typo, a bad alias, or an `ONLY_FULL_GROUP_BY` violation would still pass green. All four queries must be executed against real MySQL **before T-09/T-10 wire the repository into a live path**. Note: `.getQuery()` against a non-connected `DataSource` would catch typos and aliases but **not** parser-level rejections — only MySQL can. |
 
 **Known blocker for this register:** `npm run migration:generate` is currently **non-functional** against the dev datasource — `alliancereportingdb.orm_metadata` does not exist, and there is pre-existing generated-column drift on `bilateral_project_mapping.active_agreement_id`. Unrelated to this spec and not fixed by it, but it blocks generation for every spec until someone owns it. This spec's migrations are hand-written in response (D-T02-a).
 
@@ -426,7 +426,16 @@ Per `/akili-execute` §2.4, none of these may become a task in this spec. They a
 - **R6 — the JS re-collapse is a no-op in production**, so a future maintainer who correctly reasons "the SQL already groups, this Map is redundant" gets two red tests describing impossible behavior. The doc comment should state plainly that the SQL `GROUP BY` is the production mechanism, the Map is a test-observable safety net, and `spec.ts:175-178` is the actual gate.
 - **Test hygiene:** `jest.spyOn(…, '_warn')` has no `mockImplementation`, so it calls through and prints a real WARN line on every green run — against the "green costs one line" contract in `tasks.md` §4.
 
-#### Budget tripwire — **FIRED**, escalated to the user
+#### Post-review follow-up — user overrode the advisory rule on the convergent finding
+
+`/akili-execute` §2.4 says an advisory is recorded and never triggers rework. The Leader therefore did **not** act on the `GROUP_CONCAT` finding, and instead escalated it with the two other options (leave as O-6; run the dev-DB session). **The user chose to fix it now**, which is the user's prerogative to override — recorded here rather than applied silently.
+
+- **Scoped Implementer, effort `medium`, single-line deletion.** Before: `') > 1 THEN bur.result_id END ORDER BY bur.result_id)'` → after: `') > 1 THEN bur.result_id END)'`.
+- No spec assertion referenced the removed clause (the QueryBuilder is mocked, so no test compiled the SQL) — no test changes were required, which is itself a restatement of the underlying gap.
+- Verified: `tsc` clean, `npm test -- --silent` → **325 suites / 2106 tests**, unchanged.
+- **O-6 is narrowed, not closed.** The suspected parser rejection is gone; "the four queries have never been executed as SQL" still stands and still blocks T-09/T-10.
+
+#### Budget tripwire — **FIRED**, escalated to the user, re-baseline accepted
 
 `design.md` §14 budgets the whole 12-task spec at ~1,450 LOC (≈750 production, ≈700 tests).
 
@@ -437,7 +446,9 @@ Per `/akili-execute` §2.4, none of these may become a task in this spec. They a
 | **Running total, 5 of 12 tasks** | ~1,450 *(all 12)* | **1,863 — 128%** |
 | PR 2 (T-05 … T-08) | ~600 | 1,051 after **one** of four tasks |
 
-Per `/akili-execute` §2.4 the Leader **stopped and escalated rather than advancing to T-06**. Leader's read, offered as a hypothesis and not a finding: this is a mis-sized estimate rather than runaway scope. The production side is four grouped SQL builders plus a shared spine and two writes — plausibly what "Size L" means, against a ~750-LOC production budget covering *all twelve* tasks. The test side is where the DB-less constraint bit: proving grouping without a database required a structural layer *and* a behavioral mapper layer, roughly double what one integration test would have needed. Disposition is the user's call.
+Per `/akili-execute` §2.4 the Leader **stopped and escalated rather than advancing to T-06**. Leader's read, offered as a hypothesis and not a finding: this is a mis-sized estimate rather than runaway scope. The production side is four grouped SQL builders plus a shared spine and two writes — plausibly what "Size L" means, against a ~750-LOC production budget covering *all twelve* tasks. The test side is where the DB-less constraint bit: proving grouping without a database required a structural layer *and* a behavioral mapper layer, roughly double what one integration test would have needed.
+
+**User decision: accept and re-baseline.** `design.md` §14 is revised to **~4,600** with the full basis recorded in the new §14.1; `tasks.md` §1 and §3 are swept to match. The hypothesis above was accepted without a bloat audit — recorded as such, since it was not independently tested. The tripwire is re-armed against the new figure and will fire again if actuals exceed it.
 
 #### Final verification
 

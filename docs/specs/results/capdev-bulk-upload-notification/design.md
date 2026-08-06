@@ -383,14 +383,36 @@ Every new file gets a sibling `*.spec.ts` (NFR-CBU-004).
 | Signal | Expected |
 | --- | --- |
 | Tasks | **12** (+1 vs r1: the defensive config accessors and template wrapper are their own task, per JD-02 / JD-05) |
-| Lines of code | **~1,450** (≈750 production incl. migrations and seeded HTML, ≈700 tests) |
+| Lines of code | **~4,600** — *re-baselined 2026-08-06 after the tripwire fired at T-05; original ~1,450 (≈750 production, ≈700 tests) retained in §14.1* |
 | Review rounds | **2** |
 
-*r1 estimated 11 tasks / ~1,300 LOC. The increase is the wrapper work Judgment Day surfaced — it was always required, it was simply invisible while the design assumed the reused utilities defaulted gracefully.*
+*r1 estimated 11 tasks / ~1,300 LOC. The increase to ~1,450 was the wrapper work Judgment Day surfaced — it was always required, it was simply invisible while the design assumed the reused utilities defaulted gracefully.*
 
-Consistent with the declared **Full** depth. `/akili-execute` should **stop and escalate** rather than continue if actuals exceed these — most plausibly via the migration or template HTML growing past estimate, or the recipient builder needing a third rework round.
+Consistent with the declared **Full** depth. `/akili-execute` should **stop and escalate** rather than continue if actuals exceed these.
 
 **PR strategy:** exceeds ~400 LOC → split. See `tasks.md` §PR strategy.
+
+### 14.1 Re-baseline — 2026-08-06 (tripwire fired at T-05)
+
+The tripwire fired as designed at the end of T-05 and was escalated; the user accepted a re-baseline. **This is a Leader revision recorded during execution, not a re-run of `/akili-specify`** — the task decomposition and the design are unchanged. Only the size estimate was wrong.
+
+| | Original | Actual / projected |
+| --- | --- | --- |
+| PR 1 — T-01…T-04 | ~450 | **812 actual** (1.8×) |
+| PR 2 — T-05…T-08 | ~600 | **1,051 actual for T-05 alone** · ~1,300 projected for T-06…T-08 |
+| PR 3 — T-09…T-12 | ~400 | ~1,500 projected |
+| **Total** | **~1,450** | **1,863 actual at 5/12 tasks · ~4,600 projected** |
+
+**Why the original was wrong — two independent causes:**
+
+1. **The production estimate was low across the board.** ≈750 production lines were budgeted for all twelve tasks. T-05's repository alone is 545 — four grouped SQL builders, a shared join spine, a correlated tie-break subquery, and two writes. That is what Size L means in this codebase, and the original figure never reflected it.
+2. **The test estimate was structurally low, and specifically so.** ≈700 test lines for twelve tasks assumed tests roughly proportional to production code. The realised ratio is about **1:1** (T-05: 545 production / 506 test), driven by two things the estimate could not have priced: the `Disqualifies` clause this spec attaches to every task demands non-vacuous fixtures rather than smoke tests, and the **DB-less constraint** forces every SQL claim to be proven twice — structurally against the QueryBuilder and behaviorally against an extracted pure mapper — where one integration test would otherwise suffice.
+
+A flat 1.8× multiplier from PR 1 would project ~2,600 and is **too optimistic**: T-05 by itself exceeded PR 2's entire allocation, and PR 3 carries the heaviest work in the spec (T-09 orchestration, T-11 E2E, T-12 the failure-isolation sweep). The ~4,600 figure is bottom-up at the observed 1:1 test ratio.
+
+**This is a projection, and the tripwire still binds against it.** If actuals exceed ~4,600, `/akili-execute` stops and escalates again rather than quietly absorbing the next overrun.
+
+**Consequence for PR strategy:** PR 2 and PR 3 will each land well above the ~400-LOC single-PR guidance. `tasks.md` §3 splits by blast radius rather than line count, which remains the right axis — but each PR description must state its real size up front rather than let a reviewer discover it.
 
 ---
 

@@ -52,7 +52,7 @@ const MULTI_PRIMARY_RESULT_IDS_SELECT =
   'SELECT COUNT(*) FROM result_contracts rc_dup ' +
   'WHERE rc_dup.result_id = bur.result_id ' +
   'AND rc_dup.is_primary = TRUE AND rc_dup.is_active = TRUE' +
-  ') > 1 THEN bur.result_id END ORDER BY bur.result_id)';
+  ') > 1 THEN bur.result_id END)';
 
 function toNullableNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
