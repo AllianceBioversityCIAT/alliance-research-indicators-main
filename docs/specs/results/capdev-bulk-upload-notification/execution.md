@@ -42,6 +42,23 @@ The legacy e2e fixture in T-11 MUST therefore send `metadata` with **exactly** `
 
 ---
 
+## 4. Owed DB evidence register
+
+Consequence of the user's environment decision at the T-01→T-02 gate (*"write the migration, don't apply it"*, same rule for T-03/T-04). Every migration this spec produces is **written and reviewed by inspection but never executed**. Collect these into **one supervised human session** against the shared dev MySQL rather than three interruptions.
+
+Run from `server/researchindicators/`, in this order:
+
+| # | Task | Command | Expected |
+| --- | --- | --- | --- |
+| O-1 | T-02 | `npm run migration:dev:execute` | 9 nullable columns appear on `bulk_upload_processes`; existing rows keep NULLs |
+| O-2 | T-02 | `npm run migration:revert` | the 9 columns drop cleanly; no other change |
+| O-3 | T-03 | *(pending — seed `app_config` rows)* | to be filled when T-03 lands |
+| O-4 | T-04 | *(pending — seed `sec_template` row)* | to be filled when T-04 lands |
+
+**Known blocker for this register:** `npm run migration:generate` is currently **non-functional** against the dev datasource — `alliancereportingdb.orm_metadata` does not exist, and there is pre-existing generated-column drift on `bilateral_project_mapping.active_agreement_id`. Unrelated to this spec and not fixed by it, but it blocks generation for every spec until someone owns it. This spec's migrations are hand-written in response (D-T02-a).
+
+---
+
 ## 3. Task Execution History
 
 <!-- entries appended below, newest last -->
@@ -97,5 +114,82 @@ The suite is also self-guarding: if `minimalResult` ever stops validating, the t
 #### Final verification
 
 Full server unit suite green (321 suites / 2048 tests), `tsc` clean, scope confined to the two files the task names.
+
+---
+
+### T-02 — Additive migration + entity columns on `bulk_upload_processes`
+
+- **Final status:** 🟡 **`[~]` — code PASS, DB evidence owed** (Reviewer `STATUS: PASS`, attempt 1 of 3)
+- **Date:** 2026-08-06
+- **Requirements covered:** R-CBU-008, NFR-CBU-005
+- **Design refs:** §4.1, §3
+- **Implementer attempts:** 1
+- **Skills assigned:** `nestjs-expert` (as recommended — no Leader deviation)
+- **Effort:** `medium`
+- **Review lens mode:** lens checklist
+
+#### ⛔ Environment decision governing this task (and T-03, T-04)
+
+The user was asked at the T-01→T-02 gate how to handle schema work against the **shared remote dev MySQL** (there is no local DB; `docs/infrastructure.md` → *Boundary rule* makes destructive schema ops there a human decision). **User chose: "Write migration, don't apply it"**, and "Same rule" for T-03/T-04.
+
+Consequently the Implementer was forbidden `migration:dev:execute`, `migration:execute`, `migration:revert`, and any raw DDL. The task's Done criteria "applies cleanly on dev" / "reverts" are **authorized deferrals, not failures**. This is why the task closes `[~]` and not `[x]` despite a Reviewer PASS.
+
+#### Attempt 1
+
+- **Files created/changed:**
+  - `src/db/migrations/1786043523207-addBulkUploadNotificationMetrics.ts` *(new)*
+  - `src/domain/entities/ai-reports/entities/bulk-upload-processes.entity.ts` *(modified — 9 columns)*
+  - `src/domain/entities/ai-reports/entities/bulk-upload-processes.entity.spec.ts` *(new)*
+  - `src/domain/entities/ai-reports/notifications/enum/notification-status.enum.ts` *(new)*
+- **Implementer verification** (from `server/researchindicators/`):
+  - `npx tsc --noEmit -p tsconfig.json` → clean
+  - `npx jest ...bulk-upload-processes.entity.spec.ts --silent` → **18/18 passed**
+  - `npm test -- --silent` → **322 suites / 2066 tests passed**
+  - `git status --porcelain` → only the 4 in-scope files
+- **Reviewer verdict:** `STATUS: PASS` — "All 9 columns agree three ways (design §4.1 ↔ migration SQL ↔ entity decorators) on name, type, nullability, and absence of default; `down()` is an exact nine-drop reverse of `up()`; the migration is append-only with the newest timestamp and matches the house idiom; the enum sits exactly where design §3 puts it."
+
+#### Migration route — generator is broken, hand-written instead
+
+The Leader authorized one **read-only** diagnostic (`migration:generate` diffs `information_schema`; it writes only a local file). It connected and **errored before producing anything**:
+
+```
+QueryFailedError: Table 'alliancereportingdb.orm_metadata' doesn't exist
+...GENERATED_COLUMN diff attempted on 'active_agreement_id' in table 'bilateral_project_mapping'
+```
+
+Pre-existing drift on an unrelated table. The Reviewer **corroborated rather than trusted** this: `bilateral_project_mapping` / `active_agreement_id` is a real pre-existing table (`1779190000011-createBilateralProjectMapping.ts`) untouched by this diff.
+
+Per the brief's fallback, the Implementer hand-wrote the migration on the `AddedTipIdKp1784211738931` idiom, timestamp `1786043523207` (> prior newest `1784211738931`).
+
+**The `Disqualifies` clause is not tripped.** It targets a *generated* migration pruned into shape; nothing was generated and nothing pruned. The artifact contains exactly the 9 additive columns — narrows nothing, drops nothing, backfills nothing.
+
+**Reviewer's independent safety check** (valuable because nobody will execute this migration before it runs on a shared DB): `1781101247756-createIaReportSchema.ts` creates `bulk_upload_processes` with only `id`, `file_name`, `ai_interaction_id` + audit columns, and **no other migration in the repo touches this table**. So all 9 `ADD`s target names that do not yet exist and all 9 `DROP`s target names that will. Both directions are safe by inspection.
+
+Also resolved: entity declares bare `type: 'timestamp'` while audit columns are `timestamp(6)`. Non-issue — `deleted_at` in `AuditableEntity` uses the identical bare decorator and was emitted as `timestamp NULL` in the same table's create migration.
+
+#### Decisions
+
+- **D-T02-a — Hand-writing is the STANDING route for the rest of this spec.** T-03 and T-04 both prescribe generated migrations and will hit the identical broken generator. Leader decision: they are hand-written on the house idiom, with the same by-inspection verification the Reviewer applied here (target-table history check + `up()`/`down()` inverse check). Recorded so it is not rediscovered twice.
+- **D-T02-b — `bigint` → `number` typing accepted as-is, flagged forward.** TypeORM maps MySQL `bigint` to a **string** property, so `total_results?: number | null` is a mismatch the compiler will believe. The Reviewer ruled it **not T-02's defect**: `id!: number` on this same entity and `created_by`/`updated_by` in `AuditableEntity` carry the identical mismatch, and neither §4.1 nor R-CBU-008 specifies the TS property type. Changing it here would make this the only entity in the codebase typed differently. **Carried forward into the T-05 and T-07 briefs** — see the owed-evidence register.
+
+#### Owed evidence (blocks `[x]`)
+
+| # | Command | From | Why owed |
+| --- | --- | --- | --- |
+| O-1 | `npm run migration:dev:execute` | `server/researchindicators/` | T-02 Done: migration applies cleanly on dev |
+| O-2 | `npm run migration:revert` | `server/researchindicators/` | T-02 Done: migration reverses; existing rows unchanged |
+
+Both require a supervised human session against the shared dev MySQL. See §4 *Owed DB evidence register*.
+
+#### Advisory (4R lenses — recorded, non-gating, no rework, no new task)
+
+- **⚠️ RELIABILITY / forward-flag to T-05, T-07, T-09 — `bigint` reads are strings, and this defeats T-07's own gate.** Two reinforcing causes: TypeORM maps `bigint` to a string property, **and** MySQL `SUM()` over an integer column returns `DECIMAL`, which mysql2 also yields as a string. So `total_participants` reaches the formatter as `"1234"`, and `"1234".toLocaleString()` returns `"1234"` — **not** `"1,204"`-style output. That silently violates §6.5's `en-US` thousands-separator rule while emitting no `NaN`, `Infinity`, `null`, `undefined`, or `Invalid Date` — i.e. **it survives every negative assertion T-07's `Disqualifies` clause requires.** Suggested: T-05 coerces with `Number(...)` at the raw-query boundary; T-07 adds one *positive* assertion that a value ≥ 1000 renders with a separator. *(This is in-scope for T-05/T-07 as already written — §6.5 already mandates the separators — so it is a briefing input, not scope growth.)*
+- **RISK / spec-wide:** the migration generator is down against dev (`orm_metadata` missing + `bilateral_project_mapping` generated-column drift). Not this spec's to fix; it will block any future `migration:generate` in any spec. Addressed for this spec by D-T02-a.
+- **READABILITY:** the entity spec keys off `propertyName` and never asserts `options.name`. They coincide for all nine, so nothing is wrong, but the entity↔migration contract is on the *column* name; one `expect(column.options.name).toBe(propertyName)` would make the dependency explicit.
+- **RISK / design-level note, not a diff finding:** MySQL `timestamp` tops out at 2038-01-19 and is timezone-converted on read/write. `activity_start_date` / `activity_end_date` are calendar activity dates where `datetime`/`date` would avoid TZ shifting a boundary date by a day. The implementation correctly follows design §4.1 as written — **this is a note against the design**, surfacing in §6.5's date-range clause.
+
+#### Final verification
+
+Full server unit suite green (322 suites / 2066 tests), `tsc` clean, scope confined to the 4 files the task names. Coverage floor unaffected (`*.entity.ts`, `*.enum.ts`, `db/migrations/**` are coverage-excluded per src guide §9).
 
 ---

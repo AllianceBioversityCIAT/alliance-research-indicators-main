@@ -88,7 +88,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-02 — Additive migration + entity columns on `bulk_upload_processes`
-- **Status:** [ ]
+- **Status:** [~] — code complete, Reviewer PASS. Blocked on owed DB evidence O-1/O-2 (`execution.md` §4), per the user's "write, don't apply" decision.
 
 - **Requirements covered:** R-CBU-008, NFR-CBU-005
 - **Design refs:** §4.1
