@@ -79,7 +79,6 @@ import { CreateResultInnovationDevDto } from '../../../entities/result-innovatio
 import { UpdateIpRightDto } from '../../../entities/result-ip-rights/dto/update-ip-right.dto';
 import { CreateResultActorDto } from '../../../entities/result-actors/dto/create-result-actor.dto';
 import { CreateResultInstitutionTypeDto } from '../../../entities/result-institution-types/dto/create-result-institution-type.dto';
-import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
 import { PolicyTypeHomologation } from './homologation/policy-type.homologation';
 import { PolicyStageHomologation } from './homologation/policy-stage.homologation';
 import { DeliveryModalityHomologation } from './homologation/delivery-modality.homologation';
