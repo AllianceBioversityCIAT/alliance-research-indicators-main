@@ -576,10 +576,34 @@ Two items surfaced by the T-07 review that are **spec-owner calls, not Implement
 
 | # | Decision | Why it cannot wait |
 | --- | --- | --- |
-| OD-1 | **R-CBU-006 contradicts itself on empty countries.** Metric table + §6.5 say render `"multiple countries"`; the "Degenerate metrics" scenario says omit the country clause. | T-08's degenerate-scenario test must assert one or the other. Written against the scenario sentence, it fails against a correct formatter. The Leader's recommendation: fix the requirements sentence to match the binding design, since T-07 already implements it and the design is unambiguous. |
+| OD-1 | ~~**R-CBU-006 contradicts itself on empty countries.**~~ → ✅ **RESOLVED 2026-08-06** | See the resolution note below. |
 | OD-2 | **The rounds-to-zero suppression is only recorded in a test.** Suppress (current) or render a `"<1"` floor clause? | The floor clause needs a copy change in T-04's template, which is a seeded migration + its byte-equality mirror — cheap now, three coupled edits after T-08 binds to the current copy. Note the current behavior under-reports women's participation rather than over-reporting it. |
 
 *(Neither is a Pivot: the design is internally consistent and the implementation follows it. OD-1 is a defect in one requirements sentence; OD-2 is a gap the requirements never addressed.)*
+
+### OD-1 resolution — 2026-08-06
+
+**User decision: fix the requirements sentence.** The metric table (and design §6.5) are correct; the scenario line was wrong.
+
+**Ground truth established before editing**, from T-04's seeded template at `capdev-bulk-summary.html:16`:
+
+```
+{{trainingsCount}} trainings conducted{{#if countries}} across {{countries}}{{/if}}…
+```
+
+Because the empty-set fallback is the **non-empty** string `"multiple countries"`, `{{#if countries}}` passes and the clause renders. The degenerate body is therefore `"The records encompass 3 trainings conducted across multiple countries."` — the country clause is the one degenerate case that *substitutes* text rather than disappearing, which is exactly why the scenario's blanket "omits… and country clauses" was wrong.
+
+**Correction Closure — both directions swept** (per `/akili-specify`):
+
+- **Forward** (the superseded value at sites the analysis did not cite): grepped `multiple countries` / `country clause` across the whole spec folder. Exactly **one** wrong site — `requirements.md:263`. `requirements.md:242` (metric table), `design.md:263` (§6.5), and `tasks.md:175` (T-07 scope) all already said `"multiple countries"`.
+- **Backward** (documents citing the corrected section, which may now assert a falsehood): grepped `Degenerate`. Citers are `tasks.md:176` (generic reference — still valid), `requirements.md:420` (D2 defect row — still valid), and `design.md:257`/`369` (DD-4 rationale — unaffected). **No citer asserted the old behavior.**
+
+**Changes made:**
+
+1. `requirements.md` — the scenario line split in two: the participants/percentage/date-range clauses are omitted, and a new line states the country clause still renders with the fallback. An inline correction note records what the sentence used to say and why it was wrong, so the change is not silently absorbed.
+2. `tasks.md` T-08 — added a **binding correction** line to its `Tests` clause. This is the load-bearing edit: T-08's existing `Tests` list never mentioned the degenerate body at all, so an Implementer working from the old scenario sentence would have written `expect(body).not.toContain('countries')` and produced a red test against a *correct* formatter. Fixing only `requirements.md` would have left that trap armed.
+
+No code changed. T-07 already implements the correct behavior and its 24 tests are unaffected.
 
 ---
 

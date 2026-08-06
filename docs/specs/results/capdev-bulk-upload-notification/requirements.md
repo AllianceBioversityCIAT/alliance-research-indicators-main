@@ -260,9 +260,14 @@ AI mining service ──POST /api/v1/results/ai/formalize/bulk──▶ ResultsS
 **Scenario: Degenerate metrics**
 - GIVEN a group of 3 CapDev results with no participant counts, no dates and no countries
 - WHEN the email is rendered
-- THEN the body reports 3 trainings and omits the participants, percentage, date-range and country clauses
+- THEN the body reports 3 trainings and omits the participants, percentage and date-range clauses
+- AND the **country clause still renders**, carrying the `"multiple countries"` fallback from the metric table above — an empty country set is the one degenerate case that *substitutes* text rather than disappearing
 - BUT it must NOT render `NaN`, `Infinity`, `null`, `undefined`, `Invalid Date`, or an unsubstituted `{{token}}`
 - AND IT MUST still render the salutation, the STAR link and the token-owner contact line
+
+> **Correction — 2026-08-06 (OD-1).** This scenario previously read *"omits the participants, percentage, date-range **and country** clauses"*, which contradicted the metric table in this same requirement (and design §6.5), both of which specify the `"multiple countries"` fallback. The two could not both hold. The table is correct and is what T-07 implements: because the fallback is a **non-empty** string, the template's `{{#if countries}}` guard passes and the clause renders. The degenerate body is therefore `"The records encompass 3 trainings conducted across multiple countries."` Surfaced by the T-07 review; recorded in `execution.md` §6.
+>
+> **Binding on T-08:** its degenerate-scenario rendered-body test must assert `"across multiple countries"` is **present**. Written against the old sentence, it would fail against a correct formatter.
 
 ---
 
