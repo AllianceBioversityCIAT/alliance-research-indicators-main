@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { ValidationPipe } from '@nestjs/common';
 import {
+  AiContactDto,
   AiRawCountry,
   AiRawEvidence,
   AiRawInstitution,
@@ -11,6 +13,26 @@ import {
   ResultRawAi,
   RootAi,
 } from './result-ai.dto';
+
+// Mirrors the exact pipe configuration the endpoint runs under
+// (results.controller.ts:663-669 — POST /api/v1/results/ai/formalize/bulk).
+// A DTO validated under default class-validator/ValidationPipe options
+// proves nothing about the endpoint's real `whitelist` + `forbidNonWhitelisted`
+// + `transform` behavior.
+const endpointValidationPipe = new ValidationPipe({
+  whitelist: true,
+  forbidNonWhitelisted: true,
+  transform: true,
+});
+
+const minimalResult = {
+  contract_code: 'AGR-1',
+  indicator: 'Policy Change',
+  title: 'T',
+  countries: [],
+  regions: [],
+  evidences: [],
+};
 
 describe('result-ai DTOs (class-transformer + class-validator)', () => {
   it('validates CountryAreas', async () => {
@@ -95,5 +117,132 @@ describe('result-ai DTOs (class-transformer + class-validator)', () => {
     });
     expect(raw.countries[0]).toBeInstanceOf(AiRawCountry);
     expect((await validate(raw)).length).toBe(0);
+  });
+
+  describe('ProcessMedatada.contacts (R-CBU-005) under the endpoint ValidationPipe', () => {
+    const bodyMetadata = { type: 'body' as const, metatype: RootAi, data: '' };
+
+    it('accepts a legacy payload without contacts (backward compatibility)', async () => {
+      const payload = {
+        results: [minimalResult],
+        metadata: {
+          file_name: 'file.csv',
+          ai_interaction_id: 'int-1',
+        },
+      };
+
+      const result = await endpointValidationPipe.transform(
+        payload,
+        bodyMetadata,
+      );
+
+      expect(result).toBeInstanceOf(RootAi);
+      expect(result.metadata.contacts).toBeUndefined();
+    });
+
+    it('accepts a payload with valid contacts and transforms them into AiContactDto instances', async () => {
+      const payload = {
+        results: [minimalResult],
+        metadata: {
+          file_name: 'file.csv',
+          ai_interaction_id: 'int-1',
+          contacts: [
+            {
+              email: 'lead@example.org',
+              name: 'Jane Lead',
+              role: 'reporting_leader',
+              contract_code: 'AGR-1',
+            },
+          ],
+        },
+      };
+
+      const result = await endpointValidationPipe.transform(
+        payload,
+        bodyMetadata,
+      );
+
+      expect(result.metadata.contacts).toHaveLength(1);
+      expect(result.metadata.contacts[0]).toBeInstanceOf(AiContactDto);
+      expect(result.metadata.contacts[0].email).toBe('lead@example.org');
+    });
+
+    it('rejects a contact missing email', async () => {
+      const payload = {
+        results: [minimalResult],
+        metadata: {
+          file_name: 'file.csv',
+          ai_interaction_id: 'int-1',
+          contacts: [{ name: 'No Email' }],
+        },
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payload, bodyMetadata),
+      ).rejects.toThrow();
+    });
+
+    it('rejects a contact with a non-string/malformed email', async () => {
+      const payload = {
+        results: [minimalResult],
+        metadata: {
+          file_name: 'file.csv',
+          ai_interaction_id: 'int-1',
+          contacts: [{ email: 12345 }],
+        },
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payload, bodyMetadata),
+      ).rejects.toThrow();
+
+      const payloadWithBadFormat = {
+        results: [minimalResult],
+        metadata: {
+          file_name: 'file.csv',
+          ai_interaction_id: 'int-1',
+          contacts: [{ email: 'not-an-email' }],
+        },
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payloadWithBadFormat, bodyMetadata),
+      ).rejects.toThrow();
+    });
+
+    it('rejects an unknown property inside a contact object (whitelist behavior)', async () => {
+      const payload = {
+        results: [minimalResult],
+        metadata: {
+          file_name: 'file.csv',
+          ai_interaction_id: 'int-1',
+          contacts: [
+            {
+              email: 'lead@example.org',
+              unexpected_field: 'should not be allowed',
+            },
+          ],
+        },
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payload, bodyMetadata),
+      ).rejects.toThrow();
+    });
+
+    it('rejects an invalid role value', async () => {
+      const payload = {
+        results: [minimalResult],
+        metadata: {
+          file_name: 'file.csv',
+          ai_interaction_id: 'int-1',
+          contacts: [{ email: 'lead@example.org', role: 'not_a_real_role' }],
+        },
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payload, bodyMetadata),
+      ).rejects.toThrow();
+    });
   });
 });
