@@ -119,7 +119,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-04 — Template enum, seeded `sec_template` row, on-disk mirror
-- **Status:** [ ]
+- **Status:** [~] — code complete, Reviewer PASS. Blocked on owed DB evidence O-4/O-5 (`execution.md` §4), per the user's "write, don't apply" decision.
 
 - **Requirements covered:** R-CBU-007
 - **Design refs:** §4.2, §3

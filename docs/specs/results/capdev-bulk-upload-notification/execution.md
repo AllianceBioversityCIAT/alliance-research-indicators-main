@@ -53,7 +53,8 @@ Run from `server/researchindicators/`, in this order:
 | O-1 | T-02 | `npm run migration:dev:execute` | 9 nullable columns appear on `bulk_upload_processes`; existing rows keep NULLs |
 | O-2 | T-02 | `npm run migration:revert` | the 9 columns drop cleanly; no other change |
 | O-3 | T-03 | `npm run migration:dev:execute` then `npm run migration:revert` | two `app_config` rows appear (`EMAIL.CAPDEV_BULK_UPLOAD.ENABLED` = `'false'`, `EMAIL.CAPDEV_BULK_UPLOAD.CC_EMAIL` = `''`) with `is_active = 1`; revert deletes exactly those two |
-| O-4 | T-04 | *(pending — seed `sec_template` row)* | to be filled when T-04 lands |
+| O-4 | T-04 | `npm run migration:dev:execute` then `npm run migration:revert` | the `capdev-bulk-upload-summary` row appears in `sec_template`; revert removes only it |
+| O-5 | T-04 | `_getTemplate(TemplateEnum.CAPDEV_BULK_UPLOAD_SUMMARY)` returns non-empty against dev | **the one claim static review cannot close** — it is also the only way to confirm the live `sec_template.is_active` column really carries `DEFAULT 1`, rather than merely being declared `default: true` on `AuditableEntity`. Three working precedents make it near-certain, not proven. |
 
 **Known blocker for this register:** `npm run migration:generate` is currently **non-functional** against the dev datasource — `alliancereportingdb.orm_metadata` does not exist, and there is pre-existing generated-column drift on `bilateral_project_mapping.active_agreement_id`. Unrelated to this spec and not fixed by it, but it blocks generation for every spec until someone owns it. This spec's migrations are hand-written in response (D-T02-a).
 
@@ -258,5 +259,99 @@ O-3 in §4 — `migration:dev:execute` + `migration:revert` against dev.
 #### Final verification
 
 Full server unit suite green (323 suites / 2072 tests), `tsc` clean, scope confined to the 4 files the task names. `EnvAppConfigUtil` is already provided and exported by `global-utils.module.ts`, so T-09 needs no wiring from this task.
+
+---
+
+### T-04 — Template enum, seeded `sec_template` row, on-disk mirror
+
+- **Final status:** 🟡 **`[~]` — code PASS, DB evidence owed** (Reviewer `STATUS: PASS`, attempt 1 of 3)
+- **Date:** 2026-08-06
+- **Requirements covered:** R-CBU-007 (AC.4 + AC.6 verified statically here; AC.1/2/3/5 belong to T-08)
+- **Design refs:** §4.2, §3, §6.5, DD-4
+- **Implementer attempts:** 1
+- **Skills assigned:** `nestjs-expert` (as recommended)
+- **Effort:** **`high`** — *Leader deviation from `medium`.* Reason: this task silently fixes the Handlebars variable contract that T-07 and T-08 must both match, and its disqualifier is KZ-001, the spec's highest-severity Kaizen lesson.
+- **Review lens mode:** lens checklist
+
+#### Leader action — the approved copy was retrieved, not invented
+
+The spec repeatedly cites "the approved copy" (design §4.2, R-CBU-007) without inlining it. Rather than let the Implementer compose plausible wording — which the mandatory D7 human review would then have rewritten, invalidating the migration and its byte-equality mirror — the Leader pulled the verbatim body from **Jira AC-1607** and passed it into the brief as the source of truth, with an explicit instruction not to "improve" the prose. The ticket's odd `"contact direct them to"` is approved text and was preserved deliberately.
+
+#### Attempt 1
+
+- **Files created/changed:**
+  - `src/domain/shared/auxiliar/template/enum/template.enum.ts` *(modified — `CAPDEV_BULK_UPLOAD_SUMMARY = 'capdev-bulk-upload-summary'`)*
+  - `src/domain/shared/auxiliar/template/template/capdev-bulk-summary.html` *(new — 30 lines, review/diff mirror; **never read by the running app**)*
+  - `src/db/migrations/1786045516418-insertCapdevBulkSummaryTemplate.ts` *(new)*
+  - `src/domain/shared/auxiliar/template/template/capdev-bulk-summary.template.spec.ts` *(new — the KZ-001 gate)*
+- **Implementer verification:** `tsc` clean; `npm test -- --silent` → **324 suites / 2073 tests passed**.
+- **Reviewer verdict:** `STATUS: PASS` — "closes its KZ-001 disqualifier with a genuinely load-bearing gate — the migration owns the single HTML literal, `up()` binds that exact identifier, and the spec imports it rather than re-declaring it."
+
+#### KZ-001 adjudication — the gate is load-bearing, verified two independent ways
+
+Anti-drift route **(b)**: the migration exports `CAPDEV_BULK_SUMMARY_TEMPLATE_HTML`; `up()` binds **that identifier** (not a copy) as the second parameter; the spec imports the same binding and compares it to the disk file.
+
+- **Implementer's own mutation test:** appended one space to the `.html`, reran the spec → failed with a `toBe` diff naming the line; reverted → passed. *(First worker in this run to proactively prove a negative assertion can fail — the discipline KZ-001 asks for.)*
+- **Reviewer's independent structural check** (did not trust the self-report): grep confirms **no second literal anywhere in `src`** — only the spec, the html, and two comment lines. Byte-equality confirmed by line count and line-for-line mapping, including the trailing newline (both sides are 30 newline-terminated lines), the two em-dashes, and the 300-char unwrapped metrics line. The classic off-by-one trailing-newline defect is **not** present.
+- **Tooling cannot silently break it:** `.husky/pre-commit` is empty, and both `lint` (eslint, `.ts` only) and `format` (prettier, `.ts` only) exclude `.html`. Nothing will reflow that long line behind the gate's back.
+
+#### The Handlebars variable contract — **binding input for T-07 and T-08**
+
+T-04 defines it; T-07 must produce exactly these fields and T-08 renders them.
+
+| Field | Meaning | Guarded |
+| --- | --- | --- |
+| `projectLeadName` | salutation (T-06's 3-tier chain, incl. `"Colleagues"`) | no — non-empty by contract |
+| `trainingsCount` | e.g. `"12"` | no — group only dispatched when > 0 |
+| `countries` | comma-joined names, or `"multiple countries"` | `{{#if countries}}` |
+| `startDate` | e.g. `"March 2025"` | `{{#if startDate}}` — **also guards `endDate`** |
+| `endDate` | range end | renders **only** inside the `startDate` guard |
+| `participantsCount` | e.g. `"1,204"` | `{{#if participantsCount}}` |
+| `percentageWomen` | number without `%`, e.g. `"58"` | **nested inside** `participantsCount` |
+| `starLink` | full STAR CapDev URL | no |
+| `tokenOwnerName` / `tokenOwnerEmail` | contact sentence (AC.4 needs both) | no |
+
+**Two invariants are encoded in the template's nesting rather than in any type**, and T-07 must honour them or the sentence breaks grammatically while every type-check passes: `endDate` cannot render without `startDate`, and `percentageWomen` cannot render without `participantsCount` as its "of whom" antecedent.
+
+#### Dangling-connector sweep — Reviewer walked all 8 combinations independently
+
+The base text ends `…trainings conducted` with **no trailing space**, and every optional segment carries its own leading delimiter inside its guard. That one detail is what makes the whole matrix safe. Verified: no doubled spaces, no leading comma, no dangling `across`/`from`/`to`/`—`, sentence period outside all four blocks, all `{{#if}}`/`{{/if}}` pairs balanced. The all-absent case renders `"The records encompass 12 trainings conducted."` The specific space-before-comma risk (countries+dates off, participants on) does **not** occur: `conducted` + `, in which` = `conducted, in which`.
+
+#### Decisions
+
+- **D-T04-a — copy sourced from Jira AC-1607**, preserved verbatim including its awkward phrasing.
+- **D-T04-b — two flagged copy deviations accepted.** `({{tokenOwnerEmail}})` is **mandated by AC.4** (name *and* email), not decoration. The plain-text `The Alliance of Bioversity and CIAT` sign-off substitutes for the ticket's signature **image**, which is not retrievable via the Jira API — routed to the D7 human gate.
+- **D-T04-c — the spec→`db/migrations/` import is accepted as the least-bad option** inside the task's 4-file scope bound. Reviewer ruled it **not a defect**: append-only is preserved, coverage excludes `db/migrations/**`, TypeORM's loader ignores non-function exports, the migration *already* imports `TemplateEnum` from `src` (house style), and if migrations were ever pruned the break is a **compile error** — loud, not silently vacuous. Cleaner shape recorded as advisory.
+
+#### Owed evidence (blocks `[x]`)
+
+O-4 and **O-5** in §4. O-5 is notable: `_getTemplate` returning non-empty against dev is *the one claim static review cannot close*, and it doubles as the only proof that the live `sec_template.is_active` column really carries `DEFAULT 1` rather than merely being declared `default: true` on `AuditableEntity`. No `CREATE TABLE sec_template` migration exists in the repo — the table predates the migrations folder — so three working precedents (`WELCOME_EMAIL`, `INNOVATION_LEVEL_SEVEN`, `insertNewTamplate.ts`, all of which omit `is_active` and are read successfully in production) are the evidence, and they make it near-certain rather than proven.
+
+#### Advisory (4R lenses — recorded, non-gating, no rework, no new task)
+
+1. **⚠️ RELIABILITY / forward-flag to T-07 — `{{#if}}` on a pre-rendered string cannot distinguish `"0"` from absent; `"0"` is truthy.** `participantsCount: "0"` renders *"in which 0 participants took part"*, and `percentageWomen: "0"` renders *"— 0% of whom were women, a most noteworthy figure"* — a D7-grade embarrassment. §6.5 covers participants `0`/all-null but **not** participants > 0 with zero women, so this case is genuinely uncovered by the design. **The DTO contract must be "empty string when the clause should not render"**, written into `capdev-bulk-email-template.dto.ts` as a doc comment during T-07.
+2. **⚠️ RELIABILITY / forward-flag to T-07 + T-08 — half-range dates.** `endDate` is guarded only by `{{#if startDate}}`, so a half-range input renders `"from March 2025 to."` — exactly the dangling-connector class T-07's own `Disqualifies` clause names. Not a T-04 violation (its scope treats "date range" as one clause; §6.5 assigns both-or-neither to the formatter), but **the template cannot self-defend**. T-07 must assert both-or-neither; T-08 should render a half-range input against the real file to prove the boundary rather than assume it.
+3. **RISK — `{{{starLink}}}` disables escaping in both the `href` and the link text, for no benefit.** The value is env-derived so exposure is low, and design §9 relies on Handlebars escaping for `metadata.contacts[].email`, not the link — so no rule is broken. But inside an attribute `{{starLink}}` is strictly better: `&` → `&amp;` is the *correct* HTML serialization and decodes back to `&`, so the link behaves identically while a stray `"` can no longer terminate the attribute. Per Q1 (§15) the link carries a CapDev-tab query string, so `&` is the **expected** case, not hypothetical.
+4. **READABILITY — the `.spec.ts` → `db/migrations/` edge is the only src→migration import in the repo.** The cleaner shape, at the cost of one file outside T-04's bound, is a `capdev-bulk-summary.template.ts` beside the `.html` exporting the constant, imported by *both* the migration and the spec — every edge then points migration→src. Worth revisiting if T-08 also needs the constant.
+5. **RISK (future) — the gate proves disk == migration literal, not disk == the live `sec_template` row.** A later `updateCapdevBulkSummaryTemplate` migration, or a manual `UPDATE`, reopens the exact KZ-001 gap this task closed. Any future edit to this template must move the constant and update the mirror **in the same commit**.
+
+#### Final verification
+
+Full server unit suite green (324 suites / 2073 tests), `tsc` clean, 126 insertions across exactly the 4 in-scope files. Nothing in the diff makes the `.html` runtime-reachable — its only reader is `fs.readFileSync` inside a `.spec.ts`; production still goes `TemplateService._getTemplate` → `sec_template`.
+
+---
+
+## 5. PR 1 (Foundation) — completion state
+
+All four foundation tasks have landed with a Reviewer PASS. Per `tasks.md` §3, PR 1 has **no runtime blast radius**: an additive DTO field, additive nullable columns, and seeded config/template rows that nothing calls yet.
+
+| Task | Code | Reviewer | Status | Owed |
+| --- | --- | --- | --- | --- |
+| T-01 | ✅ | PASS | **`[x]`** | — |
+| T-02 | ✅ | PASS | `[~]` | O-1, O-2 |
+| T-03 | ✅ | PASS | `[~]` | O-3 |
+| T-04 | ✅ | PASS | `[~]` | O-4, O-5 |
+
+**PR 1 cannot be certified complete from this session.** `tasks.md` §8 requires migrations to apply and revert on dev, and `npm run lint -- --quiet` with a `git status` re-check (the script carries `--fix`, so it must not run mid-task). Both are pending: the former needs the supervised DB session in §4, the latter should run once before the PR opens.
 
 ---
