@@ -642,6 +642,92 @@ Three items, all disclosure rather than outstanding work: (1) four modified spec
 
 ---
 
+### T-08 — Template wrapper + email assembly
+
+- **Date:** 2026-08-09
+- **Attempts:** 1 (Reviewer PASS ×2, no FAIL, no rework attempt consumed)
+- **Implementer:** `akili-implementer` (`sonnet`, effort `high` — above the T2 default; the task is well-specified but carries three named traps and a hard disqualifier)
+- **Reviewers:** two parallel lens Reviewers (`akili-reviewer`, `opus`, read-only) — **reliability** and **risk**. Parallel mode selected because NFR-CBU-003 is a security-category NFR and because D-OD2-d had just made an ungated cross-file invariant this task's responsibility.
+
+#### Leader scope decision (recorded before briefing)
+
+T-08 and T-09 share `capdev-bulk-notification.service.ts`. The seam was drawn at **per-group send**: T-08 owns the safe template accessor, the render-and-send-one-group method, subject, STAR link and contact fields; T-09 owns `dispatch()` — the four queries, the flag gate, metric persistence, the per-group loop, the aggregate status write, and provider registration in `ai-reports.module.ts`.
+
+The seam is not cosmetic. T-08's `Tests` line requires "missing template → zero `sendEmail`, one error log", which is untestable unless T-08 owns a send path. Drawing the line at `dispatch()` instead would have deferred that assertion to T-09 and left R-CBU-007 AC.5 unproven through two tasks.
+
+#### Method contract handed to T-09
+
+```ts
+async sendGroupNotification(input: CapdevGroupSendInput): Promise<CapdevGroupSendOutcome>
+enum CapdevGroupSendStatus { SENT = 'SENT', NO_TEMPLATE = 'NO_TEMPLATE' }
+```
+
+`NO_TEMPLATE` is an **internal per-group outcome, deliberately not added to `NotificationStatus`** — that enum stays the four persisted values (`SENT | SKIPPED | FAILED | PARTIAL`) that T-09 writes to `notification_status`. Widening a persisted column's domain to carry a transient control-flow marker was the failure this instruction pre-empted.
+
+A `sendEmail` rejection is **not** caught in `sendGroupNotification`; it propagates so T-09's per-group `try/catch` (design §6.6) remains the single logger, keeping R-CBU-010 AC.5's "exactly one error log" true. Both Reviewers verified this in the code rather than accepting the Implementer's claim: no `try/catch`, no `.catch()`, no floating promise.
+
+#### Files
+
+| File | Change |
+| --- | --- |
+| `.../notifications/capdev-bulk-notification.service.ts` | **NEW** (237 → 239 lines). `safeGetTemplate` wrapper; `sendGroupNotification`; subject; STAR link; token-owner contact fields. |
+| `.../notifications/capdev-bulk-notification.service.spec.ts` | **NEW** (311 → 316 lines). 8 tests. |
+
+Nothing else in the tree changed — verified by `git status` and by an explicit `git diff --stat` over the formatter, template, and migration paths, which returned empty.
+
+#### Verification (Leader's own run, no agents active)
+
+- `npx tsc --noEmit -p tsconfig.json` → exit 0
+- `npx eslint <both files> --quiet` → exit 0 (after `npm run lint`'s `--fix`; `git status` re-checked, no files leaked into other tasks)
+- `npm test -- --silent` → **328 suites / 2154 tests passed, 1 snapshot, 48.182s**
+
+#### What the review bought that the green suite did not
+
+Both lenses returned `PASS`, and both — independently, from opposite directions — found the same hole in a gate this spec had just declared closed.
+
+**D-OD2-d was half-delivered.** The `<1%` branch was correctly gated: re-adding `%` to the template renders `&lt;1%%` and drops the `%` from the formatter renders `&lt;1 of whom`, both turning the same assertion red. But the `p >= 1` branch was **not** gated at the render layer. The risk lens ran the mutation rather than checking that a well-named test existed, and found that dropping the `%` from `capdev-metrics.formatter.ts:94` alone left every test in T-08's suite green — the happy path rendered `— 58 of whom were women` and asserted nothing about that sentence. It was caught only by the formatter's own unit spec, one layer away from the render, which is exactly the distance D-OD2-d exists to close.
+
+The reliability lens reached the same place from the other side: `buildTemplateData` maps ten fields and the suite asserted four in the body, so `projectLeadName: ''` or a swapped `startDate`/`endDate` also stayed green. `not.toContain('{{')` cannot catch that class, because Handlebars renders a missing or empty value as the empty string — **KZ-001 one level down**, and a standing argument against treating "no unresolved tokens" as a rendering guarantee.
+
+Convergence from two independent lenses on one finding is the signal the parallel mode exists to produce; either lens alone would have read as a stylistic suggestion.
+
+#### Leader adjudication — advisory fold, not a rework
+
+Both Reviewers classified these advisory and neither raised a spec violation, so the verdict stood at `PASS` and **the attempt count stayed at 1**. But an advisory that leaves the task's own stated purpose half-delivered is closed before signing, not recorded and walked past. Four bounded changes were sent back to the same Implementer, explicitly labelled *not a rework attempt*:
+
+1. `expect(body).toContain('— 58% of whom were women')` — closes the `p >= 1` render coupling.
+2. Salutation and date-range assertions — closes the field-mapping mutation class.
+3. `tokenOwner` narrowed from `CapdevBulkTokenOwnerDto | null` to non-nullable (see D-T08-a).
+4. `not.toContain('%')` → `not.toMatch(/\d+%|<1%/)` — the broad form would break spuriously on any future `%` in the template (`width: 100%` in an email style block being the likely one), with a failure message pointing nowhere near the cause.
+
+**The fold was required to demonstrate the gate, not assert it:** mutate the formatter, observe red, revert. Given that the failure mode under review was "a test that looks right but proves nothing," accepting *"I added the assertion"* would have repeated the exact error being corrected. Result: the mutation turned the happy-path test red on the new assertion with the body showing `— 58 of whom were women`; all other tests stayed green, confirming the gap had been invisible to everything except the formatter's own spec. Revert verified by the Leader independently (`git diff` empty on the formatter; line 94 re-inspected for the `%`).
+
+#### Decisions
+
+- **D-T08-a — the token-owner parameter is non-nullable; the guarantee is enforced at the fetch point.** Both lenses found `null` was not unhandled but handled *silently*: `resolveTokenOwnerContact` optional-chains through and yields `{ tokenOwnerName: '', tokenOwnerEmail: '' }`, so the body ships `contact direct them to  (), who shall be happy to assist.` to a Project Leader — violating `capdev-bulk-email-template.dto.ts`'s "non-empty by contract" and landing precisely in the class DD-4 exists to keep out of Handlebars. Reachable two ways, not one: a `null` token owner, **and** a resolved owner whose `email` and both names are null (`capdev-bulk-group.dto.ts` permits it). Design §6.1 declares the first unreachable, so this was correctly advisory rather than a violation. Dropping `| null` converts a silently-broken email into a **compile error at T-09's call site**, forcing the guarantee to be stated where the data is fetched. No runtime fallback string was added — choosing between skipping the group and falling back to a support address is T-09's call, and inventing copy here would have pre-empted it.
+- **D-T08-b — the subject carries no environment marker.** R-CBU-007's prose mentions one; `MessageMicroservice` already threads `environment: ARI_MIS_ENV` into the payload. Prefixing here would break AC.2's "subject begins with `[<agreement_id>]`". The risk lens checked this specifically because it read as drift, and confirmed it is correct.
+
+#### Advisories — recorded, not acted on, no tasks minted
+
+1. **`sendEmail` is `client.emit` — fire-and-forget onto the broker.** It resolves with no delivery acknowledgement, so `SENT` means "handed to the broker", not "delivered". Correct existing platform behaviour and nothing here should change it — but **`notification_status = 'SENT'` (R-CBU-011) inherits exactly this weaker guarantee**, and a broker-side failure will never produce `FAILED` or `PARTIAL`. T-09 should know this rather than discover it.
+2. **`safeGetTemplate` uses a bare `catch`,** so a transient DataSource error is reported as `NO_TEMPLATE` — "the template row is missing", logged at error with that wording — rather than as a group failure. Design §6.2 mandates catching the throw, so this conforms; but it blurs R-CBU-011 AC.3's skipped-vs-failed distinction for a cause that is neither. Worth a distinguishing log field when T-09 wires the aggregate status.
+3. **`expect(body).not.toContain('trainee_name')` is tautological** — no participant-level field exists in the DTO or the template, so it survives every mutation of this diff. It is literally what `tasks.md` T-08's `Tests` line asks for, so it stays; but the real data-minimisation guard is the DTO's key set.
+4. **`starLink` degrades to `undefined/results-center?...`** if `ARI_CLIENT_HOST` is unset. A deployment concern, not a code one. (The triple stache on `starLink` is safe — the value is entirely code-constructed from env plus a module constant, no user data.)
+
+#### NFR-CBU-003 — both halves checked
+
+The structural half holds: `CapdevGroupSendInput.metrics` is six pre-rendered aggregate strings, so no participant channel exists. The **runtime half** was checked separately at the Leader's instruction, because the Implementer's structural argument does not cover it: the service's only log carries the template key, `agreement_id` and `bulk_upload_process_id` — no address; `MessageMicroservice`'s info-level line interpolates only the subject, never `to`/`cc`; and this diff adds zero info-level logs.
+
+#### Implementer `Not Done / Assumptions` — adjudicated, no scope owed
+
+Round 1 disclosed three items, none outstanding work: (1) the STAR link query string implements design §15's own recorded stance on open question Q1, explicitly non-blocking — a wrong param degrades to a correct page, and the value is enum-bound rather than a literal; (2) the token-owner nullable, escalated to the reliability lens for adjudication rather than settled on the Implementer's summary → became **D-T08-a**; (3) no dedicated NFR-CBU-003 fixture, argued structurally — accepted, and the runtime half verified independently above. Round 2 returned `none`, with the mutation demonstrated and reverted.
+
+#### Status transition
+
+- **T-08 → `[x]`** — Reviewer PASS ×2 (reliability + risk), advisory fold applied and its gate demonstrated red-then-reverted, full suite and lint green on the Leader's own run. **No owed evidence** — T-08 renders the on-disk template through real Handlebars, and that file is byte-equality-coupled to the migration literal by T-04's separate guard, so nothing here waits on dev MySQL.
+
+---
+
 ## 6. Open decisions blocking T-08
 
 Two items surfaced by the T-07 review that are **spec-owner calls, not Implementer or Reviewer calls**. Both should be settled before T-08 is briefed, because T-08's rendered-body assertions depend on them.

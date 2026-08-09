@@ -185,7 +185,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-08 — Template wrapper + email assembly
-- **Status:** [ ]
+- **Status:** [x] — Reviewer PASS ×2 (reliability + risk lenses), attempt 1, 2026-08-09. Both lenses independently found that **D-OD2-d was only half-delivered**: the `<1%` branch was gated but the `p >= 1` branch was not, so dropping the `%` from `capdev-metrics.formatter.ts:94` left T-08's whole suite green. Closed by a Leader-directed advisory fold (not a rework; attempt count unchanged) whose gate was **demonstrated red-then-reverted**, not asserted. **No owed evidence** — rendering runs the on-disk template through real Handlebars, and T-04's byte-equality guard couples that file to the migration literal. See `execution.md` → T-08 for D-T08-a/D-T08-b and the four recorded advisories.
 
 - **Requirements covered:** R-CBU-007, NFR-CBU-003
 - **Design refs:** §6.2, §2.2
@@ -226,6 +226,11 @@ Two rules, both non-negotiable:
 
   *(Closes ledger entry JD-S8, which flagged this derivation as defined only for `PARTIAL`.)*
 - **Tests:** flag `false` → metrics **written**, status `SKIPPED`, zero `sendEmail`; flag row absent → same + one warn; zero CapDev results → `SKIPPED`, no email; group 1 throwing still dispatches group 2 → `PARTIAL`; unresolvable PI skips that group only; info logs carry counts and **no email address**.
+- **Carried forward from T-08's review (2026-08-09) — three things this task inherits and must decide, not discover:**
+  1. **`sendGroupNotification` is T-08's; consume it, don't re-implement it.** Signature and outcome type in `execution.md` → T-08. A `sendEmail` rejection **propagates by design** so this task's per-group `try/catch` is the single logger — do not add a second catch inside the send path or R-CBU-010 AC.5's "exactly one error log" breaks.
+  2. **The token-owner parameter is non-nullable (D-T08-a).** `CapdevBulkGroupDto.token_owner` is nullable, so the call site here **will not compile** until this task states the guarantee. That compile error is deliberate. Decide explicitly — skip the group, or fall back to a support address — and record the choice; do **not** silence it with an empty string, which ships `contact direct them to  ().` to a Project Leader.
+  3. **`SENT` means "handed to the broker", not "delivered."** `MessageMicroservice.sendEmail` is `client.emit` — fire-and-forget, no acknowledgement. The `notification_status` table above inherits that weaker guarantee: a broker-side failure will never produce `FAILED` or `PARTIAL`. Correct existing platform behaviour, not a defect to fix here — but the status column's meaning should be documented in the code so a dashboard reader is not misled.
+- **One advisory worth folding in while you are here:** `safeGetTemplate` uses a bare `catch`, so a transient DataSource error is reported as `NO_TEMPLATE` — logged at error as "the template row is missing" — rather than as a group failure. Conforms to design §6.2, but blurs R-CBU-011 AC.3's skipped-vs-failed distinction for a cause that is neither. A distinguishing log field costs one line.
 - **Done:** `npm test -- --silent` green.
 - **Disqualifies:** a flag-off test asserting only `sendEmail` was not called. That passes for the *wrong* implementation (flag first). It must **also** assert the metrics write happened and `notification_status = 'SKIPPED'` was persisted.
 - **Skills:** `nestjs-expert`, `error-handling-patterns` · **Size:** L
