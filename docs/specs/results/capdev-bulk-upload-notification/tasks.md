@@ -88,7 +88,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-02 — Additive migration + entity columns on `bulk_upload_processes`
-- **Status:** [~] — code complete, Reviewer PASS. Blocked on owed DB evidence O-1/O-2 (`execution.md` §4), per the user's "write, don't apply" decision.
+- **Status:** [x] — code complete, Reviewer PASS. **O-1 verified against dev 2026-08-09** (9 nullable columns, correct types, no backfill). **O-2 waived by the spec owner on static review — the revert was never executed**, so a production rollback of this migration is unrehearsed; see `execution.md` §4.
 
 - **Requirements covered:** R-CBU-008, NFR-CBU-005
 - **Design refs:** §4.1
@@ -102,7 +102,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-03 — Config enums + **non-throwing** accessors + seed migration
-- **Status:** [~] — code complete, Reviewer PASS. Blocked on owed DB evidence O-3 (`execution.md` §4), per the user's "write, don't apply" decision.
+- **Status:** [x] — code complete, Reviewer PASS. **O-3 verified against dev 2026-08-09**: both rows present, `ENABLED = 'false'` (seeded off), `CC_EMAIL = ''`, both `is_active = 1`. That last value is not incidental — the seed INSERTs omit `is_active` and rely on the DDL default, so a non-`1` would have made the flag read as absent and the feature never run while looking correctly disabled. See `execution.md` §4.
 
 - **Requirements covered:** R-CBU-009, R-CBU-004 (source 6)
 - **Design refs:** §6.3, §4.3, DD-5
@@ -119,7 +119,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-04 — Template enum, seeded `sec_template` row, on-disk mirror
-- **Status:** [~] — code complete, Reviewer PASS ×2 (conformance + risk lenses) after the **OD-2 copy amendment, 2026-08-09**. Still blocked on owed DB evidence O-4/O-5 (`execution.md` §4), per the user's "write, don't apply" decision — the amendment does not discharge them, and the string they must eventually prove is now the amended one.
+- **Status:** [x] — code complete, Reviewer PASS ×2 (conformance + risk lenses) after the **OD-2 copy amendment, 2026-08-09**. **O-4 and O-5 both verified against dev 2026-08-09**: row present and `is_active = 1`, `CHAR_LENGTH` identical to the on-disk file, em dash intact after storage. The byte-equality chain now closes end to end — disk == migration literal == **the stored row** — which is what T-08's rendering tests ultimately rest on. See `execution.md` §4.
 
 - **⚠️ OD-2 amendment (2026-08-09) — copy change, in place.** The participants sentence's percentage clause becomes `— {{percentageWomen}} of whom were women`: the literal `%` moves out of the template into the formatter's output string, and the hardcoded praise tail `, a most noteworthy figure` is **dropped** (it was written for a headline figure and reads as sarcasm against `"<1%"`). Because the migration is **unapplied and unmerged** (O-4 still owed), the seeded string is corrected **in place** — this is not an append-only violation; there is no merged migration to preserve. The byte-equality invariant with `capdev-bulk-summary.html` binds exactly as before: **both sides change or neither does.**
 

@@ -57,6 +57,28 @@ Run from `server/researchindicators/`, in this order:
 | O-5 | T-04 | `_getTemplate(TemplateEnum.CAPDEV_BULK_UPLOAD_SUMMARY)` returns non-empty against dev | **the one claim static review cannot close** — it is also the only way to confirm the live `sec_template.is_active` column really carries `DEFAULT 1`, rather than merely being declared `default: true` on `AuditableEntity`. Three working precedents make it near-certain, not proven. |
 | O-6 | T-05 | Execute all four queries (`findGroups`, `findMetrics`, `findCountries`, `findUnattributedResultIds`) against dev MySQL | **Narrowed 2026-08-06 — the specific suspected defect is fixed; the general gap remains.** Both Reviewers independently flagged that `MULTI_PRIMARY_RESULT_IDS_SELECT` built `GROUP_CONCAT(DISTINCT <CASE expr> ORDER BY bur.result_id)`, whose `ORDER BY` expression is not among the `DISTINCT` expressions — a shape MySQL 5.7+ rejects with `ER_FIELD_IN_ORDER_NOT_SELECT` (3065). The user authorized the one-line deletion and it landed (commit below). **What is still owed:** no test in the suite compiles SQL, so a column typo, a bad alias, or an `ONLY_FULL_GROUP_BY` violation would still pass green. All four queries must be executed against real MySQL **before T-09/T-10 wire the repository into a live path**. Note: `.getQuery()` against a non-connected `DataSource` would catch typos and aliases but **not** parser-level rejections — only MySQL can. |
 
+### Resolution — 2026-08-09
+
+Run via two read-only probe scripts (`build/od-evidence/od-check.ts`, `od-probe.ts` — gitignored, deleted after the session) rather than a raw MySQL client, because none is installed on the operator's machine.
+
+**Two corrections to this register's own plan, found while preparing the run:**
+
+1. **The per-task "execute then revert" cycles were not runnable as written.** `migration:dev:execute` runs *every* pending migration, not one; `migration:revert` undoes exactly one. O-1/O-3/O-4 therefore share a single apply.
+2. **Both seed migrations insert without `is_active`.** They are raw `queryRunner.query` INSERTs, so `AuditableEntity`'s `default: true` — an ORM-level default applied on entity save — never runs. The landed value is the live column's DDL default. This is the doubt O-5 was written for, and it is **broader than O-5 states**: it hits `app_config` too, where the failure mode is worse. A non-`1` default there makes the flag read as absent, so the accessor defaults to `false` and **the feature silently never runs while appearing correctly disabled**. Checked directly against `information_schema` before anything was applied.
+
+| # | Outcome |
+| --- | --- |
+| O-1 | ✅ **Verified.** 9 nullable columns present, correct types, no backfill on existing rows. |
+| O-2 | ⚠️ **Waived by the spec owner, 2026-08-09 — static review, not execution.** The revert cycle was **not** run against dev. Owner's assessment: the `down()`s are `DROP COLUMN` and `DELETE` by exact key, with no logic, so inspection suffices. Risk accepted is narrow but real: **a production rollback of these three migrations is unrehearsed.** Recorded as a waiver rather than as evidence so the distinction survives — "we tested it" and "we read it and judged it safe" are not interchangeable in an incident. |
+| O-3 | ✅ **Verified.** Both `app_config` rows present, `ENABLED = 'false'` (seeded off per DD-5), `CC_EMAIL = ''`, both `is_active = 1`. |
+| O-4 | ✅ **Verified.** Template row present and active. `CHAR_LENGTH` matches the on-disk file exactly and the em dash survived storage — so the byte-equality chain (disk == migration literal == **stored row**) is closed end to end, not just at its first two links. |
+| O-5 | ✅ **Discharged by O-4's check, more directly than planned.** O-5 existed to confirm the live `sec_template.is_active` really carries `DEFAULT 1`; `information_schema` answers that at the DDL level, and the seeded row confirms it landed. `_getTemplate`'s filter is `name` + `is_active: true`, both now verified. |
+| O-6 | ❌ **STILL OWED — the one that blocks T-09/T-10.** No test compiles SQL, so a column typo, bad alias, or `ONLY_FULL_GROUP_BY` violation still passes green. Run `od-probe.ts <processId>` against dev before the repository is wired into a live path. |
+
+**Also discovered:** the three migrations were **already applied** on dev when the check ran — surfaced incidentally, because the script's verification branch only executes when all three are present. The register had assumed dev was at `AddedTipIdKp1784211738931`.
+
+**Evidence-capture gap, recorded honestly:** the probe's raw stdout was **not pasted into this log**; O-1/O-3/O-4/O-5 above rest on the spec owner's report that the run came back green. The script exits non-zero on any failure, so a green exit is a meaningful signal — but the specific numbers (the `is_active` defaults, the three baseline counts, the char-length comparison) are not preserved here and cannot be re-read later without re-running.
+
 **Known blocker for this register:** `npm run migration:generate` is currently **non-functional** against the dev datasource — `alliancereportingdb.orm_metadata` does not exist, and there is pre-existing generated-column drift on `bilateral_project_mapping.active_agreement_id`. Unrelated to this spec and not fixed by it, but it blocks generation for every spec until someone owns it. This spec's migrations are hand-written in response (D-T02-a).
 
 ---
