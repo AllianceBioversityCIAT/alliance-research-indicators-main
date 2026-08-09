@@ -259,9 +259,13 @@ Takes raw aggregate row + country list, returns the template DTO of **pre-render
 | Input state | Rendered |
 | --- | --- |
 | participants `0` or all-null | participants clause and percentage clause both absent (empty strings; the template guards with `{{#if}}`) |
+| participants > 0, women share `<= 0` | percentage clause absent; participants clause still renders *(OD-2)* |
+| participants > 0, women share `0 < p < 1` | `"<1%"` — the floor clause, never suppression *(OD-2)* |
 | either date bound null | date clause absent — never a half-range, never `Invalid Date` |
 | empty country set | `"multiple countries"` |
-| normal | `"12"`, `"1,204"`, `"58"`, `"March 2025"`, `"Kenya, Uganda"` |
+| normal | `"12"`, `"1,204"`, `"58%"`, `"March 2025"`, `"Kenya, Uganda"` |
+
+**`percentageWomen` carries its own `%` sign** *(OD-2, 2026-08-09)*. The template slot is bare — `— {{percentageWomen}} of whom were women` — so one slot renders both `"<1%"` and `"58%"` without the template branching on magnitude. Putting the `%` in the template would force `"<1"` to render as `"<1%"` only by accident of adjacency, and would leave no way to express a floor at all. Full rule and its error-direction rationale in `requirements.md` → R-CBU-006.
 
 Doing this in TypeScript rather than in Handlebars is deliberate: Handlebars fails *silently* (a null renders as an empty string, a missing helper renders nothing), which is exactly the failure mode that would put `NaN` or a dangling "from to" in front of a Project Leader. In TS the branches are enumerable and testable (D2, D6).
 

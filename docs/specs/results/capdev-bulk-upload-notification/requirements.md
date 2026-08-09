@@ -243,7 +243,22 @@ AI mining service ──POST /api/v1/results/ai/formalize/bulk──▶ ResultsS
 | Start date | `MIN(result_capacity_sharing.start_date)`, formatted `Month YYYY` | see below |
 | End date | `MAX(result_capacity_sharing.end_date)`, formatted `Month YYYY` | see below |
 | Participants | `SUM(session_participants_total)`; when a row's total is null, use `male + female + non_binary` for that row | `0` when every source value is null |
-| Women % | `round(SUM(female) / SUM(participants) * 100)` | **omitted from the sentence entirely** when the participant total is `0` |
+| Women % | `SUM(female) / SUM(participants) * 100`, rendered as a **pre-rendered figure string including the `%` sign** | three branches — see the rule below |
+
+**Women-percentage rule (OD-2, decided 2026-08-09).** Let `p = SUM(female) / SUM(participants) * 100` computed on the un-rounded values:
+
+| Condition | Rendered `percentageWomen` | Sentence effect |
+| --- | --- | --- |
+| participants total is `0` / all-null | `""` | the whole participants clause is absent, so the percentage clause cannot render |
+| `p <= 0` (no women recorded) | `""` | percentage clause omitted; participants clause still renders |
+| `0 < p < 1` | `"<1%"` | renders the **floor clause** — a sub-1% share is reported, never silently dropped |
+| `p >= 1` | `"{round(p)}%"`, e.g. `"37%"` | renders normally |
+
+The `%` sign belongs to the **formatter's output string**, not to the template. This is what allows one Handlebars slot to carry both `"<1%"` and `"37%"` without the template branching on magnitude.
+
+**Rationale — error direction.** Suppressing a non-zero sub-1% women's share reports the training as though no women attended. For a gender-sensitive reporting organisation that error direction *flatters* the data, which is the worse of the two failure modes. The floor clause is the honest option that still avoids the degenerate `"— 0% of whom were women"` render DD-4 exists to prevent.
+
+**Boundary is exact, not "rounds to zero".** The threshold is `p < 1`, not `round(p) == 0`. A share of `0.6%` renders `"<1%"`, *not* `"1%"` — rounding up across the 1% line would over-report in the opposite direction, and the whole point of this rule is that neither direction is silently wrong.
 
 - When **either** date bound is missing, the date clause is dropped from the sentence rather than rendering `null`, `Invalid Date`, or a partial range.
 - Country names come from CLARISA (`clarisa_countries`), joined on `isoAlpha2` — never free text.
@@ -256,6 +271,8 @@ AI mining service ──POST /api/v1/results/ai/formalize/bulk──▶ ResultsS
 - [ ] AC.4 — Given a total participant count of 0, the rendered body contains no `NaN`, no `Infinity`, and no percentage clause.
 - [ ] AC.5 — Given every `start_date` null, the body contains no date range clause and no literal `null`/`Invalid Date`.
 - [ ] AC.6 — Metrics count only the group's results, never the batch's.
+- [ ] AC.7 — Given a non-zero female count whose share is below 1% (e.g. 4 of 1,240), the rendered body contains the floor clause and does **not** contain `"0%"`. ⚠️ **Assert the HTML-escaped form** `"— &lt;1% of whom were women"`, or decode the body before comparing: `{{percentageWomen}}` is a double stache, so Handlebars escapes the `<`. The reader still sees `<1%` — the escaping is correct on the wire and the slot must stay a double stache (D-OD2-c). Asserting the raw `"— <1% of whom were women"` fails against a *correct* template.
+- [ ] AC.8 — Given a female count of exactly `0` with participants > 0, the rendered body contains the participants clause and **no** women clause at all — no `"0%"`, no `"<1%"`.
 
 **Scenario: Degenerate metrics**
 - GIVEN a group of 3 CapDev results with no participant counts, no dates and no countries
@@ -268,6 +285,13 @@ AI mining service ──POST /api/v1/results/ai/formalize/bulk──▶ ResultsS
 > **Correction — 2026-08-06 (OD-1).** This scenario previously read *"omits the participants, percentage, date-range **and country** clauses"*, which contradicted the metric table in this same requirement (and design §6.5), both of which specify the `"multiple countries"` fallback. The two could not both hold. The table is correct and is what T-07 implements: because the fallback is a **non-empty** string, the template's `{{#if countries}}` guard passes and the clause renders. The degenerate body is therefore `"The records encompass 3 trainings conducted across multiple countries."` Surfaced by the T-07 review; recorded in `execution.md` §6.
 >
 > **Binding on T-08:** its degenerate-scenario rendered-body test must assert `"across multiple countries"` is **present**. Written against the old sentence, it would fail against a correct formatter.
+
+> **Amendment — 2026-08-09 (OD-2).** The Women % row previously read *"`round(...)` | **omitted from the sentence entirely** when the participant total is `0`"*. That sentence named only one trigger, while the implementation (T-07) additionally suppressed any share that rounded to zero — behavior recorded **only in a test** (`capdev-metrics.formatter.spec.ts:115`), which the T-07 Reviewer correctly refused to treat as a requirement. The spec owner resolved the gap toward the **floor clause** rather than either suppression or a literal `0%`. Two consequences beyond this requirement:
+>
+> 1. **The `%` sign moves from the template into the formatter output.** T-04's template clause changes from `— {{percentageWomen}}% of whom were women, a most noteworthy figure` to `— {{percentageWomen}} of whom were women`. The hardcoded praise tail is **dropped**: it was written for a headline figure and reads as sarcasm against `"<1%"`.
+> 2. **T-04 and T-07 are reopened.** Neither had been applied to a database (O-4 owed), so the seed migration is unapplied and unmerged and its copy is corrected **in place** rather than chased with a second migration.
+>
+> Surfaced by the T-07 review as advisory 1; recorded in `execution.md` §6.
 
 ---
 

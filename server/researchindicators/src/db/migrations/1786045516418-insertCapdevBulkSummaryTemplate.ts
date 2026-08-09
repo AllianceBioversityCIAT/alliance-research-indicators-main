@@ -28,7 +28,7 @@ export const CAPDEV_BULK_SUMMARY_TEMPLATE_HTML = `<!doctype html>
       system.
     </p>
     <p>
-      The records encompass {{trainingsCount}} trainings conducted{{#if countries}} across {{countries}}{{/if}}{{#if startDate}} during the period from {{startDate}} to {{endDate}}{{/if}}{{#if participantsCount}}, in which {{participantsCount}} participants took part{{#if percentageWomen}} — {{percentageWomen}}% of whom were women, a most noteworthy figure{{/if}}{{/if}}.
+      The records encompass {{trainingsCount}} trainings conducted{{#if countries}} across {{countries}}{{/if}}{{#if startDate}} during the period from {{startDate}} to {{endDate}}{{/if}}{{#if participantsCount}}, in which {{participantsCount}} participants took part{{#if percentageWomen}} — {{percentageWomen}} of whom were women{{/if}}{{/if}}.
     </p>
     <p>
       You may review the uploaded Capacity Development activities at the

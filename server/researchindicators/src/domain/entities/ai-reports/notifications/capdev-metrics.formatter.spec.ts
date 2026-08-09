@@ -128,21 +128,63 @@ describe('formatCapdevMetrics', () => {
     expect(result.percentageWomen).not.toBe('0');
   });
 
-  it('renders a real, rounded percentage when women > 0', () => {
+  it('renders a real, rounded percentage carrying its own "%" sign when women share is >= 1% (AC — normal share)', () => {
     const result = formatCapdevMetrics(
       baseMetrics({ participants_total: 1204, female_participants_total: 698 }),
       ['Kenya'],
     );
     expect(result.participantsCount).toBe('1,204');
-    expect(result.percentageWomen).toBe('58'); // round(698/1204*100) = 58, no % sign
+    expect(result.percentageWomen).toBe('58%'); // round(698/1204*100) = 58
   });
 
-  it('renders empty percentageWomen when the rounded percentage is 0 despite some women (rounds to zero)', () => {
+  it('renders a plain example share with the "%" sign (e.g. 37 of 100)', () => {
     const result = formatCapdevMetrics(
-      baseMetrics({ participants_total: 1000, female_participants_total: 1 }),
+      baseMetrics({ participants_total: 100, female_participants_total: 37 }),
       ['Kenya'],
     );
+    expect(result.percentageWomen).toBe('37%');
+  });
+
+  // ---- OD-2 (2026-08-09) — the floor clause, not suppression -------------
+  it('renders the floor clause "<1%" for a non-zero sub-1% share (e.g. 4 of 1,240) (AC.7)', () => {
+    const result = formatCapdevMetrics(
+      baseMetrics({ participants_total: 1240, female_participants_total: 4 }),
+      ['Kenya'],
+    );
+    // 4/1240*100 = 0.322...% — non-zero, must render the floor, never "0%".
+    expect(result.percentageWomen).toBe('<1%');
+    expect(result.percentageWomen).not.toBe('0%');
+  });
+
+  it('renders "<1%" (never a rounded-up "1%") for a share in [0.5, 1) — D-OD2-a boundary (6 of 1,000 = 0.6%)', () => {
+    const result = formatCapdevMetrics(
+      baseMetrics({ participants_total: 1000, female_participants_total: 6 }),
+      ['Kenya'],
+    );
+    // Math.round(0.6) would be 1 — the guard this test exists to catch is a
+    // future "simplification" back to round(p) === 0 / round(p).
+    expect(result.percentageWomen).toBe('<1%');
+    expect(result.percentageWomen).not.toBe('1%');
+  });
+
+  it('renders "1%" (not "<1%") for a share exactly at the p === 1 boundary', () => {
+    const result = formatCapdevMetrics(
+      baseMetrics({ participants_total: 1000, female_participants_total: 10 }),
+      ['Kenya'],
+    );
+    // 10/1000*100 = 1 exactly — the boundary is p < 1, so p === 1 rounds normally.
+    expect(result.percentageWomen).toBe('1%');
+  });
+
+  it('renders empty percentageWomen for a female count of exactly 0 with participants > 0 (AC.8, still suppressed)', () => {
+    const result = formatCapdevMetrics(
+      baseMetrics({ participants_total: 1000, female_participants_total: 0 }),
+      ['Kenya'],
+    );
+    expect(result.participantsCount).toBe('1,000');
     expect(result.percentageWomen).toBe('');
+    expect(result.percentageWomen).not.toBe('0%');
+    expect(result.percentageWomen).not.toBe('<1%');
   });
 
   // ---- AC.5 / Advisory 2 — dates: all-null and both half-ranges ----------

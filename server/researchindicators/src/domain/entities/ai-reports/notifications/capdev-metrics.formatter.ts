@@ -45,12 +45,33 @@ function formatDateRange(
 }
 
 /**
- * Participants + women %, together (Advisory 1 / DD-4). The empty string is
- * the *only* "do not render" sentinel — Handlebars' `{{#if}}` treats the
- * string `"0"` as truthy, so participants of `0` and a rounded women
- * percentage of `0` both collapse to `""`, never `"0"`. This covers both
- * the design's tabulated case (participants 0/all-null) and the case it
- * left uncovered: participants > 0 with zero (or rounds-to-zero) women.
+ * Participants + women %, together (Advisory 1 / DD-4, amended OD-2
+ * 2026-08-09). The empty string is the *only* "do not render" sentinel —
+ * Handlebars' `{{#if}}` treats the string `"0"` as truthy, so participants
+ * of `0` collapses to `""`, never `"0"`.
+ *
+ * The women-percentage branch is the four-state rule from R-CBU-006 /
+ * design.md §6.5, computed on the **un-rounded** share `p`:
+ *   - participants `0`/all-null → `""` (handled by the early return above)
+ *   - `p <= 0` (no women recorded) → `""` — clause omitted
+ *   - `0 < p < 1` → `"<1%"` — the floor clause: a non-zero sub-1% share is
+ *     reported, never silently dropped as though no women attended
+ *   - `p >= 1` → `"{round(p)}%"`
+ *
+ * The boundary is the exact comparison `p < 1`, **not** `Math.round(p) === 0`
+ * — those differ on `[0.5, 1)`, where rounding would print `"1%"` and
+ * over-report in the opposite direction (D-OD2-a). Do not "simplify" this
+ * back to a round.
+ *
+ * The `!(percentage > 0)` guard (rather than e.g. `Number.isNaN(...)`)
+ * mirrors the prior implementation's base check on purpose: `NaN > 0` is
+ * `false`, so a non-finite `percentage` is absorbed into the suppressed
+ * branch for free, and `participantsCount` can never be the string `"0"`
+ * because `participants` is already guaranteed positive-finite above.
+ *
+ * The `%` sign is emitted **here**, in the formatter's output string — not
+ * by the template — so one Handlebars slot can carry both `"<1%"` and
+ * `"58%"` without branching on magnitude (D-OD2-b).
  */
 function formatParticipants(
   participantsTotal: number,
@@ -62,11 +83,20 @@ function formatParticipants(
   }
 
   const female = toPositiveFinite(femaleParticipantsTotal) ?? 0;
-  const percentage = Math.round((female / participants) * 100);
+  const percentage = (female / participants) * 100;
+
+  let percentageWomen: string;
+  if (!(percentage > 0)) {
+    percentageWomen = '';
+  } else if (percentage < 1) {
+    percentageWomen = '<1%';
+  } else {
+    percentageWomen = `${Math.round(percentage)}%`;
+  }
 
   return {
     participantsCount: participants.toLocaleString(THOUSANDS_LOCALE),
-    percentageWomen: percentage > 0 ? String(percentage) : '',
+    percentageWomen,
   };
 }
 

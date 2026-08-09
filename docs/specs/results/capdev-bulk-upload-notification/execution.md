@@ -570,6 +570,78 @@ Repaired by making the helper **enforce what its comment claimed** (a `GUARDED_F
 
 ---
 
+### T-04 + T-07 — OD-2 amendment (the `"<1%"` floor clause)
+
+- **Status:** PASS — 1 Implementer attempt, 2 parallel lens Reviewers, both PASS.
+- **Date:** 2026-08-09
+- **Requirements covered:** R-CBU-006 (amended — the *Women-percentage rule*, AC.7, AC.8), R-CBU-007 (template copy)
+- **Attempts:** 1
+
+**Why two Reviewers.** The diff touches a **migration** — a listed trigger for parallel-lens mode in `/akili-execute` §2.3 — and it amends code that had **already passed review**, so the prior PASS no longer covered the tree. Lens A: spec conformance (gate) + reliability. Lens B: risk + test fidelity. Both on T3, both independent of the T2 Implementer.
+
+**Files changed (5):** `capdev-metrics.formatter.ts` (rule + JSDoc) · `capdev-bulk-email-template.dto.ts` (contract rewritten) · `capdev-bulk-summary.html:16` · `1786045516418-insertCapdevBulkSummaryTemplate.ts` (literal, in place) · `capdev-metrics.formatter.spec.ts` (rewrote the stale "rounds to zero" test, +5 cases).
+
+**Rule as landed:**
+
+```ts
+const percentage = (female / participants) * 100;   // un-rounded
+if (!(percentage > 0))    percentageWomen = '';
+else if (percentage < 1)  percentageWomen = '<1%';
+else                      percentageWomen = `${Math.round(percentage)}%`;
+```
+
+**Verification.** Implementer: formatter suite red→green (5 failing before the fix, 28/28 after), byte-equality 1/1, full suite **327 suites / 2146 tests**, `tsc` clean. `npm run lint` withheld during the task (carries `--fix`); Leader ran it after review — see below.
+
+#### What the review bought that the green suite did not
+
+- **The `p === 1` boundary is float-safe for *every* integer pair, not just the fixture.** An exact 1% share requires `participants = 100 × female`, so `p` is always `double(0.01) × 100`. `double(0.01)` exceeds 0.01 by ≈2.08e-17, under the half-ULP at 1.0 (1.11e-16) — the product is exactly `1.0`. The boundary is tested *on* the boundary, not near it. Lens B checked the other fixtures the same way (`4/1240`, `6/1000`, `698/1204`, `37/100`) — all far from both `0.5` and `1`, so last-bit wobble changes nothing.
+- **`"0%"` is now structurally unreachable**, not merely unasserted: `Math.round` runs only on the `p >= 1` branch, so the minimum rendered figure is `1%`. AC.8's negative assertion is guaranteed by construction.
+- **D-OD2-a is pinned on both sides, mutation-checked.** Lens B mutated the branch six ways: `round(p) === 0` → red at `:159`; `p < 0.5` → red at `:159`; `p <= 1` → red at `:170`; dropping the `%` → red at `:131`/`:140`; `'<1%'`→`'0%'` → red at `:149`/`:159`. The decision is recorded in a test that **actually fails on its violation** — which is the defect class OD-2 was raised against, now closed rather than relocated.
+- **The byte-equality gate is a real raw comparison.** `capdev-bulk-summary.template.spec.ts` does `expect(diskHtml).toBe(CAPDEV_BULK_SUMMARY_TEMPLATE_HTML)` — no `trim`, no whitespace collapse, no CRLF normalization — and imports the constant from the migration module, so it compares the exact value `up()` binds as its `?` parameter. The HTML contains no backtick and no `${`, so the untagged template literal is a byte-faithful carrier. Lens B additionally verified the two long edited lines by anchored fixed-form grep (head and tail patterns, 2 hits each — one per file), independently of the test.
+- **Neither `lint` nor `format` can silently reformat one side:** both are scoped to `*.ts`; `.husky/pre-commit` is empty and there is no lint-staged config. Editor format-on-save on the `.html` is the one drift vector, and it turns the gate **red** — intended behavior.
+- **Copy reads correctly in all four states**, including `…took part.` with a clean sentence end when the women clause is absent, and no dangling comma or double space where the praise tail was removed.
+
+#### ⚠️ The finding that outranks both PASSes — and the Leader adjudication of a Reviewer disagreement
+
+**Both lenses independently found it: Handlebars HTML-escapes `{{percentageWomen}}`, so the rendered body contains `— &lt;1% of whom were women`, not `— <1% of whom were women`.**
+
+The behavior is correct on the wire — a mail client displays `<1%`. The defect is in **the spec text written earlier the same day**: `requirements.md` AC.7 and `tasks.md` T-08's OD-2 binding correction both quote the **unescaped** form. An Implementer following either literally writes `expect(body).toContain('— <1% of whom were women')` and gets a **red test against a correct template**. This is the OD-1 trap class, re-armed by the OD-2 amendment itself — and it did not exist before it, because the prior value `"58"` contains no escapable character.
+
+**The two Reviewers proposed opposite fixes.** Lens A offered switching the slot to `{{{percentageWomen}}}`, reasoning the value comes from a closed formatter-controlled set (`''` | `'<1%'` | `'N%'`) with no user input, and noting the template already triple-staches `starLink`. Lens B stated the opposite in its advisory: *"the double stache is the right choice and a future switch to `{{{percentageWomen}}}` would be a defect."*
+
+**Leader ruling: Lens B is right; keep the double stache and fix the contract text (Lens A's option (a)).** The safety argument is sound but answers the wrong question — the risk is not injection, it is **HTML validity**. A literal `<` in HTML text content must be escaped; emitting a raw `<1%` produces technically invalid markup that survives only because `<1` cannot begin a tag name, leaving the rendering at the mercy of whatever sanitizer a mail client applies. `&lt;1%` is the correct wire representation and renders exactly as intended. The fix is therefore **documentation-only, no code change** — which is also the strictly lower-risk of the two, since the alternative would have altered a shipping template on a reasoning error.
+
+**Recorded as D-OD2-c.** The copy choice itself (`"<1%"` over e.g. `"fewer than 1%"`) is the spec owner's, made at the OD-2 gate, and is **not** reopened by this — the escaped form renders identically to the reader.
+
+**Contract edits made by the Leader as a consequence** (not Implementer rework — this is Leader-authored text being corrected):
+
+1. `requirements.md` AC.7 — restated against the escaped body, with the reason inline so it is not "simplified" back.
+2. `tasks.md` T-08 — the OD-2 binding correction now names the escaped form, and its two rendered-body tests are marked **blocking**, not owed. Rationale from Lens B's second advisory: **D-OD2-b is a cross-file invariant with no gate.** Byte-equality couples disk↔migration; nothing couples either to the formatter. Re-adding `%` to the template yields `58%%`; removing it from the formatter yields `— 58 of whom were women`. Neither goes red until T-08's rendering tests exist.
+
+#### Advisory (recorded, non-gating, no rework, no new task)
+
+1. **READABILITY (formatter JSDoc)** — "a non-finite `percentage` is absorbed into the suppressed branch for free" over-generalizes from `NaN`. `+Infinity > 0` is true, so `+Infinity` would reach `Math.round(Infinity)` → `"Infinity%"`. Unreachable today (both operands pass `toPositiveFinite`), and identically unreachable before this diff — but the sentence would mislead whoever relaxes that guard. Narrowing to "a `NaN` percentage" would make it exactly true.
+2. **READABILITY (DTO contract)** — flagged by **both** lenses: "Empty (`""`) **only** when the un-rounded share `p` is `<= 0`" is not exhaustive; it is also empty when the participants clause is absent. The preceding nesting sentence covers it contextually, so T-08's briefing risk is low.
+3. **RELIABILITY (pre-existing, not introduced here)** — the claim that `participantsCount` can never be `"0"` holds for integer sums, but `toLocaleString('en-US')` defaults to 3 fraction digits, so a positive-finite fractional value below `0.0005` would format as `"0"` and truthily render the participants clause. Unreachable through the repository's `SUM` over integer columns.
+4. **RESILIENCE** — the byte-equality gate is line-ending sensitive by design, and the repo has no `.gitattributes`. A Windows checkout with `core.autocrlf=true` would CRLF the `.html` while the migration literal stays LF, failing the test for a non-defect reason. Not worth acting on for a macOS/Linux team; worth `*.html text eol=lf` if CI ever runs on Windows.
+5. **Still open, unchanged by this amendment** — no *upper* clamp on `percentageWomen` (`SUM(female) > SUM(participants)` renders e.g. `"150%"`). Deliberately out of scope; no task minted from it.
+
+#### Decisions
+
+- **D-OD2-c — the double stache stays; the contract text is what was wrong.** Escaping is correct HTML; `&lt;1%` renders as `<1%`. Reviewer disagreement adjudicated on HTML validity, not on injection risk.
+- **D-OD2-d — T-08's two OD-2 rendered-body tests are blocking, not owed.** They are the only gate that couples the formatter's output to the template's copy; without them, D-OD2-b is enforced by nothing.
+
+#### Implementer `Not Done / Assumptions` — adjudicated, no scope owed
+
+Three items, all disclosure rather than outstanding work: (1) four modified spec `.md` files correctly identified as the Leader's amendment authoring, confirmed by `git status` (4 docs Leader, 5 code files Implementer, nothing else); (2) scope discipline held — no upper clamp, no T-08 service, no neighbouring refactor; (3) one extra test beyond the brief (`37 of 100 → "37%"`), anchored in `design.md` §6.5's worked example — Lens B assessed it as not creep. The Implementer also **re-verified the unmerged/unapplied migration premise itself** (`git log` shows the file touched only by `17a90ae5` on this branch) rather than taking the brief on faith — the right instinct where a wrong premise would be expensive and invisible.
+
+#### Status transitions
+
+- **T-04 → `[~]`** — code PASS on both lenses; still owed **O-4/O-5** (unchanged; the amendment does not discharge DB evidence, and the seeded string it must eventually prove is now the amended one).
+- **T-07 → `[x]`** — PASS on both lenses, no owed evidence.
+
+---
+
 ## 6. Open decisions blocking T-08
 
 Two items surfaced by the T-07 review that are **spec-owner calls, not Implementer or Reviewer calls**. Both should be settled before T-08 is briefed, because T-08's rendered-body assertions depend on them.
@@ -577,7 +649,7 @@ Two items surfaced by the T-07 review that are **spec-owner calls, not Implement
 | # | Decision | Why it cannot wait |
 | --- | --- | --- |
 | OD-1 | ~~**R-CBU-006 contradicts itself on empty countries.**~~ → ✅ **RESOLVED 2026-08-06** | See the resolution note below. |
-| OD-2 | **The rounds-to-zero suppression is only recorded in a test.** Suppress (current) or render a `"<1"` floor clause? | The floor clause needs a copy change in T-04's template, which is a seeded migration + its byte-equality mirror — cheap now, three coupled edits after T-08 binds to the current copy. Note the current behavior under-reports women's participation rather than over-reporting it. |
+| OD-2 | ~~**The rounds-to-zero suppression is only recorded in a test.**~~ → ✅ **RESOLVED 2026-08-09** | See the resolution note below. |
 
 *(Neither is a Pivot: the design is internally consistent and the implementation follows it. OD-1 is a defect in one requirements sentence; OD-2 is a gap the requirements never addressed.)*
 
@@ -604,6 +676,35 @@ Because the empty-set fallback is the **non-empty** string `"multiple countries"
 2. `tasks.md` T-08 — added a **binding correction** line to its `Tests` clause. This is the load-bearing edit: T-08's existing `Tests` list never mentioned the degenerate body at all, so an Implementer working from the old scenario sentence would have written `expect(body).not.toContain('countries')` and produced a red test against a *correct* formatter. Fixing only `requirements.md` would have left that trap armed.
 
 No code changed. T-07 already implements the correct behavior and its 24 tests are unaffected.
+
+### OD-2 resolution — 2026-08-09
+
+**User decision: the `"<1%"` floor clause.** Neither suppression (which the code did) nor a literal `0%` (which the requirement's text implied).
+
+**The question, restated from the artifacts rather than the summary.** `capdev-metrics.formatter.ts:65-69` computed `Math.round((female / participants) * 100)` and emitted `percentage > 0 ? String(percentage) : ''`. `capdev-bulk-summary.html:16` guarded the clause with `{{#if percentageWomen}}`. Together: a group with 4 women out of 1,240 participants produced `Math.round(0.32) === 0` → `''` → **the entire women clause vanished**, and the email reported the training as though no women attended. That rule lived in exactly one place — `capdev-metrics.formatter.spec.ts:115`, a test — which the T-07 Reviewer declined to accept as a requirement (*"a test is not a requirement"*) while also declining to FAIL it, on the grounds that the literal requirement would force the `"— 0% of whom were women, a most noteworthy figure"` render back into production.
+
+**Resolved rule** (canonical text in `requirements.md` → R-CBU-006 → *Women-percentage rule*):
+
+| `p = female / participants * 100` | `percentageWomen` |
+| --- | --- |
+| participants `0` / all-null | `""` (participants clause absent, so the nested clause cannot render) |
+| `p <= 0` | `""` — clause omitted |
+| `0 < p < 1` | `"<1%"` |
+| `p >= 1` | `"{round(p)}%"` |
+
+**Two decisions inside the decision, both deliberate:**
+
+- **D-OD2-a — the boundary is `p < 1`, not `round(p) === 0`.** These differ on `0.5 ≤ p < 1`, where rounding would print `"1%"`. The floor is chosen there too: this rule exists because *silent misreporting in either direction* is the defect, and rounding `0.6%` up across the 1% line is the same error with the sign flipped. Written into the requirement explicitly so a future reader does not "simplify" it back to a round.
+- **D-OD2-b — the `%` sign moves from the template into the formatter output, and the praise tail is dropped.** `— {{percentageWomen}}% of whom were women, a most noteworthy figure` becomes `— {{percentageWomen}} of whom were women`. The `%` has to move because one Handlebars slot must now carry both `"<1%"` and `"37%"`; a template-side `%` would render `"<1%"` only by accident of adjacency and could not express a floor at all. The praise tail goes because it was written for a headline figure and reads as sarcasm against a sub-1% share — the D7 embarrassment class, arriving through copy rather than through arithmetic.
+
+**Why this reopens two closed tasks.** The copy lives in T-04's seeded migration **and** its byte-equality on-disk mirror; the rule lives in T-07's formatter, its DTO contract, and its tests. T-04 → `[~]`, T-07 → `[~]`. The migration is corrected **in place**, which is not an append-only violation: `1786045516418-insertCapdevBulkSummaryTemplate.ts` has never been executed anywhere (O-4 is still owed) and the branch is unmerged (`git branch --contains HEAD` returns only `AC-1607-…`). Both facts were verified before the amendment was written, not assumed.
+
+**Correction Closure — both directions swept** (per `/akili-specify`):
+
+- **Forward** (the superseded rule/copy at sites the analysis did not cite): grepped `most noteworthy` / `percentageWomen` / `Women %` / `of whom were women` across the spec folder. Live sites corrected: `requirements.md:246` (metric row), `design.md:261-264` (§6.5 table — the `"58"` example was also stale, now `"58%"`), `tasks.md:175` (T-07 scope). Code sites owed to the Implementer: the formatter, the DTO contract, the template, the migration literal. Hits at `execution.md:311/333/532/541/562` are **append-only history** and were true when written — deliberately left unchanged; this note is the record of what superseded them.
+- **Backward** (documents citing the corrected sections, which may now assert a falsehood): grepped `R-CBU-006` / `DD-4` / `§6.5`. `requirements.md` AC.4 (participants `0` → no percentage clause) survives — that path still suppresses. `requirements.md:420` (D2 defect row), `design.md:369` (DD-4 rationale — reinforced, not contradicted), and `judgment.md:46` (AC.6 grouping) are unaffected. One citer *was* stale and is fixed: `tasks.md` §6 mapped R-CBU-006 to T-05 and T-07 only, though the copy now makes T-04 and the rendered-body assertions make T-08 both load-bearing for it.
+
+**Not in scope, still open.** T-07 advisory 2 — no *upper* clamp on `percentageWomen`, so `SUM(female) > SUM(participants)` renders e.g. `"150%"`. Same defect class at the other end of the range, covered by no requirement. It remains a recorded advisory; it was not folded into this amendment and no task was minted from it.
 
 ---
 

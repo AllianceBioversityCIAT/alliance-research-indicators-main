@@ -119,10 +119,12 @@ Two rules, both non-negotiable:
 ---
 
 ### T-04 — Template enum, seeded `sec_template` row, on-disk mirror
-- **Status:** [~] — code complete, Reviewer PASS. Blocked on owed DB evidence O-4/O-5 (`execution.md` §4), per the user's "write, don't apply" decision.
+- **Status:** [~] — code complete, Reviewer PASS ×2 (conformance + risk lenses) after the **OD-2 copy amendment, 2026-08-09**. Still blocked on owed DB evidence O-4/O-5 (`execution.md` §4), per the user's "write, don't apply" decision — the amendment does not discharge them, and the string they must eventually prove is now the amended one.
 
-- **Requirements covered:** R-CBU-007
-- **Design refs:** §4.2, §3
+- **⚠️ OD-2 amendment (2026-08-09) — copy change, in place.** The participants sentence's percentage clause becomes `— {{percentageWomen}} of whom were women`: the literal `%` moves out of the template into the formatter's output string, and the hardcoded praise tail `, a most noteworthy figure` is **dropped** (it was written for a headline figure and reads as sarcasm against `"<1%"`). Because the migration is **unapplied and unmerged** (O-4 still owed), the seeded string is corrected **in place** — this is not an append-only violation; there is no merged migration to preserve. The byte-equality invariant with `capdev-bulk-summary.html` binds exactly as before: **both sides change or neither does.**
+
+- **Requirements covered:** R-CBU-007, R-CBU-006 *(the percentage clause copy)*
+- **Design refs:** §4.2, §3, §6.5
 - **Files:** `src/domain/shared/auxiliar/template/enum/template.enum.ts`, `src/domain/shared/auxiliar/template/template/capdev-bulk-summary.html`, `src/db/migrations/<ts>-insertCapdevBulkSummaryTemplate.ts`
 - **Scope:** `CAPDEV_BULK_UPLOAD_SUMMARY = 'capdev-bulk-upload-summary'`; the approved copy as Handlebars HTML with `{{#if}}` guards on every optional clause (participants, percentage, date range, countries); insert into **`sec_template`** — *not* `templates`; that table does not exist. Follow `1772481692172-insertNewTemplateInnovationLevel.ts`.
 - **Tests:** none of its own — T-08 renders this exact file.
@@ -167,12 +169,14 @@ Two rules, both non-negotiable:
 ---
 
 ### T-07 — `capdev-metrics.formatter.ts` (pure)
-- **Status:** [x] — Reviewer PASS, attempt 1. Both inherited T-04 defects closed structurally. ⚠️ **Two spec-owner decisions (OD-1, OD-2) are open and block briefing T-08** — see `execution.md` §6.
+- **Status:** [x] — Reviewer PASS attempt 1, then reopened for the **OD-2 amendment (2026-08-09)** and re-PASSed by two independent lens Reviewers (conformance + risk). OD-1 and OD-2 are both resolved (`execution.md` §6). No owed evidence. **T-08 is unblocked.**
+
+- **⚠️ OD-2 amendment (2026-08-09).** `formatParticipants` gains the floor branch and emits the `%` sign itself. Exact rule, including the `p < 1` boundary (**not** `round(p) === 0`), in `requirements.md` → R-CBU-006 → *Women-percentage rule*. The DTO doc contract at `capdev-bulk-email-template.dto.ts:56-63` currently states *"without the `%` sign"* and *"empty whenever the computed percentage rounds to `0`"* — **both sentences are now false and must be rewritten**, not merely appended to. New tests owed: the sub-1% floor, the exact `p == 1` boundary, and `female == 0` (which stays suppressed).
 
 - **Requirements covered:** R-CBU-006
 - **Design refs:** §6.5, DD-4
 - **Files:** `.../notifications/capdev-metrics.formatter.ts` + spec, `.../notifications/dto/capdev-bulk-email-template.dto.ts`
-- **Scope:** raw aggregate + country list → template DTO of **pre-rendered strings**. Every degenerate case resolved here, never in Handlebars (which fails silently). Participants `0`/all-null → participants *and* percentage clauses empty; either date bound null → date clause empty (never a half-range); empty countries → `"multiple countries"`; `en-US` thousands separators.
+- **Scope:** raw aggregate + country list → template DTO of **pre-rendered strings**. Every degenerate case resolved here, never in Handlebars (which fails silently). Participants `0`/all-null → participants *and* percentage clauses empty; women share `<= 0` → percentage clause empty; women share `0 < p < 1` → `"<1%"`; women share `>= 1` → `"{round(p)}%"`; either date bound null → date clause empty (never a half-range); empty countries → `"multiple countries"`; `en-US` thousands separators.
 - **Tests:** the full degenerate matrix, plus the R-CBU-006 "Degenerate metrics" scenario end to end.
 - **Done:** `npm test -- --silent` green.
 - **Disqualifies:** asserting only on the happy path. The gate is a **negative** assertion over the produced strings — no `NaN`, `Infinity`, `null`, `undefined`, `Invalid Date`, and no dangling connector (`"from  to "`). A suite without those negatives does not cover the defect class this module exists for.
@@ -191,6 +195,10 @@ Two rules, both non-negotiable:
   - `_getTemplate` **throws** on a missing row (`template.service.ts:12-20` destructures from a `null` `findOne`). Wrap it; treat both a throw and an empty return as `NO_TEMPLATE`, logged at **error** (R-CBU-007 AC.5).
   - The rendered HTML goes in `message.socketFile` as `Buffer.from(html)`. **Never `message.text`** — the naming invites the wrong choice and all three existing callers use `socketFile`.
 - **Tests:** rendered body contains no `{{`; subject begins `[<agreement_id>]`; link starts with `ARI_CLIENT_HOST`; token owner name+email present; no `trainee_name` anywhere in the body; missing template → zero `sendEmail`, one **error** log; `message.text` unset and `socketFile` a `Buffer`.
+- **⚠️ Binding correction (OD-2, 2026-08-09) — these two tests are BLOCKING, not owed.** The rendered-body assertions bind to the **amended** copy — `— {{percentageWomen}} of whom were women`, with no `%` in the template and no `, a most noteworthy figure` tail. Required here, not only in T-07:
+  1. a sub-1% fixture renders the floor clause — **assert the escaped form** `"— &lt;1% of whom were women"`, or decode the body first. `{{percentageWomen}}` is a double stache and Handlebars escapes the `<`; the reader still sees `<1%`. **Do not "fix" this by switching to `{{{percentageWomen}}}`** — a raw `<` in HTML text is invalid markup that survives only because `<1` cannot begin a tag name (D-OD2-c).
+  2. a `female == 0` fixture renders the participants clause with **no** women clause at all.
+  **Why blocking (D-OD2-d):** D-OD2-b — the `%` living in the formatter rather than the template — is a **cross-file invariant with no gate**. Byte-equality couples the on-disk HTML to the migration literal; nothing couples either to the formatter. Re-add `%` to the template and the body renders `58%%`; drop it from the formatter and it renders `— 58 of whom were women`. Neither goes red until these tests exist.
 - **⚠️ Binding correction (OD-1, 2026-08-06):** the degenerate-scenario rendered-body test must assert `"across multiple countries"` is **present**. R-CBU-006's scenario previously said the country clause was omitted; that sentence was wrong and has been corrected. An empty country set renders the `"multiple countries"` fallback — a non-empty string, so `{{#if countries}}` passes. Asserting its absence fails against a *correct* formatter.
 - **Done:** `npm test -- --silent` green.
 - **Disqualifies:** **stubbing the template (KZ-001).** Rendering assertions must run Handlebars against the real `capdev-bulk-summary.html` from T-04. A `template: ''` stub makes "no `{{` remaining" and "no `NaN`" pass vacuously — that exact failure mode consumed four instances in a prior spec.
@@ -273,7 +281,7 @@ Two rules, both non-negotiable:
 | R-CBU-003 | T-05, T-06 |
 | R-CBU-004 | T-03, T-06 |
 | R-CBU-005 | T-01, T-11 |
-| R-CBU-006 | T-05, T-07 |
+| R-CBU-006 | T-04 *(percentage clause copy, OD-2)*, T-05, T-07, T-08 |
 | R-CBU-007 | T-04, T-08 |
 | R-CBU-008 | T-02, T-05, T-09 |
 | R-CBU-009 | T-03, T-09 |

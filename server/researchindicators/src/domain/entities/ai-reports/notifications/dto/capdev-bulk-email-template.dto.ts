@@ -54,12 +54,15 @@ export class CapdevBulkEmailTemplateDto {
   participantsCount: string;
 
   /**
-   * The women percentage **without** the `%` sign, e.g. `"58"`. Nested
-   * inside the `participantsCount` guard — never rendered when
-   * `participantsCount` is empty. Also empty whenever the computed
-   * percentage rounds to `0` (participants > 0 but zero women recorded),
-   * since a rendered `"0"` clause here would truthily render "— 0% of whom
-   * were women" per the binding contract above.
+   * The women percentage as a **pre-rendered figure string that already
+   * carries the `%` sign** (OD-2, 2026-08-09), e.g. `"58%"`, or the floor
+   * clause `"<1%"` for a non-zero share below one percent. Nested inside
+   * the `participantsCount` guard — never rendered when `participantsCount`
+   * is empty. Empty (`""`) only when the un-rounded share `p` is `<= 0`
+   * (no women recorded) — **not** whenever it rounds to `0`; a share in
+   * `(0, 1)` renders `"<1%"` rather than being suppressed, so the women
+   * clause is never silently dropped for a real, non-zero share. See
+   * `capdev-metrics.formatter.ts` → `formatParticipants` for the exact rule.
    */
   percentageWomen: string;
 
