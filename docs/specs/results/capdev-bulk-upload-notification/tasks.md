@@ -135,7 +135,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-05 — Notification repository: four grouped queries + two writes
-- **Status:** [~] — code PASS on both review lenses (reliability + risk). The suspected `ER_FIELD_IN_ORDER_NOT_SELECT` in Q1's `GROUP_CONCAT` was fixed on user authorization. **O-6 still owed:** no test compiles SQL, so the four queries remain unverified *as SQL* — execute them against dev MySQL before T-09/T-10 wire the repository live. See `execution.md` → T-05.
+- **Status:** [x] — code PASS on both review lenses (reliability + risk). The suspected `ER_FIELD_IN_ORDER_NOT_SELECT` in Q1's `GROUP_CONCAT` was fixed on user authorization. **O-6 discharged 2026-08-09:** all four queries executed against dev MySQL across five bulk processes, 5/5 green — parser-level rejections fire at prepare time regardless of row count, so a completed run proves the class absent. ⚠️ Two output paths (`multiPrimaryWarnings`, `findUnattributedResultIds`) returned empty on every process, so their **SQL is proven but their row-mapping is not** — that rests on the repository spec's fixtures. See `execution.md` §4 → O-6 detail.
 
 - **Requirements covered:** R-CBU-002, R-CBU-003, R-CBU-006, R-CBU-008
 - **Design refs:** §6.1

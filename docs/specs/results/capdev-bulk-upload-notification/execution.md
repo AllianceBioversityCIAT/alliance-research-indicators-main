@@ -73,7 +73,34 @@ Run via two read-only probe scripts (`build/od-evidence/od-check.ts`, `od-probe.
 | O-3 | ✅ **Verified.** Both `app_config` rows present, `ENABLED = 'false'` (seeded off per DD-5), `CC_EMAIL = ''`, both `is_active = 1`. |
 | O-4 | ✅ **Verified.** Template row present and active. `CHAR_LENGTH` matches the on-disk file exactly and the em dash survived storage — so the byte-equality chain (disk == migration literal == **stored row**) is closed end to end, not just at its first two links. |
 | O-5 | ✅ **Discharged by O-4's check, more directly than planned.** O-5 existed to confirm the live `sec_template.is_active` really carries `DEFAULT 1`; `information_schema` answers that at the DDL level, and the seeded row confirms it landed. `_getTemplate`'s filter is `name` + `is_active: true`, both now verified. |
-| O-6 | ❌ **STILL OWED — the one that blocks T-09/T-10.** No test compiles SQL, so a column typo, bad alias, or `ONLY_FULL_GROUP_BY` violation still passes green. Run `od-probe.ts <processId>` against dev before the repository is wired into a live path. |
+| O-6 | ✅ **Verified 2026-08-09 — see the detail block below.** All four queries execute against dev MySQL without error across **five** bulk processes. **T-09/T-10 are unblocked.** |
+
+### O-6 detail — 2026-08-09 (run by the Leader; read-only, no writes issued)
+
+`build/od-evidence/od-probe.ts` against `alliancereportingdb` (`192.168.20.210`), processes **2, 5, 9, 1, 3** — every bulk process on dev carrying CapDev results (11 processes exist; 5 qualify).
+
+**Result: 5/5 probes green on all five processes.** Representative output (process 2):
+
+```
+O-6.1 findGroups   OK  1 group(s), 0 multi-primary warning(s);
+                       keys: agreement_id, project_lead_description, pi, ra, pa, token_owner
+O-6.2 findMetrics  OK  {"agreement_id":"D527","trainings_count":2,"participants_total":44,
+                        "female_participants_total":20,"start_date":"2024-07-18T00:00:00.000Z",
+                        "end_date":"2024-09-30T00:00:00.000Z"}
+O-6.3 findCountries OK {"agreement_id":"D527","country_names":["Colombia"],"iso_alpha2_list":["CO"]}
+O-6.4 findUnattributedResultIds OK  0 unattributed result id(s)
+O-5   _getTemplate OK  1308 chars; em-dash present=true; 19 unrendered {{ }} slots
+```
+
+**What this discharges.** O-6's narrowed concern was `ER_FIELD_IN_ORDER_NOT_SELECT` (3065) in Q1's `GROUP_CONCAT`, plus the general class of parser-level rejections (`ONLY_FULL_GROUP_BY`, bad alias, column typo) that no unit test can catch because nothing in the suite compiles SQL. **All of these fire at prepare/execute time, independently of how many rows match** — so a query that ran to completion proves the class is absent. It is.
+
+**What it does not discharge, stated precisely.** Two output paths returned empty on *every* process on dev: `multiPrimaryWarnings` (0 everywhere) and `findUnattributedResultIds` (0 everywhere). Their **SQL is proven**; their **row-mapping is not**, and rests on the repository spec's fixtures, which re-collapse raw rows precisely so this is testable without a database. Dev has no multi-primary contract and no unattributed result to exercise them with, so this is a limit of the available data, not a gap in the run — but it should not be read as "the multi-primary path works end to end."
+
+**Incidental confirmations:**
+
+- **Byte fidelity closed independently of O-4's check.** `_getTemplate` returned **1,308 characters**; the on-disk file is 1,308 characters / 1,312 bytes (two em dashes, 3 bytes each). Stored copy == disk copy == migration literal, confirmed through the runtime accessor rather than through `CHAR_LENGTH`.
+- **Real data exercises the OD-2 `female == 0` branch.** Processes 1 and 3 carry `female_participants_total: 0` against 6 and 3 participants — the AC.8 suppression case, present in live data rather than only in fixtures.
+- **Date storage is inconsistent but harmless.** Some rows store a pure calendar date (`2024-07-18T00:00:00.000Z`), others a Bogotá-midnight instant (`2024-10-17T05:00:00.000Z`). Both land on the intended calendar day because `capdev-metrics.formatter.ts:20` pins `timeZone: 'UTC'` on the `Intl.DateTimeFormat`. Without that pin, a row stored as local midnight would render the **previous month** on a UTC server. The comment on that line ("the DB value is a calendar date, not an instant") is load-bearing, not decorative — do not remove the `timeZone` option.
 
 **Also discovered:** the three migrations were **already applied** on dev when the check ran — surfaced incidentally, because the script's verification branch only executes when all three are present. The register had assumed dev was at `AddedTipIdKp1784211738931`.
 
