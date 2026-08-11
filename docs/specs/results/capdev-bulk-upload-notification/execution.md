@@ -777,6 +777,81 @@ Round 1 disclosed three items, none outstanding work: (1) the STAR link query st
 
 ---
 
+### T-09 — `CapdevBulkNotificationService` orchestration
+
+- **Date:** 2026-08-11
+- **Attempts:** 1 coding attempt (Reviewer PASS ×2, no FAIL). Preceded by **one aborted spawn**: the first Implementer died on a network error (`ENOTFOUND`) mid-research, before writing any code. Working tree verified clean afterwards; relaunched with the same brief plus the lookups it had reached. **An environment failure is not a work FAIL and did not consume an attempt.**
+- **Implementer:** `akili-implementer` (`sonnet`, effort `xhigh` — highest-consequence task in the spec: it persists data and decides a durable status column)
+- **Reviewers:** two parallel lens Reviewers (`akili-reviewer`, `opus`, read-only) — **reliability** and **data-semantics/observability**.
+
+#### Leader decision taken before briefing
+
+**`tokenOwner === null` → skip the group, log at `error`, continue.** T-08 left `sendGroupNotification`'s parameter non-nullable (D-T08-a) precisely so this decision could not be skipped; the compile error was the forcing function and it worked. Chosen over a support-address fallback because §6.1 declares the path unreachable — reaching it means an invariant broke, which is an error-level event, not a routine degradation. A fallback would conceal a broken invariant, and R-CBU-007 AC.4 requires the token owner *by name*, so a generic substitute does not satisfy the AC, it only hides the violation. Symmetric with the existing unresolvable-PI rule. Counts as **not dispatched**.
+
+#### Verification (Leader's own run, no agents active)
+
+- `npx tsc --noEmit` → exit 0 · `npx eslint <module> --quiet` → exit 0
+- `npm test -- --silent` → **328 suites / 2180 tests passed, 1 snapshot, 16.917s**
+
+#### What the review bought
+
+Both lenses PASSed and both confirmed the load-bearing parts structurally rather than by claim: the flag check provably sits after `persistProcessMetrics` (no early exit between the reads and the write), the Disqualifies clause is discharged by a test asserting the metrics write **and** the persisted `SKIPPED` rather than only "no `sendEmail`", every row of the status table has a mutation that turns a named test red, and `safeGetTemplate` still does not log so the single-error-log discipline holds.
+
+Beyond conformance they surfaced four things worth the run:
+
+1. **AC.4 was true but unenforced.** `sent_at` was derived from `dispatchedCount > 0` rather than from the status just computed, so "`sent_at` null whenever `SKIPPED`" held only because three call sites passed literal arguments. The invariant was asserted in three places and enforced in none — one refactor from breaking silently in a durable column. Folded: derived from the status. All 27 pre-existing tests passed unchanged, which is what proves the change was behaviour-identical rather than merely intended to be.
+2. **AC.6 was gated by nothing.** Every `dispatch` test mocked `sendGroupNotification`, so "stored metrics agree with the emailed ones" held by construction (both read one `metricsByAgreementId` map) with no test on it. **That is the same shape both lenses caught in T-08 one task earlier** — an invariant true by construction, ungated. Folded: one unmocked dispatch renders the real on-disk template and compares the body's trainings count against the value read back from the actual `persistProcessMetrics` call — same-run agreement, not two hand-written literals.
+3. **A data defect in already-PASSed T-05 code** — see the Q2 block below.
+4. **An orphaned AC** — R-CBU-004 AC.4 (drops logged at debug) is unimplemented **feature-wide**, found by diffing §10 row by row. Assigned to T-12 by spec-owner decision, with the reason it could not land here recorded: `tasks.md` told T-09 to implement "every §10 log line" while its Files clause denied it the builder that would have to carry the data — a spec-internal contradiction, not implementer drift.
+
+#### §10 conformance
+
+Nine of ten rows implemented at the correct level, verified row by row with file:line. The unattributed warn carries the **`result_id` list**, not a scalar (R-CBU-002 AC.3), pinned by a test asserting the literal ids. The multi-primary warn is emitted in T-05 and deliberately not duplicated. NFR-CBU-003 verified at **every** call site, not only the named ones: info level appears exactly twice and carries `to`/`cc` counts, and the token-owner error logs the agreement and process id but **not** `tokenOwner.email` — the easy mistake there. A test asserts no info message contains `@`.
+
+The tenth row (recipient dropped, debug) is the orphaned AC above. One log line the code emits that §10 does not enumerate — the token-owner error — is sanctioned by the Leader decision above.
+
+#### Q2 `result_capacity_sharing.is_active` — corrected, and the mechanism was not what the review described
+
+`findMetrics` joined `result_capacity_sharing` with no `is_active` predicate, while the countries query **in the same file** filters `rcty.is_active = TRUE` and every other reader of that table on the platform filters it too. That internal inconsistency was the signal. Spec owner authorised the fix; `AND rcs.is_active = TRUE` landed with a `STRUCTURAL —` test (the house convention in this spec file since T-05, because no unit test can execute SQL), and the gate was demonstrated red-then-reverted.
+
+**Then the dev probe corrected the reasoning behind it.** The review's stated mechanism was inflation via multiple rows per result. The data says otherwise:
+
+| Fact from dev | Consequence |
+| --- | --- |
+| **252** rows in `result_capacity_sharing` with `is_active = 0` | The review's aside that "the condition evidently did not occur" was **wrong** — soft-deleted rows exist in quantity |
+| **0** results with more than one `result_capacity_sharing` row | The inflation-by-duplicates mechanism is **not** the live risk |
+
+So the real defect was narrower and different: a result whose **single** capacity-sharing row is soft-deleted was having that row's participants counted as live. With the fix, the `leftJoin` yields NULL and the formatter's degenerate path suppresses the clause — which is the correct reading of a deleted training record.
+
+**Effect on dev today: none.** All five CapDev processes return byte-identical metrics before and after (44/20, 67/17, 68/33, 6/0, 3/0, same date bounds) — no inactive row currently attaches to a bulk-uploaded CapDev result. Recorded plainly: **the predicate's presence is pinned by a test; its effect is not, and cannot be until data exhibiting the case exists.** The fix rests on consistency with the rest of the codebase, not on an observed failure.
+
+#### O-6 re-verified (the Q2 change invalidated the prior evidence)
+
+Changing Q2 retired the O-6 evidence collected 2026-08-09 for that query, so the probe was re-run against dev over the same five processes, plus the new `countTotalResults`. **5/5 green on each.** `total_results` returns 2/2/2/1/1 — equal to `total_capdev_results` for these batches, which is consistent: every one of them contained only CapDev results.
+
+#### Decisions
+
+- **D-T09-a — OD-3 resolved in favour of R-CBU-008 AC.1 (group-scoped).** `design.md` §4.1 said "across the batch" for six columns while §6.1 builds Q2/Q3 on the contract-inner-joined spine, making a batch-wide value structurally unobtainable — **design contradicting design**, the same class as OD-1. AC.1 already specified the group-scoped reading. §4.1's wording was corrected for all six columns and the word "attributed" made load-bearing. **No code changed** — the implementation already followed AC.1. Consequence recorded in §4.1: when unattributed results exist, `total_capdev_results` is strictly less than the created-CapDev count, and the gap is exactly Q4's list.
+- **D-T09-b — `total_results` is populated, not left null.** The Implementer's premise (no producing query) was right about the four existing queries, all of which descend from the CapDev-filtered spine — but the value is one unjoined scalar read away, using the `result_id IS NOT NULL AND error_message IS NULL` predicate `requirements.md:30` already defines as a *created result*. Closes the open half of ledger entry JD-S6. `total_results` is now the **only** genuinely batch-wide column in §4.1.
+- **D-T09-c — the recipient-dropped debug log belongs to T-12**, with the builder-signature widening and the purity-preserving rationale written into that task.
+
+#### Advisories — recorded, no tasks minted
+
+1. **A repository read failure leaves `notification_status` NULL**, which §4.1 defines as "predates the feature", so a mid-stage crash is indistinguishable from a pre-feature row in the durable record R-CBU-011 relies on. `FAILED` is unreachable for that whole class. The outer boundary is T-10's, and T-12 owns "metric query throws" — but that scenario is **batch-level, not per-group**, which T-12's current framing does not distinguish.
+2. **`err.message` is interpolated at error level** in the group-failed log (what §10 asks for), so a broker error string could in principle echo an address. Error level is outside NFR-CBU-003's info-level target, so not a violation.
+3. **Reason-label asymmetry** across the three skip/error lines: `reason=NO_PI`, `cause=TEMPLATE_*`, and a bare prose sentence for the token-owner skip. Three conventions for one question a log reader asks; a uniform `reason=` key would make R-CBU-011 AC.3 greppable rather than regex-able.
+4. **One test title overclaims** — a zero-groups test says "no email" but asserts the metrics write, the status, and that the flag was never read. True (the loop cannot run), but an unasserted claim in a test name is what a later reader trusts.
+
+#### Implementer `Not Done / Assumptions` — adjudicated, no scope owed
+
+Round 1 disclosed three items, **all three correctly identified as spec-owner matters rather than gaps in its own work**, and all three became decisions above. Its reasoning on `total_results` — refusing to put a CapDev-only number under an "all indicators" column because a wrong number misleads worse than an honest null — was the right instinct even though the spec owner ultimately chose to populate it. Rounds 2 and 3 returned clean, with both folds' gates demonstrated red-then-reverted. It also flagged that `design.md`/`tasks.md` had changed under it and asked rather than assuming — those were the Leader's concurrent spec edits.
+
+#### Status transition
+
+- **T-09 → `[x]`** — Reviewer PASS ×2, three folds applied (AC.4 structural, AC.6 gated, Q2 + `total_results`), O-6 re-verified against dev after the query change, full suite and lint green on the Leader's own run. **T-10 is unblocked.**
+
+---
+
 ## 6. Open decisions blocking T-08
 
 Two items surfaced by the T-07 review that are **spec-owner calls, not Implementer or Reviewer calls**. Both should be settled before T-08 is briefed, because T-08's rendered-body assertions depend on them.

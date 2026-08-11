@@ -202,10 +202,13 @@ export function mapCapdevBulkCountriesRow(
 }
 
 /**
- * Four grouped reads + two writes for the CapDev bulk-upload notification
- * stage (design.md §6.1). All reads are keyed on `bulk_upload_process_id`
- * and grouped in SQL — O(groups) query count, never O(results)
- * (NFR-CBU-001).
+ * Four grouped reads + one ungrouped scalar read + two writes for the
+ * CapDev bulk-upload notification stage (design.md §6.1). The four grouped
+ * reads are keyed on `bulk_upload_process_id` and grouped in SQL — O(groups)
+ * query count, never O(results) (NFR-CBU-001). The scalar read
+ * (`countTotalResults`) is the one column in §4.1 that is neither
+ * indicator- nor contract-filtered, so it has no join and no `GROUP BY` at
+ * all — a single `COUNT(*)`, still O(1).
  */
 @Injectable()
 export class CapdevBulkNotificationRepository extends Repository<BulkUploadProcesses> {
@@ -303,10 +306,24 @@ export class CapdevBulkNotificationRepository extends Repository<BulkUploadProce
    * `male + female + non_binary` per row when `session_participants_total`
    * is null (R-CBU-006 AC.3); `SUM` ignores nulls so a group with no capacity
    * data at all correctly totals `0`.
+   *
+   * **`rcs.is_active = TRUE` is mandatory on the join**, matching Q3's
+   * `result_countries` join in this same file and every other reader of
+   * `result_capacity_sharing` on the platform. `ResultCapacitySharing`
+   * extends `AuditableEntity` and is `@ManyToOne` to `Result`, so a result
+   * can carry more than one row; an unfiltered join lets a soft-deleted row
+   * inflate the SUMs and widen the MIN/MAX date bounds — numbers that get
+   * persisted to `bulk_upload_processes` and mailed to a Project Leader.
+   * `trainings_count` needs no such guard: it counts distinct
+   * `bulk_upload_results` rows, not `result_capacity_sharing` rows.
    */
   async findMetrics(processId: number): Promise<CapdevBulkMetricsDto[]> {
     const rawRows = await this.capdevSpineQuery(processId)
-      .leftJoin(ResultCapacitySharing, 'rcs', 'rcs.result_id = bur.result_id')
+      .leftJoin(
+        ResultCapacitySharing,
+        'rcs',
+        'rcs.result_id = bur.result_id AND rcs.is_active = TRUE',
+      )
       .select('ac.agreement_id', 'agreement_id')
       .addSelect('COUNT(DISTINCT bur.id)', 'trainings_count')
       .addSelect(
@@ -382,6 +399,29 @@ export class CapdevBulkNotificationRepository extends Repository<BulkUploadProce
       .getRawMany<{ result_id: number | string }>();
 
     return rows.map((row) => toNumber(row.result_id));
+  }
+
+  /**
+   * Batch-wide total of created results — §4.1's `total_results`, the only
+   * column in that table that is filtered **neither** by indicator **nor**
+   * by contract (every other read in this file descends from
+   * `capdevSpineQuery`, which hard-filters to
+   * `IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT`). "Created" is
+   * `requirements.md`'s glossary definition: `result_id IS NOT NULL AND
+   * error_message IS NULL`. One unjoined scalar read, no `GROUP BY`, no
+   * fan-out — NFR-CBU-001's O(groups)/≤2s targets are unaffected.
+   */
+  async countTotalResults(processId: number): Promise<number> {
+    const row = await this.dataSource
+      .getRepository(BulkUploadResults)
+      .createQueryBuilder('bur')
+      .where('bur.bulk_upload_process_id = :processId', { processId })
+      .andWhere('bur.result_id IS NOT NULL')
+      .andWhere('bur.error_message IS NULL')
+      .select('COUNT(*)', 'count')
+      .getRawOne<{ count: string | number }>();
+
+    return toNumber(row?.count);
   }
 
   /**

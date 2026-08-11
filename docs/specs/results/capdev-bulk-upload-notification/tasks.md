@@ -207,7 +207,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-09 — `CapdevBulkNotificationService` orchestration
-- **Status:** [ ]
+- **Status:** [x] — Reviewer PASS ×2 (reliability + data-semantics lenses), attempt 1, 2026-08-11. A prior spawn died on a network error before writing code; that is an environment failure and consumed no attempt. Three Leader-directed folds: **AC.4 made structural** (`sent_at` derived from the status, not from a count), **AC.6 gated** (an unmocked dispatch compares the rendered trainings count against the same run's persisted value — the T-08 ungated-invariant shape, closed here), and **Q2 `is_active` + `total_results`** per spec-owner decisions D-T09-a/b/c. **O-6 re-verified against dev** after the Q2 change, 5/5 on five processes. See `execution.md` → T-09.
 
 - **Requirements covered:** R-CBU-001, R-CBU-002, R-CBU-008, R-CBU-009, R-CBU-011, NFR-CBU-002
 - **Design refs:** §2.1, §6.6, §10
@@ -267,10 +267,15 @@ Two rules, both non-negotiable:
 ### T-12 — Failure-isolation and data-minimisation sweep
 - **Status:** [ ]
 
-- **Requirements covered:** R-CBU-010, R-CBU-011, NFR-CBU-002, NFR-CBU-003
+- **Requirements covered:** R-CBU-010, R-CBU-011, NFR-CBU-002, NFR-CBU-003, **R-CBU-004 AC.4**
 - **Design refs:** §6.6, §9, §10
-- **Files:** cross-cutting specs
+- **Files:** cross-cutting specs, **plus `capdev-recipients.builder.ts` + spec and the `dispatch()` loop** (see the orphaned-AC item below)
 - **Scope:** the R-CBU-010 "Broker down" scenario end to end; per-group isolation under three distinct failure modes (send throws, metric query throws, template missing); assert exactly one error log per caught failure carrying the process id; assert no email address at info level; assert no `trainee_name` in any rendered body.
+- **⚠️ Orphaned AC, assigned here by spec-owner decision 2026-08-11.** **R-CBU-004 AC.4** — "a malformed entry is dropped and **logged at debug level**" — is unimplemented **feature-wide**, not merely unfinished. T-06 owns R-CBU-004 and shipped without it; the T-09 review found it while diffing §10 row by row. No other remaining task claimed it.
+  - **Why it could not land in T-09:** `capdev-recipients.builder.ts` returns `{ to, cc, salutation } | null`; drops happen inside `buildCc` via a bare `continue` that retains nothing, so there is **no data at the orchestration layer to log**. `tasks.md` told T-09 to implement "every §10 log line" while its **Files** clause denied it the file needed — a spec-internal contradiction, not implementer drift.
+  - **Fix:** widen the builder's return to `{ to, cc, salutation, dropped: string[] }` and `_debug` it in the per-group loop. ~4 lines across two files.
+  - **T-06's purity disqualifier survives** — `dropped` is a return value, not a side effect. No DB, no clock, no config. Do not "simplify" this into a logger call inside the builder; that would break the purity gate T-06 was reviewed against.
+  - **Test it as a drop, not as a log call:** feed a malformed address, assert it is absent from `cc` **and** that a debug line names it. A spy on `_debug` alone passes for a builder that logs everything and drops nothing.
 - **Done:** `npm test -- --silent` and `npm run test:e2e` green; full-suite run clean (KZ-003 — this task touches a shared service; a targeted run confirms the brief was followed, not that the blast radius is clean).
 - **Disqualifies:** counting log calls without inspecting their level and payload. "One log emitted" is not the requirement — "exactly one **error**-level log, carrying the bulk process id, and no address at info" is. A spy asserting only call count cannot tell those apart.
 - **Skills:** `error-handling-patterns`, `systematic-debugging` · **Size:** M

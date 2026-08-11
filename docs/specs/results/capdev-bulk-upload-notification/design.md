@@ -137,19 +137,23 @@ src/db/migrations/
 
 | Column | Type | Null | Purpose |
 | --- | --- | --- | --- |
-| `total_results` | `bigint` | ✔ | created rows in the batch, all indicators |
-| `total_capdev_results` | `bigint` | ✔ | created CapDev rows (the batch-wide training count) |
-| `total_participants` | `bigint` | ✔ | summed across the batch |
-| `total_female_participants` | `bigint` | ✔ | summed across the batch |
-| `activity_start_date` | `timestamp` | ✔ | `MIN(start_date)` across the batch |
-| `activity_end_date` | `timestamp` | ✔ | `MAX(end_date)` across the batch |
-| `countries` | `json` | ✔ | distinct ISO alpha-2 list |
+| `total_results` | `bigint` | ✔ | created rows in the batch, **all indicators** — the one genuinely batch-wide column (OD-3) |
+| `total_capdev_results` | `bigint` | ✔ | training count summed over the batch's **attributed** CapDev results (OD-3) |
+| `total_participants` | `bigint` | ✔ | summed over the batch's **attributed** CapDev results (OD-3) |
+| `total_female_participants` | `bigint` | ✔ | summed over the batch's **attributed** CapDev results (OD-3) |
+| `activity_start_date` | `timestamp` | ✔ | `MIN(start_date)` over the batch's **attributed** CapDev results (OD-3) |
+| `activity_end_date` | `timestamp` | ✔ | `MAX(end_date)` over the batch's **attributed** CapDev results (OD-3) |
+| `countries` | `json` | ✔ | distinct ISO alpha-2 list over the batch's **attributed** CapDev results (OD-3) |
 | `notification_sent_at` | `timestamp` | ✔ | null unless at least one group dispatched |
 | `notification_status` | `varchar(20)` | ✔ | `SENT` \| `SKIPPED` \| `FAILED` \| `PARTIAL` |
 
 All nullable, no defaults, no backfill — existing rows keep NULLs, which correctly read as "predates the feature" (NFR-CBU-005). No new index: every read is by primary key.
 
 **Batch-level, not group-level.** Per-group metrics are recomputable from `bulk_upload_results` + `result_contracts` at any time; storing them again would create a second source of truth to keep in sync. The process row stores the batch roll-up that a dashboard actually queries.
+
+**"Attributed" is load-bearing — OD-3, decided 2026-08-11.** This table originally said "across the batch" for six columns, which **contradicted itself against §6.1**: Q2 and Q3 are built on the contract-inner-joined spine, so a CapDev result with no resolved contract lands in Q4's unattributed list and in **no group**, making a genuinely batch-wide value structurally unobtainable through those queries. R-CBU-008 AC.1 ("equals the sum of the per-group training counts") already specified the group-scoped reading; the spec owner resolved in its favour and this wording was corrected to match. **No code changed** — the implementation already followed AC.1.
+
+The consequence to keep in view: when a batch has unattributed CapDev results, `total_capdev_results` is **strictly less** than the count of created CapDev rows, and the gap is exactly Q4's list. A dashboard comparing this column against a raw `results` count will see a discrepancy, and that discrepancy is the attribution failure, not a bug. `total_results` is the sole exception — it is unfiltered by indicator *and* by contract, so it really is batch-wide.
 
 ### 4.2 `sec_template` — one seeded row
 

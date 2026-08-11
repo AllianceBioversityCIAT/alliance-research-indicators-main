@@ -6,6 +6,7 @@ import {
   mapCapdevBulkGroupRows,
   mapCapdevBulkMetricsRow,
 } from './capdev-bulk-notification.repository';
+import { ResultCapacitySharing } from '../../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import { NotificationStatus } from './enum/notification-status.enum';
 import { CapdevBulkGroupRawRow } from './dto/capdev-bulk-group.dto';
@@ -30,6 +31,7 @@ function createMockQueryBuilder() {
     qb[method] = jest.fn().mockReturnValue(qb);
   });
   qb.getRawMany = jest.fn().mockResolvedValue([]);
+  qb.getRawOne = jest.fn().mockResolvedValue({ count: '0' });
   return qb;
 }
 
@@ -355,6 +357,17 @@ describe('CapdevBulkNotificationRepository', () => {
       expect(mockQueryBuilder.groupBy).toHaveBeenCalledWith('ac.agreement_id');
     });
 
+    it('STRUCTURAL — the result_capacity_sharing join filters is_active = TRUE, so a soft-deleted row cannot inflate the sums or widen the date bounds', async () => {
+      await repository.findMetrics(1);
+      const rcsJoinCall = mockQueryBuilder.leftJoin.mock.calls.find(
+        ([entity]) => entity === ResultCapacitySharing,
+      );
+      expect(rcsJoinCall).toBeDefined();
+      expect(rcsJoinCall?.[2]).toBe(
+        'rcs.result_id = bur.result_id AND rcs.is_active = TRUE',
+      );
+    });
+
     it('query count is O(groups): exactly one getRawMany call', async () => {
       mockQueryBuilder.getRawMany.mockResolvedValue(
         Array.from({ length: 20 }, (_, i) => ({
@@ -450,6 +463,54 @@ describe('CapdevBulkNotificationRepository', () => {
       );
       await repository.findUnattributedResultIds(1);
       expect(mockQueryBuilder.getRawMany).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Total results — countTotalResults (§4.1's total_results, batch-wide)
+  // ---------------------------------------------------------------------
+  describe('countTotalResults', () => {
+    it("BEHAVIORAL — coerces the driver's string count to a number", async () => {
+      mockQueryBuilder.getRawOne.mockResolvedValue({ count: '17' });
+      const result = await repository.countTotalResults(1);
+      expect(result).toBe(17);
+    });
+
+    it('BEHAVIORAL — a null/undefined row (defensive) coerces to 0, never NaN', async () => {
+      mockQueryBuilder.getRawOne.mockResolvedValue(undefined);
+      const result = await repository.countTotalResults(1);
+      expect(result).toBe(0);
+      expect(Number.isNaN(result)).toBe(false);
+    });
+
+    it('STRUCTURAL — filters to created results (requirements.md glossary: result_id IS NOT NULL AND error_message IS NULL) and nothing else — no indicator filter, no join', async () => {
+      await repository.countTotalResults(1);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'bur.result_id IS NOT NULL',
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'bur.error_message IS NULL',
+      );
+      // The one column in §4.1 that is neither indicator- nor
+      // contract-filtered: no CapDev binding, no join at all.
+      expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
+        expect.stringContaining('indicator_id'),
+        expect.anything(),
+      );
+      expect(mockQueryBuilder.innerJoin).not.toHaveBeenCalled();
+      expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalled();
+    });
+
+    it('STRUCTURAL — selects COUNT(*), never a row list', async () => {
+      await repository.countTotalResults(1);
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith('COUNT(*)', 'count');
+    });
+
+    it('query count is O(1): exactly one getRawOne call, no getRawMany, regardless of batch size', async () => {
+      await repository.countTotalResults(1);
+      expect(mockQueryBuilder.getRawOne).toHaveBeenCalledTimes(1);
+      expect(mockQueryBuilder.getRawMany).not.toHaveBeenCalled();
     });
   });
 
