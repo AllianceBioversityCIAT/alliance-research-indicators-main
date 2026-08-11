@@ -149,6 +149,8 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - Component tests: cover role-conditional rendering, signal-driven state transitions, form validity, error surfaces.
 - Coverage floors (project-wide, enforced by `jest.config.ts`): statements 40%, branches 20%, lines 45%, functions 30%. Don't regress on changed files.
 - Excluded from coverage by design: `app.config.ts`, `app.routes.ts`, `shared/sockets/websocket.service.ts`, `shared/components/alert/alert.component.ts`.
+- **When a spec stubs a child component, assert the stub renders/evaluates what the real one does** (projected content, host bindings) — or use the real component. A stub with `template: ''` cannot prove anything about projected controls. *(Kaizen KZ-001)*
+- **If a change touches a component rendered by many screens, run the full suite before reporting** — targeted suites confirm the brief was followed, not that the blast radius is clean. *(Kaizen KZ-003)*
 
 ---
 

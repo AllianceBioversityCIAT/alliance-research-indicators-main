@@ -103,6 +103,7 @@ Per task, declare:
 - Which `*.spec.ts` files are added or updated.
 - Coverage target if differing from the global 60% threshold.
 - E2E test cases (happy path + at least one auth failure + at least one role/status denial when applicable).
+- A **`Disqualifies` clause**: what would make the evidence inconclusive. **A fixture whose N units are built from identical defaults cannot distinguish per-unit scoping from a batch-wide bug — vary at least one discriminating field per unit.** *(Kaizen KZ-004)*
 
 A task is NOT done until:
 - `npm run lint` passes.
