@@ -1270,4 +1270,507 @@ describe('CapdevBulkNotificationService', () => {
       expect(debugSpy).not.toHaveBeenCalled();
     });
   });
+
+  // -----------------------------------------------------------------------
+  // Audit gap-fill — R-CBU-002 AC.1/AC.2, R-CBU-006 AC.6, R-CBU-008 AC.1
+  //
+  // Every pre-existing multi-group `dispatch()` test builds its groups from
+  // `makeMetricsRow(id)` with the SAME default `trainings_count` (5) and the
+  // SAME PI/RA fixture, so per-group scoping had no observable consequence.
+  // Three mutations confirmed it was ungated:
+  //   * per-group metrics -> batch-wide sum  ................ 116/116 green
+  //   * `totalCapdevResults +=` -> `=` (last group wins) .... 116/116 green
+  //   * file-contact `contract_code` filter removed ......... green at
+  //     dispatch level (only the builder's own unit spec went red)
+  // The fixture below is the one that distinguishes the groups: distinct
+  // training counts, distinct PIs, distinct RAs, contract-scoped contacts.
+  // -----------------------------------------------------------------------
+  describe('dispatch — per-group scoping across a 3-contract batch', () => {
+    const AGREEMENTS = ['CTR-A', 'CTR-B', 'CTR-C'] as const;
+    const TRAININGS: Record<string, number> = {
+      'CTR-A': 5,
+      'CTR-B': 2,
+      'CTR-C': 7,
+    };
+
+    /** One group per contract, each with its OWN PI and RA address. */
+    function groupFor(agreementId: string): CapdevBulkGroupDto {
+      const slug = agreementId.toLowerCase();
+      return makeGroup({
+        agreement_id: agreementId,
+        pi: {
+          carnet: `pi-${slug}`,
+          first_name: 'Lead',
+          last_name: agreementId,
+          email: `pi.${slug}@example.org`,
+        },
+        ra: {
+          carnet: `ra-${slug}`,
+          first_name: 'Assistant',
+          last_name: agreementId,
+          email: `ra.${slug}@example.org`,
+        },
+      });
+    }
+
+    async function dispatchThreeGroups(
+      fileContacts: Array<{ email: string; contract_code?: string }> = [],
+    ) {
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: AGREEMENTS.map(groupFor),
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue(
+        AGREEMENTS.map((id) =>
+          makeMetricsRow(id, {
+            trainings_count: TRAININGS[id],
+            // Distinct participant totals too, so a batch-wide participants
+            // regression is caught by the same fixture.
+            participants_total: TRAININGS[id] * 10,
+            female_participants_total: TRAININGS[id] * 4,
+          }),
+        ),
+      );
+      repository.findCountries.mockResolvedValue(
+        AGREEMENTS.map((id) =>
+          makeCountriesRow(id, {
+            country_names: [id === 'CTR-A' ? 'Kenya' : 'Uganda'],
+            iso_alpha2_list: [id === 'CTR-A' ? 'KE' : 'UG'],
+          }),
+        ),
+      );
+      repository.countTotalResults.mockResolvedValue(20);
+
+      // No `sendGroupNotification` stub — the real method renders each body
+      // through the real on-disk template and real Handlebars (KZ-001), so
+      // the per-group numbers asserted below are the ones a Project Leader
+      // would actually read.
+      const { service, sendEmail } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository },
+      );
+      const logSpy = jest.spyOn(
+        (service as unknown as { logger: { _log: jest.Mock } }).logger,
+        '_log',
+      );
+
+      await service.dispatch(77, fileContacts);
+
+      /** The `EmailBody` dispatched for one contract, by subject token. */
+      const emailFor = (agreementId: string) =>
+        sendEmail.mock.calls
+          .map(([body]) => body)
+          .find((body) => body.subject.startsWith(`[${agreementId}]`));
+
+      return { repository, sendEmail, emailFor, logSpy };
+    }
+
+    it('R-CBU-011 AC.1/AC.2 — a 3-group batch produces 3 info logs, each naming the bulk process id and its own agreement_id, and none carrying an email address', async () => {
+      const { logSpy } = await dispatchThreeGroups();
+
+      const sentLines = logSpy.mock.calls
+        .map(([msg]) => msg as string)
+        .filter((msg) => msg.includes('Notification sent'));
+
+      expect(sentLines).toHaveLength(3);
+      for (const agreementId of AGREEMENTS) {
+        const line = sentLines.find((msg) =>
+          msg.includes(`agreement_id=${agreementId}`),
+        );
+        expect(line).toBeDefined();
+        expect(line).toContain('bulk_upload_process_id=77');
+        expect(line).toContain(`trainings=${TRAININGS[agreementId]}`);
+      }
+
+      // AC.2 — counts, never addresses, at info level. The fixture gives
+      // every group a real PI and RA address, so a regression that logged
+      // the recipient lists instead of their lengths would surface here.
+      const infoMessages = logSpy.mock.calls.map(([msg]) => msg as string);
+      expect(infoMessages.some((msg) => msg.includes('@'))).toBe(false);
+    });
+
+    it('R-CBU-002 AC.1 — a batch spanning 3 distinct contracts produces exactly 3 sendEmail calls, one per contract', async () => {
+      const { sendEmail, emailFor } = await dispatchThreeGroups();
+
+      expect(sendEmail).toHaveBeenCalledTimes(3);
+      // ...and they are three DIFFERENT contracts, not the same one thrice —
+      // "AND IT MUST use each group's own contract for the subject token".
+      for (const agreementId of AGREEMENTS) {
+        expect(emailFor(agreementId)).toBeDefined();
+      }
+    });
+
+    it("R-CBU-002 AC.2 / R-CBU-006 AC.6 — each group's rendered body reports that group's own training count, never the batch total", async () => {
+      const { emailFor } = await dispatchThreeGroups();
+
+      for (const agreementId of AGREEMENTS) {
+        const body = (
+          emailFor(agreementId).message.socketFile as Buffer
+        ).toString('utf-8');
+
+        expect(body).toContain(
+          `The records encompass ${TRAININGS[agreementId]} trainings`,
+        );
+        // The batch total (5 + 2 + 7 = 14) must never appear as the group's
+        // headline figure — this is the assertion the batch-wide-metrics
+        // mutation turns red.
+        expect(body).not.toContain('The records encompass 14 trainings');
+        // Participants are scoped the same way.
+        expect(body).toContain(
+          `${TRAININGS[agreementId] * 10} participants took part`,
+        );
+      }
+    });
+
+    it("R-CBU-002 Scenario 'Cross-project isolation' — no group's PI or RA appears in another group's `to` or `cc`", async () => {
+      const { emailFor } = await dispatchThreeGroups();
+
+      for (const own of AGREEMENTS) {
+        const email = emailFor(own);
+        const addresses = [...email.to, ...email.cc].map((a: string) =>
+          a.toLowerCase(),
+        );
+
+        expect(email.to).toEqual([`pi.${own.toLowerCase()}@example.org`]);
+        expect(addresses).toContain(`ra.${own.toLowerCase()}@example.org`);
+
+        for (const other of AGREEMENTS.filter((id) => id !== own)) {
+          const slug = other.toLowerCase();
+          expect(addresses).not.toContain(`pi.${slug}@example.org`);
+          expect(addresses).not.toContain(`ra.${slug}@example.org`);
+        }
+      }
+    });
+
+    it("R-CBU-005 AC.3 (integration) — a contract-scoped file contact reaches only its own group's cc, while an unscoped one reaches every group", async () => {
+      const { emailFor } = await dispatchThreeGroups([
+        { email: 'scoped-to-a@example.org', contract_code: 'CTR-A' },
+        { email: 'everyone@example.org' },
+      ]);
+
+      expect(emailFor('CTR-A').cc).toEqual(
+        expect.arrayContaining(['scoped-to-a@example.org']),
+      );
+      // The leak this closes at the dispatch level: previously only the
+      // builder's own unit spec caught a dropped `contract_code` filter.
+      expect(emailFor('CTR-B').cc).not.toContain('scoped-to-a@example.org');
+      expect(emailFor('CTR-C').cc).not.toContain('scoped-to-a@example.org');
+
+      for (const agreementId of AGREEMENTS) {
+        expect(emailFor(agreementId).cc).toEqual(
+          expect.arrayContaining(['everyone@example.org']),
+        );
+      }
+    });
+
+    it("R-CBU-008 AC.1 — the persisted total_capdev_results is the SUM of every group's training count, not one group's", async () => {
+      const { repository } = await dispatchThreeGroups();
+
+      const aggregate = repository.persistProcessMetrics.mock.calls[0][1];
+      expect(aggregate.total_capdev_results).toBe(5 + 2 + 7);
+      expect(aggregate.total_participants).toBe((5 + 2 + 7) * 10);
+      expect(aggregate.total_female_participants).toBe((5 + 2 + 7) * 4);
+      // `total_results` stays the batch-wide scalar read, unfolded from the
+      // CapDev groups.
+      expect(aggregate.total_results).toBe(20);
+      // Countries are the batch-wide distinct ISO set across all groups.
+      expect([...aggregate.countries].sort()).toEqual(['KE', 'UG']);
+    });
+
+    it('R-CBU-003 Scenario "Unresolvable PI" (integration) — a group whose PI is unresolvable but whose RA is not dispatches no email at all, and does not abort the other groups', async () => {
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [
+          // The mutation-relevant fixture: unresolvable PI *with* a usable
+          // CC candidate sitting right next to it.
+          makeGroup({
+            agreement_id: 'CTR-A',
+            pi: {
+              carnet: 'pi-a',
+              first_name: 'Lead',
+              last_name: 'A',
+              email: null,
+            },
+            ra: {
+              carnet: 'ra-a',
+              first_name: 'Assistant',
+              last_name: 'A',
+              email: 'ra.ctr-a@example.org',
+            },
+          }),
+          groupFor('CTR-B'),
+        ],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([
+        makeMetricsRow('CTR-A'),
+        makeMetricsRow('CTR-B'),
+      ]);
+      const { service, sendEmail } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository },
+      );
+
+      await service.dispatch(78);
+
+      // Exactly one email, and it is group B's — group A produced none, and
+      // its RA was never promoted into a `to` slot.
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+      const only = sendEmail.mock.calls[0][0];
+      expect(only.subject.startsWith('[CTR-B]')).toBe(true);
+      expect([...only.to, ...only.cc]).not.toContain('ra.ctr-a@example.org');
+      // "AND IT MUST NOT abort the notifications of the other project groups".
+      expect(repository.updateNotificationStatus).toHaveBeenCalledWith(
+        78,
+        NotificationStatus.PARTIAL,
+        expect.any(Date),
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Audit gap-fill — R-CBU-009 AC.3 (no caching that outlives the request)
+  //
+  // Mutation-confirmed ungated: memoising the flag on the service instance
+  // (`this.cachedFlag ??= await ...`) left all 116 notification tests green,
+  // because no test called `dispatch()` twice on one instance.
+  // -----------------------------------------------------------------------
+  describe('dispatch — R-CBU-009 AC.3 kill-switch re-read', () => {
+    it('a flag flipped between two bulk runs takes effect on the second, with no restart: the config is read once per dispatch, never memoised', async () => {
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [makeGroup()],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([
+        makeMetricsRow('ABC-123', { trainings_count: 3 }),
+      ]);
+      const envAppConfig = createEnvAppConfigMock();
+      // Run 1: off. Run 2: on. Same service instance, no re-construction.
+      envAppConfig.CAPDEV_BULK_UPLOAD_ENABLED.mockResolvedValueOnce({
+        value: false,
+        defaulted: false,
+      }).mockResolvedValueOnce({ value: true, defaulted: false });
+      const { service, sendEmail } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository, envAppConfig },
+      );
+
+      await service.dispatch(101);
+      expect(sendEmail).not.toHaveBeenCalled();
+      expect(repository.updateNotificationStatus).toHaveBeenLastCalledWith(
+        101,
+        NotificationStatus.SKIPPED,
+        null,
+      );
+
+      await service.dispatch(102);
+
+      // The second run picked up the new value — a memoised flag would leave
+      // this at zero sends and SKIPPED.
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+      expect(repository.updateNotificationStatus).toHaveBeenLastCalledWith(
+        102,
+        NotificationStatus.SENT,
+        expect.any(Date),
+      );
+      // Read once per run, not once per process.
+      expect(envAppConfig.CAPDEV_BULK_UPLOAD_ENABLED).toHaveBeenCalledTimes(2);
+    });
+
+    it('R-CBU-009 AC.1 — metrics are still persisted on the flag-off run, so a kill-switched batch is not a data gap', async () => {
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [makeGroup()],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([
+        makeMetricsRow('ABC-123', {
+          trainings_count: 3,
+          participants_total: 30,
+        }),
+      ]);
+      const envAppConfig = createEnvAppConfigMock({
+        enabled: { value: false, defaulted: false },
+      });
+      const { service } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository, envAppConfig },
+      );
+
+      await service.dispatch(103);
+
+      expect(repository.persistProcessMetrics).toHaveBeenCalledWith(
+        103,
+        expect.objectContaining({
+          total_capdev_results: 3,
+          total_participants: 30,
+        }),
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Audit gap-fill — R-CBU-004 AC.5/AC.6 at the dispatch level
+  // -----------------------------------------------------------------------
+  describe('dispatch — R-CBU-004 AC.5/AC.6 configured-CC sources', () => {
+    const ORIGINAL_SPRM = process.env.ARI_SPRM_EMAIL;
+
+    afterEach(() => {
+      if (ORIGINAL_SPRM === undefined) delete process.env.ARI_SPRM_EMAIL;
+      else process.env.ARI_SPRM_EMAIL = ORIGINAL_SPRM;
+    });
+
+    it('AC.6 — with the EMAIL.CAPDEV_BULK_UPLOAD.CC_EMAIL row absent, the email is still sent with the remaining CC sources, plus one warn naming the key', async () => {
+      process.env.ARI_SPRM_EMAIL = 'alliance-sprm@example.org';
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [makeGroup()],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([makeMetricsRow('ABC-123')]);
+      const envAppConfig = createEnvAppConfigMock({
+        cc: { value: [], defaulted: true },
+      });
+      const { service, sendEmail } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository, envAppConfig },
+      );
+      const warnSpy = jest.spyOn(
+        (service as unknown as { logger: { _warn: jest.Mock } }).logger,
+        '_warn',
+      );
+
+      await service.dispatch(104);
+
+      // AC.6's headline: an absent optional config row never blocks the mail.
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+      // AC.5 — with every optional source absent, CC still carries SPRM.
+      expect(sendEmail.mock.calls[0][0].cc).toEqual([
+        'alliance-sprm@example.org',
+      ]);
+      expect(
+        warnSpy.mock.calls.some(([msg]) =>
+          (msg as string).includes('EMAIL.CAPDEV_BULK_UPLOAD.CC_EMAIL'),
+        ),
+      ).toBe(true);
+      expect(repository.updateNotificationStatus).toHaveBeenCalledWith(
+        104,
+        NotificationStatus.SENT,
+        expect.any(Date),
+      );
+    });
+
+    it('AC.2 — the configured CC row and the SPRM group contributing the same address yields exactly one cc entry', async () => {
+      process.env.ARI_SPRM_EMAIL = 'alliance-sprm@example.org';
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [makeGroup()],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([makeMetricsRow('ABC-123')]);
+      const envAppConfig = createEnvAppConfigMock({
+        // Same address, different casing, from a different source.
+        cc: { value: ['Alliance-SPRM@Example.org'], defaulted: false },
+      });
+      const { service, sendEmail } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository, envAppConfig },
+      );
+
+      await service.dispatch(105);
+
+      const cc: string[] = sendEmail.mock.calls[0][0].cc;
+      expect(
+        cc.filter((a) => a.toLowerCase() === 'alliance-sprm@example.org'),
+      ).toHaveLength(1);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Audit gap-fill — NFR-CBU-003 structural substitute
+  //
+  // The requirement's own verification clause asks for "a unit test asserting
+  // the rendered body excludes `trainee_name` VALUES". That test is
+  // structurally unconstructible: neither `CapdevBulkEmailTemplateDto` nor
+  // `CapdevBulkMetricsDto` carries a participant-level field, so there is no
+  // value in any fixture whose absence could be asserted. The shipped
+  // assertion (`expect(body).not.toContain('trainee_name')`) checks for the
+  // COLUMN NAME, which would not catch a future field that leaked a trainee's
+  // actual name.
+  //
+  // The substitute below closes the real risk instead: it pins the template's
+  // variable set and the DTO's key set as a CLOSED aggregate contract. Any
+  // future participant-level slot — in the template or in the data object
+  // handed to Handlebars — turns these red and forces a security re-review,
+  // which is the control NFR-CBU-003 actually exists to provide.
+  // -----------------------------------------------------------------------
+  describe('NFR-CBU-003 — closed aggregate contract (structural substitute)', () => {
+    const ALLOWED_TEMPLATE_FIELDS = [
+      'projectLeadName',
+      'trainingsCount',
+      'countries',
+      'startDate',
+      'endDate',
+      'participantsCount',
+      'percentageWomen',
+      'starLink',
+      'tokenOwnerName',
+      'tokenOwnerEmail',
+    ].sort();
+
+    it('the on-disk template interpolates ONLY aggregate-level variables — no participant-level slot can exist in it', () => {
+      // Every `{{...}}` / `{{{...}}}` token, minus block helpers (`#if`,
+      // `/if`) which are control flow, not data slots.
+      const tokens = new Set<string>();
+      for (const [, raw] of REAL_TEMPLATE_HTML.matchAll(
+        /\{\{\{?([^}]+)\}?\}\}/g,
+      )) {
+        const name = raw.trim().replace(/^#if\s+/, '');
+        if (name.startsWith('/')) continue;
+        tokens.add(name);
+      }
+
+      expect([...tokens].sort()).toEqual(ALLOWED_TEMPLATE_FIELDS);
+    });
+
+    it('the data object handed to Handlebars carries ONLY those aggregate keys — never a participant list, name or per-trainee record', async () => {
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [makeGroup()],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([makeMetricsRow('ABC-123')]);
+
+      // A real TemplateService, spied at `_getTemplate` purely to CAPTURE the
+      // data argument — it still delegates to the real render, so the body
+      // that reaches `sendEmail` is genuinely templated (KZ-001).
+      const templateService = createTemplateService({
+        template: REAL_TEMPLATE_HTML,
+      });
+      const getTemplateSpy = jest.spyOn(templateService, '_getTemplate');
+
+      const { service, sendEmail } = await createService(null, {
+        repository,
+        templateService,
+      });
+
+      await service.dispatch(106);
+
+      expect(getTemplateSpy).toHaveBeenCalledTimes(1);
+      const data = getTemplateSpy.mock.calls[0][1] as Record<string, unknown>;
+      expect(Object.keys(data).sort()).toEqual(ALLOWED_TEMPLATE_FIELDS);
+
+      // And every substituted value is a plain string — a nested object or
+      // array is how a participant-level record would arrive at the template
+      // in the first place.
+      for (const value of Object.values(data)) {
+        expect(typeof value).toBe('string');
+      }
+
+      const body = extractBody(sendEmail);
+      expect(body).not.toContain('{{');
+    });
+  });
 });

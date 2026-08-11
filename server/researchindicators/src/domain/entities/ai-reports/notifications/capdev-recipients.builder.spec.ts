@@ -63,6 +63,99 @@ describe('capdev-recipients.builder', () => {
 
       expect(build(group, [], [], [])).toBeNull();
     });
+
+    /**
+     * R-CBU-003 Scenario "Unresolvable PI" — the `BUT it must NOT promote a
+     * CC recipient into the To slot` clause, which had no assertion behind
+     * it before this test.
+     *
+     * Every pre-existing unresolvable-PI fixture in this file (and the
+     * `dispatch()` one in `capdev-bulk-notification.service.spec.ts`) leaves
+     * `ra`/`pa`/file contacts EMPTY, so a coalescing regression
+     * (`pi?.email || ra?.email || pa?.email`) had nothing to coalesce ONTO
+     * and every test stayed green. Mutation-verified: introducing exactly
+     * that fallback in `capdev-recipients.builder.ts:build` left all 116
+     * notification tests passing. This fixture is the one that goes red —
+     * it supplies a resolvable candidate in every CC source at once.
+     */
+    it('R-CBU-003 Scenario "Unresolvable PI" — returns null even when every CC source has a usable address; a CC recipient is never promoted into `to`', () => {
+      const group = makeGroup({
+        pi: {
+          carnet: 'pi-carnet',
+          first_name: 'Jane',
+          last_name: 'Doe',
+          email: null,
+        },
+        ra: {
+          carnet: 'ra-carnet',
+          first_name: 'Ada',
+          last_name: 'Lovelace',
+          email: 'ra@example.org',
+        },
+        pa: {
+          carnet: 'pa-carnet',
+          first_name: 'Grace',
+          last_name: 'Hopper',
+          email: 'pa@example.org',
+        },
+      });
+
+      const result = build(
+        group,
+        [{ email: 'file-contact@example.org', contract_code: 'ABC-123' }],
+        ['sprm@example.org'],
+        ['configured@example.org'],
+      );
+
+      // No partial recipient set is returned at all — the caller's contract
+      // is "null means skip the group entirely" (R-CBU-003 AC.2/AC.3).
+      expect(result).toBeNull();
+    });
+
+    /** Same clause, for a blank-but-present PI address (AC.3's null/blank variant). */
+    it('R-CBU-003 AC.3 — a whitespace-only PI address is unresolvable and still never backfilled from the RA', () => {
+      const group = makeGroup({
+        pi: {
+          carnet: 'pi-carnet',
+          first_name: 'Jane',
+          last_name: 'Doe',
+          email: '   ',
+        },
+        ra: {
+          carnet: 'ra-carnet',
+          first_name: 'Ada',
+          last_name: 'Lovelace',
+          email: 'ra@example.org',
+        },
+      });
+
+      expect(build(group, [], ['sprm@example.org'], [])).toBeNull();
+    });
+
+    /**
+     * R-CBU-003 AC.2's sibling: a *malformed* PI address is as unresolvable
+     * as an absent one — it must not be mailed, and must not be silently
+     * replaced. Distinct from the two above: `piEmail` is non-blank here, so
+     * only the `isValidEmail` half of the guard rejects it.
+     */
+    it('R-CBU-003 — a malformed PI address returns null rather than dispatching to it or to a CC candidate', () => {
+      const group = makeGroup({
+        pi: {
+          carnet: 'pi-carnet',
+          first_name: 'Jane',
+          last_name: 'Doe',
+          email: 'n/a',
+        },
+        ra: {
+          carnet: 'ra-carnet',
+          first_name: 'Ada',
+          last_name: 'Lovelace',
+          email: 'ra@example.org',
+        },
+      });
+
+      expect(build(group, [], ['sprm@example.org'], [])).toBeNull();
+    });
   });
 
   describe('cc — sanitisation order: normalise -> validate -> drop-if-in-to -> dedupe', () => {

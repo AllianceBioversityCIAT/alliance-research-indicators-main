@@ -10,6 +10,7 @@ import {
   CountryAreas,
   OrganizationDetailed,
   ResultInnovationActorDetailedDto,
+  ProcessMedatada,
   ResultRawAi,
   RootAi,
 } from './result-ai.dto';
@@ -243,6 +244,69 @@ describe('result-ai DTOs (class-transformer + class-validator)', () => {
       await expect(
         endpointValidationPipe.transform(payload, bodyMetadata),
       ).rejects.toThrow();
+    });
+  });
+  /**
+   * R-CBU-005 AC.5 — "Swagger at /api documents metadata.contacts."
+   *
+   * Audit gap-fill: this AC had no automated assertion. The `@ApiBody({ type:
+   * RootAi })` on the handler means Swagger's model is generated from these
+   * decorators, so asserting the emitted `@nestjs/swagger` metadata proves
+   * the documented contract without booting SwaggerModule. A regression that
+   * drops `@ApiProperty` from `contacts` (leaving `@IsOptional` etc. intact,
+   * so every validation test above stays green) turns this red.
+   */
+  describe('R-CBU-005 AC.5 — Swagger model metadata for metadata.contacts', () => {
+    it('ProcessMedatada exposes `contacts` as a documented, optional array of AiContactDto', () => {
+      const properties: string[] = Reflect.getMetadata(
+        'swagger/apiModelPropertiesArray',
+        ProcessMedatada.prototype,
+      );
+      expect(properties).toContain(':contacts');
+
+      const contacts = Reflect.getMetadata(
+        'swagger/apiModelProperties',
+        ProcessMedatada.prototype,
+        'contacts',
+      );
+      expect(contacts).toBeDefined();
+      // Optional — R-CBU-005's backward-compatibility promise, documented as
+      // such rather than merely tolerated by the validator.
+      expect(contacts.required).toBe(false);
+      expect(contacts.isArray).toBe(true);
+      // The nested model is the real DTO, so Swagger renders email/name/role/
+      // contract_code rather than an opaque `object`.
+      expect(contacts.type).toBe(AiContactDto);
+      expect(String(contacts.description)).toContain('contact');
+    });
+
+    it('AiContactDto documents `email` as required and the remaining fields as optional', () => {
+      const properties: string[] = Reflect.getMetadata(
+        'swagger/apiModelPropertiesArray',
+        AiContactDto.prototype,
+      );
+      expect(properties).toEqual(
+        expect.arrayContaining([':email', ':name', ':role', ':contract_code']),
+      );
+
+      const email = Reflect.getMetadata(
+        'swagger/apiModelProperties',
+        AiContactDto.prototype,
+        'email',
+      );
+      // `required` is undefined-or-true for a required @ApiProperty; only an
+      // explicit `required: false` marks it optional.
+      expect(email.required).not.toBe(false);
+
+      for (const optional of ['name', 'role', 'contract_code']) {
+        const meta = Reflect.getMetadata(
+          'swagger/apiModelProperties',
+          AiContactDto.prototype,
+          optional,
+        );
+        expect(meta).toBeDefined();
+        expect(meta.required).toBe(false);
+      }
     });
   });
 });
