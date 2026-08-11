@@ -57,6 +57,7 @@ import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 import { PortfoliosService } from '../portfolios/portfolios.service';
 import { AiReportsService } from '../ai-reports/ai-reports.service';
+import { CapdevBulkNotificationService } from '../ai-reports/notifications/capdev-bulk-notification.service';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -100,6 +101,7 @@ describe('ResultsService', () => {
   >;
   let mockPortfoliosService: jest.Mocked<Pick<PortfoliosService, 'findOne'>>;
   let mockAiReportsService: { create: jest.Mock };
+  let mockCapdevBulkNotificationService: { dispatch: jest.Mock };
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -291,6 +293,9 @@ describe('ResultsService', () => {
     mockAiReportsService = {
       create: jest.fn().mockResolvedValue({ id: 1 }),
     };
+    mockCapdevBulkNotificationService = {
+      dispatch: jest.fn().mockResolvedValue(undefined),
+    };
 
     mockEntityManager = {
       getRepository: jest.fn(),
@@ -414,6 +419,10 @@ describe('ResultsService', () => {
         {
           provide: AiReportsService,
           useValue: mockAiReportsService,
+        },
+        {
+          provide: CapdevBulkNotificationService,
+          useValue: mockCapdevBulkNotificationService,
         },
       ],
     }).compile();
@@ -3393,6 +3402,146 @@ describe('ResultsService', () => {
           ]),
         }),
       );
+    });
+
+    // T-10 (R-CBU-001, R-CBU-010) — the CapDev notification stage is a
+    // sibling call, wrapped so nothing it does can affect the response.
+    it('should dispatch the CapDev bulk notification with the created process id and the metadata file contacts', async () => {
+      const contacts = [{ email: 'lead@example.org' }];
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-789',
+          file_name: 'contacts.csv',
+          contacts,
+        },
+      };
+      mockAiReportsService.create.mockResolvedValueOnce({ id: 42 });
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+
+      await service.createResultFromAiBulk(payload as any);
+
+      expect(mockCapdevBulkNotificationService.dispatch).toHaveBeenCalledWith(
+        42,
+        contacts,
+      );
+    });
+
+    it('should still answer with the unchanged data payload when MessageMicroservice.sendEmail throws inside dispatch', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-throw-1',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+      mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+        new Error('sendEmail failed: broker unreachable'),
+      );
+
+      const output = await service.createResultFromAiBulk(payload as any);
+
+      expect(output).toEqual({
+        results_errors: [],
+        results_created: [{ result_id: 1, error: false }],
+      });
+    });
+
+    it('should still answer with the unchanged data payload when the notification repository throws', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-throw-2',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+      mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+        new Error('repository query failed'),
+      );
+
+      const output = await service.createResultFromAiBulk(payload as any);
+
+      expect(output).toEqual({
+        results_errors: [],
+        results_created: [{ result_id: 1, error: false }],
+      });
+    });
+
+    it('should keep results created before a notification failure persisted and readable', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any, { title: 'R2' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-throw-3',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any)
+        .mockResolvedValueOnce({ result_id: 2, error: false } as any);
+      mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+        new Error('sendEmail failed'),
+      );
+
+      const output = await service.createResultFromAiBulk(payload as any);
+
+      // The bulk upload persistence call already happened before dispatch()
+      // ever runs — a failure there cannot un-persist it.
+      expect(mockAiReportsService.create).toHaveBeenCalledTimes(1);
+      expect(output.results_created).toEqual([
+        { result_id: 1, error: false },
+        { result_id: 2, error: false },
+      ]);
+      expect(output.results_errors).toHaveLength(0);
+    });
+
+    it('should not let dispatch() throw propagate out of createResultFromAiBulk', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-throw-4',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+      mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+        new Error('unexpected failure'),
+      );
+
+      // If the outer try/catch did not contain the rejection, this await
+      // itself would throw and fail the test.
+      const output = await service.createResultFromAiBulk(payload as any);
+      expect(output.results_created).toHaveLength(1);
+    });
+
+    it('should produce a data payload with exactly the pre-change shape (results_errors, results_created only)', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-shape',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+
+      const output = await service.createResultFromAiBulk(payload as any);
+
+      expect(Object.keys(output).sort()).toEqual([
+        'results_created',
+        'results_errors',
+      ]);
     });
   });
 

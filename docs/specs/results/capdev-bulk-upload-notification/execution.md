@@ -852,6 +852,88 @@ Round 1 disclosed three items, **all three correctly identified as spec-owner ma
 
 ---
 
+### T-10 — Wire into `ResultsService` + module registration
+
+- **Date:** 2026-08-11
+- **Attempts:** 1 coding attempt (Reviewer PASS ×2, no FAIL), plus one Leader-directed advisory fold (comment-only; **not** a rework, attempt count unchanged).
+- **Implementer:** `akili-implementer` (`sonnet`, effort `high`)
+- **Reviewers:** two parallel lens Reviewers (`akili-reviewer`, `opus`, read-only) — **conformance/reliability** and **risk/resilience**. Two lenses rather than the default single checklist because T-10 is the only task in the spec that changes runtime behavior.
+- **Skills assigned:** `nestjs-expert`, `error-handling-patterns`. **Leader deviation** from the task's list (`nestjs-expert` only): T-10's substance is the R-CBU-010 outer containment boundary, which is an error-propagation design question.
+
+#### Files changed
+
+`ai-reports.module.ts` (+16/−3) · `results.service.ts` (+19/−2) · `results.service.spec.ts` (+149). **186 insertions, 3 deletions.**
+
+#### Verification (Leader's own runs, tree quiet, no agents active)
+
+- `npx tsc --noEmit` → exit 0 · `npx eslint <touched paths> --quiet` → exit 0
+- `npm test -- --silent` → **328 suites / 2186 tests passed, 1 snapshot, 17.374 s**
+- `npm run test:e2e` → **PASS, 1/1, 3.593 s** — the literal Done-clause command
+- App boot (DI) → `PASS`, **0 DB retries, 0 `can't resolve dependencies`, 0 `Maximum call stack`**
+
+The T-10 **Disqualifies** clause ("a passing unit suite alone… an app that boots is part of the evidence") is therefore discharged: `test/app.e2e-spec.ts` compiles the real `AppModule`, so a DI wiring failure would surface there.
+
+#### The environment scare — recorded because it nearly cost the task its evidence
+
+At briefing time the dev MySQL (VPN, `192.168.20.x`) was **unreachable**. On that basis the Leader diagnosed `npm run test:e2e` as a broken harness — "red on a 5000 ms hook timeout, and hangs forever without `--forceExit`" — opened **O-7** as owed boot/e2e evidence, told the Implementer T-10 would be parked `[~]`, and (with the spec owner) assigned the supposed harness defect to T-11.
+
+**All of that was measuring the outage, not the harness.** The 5 s hook timeout was the app burning its budget retrying an unreachable database. When the VPN returned, the same command was green in 3.6 s. Corrected consequences:
+
+| Claim made under the outage | Corrected |
+| --- | --- |
+| `test:e2e` red on a hook timeout | **Green**, pre- and post-change |
+| O-7 owed; T-10 parked `[~]` | **Discharged in-flight; T-10 → `[x]`** |
+| Whole harness defect → T-11 | Narrowed — see below |
+
+**What survives, verified by A/B with the tree stashed:** `npm run test:e2e` prints its results and then **never exits** (open handles; the script carries no `--forceExit`). Confirmed on **both** trees — pre-change `PASS 4.461 s` then no exit, post-change identical. So the non-exit is genuinely pre-existing and **not** introduced by T-10's new `MessageMicroservice` provider. This A/B exists because the conformance Reviewer flagged that the Leader's original comparison used `--forceExit` on one side and not the other — a fair catch on the evidence, not on the code. **T-11 inherits the narrowed defect (non-exit only), not the original overstated one.**
+
+Also disproven: the Implementer reported a `RangeError: Maximum call stack size exceeded` in its own probe and **declined to assert it was pre-existing** because it lacked the baseline. Correct instinct — it was retry-exhaustion noise from the outage, absent once the DB was reachable.
+
+#### What the two lenses bought
+
+Both PASSed, and both verified load-bearing claims structurally rather than accepting them:
+
+1. **Containment is total for the failures that exist here.** The conformance lens read the *whole* `dispatch()` body hunting for an orphan promise that could escape the `try/catch` as an unhandled rejection — every call is awaited, including the sequential per-group loop; there is no `void`/fire-and-forget path.
+2. **The tests genuinely gate.** All four failure tests drive `dispatch` via `mockRejectedValueOnce` and then `await` the method **without** `expect(...).rejects` — delete the `try/catch` and they go red. This is the property that was *missing* in T-08 and T-09, where invariants were true by construction of the mock. Recorded as the first task in this spec where that shape did not have to be folded in after the fact.
+3. **No transaction, verified not asserted.** The risk lens confirmed `createResultFromAiBulk` has no `queryRunner` and no `manager.transaction`, so design §6.6's "outside any transaction governing result creation" is factually true here.
+4. **DI blast radius is one module.** `ResultsService` is provided in exactly one place (`results.module.ts:92`), which already imports `AiReportsModule` — so the new constructor dependency resolves in the only injector that constructs it, and `result-oicr.module.ts`'s `forwardRef(() => ResultsModule)` is unaffected. No cycle: `AiReportsModule`'s only import is `TemplateModule`, which imports nothing leading back.
+
+#### Two corrections the risk lens made to the spec's own record
+
+- **JD-S7's stated mechanism is aimed at the wrong component.** The ledger records the unbounded-wait risk as a stalling `client.emit` on a lazily-connecting `ClientProxy`. It cannot stall: `MessageMicroservice.sendEmail` calls `this.client.emit(...)` with no `await`, `firstValueFrom`, or `subscribe` (unlike the sibling `emitToPattern`, which does use `firstValueFrom`), and `BrokerConnectionBase` builds the proxy without connecting. The live unbounded surface T-10 puts on the request path is **7–8 MySQL round-trips**, with no query or acquire timeout in `orm.config.ts`. **JD-S7 remains open by human decision — but a future mitigation should be aimed at the DB stage, not the broker.**
+- **`tasks.md` §3's flag-off claim is right as written and wrong as usually paraphrased.** "Sends nothing until someone flips a row" is **confirmed** — zero `sendEmail` on every flag-off path. "No runtime behavior" is **refuted**: **5 reads + 2 writes execute per bulk upload regardless of the flag**, including batches containing zero CapDev results (a zero-group batch never even reads the flag). This is intended — design §12 step 1 and the JD-01 step order — but the PR 3 description must state it. **The kill switch stops email, not work.**
+
+#### Leader error, recorded
+
+The Leader's risk brief asked whether inline `await` violates **NFR-CBU-002**. It does not — NFR-CBU-002 is *"no duplicate notification per process"*. The latency NFR is **NFR-CBU-001**, and `tasks.md` §6 assigns it to T-05/T-11, not T-10. The Reviewer read the requirement at the source and corrected the framing instead of answering the question as posed. Inline await is **DD-3**, with both alternatives explicitly rejected.
+
+#### Advisory fold applied (Leader-directed, comment-only, no attempt consumed)
+
+The risk lens found the new inline comment **overclaiming against DD-3**: it promised a notification failure "must never roll back or **delay** the response", while the awaited dispatch delays the response by construction and a slow failure delays it proportionally. That plants JD-S7's exact contradiction into production code as a guarantee. Folded to "roll back or **fail** the response" (`results.service.ts:1066`). Suite identical after the change (2186/2186), as a comment-only edit must be.
+
+#### Advisories — recorded, no tasks minted
+
+1. **`const process` shadows Node's global `process`** for the rest of the method. The name comes from design §2.1 so it is conformant, but a later edit adding `process.env.X` inside this method would silently read the bulk-process entity. A rename to `bulkProcess` removes the trap; the design's pseudocode does not bind the identifier.
+2. **The catch discards the stack** (`error?.message ?? error`) and diverges from the notification service's own `err instanceof Error ? err.message : String(err)`. `CgiarLogger.error` accepts a second `{ stack }` argument — passing it would make the one surviving log line diagnosable.
+3. **Deploy-before-migrate degrades silently.** If this code lands anywhere before T-02's migration, every bulk upload throws inside `dispatch()`, is swallowed by the new catch, and returns `201` with one error log and `notification_status` left NULL. The containment works as designed, which is exactly what makes it quiet. Compounds T-09 advisory 1: NULL status is indistinguishable from "predates the feature". Design §12 step 1 should read as **ordered**, not concurrent.
+4. **Two test names promise a fidelity they lack** — the "`sendEmail` throws" and "repository throws" cases both stub `dispatch` itself; the real seams are T-09's and T-12's. T-10 gates only the outer boundary.
+5. **The DD-2 async-dispatch seam is one argument wider** than "process id only" — `metadata?.contacts` is request state threaded past the DB re-read. Serialisable, so still queue-compatible, but a future queued dispatch must carry it in the message payload.
+6. **`npm run test:cov` was not run.** Regression risk is negligible (~20 production lines, all exercised), but `tasks.md` §8's 60% floor is not discharged by T-10.
+
+#### Implementer `Not Done / Assumptions` — adjudicated, no scope owed
+
+Three items, all correctly raised. (a) `CapdevBulkNotificationRepository` deliberately **not** exported — the task text says "the service to exports" and nothing outside the module injects the repository; the Reviewer confirmed the narrower reading is right and that the `result-oicr` exemplar exports its repository only because it has external consumers. (b) `AiContactDto[]` → `CapdevRecipientFileContact[]` compatibility verified as real, not accidental: `string` widens to `string | null | undefined` and excess-property checking does not apply to a non-literal. (c) The `RangeError`, disproven above.
+
+#### Leader process incident
+
+A stale background command scheduled to restore the stash fired **after** the Leader had already restored it manually, popping an unrelated branch's stash (`AC-1672`, labelled "REJECTED — DO NOT APPLY") into the tree and leaving three conflicted **client** files. No work was lost — git preserves a stash on conflicted pop — and the files were reverted to HEAD with the spec owner's approval. **Lesson: never leave a mutating command queued against state you intend to change.** Candidate Kaizen entry at archive.
+
+#### Status transition
+
+- **T-10 → `[x]`** — Reviewer PASS ×2, one comment-only fold, full unit suite + e2e + app boot green on the Leader's own runs, O-7 discharged in-flight. **T-11 and T-12 are unblocked.**
+
+---
+
 ## 6. Open decisions blocking T-08
 
 Two items surfaced by the T-07 review that are **spec-owner calls, not Implementer or Reviewer calls**. Both should be settled before T-08 is briefed, because T-08's rendered-body assertions depend on them.

@@ -238,7 +238,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-10 — Wire into `ResultsService` + module registration
-- **Status:** [ ]
+- **Status:** [x] — Reviewer PASS ×2 (conformance/reliability + risk/resilience), attempt 1, 2026-08-11, plus one comment-only Leader-directed fold (no attempt consumed). Full Done clause discharged on the Leader's own runs: `npm test` 2186/2186, **`npm run test:e2e` green (1/1)**, and **the app boots with 0 DI resolution errors**. A dev-MySQL (VPN) outage during briefing made the Leader mis-diagnose the e2e harness and open an owed-evidence item (O-7); both were retracted once the DB returned — see `execution.md` → T-10 → *The environment scare*. Two corrections to the spec's own record landed here: **JD-S7's mechanism is DB-shaped, not broker-shaped**, and **§3's flag-off claim holds only as written** (5 reads + 2 writes run per upload regardless of the flag). **T-11 and T-12 are unblocked.**
 
 - **Requirements covered:** R-CBU-001, R-CBU-010
 - **Design refs:** §2.1, §3, §6.6
@@ -253,6 +253,10 @@ Two rules, both non-negotiable:
 
 ### T-11 — E2E: the payload contract holds both ways
 - **Status:** [ ]
+
+- **⚠️ Inherited harness defect, assigned here by spec-owner decision 2026-08-11.** `npm run test:e2e` **passes** but the process **never exits** — jest holds open handles (DB pool, RMQ, cron) and the script carries no `--forceExit`. Verified by A/B with T-10 stashed: pre-change `PASS 4.461 s` then no exit; post-change identical. **Pre-existing, not introduced by T-10.** Left unfixed, a CI runner blocks until it times out, and locally the run looks like a hang with no output (it cost the Leader an 18-minute dead wait).
+  - **Do not widen this into a timeout fix.** A first Leader diagnosis also called the suite red on a 5000 ms hook timeout — that was the app retrying an unreachable dev MySQL during a VPN outage, not a harness defect. With the DB up, the boot is ~3.6 s, comfortably inside the default. **Only the non-exit is real.**
+  - Whatever T-11 adds must exit on its own; asserting a green result is not enough if the process then hangs.
 
 - **Requirements covered:** R-CBU-005
 - **Design refs:** §5, defect class D4
