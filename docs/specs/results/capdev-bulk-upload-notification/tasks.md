@@ -18,7 +18,7 @@ From `design.md` §14. `/akili-execute` **stops and escalates** rather than cont
 | Signal | Budget |
 | --- | --- |
 | Tasks | 12 |
-| LOC | **~4,600** — re-baselined 2026-08-06 after the tripwire fired at T-05 (original ~1,450). Basis and cause in `design.md` §14.1. |
+| LOC | **~5,600** — re-baselined **2026-08-11** after the tripwire fired a second time before T-12 (5,085 actual at 11/12 tasks). Prior figures ~4,600 (2026-08-06) and ~1,450 (original). Basis and cause in `design.md` §14.1 and **§14.2**. |
 | Review rounds | 2 |
 
 ---
@@ -49,13 +49,13 @@ No cycles. T-01 through T-04 are mutually independent and parallelisable.
 
 ## 3. PR strategy
 
-~4,600 LOC far exceeds the 400-LOC single-PR guidance. Three PRs, split so that **only the last one changes runtime behavior**. The `~LOC` column below is **re-baselined 2026-08-06** (`design.md` §14.1); every PR lands well above the guidance, so each PR description must state its real size up front rather than let a reviewer discover it:
+~5,600 LOC far exceeds the 400-LOC single-PR guidance. Three PRs, split so that **only the last one changes runtime behavior**. The `~LOC` column below is **re-baselined 2026-08-11** (`design.md` §14.2); every PR lands well above the guidance, so each PR description must state its real size up front rather than let a reviewer discover it:
 
 | PR | Tasks | ~LOC | Blast radius |
 | --- | --- | --- | --- |
 | **PR 1 — Foundation** | T-01 … T-04 | **812 actual** *(est. ~450)* | **None at runtime.** Additive DTO field, additive columns, seeded config/template rows. Nothing calls any of it yet. |
-| **PR 2 — Engine** | T-05 … T-08 | **~2,350** *(1,051 actual for T-05; est. ~600 for the PR)* | **None at runtime.** Repository + two pure modules + email assembly, fully unit-tested but unwired. |
-| **PR 3 — Activation** | T-09 … T-12 | ~1,500 *(est. ~400)* | **The only PR with blast radius** — and it lands with the flag seeded `false`, so even merged it sends nothing until someone flips a row. |
+| **PR 2 — Engine** | T-05 … T-08 | **2,615 actual** *(est. ~600, then ~2,350)* | **None at runtime.** Repository + two pure modules + email assembly, fully unit-tested but unwired. |
+| **PR 3 — Activation** | T-09 … T-12 | **1,727 actual through T-11** *(est. ~400, then ~1,500)* · ~2,100 projected with T-12 | **The only PR with blast radius** — and it lands with the flag seeded `false`, so even merged it sends nothing until someone flips a row. |
 
 Per `cognitive-doc-design` review-empathy: each PR description states what to review first, what is deliberately dead code until the next PR, and links previous/next.
 

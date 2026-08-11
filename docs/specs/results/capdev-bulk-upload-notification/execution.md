@@ -10,7 +10,7 @@
 - **Worker wrappers:** `.claude/agents/akili-implementer.md` (T2 `sonnet`) · `.claude/agents/akili-reviewer.md` (T3 `opus`, read-only) — author ≠ auditor enforced by configuration
 - **Approval mode:** *not recorded* in the spec's Document Control → default **interactive** (user gate after every task)
 - **Rework ceiling:** 3 attempts per task
-- **Budget tripwire** (`design.md` §14 / `tasks.md` §1): 12 tasks · **~4,600 LOC** · 2 review rounds — *re-baselined 2026-08-06 after the tripwire fired at T-05 and the user accepted the revision; original ~1,450. Cause and basis in `design.md` §14.1. The tripwire still binds against the new figure.*
+- **Budget tripwire** (`design.md` §14 / `tasks.md` §1): 12 tasks · **~5,600 LOC** · 2 review rounds — *re-baselined **twice**: to ~4,600 on 2026-08-06 (fired at T-05, `design.md` §14.1) and to ~5,600 on 2026-08-11 (fired again before T-12, `design.md` §14.2). Original ~1,450. The tripwire still binds against the current figure; a third firing escalates to a scope conversation, not a third revision.*
 - **Commit standard:** `[SPEC:docs/specs/results/capdev-bulk-upload-notification] <type>(<module>): <subject>`
 - **Concurrency decision:** all 12 tasks target the **same package** (`server/researchindicators`). Per root `CLAUDE.md` → *Concurrency* ("two tasks in the same package are not [safe]") and `.agents/leader.md` → *Disjoint source files are necessary but not sufficient*, T-01…T-04 are **logically** independent but share `node_modules`, Jest cache, and build output. **Execution is serialized**, document order.
 - **Active Kaizen lessons in force:** KZ-001 (test-double fidelity — binds T-04/T-08), KZ-003 (full-suite run on shared-service change — binds T-12)
@@ -1067,6 +1067,28 @@ Two lessons, both Kaizen candidates at archive:
 #### Status transition
 
 - **T-11 → `[x]`** — Reviewer PASS attempt 1, two comment/type-only folds, `test:e2e` 4/4 green **and exiting** on the Leader's own run, `tsc` + `eslint` clean, unit-suite regression structurally impossible. D-T11-b corrected across 6 spec sites + 2 constitution guides with both sweep directions closed. **T-12 is unblocked — and is the last task in the spec.**
+
+---
+
+### Budget tripwire — **FIRED a second time**, measured before T-12, re-baseline accepted
+
+Measured by the Leader at the T-11 → T-12 gate rather than after T-12 landed. That timing is the point: §14.1's own closing sentence armed the tripwire against ~4,600, and a tripwire checked only *after* absorbing the next task cannot stop anything.
+
+| | Budgeted (2026-08-06) | Actual at 11/12 tasks |
+| --- | --- | --- |
+| Tasks | 12 | 11 done, 1 open — within |
+| **LOC** (`src/` + `test/`) | **~4,600** | **5,085 insertions / 5,079 net — +485 (+10.5%), before T-12 writes a line** |
+| Review rounds | 2 | ≤2 per task — within |
+
+Measurement: `git diff --shortstat a5ee2c47~1..HEAD -- src/ test/` across the 15 `[SPEC:…]`-prefixed commits — 31 files. The 2,668 lines of spec documentation are excluded; the budget has always counted code.
+
+**Leader's read, offered as a hypothesis and not a finding.** §14.1 identified the right driver (the ~1:1 test ratio) and then mis-allocated *inside* PR 3: ~1,500 for four tasks, of which **T-09 alone took 1,098**. PR 2's +265 is a separate and non-recurring cost — the OD-2 amendment (95 lines reopening T-04/T-07), which was rework forced by a requirements defect, not scope. No commit fails to map to an approved task, and the *advisory-never-becomes-a-task* rule held in both places it was tested (T-07's upper-clamp advisory, T-11's A-1 masked handle) — neither was quietly folded into a neighbour.
+
+**User decision (2026-08-11): accept and re-baseline to ~5,600, finish T-12 in full.** `design.md` §14 revised, basis recorded in the new §14.2, `tasks.md` §1 and §3 swept, this Document Control updated. Correction Closure ran both directions: forward on `4,600`/`4600` (live sites `tasks.md:21`, `tasks.md:52`, `design.md:396`, `execution.md:13` — all corrected; §14.1 and the T-05 firing record left intact as history that was true when written), backward on `§14` / `Budget tripwire` (citers at `tasks.md:14-16` are generic and survive; `judgment.md:92` and `design.md:203` are the NFR-CBU-001 *time* budget and the query budget, unrelated).
+
+**Explicitly declined:** narrowing T-12 to hold the old line. T-12 carries **R-CBU-004 AC.4**, an approved acceptance criterion currently unimplemented feature-wide — holding a number by shipping a known-unmet requirement trades a visible miss for an invisible one.
+
+**Re-armed against ~5,600.** A third firing is no longer an estimation error to revise; it means the spec cannot be priced by this method, and the response is a scope conversation.
 
 ---
 

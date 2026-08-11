@@ -393,7 +393,7 @@ Every new file gets a sibling `*.spec.ts` (NFR-CBU-004).
 | Signal | Expected |
 | --- | --- |
 | Tasks | **12** (+1 vs r1: the defensive config accessors and template wrapper are their own task, per JD-02 / JD-05) |
-| Lines of code | **~4,600** — *re-baselined 2026-08-06 after the tripwire fired at T-05; original ~1,450 (≈750 production, ≈700 tests) retained in §14.1* |
+| Lines of code | **~5,600** — *re-baselined **2026-08-11** after the tripwire fired a second time at T-11; the 2026-08-06 figure of ~4,600 is retained in §14.1 and the second firing is analysed in §14.2. Original ~1,450 (≈750 production, ≈700 tests) also in §14.1* |
 | Review rounds | **2** |
 
 *r1 estimated 11 tasks / ~1,300 LOC. The increase to ~1,450 was the wrapper work Judgment Day surfaced — it was always required, it was simply invisible while the design assumed the reused utilities defaulted gracefully.*
@@ -423,6 +423,29 @@ A flat 1.8× multiplier from PR 1 would project ~2,600 and is **too optimistic**
 **This is a projection, and the tripwire still binds against it.** If actuals exceed ~4,600, `/akili-execute` stops and escalates again rather than quietly absorbing the next overrun.
 
 **Consequence for PR strategy:** PR 2 and PR 3 will each land well above the ~400-LOC single-PR guidance. `tasks.md` §3 splits by blast radius rather than line count, which remains the right axis — but each PR description must state its real size up front rather than let a reviewer discover it.
+
+### 14.2 Second re-baseline — 2026-08-11 (tripwire fired again, before T-12)
+
+The tripwire fired as designed a second time, measured by the Leader **before dispatching T-12** rather than after absorbing it. Escalated per `/akili-execute` §2.4; the user accepted a re-baseline to **~5,600**. As in §14.1 this is a Leader revision recorded during execution — the task decomposition, the requirements, and the design are unchanged. Only the size estimate was wrong, and this time it was wrong in a narrower and more specific place.
+
+**Measurement.** `git diff --shortstat <first-spec-commit>~1..HEAD -- src/ test/` over the 15 commits carrying this spec's `[SPEC:…]` prefix: **31 files, 5,085 insertions, 6 deletions**. Docs (`docs/`, 2,668 lines) are excluded — the budget has always counted code.
+
+| | §14.1 projection | Actual at 11/12 tasks | Delta |
+| --- | --- | --- | --- |
+| PR 1 — T-01…T-04 | 812 (already actual) | **812** | 0 |
+| PR 2 — T-05…T-08 | ~2,350 | **2,615** | **+265** |
+| PR 3 — T-09…T-12 | ~1,500 | **1,727 with T-12 not started** | **+227, one task still owed** |
+| **Total** | **~4,600** | **5,085 (net 5,079)** | **+485 (+10.5%)** |
+
+**Why §14.1 was still wrong — one cause, not two.** §14.1 diagnosed the real driver (the ~1:1 test-to-production ratio this spec's `Disqualifies` clauses and DB-less constraint force) and applied it bottom-up. It then mis-allocated within PR 3: **~1,500 for four tasks, of which T-09 alone consumed 1,098** — 73% of the allocation for a quarter of the work. The orchestration task was priced as one of four peers when it is the spec's second-largest unit after T-05's repository.
+
+PR 2's +265 has a different and non-recurring cause: the **OD-2 amendment** (95 lines reopening T-04 and T-07) was rework forced by a defect *in the requirements*, discovered during T-07's review. It is correction cost, not scope.
+
+**No silent scope growth.** Every commit maps to an approved task. The *advisory-never-becomes-a-task* rule held under pressure — T-07's `percentageWomen` upper-clamp advisory and T-11's masked-open-handle advisory (A-1) were both recorded and left unimplemented rather than folded into adjacent tasks.
+
+**The new figure.** ~5,600 = 5,085 actual + ~400 projected for T-12 (a Size M test sweep plus ~4 production lines for the R-CBU-004 AC.4 fold, at the observed 1:1 ratio) + a thin margin. **The tripwire re-arms against it.** A third firing would mean the estimate is not merely mis-allocated but structurally unable to price this spec, and the right response then is a scope conversation rather than a third revision.
+
+**What was explicitly not done.** Trimming T-12 to hold the ~4,600 line was offered and declined: T-12 carries **R-CBU-004 AC.4**, an approved acceptance criterion that is unimplemented feature-wide (see `tasks.md` → T-12 → *Orphaned AC*). Holding a budget by shipping a known-unmet requirement trades a visible number for an invisible defect.
 
 ---
 
