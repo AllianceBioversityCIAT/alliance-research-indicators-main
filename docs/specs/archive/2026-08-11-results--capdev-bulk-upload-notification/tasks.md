@@ -293,7 +293,7 @@ Two rules, both non-negotiable:
 | R-CBU-001 | T-09, T-10 |
 | R-CBU-002 | T-05, T-09 |
 | R-CBU-003 | T-05, T-06 |
-| R-CBU-004 | T-03, T-06 |
+| R-CBU-004 | T-03, T-06, **T-12** *(AC.4 — the orphaned criterion, assigned to T-12 by spec-owner decision 2026-08-11)* |
 | R-CBU-005 | T-01, T-11 |
 | R-CBU-006 | T-04 *(percentage clause copy, OD-2)*, T-05, T-07, T-08 |
 | R-CBU-007 | T-04, T-08 |
@@ -302,7 +302,7 @@ Two rules, both non-negotiable:
 | R-CBU-010 | T-10, T-12 |
 | R-CBU-011 | T-09, T-12 |
 | NFR-CBU-001 | T-05 |
-| NFR-CBU-002 | T-09 |
+| NFR-CBU-002 | T-09, T-12 |
 | NFR-CBU-003 | T-08, T-12 |
 | NFR-CBU-004 | all |
 | NFR-CBU-005 | T-02, T-03, T-04 |
@@ -325,7 +325,7 @@ Every requirement appears in ≥1 task; every task cites ≥1 requirement.
 ## 8. Done definition
 
 - [x] All 12 tasks `done` — **2026-08-11**, every one on a Reviewer PASS
-- [~] `npm test -- --silent` and `npm run test:e2e` green; coverage ≥ 60% not regressed — **tests green (2196 unit / 4 e2e)**; the coverage half is **owed**: `npm run test:cov` was never run, so NFR-CBU-004's floor is discharged by inference, not measurement. Belongs to `/akili-test`.
+- [x] `npm test -- --silent` and `npm run test:e2e` green; coverage ≥ 60% not regressed — **discharged by measurement at `/akili-validate`, 2026-08-11**: `npm run test:cov -- --silent` → **328 suites / 2,214 tests passed**, global coverage **83.98 / 75.06 / 85.15 / 83.99** against a floor of 60 on all four. `npm run test:e2e` → **4/4, 5.175 s, exit 0**, which also closes `test-report.md` §9 **R1a** (the `testTimeout: 120000` fix had been committed but never observed green). See `validation-report.md` §5 and §9.
 - [x] `npm run lint -- --quiet` clean, `git status` re-checked (the script carries `--fix`) — run by the Leader at the T-12 gate; `--fix` touched no file beyond the 5 in the diff
 - [ ] Migrations apply and revert on dev — **apply verified** (O-1/O-3/O-4/O-5 against dev 2026-08-09); **revert never executed** (O-2 waived by the spec owner on static review), so production rollback of the T-02 migration remains unrehearsed
 - [ ] Flag still seeded `false` at merge — **the feature ships dark**. Seeded `false` and verified at T-03 (O-3); **re-confirm against dev immediately before merge**, not from this record

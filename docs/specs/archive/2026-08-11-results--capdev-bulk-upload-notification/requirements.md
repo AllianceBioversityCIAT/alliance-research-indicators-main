@@ -532,24 +532,26 @@ No new endpoints.
 
 ## 13. Requirement ID index
 
+> **Corrected 2026-08-11 by `/akili-validate`.** The `Covered by` column was the **pre-execution** mapping and was never updated as tasks moved; it disagreed with `tasks.md` §6 on **11 of 16 rows**. The worst case was R-CBU-004, which pointed at T-04 and omitted T-12 — the task where its most-contested criterion (AC.4, the malformed-entry debug line) actually landed. The column below is now derived from each task's own `Requirements covered:` clause, and `tasks.md` §6 is the single source; it is reproduced here only for readers arriving from this document.
+
 | ID | Title | Covered by |
 | --- | --- | --- |
-| R-CBU-001 | Notification fires after a successful CapDev bulk upload | T-07, T-09 |
-| R-CBU-002 | One email per project group | T-02, T-09 |
-| R-CBU-003 | PI resolved from Agresso as the sole `To` | T-03 |
-| R-CBU-004 | CC list assembled, deduplicated and sanitised | T-04 |
-| R-CBU-005 | AI bulk payload carries file-sourced contacts | T-01 |
-| R-CBU-006 | CapDev metrics computed per project group | T-05 |
-| R-CBU-007 | Email rendered from a DB-stored Handlebars template | T-06, T-08 |
-| R-CBU-008 | Aggregated metrics persisted on the bulk process | T-02, T-10 |
-| R-CBU-009 | Notification is switchable off without a deploy | T-06, T-07 |
-| R-CBU-010 | Notification failures never fail the bulk upload | T-07, T-09 |
-| R-CBU-011 | Notification activity is observable | T-07 |
-| NFR-CBU-001 | Bulk upload latency | T-05, T-11 |
-| NFR-CBU-002 | No duplicate notification per process | T-07 |
-| NFR-CBU-003 | Recipient data minimisation | T-04, T-08 |
+| R-CBU-001 | Notification fires after a successful CapDev bulk upload | T-09, T-10 |
+| R-CBU-002 | One email per project group | T-05, T-09 |
+| R-CBU-003 | PI resolved from Agresso as the sole `To` | T-05, T-06 |
+| R-CBU-004 | CC list assembled, deduplicated and sanitised | T-03, T-06, **T-12** *(AC.4)* |
+| R-CBU-005 | AI bulk payload carries file-sourced contacts | T-01, T-11 |
+| R-CBU-006 | CapDev metrics computed per project group | T-04 *(percentage clause copy, OD-2)*, T-05, T-07, T-08 |
+| R-CBU-007 | Email rendered from a DB-stored Handlebars template | T-04, T-08 |
+| R-CBU-008 | Aggregated metrics persisted on the bulk process | T-02, T-05, T-09 |
+| R-CBU-009 | Notification is switchable off without a deploy | T-03, T-09 |
+| R-CBU-010 | Notification failures never fail the bulk upload | T-10, T-12 |
+| R-CBU-011 | Notification activity is observable | T-09, T-12 |
+| NFR-CBU-001 | Bulk upload latency | T-05 |
+| NFR-CBU-002 | No duplicate notification per process | T-09, T-12 |
+| NFR-CBU-003 | Recipient data minimisation | T-08, T-12 |
 | NFR-CBU-004 | Test coverage | all |
-| NFR-CBU-005 | Migration safety | T-02, T-08 |
+| NFR-CBU-005 | Migration safety | T-02, T-03, T-04 |
 
 ---
 
