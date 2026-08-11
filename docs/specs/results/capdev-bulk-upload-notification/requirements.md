@@ -13,7 +13,7 @@
 
 ## 1. Context
 
-After `POST /api/v1/results/ai/formalize/bulk` finishes, ARI persists the batch (`bulk_upload_processes` + `bulk_upload_results`) and returns a payload to the caller. **Nobody outside that HTTP call learns the upload happened.** Project Leaders, Research Assistants and reporting contacts have no signal that their Capacity Sharing for Development trainings are now recorded in STAR, and no aggregate view of what landed.
+After `POST /api/results/ai/formalize/bulk` finishes, ARI persists the batch (`bulk_upload_processes` + `bulk_upload_results`) and returns a payload to the caller. **Nobody outside that HTTP call learns the upload happened.** Project Leaders, Research Assistants and reporting contacts have no signal that their Capacity Sharing for Development trainings are now recorded in STAR, and no aggregate view of what landed.
 
 This spec adds an automatic, per-project summary email at the end of a successful CapDev bulk upload, and persists the same aggregates on the process row so dashboards can consume them later.
 
@@ -40,7 +40,7 @@ This spec adds an automatic, per-project summary email at the end of a successfu
 ## 3. System Context & Scope
 
 ```
-AI mining service ──POST /api/v1/results/ai/formalize/bulk──▶ ResultsService.createResultFromAiBulk
+AI mining service ──POST /api/results/ai/formalize/bulk──▶ ResultsService.createResultFromAiBulk
                                                                       │
                                                      persists batch ──┤
                                                                       ▼
@@ -85,7 +85,7 @@ AI mining service ──POST /api/v1/results/ai/formalize/bulk──▶ ResultsS
 - Only **created CapDev results** feed the notification. Rows with `error_message`, rows with `result_id IS NULL`, and rows for any other indicator are excluded from both recipients and metrics.
 - If the batch contains zero created CapDev results, **no email is sent at all** and the process completes normally.
 
-**Outputs:** unchanged `ServerResponseDto` from `POST /api/v1/results/ai/formalize/bulk` (`201`, `data = { results_errors, results_created }`).
+**Outputs:** unchanged `ServerResponseDto` from `POST /api/results/ai/formalize/bulk` (`201`, `data = { results_errors, results_created }`).
 
 **Acceptance criteria:**
 - [ ] AC.1 — Given a batch with ≥1 created CapDev result, exactly one `MessageMicroservice.sendEmail` call occurs per project group.
@@ -469,7 +469,9 @@ No new indexes required — all reads are keyed on existing primary/foreign keys
 
 | Endpoint | Change |
 | --- | --- |
-| `POST /api/v1/results/ai/formalize/bulk` | **Request only.** `metadata.contacts` added as an optional array (R-CBU-005). Roles unchanged (`TECHNICAL_SUPPORT`, `CENTER_ADMIN`, `MEL_REGIONAL_EXPERT`). Response envelope and `data` shape unchanged. Stays on `/v1` — the change is additive and backward compatible, so no `/v2` is warranted. Swagger `@ApiBody({ type: RootAi })` must document the new field. |
+| `POST /api/results/ai/formalize/bulk` | **Request only.** `metadata.contacts` added as an optional array (R-CBU-005). Roles unchanged (`TECHNICAL_SUPPORT`, `CENTER_ADMIN`, `MEL_REGIONAL_EXPERT`). Response envelope and `data` shape unchanged. **Stays unversioned** — the change is additive and backward compatible, so it introduces no version segment where the handler has none. Swagger `@ApiBody({ type: RootAi })` must document the new field. |
+
+> **⚠️ Path correction (D-T11-b, 2026-08-11).** This row and the three narrative references above (§1, §3, R-CBU-001 *Outputs*) previously named `POST /api/results/ai/formalize/bulk`, and this row additionally claimed the endpoint "stays on `/v1`". **There is no `/v1` segment on this handler and never was.** URI versioning is enabled globally with no `defaultVersion` (`main.ts:53-56`) and `createResultFromAiBulk` declares no `@Version()` (`results.controller.ts:656-682`), so it mounts unversioned; `/api/v1/results/ai/formalize/bulk` returns `404`. See `design.md` §5 for the full evidence chain. This corrects the documentation only — no code changed, and the AI mining service's existing integration was never affected, since it has always called the reachable path.
 
 No new endpoints.
 

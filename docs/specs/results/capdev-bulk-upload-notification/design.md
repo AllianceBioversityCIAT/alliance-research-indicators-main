@@ -174,7 +174,9 @@ The consequence to keep in view: when a batch has unattributed CapDev results, `
 
 **One request-side change. No new endpoint.**
 
-`POST /api/v1/results/ai/formalize/bulk` — `metadata.contacts?: AiContactDto[]`
+`POST /api/results/ai/formalize/bulk` — `metadata.contacts?: AiContactDto[]`
+
+> **⚠️ Path correction (D-T11-b, 2026-08-11).** This section previously read `POST /api/v1/results/ai/formalize/bulk`. **That route does not exist.** `main.ts:53-56` enables URI versioning (`setGlobalPrefix('api')` + `enableVersioning({ type: VersioningType.URI })`) but sets **no `defaultVersion`**, and `createResultFromAiBulk` (`results.controller.ts:656-682`) carries no `@Version()` decorator — the only versioned handler in `ResultsController` is `@Version('2')` at `:257-258`. Under Nest, a handler with neither its own version nor a configured default is mounted **without** a version segment. Discovered by T-11's Implementer while booting the app and dumping its Express route table, and independently confirmed by the Reviewer against `main.ts`, `results.controller.ts`, and `main.routes.ts`. The endpoint's reachable path has always been unversioned; nothing about the running system changed. Corrected in place because no reader is served by a documented URL that `404`s.
 
 ```
 AiContactDto

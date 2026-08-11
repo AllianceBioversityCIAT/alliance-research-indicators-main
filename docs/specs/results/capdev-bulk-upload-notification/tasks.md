@@ -252,7 +252,7 @@ Two rules, both non-negotiable:
 ---
 
 ### T-11 — E2E: the payload contract holds both ways
-- **Status:** [ ]
+- **Status:** [x] — Reviewer PASS attempt 1 (lens-checklist mode), 2026-08-11, plus two Leader-directed folds (comment + type-only; no attempt consumed). `npm run test:e2e` **4/4 green and the process exits** on the Leader's own run. **The inherited non-exit needed BOTH fixes** — `app.close()` alone left jest alive 5+ minutes across two independent runs; `"forceExit": true` in `test/jest-e2e.json` is the load-bearing part, and `--detectOpenHandles` named no handle, so the leak is **masked, not diagnosed** (advisory A-1). Zero writes *and* zero queries reach the shared dev DB (`SetUpInterceptor` short-circuits before any query). **D-T11-b:** the documented path `/api/v1/results/ai/formalize/bulk` **does not exist** — `main.ts:53-56` sets no `defaultVersion` and the handler declares no `@Version()`, so it mounts unversioned; corrected across 6 spec sites + 2 constitution guides, both sweep directions closed. AC.3 is not owed here (discharged at `capdev-recipients.builder.spec.ts:135-155`), but a **cross-group CC leak is gated only at unit level**. See `execution.md` → T-11.
 
 - **⚠️ Inherited harness defect, assigned here by spec-owner decision 2026-08-11.** `npm run test:e2e` **passes** but the process **never exits** — jest holds open handles (DB pool, RMQ, cron) and the script carries no `--forceExit`. Verified by A/B with T-10 stashed: pre-change `PASS 4.461 s` then no exit; post-change identical. **Pre-existing, not introduced by T-10.** Left unfixed, a CI runner blocks until it times out, and locally the run looks like a hang with no output (it cost the Leader an 18-minute dead wait).
   - **Do not widen this into a timeout fix.** A first Leader diagnosis also called the suite red on a 5000 ms hook timeout — that was the app retrying an unreachable dev MySQL during a VPN outage, not a harness defect. With the DB up, the boot is ~3.6 s, comfortably inside the default. **Only the non-exit is real.**
@@ -261,7 +261,7 @@ Two rules, both non-negotiable:
 - **Requirements covered:** R-CBU-005
 - **Design refs:** §5, defect class D4
 - **Files:** `test/` (jest-e2e)
-- **Scope:** supertest against `POST /api/v1/results/ai/formalize/bulk` — legacy payload **without** `contacts` → `201`; payload **with** valid contacts → `201` and they reach CC; contact with a malformed `email` → `400` in the `GlobalExceptions` envelope, batch not persisted.
+- **Scope:** supertest against `POST /api/results/ai/formalize/bulk` — legacy payload **without** `contacts` → `201`; payload **with** valid contacts → `201` and they reach CC; contact with a malformed `email` → `400` in the `GlobalExceptions` envelope, batch not persisted.
 - **Done:** `npm run test:e2e` green.
 - **Disqualifies:** a "legacy payload" fixture that isn't actually the pre-change shape. Capture it from the current `RootAi` **before** T-01 merges, or the regression this guards against is untested — a fixture written after the DTO change will happily include the new field.
 - **Skills:** `nestjs-expert` · **Size:** M

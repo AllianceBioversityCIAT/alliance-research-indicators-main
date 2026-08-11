@@ -934,6 +934,142 @@ A stale background command scheduled to restore the stash fired **after** the Le
 
 ---
 
+### T-11 — E2E: the payload contract holds both ways
+
+- **Date:** 2026-08-11
+- **Status:** ✅ **PASS** — Reviewer PASS on attempt 1, plus two Leader-directed advisory folds (comment + type-only; **not** a rework, attempt count unchanged).
+- **Attempts:** 1 coding attempt, 0 FAIL. One Implementer turn ended without delivering its report and was recovered by a single poke (see *The delivery failure* below) — a protocol event, not a rework.
+- **Implementer:** `akili-implementer` (`sonnet`, effort **`high`**)
+- **Reviewer:** one `akili-reviewer` (`opus`, read-only) in **lens-checklist** mode — the effort dial (`high`) selects the single-Reviewer sweep rather than parallel lens Reviewers. 6 advisories returned, 2 folded.
+- **Skills assigned:** `nestjs-expert`, **`systematic-debugging`**. **Leader deviation** from the task's list (`nestjs-expert` only): T-11 carries an inherited harness defect (the non-exit), and `.agents/leader.md` → *Delegation Discipline* maps any bug or test failure to `systematic-debugging`. Effort is `high` rather than the `medium` default because the difficulty is not line count — it is an auth bypass inside a real `AppModule`, fixture fidelity against baseline B-1, and a harness defect that hides its own failure.
+
+#### Environment pre-check (run before briefing, per `/akili-execute` Step 2.1)
+
+Dev MySQL `192.168.20.210:3306` **reachable** at run start. This is the condition whose absence produced the T-10 environment scare (§ above), so it is recorded rather than assumed: the T-11 e2e boots the real `AppModule`, which connects to that database.
+
+#### D-T11-a — how far the e2e reaches into the real stack *(spec-owner decision, 2026-08-11)*
+
+**The ambiguity.** T-11's scope bullet 2 — *"payload with valid contacts → `201` and they reach CC"* — is not decidable from the spec. Neither `requirements.md` R-CBU-005 nor `design.md` §11 states what the e2e may touch, and three facts collide:
+
+1. the endpoint sits behind `JwtMiddleware` (`app.module.ts:75`) + `@UseGuards(RolesGuard)` (`results.controller.ts:55`), so the test must bypass auth or mint a real token;
+2. `createResultFromAiBulk` writes real rows to the **shared** dev MySQL, which `docs/infrastructure.md` → *Boundary rule* makes a human decision, never an agent's;
+3. the `ENABLED` flag is seeded `'false'` by T-03, so a faithful real run dispatches **nothing** — bullet 2 is unprovable without an override regardless of the DB question.
+
+**Decided:** real chain, repository stubbed, **zero writes to the shared dev DB**.
+
+| Layer | T-11 treatment |
+| --- | --- |
+| `AppModule`, `ValidationPipe` (`whitelist` + `forbidNonWhitelisted` + `transform`), `GlobalExceptions`, `ResponseInterceptor`, `RootAi`/`AiContactDto` | **real** — the D4 gate and the `400` envelope |
+| `JwtMiddleware`, `RolesGuard` | bypassed / `overrideGuard` with a stub `req.user` |
+| `ResultsService.createResultFromAiBulk` | stubbed spy — **no persistence** |
+| `CapdevBulkNotificationRepository` (5 reads + 2 writes) | stubbed, one synthetic group |
+| `ENABLED` flag | overridden **on** for the CC test only |
+| `dispatch()` → `buildRecipients` → `formatCapdevMetrics` → `sendGroupNotification` | **real** — this is what makes bullet 2 a genuine assertion rather than a mock echo |
+| `MessageMicroservice.sendEmail` | spy — the CC assertion reads `EmailBody.cc` |
+
+**Rejected alternatives, and why they were offered.** *Full integration with real dev-DB writes* would be the strongest proof of the CC claim, but it writes junk rows to a shared database on every run and depends on live Agresso contract data staying valid — the spec owner declined the write authorization. *Validation-contract-only* (service stubbed, dispatch never entered) is the narrowest true reading of defect class **D4** ("legacy caller now `400`s") and would have been defensible, but it silently drops an approved scope bullet; it was offered as the reduced option and not taken.
+
+**One trap this decision creates, briefed explicitly.** T-04's `sec_template` migration is **unapplied on dev**, so a real `_getTemplate` returns nothing, `sendGroupNotification` short-circuits to `NO_TEMPLATE`, and `sendEmail` is never called — bullet 2 would pass vacuously while proving the opposite of what it claims. The brief therefore requires the template stub to carry the **real bytes** of `capdev-bulk-summary.html`. **KZ-001 binds here** (test-double fidelity, recurrence 4).
+
+#### Inherited harness defect — scope bounded in the brief
+
+`npm run test:e2e` passes but never exits (open handles: DB pool, RMQ, cron; the script carries no `--forceExit`). Pre-existing, proven by A/B with T-10 stashed. The Implementer was directed to fix it in order — `afterAll` → `await app.close()` first, `"forceExit": true` in **`test/jest-e2e.json`** only as a backstop, and never by editing `package.json` — and to report which was actually needed. The brief also restates that **only the non-exit is real**: the 5 s hook timeout in the original diagnosis was the VPN outage, not the harness.
+
+**Outcome: both were needed, and this is the opposite of the cheap answer.** `afterAll` → `await app.close()` alone left the jest process alive **5+ minutes with no self-termination across two independent runs**. `"forceExit": true` in `test/jest-e2e.json` is the load-bearing part. `--detectOpenHandles` ran green (4/4) and named **no** open handle, so the residual leak is **masked, not diagnosed** — consistent with a native/pool-level handle jest cannot attribute. Candidates (unconfirmed): the mysql2 pool, an OpenSearch keep-alive socket, `@nestjs/schedule` timers. `package.json` was not touched.
+
+#### Files changed
+
+`test/results-ai-formalize-bulk.e2e-spec.ts` (**new**, 412 lines) · `test/app.e2e-spec.ts` (+13/−1: `beforeEach`→`beforeAll`, `afterAll` → `app.close()`) · `test/jest-e2e.json` (+2/−1: `"forceExit": true`). **No `src/` file touched** — the `test/`-only scope boundary held.
+
+#### Verification (Leader's own runs, tree quiet, no agents active)
+
+| Check | Result |
+| --- | --- |
+| `npm run test:e2e` | **2 suites / 4 tests passed, 4.967 s**, and the process **exits on its own** — marker file `EXIT=0`, `pgrep` for `jest --config ./test/jest-e2e.json` empty immediately after |
+| Non-exit mechanism | jest's own `"A worker process has failed to exit gracefully and has been force exited"` line confirms `forceExit` is what ends the run — the `app.close()`-alone claim would have been unfalsifiable without it |
+| `npx tsc --noEmit -p tsconfig.json` | exit 0. `tsconfig.json` declares **no `include`** (only `exclude`), so `test/` **is** typechecked — the new suite is covered, not merely ignored |
+| `npx eslint test/ --quiet` (**no `--fix`**) | exit 0, `git status` re-checked, nothing mutated |
+| Unit-suite regression | **structurally impossible.** Unit jest is `rootDir: "src"` (`package.json`), so `test/` is outside its scope entirely. The Implementer's 2186/2186 is guaranteed by configuration, not sampled — this was reasoned rather than re-run |
+
+**Independent corroboration from the app's own logger**, which is stronger than either agent's testimony: the e2e log carries
+`ERROR [STAR MAIN API] [ValidationPipe] [exceptionFactory] [POST] [USER_ID:900001]: /api/results/ai/formalize/bulk BadRequestException`.
+That single line proves three things at once — the unversioned route is real and reachable, the **real** `ValidationPipe` produced the `400` (not a test assertion), and the `JwtMiddleware` stub genuinely populated `request.user`.
+
+**Pre-existing noise, not introduced here:** both e2e suites log a caught `console.error` — `Error loading Vite manifest: ENOENT … dist/admin/public/.vite/manifest.json` from `ReactRendererService` — because `npm run build:admin` has not run. Present in `app.e2e-spec.ts` before this diff. Benign; recorded so a future reader does not mistake it for a T-11 defect.
+
+#### Reviewer verdict
+
+`STATUS: PASS` — *"The diff conforms to T-11's scope as narrowed by D-T11-a… no query or write from any test body can reach the shared dev MySQL. The route-path deviation from the task text is correct behavior against stale documentation, and the one link the e2e authors rather than observes is independently gated by T-10's unit spec."*
+
+The five adjudications worth keeping:
+
+1. **AC.2 is not KZ-001-vacuous, but its claim needed narrowing.** Real: the `ValidationPipe`/`RootAi`→`ProcessMedatada`→`AiContactDto` transform, the DI-resolved `dispatch()`, `buildRecipients` + `formatCapdevMetrics` (module-level function imports — unmockable by accident), `safeGetTemplate` → real `Handlebars.compile` over the real on-disk bytes, real `EmailBody` assembly, captured at the last seam. **Authored, not observed:** exactly one link — `metadata?.contacts` → `dispatch`'s second parameter — which D-T11-a's own seam table *forces* (stubbing `createResultFromAiBulk` and running `dispatch` real cannot both hold unless the stub calls `dispatch`). That link is **independently gated** at `results.service.spec.ts:3409-3430`, which asserts `dispatch` was called with `(42, contacts)` from the real `createResultFromAiBulk` against `results.service.ts:1067-1076`. Unit + e2e compose to full coverage. **State the claim precisely:** AC.2 proves *the posted address survives real DTO validation and the real dispatch→builder→formatter→render chain into `EmailBody.cc`* — **not** *"through the endpoint's own service"*.
+2. **The route path — see D-T11-b below.** Claim correct; documentation stale.
+3. **Coverage complete.** T-11's three scope bullets map to AC.1/AC.2/AC.4, all present. **AC.3 is not owed by T-11** (its scope bullets never mention scoping) and is discharged at `capdev-recipients.builder.spec.ts:135-155`, which asserts both `toContain` on group A and `not.toContain` on group B. AC.5 is D-T01-a. ⚠️ **Worth carrying forward:** AC.2's fixture has exactly one group, so a **cross-group CC leak is gated only at unit level** — the e2e cannot see it.
+4. **The B-1 fixture genuinely guards D4.** `metadata: { file_name, ai_interaction_id }`, no `contacts` key — byte-for-byte the shape at §2 above, not a current-DTO payload with an optional field omitted. And `minimalValidResult()` is safe: `ResultRawAi` (`result-ai.dto.ts:271-310`) requires exactly `contract_code`, `indicator`, `title`; every other property is `@IsOptional()`. So AC.1's `201` cannot be standing in for a "400 for the wrong reason", and all three fields are pre-T-01.
+5. **Zero DB writes — and zero DB *queries* from any test body.** All 7 repository entry points `dispatch()` touches are spied (there is no eighth); both config accessors spied (no `app_config` read); `_getTemplate` spied (no `sec_template` read); `JwtMiddleware.prototype.use` stubbed (no `app_secrets`/ROAR lookup); `AppConfig.COMPLETE_CLIENT_HOST` is `process.env`-only. The Reviewer additionally traced the **real** `SetUpInterceptor`, which does run: both `setup()` calls short-circuit to `null` before any query on this request (`results.util.ts:26-36`, `portfolio.util.ts:23-34`). The suite is also self-guarding — had the `ENABLED` spy missed, dev's seeded `'false'` would return `SKIPPED` and `expect(sendEmailSpy).toHaveBeenCalledTimes(1)` would go red rather than passing quietly.
+
+**KZ-001 satisfied (recurrence 4).** `REAL_CAPDEV_TEMPLATE_HTML` is `fs.readFileSync` of the real `capdev-bulk-summary.html`, and the stub reproduces `_getTemplate`'s semantics exactly including the `data === undefined` raw-string branch (`template.service.ts:22-23`). A `template: ''` stub would have driven `NO_TEMPLATE` and turned the CC assertion **red**, not vacuously green — the failure mode is closed from both directions.
+
+#### Two Leader-directed advisory folds (no attempt consumed)
+
+- **F-1 — the `afterAll` comments contradicted the evidence.** Both originally presented `app.close()` as *the* fix and cited "no `--forceExit` in the script" as the cause, while the A/B proved `forceExit` load-bearing. `jest-e2e.json` is JSON and cannot carry a comment, so those comments are the only honest home for the finding. Rewritten to state that both are required, that **deleting the config line restores the CI-blocking hang even with `app.close()` present**, and that the leak is masked rather than diagnosed. Folded because the original wording is a live trap: it invites a future maintainer to delete the one line that works.
+- **F-2 — dropped the `as never` cast** at the `dispatch` call site. It defeated the only type check at the test's own hand-off point, and was unnecessary: `AiContactDto` is structurally assignable to `CapdevRecipientFileContact`, which is why `results.service.ts:1068-1071` needs no cast. The Implementer was told that if `tsc` went red without it, to **stop and report** rather than restore it — that would have meant T-10's recorded DTO compatibility was not real. It compiled clean, confirming the Reviewer's read. `tsc --noEmit` exit 0 after the fold.
+
+#### D-T11-b — the documented endpoint path does not exist *(Leader correction, 2026-08-11)*
+
+**Finding.** `design.md` §5, `requirements.md` §9 + §1/§3/R-CBU-001, and `tasks.md` T-11's Scope all named `POST /api/v1/results/ai/formalize/bulk`. **That route returns `404`.** Evidence, verified by the Leader and independently by the Reviewer:
+
+- `main.ts:53-56` — `setGlobalPrefix('api')` + `enableVersioning({ type: VersioningType.URI })`, and **no `defaultVersion`** anywhere in `src/`.
+- `results.controller.ts:656-682` — `createResultFromAiBulk` declares no `@Version()`. The only versioned handler in `ResultsController` is `@Version('2')` at `:257-258`.
+- Under Nest, a handler with neither its own version nor a configured default mounts **without** a version segment. Reachable path: `POST /api/results/ai/formalize/bulk`.
+
+**Consequence and why it is not a pivot.** Nothing about the design became unviable and no code changed — the endpoint's real path has always been unversioned, and the AI mining service's existing integration was never affected because it has always called the reachable path. This is a **documentation error corrected in place**, per the constitution's *"prefer fixing the document and recording a decision."* Had the Implementer obeyed the documented path, its test would have `404`d and proven nothing about D4; it booted the app, dumped the Express route table, and used the real route — the right call, correctly reported rather than silently taken.
+
+**Correction closure — two-direction sweep executed** (per `/akili-specify` → *Correction Closure*):
+- **Forward** (the superseded value at sites the analysis did not cite): `grep -rn "api/v1"` across the spec folder found **6** occurrences — `requirements.md:16,43,88,472`, `design.md:177`, `tasks.md:264`. All corrected; the only remaining matches are inside the two correction notes themselves, which quote the old value deliberately as historical record.
+- **Backward** (documents citing the corrected sections, which may now assert a falsehood): the 5 references to `design.md` §5 / `requirements.md` §9 (`tasks.md:79`, `:262`, `execution.md:122`, `:139`, `:162`) are **pointers only** — none restates the path. No further edit owed.
+
+#### Constitution Impact: T-11
+
+The same inaccuracy is in the constitution, and it caused **demonstrated** harm in this run: three spec documents *and* the root guide told the Implementer `/api/v1/...`. Corrected immediately rather than deferred to `/akili-archive`, per the root guide's own rule that a guide actively misleading agents is fixed in the task commit:
+
+- **root `CLAUDE.md` §4.1** — "URI versioning (`/api/v1`, `/api/v2`)" replaced with how versioning actually resolves (enabled, no `defaultVersion`, so a version segment appears only where `@Version(...)` is declared), plus the instruction to verify a path before writing a client, test, or doc against it.
+- **`server/researchindicators/src/CLAUDE.md` §1** — "REST API under `/api/v{n}`" corrected the same way.
+- No module was created or reshaped; no new child guide is needed. **CodeGraph re-index pending** (unchanged from prior tasks).
+
+#### Recorded advisories — not folded, and deliberately NOT new tasks
+
+`/akili-execute` → *Advisory Never Becomes A Task*: an advisory is recorded and dies there. None of these may widen this spec; each is the spec owner's call as a possible follow-up proposal.
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| A-1 | Risk | **`forceExit: true` is a shared-config change with forward blast radius.** It now applies to every future e2e suite and will silently absorb leaks those suites introduce. Defensible as a backstop given `--detectOpenHandles` named nothing, and explicitly authorized by the T-11 brief — but it is an **accepted, undiagnosed leak**, not a fixed one. A follow-up should identify the holder. |
+| A-2 | Reliability | **Extract the bootstrap instead of replicating it.** `setGlobalPrefix('api')` + `enableVersioning(...)` now live in both `main.ts` and the e2e. A future route-affecting bootstrap step would land in `main.ts` only, and the e2e would keep passing against a configuration production no longer has. An exported `configureHttpApp(app)` called by both removes the drift class permanently — and would make the `/v1` question un-guessable. **`src/` change, out of T-11's scope.** |
+| A-3 | Reliability | **Auth is unobservable at e2e level for this endpoint.** With `JwtMiddleware.prototype.use` patched and `RolesGuard` overridden to always allow, deleting `@Roles(...)` from `createResultFromAiBulk` would turn **no** e2e red. Inside D-T11-a's approved seam map and out of scope — but one case (no header → 401, wrong role → 403) would close a gap with no gate at any layer. |
+| A-4 | Reliability (minor) | **`mockClear()` does not drain `mockResolvedValueOnce` queues.** If AC.2 ever fails part-way through `dispatch`, unconsumed once-values would survive `afterEach` into the next test. Harmless today (AC.4 asserts the repository is not called at all). **Not folded deliberately:** changing mock lifecycle to fix a currently-latent coupling risks reddening a green suite for no present benefit. |
+| A-5 | Readability | `AC.2`'s inline comment claims the assertion proves the address "survived the REAL builder + formatter + template render" — true, but a reader may over-read it as *through the endpoint's own service*. The precise framing is recorded in adjudication 1 above. |
+
+#### Two findings the Implementer surfaced that outlive this task
+
+1. **`MessageMicroservice` is declared as its own provider in five separate feature modules** (`result-status-workflow`, `result-oicr`, `ai-reports`, `green-checks`, `reporting-feedback`) rather than imported from one shared module, so **each declaring module gets its own instance**. This is a live DI footgun, and it bit: the Implementer's first attempt used `moduleFixture.get(MessageMicroservice)` + an instance-level `jest.spyOn`, which silently patched the **wrong object** — `updateNotificationStatus` recorded `SENT` while the spy saw zero calls, because the real `client.emit()` ran on a different instance. Fixed **in the test** via `.overrideProvider(MessageMicroservice)`, which patches the token across every declaring module at once. **`src/` was deliberately not touched** — consolidating those five declarations is outside T-11's scope and is a candidate follow-up proposal, not an advisory this spec may absorb. Any future e2e touching mail will hit the same trap.
+2. **A real `client.emit()` reached the live RabbitMQ broker at least once during that debugging**, carrying fabricated `@example.org` addresses. `example.org` is the IANA-reserved test domain with no mail server, so **no human could receive anything** and the mailer had nothing deliverable — but a message was genuinely emitted to the real queue. Contained, self-reported, and recorded here rather than dropped. The `overrideProvider` fix makes it structurally unreachable from this suite going forward.
+
+#### The delivery failure (protocol event, worth recording)
+
+The Implementer's first turn **ended without delivering its report** — it stopped mid-wait on a background monitor. Per `.agents/leader.md` → *Idle is not delivered*, the Leader poked **once** with the specific evidence (a `-t "AC.2"` jest process alive 2 m 46 s against a ~3.6 s boot), and the full report came back. **No attempt was consumed** — this is an environment/protocol failure, not a work FAIL.
+
+Two lessons, both Kaizen candidates at archive:
+
+- **The Implementer's own background-task tool reported two `npx jest` invocations as "completed (exit code 0)" while both underlying `node` processes were still alive minutes later**, parent chain intact, with an `&&`-chained marker write that had never fired. The notification apparently tracks output-idle, not process death. The Implementer caught this itself, switched to marker-file + `ps` as its only trusted signal, and flagged that it had nearly repeated the false claim in its report. **This is precisely the class of defect T-11 existed to fix, appearing in the tooling used to verify the fix** — a green signal over a process that never exited.
+- The Leader's own first inference from the mid-flight tree ("`jest-e2e.json` unmodified, so `app.close()` sufficed") was **wrong for the same reason** — reading a working tree while a worker is active measures an intermediate state. Corrected once the report arrived.
+
+#### Status transition
+
+- **T-11 → `[x]`** — Reviewer PASS attempt 1, two comment/type-only folds, `test:e2e` 4/4 green **and exiting** on the Leader's own run, `tsc` + `eslint` clean, unit-suite regression structurally impossible. D-T11-b corrected across 6 spec sites + 2 constitution guides with both sweep directions closed. **T-12 is unblocked — and is the last task in the spec.**
+
+---
+
 ## 6. Open decisions blocking T-08
 
 Two items surfaced by the T-07 review that are **spec-owner calls, not Implementer or Reviewer calls**. Both should be settled before T-08 is briefed, because T-08's rendered-body assertions depend on them.
