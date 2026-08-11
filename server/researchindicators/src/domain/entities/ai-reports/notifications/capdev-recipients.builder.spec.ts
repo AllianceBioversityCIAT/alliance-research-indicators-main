@@ -103,6 +103,43 @@ describe('capdev-recipients.builder', () => {
       expect(result.cc).toEqual(['valid@example.org']);
     });
 
+    it('R-CBU-004 AC.4 — a malformed entry is absent from cc AND named in the returned dropped list', () => {
+      const group = makeGroup();
+      const fileContacts = [{ email: 'John Doe', contract_code: undefined }];
+
+      const result = build(group, fileContacts, [], []);
+
+      // Test it as a drop, not as a log call (tasks.md T-12 orphaned-AC
+      // block): the malformed value must be structurally absent from `cc`...
+      expect(result.cc).not.toContain('John Doe');
+      // ...AND present, verbatim, in the returned `dropped` list — this is
+      // the data the orchestration loop (T-12) has to log at debug level.
+      // A builder that "logs everything and drops nothing" would fail the
+      // line above; a builder that drops but reports nothing back would
+      // fail this one.
+      expect(result.dropped).toEqual(['John Doe']);
+    });
+
+    it('a blank/absent optional source (no RA, no PA, no file contacts) reports nothing dropped — absence is not malformation', () => {
+      const group = makeGroup();
+
+      const result = build(group, [], [], []);
+
+      expect(result.dropped).toEqual([]);
+    });
+
+    it('multiple malformed entries across sources are all named in dropped, in encounter order', () => {
+      const group = makeGroup();
+      const fileContacts = [
+        { email: 'n/a', contract_code: undefined },
+        { email: '—', contract_code: undefined },
+      ];
+
+      const result = build(group, fileContacts, [], ['not-an-email']);
+
+      expect(result.dropped).toEqual(['n/a', '—', 'not-an-email']);
+    });
+
     it('every optional source absent still yields SPRM in cc', () => {
       const group = makeGroup();
 

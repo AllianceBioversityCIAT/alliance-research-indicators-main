@@ -18,6 +18,15 @@ export interface CapdevRecipients {
   to: string[];
   cc: string[];
   salutation: string;
+  /**
+   * Trimmed values dropped by {@link buildCc}'s validity check — malformed,
+   * non-empty entries (`"n/a"`, `"—"`, `"John Doe"`), never a blank/absent
+   * optional source. A **return value**, not a side effect: this module
+   * stays pure (T-06's purity disqualifier) and the caller (T-12,
+   * `capdev-bulk-notification.service.ts`) is the one that logs it at debug
+   * level (design.md §10, R-CBU-004 AC.4).
+   */
+  dropped: string[];
 }
 
 /** Basic RFC-shaped address check — enough to drop "n/a", "—", "John Doe". */
@@ -80,17 +89,32 @@ function scopedFileContactEmails(
 /**
  * Sanitisation order (design.md §6.4, R-CBU-004): normalise -> validate ->
  * drop-if-in-`to` -> dedupe. All comparisons case-insensitive and trimmed.
+ *
+ * **`dropped` is a return value, not a side effect** (tasks.md T-12 orphaned
+ * AC, R-CBU-004 AC.4) — it records only the *validate* step's rejects: a
+ * non-empty candidate that fails `isValidEmail` (`"n/a"`, `"—"`, `"John
+ * Doe"`). A blank/absent optional source (no RA on the contract, no file
+ * contacts) is never "malformed" and is never appended here; only the
+ * `normalise` step's `!value` short-circuit skips those, silently, same as
+ * before. The `drop-if-in-to` and `dedupe` steps are correct-by-design
+ * outcomes, not malformation, so they are not reported either — design.md
+ * §10's "recipient dropped" debug line is for R-CBU-004 AC.4 specifically.
  */
 function buildCc(
   candidates: (string | null | undefined)[],
   piKey: string,
-): string[] {
+): { cc: string[]; dropped: string[] } {
   const seen = new Set<string>();
   const result: string[] = [];
+  const dropped: string[] = [];
 
   for (const raw of candidates) {
     const value = trimmed(raw); // normalise
-    if (!value || !isValidEmail(value)) continue; // validate
+    if (!value) continue; // absent/blank — not a malformed entry
+    if (!isValidEmail(value)) {
+      dropped.push(value); // validate — malformed, non-empty
+      continue;
+    }
 
     const key = normalizeKey(value);
     if (key === piKey) continue; // drop-if-in-to
@@ -100,7 +124,7 @@ function buildCc(
     result.push(value);
   }
 
-  return result;
+  return { cc: result, dropped };
 }
 
 /**
@@ -121,7 +145,7 @@ export function build(
   }
 
   const piKey = normalizeKey(piEmail);
-  const cc = buildCc(
+  const { cc, dropped } = buildCc(
     [
       group?.ra?.email,
       group?.pa?.email,
@@ -136,5 +160,6 @@ export function build(
     to: [piEmail],
     cc,
     salutation: resolveSalutation(group),
+    dropped,
   };
 }

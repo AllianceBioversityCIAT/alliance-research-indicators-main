@@ -2,7 +2,7 @@
 
 - **Module:** results (implementation in `ai-reports`)
 - **Spec id:** 2026-08-capdev-bulk-upload-notification
-- **Status:** not-started
+- **Status:** **execution complete — 12/12 tasks `[x]` as of 2026-08-11.** The §8 Done definition is not yet fully discharged (coverage measurement, migration revert, flag re-confirmation, and the human email review remain owed). Next phase: `/akili-test`.
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) (r4)
@@ -269,12 +269,12 @@ Two rules, both non-negotiable:
 ---
 
 ### T-12 — Failure-isolation and data-minimisation sweep
-- **Status:** [ ]
+- **Status:** [x] — Implementer attempt 1, **Reviewer PASS ×2** (conformance/reliability + risk/security/data-minimisation lenses), 2026-08-11, plus a 5-item Leader-directed fold batch (no attempt consumed). Full unit suite **2196/2196**, `test:e2e` **4/4**, `lint --quiet` clean with `git status` re-checked — all on the Leader's own gate. **R-CBU-004 AC.4 closed**: the builder now returns `dropped: string[]` and the service `_debug`s it, with T-06's purity disqualifier verified intact by the conformance lens. Two spec-owner decisions landed here: **D-T12-a** — R-CBU-010 AC.3 promised per-group isolation for a metric-query failure that the grouped-read architecture never provided (Q2/Q3/Q4 precede the loop; a read failure suppresses the **whole batch**), corrected in the design's favour because NFR-CBU-001 forbids the fan-out the old AC implied, both sweep directions closed. **D-T12-b** — `design.md` §9's "addresses only at debug" is not an installed control (`main.ts` sets no log levels), rollout-gated on the §14 security sign-off rather than folded here. Fold 3 also closed a KZ-001-shaped seam and, in the same move, covered the one *genuine* per-group query failure (`TEMPLATE_QUERY_ERROR`) through `dispatch()`. See `execution.md` → T-12. **Last task in the spec — 12/12.**
 
 - **Requirements covered:** R-CBU-010, R-CBU-011, NFR-CBU-002, NFR-CBU-003, **R-CBU-004 AC.4**
 - **Design refs:** §6.6, §9, §10
 - **Files:** cross-cutting specs, **plus `capdev-recipients.builder.ts` + spec and the `dispatch()` loop** (see the orphaned-AC item below)
-- **Scope:** the R-CBU-010 "Broker down" scenario end to end; per-group isolation under three distinct failure modes (send throws, metric query throws, template missing); assert exactly one error log per caught failure carrying the process id; assert no email address at info level; assert no `trainee_name` in any rendered body.
+- **Scope:** the R-CBU-010 "Broker down" scenario end to end; isolation under three distinct failure modes — **send throws** and **template missing/erroring** are per-group; **metric query throws** is batch-wide and is gated at the outer boundary in `ResultsService` (**D-T12-a** — see `requirements.md` R-CBU-010 AC.3 and `design.md` §6.6; the original "per-group" wording for this mode described an architecture that was never built); assert exactly one error log per caught failure carrying the process id; assert no email address at info level; assert no `trainee_name` in any rendered body.
 - **⚠️ Orphaned AC, assigned here by spec-owner decision 2026-08-11.** **R-CBU-004 AC.4** — "a malformed entry is dropped and **logged at debug level**" — is unimplemented **feature-wide**, not merely unfinished. T-06 owns R-CBU-004 and shipped without it; the T-09 review found it while diffing §10 row by row. No other remaining task claimed it.
   - **Why it could not land in T-09:** `capdev-recipients.builder.ts` returns `{ to, cc, salutation } | null`; drops happen inside `buildCc` via a bare `continue` that retains nothing, so there is **no data at the orchestration layer to log**. `tasks.md` told T-09 to implement "every §10 log line" while its **Files** clause denied it the file needed — a spec-internal contradiction, not implementer drift.
   - **Fix:** widen the builder's return to `{ to, cc, salutation, dropped: string[] }` and `_debug` it in the per-group loop. ~4 lines across two files.
@@ -324,9 +324,9 @@ Every requirement appears in ≥1 task; every task cites ≥1 requirement.
 
 ## 8. Done definition
 
-- [ ] All 12 tasks `done`
-- [ ] `npm test -- --silent` and `npm run test:e2e` green; coverage ≥ 60% not regressed
-- [ ] `npm run lint -- --quiet` clean, `git status` re-checked (the script carries `--fix`)
-- [ ] Migrations apply and revert on dev
-- [ ] Flag still seeded `false` at merge — **the feature ships dark**
-- [ ] Rollout steps 0–2 executed, including the **human review of a real received email** (defect classes D7/D8 have no automated gate)
+- [x] All 12 tasks `done` — **2026-08-11**, every one on a Reviewer PASS
+- [~] `npm test -- --silent` and `npm run test:e2e` green; coverage ≥ 60% not regressed — **tests green (2196 unit / 4 e2e)**; the coverage half is **owed**: `npm run test:cov` was never run, so NFR-CBU-004's floor is discharged by inference, not measurement. Belongs to `/akili-test`.
+- [x] `npm run lint -- --quiet` clean, `git status` re-checked (the script carries `--fix`) — run by the Leader at the T-12 gate; `--fix` touched no file beyond the 5 in the diff
+- [ ] Migrations apply and revert on dev — **apply verified** (O-1/O-3/O-4/O-5 against dev 2026-08-09); **revert never executed** (O-2 waived by the spec owner on static review), so production rollback of the T-02 migration remains unrehearsed
+- [ ] Flag still seeded `false` at merge — **the feature ships dark**. Seeded `false` and verified at T-03 (O-3); **re-confirm against dev immediately before merge**, not from this record
+- [ ] Rollout steps 0–2 executed, including the **human review of a real received email** (defect classes D7/D8 have no automated gate). Step 4 additionally gated by **D-T12-b** — the security sign-off must adjudicate the debug-channel finding (`requirements.md` §14)

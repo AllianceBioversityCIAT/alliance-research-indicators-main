@@ -373,7 +373,15 @@ The `%` sign belongs to the **formatter's output string**, not to the template. 
 **Acceptance criteria:**
 - [ ] AC.1 — `MessageMicroservice.sendEmail` throwing yields a `201` response with the unchanged `data` payload.
 - [ ] AC.2 — Group 1 throwing still dispatches group 2.
-- [ ] AC.3 — A repository/query error during metric computation for one group is caught, logged, and does not prevent the other groups.
+- [ ] AC.3 — A repository/query error during metric computation is caught at the **outer** boundary in `ResultsService`, logged once with the bulk process id, and does not fail the upload. It suppresses the **whole batch's** notifications, not one group's — see the correction note below.
+
+> **Correction — D-T12-a, decided 2026-08-11.** This criterion previously read: *"A repository/query error during metric computation **for one group** is caught, logged, and does not prevent the other groups."* That described an architecture that was never built. Q2 (`findMetrics`), Q3 and Q4 are **batch-wide grouped reads executed before the per-group loop opens** (`capdev-bulk-notification.service.ts:190-195`; `capdev-bulk-notification.repository.ts:320` is one query with `GROUP BY ac.agreement_id`), so there is no per-group metric call that could fail in isolation. Nothing inside the loop touches `CapdevBulkNotificationRepository` at all.
+>
+> The old wording was not merely imprecise — it promised a guarantee the system does not provide. A batch-read failure suppresses **every** group's email. `design.md` §6.6's outer boundary still holds (the upload returns `201`, results stay persisted, exactly one error log), which is R-CBU-010's headline promise; it is specifically the per-group isolation clause for this failure class that was false.
+>
+> **Why the design wins over the old AC:** grouped reads are what NFR-CBU-001 mandates ("no per-result query fan-out"), and per-group metric queries would reintroduce exactly the fan-out that requirement exists to prevent. The spec owner resolved in the design's favour. **No code changed** — T-12 tested this at the outer boundary rather than faking a per-group one.
+>
+> **The genuine per-group query failure the architecture does have** is `TemplateService._getTemplate`, wrapped by `safeGetTemplate` → `cause=TEMPLATE_QUERY_ERROR`. It is isolated per group, and T-12 gates it through `dispatch()` with a second group proving it still dispatches.
 - [ ] AC.4 — Results created before a notification failure remain persisted and readable.
 - [ ] AC.5 — Every caught failure produces exactly one error log carrying the bulk process id.
 
@@ -549,5 +557,15 @@ No new endpoints.
 
 - [ ] Engineering lead — David Felipe Casañas Hernández
 - [ ] MEL / product owner — <pending>
-- [ ] Security review (outbound PII to external addresses) — <pending>
+- [ ] Security review (outbound PII to external addresses) — <pending> · **must also adjudicate the debug-channel finding below before the flag is switched on**
+
+> **Debug-channel finding — raised by the T-12 risk review, 2026-08-11. Blocks rollout step 4, not merge.**
+>
+> `design.md` §9 treats *"addresses appear only at debug"* as a **log-hygiene control**. That premise does not hold in this deployment: `src/main.ts:18` calls `NestFactory.create` with no options and nothing in `src/` calls `useLogger` or `setLogLevels`, so Nest 10's `DEFAULT_LOG_LEVELS` — which include `debug` — are in force. The `recipient dropped` debug line (§10) therefore reaches stdout in **every** environment at the same retention as info.
+>
+> **Why this is not a T-12 defect and not a merge blocker.** The implementation matches §10 exactly; the spec's assumption about the channel is what is wrong. The debug loop sits *after* the `ENABLED` gate, so while the feature ships dark the line never executes — a flag-off environment logs zero recipient values. The exposure begins only at rollout step 4.
+>
+> **Scope note.** Installing a real log-level policy means a bootstrap change in `main.ts` affecting every module in the server. That is outside this spec and belongs in its own proposal — it is deliberately **not** folded into T-12. Interim options for the reviewer: a bootstrap `logLevels` policy, or masking the logged value (first 3 characters + domain) at the §10 site.
+>
+> Mitigations already in place: the value is CRLF-neutralised at the log site, and file-sourced addresses cannot reach it at all (`@IsEmail()` on `AiContactDto` rejects them at the DTO boundary). The residual exposure is malformed **internal staff** addresses from Agresso or `app_config`.
 - [ ] DevOps (app_config seeding per environment) — <pending>

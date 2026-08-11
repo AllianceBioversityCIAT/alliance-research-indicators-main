@@ -55,6 +55,38 @@ function createTemplateService(
 }
 
 /**
+ * A **real** `TemplateService` (real Handlebars, real `_getTemplate`
+ * control flow) backed by a `findOne` sequenced per call — one entry per
+ * call to `_getTemplate`, in order. This is what makes a per-group
+ * `dispatch()` test differentiate group A from group B without stubbing
+ * `_getTemplate` itself (Leader fold 3, KZ-001): a `_getTemplate` stub would
+ * make group B's `sendEmail` receive the *fake* return value verbatim,
+ * never running it through real Handlebars — "no `{{` remaining" would then
+ * be true only because nothing was ever templated, not because rendering
+ * succeeded.
+ *
+ * Each entry is either a `{ template }` row (found) or an `Error` (the
+ * `findOne`-throws branch — `template.service.ts`'s destructure of a `null`
+ * result).
+ */
+function createSequencedTemplateService(
+  entries: Array<{ template: string } | null | Error>,
+): TemplateService {
+  const findOne = jest.fn();
+  for (const entry of entries) {
+    if (entry instanceof Error) {
+      findOne.mockRejectedValueOnce(entry);
+    } else {
+      findOne.mockResolvedValueOnce(entry);
+    }
+  }
+  const dataSource = {
+    getRepository: jest.fn().mockReturnValue({ findOne }),
+  } as unknown as DataSource;
+  return new TemplateService(dataSource);
+}
+
+/**
  * Minimal mock repository — T-05's repository already has its own exhaustive
  * spec (`capdev-bulk-notification.repository.spec.ts`); `dispatch()`'s tests
  * only need to prove it calls the repository correctly, not re-verify the
@@ -114,6 +146,17 @@ async function createService(
   options: {
     repository?: ReturnType<typeof createRepositoryMock>;
     envAppConfig?: ReturnType<typeof createEnvAppConfigMock>;
+    /**
+     * T-12: a **real** `TemplateService` (e.g. from
+     * {@link createSequencedTemplateService}) that drives `_getTemplate`
+     * per-call — group A missing/erroring, group B present — rather than
+     * the fixed-per-instance `createTemplateService(templateRow)`. Always a
+     * real instance (KZ-001: never a `{ _getTemplate: jest.fn() }` stub, or
+     * a "real Handlebars" claim elsewhere in this file would be false for
+     * whichever group used it). Ignored — and `templateRow` used instead —
+     * when omitted.
+     */
+    templateService?: TemplateService;
   } = {},
 ) {
   const sendEmail = jest.fn().mockResolvedValue(undefined);
@@ -123,6 +166,8 @@ async function createService(
   };
   const repository = options.repository ?? createRepositoryMock();
   const envAppConfig = options.envAppConfig ?? createEnvAppConfigMock();
+  const templateService =
+    options.templateService ?? createTemplateService(templateRow);
 
   const module: TestingModule = await Test.createTestingModule({
     providers: [
@@ -130,7 +175,7 @@ async function createService(
       { provide: CapdevBulkNotificationRepository, useValue: repository },
       {
         provide: TemplateService,
-        useValue: createTemplateService(templateRow),
+        useValue: templateService,
       },
       { provide: MessageMicroservice, useValue: { sendEmail } },
       { provide: AppConfig, useValue: appConfig },
@@ -148,6 +193,7 @@ const RECIPIENTS: CapdevRecipients = {
   to: ['pi@example.org'],
   cc: ['ra@example.org', 'sprm@example.org'],
   salutation: 'Ada Lovelace',
+  dropped: [],
 };
 
 const TOKEN_OWNER: CapdevBulkTokenOwnerDto = {
@@ -939,6 +985,289 @@ describe('CapdevBulkNotificationService', () => {
           }),
         }),
       );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // T-12 — failure-isolation and data-minimisation sweep
+  // -----------------------------------------------------------------------
+  describe('T-12 — R-CBU-010 "Broker down" scenario, end to end', () => {
+    it('RabbitMQ unreachable (sendEmail throws): metrics still persisted (not rolled back), notification_status FAILED, exactly one ERROR-level log carrying the bulk process id, no info-level address, no trainee_name in the rendered-but-undelivered body', async () => {
+      const group = makeGroup();
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [group],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([
+        makeMetricsRow('ABC-123', { trainings_count: 40 }),
+      ]);
+      const {
+        service,
+        sendEmail,
+        repository: repo,
+      } = await createService({ template: REAL_TEMPLATE_HTML }, { repository });
+      // Real sendGroupNotification runs end to end (KZ-001) — the template
+      // renders for real before the broker call is attempted and fails;
+      // only the transport (MessageMicroservice.sendEmail) is faked.
+      sendEmail.mockRejectedValueOnce(
+        new Error('ECONNREFUSED: RabbitMQ unreachable'),
+      );
+      const errorSpy = jest.spyOn(
+        (service as unknown as { logger: { _error: jest.Mock } }).logger,
+        '_error',
+      );
+      const warnSpy = jest.spyOn(
+        (service as unknown as { logger: { _warn: jest.Mock } }).logger,
+        '_warn',
+      );
+      const logSpy = jest.spyOn(
+        (service as unknown as { logger: { _log: jest.Mock } }).logger,
+        '_log',
+      );
+
+      await service.dispatch(9);
+
+      // Metrics are the same values the (failed) email would have carried —
+      // a broker outage must not roll back or withhold the persisted
+      // aggregate (R-CBU-008, R-CBU-010 "Broker down" scenario).
+      expect(repo.persistProcessMetrics).toHaveBeenCalledWith(
+        9,
+        expect.objectContaining({ total_capdev_results: 40 }),
+      );
+      expect(repo.updateNotificationStatus).toHaveBeenCalledWith(
+        9,
+        NotificationStatus.FAILED,
+        null,
+      );
+
+      // Disqualifies clause: binds to the specific method (`_error`), not
+      // merely "a log fired" — a spy asserting only call count cannot tell
+      // an error from a warning or an info line apart.
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy.mock.calls[0][0]).toContain('bulk_upload_process_id=9');
+      expect(errorSpy.mock.calls[0][0]).toContain('agreement_id=ABC-123');
+      // The failure is real: nothing else silently escalated to error, and
+      // no group was ever reported as sent.
+      expect(warnSpy).not.toHaveBeenCalled();
+      const infoMessages = logSpy.mock.calls.map(([msg]) => msg as string);
+      expect(
+        infoMessages.some((msg) => msg.includes('Notification sent')),
+      ).toBe(false);
+      // NFR-CBU-003 / R-CBU-011 AC.2 — no address at info level, even on
+      // the failure path.
+      expect(infoMessages.some((msg) => msg.includes('@'))).toBe(false);
+
+      // NFR-CBU-003 — the body was rendered (and captured by the mock's
+      // call args) before the broker call failed; it must still carry no
+      // participant-level PII, on a failure path as much as the happy one.
+      const renderedBody = (
+        sendEmail.mock.calls[0][0].message.socketFile as Buffer
+      ).toString('utf-8');
+      expect(renderedBody).not.toContain('trainee_name');
+    });
+  });
+
+  describe('T-12 — per-group isolation under three distinct failure modes', () => {
+    it("mode 1 (send throws): group A's sendEmail rejects, group B still dispatches — exactly one error log, naming A, at error level", async () => {
+      const groupA = makeGroup({ agreement_id: 'A' });
+      const groupB = makeGroup({ agreement_id: 'B' });
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [groupA, groupB],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([
+        makeMetricsRow('A'),
+        makeMetricsRow('B'),
+      ]);
+      const {
+        service,
+        sendEmail,
+        repository: repo,
+      } = await createService({ template: REAL_TEMPLATE_HTML }, { repository });
+      sendEmail
+        .mockRejectedValueOnce(new Error('broker unreachable'))
+        .mockResolvedValueOnce(undefined);
+      const errorSpy = jest.spyOn(
+        (service as unknown as { logger: { _error: jest.Mock } }).logger,
+        '_error',
+      );
+      const logSpy = jest.spyOn(
+        (service as unknown as { logger: { _log: jest.Mock } }).logger,
+        '_log',
+      );
+
+      await service.dispatch(9);
+
+      expect(sendEmail).toHaveBeenCalledTimes(2);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy.mock.calls[0][0]).toContain('agreement_id=A');
+      expect(errorSpy.mock.calls[0][0]).toContain('bulk_upload_process_id=9');
+
+      const infoMessages = logSpy.mock.calls.map(([msg]) => msg as string);
+      const sentLine = infoMessages.find((msg) =>
+        msg.includes('Notification sent'),
+      );
+      expect(sentLine).toBeDefined();
+      expect(sentLine).toContain('agreement_id=B');
+
+      expect(repo.updateNotificationStatus).toHaveBeenCalledWith(
+        9,
+        NotificationStatus.PARTIAL,
+        expect.any(Date),
+      );
+    });
+
+    it('mode 2 (metric query throws): findMetrics fails for the whole batch — this is the OUTER boundary (design.md §6.6 "two nested boundaries"), not per-group isolation, since the four grouped reads run before the per-group loop and before the persistence write; it propagates out of dispatch() itself and neither write occurs', async () => {
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [makeGroup()],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockRejectedValue(new Error('ER_QUERY_TIMEOUT'));
+      const { service, repository: repo } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository },
+      );
+
+      // No per-group boundary exists yet at this point in dispatch() —
+      // ResultsService's outer try/catch (results.service.spec.ts) is what
+      // contains this, exactly as design.md §6.6 describes: "Outer — the
+      // whole dispatch() call is wrapped in ResultsService."
+      await expect(service.dispatch(9)).rejects.toThrow('ER_QUERY_TIMEOUT');
+
+      expect(repo.persistProcessMetrics).not.toHaveBeenCalled();
+      expect(repo.updateNotificationStatus).not.toHaveBeenCalled();
+    });
+
+    it("mode 3 (template query throws): group A's template lookup rejects, group B's resolves and renders for real through Handlebars — group B still dispatches, exactly one error log naming A at cause=TEMPLATE_QUERY_ERROR", async () => {
+      const groupA = makeGroup({ agreement_id: 'A' });
+      const groupB = makeGroup({ agreement_id: 'B' });
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [groupA, groupB],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([
+        makeMetricsRow('A'),
+        makeMetricsRow('B'),
+      ]);
+      // Leader fold 3 (conformance lens, KZ-001): a real `TemplateService` +
+      // real Handlebars throughout, never a `_getTemplate` stub — the
+      // previous version of this test replaced `_getTemplate` itself, so
+      // group B's `sendEmail` received the fixture string verbatim,
+      // unrendered. A `_getTemplate` stub makes "no `{{` remaining" true
+      // for the wrong reason (nothing was ever templated), which is exactly
+      // KZ-001's shape. This also closes on the one genuine *per-group query
+      // failure* the shipped architecture actually has (see the mode-2 test
+      // above for why the batch-wide metric query is architecturally not
+      // per-group): group A's `findOne` rejects with a transient
+      // DataSource-shaped error, group B's resolves the real seeded HTML.
+      const templateService = createSequencedTemplateService([
+        new Error('ER_QUERY_TIMEOUT'),
+        { template: REAL_TEMPLATE_HTML },
+      ]);
+      const {
+        service,
+        sendEmail,
+        repository: repo,
+      } = await createService(null, { repository, templateService });
+      const errorSpy = jest.spyOn(
+        (service as unknown as { logger: { _error: jest.Mock } }).logger,
+        '_error',
+      );
+      const logSpy = jest.spyOn(
+        (service as unknown as { logger: { _log: jest.Mock } }).logger,
+        '_log',
+      );
+
+      await service.dispatch(9);
+
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy.mock.calls[0][0]).toContain('agreement_id=A');
+      expect(errorSpy.mock.calls[0][0]).toContain('cause=TEMPLATE_QUERY_ERROR');
+
+      const infoMessages = logSpy.mock.calls.map(([msg]) => msg as string);
+      const sentLine = infoMessages.find((msg) =>
+        msg.includes('Notification sent'),
+      );
+      expect(sentLine).toContain('agreement_id=B');
+
+      // KZ-001 fidelity check: group B's body actually went through real
+      // Handlebars — no unresolved token reached the outbound `sendEmail`
+      // call. This is the assertion the previous `_getTemplate` stub would
+      // have passed vacuously (the stub's return value has no `{{` in it
+      // either way, rendered or not).
+      const body = (
+        sendEmail.mock.calls[0][0].message.socketFile as Buffer
+      ).toString('utf-8');
+      expect(body).not.toContain('{{');
+
+      expect(repo.updateNotificationStatus).toHaveBeenCalledWith(
+        9,
+        NotificationStatus.PARTIAL,
+        expect.any(Date),
+      );
+    });
+  });
+
+  describe('T-12 — R-CBU-004 AC.4 orphaned AC: dropped recipient logged at debug, wired through dispatch()', () => {
+    it('a malformed file-contact email is absent from cc AND named in a debug line carrying the bulk process id and agreement_id', async () => {
+      const group = makeGroup();
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [group],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([makeMetricsRow('ABC-123')]);
+      const { service, sendEmail } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository },
+      );
+      const debugSpy = jest.spyOn(
+        (service as unknown as { logger: { _debug: jest.Mock } }).logger,
+        '_debug',
+      );
+
+      await service.dispatch(9, [
+        { email: 'John Doe', contract_code: undefined },
+      ]);
+
+      // Test it as a drop, not as a log call (tasks.md T-12): the malformed
+      // value never reaches the actual outbound `cc`...
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+      expect(sendEmail.mock.calls[0][0].cc).not.toContain('John Doe');
+      // ...AND a debug line names it. A spy on `_debug` alone — without the
+      // `cc` assertion above — would pass for a builder that logs every
+      // candidate and drops nothing.
+      expect(debugSpy).toHaveBeenCalledTimes(1);
+      expect(debugSpy.mock.calls[0][0]).toContain('John Doe');
+      expect(debugSpy.mock.calls[0][0]).toContain('bulk_upload_process_id=9');
+      expect(debugSpy.mock.calls[0][0]).toContain('agreement_id=ABC-123');
+    });
+
+    it('no malformed entries -> no debug log at all', async () => {
+      const group = makeGroup();
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [group],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([makeMetricsRow('ABC-123')]);
+      const { service } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository },
+      );
+      const debugSpy = jest.spyOn(
+        (service as unknown as { logger: { _debug: jest.Mock } }).logger,
+        '_debug',
+      );
+
+      await service.dispatch(9);
+
+      expect(debugSpy).not.toHaveBeenCalled();
     });
   });
 });

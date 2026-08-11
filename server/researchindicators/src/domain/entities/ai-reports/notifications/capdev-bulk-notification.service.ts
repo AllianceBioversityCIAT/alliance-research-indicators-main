@@ -309,6 +309,29 @@ export class CapdevBulkNotificationService {
           continue;
         }
 
+        // R-CBU-004 AC.4 / tasks.md T-12 orphaned AC — `dropped` is the
+        // builder's *return value*, not a side effect (T-06's purity gate);
+        // this is the one place with both the process id and the malformed
+        // value, so this is where the debug line design.md §10 requires is
+        // emitted, one per dropped entry. `?? []` guards against a future
+        // construction site that omits the field — unreachable today (a
+        // single TS-enforced call site), but without it a `TypeError: not
+        // iterable` here would land inside this group's `try`, misreporting
+        // every group as a broker failure (Leader fold 1, risk lens).
+        for (const value of recipients.dropped ?? []) {
+          // CRLF-neutralised before interpolation (Leader fold 2, risk
+          // lens): the value is DB-sourced (`alliance_user_staff` / a
+          // configured CC row), not only AI-payload-sourced, so `@IsEmail()`
+          // on `AiContactDto` does not close this vector. Sanitising at the
+          // log site — not in the builder — keeps the builder pure and its
+          // returned `dropped` value faithful to what was actually dropped.
+          const safeValue = value.replace(/[\r\n]/g, ' ');
+          this.logger._debug(
+            `Recipient dropped for agreement_id=${group.agreement_id} ` +
+              `(bulk_upload_process_id=${processId}): ${safeValue}`,
+          );
+        }
+
         const metricsRow =
           metricsByAgreementId.get(group.agreement_id) ??
           this.emptyMetrics(group.agreement_id);

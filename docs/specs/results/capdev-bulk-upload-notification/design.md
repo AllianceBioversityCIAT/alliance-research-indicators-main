@@ -284,6 +284,13 @@ Two nested boundaries:
 
 `dispatch()` runs **after** `AiReportsService.create()` and outside any transaction governing result creation — a mail failure has nothing to roll back. `notification_status` records the aggregate outcome; `PARTIAL` when the dispatched count is strictly between zero and the group count.
 
+**Which boundary catches which failure — D-T12-a, 2026-08-11.** The split is not a matter of degree; it follows from §6.1's query plan. The four grouped reads (Q1–Q4) plus the total count run **before** the loop opens, so **any of them rejecting is an outer-boundary failure that suppresses the whole batch** — there is no per-group metric call to isolate. Nothing inside the loop touches `CapdevBulkNotificationRepository`. The inner boundary therefore contains exactly three classes: a `sendEmail` rejection, a `safeGetTemplate` failure (`NO_TEMPLATE` / `TEMPLATE_QUERY_ERROR` — the one genuine per-group *query* failure), and a render error.
+
+Two consequences worth stating rather than leaving to be rediscovered:
+
+- `requirements.md` R-CBU-010 AC.3 originally claimed per-group isolation for a metric-query error. It was corrected against this section, not the reverse — grouped reads are what NFR-CBU-001 mandates, and per-group metric queries would reintroduce the fan-out it forbids.
+- On a batch-read rejection, neither `persistProcessMetrics` nor `updateNotificationStatus` runs, so `notification_status` stays `NULL` — **indistinguishable from a pre-migration row or a process where the feature never ran.** R-CBU-011's "answerable months later without log retention" degrades to log-only for that failure class. No acceptance criterion covers it; recorded here as a known limitation rather than silently carried.
+
 ---
 
 ## 7. Frontend / UX component architecture
@@ -363,7 +370,7 @@ Every new file gets a sibling `*.spec.ts` (NFR-CBU-004).
 | 1 | Deploy code + `npm run migration:dev:execute` (dev) / `migration:execute` (deployed). Flag seeded `false`. | Bulk uploads behave exactly as before — zero emails, **but metrics are already being written** (the flag gates dispatch only, §2.1). This is the safe resting state. |
 | 2 | Point `EMAIL.CAPDEV_BULK_UPLOAD.CC_EMAIL` at an internal address and enable on **dev only**. Run a real bulk upload. | **Human review of the received email** — copy, tone, Outlook rendering (**D7**), and the resolved recipient list checked against the real contracts (**D8**). |
 | 3 | AI mining service starts sending `metadata.contacts`. Re-run on dev. | File contacts appear in CC; legacy shape still accepted. |
-| 4 | Enable in production. | Watch the per-group info logs and `notification_status` for the first uploads. |
+| 4 | Enable in production. | Watch the per-group info logs and `notification_status` for the first uploads. **Precondition — the security sign-off must have adjudicated the debug-channel finding** (`requirements.md` §14): this app installs no log-level policy, so the §10 `recipient dropped` debug line reaches stdout at info's retention once the flag is on. Step 4 is the first moment it can execute. |
 
 **Rollback:** set `EMAIL.CAPDEV_BULK_UPLOAD.ENABLED` to `'false'` — an `UPDATE` on one row, no deploy, effective on the next upload (R-CBU-009 AC.3). The migrations are additive and need no reversal; results and metrics are unaffected.
 

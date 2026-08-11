@@ -1092,6 +1092,75 @@ Measurement: `git diff --shortstat a5ee2c47~1..HEAD -- src/ test/` across the 15
 
 ---
 
+### T-12 — Failure-isolation and data-minimisation sweep
+
+- **Status:** PASS · **2026-08-11** · Implementer attempts: **1** · Reviewer verdicts: **PASS ×2** (parallel lens mode) · plus one Leader-directed fold batch of 5 items (**no attempt consumed**)
+- **Requirements covered:** R-CBU-010, R-CBU-011, NFR-CBU-002, NFR-CBU-003, **R-CBU-004 AC.4**
+- **Skills assigned:** `error-handling-patterns`, `nestjs-expert`, `tdd` *(scoped to Part B only)*, `systematic-debugging` · **Effort:** `xhigh`
+
+**Leader deviations from the task's skill list, and why.** `tasks.md` T-12 named `error-handling-patterns` + `systematic-debugging`. I **added** `nestjs-expert` (the work is Jest over NestJS DI with `LoggerUtil` spies — the `## Skill Map` routes server work there) and **added `tdd` scoped to Part B only**: the orphaned-AC fold is a behavioral contract change whose own `Disqualifies` clause describes a test that passes for the wrong reason, which is exactly what red-green prevents. `tdd` would have been overhead on Part A, so it was not assigned there. `xhigh` effort selected the **parallel lens Reviewer** mode per `/akili-execute` §2.3, consistent with T-08…T-10.
+
+**Pre-dispatch baseline, measured by the Leader with a quiet tree** (per `.agents/leader.md` → *never measure beside an active worker*): `npm run test:e2e` → 2 suites / 4 tests PASS. The `Error loading Vite manifest` console line is pre-existing and benign (the admin SSR bundle is not built) and the force-exit is the known A-1 advisory — both recorded here so the Implementer's run had something to compare against rather than a fresh diagnosis. This is the direct lesson of T-10's environment scare.
+
+#### Attempt 1 — files changed
+
+| File | Change |
+| --- | --- |
+| `capdev-recipients.builder.ts` | `CapdevRecipients` gains `dropped: string[]`; `buildCc` separates absent/blank (silently skipped) from non-empty-but-invalid (pushed to `dropped`) |
+| `capdev-recipients.builder.spec.ts` | 3 tests — malformed absent from `cc` **and** present in `dropped`; blank sources report nothing dropped; multiple malformed named in order |
+| `capdev-bulk-notification.service.ts` | one `_debug` per dropped entry in the per-group loop, carrying `agreement_id` + process id |
+| `capdev-bulk-notification.service.spec.ts` | 6 tests — broker-down end to end, the three failure modes, and the drop-and-debug wiring through `dispatch()` |
+| `results.service.spec.ts` | R-CBU-010 AC.5 at the **outer** boundary — `CgiarLogger.prototype.error` spied directly |
+
+**Verification:** `npm test -- --silent` → **328 suites / 2196 tests** (baseline 2186; +10 fully accounted: 3 builder + 6 service + 1 results.service). `npm run test:e2e` → **2 suites / 4 tests PASS**, matching the Leader's baseline exactly. Implementer-run non-vacuity checks, red-then-reverted: forcing `dropped: []` reddened 3 tests; downgrading the outer catch from `.error` to `.warn` reddened the boundary test.
+
+#### Reviewer verdicts — both `STATUS: PASS`
+
+**Lens A (spec conformance + reliability).** Tabulated all 8 new logging assertions and confirmed every one binds to a named `LoggerUtil`/`CgiarLogger` method *and* inspects its payload — none is a bare call count. Confirmed R-CBU-004 AC.4 satisfied in **both** layers, the `debug` level matching §10, and **T-06's purity disqualifier intact** (the builder imports only `cleanName`/`cleanText` and the group DTO — no DB, clock, config, or logger).
+
+*Adjudication requested by the Leader on the Implementer's unrequested production judgment* — `buildCc` distinguishing blank from malformed. **Verdict: defensible, behavior-preserving.** The `cc` output is byte-identical before and after; the distinction governs only which values earn a debug line, which is precisely what AC.4 and §10's single `recipient dropped` row cover — and AC.4's own three examples (`"n/a"`, `"—"`, `"John Doe"`) are all non-empty. The alternative would emit three empty-valued debug lines per group for every contract lacking an RA, PA, and file contacts.
+
+**Lens B (risk + security + data minimisation).** Traced `dropped` to every consumer and proved it inert: it reaches no `to`/`cc`, no subject, no body, no persisted column, no info/warn line, no error payload. Both catch blocks are message-only (`err.message`, never `.stack`), so no address or template content can reach an error-level log. It also **corrected two premises in the Leader's own brief, in the diff's favour**: the debug loop sits *after* the `ENABLED` gate (a flag-off run logs zero recipient values), and file-sourced addresses cannot reach it at all because `@IsEmail()` on `AiContactDto` makes them a `400` before `dispatch()`.
+
+#### The architectural finding — surfaced by the Implementer, independently verified by Lens A
+
+The Implementer's `Not Done / Assumptions` field reported that **R-CBU-010 AC.3's "for one group" wording does not match the shipped architecture**, tested at the outer boundary instead, and **did not edit the requirement**. Lens A was asked to verify or refute the claim and verified it **TRUE** against `capdev-bulk-notification.service.ts:190-195` (all five reads precede `persistProcessMetrics` at `:231` and the loop at `:278`) and `capdev-bulk-notification.repository.ts:320` (one query, `GROUP BY ac.agreement_id`). Nothing inside the loop touches the repository.
+
+This is the mechanism that made it findable: the field is checked *before* the verdict per `/akili-execute` §2.3 rule 0, and the escalation route — report the mismatch rather than reinterpret the AC — is what kept a false requirement from being quietly satisfied by a test that proved something else. Resolved as **D-T12-a** below.
+
+#### Leader-directed fold batch (5 items, no attempt consumed)
+
+1. **`recipients.dropped ?? []`** — unreachable today (single TS-enforced construction site), but the loop is *inside* the per-group `try`, so a `TypeError` would not surface as a crash: it would convert **every** group into `FAILED` and misattribute total notification loss to the broker.
+2. **CRLF neutralisation** — `.replace(/[\r\n]/g, ' ')` at the log site. The file vector is closed by `@IsEmail()`; the Agresso / `app_config` vector was not.
+3. **Mode-3 fidelity + the real per-group analogue (KZ-001).** The original `templateService` override bypassed `TemplateService` and Handlebars, so group B received the raw unrendered template — no test went green over broken behavior, but the seam invited exactly the assertion that would be vacuous. Reworked to a **real** `TemplateService` with a per-call sequenced `findOne`, group A's rejecting (`cause=TEMPLATE_QUERY_ERROR`) — which also covers the one genuine *per-group query failure* the architecture has, previously tested only in single-group isolation. Added `not.toContain('{{')` on group B's body: the fidelity assertion that could not fail under the old stub. **Proof it binds:** removing `safeGetTemplate`'s `try/catch` reddened it on the exact `cause=` assertion; reverted and confirmed by `git diff`.
+4. **Spy restoration** — `errorSpy.mockRestore()` moved into a `finally`. `restoreMocks` is unset and `clearAllMocks` does not undo `spyOn`, so a throwing assertion would have left `CgiarLogger.prototype.error` mocked for the rest of the file.
+5. **JSDoc wording** — "Raw values" → "Trimmed values" (`buildCc` pushes `trimmed(raw)`).
+
+Post-fold verification: **2196 unit unchanged** (fold 3 reworked an existing test rather than adding one), **e2e 4/4**. Leader's own `npm run lint -- --quiet`: clean, and `git status` re-checked after — `--fix` touched no file beyond the 5.
+
+#### Decisions
+
+- **D-T12-a — R-CBU-010 AC.3 corrected; the design wins.** *(spec-owner decision, 2026-08-11)* AC.3 promised per-group isolation for a metric-query failure. Q2/Q3/Q4 are batch-wide reads preceding the loop, so a read failure suppresses the **whole batch's** notifications. The guarantee was not relocated to the outer boundary — for this failure class it is genuinely absent; R-CBU-010's headline promise (upload returns `201`, results persisted, one error log) still holds. **The design wins because grouped reads are what NFR-CBU-001 mandates** — per-group metric queries would reintroduce the fan-out that requirement exists to forbid. No code changed.
+  - **Correction Closure — both directions swept.** *Forward* (`for one group` / `per-group` / `per group` across the spec folder): exactly two live sites beyond AC.3 itself — `tasks.md:277` (T-12's own scope line, corrected to name the boundary per mode) and `design.md` §6.6 (extended with the boundary split). `design.md:344`'s test-strategy line was inspected and **survives**: it lists "throwing repository, per-group isolation" as distinct coverage items, not as a claim that the former is the latter. *Backward* (citers of `R-CBU-010` / `§6.6`): `requirements.md:142`, `:445`, `:538`, `judgment.md:114`, `tasks.md:213/230/243/244/274/302`, `design.md:18/57/240/278/378` all reference the outer-boundary guarantee or the per-group `try/catch` for **send** failures — none asserts the corrected claim, none becomes false.
+- **D-T12-b — the debug-channel finding is rollout-gated, not merged-blocked.** *(spec-owner decision, 2026-08-11)* `design.md` §9 treats "addresses only at debug" as a control; this app installs no log-level policy (`main.ts:18`, no `useLogger`/`setLogLevels`), so Nest 10's defaults put `debug` on stdout at info's retention. Recorded against the pending **Security review** sign-off in `requirements.md` §14 and added as a **precondition on rollout step 4** in `design.md` §12. Not folded into T-12: a `main.ts` log policy affects every module in the server and belongs in its own proposal.
+
+#### Advisories recorded — none gates, none becomes a task
+
+Per `/akili-execute` §2.4, recorded and left alone. The route from any of these to new work is a proposal outside this spec, not a task inside it.
+
+- **`not.toContain('trainee_name')` asserts a column name, not participant-name values** — which is what NFR-CBU-003's "How verified" clause literally requires. Lens B established the value-based test is **unconstructible**: `CapdevBulkEmailTemplateDto` / `CapdevBulkMetricsDto` carry no participant-level field, so there is no value in the fixture to assert the absence of. The verification clause is unsatisfiable as written against this data model. Records against NFR-CBU-003, not against T-12.
+- **`notification_status` stays `NULL` when a batch read rejects** — indistinguishable from a pre-migration row or a process where the feature never ran; R-CBU-011's "answerable months later without log retention" degrades to log-only for that class. No AC covers it. Now also recorded in `design.md` §6.6 so a reader meets it at the mechanism rather than only in this log.
+- **`dropped` is not deduplicated** — one unscoped malformed contact in a 30-group batch yields 30 identical debug lines. Debug level, low blast radius.
+- **Redundant `@`-check on the broker-down path** — cannot fail given the adjacent assertion that no "Notification sent" line was emitted. Harmless, but reads as stronger evidence than it is; the load-bearing version is the pre-existing success-path check.
+- **`safeGetTemplate`'s bare `catch` discards the underlying error** (pre-existing) — good for PII containment, poor for triage. Fold 3 makes the behavior a regression-protected contract.
+- **NFR-CBU-004's 60% floor was discharged by inference, not measurement** — `npm run test:cov` was not run; T-12's `Done` clause does not name it. The diff adds 12 production lines, all exercised. Flagged for `/akili-test`.
+
+#### Status transition
+
+- **T-12 → `[x]`** — Implementer attempt 1, Reviewer PASS ×2, 5-item Leader fold batch, full unit suite 2196 + e2e 4/4 + lint clean on the Leader's own gate. **This is the last task in the spec: 12/12.** The §8 Done definition is *not* thereby satisfied — migrations apply/revert on dev and the human review of a real received email remain owed, and D-T12-b now gates rollout step 4.
+
+---
+
 ## 6. Open decisions blocking T-08
 
 Two items surfaced by the T-07 review that are **spec-owner calls, not Implementer or Reviewer calls**. Both should be settled before T-08 is briefed, because T-08's rendered-body assertions depend on them.

@@ -58,6 +58,7 @@ import { GreenCheckRepository } from '../green-checks/repository/green-checks.re
 import { PortfoliosService } from '../portfolios/portfolios.service';
 import { AiReportsService } from '../ai-reports/ai-reports.service';
 import { CapdevBulkNotificationService } from '../ai-reports/notifications/capdev-bulk-notification.service';
+import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -3522,6 +3523,48 @@ describe('ResultsService', () => {
       // itself would throw and fail the test.
       const output = await service.createResultFromAiBulk(payload as any);
       expect(output.results_created).toHaveLength(1);
+    });
+
+    // T-12 — R-CBU-010 AC.5: the outer containment boundary (design.md §6.6
+    // "Outer") is its own logger, not merely a swallowed rejection. Binds to
+    // the specific method (`CgiarLogger.prototype.error`), not "some log
+    // fired" (Disqualifies) — a spy on `.log`/`.warn` would not catch a
+    // regression that demoted this to a lower level.
+    it('logs exactly one ERROR-level line carrying the bulk process id when dispatch() throws (R-CBU-010 AC.5, outer boundary)', async () => {
+      const errorSpy = jest
+        .spyOn(CgiarLogger.prototype, 'error')
+        .mockImplementation(() => undefined);
+      // Leader fold 4 (test hygiene): `jest.clearAllMocks()` in the
+      // top-level `afterEach` (:434-435) clears call records but does NOT
+      // undo a `spyOn` — restoring the prototype method must survive an
+      // assertion throwing mid-test, or every later test in this file would
+      // silently run against a mocked `CgiarLogger.prototype.error`.
+      try {
+        const payload = {
+          results: [{ title: 'R1' } as any],
+          metadata: {
+            ai_interaction_id: 'ai-throw-5',
+            file_name: 'upload.xlsx',
+          },
+        };
+        jest
+          .spyOn(service, 'formalizeResult')
+          .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+        mockAiReportsService.create.mockResolvedValueOnce({ id: 777 });
+        mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+          new Error('ECONNREFUSED: RabbitMQ unreachable'),
+        );
+
+        await service.createResultFromAiBulk(payload as any);
+
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        expect(errorSpy.mock.calls[0][0]).toContain('777');
+        expect(errorSpy.mock.calls[0][0]).toContain(
+          'ECONNREFUSED: RabbitMQ unreachable',
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
 
     it('should produce a data payload with exactly the pre-change shape (results_errors, results_created only)', async () => {
