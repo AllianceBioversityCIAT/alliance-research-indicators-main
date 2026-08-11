@@ -30,6 +30,18 @@ describe('AppController (e2e)', () => {
   // `--detectOpenHandles` named NO open handle, so the residual leak is
   // masked here, not diagnosed (candidates: the mysql2 pool, OpenSearch
   // keep-alive, or `@nestjs/schedule` timers — not confirmed).
+  //
+  // `"testTimeout": 120000` in `test/jest-e2e.json` is the second config line
+  // this suite depends on, added after `/akili-test` root-caused an
+  // intermittent 4/4 failure. Jest's default is 5000 ms and the config set no
+  // override, while the `beforeAll` above boots the whole `AppModule`: ~3.6 s
+  // on a quiet machine, but **78.5 s measured under concurrent load** (compile
+  // + contention — MySQL, CLARISA and OpenSearch all answered in under 300 ms
+  // at the time). The failure surfaces as
+  // `Cannot read properties of undefined (reading 'mockClear')`, which is a
+  // cascade from the real error: `Exceeded timeout of 5000 ms for a hook`.
+  // Do not lower it back toward the default to "speed up" the suite — the
+  // margin it buys is for a loaded CI runner, not for this machine.
   afterAll(async () => {
     await app?.close();
   });
