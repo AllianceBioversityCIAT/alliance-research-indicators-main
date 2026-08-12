@@ -1043,19 +1043,24 @@ export class BilateralService {
       }
 
       const { tocResult, indicator } = validatedCatalogRefs.get(entry.sp_code);
+      // Indicator-derived fields (R-BIL-111 AC.1, R-BIL-114 AC.1) are only
+      // populated when an indicator actually resolved. A Level + HLO-only
+      // "Yes" clears the floor with `indicator: null` (validation loop
+      // above), so `target_year` must not claim a live-version target for
+      // an indicator that was never chosen (judgment F-9).
       return {
         result_id: resultId,
         sp_code: entry.sp_code,
         aligns_with_toc: true,
         level: entry.level,
         toc_result_id: entry.toc_result_id,
-        indicator_id: entry.indicator_id,
+        indicator_id: indicator ? entry.indicator_id : null,
         quantitative_contribution: entry.quantitative_contribution ?? null,
         toc_result_title: tocResult.title,
-        indicator_description: indicator.indicator_description,
-        unit_messurament: indicator.unit_messurament ?? null,
-        target_value: this.resolveLiveTargetValue(indicator),
-        target_year: MAPPABLE_LIVE_VERSION,
+        indicator_description: indicator ? indicator.indicator_description : null,
+        unit_messurament: indicator ? (indicator.unit_messurament ?? null) : null,
+        target_value: indicator ? this.resolveLiveTargetValue(indicator) : null,
+        target_year: indicator ? MAPPABLE_LIVE_VERSION : null,
       };
     });
   }

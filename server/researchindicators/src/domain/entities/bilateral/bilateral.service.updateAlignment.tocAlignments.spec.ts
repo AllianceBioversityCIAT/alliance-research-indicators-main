@@ -1251,5 +1251,168 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         });
       });
     });
+
+    // -----------------------------------------------------------------------
+    // T-04 — partial snapshot construction (R-BIL-111 AC.1/AC.2/AC.5,
+    // R-BIL-114 AC.1-3, R-BIL-118 AC.3). Closes the crash path T-03
+    // deliberately left open: after T-03, a Level+HLO-only "Yes" clears
+    // validation but the return map (bilateral.service.ts ~:1034-1060)
+    // still destructured `indicator` unconditionally and dereferenced it —
+    // `TypeError` on a full round trip. T-03's own scope note above says
+    // this must be proven here, not there.
+    // -----------------------------------------------------------------------
+    describe('T-04 — partial snapshot construction (R-BIL-111 AC.1/AC.2/AC.5, R-BIL-114 AC.1-3, R-BIL-118 AC.3)', () => {
+      const sp01Partial = () => ({
+        sp_code: 'SP01',
+        aligns_with_toc: true as const,
+        level: 'OUTPUT' as const,
+        toc_result_id: 5187,
+        // no indicator_id — Level + HLO floor only.
+      });
+
+      it('non-throwing end-to-end round trip for a Level+HLO-only entry — the TypeError crash path T-03 left open is closed (R-BIL-111 AC.1/AC.2)', async () => {
+        await expect(
+          service.updateAlignment(
+            19792,
+            '19792',
+            patchDto([sp01Partial()], ['SP01']),
+            user,
+          ),
+        ).resolves.toBeDefined();
+
+        expect(upsertForSp).toHaveBeenCalledTimes(1);
+      });
+
+      it('partial row persists with the exact null set — indicator_id, indicator_description, unit_messurament, target_value, target_year null; level/toc_result_id/toc_result_title populated (R-BIL-111 AC.1, R-BIL-114 AC.1)', async () => {
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Partial()], ['SP01']),
+          user,
+        );
+
+        // Field-by-field assertion on the payload actually passed to the
+        // repository — not merely that the call resolved.
+        expect(upsertForSp).toHaveBeenCalledWith(
+          {
+            result_id: 19792,
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: null,
+            quantitative_contribution: null,
+            toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+            indicator_description: null,
+            unit_messurament: null,
+            target_value: null,
+            target_year: null,
+          },
+          42,
+          fakeManager,
+        );
+      });
+
+      it('complete row (indicator resolved) is byte-identical to pre-change output — no regression from the new partial branch', async () => {
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Yes()], ['SP01']),
+          user,
+        );
+
+        expect(upsertForSp).toHaveBeenCalledWith(
+          {
+            result_id: 19792,
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: 5972,
+            quantitative_contribution: 3,
+            toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+            indicator_description: 'Number of new market intelligence briefs',
+            unit_messurament: 'Number',
+            target_value: '10',
+            target_year: 2026,
+          },
+          42,
+          fakeManager,
+        );
+      });
+
+      it('PATCH response ≡ subsequent GET for the same partial state (R-BIL-114 AC.2)', async () => {
+        (service.getAlignment as unknown as jest.SpyInstance).mockRestore();
+        const savedRows: Record<string, unknown>[] = [];
+        upsertForSp.mockImplementation(async (input) => {
+          savedRows.push({ id: savedRows.length + 1, ...input });
+          return savedRows[savedRows.length - 1];
+        });
+        findActiveTocRows.mockImplementation(async () => savedRows);
+
+        const patchResponse = await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Partial()], ['SP01']),
+          user,
+        );
+
+        const getResponse = await service.getAlignment(19792, '19792', user);
+
+        expect(getResponse.toc_alignments).toEqual(
+          patchResponse.toc_alignments,
+        );
+        expect(patchResponse.toc_alignments).toEqual([
+          {
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: null,
+            quantitative_contribution: null,
+            toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+            indicator_description: null,
+            unit_of_measurement: null,
+            target_value: null,
+            target_year: null,
+          },
+        ]);
+      });
+
+      it('writing a partial row for SP01 leaves SP03’s saved complete row untouched (R-BIL-118 AC.3)', async () => {
+        findActiveTocRows.mockResolvedValue([
+          {
+            id: 11,
+            sp_code: 'SP03',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: 5972,
+            quantitative_contribution: 3,
+            toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+            indicator_description: 'Number of new market intelligence briefs',
+            unit_messurament: 'Number',
+            target_value: '10',
+            target_year: 2026,
+          },
+        ]);
+
+        await service.updateAlignment(
+          19792,
+          '19792',
+          patchDto([sp01Partial()], ['SP01', 'SP03']),
+          user,
+        );
+
+        // Only SP01 is written; SP03's saved row is never upserted or
+        // deactivated by this PATCH.
+        expect(upsertForSp).toHaveBeenCalledTimes(1);
+        expect(upsertForSp.mock.calls[0][0].sp_code).toBe('SP01');
+        expect(
+          upsertForSp.mock.calls.some((call) => call[0].sp_code === 'SP03'),
+        ).toBe(false);
+        expect(deactivateForSps).not.toHaveBeenCalled();
+      });
+    });
   });
 });
