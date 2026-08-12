@@ -78,13 +78,18 @@ export interface AlignmentResponse {
   toc_alignments: TocAlignmentReadbackResponse[];
 }
 
-// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094
+// @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-03 / R-BIL-111, R-BIL-113
 //
 // One per-SP ToC alignment answer (design §5 PATCH contract). Field-presence
-// rules conditioned on `aligns_with_toc` (level/toc_result_id/indicator_id
-// required when true) are enforced in BilateralService as structural
-// validation — the per-alignment `{ sp_code, field, error }` 400 contract
-// owns them (design §6.3 step 2b), NOT class-validator.
+// rules conditioned on `aligns_with_toc` are enforced in BilateralService as
+// structural validation — the per-alignment `{ sp_code, field, error }` 400
+// contract owns them (design §6.1), NOT class-validator. The required floor
+// for `aligns_with_toc: true` is `level` + `toc_result_id` only
+// (R-BIL-111 §5.1, D-C1-3); `indicator_id` and `quantitative_contribution`
+// are optional, but each supplied field is still catalog-validated
+// (R-BIL-113), and a supplied `quantitative_contribution` without an
+// `indicator_id` is rejected with `contribution_without_indicator`
+// (R-BIL-113 AC.6).
 export class TocAlignmentInputDto {
   @ApiProperty({
     type: String,
@@ -108,7 +113,7 @@ export class TocAlignmentInputDto {
   @ApiPropertyOptional({
     enum: ['OUTPUT', 'OUTCOME', 'EOI'],
     description:
-      'ToC catalog level. Required when aligns_with_toc is true; must be in the result type’s allowed_levels (R-BIL-094).',
+      'ToC catalog level. Required when aligns_with_toc is true (Level + HLO floor, R-BIL-111); must be in the result type’s allowed_levels (R-BIL-094).',
   })
   @IsOptional()
   @IsIn(['OUTPUT', 'OUTCOME', 'EOI'])
@@ -117,7 +122,7 @@ export class TocAlignmentInputDto {
   @ApiPropertyOptional({
     type: Number,
     description:
-      'Upstream ToC result id. Required when aligns_with_toc is true; validated against the (SP, level) catalog.',
+      'Upstream ToC result id. Required when aligns_with_toc is true (Level + HLO floor, R-BIL-111); validated against the (SP, level) catalog.',
   })
   @IsOptional()
   @IsInt()
@@ -126,7 +131,7 @@ export class TocAlignmentInputDto {
   @ApiPropertyOptional({
     type: Number,
     description:
-      'Upstream indicator id. Required when aligns_with_toc is true; validated against the chosen ToC result’s indicators.',
+      'Upstream indicator id. Optional even when aligns_with_toc is true — a "Yes" may stop at Level + HLO (R-BIL-111). When supplied, validated against the chosen ToC result’s indicators (R-BIL-113 AC.3).',
   })
   @IsOptional()
   @IsInt()
@@ -135,7 +140,8 @@ export class TocAlignmentInputDto {
   @ApiPropertyOptional({
     type: Number,
     nullable: true,
-    description: 'Quantitative contribution (numeric, nullable).',
+    description:
+      'Quantitative contribution (numeric, nullable). Requires indicator_id to be present — a contribution is expressed in the selected indicator’s unit of measurement, so supplying it without an indicator_id returns 400 contribution_without_indicator (R-BIL-113 AC.6).',
   })
   @IsOptional()
   @IsNumber()

@@ -789,12 +789,13 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         expect(getTocResults).not.toHaveBeenCalled();
       });
 
-      it('error code: missing_required_fields — ONE entry per missing field on a bare "Yes"', async () => {
+      it('error code: missing_required_fields — bare "Yes" names both floor fields, level + toc_result_id, and ONLY those (R-BIL-111 §5.1, R-BIL-111 AC.4)', async () => {
         const errors = await expectAtomic400(
           patchDto([{ sp_code: 'SP01', aligns_with_toc: true }]),
         );
 
-        // One entry per missing field (design §5 / RB-4 relay note).
+        // Required floor for aligns_with_toc: true is level + toc_result_id
+        // ONLY (D-C1-3) — indicator_id is optional and must NOT appear here.
         expect(errors).toEqual([
           {
             sp_code: 'SP01',
@@ -806,23 +807,17 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
             field: 'toc_result_id',
             error: 'missing_required_fields',
           },
-          {
-            sp_code: 'SP01',
-            field: 'indicator_id',
-            error: 'missing_required_fields',
-          },
         ]);
       });
 
-      it('error code: missing_required_fields — a single missing field yields exactly one entry naming it', async () => {
+      it('error code: missing_required_fields — a single missing floor field yields exactly one entry naming it', async () => {
         const errors = await expectAtomic400(
           patchDto([
             {
               sp_code: 'SP01',
               aligns_with_toc: true,
               level: 'OUTPUT',
-              toc_result_id: 5187,
-              // indicator_id missing
+              // toc_result_id missing
             },
           ]),
         );
@@ -830,7 +825,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         expect(errors).toEqual([
           {
             sp_code: 'SP01',
-            field: 'indicator_id',
+            field: 'toc_result_id',
             error: 'missing_required_fields',
           },
         ]);
@@ -1008,6 +1003,252 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         expect(upsertForSp).not.toHaveBeenCalled();
         expect(deactivateForSps).not.toHaveBeenCalled();
         expect(emit).not.toHaveBeenCalled();
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // T-03 — conditional validation + contribution_without_indicator
+    // (R-BIL-111 §5.1, R-BIL-113, NFR-BIL-110). Scope note: T-03 owns
+    // validation only (bilateral.service.ts validateTocAlignments,
+    // roughly :855-990). Full non-throwing persistence of a partial row —
+    // R-BIL-111 AC.1/AC.2 — is T-04's scope (the snapshot-construction
+    // return map, ~:993-1019, still assumes a resolved indicator). Tests
+    // below that need to prove "clears validation" for a null-indicator
+    // entry therefore assert absence of BadRequestException + correct
+    // catalog consultation, not a fully-resolved, non-throwing return —
+    // see the scope note on the first such test.
+    // -----------------------------------------------------------------------
+    describe('T-03 — conditional validation + contribution_without_indicator (R-BIL-111 §5.1, R-BIL-113, NFR-BIL-110)', () => {
+      it('validation layer: Level + HLO only (no indicator_id) clears validation — floor satisfied, catalog consulted for the (sp, level) combo, no BadRequestException (R-BIL-111 AC.4, R-BIL-113 AC.4)', async () => {
+        let thrown: unknown;
+        try {
+          await service.updateAlignment(
+            19792,
+            '19792',
+            patchDto(
+              [
+                {
+                  sp_code: 'SP01',
+                  aligns_with_toc: true,
+                  level: 'OUTPUT',
+                  toc_result_id: 5187,
+                },
+              ],
+              ['SP01'],
+            ),
+            user,
+          );
+        } catch (err) {
+          thrown = err;
+        }
+
+        // Scope note (T-03/T-04 split, design §6.1 vs §6.2): this proves the
+        // entry clears VALIDATION — it is not rejected as
+        // missing_required_fields or any other 400, and the catalog is
+        // correctly consulted for its combo. It does not assert the call
+        // completes without error end-to-end: the snapshot-construction
+        // return map is T-04's scope and still assumes a resolved
+        // indicator, so full non-throwing persistence of a null-indicator
+        // row is proven by T-04, not here.
+        expect(thrown).not.toBeInstanceOf(BadRequestException);
+        expect(getTocResults).toHaveBeenCalledTimes(1);
+        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+      });
+
+      it('R-BIL-111 AC.4 — Level-only (toc_result_id absent) rejects with missing_required_fields naming toc_result_id, catalog never consulted', async () => {
+        const errors = await expectAtomic400(
+          patchDto(
+            [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT' }],
+            ['SP01'],
+          ),
+        );
+
+        expect(errors).toEqual([
+          {
+            sp_code: 'SP01',
+            field: 'toc_result_id',
+            error: 'missing_required_fields',
+          },
+        ]);
+        expect(getTocResults).not.toHaveBeenCalled();
+      });
+
+      it('R-BIL-111 — bare "Yes" (both floor fields absent) rejects naming level AND toc_result_id', async () => {
+        const errors = await expectAtomic400(
+          patchDto([{ sp_code: 'SP01', aligns_with_toc: true }], ['SP01']),
+        );
+
+        expect(errors).toEqual([
+          { sp_code: 'SP01', field: 'level', error: 'missing_required_fields' },
+          {
+            sp_code: 'SP01',
+            field: 'toc_result_id',
+            error: 'missing_required_fields',
+          },
+        ]);
+      });
+
+      it('R-BIL-113 AC.4 — an absent indicator_id contributes NO error of any kind', async () => {
+        const errors = await expectAtomic400(
+          patchDto(
+            [
+              {
+                sp_code: 'SP01',
+                aligns_with_toc: true,
+                level: 'OUTPUT',
+                toc_result_id: 5187,
+              }, // no indicator_id
+              { sp_code: 'SP99', aligns_with_toc: false }, // forces the 400 without reaching the return map
+            ],
+            ['SP01'],
+          ),
+        );
+
+        // SP01's absent indicator_id contributes NO error — the only
+        // collected error is SP99's sp_not_selected.
+        expect(errors).toEqual([
+          { sp_code: 'SP99', field: 'sp_code', error: 'sp_not_selected' },
+        ]);
+        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+      });
+
+      it('R-BIL-113 AC.6 — quantitative_contribution supplied without indicator_id → 400 contribution_without_indicator on quantitative_contribution, never missing_required_fields (D-C1-8)', async () => {
+        const errors = await expectAtomic400(
+          patchDto(
+            [
+              {
+                sp_code: 'SP01',
+                aligns_with_toc: true,
+                level: 'OUTPUT',
+                toc_result_id: 5187,
+                quantitative_contribution: 12,
+              },
+            ],
+            ['SP01'],
+          ),
+        );
+
+        expect(errors).toEqual([
+          {
+            sp_code: 'SP01',
+            field: 'quantitative_contribution',
+            error: 'contribution_without_indicator',
+          },
+        ]);
+        // Rejected on presence alone — no need to consult the catalog just
+        // to reject a structural rule.
+        expect(getTocResults).not.toHaveBeenCalled();
+      });
+
+      it('R-BIL-113 — "Relaxation does not admit garbage": a foreign indicator_id still rejects with unknown_indicator_id, and the identical request is accepted at the validation layer once indicator_id is omitted entirely', async () => {
+        // Half 1 — a foreign indicator_id is still rejected.
+        const errors = await expectAtomic400(
+          patchDto([sp01Yes(9999)], ['SP01']),
+        );
+        expect(errors).toEqual([
+          {
+            sp_code: 'SP01',
+            field: 'indicator_id',
+            error: 'unknown_indicator_id',
+          },
+        ]);
+
+        // Half 2 — same level/toc_result_id, indicator_id omitted: accepted
+        // at the validation layer (see scope note above).
+        getTocResults.mockClear();
+        let thrown: unknown;
+        try {
+          await service.updateAlignment(
+            19792,
+            '19792',
+            patchDto(
+              [
+                {
+                  sp_code: 'SP01',
+                  aligns_with_toc: true,
+                  level: 'OUTPUT',
+                  toc_result_id: 5187,
+                },
+              ],
+              ['SP01'],
+            ),
+            user,
+          );
+        } catch (err) {
+          thrown = err;
+        }
+        expect(thrown).not.toBeInstanceOf(BadRequestException);
+      });
+
+      it('D-V2-8 atomicity holds across the new floor and the new error code: any single failure in the batch blocks persistence for the whole batch', async () => {
+        await expectAtomic400(
+          patchDto(
+            [
+              { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT' }, // missing toc_result_id
+              {
+                sp_code: 'SP03',
+                aligns_with_toc: true,
+                level: 'OUTPUT',
+                toc_result_id: 5187,
+                quantitative_contribution: 5,
+              }, // contribution_without_indicator
+            ],
+            ['SP01', 'SP03'],
+          ),
+        );
+        // expectAtomic400 already asserts transaction/upsertForSp/
+        // deactivateForSps were never called — pinning atomicity across
+        // BOTH the untouched floor check and the new contribution guard in
+        // the same batch.
+      });
+
+      describe('NFR-BIL-110 — fan-out stays deduplicated', () => {
+        it('one getTocResults call per distinct (sp_code, level) combo on a mixed batch; a partial entry correctly contributes a call (0→1 — an intended increase, not a regression, design §6.1)', async () => {
+          const errors = await expectAtomic400(
+            patchDto(
+              [
+                // Partial — no indicator_id. Clears the floor, so it now
+                // requires a catalog call to validate its toc_result_id.
+                {
+                  sp_code: 'SP01',
+                  aligns_with_toc: true,
+                  level: 'OUTPUT',
+                  toc_result_id: 5187,
+                },
+                // Complete — unaffected by this spec.
+                { ...sp01Yes(), sp_code: 'SP03' },
+                // Forces the batch to 400 before construction, keeping this
+                // test clear of the (out-of-scope) snapshot return map.
+                { sp_code: 'SP99', aligns_with_toc: false },
+              ],
+              ['SP01', 'SP03'],
+            ),
+          );
+
+          expect(errors).toEqual([
+            { sp_code: 'SP99', field: 'sp_code', error: 'sp_not_selected' },
+          ]);
+          // One call per distinct (sp_code, level) combo — do NOT assert
+          // zero calls for the partial SP01 entry (design §6.1 — that
+          // would be a backwards, false-green assertion).
+          expect(getTocResults).toHaveBeenCalledTimes(2);
+          expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+          expect(getTocResults).toHaveBeenCalledWith('SP03', 'OUTPUT');
+        });
+
+        it('zero getTocResults calls when every entry fails the required floor', async () => {
+          const errors = await expectAtomic400(
+            patchDto([
+              { sp_code: 'SP01', aligns_with_toc: true }, // bare "Yes"
+              { sp_code: 'SP03', aligns_with_toc: true, level: 'OUTPUT' }, // missing toc_result_id
+            ]),
+          );
+
+          expect(
+            errors.every((error) => error.error === 'missing_required_fields'),
+          ).toBe(true);
+          expect(getTocResults).not.toHaveBeenCalled();
+        });
       });
     });
   });

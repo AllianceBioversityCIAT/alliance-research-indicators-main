@@ -92,7 +92,8 @@ interface TocAlignmentValidationError {
     | 'missing_required_fields'
     | 'level_not_allowed'
     | 'unknown_toc_result_id'
-    | 'unknown_indicator_id';
+    | 'unknown_indicator_id'
+    | 'contribution_without_indicator';
 }
 
 /**
@@ -833,13 +834,20 @@ export class BilateralService {
    *   a. Version gate: live version (`report_year_id`, literal year per
    *      D-V2-7) ≠ 2026 → 409 `toc_mapping_version_locked` (R-BIL-097).
    *   b. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
-   *      `missing_required_fields` — collected per alignment.
+   *      `missing_required_fields` — collected per alignment. The required
+   *      floor for `aligns_with_toc: true` is `level` + `toc_result_id`
+   *      only (R-BIL-111 §5.1, D-C1-3); `indicator_id` is optional.
    *   c. Catalog validation per "Yes" entry — `level_not_allowed`, then
-   *      `(toc_result_id, indicator_id)` existence in the cached (sp, level)
-   *      catalog → `unknown_toc_result_id` / `unknown_indicator_id`.
-   *      Catalogs are fetched ONLY for the (sp, level) combos actually
-   *      referenced; a cold-cache upstream failure propagates as 503 with
-   *      nothing persisted (R-BIL-094).
+   *      `toc_result_id` existence in the cached (sp, level) catalog →
+   *      `unknown_toc_result_id`. `indicator_id` is resolved against that
+   *      ToC result's indicators ONLY when supplied → `unknown_indicator_id`
+   *      (R-BIL-113 AC.1–4). A `quantitative_contribution` supplied without
+   *      an `indicator_id` is rejected with the dedicated
+   *      `contribution_without_indicator` code — never
+   *      `missing_required_fields` (R-BIL-113 AC.6, D-C1-8). Catalogs are
+   *      fetched ONLY for the (sp, level) combos actually referenced; a
+   *      cold-cache upstream failure propagates as 503 with nothing
+   *      persisted (R-BIL-094, NFR-BIL-110).
    *   d. ANY collected error → single 400 carrying ALL per-alignment errors
    *      as `errors.toc_alignments` (atomic — D-V2-8). The legacy
    *      `errors.unknown_sp_codes` contract is untouched (it fires earlier,
@@ -902,9 +910,12 @@ export class BilateralService {
         continue;
       }
 
-      const missingFields = (
-        ['level', 'toc_result_id', 'indicator_id'] as const
-      ).filter((field) => entry[field] === undefined || entry[field] === null);
+      // Required floor for aligns_with_toc: true (R-BIL-111 §5.1, D-C1-3):
+      // level + toc_result_id only. indicator_id is optional and validated
+      // conditionally below (R-BIL-113).
+      const missingFields = (['level', 'toc_result_id'] as const).filter(
+        (field) => entry[field] === undefined || entry[field] === null,
+      );
       if (missingFields.length) {
         for (const field of missingFields) {
           errors.push({
@@ -921,6 +932,25 @@ export class BilateralService {
           sp_code: entry.sp_code,
           field: 'level',
           error: 'level_not_allowed',
+        });
+        continue;
+      }
+
+      // A contribution is expressed in the selected indicator's unit of
+      // measurement — without an indicator it is unitless and not
+      // interpretable (R-BIL-113 AC.6, D-C1-8). Distinct from the floor
+      // above: indicator_id itself stays optional, so this is never
+      // reported as missing_required_fields.
+      const hasContribution =
+        entry.quantitative_contribution !== undefined &&
+        entry.quantitative_contribution !== null;
+      const hasIndicator =
+        entry.indicator_id !== undefined && entry.indicator_id !== null;
+      if (hasContribution && !hasIndicator) {
+        errors.push({
+          sp_code: entry.sp_code,
+          field: 'quantitative_contribution',
+          error: 'contribution_without_indicator',
         });
         continue;
       }
@@ -950,7 +980,7 @@ export class BilateralService {
 
     const validatedCatalogRefs = new Map<
       string,
-      { tocResult: TocResult; indicator: TocIndicator }
+      { tocResult: TocResult; indicator: TocIndicator | null }
     >();
     for (const entry of catalogChecks) {
       const catalog = catalogByKey.get(`${entry.sp_code}:${entry.level}`) ?? [];
@@ -962,6 +992,17 @@ export class BilateralService {
           sp_code: entry.sp_code,
           field: 'toc_result_id',
           error: 'unknown_toc_result_id',
+        });
+        continue;
+      }
+
+      // indicator_id is optional at the Level + HLO floor (R-BIL-111) — only
+      // validate it against the catalog when the caller supplied one
+      // (R-BIL-113 AC.3–4).
+      if (entry.indicator_id === undefined || entry.indicator_id === null) {
+        validatedCatalogRefs.set(entry.sp_code, {
+          tocResult,
+          indicator: null,
         });
         continue;
       }
