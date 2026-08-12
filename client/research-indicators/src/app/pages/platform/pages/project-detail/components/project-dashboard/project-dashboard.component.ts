@@ -29,6 +29,8 @@ import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { Result } from '@shared/interfaces/result/result.interface';
+import { ModalComponent } from '@shared/components/modal/modal.component';
+import { AllModalsService } from '@shared/services/cache/all-modals.service';
 
 const MAX_GROUNDING_DOCS = 3;
 const MAX_GROUNDING_RESOURCES = 3;
@@ -47,7 +49,7 @@ interface ProjectStatusChartItem {
 @Component({
   selector: 'app-project-dashboard',
   standalone: true,
-  imports: [ButtonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe],
+  imports: [ButtonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe, ModalComponent],
   providers: [
     GetTopContributorsContractsService,
     GetTopMainContactPersonsService,
@@ -67,6 +69,7 @@ export class ProjectDashboardComponent {
   private readonly documentOverviewService = inject(DocumentOverviewService);
   private readonly rolesService = inject(RolesService);
   private readonly actions = inject(ActionsService);
+  private readonly allModalsService = inject(AllModalsService);
 
   readonly maxGroundingDocs = MAX_GROUNDING_DOCS;
   readonly maxGroundingResources = MAX_GROUNDING_RESOURCES;
@@ -81,8 +84,6 @@ export class ProjectDashboardComponent {
   readonly executiveOverviewError = signal(false);
   /** Saved free-text contextual resource (empty string means no text resource). */
   readonly groundingText = signal<string>('');
-  /** Text returned by the overview service is an analyzed resource and cannot be edited locally. */
-  readonly groundingTextLocked = signal(false);
   readonly showGroundingTextEditor = signal(false);
   readonly groundingTextDraft = signal<string>('');
 
@@ -108,12 +109,7 @@ export class ProjectDashboardComponent {
   readonly hasExecutiveOverviewData = computed(() => this.executiveOverviewParagraphs().length > 0);
   readonly showExecutiveOverview = computed(() => {
     if (this.canAccessGroundingSetup()) {
-      return (
-        this.hasGroundingResources() ||
-        this.executiveOverviewLoading() ||
-        this.executiveOverviewError() ||
-        this.hasExecutiveOverviewData()
-      );
+      return this.hasGroundingResources() || this.executiveOverviewLoading() || this.executiveOverviewError() || this.hasExecutiveOverviewData();
     }
 
     return this.hasExecutiveOverviewData();
@@ -182,10 +178,7 @@ export class ProjectDashboardComponent {
   );
 
   readonly mainContactPersonsEmpty = computed(
-    () =>
-      !this.topMainContactPersons.loading() &&
-      !this.topMainContactPersons.loadError() &&
-      this.topMainContactPersons.list().length === 0
+    () => !this.topMainContactPersons.loading() && !this.topMainContactPersons.loadError() && this.topMainContactPersons.list().length === 0
   );
 
   readonly partnerItems = computed(() =>
@@ -258,6 +251,32 @@ export class ProjectDashboardComponent {
       return 0;
     }
     return Math.min(100, (value / max) * 100);
+  }
+
+  async openGroundingSetupModal(): Promise<void> {
+    if (!this.canAccessGroundingSetup()) {
+      return;
+    }
+
+    const projectId = this.contractId();
+    if (!projectId) {
+      return;
+    }
+
+    try {
+      const response = await this.documentOverviewService.fetchDocumentOverviewSummary(projectId);
+      this.applyDocumentOverviewResponse(response);
+      this.showGroundingTextEditor.set(false);
+      this.groundingTextDraft.set('');
+      this.allModalsService.openModal('projectGroundingSetup');
+      this.allModalsService.setModalWidth('projectGroundingSetup', true);
+    } catch {
+      this.actions.showToast({
+        severity: 'error',
+        summary: 'Unable to open setup',
+        detail: 'The saved grounding resources could not be loaded. Please try again.'
+      });
+    }
   }
 
   triggerGroundingUpload(fileInput: HTMLInputElement): void {
@@ -377,8 +396,7 @@ export class ProjectDashboardComponent {
       icon: 'pi pi-exclamation-triangle',
       color: '#E69F00',
       detail:
-        'Removing this document may make the current Executive Overview outdated. ' +
-        'We recommend regenerating it to update the grounded summary.',
+        'Removing this document may make the current Executive Overview outdated. ' + 'We recommend regenerating it to update the grounded summary.',
       confirmCallback: {
         label: 'Continue',
         event: () => {
@@ -416,11 +434,7 @@ export class ProjectDashboardComponent {
   }
 
   openGroundingTextEditor(): void {
-    if (
-      !this.canAccessGroundingSetup() ||
-      this.groundingTextLocked() ||
-      (!this.hasGroundingText() && !this.canAddGroundingText())
-    ) {
+    if (!this.canAccessGroundingSetup() || (!this.hasGroundingText() && !this.canAddGroundingText())) {
       return;
     }
 
@@ -434,7 +448,7 @@ export class ProjectDashboardComponent {
   }
 
   saveGroundingText(): void {
-    if (!this.canAccessGroundingSetup() || this.groundingTextLocked()) {
+    if (!this.canAccessGroundingSetup()) {
       return;
     }
 
@@ -454,7 +468,7 @@ export class ProjectDashboardComponent {
   }
 
   removeGroundingText(): void {
-    if (!this.canAccessGroundingSetup() || this.groundingTextLocked()) {
+    if (!this.canAccessGroundingSetup()) {
       return;
     }
 
@@ -532,13 +546,10 @@ export class ProjectDashboardComponent {
     this.overviewSourceDocuments.set(mapOverviewSourceDocuments(response));
     this.executiveOverviewGeneratedAt.set(response.generated_at ?? null);
 
-    const analyzedText = response.text?.trim() ?? '';
-    this.groundingTextLocked.set(Boolean(analyzedText));
-    if (analyzedText) {
-      this.groundingText.set(analyzedText);
-      this.showGroundingTextEditor.set(false);
-      this.groundingTextDraft.set('');
-    }
+    const responseText = response.text?.trim() ?? '';
+    this.groundingText.set(responseText);
+    this.showGroundingTextEditor.set(false);
+    this.groundingTextDraft.set('');
   }
 
   private clearGeneratedExecutiveOverview(): void {
@@ -552,11 +563,12 @@ export class ProjectDashboardComponent {
     this.statusChartError.set(false);
 
     try {
-      const response = await this.api.GET_Results(
-        { 'contract-codes': [contractId] },
-        undefined,
-        { page: 1, limit: 10_000, sortField: 'code', sortOrder: 'DESC' }
-      );
+      const response = await this.api.GET_Results({ 'contract-codes': [contractId] }, undefined, {
+        page: 1,
+        limit: 10_000,
+        sortField: 'code',
+        sortOrder: 'DESC'
+      });
       this.statusChartItems.set(buildStatusChartItems(response?.data?.results ?? []));
     } catch {
       this.statusChartItems.set([]);
