@@ -1201,6 +1201,19 @@ describe('ProjectDashboardComponent', () => {
       expect(component.showExecutiveOverview()).toBe(true);
     });
 
+    it('should expand and collapse the executive overview', async () => {
+      await setup();
+
+      expect(component.executiveOverviewExpanded()).toBe(false);
+      expect(component.executiveOverviewText()).toBe('Stored overview paragraph.\n\nSecond stored paragraph.');
+
+      component.toggleExecutiveOverview();
+      expect(component.executiveOverviewExpanded()).toBe(true);
+
+      component.toggleExecutiveOverview();
+      expect(component.executiveOverviewExpanded()).toBe(false);
+    });
+
     it('should load executive overview summary for non-admin users when data exists', async () => {
       await setup('C-1', { isAdmin: false });
 
