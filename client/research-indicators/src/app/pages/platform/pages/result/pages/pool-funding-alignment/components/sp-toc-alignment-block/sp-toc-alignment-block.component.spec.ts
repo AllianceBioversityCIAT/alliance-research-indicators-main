@@ -984,6 +984,54 @@ describe('SpTocAlignmentBlockComponent', () => {
     });
   });
 
+  // R-BIL-116 — regression (already implemented): unit + target precede the
+  // contribution input, and — the partial-row case this spec relaxes into
+  // reachability — neither renders while no indicator is selected. Satisfied
+  // by construction via the `@if (selectedIndicator(); as indicator)` gate
+  // (:281), which also wraps unit/target/contribution as one unit.
+  describe('R-BIL-116 — unit and target precede the contribution input (regression)', () => {
+    function fullDraft(): SpAlignmentDraft {
+      return emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973 });
+    }
+
+    it('AC.1 — unit and target render when an indicator is selected', () => {
+      setup({ catalog: SP01_CAT, draft: fullDraft() });
+      fixture.detectChanges();
+      const unit = fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-SP01"]') as HTMLElement | null;
+      const target = fixture.nativeElement.querySelector('[data-testid="sp-toc-target-SP01"]') as HTMLElement | null;
+      expect(unit).not.toBeNull();
+      expect(target).not.toBeNull();
+      expect(unit!.textContent?.trim()).toBe('Number');
+      expect(target!.textContent?.trim()).toBe('5');
+    });
+
+    it('AC.2 — unit and target sit before the contribution input in DOM order, never after', () => {
+      setup({ catalog: SP01_CAT, draft: fullDraft() });
+      fixture.detectChanges();
+      const unit = fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-SP01"]') as HTMLElement;
+      const target = fixture.nativeElement.querySelector('[data-testid="sp-toc-target-SP01"]') as HTMLElement;
+      const input = fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-input-SP01"]') as HTMLElement;
+      expect(unit).not.toBeNull();
+      expect(target).not.toBeNull();
+      expect(input).not.toBeNull();
+      // DOCUMENT_POSITION_FOLLOWING on `input` relative to `unit`/`target` means
+      // unit/target come earlier in the document — i.e. before the input.
+      expect(unit.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(target.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('AC.3 — no indicator selected (partial row: Level + HLO only): neither unit nor target renders, and the contribution input never shows a stale unit', () => {
+      setup({ catalog: SP01_CAT, draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null }) });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-target-SP01"]')).toBeNull();
+      // The whole contribution panel — including the input — is gated by the same
+      // `selectedIndicator()` check, so no input renders to carry a stale unit.
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-input-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-SP01"]')).toBeNull();
+    });
+  });
+
   // --- disabled / version-locked (AC-09.1 block parts) -----------------------
   describe('disabled / version-locked rendering', () => {
     it('renders the current draft values read-only when disabled', () => {

@@ -676,6 +676,54 @@ describe('PoolFundingAlignmentComponent', () => {
     });
   });
 
+  // R-BIL-115 — regression (already implemented): the selected-SP chip renders
+  // through the `#rows` ng-template of `app-multiselect` (pool-funding-alignment
+  // .component.html :151), driven by `findScienceProgram()` resolving the chip's
+  // allocation from the per-result `sciencePrograms` picker list.
+  describe('R-BIL-115 — SP selector display format (regression)', () => {
+    const spOption = (overrides: Partial<PoolFundingScienceProgram> = {}): PoolFundingScienceProgram => ({
+      code: 'SP06',
+      name: 'Climate Action',
+      category: null,
+      color: '#000000',
+      icon_key: 'SP06',
+      allocation: 10,
+      ...overrides
+    });
+
+    const renderSelectedChip = async (option: PoolFundingScienceProgram) => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set([option]);
+      currentAlignment.set({ ...baseAlignment, has_contribution: false });
+      component.seedFromServer(currentAlignment()!);
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [{ official_code: option.code, name: option.name, category: option.category ?? null, color: option.color ?? null }]
+      }));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('AC.1 — renders the selected SP as "<code> — <allocation>% - <name>"', async () => {
+      await renderSelectedChip(spOption());
+      const chip = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-chip-SP06"]') as HTMLElement | null;
+      expect(chip).not.toBeNull();
+      expect(chip!.textContent?.replace(/\s+/g, ' ').trim()).toBe('SP06 — 10% - Climate Action');
+    });
+
+    it('AC.2 — a null allocation renders the existing "—" placeholder, never the literal "null"', async () => {
+      // Runtime data can carry a null allocation even though the wire type is
+      // declared non-nullable (`?? '—'` in the template is the actual guard).
+      await renderSelectedChip(spOption({ allocation: null as unknown as number }));
+      const chip = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-chip-SP06"]') as HTMLElement | null;
+      expect(chip).not.toBeNull();
+      expect(chip!.textContent?.replace(/\s+/g, ' ').trim()).toBe('SP06 — —% - Climate Action');
+      expect(chip!.textContent).not.toMatch(/\bnull\b/);
+    });
+  });
+
   describe('deselect-confirm flow (AC-02.3, D-6a)', () => {
     // onSpSelectionChange defers reconcileDrafts via queueMicrotask
     // (toc-mapping-save-gating-ux T-01), so flush the microtask after each notify.
