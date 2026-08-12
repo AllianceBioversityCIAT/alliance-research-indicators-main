@@ -207,8 +207,19 @@
                 Unable to generate the executive overview. Please try again.
               </p>
             } @else {
-              @for (paragraph of executiveOverviewParagraphs(); track paragraph) {
-                <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[#4c5158]">{{ paragraph }}</p>
+              <p
+                class="m-0 whitespace-pre-line font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[#4c5158]"
+                [class.line-clamp-4]="!executiveOverviewExpanded()">
+                {{ executiveOverviewText() }}
+              </p>
+              @if (executiveOverviewParagraphs().length > 0) {
+                <button
+                  type="button"
+                  class="w-fit border-0 bg-transparent p-0 font-['Barlow'] text-[12px] font-semibold text-[#1771b3]"
+                  [attr.aria-expanded]="executiveOverviewExpanded()"
+                  (click)="toggleExecutiveOverview()">
+                  {{ executiveOverviewExpanded() ? 'View less' : 'View more' }}
+                </button>
               }
             }
           </div>

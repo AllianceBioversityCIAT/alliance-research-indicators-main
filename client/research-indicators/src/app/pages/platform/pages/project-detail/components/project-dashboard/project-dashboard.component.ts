@@ -80,6 +80,8 @@ export class ProjectDashboardComponent {
   readonly executiveOverviewGeneratedAt = signal<string | null>(null);
   readonly uploadingGroundingDoc = signal(false);
   readonly executiveOverviewParagraphs = signal<string[]>([]);
+  readonly executiveOverviewExpanded = signal(false);
+  readonly executiveOverviewText = computed(() => this.executiveOverviewParagraphs().join('\n\n'));
   readonly executiveOverviewLoading = signal(false);
   readonly executiveOverviewError = signal(false);
   /** Saved free-text contextual resource (empty string means no text resource). */
@@ -251,6 +253,10 @@ export class ProjectDashboardComponent {
       return 0;
     }
     return Math.min(100, (value / max) * 100);
+  }
+
+  toggleExecutiveOverview(): void {
+    this.executiveOverviewExpanded.update(expanded => !expanded);
   }
 
   async openGroundingSetupModal(): Promise<void> {
@@ -542,6 +548,7 @@ export class ProjectDashboardComponent {
 
   private applyDocumentOverviewResponse(response: DocumentOverviewResponse): void {
     this.executiveOverviewParagraphs.set(parseDocumentOverviewParagraphs(response));
+    this.executiveOverviewExpanded.set(false);
     this.groundedDocuments.set(mapAvailableOverviewFiles(response));
     this.overviewSourceDocuments.set(mapOverviewSourceDocuments(response));
     this.executiveOverviewGeneratedAt.set(response.generated_at ?? null);
