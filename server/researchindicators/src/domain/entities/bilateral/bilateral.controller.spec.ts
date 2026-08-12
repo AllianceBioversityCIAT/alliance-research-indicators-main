@@ -17,17 +17,26 @@ import { ROLES_KEY, RolesGuard } from '../../shared/guards/roles.guard';
 import { ResultOwnerGuard } from '../../shared/guards/result-owner.guard';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
-import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
+import {
+  AlignmentResponse,
+  TocAlignmentReadbackResponse,
+  UpdatePoolFundingAlignmentDto,
+} from './dto/update-pool-funding-alignment.dto';
 import { ContributionDto } from './dto/upsert-indicator-mapping.dto';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.6 / NFR-BIL-070
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-04 / R-BIL-090, R-BIL-091
+// @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-05 / R-BIL-114 (Swagger: design §6.3, D-C1-10)
 //
 // Handler-level coverage for the bilateral controller — asserts the controller
 // is a thin pass-through to BilateralService + role-decorator metadata is
 // wired correctly on every mutation endpoint. T-04 adds Swagger-metadata
 // assertions for the reshaped GET /hlos-indicators handler (design §5: the
-// frozen envelope must render at /swagger).
+// frozen envelope must render at /swagger). T-05 adds the same class of
+// assertion for GET / and PATCH / — the partial-row null contract
+// (R-BIL-114) must be REGISTERED metadata, not merely a TSDoc comment
+// (evidence disqualifier: a comment on an interface renders nothing in
+// Swagger).
 
 describe('BilateralController (T-15.6)', () => {
   let controller: BilateralController;
@@ -396,6 +405,146 @@ describe('BilateralController (T-15.6)', () => {
           [...expected].sort(),
         );
       }
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-05 / R-BIL-114 (Swagger: design §6.3, D-C1-10)
+  //
+  // Same reasoning as the T-04 block above, applied to GET / and PATCH /:
+  // the handler must declare an @ApiResponse(200) typed with AlignmentResponse,
+  // and TocAlignmentReadbackResponse's indicator-derived fields must carry
+  // `nullable: true` @ApiProperty metadata — the partial-row null contract
+  // (R-BIL-114 AC.1/AC.4) is only "documented in Swagger" if this metadata
+  // is actually registered. A TSDoc comment on a plain interface (the
+  // pre-T-05 shape) would leave this describe block red.
+  describe('Swagger metadata — GET / and PATCH / (T-05)', () => {
+    it('GET / declares @ApiResponse 200 typed with AlignmentResponse', () => {
+      const apiResponses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        BilateralController.prototype.getAlignment,
+      ) as Record<string, { type?: unknown; description?: string }>;
+
+      expect(apiResponses).toBeDefined();
+      expect(apiResponses[HttpStatus.OK].type).toBe(AlignmentResponse);
+    });
+
+    it("PATCH / declares @ApiResponse 200 typed with AlignmentResponse, plus a 400 whose description names contribution_without_indicator (leader-assigned fix — the endpoint's documented 400 vocabulary was missing this code)", () => {
+      const apiResponses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        BilateralController.prototype.updateAlignment,
+      ) as Record<string, { type?: unknown; description?: string }>;
+
+      expect(apiResponses).toBeDefined();
+      expect(apiResponses[HttpStatus.OK].type).toBe(AlignmentResponse);
+      expect(apiResponses[HttpStatus.BAD_REQUEST].description).toContain(
+        'contribution_without_indicator',
+      );
+      // Regression: the rest of the documented 400 vocabulary must still be present.
+      for (const code of [
+        'duplicate_sp_code',
+        'sp_not_selected',
+        'missing_required_fields',
+        'level_not_allowed',
+        'unknown_toc_result_id',
+        'unknown_indicator_id',
+      ]) {
+        expect(apiResponses[HttpStatus.BAD_REQUEST].description).toContain(
+          code,
+        );
+      }
+    });
+
+    it('AlignmentResponse carries @ApiProperty metadata for every top-level field', () => {
+      const properties = (Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+        AlignmentResponse.prototype,
+      ) ?? []) as string[];
+
+      const fields = properties.map((p) => p.replace(/^:/, ''));
+      expect(fields.sort()).toEqual(
+        [
+          'result_code',
+          'eligible',
+          'has_pool_funding_alignment_eligible',
+          'has_contribution',
+          'selected_levers',
+          'selected_science_programs',
+          'is_synced_to_prms',
+          'is_read_only',
+          'version_locked',
+          'toc_alignments',
+        ].sort(),
+      );
+    });
+
+    it('TocAlignmentReadbackResponse carries @ApiProperty metadata for every field', () => {
+      const properties = (Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+        TocAlignmentReadbackResponse.prototype,
+      ) ?? []) as string[];
+
+      const fields = properties.map((p) => p.replace(/^:/, ''));
+      expect(fields.sort()).toEqual(
+        [
+          'sp_code',
+          'aligns_with_toc',
+          'level',
+          'toc_result_id',
+          'indicator_id',
+          'quantitative_contribution',
+          'toc_result_title',
+          'indicator_description',
+          'unit_of_measurement',
+          'target_value',
+          'target_year',
+        ].sort(),
+      );
+    });
+
+    // This is the assertion the evidence disqualifier calls for: it reads
+    // the REGISTERED nullable flag off the property metadata storage that
+    // SwaggerModule consults when it builds /swagger — not a comment, not a
+    // TSDoc block. Remove `nullable: true` from any of these @ApiProperty
+    // calls and this test goes red.
+    it.each([
+      'indicator_id',
+      'indicator_description',
+      'unit_of_measurement',
+      'target_value',
+      'target_year',
+      'quantitative_contribution',
+    ])(
+      'TocAlignmentReadbackResponse.%s is registered nullable: true (R-BIL-114 AC.1/AC.4 — null when the row has no resolved indicator)',
+      (field) => {
+        const propertyMetadata = Reflect.getMetadata(
+          DECORATORS.API_MODEL_PROPERTIES,
+          TocAlignmentReadbackResponse.prototype,
+          field,
+        ) as { nullable?: boolean } | undefined;
+
+        expect(propertyMetadata).toBeDefined();
+        expect(propertyMetadata?.nullable).toBe(true);
+      },
+    );
+
+    // toc_result_title and level/toc_result_id are also nullable (null on a
+    // "No" row), but ONLY toc_result_title stays populated once
+    // aligns_with_toc is true regardless of whether an indicator was
+    // chosen — pin that distinction in the description text so the doc
+    // doesn't silently drift from R-BIL-114's "toc_result_title is always
+    // populated" invariant.
+    it('TocAlignmentReadbackResponse.toc_result_title documents that it stays populated once a ToC result is chosen, independent of the indicator', () => {
+      const propertyMetadata = Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES,
+        TocAlignmentReadbackResponse.prototype,
+        'toc_result_title',
+      ) as { nullable?: boolean; description?: string } | undefined;
+
+      expect(propertyMetadata).toBeDefined();
+      expect(propertyMetadata?.nullable).toBe(true);
+      expect(propertyMetadata?.description).toMatch(
+        /independent of whether an indicator/,
+      );
     });
   });
 });
