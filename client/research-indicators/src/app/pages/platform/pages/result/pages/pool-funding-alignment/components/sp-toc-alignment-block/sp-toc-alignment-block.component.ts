@@ -157,7 +157,10 @@ export class SpTocAlignmentBlockComponent {
     EOI: '2030 Outcome'
   };
 
-  readonly ALIGN_QUESTION = "Does this result align with the Program's TOC indicators?";
+  // R-BIL-110 — reworded to ask whether the contributor wants to map, not
+  // whether the result aligns; the underlying stored field keeps its name and
+  // value domain unchanged (D-C1-2 — copy-only, no rename).
+  readonly ALIGN_QUESTION = 'Would you like to complete the detailed Theory of Change mapping for this result?';
   readonly LEVEL_LABEL = 'Level';
   readonly INDICATOR_LABEL = 'Indicator';
   readonly CONTRIBUTION_LABEL = 'Quantitative contribution';

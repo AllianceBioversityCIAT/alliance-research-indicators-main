@@ -1108,4 +1108,29 @@ describe('SpTocAlignmentBlockComponent', () => {
     const err = fixture.nativeElement.querySelector('[data-testid="sp-toc-error-contribution-SP01"]') as HTMLElement;
     expect(err.textContent?.trim()).toBe('Contribution is required');
   });
+
+  // R-BIL-110 — the per-SP question asks whether the contributor wants to
+  // map, not whether the result aligns. The stored field is unrenamed
+  // (D-C1-2); this only pins the constant's text and its `.label` binding.
+  describe('R-BIL-110 — reworded ToC intent question', () => {
+    it('AC.1 — ALIGN_QUESTION holds the exact required copy', () => {
+      setup();
+      expect(component.ALIGN_QUESTION).toBe('Would you like to complete the detailed Theory of Change mapping for this result?');
+    });
+
+    it('AC.1 — the rendered question text matches ALIGN_QUESTION exactly', () => {
+      setup();
+      fixture.detectChanges();
+      const question = fixture.nativeElement.querySelector('#sp-toc-aligns-q-SP01') as HTMLElement;
+      expect(question).not.toBeNull();
+      expect(question.textContent?.trim()).toBe(`${component.ALIGN_QUESTION}*`);
+    });
+
+    it('scenario clause — the question renders through the canonical .label class, not a Tailwind substitute', () => {
+      setup();
+      fixture.detectChanges();
+      const question = fixture.nativeElement.querySelector('#sp-toc-aligns-q-SP01') as HTMLElement;
+      expect(question.classList.contains('label')).toBe(true);
+    });
+  });
 });
