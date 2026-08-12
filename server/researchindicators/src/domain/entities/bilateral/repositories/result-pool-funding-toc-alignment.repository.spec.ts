@@ -230,6 +230,171 @@ describe('ResultPoolFundingTocAlignmentRepository', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Regression net (AC-1676, T-01) — per-SP isolation + partial-unique
+  // active-row constraint (R-BIL-118). Both properties already hold on
+  // unmodified code; this block pins them BEFORE the T-03/T-04 partial-ToC
+  // relaxation lands. Unlike the mock-based tests above (which only assert
+  // *which* repository methods were called), these use a small in-memory
+  // fake store that actually applies `findOne`/`update`/`create`/`save`
+  // against stored rows the way the real TypeORM repository would — so a
+  // weakened `WHERE` scope in `upsertForSp` makes the assertions fail, not
+  // just go unnoticed. This block proves the application half of AC.2 only:
+  // `upsertForSp` never issues a second insert for an already-active
+  // (result, sp) pair, so the DB partial-unique index is never reached by
+  // application traffic. The DB-enforced half — the
+  // `idx_rpfta_active_result_sp` partial-unique index on the generated
+  // `active_result_sp` column (migration 1779190000015), which enforces
+  // independently and which `upsertForSp` relies on as a backstop, not the
+  // reverse — is discharged structurally: this task changes no DDL, and
+  // design.md §4 / requirements.md §5 record that column and index as
+  // unchanged.
+  //
+  // @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-01 / R-BIL-118
+  // ---------------------------------------------------------------------------
+  describe('per-SP isolation + partial-unique active row (R-BIL-118)', () => {
+    // Generic WHERE matcher mimicking a real UPDATE/SELECT — every key in
+    // `criteria` must equal the row's value. Deliberately NOT hard-coded to
+    // `id` so a mutant that widens the update criteria (e.g. dropping the
+    // `id` scope down to `result_id` only) is caught by these tests.
+    const matches = (
+      row: Record<string, unknown>,
+      criteria: Record<string, unknown>,
+    ) => Object.entries(criteria).every(([key, value]) => row[key] === value);
+
+    it('R-BIL-118 AC.1 — writing SP01 leaves SP02 row byte-identical', async () => {
+      const sp01Row = {
+        id: 1,
+        result_id: 101,
+        sp_code: 'SP01',
+        is_active: true,
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5,
+        indicator_id: null,
+        quantitative_contribution: null,
+        toc_result_title: 'sp01 title',
+        indicator_description: null,
+        unit_messurament: null,
+        target_value: null,
+        target_year: null,
+      };
+      const sp02Row = {
+        id: 2,
+        result_id: 101,
+        sp_code: 'SP02',
+        is_active: true,
+        aligns_with_toc: true,
+        level: 'OUTCOME',
+        toc_result_id: 9,
+        indicator_id: 77,
+        quantitative_contribution: 4.2,
+        toc_result_title: 'sp02 title',
+        indicator_description: 'sp02 description',
+        unit_messurament: 'Number',
+        target_value: '10',
+        target_year: 2026,
+      };
+      const sp02Snapshot = { ...sp02Row };
+      const store: Record<string, unknown>[] = [sp01Row, sp02Row];
+
+      jest
+        .spyOn(repository, 'findOne')
+        .mockImplementation(
+          async ({ where }: { where: Record<string, unknown> }) =>
+            (store.find((row) => matches(row, where)) as never) ?? null,
+        );
+      const updateSpy = jest
+        .spyOn(repository, 'update')
+        .mockImplementation(async (criteria: any, payload: any) => {
+          const matched = store.filter((row) => matches(row, criteria));
+          matched.forEach((row) => Object.assign(row, payload));
+          return { affected: matched.length } as any;
+        });
+
+      await repository.upsertForSp(
+        {
+          result_id: 101,
+          sp_code: 'SP01',
+          aligns_with_toc: true,
+          level: 'OUTCOME',
+          toc_result_id: 42,
+          indicator_id: 999,
+          toc_result_title: 'sp01 title, updated',
+        },
+        555,
+      );
+
+      // SP02's row must be untouched, field for field.
+      expect(sp02Row).toEqual(sp02Snapshot);
+      // The update was scoped to SP01's row id only.
+      expect(updateSpy).toHaveBeenCalledWith(
+        { id: 1 },
+        expect.objectContaining({ toc_result_id: 42 }),
+      );
+      expect(updateSpy).not.toHaveBeenCalledWith({ id: 2 }, expect.anything());
+    });
+
+    it('R-BIL-118 AC.2 (application half) — re-submitting the same (result, sp) updates the single active row in place, never inserting a second, so the partial-unique index is never reached', async () => {
+      const store: Record<string, unknown>[] = [];
+      let nextId = 1;
+
+      jest
+        .spyOn(repository, 'findOne')
+        .mockImplementation(
+          async ({ where }: { where: Record<string, unknown> }) =>
+            (store.find((row) => matches(row, where)) as never) ?? null,
+        );
+      jest
+        .spyOn(repository, 'update')
+        .mockImplementation(async (criteria: any, payload: any) => {
+          const matched = store.filter((row) => matches(row, criteria));
+          matched.forEach((row) => Object.assign(row, payload));
+          return { affected: matched.length } as any;
+        });
+      jest
+        .spyOn(repository, 'create')
+        .mockImplementation(
+          (entity) => entity as ResultPoolFundingTocAlignment,
+        );
+      jest.spyOn(repository, 'save').mockImplementation(async (entity: any) => {
+        const row = { id: nextId++, is_active: true, ...entity };
+        store.push(row);
+        return row as never;
+      });
+
+      await repository.upsertForSp(
+        {
+          result_id: 101,
+          sp_code: 'SP01',
+          aligns_with_toc: true,
+          level: 'OUTPUT',
+          toc_result_id: 5,
+        },
+        555,
+      );
+      // Re-submitting the SAME (result, sp) with different content must
+      // update the existing active row, not insert a second one.
+      await repository.upsertForSp(
+        {
+          result_id: 101,
+          sp_code: 'SP01',
+          aligns_with_toc: true,
+          level: 'OUTCOME',
+          toc_result_id: 9,
+        },
+        555,
+      );
+
+      const activeSp01Rows = store.filter(
+        (row) =>
+          row.result_id === 101 && row.sp_code === 'SP01' && row.is_active,
+      );
+      expect(activeSp01Rows).toHaveLength(1);
+      expect(activeSp01Rows[0]).toMatchObject({ level: 'OUTCOME' });
+    });
+  });
+
   describe('deactivateForSps', () => {
     it('soft-deactivates active rows for the given SPs with audit fields', async () => {
       const updateSpy = jest

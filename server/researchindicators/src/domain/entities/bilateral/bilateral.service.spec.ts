@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
+  ConflictException,
   NotFoundException,
   HttpException,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
+import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.6 / NFR-BIL-070
 //
@@ -54,6 +56,9 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
   const findActiveTocRows = jest.fn();
   const getTocResults = jest.fn();
   const getTocResultsForSps = jest.fn();
+  // R-BIL-117 AC.3 — named so the gate-bypass test can assert it is never
+  // reached when the read-only gate rejects the write first.
+  const tocUpsertForSp = jest.fn();
 
   // Mimic TypeORM's actual save: echo back the payload (merged with an id)
   // so `savedMapping` carries the lever_code / indicator_code / indicator_type
@@ -72,6 +77,10 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
   } as unknown as EntityManager;
 
   const user: User = { sec_user_id: 42 } as User;
+  // R-BIL-117 AC.2 — SYSTEM_ADMIN identity used to prove the read-only
+  // gate rejects writes regardless of role (it runs before RolesGuard's
+  // SYSTEM_ADMIN bypass would ever matter).
+  const systemAdmin: User = { sec_user_id: 1 } as User;
 
   // Sentinel handler used for upsertContribution happy path — NOOP-style
   // (no FK; narrative goes into `other_contribution_narrative`).
@@ -117,7 +126,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           provide: ResultPoolFundingTocAlignmentRepository,
           useValue: {
             findActiveByResultId: findActiveTocRows,
-            upsertForSp: jest.fn(),
+            upsertForSp: tocUpsertForSp,
             deactivateForSps: jest.fn(),
           },
         },
@@ -420,6 +429,135 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         expect(getTocResults).not.toHaveBeenCalled();
         expect(getTocResultsForSps).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Regression net (AC-1676, T-01) — read-only gate (R-BIL-117). This gate
+  // already exists on unmodified code; this block pins it BEFORE the
+  // T-03/T-04 partial-ToC relaxation lands, so a future regression fails a
+  // test tied to this spec rather than relying solely on
+  // `bilateral.service.sourceReadOnlyGate.spec.ts` (T-15.2), which was
+  // written for a different ticket's traceability. Per-SP isolation
+  // (R-BIL-118) is pinned at the repository layer, see
+  // `repositories/result-pool-funding-toc-alignment.repository.spec.ts`.
+  //
+  // @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-01 / R-BIL-117
+  // ---------------------------------------------------------------------------
+  describe('read-only gate — is_read_only union + write rejection (R-BIL-117)', () => {
+    const contextFor = (overrides: {
+      platform_code: string;
+      is_synced_to_prms: boolean;
+    }) => ({
+      result_id: 19792,
+      result_official_code: 19792,
+      is_pool_funding_contributor: true,
+      report_year_id: 2026,
+      ...overrides,
+    });
+
+    // R-BIL-117 AC.1 — is_read_only is the UNION of PRMS-sourced and
+    // is_synced_to_prms. Covers all four truth-table combinations; the
+    // (STAR, synced) and (PRMS, synced) rows are not exercised by the
+    // existing sourceReadOnlyGate spec, which only asserts is_read_only on
+    // the (PRMS, not-synced) row.
+    it.each([
+      { platform_code: 'STAR', is_synced_to_prms: false, expected: false },
+      { platform_code: 'STAR', is_synced_to_prms: true, expected: true },
+      { platform_code: 'PRMS', is_synced_to_prms: false, expected: true },
+      { platform_code: 'PRMS', is_synced_to_prms: true, expected: true },
+    ])(
+      'is_read_only=$expected for platform_code=$platform_code, is_synced_to_prms=$is_synced_to_prms',
+      async ({ platform_code, is_synced_to_prms, expected }) => {
+        findContext.mockResolvedValueOnce(
+          contextFor({ platform_code, is_synced_to_prms }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(null);
+        findActiveTocRows.mockResolvedValueOnce([]);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.is_read_only).toBe(expected);
+      },
+    );
+
+    // R-BIL-117 AC.2 — 409 on write under each condition, including for
+    // SYSTEM_ADMIN. The BOTH-true combination is not exercised by the
+    // existing sourceReadOnlyGate spec (each condition is tested there in
+    // isolation, never together).
+    it('rejects a SYSTEM_ADMIN write with 409 when the result is BOTH PRMS-sourced AND already synced', async () => {
+      findContext.mockResolvedValueOnce(
+        contextFor({ platform_code: 'PRMS', is_synced_to_prms: true }),
+      );
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01'],
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, systemAdmin);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(ConflictException);
+      // The PRMS-source gate runs first (bilateral.service.ts:659), so its
+      // wording wins over the synced-to-PRMS gate even when both fire.
+      expect(thrown!.message).toBe(
+        'Result is PRMS-sourced; bilateral alignment is read-only in STAR',
+      );
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects a SYSTEM_ADMIN write with 409 when the result is synced to PRMS but not PRMS-sourced', async () => {
+      findContext.mockResolvedValueOnce(
+        contextFor({ platform_code: 'STAR', is_synced_to_prms: true }),
+      );
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01'],
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, systemAdmin),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    // R-BIL-117 AC.3 — the partial-ToC relaxation (T-03/T-04) must not open
+    // a write path that bypasses this gate. Pinned here on TODAY's code: a
+    // request carrying `toc_alignments` is rejected by the same top-level
+    // gate before any ToC-specific processing runs.
+    it('a write carrying toc_alignments is rejected by the SAME gate before any ToC processing runs', async () => {
+      findContext.mockResolvedValueOnce(
+        contextFor({ platform_code: 'PRMS', is_synced_to_prms: false }),
+      );
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01'],
+        toc_alignments: [
+          {
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 1,
+          },
+        ],
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, systemAdmin),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(tocUpsertForSp).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
     });
   });
 
