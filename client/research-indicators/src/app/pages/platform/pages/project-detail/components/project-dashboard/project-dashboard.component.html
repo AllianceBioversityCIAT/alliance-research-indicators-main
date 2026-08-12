@@ -70,7 +70,8 @@
             } @else {
             <button type="button"
               class="min-h-0 w-full flex-1 overflow-y-auto border-0 bg-transparent p-0 text-left font-['Barlow'] text-[13px] leading-[1.5] text-[#8d9299]"
-              [disabled]="!canAddGroundingText() || uploadingGroundingDoc()" (click)="openGroundingTextEditor()">
+              [disabled]="groundingTextLocked() || !canAddGroundingText() || uploadingGroundingDoc()"
+              (click)="openGroundingTextEditor()">
               @if (hasGroundingText()) {
               <span class="text-[#112f5c]">{{ groundingText() }}</span>
               } @else {
@@ -81,9 +82,12 @@
               <span class="font-['Barlow'] text-[11px] text-[#8d9299]">Counted as one text resource</span>
               @if (hasGroundingText()) {
               <div class="flex items-center gap-3 font-['Barlow'] text-[12px] font-semibold">
-                <span class="text-[#1771b3]"><i class="pi pi-check mr-1 !text-[10px]" aria-hidden="true"></i>Added</span>
+                <span class="text-[#1771b3]"><i class="pi pi-check mr-1 !text-[10px]" aria-hidden="true"></i>{{
+                  groundingTextLocked() ? 'Analyzed' : 'Added' }}</span>
+                @if (!groundingTextLocked()) {
                 <button type="button" class="border-0 bg-transparent p-0 font-semibold text-[#777C83]"
                   (click)="removeGroundingText()">Remove</button>
+                }
               </div>
               } @else {
               <button type="button" class="rounded-lg border border-[#1771b3] bg-transparent px-4 py-2 font-['Barlow'] text-[12px] font-semibold text-[#1771b3]"

@@ -81,6 +81,8 @@ export class ProjectDashboardComponent {
   readonly executiveOverviewError = signal(false);
   /** Saved free-text contextual resource (empty string means no text resource). */
   readonly groundingText = signal<string>('');
+  /** Text returned by the overview service is an analyzed resource and cannot be edited locally. */
+  readonly groundingTextLocked = signal(false);
   readonly showGroundingTextEditor = signal(false);
   readonly groundingTextDraft = signal<string>('');
 
@@ -414,7 +416,11 @@ export class ProjectDashboardComponent {
   }
 
   openGroundingTextEditor(): void {
-    if (!this.canAccessGroundingSetup() || (!this.hasGroundingText() && !this.canAddGroundingText())) {
+    if (
+      !this.canAccessGroundingSetup() ||
+      this.groundingTextLocked() ||
+      (!this.hasGroundingText() && !this.canAddGroundingText())
+    ) {
       return;
     }
 
@@ -428,7 +434,7 @@ export class ProjectDashboardComponent {
   }
 
   saveGroundingText(): void {
-    if (!this.canAccessGroundingSetup()) {
+    if (!this.canAccessGroundingSetup() || this.groundingTextLocked()) {
       return;
     }
 
@@ -448,7 +454,7 @@ export class ProjectDashboardComponent {
   }
 
   removeGroundingText(): void {
-    if (!this.canAccessGroundingSetup()) {
+    if (!this.canAccessGroundingSetup() || this.groundingTextLocked()) {
       return;
     }
 
@@ -525,6 +531,14 @@ export class ProjectDashboardComponent {
     this.groundedDocuments.set(mapAvailableOverviewFiles(response));
     this.overviewSourceDocuments.set(mapOverviewSourceDocuments(response));
     this.executiveOverviewGeneratedAt.set(response.generated_at ?? null);
+
+    const analyzedText = response.text?.trim() ?? '';
+    this.groundingTextLocked.set(Boolean(analyzedText));
+    if (analyzedText) {
+      this.groundingText.set(analyzedText);
+      this.showGroundingTextEditor.set(false);
+      this.groundingTextDraft.set('');
+    }
   }
 
   private clearGeneratedExecutiveOverview(): void {

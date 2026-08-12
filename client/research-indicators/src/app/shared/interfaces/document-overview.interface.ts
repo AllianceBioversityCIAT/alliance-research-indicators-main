@@ -43,6 +43,8 @@ export interface DocumentOverviewResponse {
   bucket_name?: string;
   documents_processed?: DocumentOverviewFileEntry[];
   available_files?: DocumentOverviewFileEntry[];
+  /** Free-text contextual resource included in the analyzed overview. */
+  text?: string;
   interaction_id?: string;
   status?: string;
   generated_at?: string;

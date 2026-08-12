@@ -879,6 +879,39 @@ describe('ProjectDashboardComponent', () => {
   });
 
   describe('text contextual resource', () => {
+    it('should load and lock analyzed text returned by the overview service', async () => {
+      await setup();
+
+      (component as any).applyDocumentOverviewResponse({
+        text: '  Analyzed project context.  ',
+        available_files: [
+          { file_name: 'a.pdf', file_key: 'folder/a.pdf' },
+          { file_name: 'b.pdf', file_key: 'folder/b.pdf' }
+        ]
+      });
+
+      expect(component.groundingText()).toBe('Analyzed project context.');
+      expect(component.groundingTextLocked()).toBe(true);
+      expect(component.totalGroundingResources()).toBe(3);
+      expect(component.canUploadMoreGroundingDocs()).toBe(false);
+
+      component.openGroundingTextEditor();
+      component.removeGroundingText();
+
+      expect(component.showGroundingTextEditor()).toBe(false);
+      expect(component.groundingText()).toBe('Analyzed project context.');
+    });
+
+    it('should leave the text field editable when the overview text is empty', async () => {
+      await setup();
+
+      (component as any).applyDocumentOverviewResponse({ text: '   ' });
+
+      expect(component.groundingTextLocked()).toBe(false);
+      expect(component.hasGroundingText()).toBe(false);
+      expect(component.canAddGroundingText()).toBe(true);
+    });
+
     it('should save a trimmed text resource that counts toward the resource limit', async () => {
       await setup();
       component.groundedDocuments.set([]);
