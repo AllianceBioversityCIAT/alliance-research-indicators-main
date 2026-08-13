@@ -2080,3 +2080,39 @@ exactly the argument that certified the inert clamp."*
    **The amendment's own citation list will not be the scope — it never has been in this spec.**
 
 ---
+
+### ✅ Pivot Record: T-08 — AMENDMENT APPROVED AND APPLIED (2026-08-13)
+
+User approved. **R-BIL-125 AC.2's read-back half is reassigned from T-07 to T-08.** No requirement
+changed, no design decision reversed, no task added or removed. No rework — T-07's evidence already
+covers the write half it retains.
+
+| # | Edit | Location |
+| --- | --- | --- |
+| 1 | T-07's AC.2 criterion → **write half only**, with the read-back assertion explicitly discharged at T-08 and the reason (mocked `getAlignment`, scope boundary) | `tasks.md:337` |
+| 2 | T-08 gains **R-BIL-125 AC.2 (read-back half)** in *Requirements covered*, **plus an explicit note that the test does not exist anywhere in the repo yet** and exactly what it must assert | `tasks.md:350` |
+
+#### 🔁 Correction Closure — the Reviewer predicted three stale sites; the sweep found **five**
+
+The Reviewer named `tasks.md:349` (T-08's coverage), `requirements.md:575` and `tasks.md:728` in
+advance — **and warned the amendment's own citation list would not be the scope, "as it never has
+been in this spec."** Correct again:
+
+| Site | Predicted? | Fix |
+| --- | --- | --- |
+| `tasks.md:350` — T-08 *Requirements covered* | ✅ predicted | AC.2 read-back half added, with the missing-test note |
+| `requirements.md:575` — requirement index | ✅ predicted | T-08 added; T-07 narrowed to *AC.1; AC.2 write-half; AC.3 structurally* |
+| `tasks.md:729` — §4 coverage matrix | ✅ predicted | T-08 added to both the `AND IT MUST` column and the owning-task column |
+| **`tasks.md:307`** — T-07 *Requirements covered*, still read *"R-BIL-125 AC.1/AC.2 fully"* | ❌ **NOT predicted** | Narrowed to AC.1 fully / AC.2 write-half / AC.3 structural |
+| **`tasks.md:320`** — T-07 *Tests*, still read *"plus R-BIL-125 AC.1/AC.2/AC.3"* | ❌ **NOT predicted** | Narrowed, with the reason (`getAlignment` mocked at `:178`; pins are T-11's) |
+
+**Re-grepped to confirm closure** — every surviving `R-BIL-125` reference now names the correct owner
+per AC.
+
+> **K-003, fifth occurrence, same shape.** This time the Reviewer *predicted the failure mode in
+> advance and still under-counted the sites by two.* That is the sharpest statement of the lesson so
+> far: **even an expert forecasting exactly this failure could not enumerate the scope from memory —
+> only the literal sweep could.** The rule is not "cite carefully"; it is "**grep the literal string,
+> every round, and re-grep to confirm.**"
+
+---
