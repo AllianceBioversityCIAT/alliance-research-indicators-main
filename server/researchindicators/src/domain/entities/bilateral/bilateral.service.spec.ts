@@ -220,6 +220,12 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           { lever_code: 'SP01', lever_name: 'SP01' },
           { lever_code: 'SP02', lever_name: 'SP02' },
         ],
+        // T-08 — role carrier, ascending sp_code as the repository's
+        // ORDER BY already guarantees.
+        sp_roles: [
+          { sp_code: 'SP01', sp_role: 'PRIMARY' },
+          { sp_code: 'SP02', sp_role: 'CONTRIBUTING' },
+        ],
       });
       findAllCatalog.mockResolvedValueOnce([
         {
@@ -256,6 +262,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
             category: 'Science programs',
             color: '#ef4444',
             icon_key: 'SP01',
+            role: 'PRIMARY',
           },
           {
             code: 'SP02',
@@ -263,6 +270,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
             category: 'Science programs',
             color: '#84cc16',
             icon_key: 'SP02',
+            role: 'CONTRIBUTING',
           },
         ],
         is_synced_to_prms: false,
@@ -285,6 +293,14 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         result_id: 19792,
         has_contribution: true,
         selected_levers: [{ lever_code: 'SP01', lever_name: 'SP01' }],
+        // T-08 / RA-04 — deliberately NON-empty: the alignment row itself
+        // DOES carry a resolved Primary. The eligibility gate must still
+        // hide it (`visibleAlignment?.sp_roles ?? []`, never
+        // `alignment.sp_roles`) — a test where this fixture were empty
+        // would pass even if the service read the raw `alignment` by
+        // mistake, which is exactly the "not interchangeable with the
+        // phantom-member test" disqualifier this fixture exists to avoid.
+        sp_roles: [{ sp_code: 'SP01', sp_role: 'PRIMARY' }],
       });
       // T-07: saved rows exist, but the eligibility gate hides them the
       // same way it hides the rest of the alignment payload.
@@ -297,6 +313,8 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       expect(out.eligible).toBe(false);
       expect(out.has_contribution).toBeNull();
       expect(out.selected_levers).toEqual([]);
+      // R-BIL-123 / RA-04 — the eligibility gate, not the sp_roles content,
+      // decides this: sp_roles was populated above and still yields [].
       expect(out.selected_science_programs).toEqual([]);
       // T-07 (R-BIL-096): both fields present even on the ineligible state.
       expect(out.toc_alignments).toEqual([]);
@@ -434,6 +452,245 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         expect(out.toc_alignments).toHaveLength(2);
         expect(getTocResults).not.toHaveBeenCalled();
         expect(getTocResultsForSps).not.toHaveBeenCalled();
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // sp_roles carrier — role on the read-back
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 /
+    //   R-BIL-123 (AC.1-AC.3), R-BIL-126 AC.2, R-BIL-125 AC.2 (read-back half)
+    // -------------------------------------------------------------------------
+    describe('sp_roles carrier — role on the read-back (T-08)', () => {
+      const eligibleContext = () => ({
+        result_id: 19792,
+        result_official_code: 19792,
+        is_pool_funding_contributor: true,
+        is_synced_to_prms: false,
+        platform_code: 'STAR',
+        report_year_id: 2026,
+      });
+
+      const catalog = [
+        {
+          official_code: 'SP06',
+          name: 'SP06 name',
+          category: 'Science programs',
+          color: '#111111',
+          icon_key: 'SP06',
+        },
+        {
+          official_code: 'SP09',
+          name: 'SP09 name',
+          category: 'Science programs',
+          color: '#222222',
+          icon_key: 'SP09',
+        },
+      ];
+
+      // Scenario: "Role survives a round-trip" (requirements.md R-BIL-123).
+      it('AC.1 — exactly one entry with role: "PRIMARY"; sp_code-ascending order preserved (round-trip scenario)', async () => {
+        findContext.mockResolvedValueOnce(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce({
+          id: 501,
+          result_id: 19792,
+          has_contribution: true,
+          selected_levers: [
+            { lever_code: 'SP06', lever_name: 'SP06' },
+            { lever_code: 'SP09', lever_name: 'SP09' },
+          ],
+          // Already sp_code-ascending, mirroring the repository's
+          // `ORDER BY rpfas.sp_code ASC` — this test asserts the SERVICE
+          // does not disturb that order, not that it re-sorts.
+          sp_roles: [
+            { sp_code: 'SP06', sp_role: 'PRIMARY' },
+            { sp_code: 'SP09', sp_role: 'CONTRIBUTING' },
+          ],
+        });
+        findAllCatalog.mockResolvedValueOnce(catalog);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.selected_science_programs).toEqual([
+          {
+            code: 'SP06',
+            name: 'SP06 name',
+            category: 'Science programs',
+            color: '#111111',
+            icon_key: 'SP06',
+            role: 'PRIMARY',
+          },
+          {
+            code: 'SP09',
+            name: 'SP09 name',
+            category: 'Science programs',
+            color: '#222222',
+            icon_key: 'SP09',
+            role: 'CONTRIBUTING',
+          },
+        ]);
+        // AND IT MUST preserve the existing ordering contract (sp_code ASC).
+        expect(out.selected_science_programs.map((sp) => sp.code)).toEqual([
+          'SP06',
+          'SP09',
+        ]);
+        expect(
+          out.selected_science_programs.filter((sp) => sp.role === 'PRIMARY'),
+        ).toHaveLength(1);
+      });
+
+      // R-BIL-123 AC.2 — supporting test only, NOT the AC.2 discharge.
+      // This proves `getAlignment` is a deterministic mapping over its
+      // mocked input: two calls with the same fixture return byte-identical
+      // `selected_science_programs`. It does NOT call `updateAlignment` and
+      // so cannot observe the PATCH half of AC.2 at all — it would pass
+      // unchanged even if `updateAlignment` mutated or dropped a field
+      // after reading it back (the exact defect the Reviewer built during
+      // T-08 attempt 1 review, which this test's own two-read structure
+      // cannot see). The assertion that actually falsifies GET/PATCH
+      // parity — reading `updateAlignment`'s own return value — lives in
+      // 'AC.1 + AC.3' below. The write-then-read path across the
+      // transaction boundary remains T-13's integration test (TEST
+      // datasource); this test and 'AC.1 + AC.3' both stay within
+      // getAlignment's read side.
+      it('AC.2 — two independent reads of the same stored state return byte-identical selected_science_programs (getAlignment is a pure mapping over its input; does NOT exercise the PATCH/updateAlignment half of AC.2)', async () => {
+        const alignmentFixture = () => ({
+          id: 501,
+          result_id: 19792,
+          has_contribution: true,
+          selected_levers: [
+            { lever_code: 'SP06', lever_name: 'SP06' },
+            { lever_code: 'SP09', lever_name: 'SP09' },
+          ],
+          sp_roles: [
+            { sp_code: 'SP06', sp_role: 'PRIMARY' as const },
+            { sp_code: 'SP09', sp_role: 'CONTRIBUTING' as const },
+          ],
+        });
+
+        findContext.mockResolvedValue(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce(alignmentFixture());
+        findAllCatalog.mockResolvedValueOnce(catalog);
+        const firstRead = await service.getAlignment(19792, '19792', user);
+
+        findActiveAlignment.mockResolvedValueOnce(alignmentFixture());
+        findAllCatalog.mockResolvedValueOnce(catalog);
+        const secondRead = await service.getAlignment(19792, '19792', user);
+
+        expect(secondRead.selected_science_programs).toEqual(
+          firstRead.selected_science_programs,
+        );
+      });
+
+      // R-BIL-123 AC.3 (service half) — proves `getAlignment` passes
+      // `selected_levers` through untouched: whatever the repository
+      // returns is what the wire gets, field-by-field (keys, not just
+      // values). This does NOT prove the repository itself never leaks
+      // `sp_role` onto `selected_levers` — that fixture is hand-written
+      // here, so a leak inside the repository's own construction would not
+      // surface in this test. The repository half of AC.3 (the leak this
+      // guards against actually happening) is proven against real raw rows
+      // in `ResultPoolFundingAlignmentRepository — sp_roles LEFT JOIN
+      // null-sp_code guard (T-08 / RA-08)` below.
+      it('AC.3 (service half) — selected_levers is byte-identical as it passes through getAlignment', async () => {
+        findContext.mockResolvedValueOnce(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce({
+          id: 501,
+          result_id: 19792,
+          has_contribution: true,
+          selected_levers: [
+            { lever_code: 'SP06', lever_name: 'SP06' },
+            { lever_code: 'SP09', lever_name: 'SP09' },
+          ],
+          sp_roles: [
+            { sp_code: 'SP06', sp_role: 'PRIMARY' },
+            { sp_code: 'SP09', sp_role: 'CONTRIBUTING' },
+          ],
+        });
+        findAllCatalog.mockResolvedValueOnce(catalog);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.selected_levers).toEqual([
+          { lever_code: 'SP06', lever_name: 'SP06' },
+          { lever_code: 'SP09', lever_name: 'SP09' },
+        ]);
+        for (const lever of out.selected_levers) {
+          expect(Object.keys(lever).sort()).toEqual([
+            'lever_code',
+            'lever_name',
+          ]);
+        }
+      });
+
+      // R-BIL-126 AC.2 — legacy alignment (sp_role = NULL on every row,
+      // surfaced by the repository as `sp_role: null`) ⇒ 200 with
+      // `role: null` on every entry, not an error and not a synthesised role.
+      it('R-BIL-126 AC.2 — legacy alignment (sp_role = NULL) returns role: null on every entry', async () => {
+        findContext.mockResolvedValueOnce(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce({
+          id: 77,
+          result_id: 19792,
+          has_contribution: true,
+          selected_levers: [
+            { lever_code: 'SP06', lever_name: 'SP06' },
+            { lever_code: 'SP09', lever_name: 'SP09' },
+          ],
+          sp_roles: [
+            { sp_code: 'SP06', sp_role: null },
+            { sp_code: 'SP09', sp_role: null },
+          ],
+        });
+        findAllCatalog.mockResolvedValueOnce(catalog);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.selected_science_programs).toEqual([
+          expect.objectContaining({ code: 'SP06', role: null }),
+          expect.objectContaining({ code: 'SP09', role: null }),
+        ]);
+      });
+
+      // R-BIL-125 AC.2 (read-back half — REASSIGNED from T-07, 2026-08-13,
+      // user-approved; execution.md → Pivot Record: T-08). T-07 proved only
+      // the write half (deactivateForSps not called on a role change); no
+      // test anywhere asserted the OUTPUT side — that an active ToC row for
+      // a Contributing SP still appears in toc_alignments[]. `getAlignment`
+      // runs UNMOCKED here, which is why this was impossible in T-07
+      // (`tocAlignments.spec.ts` mocks `getAlignment` to `{}` for every
+      // test). The read-back's ToC filter is role-blind by design
+      // (bilateral.service.ts: `toc_alignments: (eligible ? tocAlignmentRows
+      // : []).map(...)`) and this test asserts that it STAYS that way — it
+      // is not new behavior, it is the first assertion of existing
+      // behavior against a role-differentiated fixture.
+      it("R-BIL-125 AC.2 (read-back half) — a Contributing SP's active ToC row still appears in toc_alignments[], alongside the Primary's", async () => {
+        findContext.mockResolvedValueOnce(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce({
+          id: 501,
+          result_id: 19792,
+          has_contribution: true,
+          selected_levers: [
+            { lever_code: 'SP06', lever_name: 'SP06' },
+            { lever_code: 'SP09', lever_name: 'SP09' },
+          ],
+          sp_roles: [
+            { sp_code: 'SP06', sp_role: 'PRIMARY' },
+            { sp_code: 'SP09', sp_role: 'CONTRIBUTING' },
+          ],
+        });
+        findAllCatalog.mockResolvedValueOnce(catalog);
+        // SP09 is Contributing (per sp_roles above) yet has an active,
+        // saved ToC row — the read filter must not exclude it.
+        findActiveTocRows.mockResolvedValueOnce([
+          { id: 1, sp_code: 'SP06', aligns_with_toc: true },
+          { id: 2, sp_code: 'SP09', aligns_with_toc: true },
+        ]);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.toc_alignments.map((row) => row.sp_code)).toEqual([
+          'SP06',
+          'SP09',
+        ]);
       });
     });
   });
@@ -728,9 +985,42 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       });
     });
 
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 forward
+    // pointer. `jest.clearAllMocks()` (the file's top-level `afterEach`)
+    // clears `.mock.calls` but NOT a mock's `.mockImplementation` — so
+    // `transaction`'s implementation above (bound to this describe's
+    // `scopedManager`, which throws on any entity it doesn't recognize)
+    // would otherwise persist as a stale default for whichever describe
+    // runs next. The outer `beforeEach` already reassigns it to
+    // `fakeManager` before every test, which is why no failure has been
+    // observed yet — this `mockReset()` removes the implementation
+    // explicitly rather than relying on that ordering.
+    afterEach(() => {
+      transaction.mockReset();
+    });
+
     it('AC.1 + AC.3 — persists SP06 as PRIMARY and SP09 as CONTRIBUTING, exactly one row each (sp_codes keeps its meaning — Primary not sent twice)', async () => {
       findContext.mockResolvedValueOnce(eligibleContext());
       findActiveAlignment.mockResolvedValueOnce(null);
+
+      // R-BIL-123 AC.2 (PATCH half — Reviewer FAIL, T-08 attempt 2). The
+      // describe-level `beforeEach` mocks `getAlignment` to `{}`, so this
+      // override gives it a REAL role-bearing shape instead, then the
+      // assertion below reads `updateAlignment`'s OWN return value. That is
+      // what makes AC.2 falsifiable: if anything between `const response =
+      // await this.getAlignment(...)` and `updateAlignment`'s `return
+      // response` (bilateral.service.ts:869-876) drops or rewrites a field
+      // — e.g. stripping `role` off `selected_science_programs` — this
+      // assertion goes red. The two-read test below never calls
+      // `updateAlignment` at all, so it cannot see that defect (see its
+      // comment).
+      jest.spyOn(service, 'getAlignment').mockResolvedValueOnce({
+        result_code: '19792',
+        selected_science_programs: [
+          { code: 'SP06', role: 'PRIMARY' },
+          { code: 'SP09', role: 'CONTRIBUTING' },
+        ],
+      } as never);
 
       const dto: UpdatePoolFundingAlignmentDto = {
         has_contribution: true,
@@ -738,9 +1028,18 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         primary_sp_code: 'SP06',
       };
 
-      await expect(
-        service.updateAlignment(19792, '19792', dto, user),
-      ).resolves.toBeDefined();
+      const result = await service.updateAlignment(19792, '19792', dto, user);
+      expect(result).toBeDefined();
+
+      // updateAlignment's return value must carry the SAME (sp_code, role)
+      // pairs the read-back it built from carried — proving PATCH returns
+      // GET's result untouched, not merely that it was called.
+      expect(
+        result.selected_science_programs.map((sp) => [sp.code, sp.role]),
+      ).toEqual([
+        ['SP06', 'PRIMARY'],
+        ['SP09', 'CONTRIBUTING'],
+      ]);
 
       expect(alignmentSpSave).toHaveBeenCalledTimes(1);
       const [rows] = alignmentSpSave.mock.calls[0];
@@ -1198,5 +1497,119 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(transaction).not.toHaveBeenCalled();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ResultPoolFundingAlignmentRepository.findActiveAlignmentByResultId —
+// sp_roles LEFT JOIN null-sp_code guard (RA-08)
+//
+// @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123
+//
+// This is deliberately a REPOSITORY-level test, not a `BilateralService`
+// test with `findActiveAlignmentByResultId` mocked: the eligibility-gate
+// test above and this one are NOT interchangeable (both would show `[]` in
+// the passing case), and asserting on a mock's own canned return would be
+// tautological — the actual guard being proven here is inside
+// `result-pool-funding-alignment.repository.ts`, filtering the raw row
+// shape a real LEFT JOIN produces when an alignment has zero active SP
+// rows (one row, with `sp_code`/`sp_role` NULL, same shape `selected_levers`
+// already guards against via `Boolean(row.lever_code)`).
+//
+// A dedicated repository spec FILE (`result-pool-funding-alignment
+// .repository.spec.ts`) is T-09's scope (NFR-BIL-122's query-count
+// assertion + R-BIL-123 AC.3); this single targeted test stays in this
+// file per T-08's own task instructions and does not create that file.
+// ---------------------------------------------------------------------------
+describe('ResultPoolFundingAlignmentRepository — sp_roles LEFT JOIN null-sp_code guard (T-08 / RA-08)', () => {
+  it('an alignment with zero active SP rows yields sp_roles: [] and selected_levers: [], not a phantom { sp_code: null } member', async () => {
+    const dataSource = {
+      createEntityManager: jest.fn().mockReturnValue({}),
+    } as unknown as DataSource;
+    const repository = new ResultPoolFundingAlignmentRepository(dataSource);
+
+    // The raw row shape a real LEFT JOIN with zero active
+    // `result_pool_funding_alignment_sp` rows actually produces: exactly
+    // one row, carrying the parent alignment's columns, with every
+    // rpfas.* column (including sp_code and sp_role) NULL.
+    jest.spyOn(repository, 'query').mockResolvedValue([
+      {
+        id: 501,
+        result_id: 19792,
+        has_contribution: 1,
+        lever_code: null,
+        lever_name: null,
+        sp_code: null,
+        sp_role: null,
+      },
+    ]);
+
+    const out = await repository.findActiveAlignmentByResultId(19792);
+
+    expect(out?.selected_levers).toEqual([]);
+    expect(out?.sp_roles).toEqual([]);
+  });
+
+  it('a mixed result (one active SP row) keeps only the non-null sp_code entry in sp_roles', async () => {
+    const dataSource = {
+      createEntityManager: jest.fn().mockReturnValue({}),
+    } as unknown as DataSource;
+    const repository = new ResultPoolFundingAlignmentRepository(dataSource);
+
+    jest.spyOn(repository, 'query').mockResolvedValue([
+      {
+        id: 501,
+        result_id: 19792,
+        has_contribution: 1,
+        lever_code: 'SP06',
+        lever_name: 'SP06',
+        sp_code: 'SP06',
+        sp_role: 'PRIMARY',
+      },
+    ]);
+
+    const out = await repository.findActiveAlignmentByResultId(19792);
+
+    expect(out?.sp_roles).toEqual([{ sp_code: 'SP06', sp_role: 'PRIMARY' }]);
+  });
+
+  // R-BIL-123 AC.3 — this MUST run against the real repository construction,
+  // not a `BilateralService` test with `findActiveAlignmentByResultId`
+  // mocked: a service-level fixture that hand-writes `selected_levers` as a
+  // literal (as the `bilateral.service.spec.ts` "AC.3" test above does)
+  // cannot detect `sp_role` being leaked onto `selected_levers` INSIDE the
+  // repository — it only reflects whatever the mock was told to return.
+  // (Verified empirically during T-08's falsification pass: leaking
+  // `sp_role` onto `selected_levers` in the repository left that
+  // service-level test green.) This test builds `selected_levers` from the
+  // same raw row the `sp_roles` tests above use, so a leak shows up as an
+  // unexpected key.
+  it('AC.3 — selected_levers carries ONLY lever_code/lever_name; sp_role never leaks onto it, even though the same row supplies both', async () => {
+    const dataSource = {
+      createEntityManager: jest.fn().mockReturnValue({}),
+    } as unknown as DataSource;
+    const repository = new ResultPoolFundingAlignmentRepository(dataSource);
+
+    jest.spyOn(repository, 'query').mockResolvedValue([
+      {
+        id: 501,
+        result_id: 19792,
+        has_contribution: 1,
+        lever_code: 'SP06',
+        lever_name: 'SP06',
+        sp_code: 'SP06',
+        sp_role: 'PRIMARY',
+      },
+    ]);
+
+    const out = await repository.findActiveAlignmentByResultId(19792);
+
+    expect(out?.selected_levers).toEqual([
+      { lever_code: 'SP06', lever_name: 'SP06' },
+    ]);
+    expect(Object.keys(out?.selected_levers[0] ?? {}).sort()).toEqual([
+      'lever_code',
+      'lever_name',
+    ]);
   });
 });

@@ -54,8 +54,10 @@ import {
 import { ReviewDecisionDto } from './dto/review-decision.dto';
 import {
   PoolFundingAlignmentDetail,
+  PoolFundingAlignmentSpRole,
   ResultPoolFundingAlignmentRepository,
 } from './repositories/result-pool-funding-alignment.repository';
+import { SpRole } from './dto/sp-role.type';
 import {
   ResultPoolFundingTocAlignmentRepository,
   TocAlignmentUpsertInput,
@@ -563,8 +565,14 @@ export class BilateralService {
     const isPrmsSourced = this.isPrmsSourced(context.platform_code);
     const visibleAlignment = eligible ? alignment : null;
     const selectedLevers = visibleAlignment?.selected_levers ?? [];
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123, design.md §4
+    // Read off `visibleAlignment`, NEVER the raw `alignment` — mirrors the
+    // `selectedLevers` line above so a non-eligible result keeps returning
+    // `selected_science_programs: []` (RA-04). The LEFT JOIN null-sp_code
+    // guard already ran inside the repository (RA-08), so `sp_roles` here
+    // never carries a phantom `{ sp_code: null }` member.
     const selectedSciencePrograms = await this.toSelectedSciencePrograms(
-      selectedLevers.map((lever) => lever.lever_code),
+      visibleAlignment?.sp_roles ?? [],
     );
 
     return {
@@ -620,22 +628,27 @@ export class BilateralService {
     };
   }
 
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123, design.md §4
+  // Widened from `(codes: string[])` to `(sps: PoolFundingAlignmentSpRole[])`
+  // so each entry can carry its resolved role alongside the CLARISA
+  // enrichment — enrichment itself is unchanged.
   private async toSelectedSciencePrograms(
-    codes: string[],
+    sps: PoolFundingAlignmentSpRole[],
   ): Promise<SelectedScienceProgramResponse[]> {
-    if (!codes.length) return [];
+    if (!sps.length) return [];
 
     const catalog = await this.clarisaScienceProgramsService.findAll();
     const byCode = new Map(catalog.map((sp) => [sp.official_code, sp]));
 
-    return codes.map((code) => {
-      const match = byCode.get(code);
+    return sps.map(({ sp_code, sp_role }) => {
+      const match = byCode.get(sp_code);
       return {
-        code,
-        name: match?.name ?? code,
+        code: sp_code,
+        name: match?.name ?? sp_code,
         category: match?.category ?? null,
         color: match?.color ?? null,
         icon_key: match?.icon_key ?? null,
+        role: sp_role,
       };
     });
   }
@@ -780,11 +793,15 @@ export class BilateralService {
             // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3
             // / R-BIL-073 — entity property renamed `lever_code` → `sp_code`.
             sp_code: spCode,
-            // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06
+            // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06/T-08
             // / R-BIL-120 AC.1, D-C2-4 — role is DERIVED from the resolved
             // Primary and STORED explicitly on every row (never transmitted
-            // per-row on the wire).
-            sp_role: spCode === primarySpCode ? 'PRIMARY' : 'CONTRIBUTING',
+            // per-row on the wire). `satisfies SpRole` ties this literal to
+            // the same shared union the read-back carrier and the DTO use
+            // (design.md §4, D-C2-14) — they agree by type, not convention.
+            sp_role: (spCode === primarySpCode
+              ? 'PRIMARY'
+              : 'CONTRIBUTING') satisfies SpRole,
             created_by: actorUserId,
             updated_by: actorUserId,
           })),

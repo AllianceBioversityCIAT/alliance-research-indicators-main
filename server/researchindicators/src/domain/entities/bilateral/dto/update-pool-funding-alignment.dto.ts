@@ -12,6 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { TocLevel } from '../../../tools/toc-integration/dto/toc-integration.types';
+import { SpRole } from './sp-role.type';
 
 // T-05 note: a class (not an interface) — it is nested inside AlignmentResponse
 // via `@ApiProperty({ type: () => [SelectedLeverResponse] })`, and Swagger's
@@ -52,21 +53,21 @@ export class SelectedScienceProgramResponse {
   @ApiPropertyOptional({ type: Number, nullable: true })
   allocation?: number | null;
 
-  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-120, R-BIL-123
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03/T-08 / R-BIL-120, R-BIL-123
   // Derived from sp_role, never transmitted per-row on write (R-BIL-120 —
   // the wire carries no per-row role field). `null` means role not yet
   // chosen — reachable ONLY on legacy rows written before this migration
   // (R-BIL-126); never produced by a write that passes R-BIL-121.
   //
-  // TS-optional (`role?:`) even though `@ApiProperty` (not
-  // `@ApiPropertyOptional`) documents it as an always-present, nullable
-  // response field: T-03 is declarations-only (scope boundary — no service
-  // logic) and `toSelectedSciencePrograms` (bilateral.service.ts:621) does
-  // not populate `role` yet — that carrier wiring is T-08's job
-  // (`sp_roles`, design.md §4). The `?` exists solely so `npm run build`
-  // does not force an out-of-scope edit to that construction site; the
-  // Swagger contract is unaffected because `@ApiProperty` sets `required:
-  // true` in the OpenAPI schema regardless of TS-level optionality.
+  // Required at the TS level (`role:`, not `role?:`) as of T-08:
+  // `toSelectedSciencePrograms` (bilateral.service.ts) now populates it on
+  // every entry via the `sp_roles` carrier (design.md §4). Keeping the `?`
+  // once the field is always populated would let a future construction site
+  // omit it silently — and `JSON.stringify` drops `undefined` keys, so a
+  // path that missed it would omit `role` from the wire entirely, silently
+  // contradicting the `@ApiProperty` (not `@ApiPropertyOptional`) contract
+  // below, which already documents `role` as an always-present, nullable
+  // field with `required: true` in the OpenAPI schema.
   @ApiProperty({
     enum: ['PRIMARY', 'CONTRIBUTING'],
     nullable: true,
@@ -74,7 +75,7 @@ export class SelectedScienceProgramResponse {
     description:
       'Role not yet chosen — legacy rows only. Every row written after this change always resolves to PRIMARY or CONTRIBUTING; null is unreachable on a fresh save (R-BIL-121) and appears only on alignments saved before this migration (R-BIL-126).',
   })
-  role?: 'PRIMARY' | 'CONTRIBUTING' | null;
+  role: SpRole | null;
 }
 
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-095

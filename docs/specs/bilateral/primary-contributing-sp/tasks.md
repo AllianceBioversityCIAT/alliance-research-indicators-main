@@ -384,7 +384,7 @@ graph TD
 - **Estimated LOC:** ~130
 - **Effort:** M
 - **Skills:** `nestjs-expert`, `api-design-principles`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — **PASS on attempt 2**, 1 rework attempt consumed; see [`./execution.md`](./execution.md) → T-08). Attempt 1 FAILed: R-BIL-123 AC.2 was **unfalsifiable** — the Reviewer built the defect (PATCH strips `role`) and **no test detected it**. Fixed by asserting `updateAlignment`'s **own return value**. **⚠ Two seams remain, both owned by T-13:** argument divergence at `bilateral.service.ts:869` (confirmed undetectable here) and read-your-own-write across the transaction boundary. **⚠ `npm run build` typechecks NO spec files** — `npx tsc -p tsconfig.json --noEmit` is the complete gate.
 
 ---
 

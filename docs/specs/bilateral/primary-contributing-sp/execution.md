@@ -2147,3 +2147,198 @@ because the mock only permits one call is measuring the mock, not the repository
 own done-criteria say so explicitly. A shape assertion is **not** a substitute; it cannot see the
 defect.
 
+
+### T-08 — Read-back carrier: `sp_roles`, widened enrichment, `getAlignment`
+
+| Field | Value |
+| --- | --- |
+| **Status** | 🔴 **Attempt 1 FAIL** — rework attempt 1 of 3 consumed |
+| **Date** | 2026-08-13 |
+| **Reviewer verdict** | `FAIL` — **one** blocking issue, ~3-line remediation, everything else verified clean |
+
+#### 🔴 THE FAIL — R-BIL-123 AC.2 is claimed but **unfalsifiable**
+
+The Reviewer did not merely read the AC.2 test. **It built the exact defect AC.2 exists to catch:**
+in `bilateral.service.ts`, after `const response = await this.getAlignment(...)` (`:869`), it stripped
+`role` off `response.selected_science_programs` before returning — *a `PATCH` response that disagrees
+with `GET` on precisely the field this task ships*.
+
+> **Result: 41 failed / 162 passed — ZERO change from baseline. No test in the module detected it.**
+
+Why: the AC.2 test calls `service.getAlignment` **twice** with the same fixture and asserts the two
+results match. **It never invokes `updateAlignment`, so it cannot see the `PATCH` half at all** — and
+because `getAlignment` is a deterministic mapping over a mocked input, the assertion could only fail
+on hidden state. The test's own title concedes it ("two independent reads").
+
+The structural argument in its comment — *`updateAlignment` returns `getAlignment` verbatim* — is
+**true**, and is exactly the *"we didn't change the code"* reasoning this spec's own Pivot Record
+quotes as the thing that certified the inert clamp. **Nothing asserts it.**
+
+**And the pre-existing test that DOES assert it** (`PATCH response ≡ GET — updateAlignment returns
+the getAlignment read-back verbatim`, in `tocAlignments.spec.ts`) **is one of the 41 red and is
+T-11's.** So between now and T-11, nothing guards this at all.
+
+**Violated:** `tasks.md` T-08 *Done criteria* — *"AC.2 — `GET` and `PATCH` return the same array for
+the same stored state"*; `requirements.md:234` R-BIL-123 AC.2.
+
+**Remediation (~3 lines, inside T-08's own file and scope):** the existing
+`updateAlignment — resolvePrimarySpCode + role persistence (T-06)` describe (`bilateral.service.spec.ts:924`)
+already runs `updateAlignment` with `getAlignment` **unmocked** — the Reviewer confirmed it reaches
+`:869`. Add to its `AC.1 + AC.3` test an assertion on **`updateAlignment`'s return value**: that
+`selected_science_programs` carries `role: 'PRIMARY'` for SP06 and `'CONTRIBUTING'` for SP09. That
+single assertion reddens under the sabotage. Keep the two-read test if desired — **but it must not be
+the discharge.** Deferring the *cross-transaction* write-then-read to T-13 stays correct; what cannot
+be deferred is that **`PATCH` returns the field at all**.
+
+#### ✅ The self-caught tautology — verified real, and the fix is real
+
+The Implementer reported catching its own tautological test mid-falsification. **The Reviewer re-ran
+sabotage 4 rather than credit it:** leaking `sp_role` onto `selected_levers` reddens **exactly one**
+test — the **repository-level** AC.3 test. The **service-level** one **stayed green**, confirming the
+self-report verbatim.
+
+**Verdict on keeping both: keep them.** The service-half test covers a *different* defect —
+`getAlignment` augmenting `selected_levers` on the way out — and is **honestly titled `(service
+half)` with a comment stating what it does not prove.** *"That comment is what makes it acceptable
+rather than misleading."*
+
+#### ✅ The two `[]` tests are genuinely non-interchangeable
+
+Sabotage 1 (`alignment.sp_roles`) reddens **(a) only**; sabotage 2 (drop the null filter) reddens
+**(b) only**. **Neither reddens the other.** Fixture (a) is deliberately **populated**
+(`sp_roles: [{sp_code:'SP01', sp_role:'PRIMARY'}]` with `eligible: false`), so it proves the *gate*,
+not emptiness. Fixture (b) runs against the **real repository** with a raw NULL-`sp_code` row.
+
+#### 🔴 CONFIRMED — `npm run build` is NOT a complete type gate. This affects every remaining task.
+
+`server/researchindicators/tsconfig.build.json` excludes **`**/*spec.ts`**, and `npm run build` runs
+`nest build` against it. Proven empirically by renaming the field:
+
+| Command | Result |
+| --- | --- |
+| `npx tsc -p tsconfig.build.json --noEmit` | **exit 0 — clean** |
+| `npx tsc -p tsconfig.json --noEmit` | **2 × `TS2339`** in `bilateral.service.spec.ts` |
+
+> **`npm run build` typechecks ZERO spec files.** Any task whose *"what would make this FAIL"* leans
+> on it to catch a rename, signature change, or fixture drift has a blind spot **the size of the
+> entire test tree**. **This is K-001's structural sibling** — K-001: a lint script that mutates
+> cannot verify. This: **a build that skips the tests cannot type-check them.**
+>
+> **Leader action: `npx tsc -p tsconfig.json --noEmit` is added to the standing verification block of
+> every remaining brief.**
+
+**Corollary — `tasks.md` T-08 contains a FALSE factual claim.** Its *"What would make this check
+FAIL"* asserts *"Naming the field `selected_sps` breaks the TypeORM relation and fails `npm run
+build`."* **It does not.** `PoolFundingAlignmentDetail` is a plain interface with no relationship to
+the entity's `@OneToMany`; the Reviewer ran the rename and **the build passed**. The RB-01 naming rule
+is still right, but it is a **convention** guard, not a compiler-enforced one — **nothing would have
+caught it.** Recorded for archive, given this spec's history of stale factual claims.
+
+#### Other verified findings
+- **Ordering is guaranteed, not incidental** — `ORDER BY rpfas.sp_code ASC` is **pre-existing at
+  `HEAD`** (`:51`). Not a latent flake.
+- **R-BIL-125 AC.2 (the reassigned read-back test) is genuinely discharged and non-tautological** —
+  `getAlignment` unmocked, role-differentiated fixture, and **falsified**: adding a
+  `sp_role === 'PRIMARY'` filter to `toc_alignments` reddens it. **The reassignment was worth making.**
+- **Double `sp_code` selection is correct and should stay** — projection-only, same row source, still
+  exactly **one** `this.query(...)`, matching the `e154c75b` baseline of 1. Reusing the `lever_code`
+  alias would be **worse**: sabotage 4 showed the AC.3 leak guard depends on the two being separately
+  named.
+- **`SpRole` file placement sound** — repository→dto is the **established** direction in this exact
+  file (it already imported `SelectedLeverResponse`); a standalone module avoids pulling the whole
+  class-validator graph in for one type.
+- **No new red, verified by cause:** failure sets **identical by file + full test name**, and after
+  normalising `:line:col` **all 41 failure messages are byte-identical**.
+- **`:216` not in the diff at all**; **K-001** honoured (`npx prettier --check` clean with no `--fix`
+  in the tree).
+
+
+#### ✅ Attempt 2 — Reviewer re-verdict: **`STATUS: PASS`**
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS on attempt 2** |
+| **Implementer attempts** | **2** (of 3) |
+| **Rework attempts consumed** | **1** |
+| **Reviewer verdicts** | `FAIL` (attempt 1) · `PASS` (attempt 2, focused) |
+| **Estimated / actual LOC** | ~130 / **490 insertions, 25 deletions** across both attempts |
+
+**The fix:** an assertion on **`updateAlignment`'s own return value** inside the existing `AC.1 + AC.3`
+test — `selected_science_programs` must carry `('SP06','PRIMARY')` and `('SP09','CONTRIBUTING')`.
+
+**Falsification, re-run by the Reviewer rather than taken on report:**
+
+```
+SABOTAGE (PATCH drops role) failed: 42   baseline 41
+NEWLY RED -> AC.1 + AC.3 — persists SP06 as PRIMARY and SP09 as CONTRIBUTING…
+```
+
+**Exactly one test, and it is the one carrying the new assertion.** Under attempt 1 the identical
+sabotage was invisible (41 → 41). Production files verified **md5-identical to attempt 1** — only the
+spec file moved.
+
+#### 🔴 A Reviewer error, caught by the Leader and acknowledged
+
+The attempt-1 remediation was premised on *"the describe already runs `updateAlignment` with
+`getAlignment` **unmocked**"*. **It does not** — `bilateral.service.spec.ts:972` mocks it to `{}`. The
+Leader verified this before accepting either account.
+
+The Reviewer's own explanation of how it went wrong is worth preserving:
+
+> *"What I had actually confirmed was that `:869` is **reached** — my first (crashing) sabotage variant
+> blew up in those very tests because `response.selected_science_programs` was `undefined`, and I read
+> that as evidence the call was live rather than as evidence it returned `{}`. **I inverted the
+> meaning of my own signal.**"*
+
+It then judged the Implementer's adaptation *"the better version of what I asked for"*. **Second
+Reviewer factual error this task** — the first being the `npm run build` claim it disproved itself by
+running it. Both were harmless **because neither was taken on trust.**
+
+#### The two seams AC.2's split proof cannot see — both owned by T-13
+
+The Leader asked whether covering AC.2 across two tests leaves a gap. **It does — two — and the
+Reviewer declined to expand them into more work:**
+
+| Seam | Detail |
+| --- | --- |
+| **1 — argument divergence (confirmed empirically)** | `mockResolvedValueOnce` **ignores arguments**, so a defect where `updateAlignment` calls `getAlignment` with *different* inputs than the GET path satisfies both halves and still makes GET and PATCH disagree. The Reviewer built it — `this.getAlignment(resultId, resultCode, {} as never)` — and the suite stayed at **41, undetected**. **Not academic:** `user` feeds the eligibility computation, and eligibility is what gates `selected_science_programs` to `[]`. |
+| **2 — read-your-own-write (structurally unreachable here)** | `:869` reads **after** the transaction closes at `:867`. If that read moved inside the transaction, or hit a lagging replica, PATCH would disagree with a later GET while both halves still hold. **No mocked harness can evaluate this** — `findActiveAlignment` is a `jest.fn()`, so there is no transaction boundary to get wrong. |
+
+**Why neither justified attempt 3** — the Reviewer's reasoning, which is the right instinct:
+
+> *"Attempt 1's gap was that the **named defect** was invisible — that was T-08 shipping an unguarded
+> claim about its own change. Seam 1 is a defect in **untouched code** with a named owner. **Failing a
+> task twice over a seam I did not name the first time, on code it did not write, would be the review
+> generating more work than it reviewed.**"*
+
+`:869` is pre-existing and outside every T-08 hunk (`:57-60`, `:568-575`, `:631-651`, `:796-799`), and
+no remaining task goes near it.
+
+#### ADVISORY (4R) — recorded
+
+1. **RELIABILITY → T-13.** Seam 1: T-13's integration test owns **argument threading** at
+   `bilateral.service.ts:869`, not only the commit boundary. One
+   `expect(getAlignmentSpy).toHaveBeenCalledWith(19792, '19792', user)` would close it early **if T-08
+   is ever reopened for another reason — do not reopen it for this.**
+2. **RISK — the highest-value item in the run.** `npm run build` typechecks **no** `*.spec.ts`
+   (`tsconfig.build.json` excludes `**/*spec.ts`). **Leader action taken: `npx tsc -p tsconfig.json
+   --noEmit` is now in the standing verification block of every remaining brief.** Also belongs in
+   `server/researchindicators/src/CLAUDE.md` §11 beside the K-001 note — **it is K-001's structural
+   sibling.**
+3. **RISK — doc accuracy.** `tasks.md` T-08's *"Naming the field `selected_sps` … fails `npm run
+   build`"* is **empirically false** (the Reviewer ran the rename; build exits 0). The RB-01 naming
+   rule is right but is a **convention** guard, not compiler-enforced — **nothing would have caught
+   it.** Correct before archive rather than leaving a falsified gate claim in the record.
+4. **RELIABILITY.** The two-read AC.2 test now opens *"supporting test only, NOT the AC.2 discharge"*
+   and states it would pass unchanged under the exact defect the Reviewer built. **That framing is the
+   right outcome** — it is what stops the next reader over-trusting it, the failure mode this spec
+   keeps catching in itself.
+
+#### Final verification
+✅ `npx jest src/domain/entities/bilateral` — **41 failed (unchanged, T-11's) / 162 passed / 203**
+✅ `npx tsc -p tsconfig.json --noEmit` — clean (**the complete type gate**)
+✅ `npm run build` — clean · `npx eslint` — clean · `npx prettier --check` — clean, no `--fix` in the tree
+✅ `:216` **not in the diff at all**; block SHA unchanged
+✅ Production files md5-identical between attempts; only the spec file moved
+
+---
