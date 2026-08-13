@@ -629,3 +629,605 @@ public surface changed, no HTTP contract touched, no Swagger obligation.
 ✅ T-01/T-04 protected block still hashes `94573605…`
 
 ---
+
+### T-02 — Migration: `sp_role` + generated column + unique index
+
+| Field | Value |
+| --- | --- |
+| **Status** | 🟡 **`[~]` IN-PROGRESS — artifact authored and PASSed; DB invariant UNVERIFIED** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **2** (of 3 permitted) — attempt 2 reworks the probe package only |
+| **Reviewer verdicts** | 1 × `PASS` (§A DDL + §C process) · **1 × `FAIL` (§B probe package — 5 issues, 3 destructive)** |
+| **Rework attempts consumed** | **1** of 3 |
+| **Requirements covered** | R-BIL-121 AC.3/AC.4 (**DDL authored, NOT proven**) · R-BIL-126 AC.1/AC.3/AC.5 · **NFR-BIL-120** |
+| **Dependencies** | T-01 ✅ |
+| **Estimated / actual LOC** | ~70 / **83** (one new migration file) |
+
+#### ⚠ WHY THIS TASK IS `[~]` AND NOT `done`
+
+T-02's own verification section says the manual migration run **"is the only gate that exists"**,
+and its disqualifier is explicit that `migration:dev:execute` exiting `0` **is not** evidence the
+invariant holds — **only the three direct-SQL probes are.**
+
+**No database was touched.** The user's decision (2026-08-13): *"lo que debemos hacer es pasar los
+cambios a la rama DEV y automáticamente se dispara el proceso de CI/CD"* — migrations reach DEV
+through CI/CD on the DEV branch, **not** by hand from a developer machine. Running one manually
+would mutate a shared team environment outside the deployment process.
+
+**Consequence, stated plainly so nothing downstream misreads it:**
+
+| Claim | Status |
+| --- | --- |
+| The migration file is correct by inspection, conforms to `design.md` §3.1, lints and builds | ✅ **PASS** (Reviewer, independently re-run) |
+| `idx_rpfas_active_primary` rejects a second active `PRIMARY` (R-BIL-121 AC.3) | ❌ **UNVERIFIED** |
+| The index permits **unlimited** active `CONTRIBUTING` rows (R-BIL-121 AC.4) | ❌ **UNVERIFIED** |
+| Row count + checksum preserved over seeded data (NFR-BIL-120) | ❌ **UNVERIFIED** |
+| An `is_read_only` legacy alignment is unmutated (R-BIL-126 AC.3) | ❌ **UNVERIFIED** |
+| **The probe package below has itself been audited** | ❌ **UNAUDITED** — see the hold below |
+
+**A CI/CD apply proves the DDL *runs*. It proves nothing about the invariant.** The plausible wrong
+implementation (`CONCAT(alignment_id, ':', sp_role)`) applies perfectly cleanly and only then
+silently rejects a second Contributing SP. That is precisely what Probe B exists to catch.
+
+**Discharge path:** T-13 automates all three probes against the `TEST` datasource
+(`ARI_TEST_MYSQL_*`, present in the `.env`). The manual package below is the interim check.
+
+#### Environment note — why the pre-check first reported "no database"
+
+`.env` is gitignored and lives in the **main checkout**
+(`~/Development/alliance-research-indicators-main/server/researchindicators/.env`, branch
+`star-monorepo`). It was never carried into the Orca worktree
+(`~/orca/workspaces/.../AC-1676`, branch `JuankCadavid/AC-1676`), so every credential probe came
+back empty and TypeORM fell back to `localhost:3306` → `ECONNREFUSED`. Resolved 2026-08-13 by
+symlinking the main checkout's `.env` into the worktree (user-approved; confirmed gitignored at
+`server/researchindicators/.gitignore:43`). This also exposes `ARI_TEST_MYSQL_*`, which **T-13**
+will need.
+
+#### The migration
+
+`server/researchindicators/src/db/migrations/1786636994078-addSpRoleToAlignmentSp.ts` — scaffolded
+via `npm run migration:empty` (**not** `migration:generate`, which diffs entity metadata, cannot
+emit a `STORED GENERATED` column or its expression, and would silently drop the invariant).
+
+`up()` is **character-identical** to `design.md` §3.1's normative block: one `ALTER` adding both
+`sp_role varchar(20) NULL` and `active_primary_alignment bigint GENERATED ALWAYS AS (IF(is_active =
+1 AND sp_role = 'PRIMARY', alignment_id, NULL)) STORED`, then a second adding
+`UNIQUE INDEX idx_rpfas_active_primary`. `down()` drops index → generated column → `sp_role`.
+
+#### Reviewer verdict (`opus`) — **`STATUS: PASS`**, scoped to the artifact
+
+The Reviewer tabulated the generated column across every row shape, which is the clearest
+statement of why the trap is avoided:
+
+| Row | `is_active` | `sp_role` | Condition | `active_primary_alignment` |
+| --- | --- | --- | --- | --- |
+| active PRIMARY | 1 | `'PRIMARY'` | TRUE | `alignment_id` |
+| active CONTRIBUTING | 1 | `'CONTRIBUTING'` | FALSE | `NULL` |
+| inactive PRIMARY | 0 | `'PRIMARY'` | FALSE | `NULL` |
+| legacy, active | 1 | `NULL` | `1 AND NULL` → NULL, else-branch | `NULL` |
+| legacy, inactive | 0 | `NULL` | FALSE | `NULL` |
+
+Only active-PRIMARY rows occupy the index; NULLs do not collide. R-BIL-121 AC.4 holds **by
+construction**.
+
+Other confirmed findings:
+- **`1779190000014` really is the analogue** — it adds `active_result_id bigint GENERATED ALWAYS AS
+  (IF(is_active = 1, result_id, NULL)) STORED` + a UNIQUE index. Identical shape. `1779190000015`'s
+  `varchar(71)` is `CONCAT(result_id, ':', sp_code)` — a composite key, not applicable.
+- **`id` is illegal *and* vacuous** as the key: MySQL 8 forbids `AUTO_INCREMENT` base columns in a
+  generated expression, and `id` is already unique so a unique index over it would constrain nothing.
+- **RA-10 is genuinely satisfied — one rebuild total.** `ADD COLUMN … STORED` is `ALGORITHM=COPY`;
+  the subsequent `ADD UNIQUE INDEX` over an already-materialised STORED column is an ordinary
+  secondary-index add (`ALGORITHM=INPLACE`), **not** a second rebuild.
+- **No backfill ⇒ the index add cannot fail on pre-existing duplicates** — every row is `NULL` in the
+  new column at that moment.
+- **`updated_at`'s `ON UPDATE CURRENT_TIMESTAMP(6)` does not fire on an ALTER-TABLE rebuild**, so the
+  audit columns and the checksum survive.
+- **`down()` leaves no residue.** Generated-column-before-`sp_role` is *forced*
+  (`ER_DEPENDENT_BY_GENERATED_COLUMN`); the FK `fk_rpfas_alignment` and both pre-existing indexes are
+  untouched, and InnoDB could never have adopted the new index for the FK (different column).
+- **`design.md` §11 item 3 cross-check:** this alters `result_pool_funding_alignment_sp`, **not**
+  `result_pool_funding_toc_alignment`, so C1's R-BIL-118 AC.2 structural discharge is **not tripped**.
+- **Scope clean:** `grep` for `sp_role|active_primary_alignment|idx_rpfas_active_primary` across
+  `src/` returns nothing outside the migration. `synchronize: false` (`orm.config.ts:51`), and the
+  only raw SQL against this table uses an explicit column list, so an added column breaks nothing.
+- **K-001 honoured** — a Prettier error was fixed **by hand**, not `--fix`; `npx eslint` re-run clean
+  by the Reviewer independently. `npm run build` clean, migration present in `dist/`.
+
+#### ⛔ HOLD — the probe package is UNAUDITED, do not run it against shared DEV yet
+
+The Reviewer's section B could not be completed: the package existed only in transient inter-agent
+messages and was never delivered to it (a **routing** failure by the Leader, not a defect in the
+Implementer's work — no rework attempt consumed). **Recording it here is the fix**: the package is
+now durable and readable from disk.
+
+**Undischarged items — all still open:**
+1. Does **Probe A** fail on `idx_rpfas_active_primary` specifically, rather than on the FK
+   `fk_rpfas_alignment` or a NOT NULL constraint? *(A probe that fails for the wrong reason looks
+   like proof and is worthless.)*
+2. Is **Probe B** genuinely the trap-catcher?
+3. **Cleanup over-reach:** can `UPDATE … SET is_active = 1 … WHERE sp_role = 'PRIMARY' AND is_active
+   = 0` resurrect a row that was already inactive before the probes ran?
+4. **Session-variable hazard:** `@test_alignment_id` is session-scoped. If cleanup runs in a
+   different connection it is `NULL` — does that silently no-op (leaving `ZZPROBE_*` rows in DEV) or
+   match something dangerous?
+5. Does the package discharge R-BIL-121 AC.3/AC.4 **as written**?
+6. Is the R-BIL-126 AC.3 check actionable, or does it presuppose a pre-migration snapshot nobody took?
+
+**One schema fact the Reviewer established that bears on item 3:** because there is **no backfill**,
+no pre-existing row can have `sp_role = 'PRIMARY'` — but that protects the cleanup *only if* its
+`WHERE` is genuinely conjunctive on `sp_role = 'PRIMARY'` **and** the setup touched only the one
+promoted row.
+
+#### DEFERRED VERIFICATION PACKAGE — v2, REWRITTEN AFTER §B FAIL, NOT YET RUN
+
+Column list confirmed from source: `created_at, created_by, updated_at, updated_by, is_active
+(tinyint default 1), deleted_at, id (bigint PK AUTO_INCREMENT), alignment_id (bigint NOT NULL),
+sp_code (varchar(50) NOT NULL)` + this migration's `sp_role` and generated
+`active_primary_alignment`. `is_read_only` is **computed, not stored** — `bilateral.service.ts:576`,
+`platform_code === 'PRMS' OR results.is_synced_to_prms = 1`, both on `results`, joined via
+`result_pool_funding_alignment.result_id`.
+
+```sql
+-- ============================================================
+-- RUN INSTRUCTIONS — READ BEFORE EXECUTING
+-- ============================================================
+-- Run this file INTERACTIVELY, statement-by-statement (pasted into a MySQL
+-- client one block at a time), OR non-interactively with `mysql --force`.
+-- Probe A (step 3) is EXPECTED to raise ERROR 1062 and execution MUST
+-- CONTINUE past it. A plain `mysql < package.sql` (no --force) ABORTS on
+-- the first error and never reaches cleanup (step 8) — leaving the
+-- promoted row mutated in shared DEV.
+--
+-- If you already ran this non-interactively WITHOUT --force and it
+-- stopped at Probe A: do NOT re-run from the top. Jump straight to
+-- "PRE-CLEANUP IDENTITY CHECK" (step 7) and run cleanup (step 8) before
+-- doing anything else.
+--
+-- OPEN GAP — NOT COVERED BY THIS PACKAGE: T-02 done-criterion 1
+-- ("Forward + revert + forward all clean") has NO owner here. Migrations
+-- reach DEV only through CI/CD; this package has no vehicle to run
+-- down()/up() cycles against a shared environment. The R-BIL-126 AC.5 /
+-- NFR-BIL-120 reversibility evidence remains an OPEN GAP, to be closed
+-- elsewhere (e.g. T-13's automated probes against the TEST datasource),
+-- not invented here.
+--
+-- ⚠⚠⚠ CRITICAL — THE NULL -> ERROR 1048 INVERSION ⚠⚠⚠
+-- `@test_alignment_id` and `@promoted_id` are SESSION variables (step 2).
+-- `SET @test_alignment_id = (SELECT … HAVING …)` silently returns NULL if no
+-- alignment qualifies, OR in a fresh/reconnected session that never ran
+-- step 2 on this connection. When `@test_alignment_id` is NULL,
+-- `@promoted_id` is also NULL, and step 2's UPDATE `WHERE id = @promoted_id`
+-- then matches 0 rows — `Query OK, 0 rows affected`, NO error, NO warning.
+-- The promotion silently does not happen.
+--
+-- Every probe after that point is then inserting `alignment_id = NULL` into
+-- a `bigint NOT NULL` column with no default. Under MySQL 8's default
+-- STRICT_TRANS_TABLES this raises ERROR 1048 (23000): Column
+-- 'alignment_id' cannot be null — BEFORE the FK and BEFORE the unique index
+-- (idx_rpfas_active_primary) are ever consulted. This INVERTS the meaning
+-- of every probe below, in BOTH directions:
+--   * Probe A (step 3, expects 1062) ALSO errors under 1048 — a human
+--     scanning "Probe A must fail => it failed => PASS" records a FALSE
+--     PASS. The migration's central invariant gets certified by a NOT NULL
+--     violation that never touched the unique index.
+--   * Probe B (step 4, expects success) FAILS under 1048 — read as "the
+--     trap is present and the DDL is wrong", a FALSE FAIL against a
+--     migration already certified correct, which would send someone to
+--     "fix" working DDL.
+--   * Probes C / C2 (steps 5-6) fail the same way, for the same reason.
+--
+-- DISTINGUISHING THE TWO ERRORS IS THE WHOLE POINT:
+--   1062 = the unique index fired (a real result).
+--   1048 = the variable was NULL (the run is VOID — restart from step 2).
+-- If ERROR 1048 appears anywhere in steps 3-6: STOP. Nothing below that
+-- point is evidence of anything. Do not record a PASS or a FAIL from it.
+-- ============================================================
+
+-- ============================================================
+-- 0. RUN AFTER up() migration lands, BEFORE any probe below
+-- ============================================================
+
+-- 1. BASELINE CAPTURE
+SELECT COUNT(*) AS row_count FROM result_pool_funding_alignment_sp;
+
+-- Order-independent checksum over (id, alignment_id, sp_code, is_active).
+-- NOTE: this checksum is BLIND TO `sp_role` AND `updated_at` BY DESIGN —
+-- both are columns the probes below write. "Identical at step 10" does NOT
+-- by itself prove those two columns were restored; step 8's cleanup carries
+-- its own sp_role-aware assertion for that reason.
+SELECT SUM(CRC32(CONCAT_WS('|', id, alignment_id, sp_code, is_active))) AS checksum
+FROM result_pool_funding_alignment_sp;
+
+-- Expected: row_count > 0 (seeded DEV data — if 0, STOP: the run is
+-- inconclusive per the task's own disqualifier, do not proceed to probes
+-- until rows are seeded).
+
+-- WHOLE-POPULATION "no backfill" PROOF. up() provably issues no DML (Reviewer
+-- inspection of the migration file confirmed this), so both counts below
+-- MUST already read 0 before any probe runs, over the ENTIRE table — not a
+-- sample. This is what stands in for a pre-migration snapshot nobody is
+-- instructed to take (see step 9's note for why one isn't obtainable here).
+SELECT COUNT(*) AS must_be_zero FROM result_pool_funding_alignment_sp WHERE sp_role IS NOT NULL;
+SELECT COUNT(*) AS must_be_zero FROM result_pool_funding_alignment_sp WHERE active_primary_alignment IS NOT NULL;
+
+-- ============================================================
+-- 2. SETUP — pick a seeded alignment with >=1 active SP row, and CAPTURE
+--    THE PROMOTED ROW'S IDENTITY (id). Every later step targets @promoted_id
+--    directly; none re-derive "the promoted row" by predicate. That is the
+--    fix for §B FAIL issue 1: a predicate like `alignment_id = @test_alignment_id
+--    AND sp_role = 'PRIMARY'` only ever meant "the promoted row" by the
+--    timing coincidence that no backfill exists yet — it stops meaning that
+--    the moment T-06 writes a real PRIMARY row, or a historically
+--    deactivated one, onto the same alignment.
+-- ============================================================
+SET @test_alignment_id = (
+  SELECT alignment_id FROM result_pool_funding_alignment_sp
+  WHERE is_active = 1
+  GROUP BY alignment_id
+  HAVING COUNT(*) >= 1
+  LIMIT 1
+);
+-- >= 1 suffices: only ONE active row is ever promoted (below), and Probe B
+-- (step 4) creates its own CONTRIBUTING rows rather than requiring
+-- pre-seeded ones. >= 1 lets this package run against more DEV seed shapes
+-- without weakening any probe.
+SELECT @test_alignment_id AS chosen_alignment_id;
+-- ⛔ If NULL: STOP. Run no further statement. Seed DEV, then restart at step 2.
+-- ✅ If non-NULL: replace EVERY `@test_alignment_id` in steps 3-6 with the
+--    literal number printed above before running them. A literal cannot be
+--    lost across a reconnect, cannot be NULL, and makes each later statement
+--    independently reviewable before it executes — this closes the NULL ->
+--    ERROR 1048 inversion (see RUN INSTRUCTIONS above) and the lost-session
+--    hazard together.
+
+-- Promote ONE active row that holds NO existing role (AND sp_role IS NULL)
+-- on that alignment to PRIMARY, and capture its id. The added `sp_role IS
+-- NULL` makes it impossible to hijack a row that already holds a real role
+-- — the mirror-image half of FAIL issue 1.
+SELECT id INTO @promoted_id
+FROM result_pool_funding_alignment_sp
+WHERE alignment_id = @test_alignment_id AND is_active = 1 AND sp_role IS NULL
+ORDER BY id LIMIT 1;
+SELECT @promoted_id AS promoted_row_id;
+-- ⛔ If NULL: STOP. Every active row on this alignment already holds a role;
+--    choose a different @test_alignment_id or seed a role-free active row
+--    first, then restart at step 2.
+-- ✅ If non-NULL: replace EVERY `@promoted_id` in steps 5, 6 and 8 with the
+--    literal number printed above before running them, for the same reason
+--    as `@test_alignment_id` above — a literal cannot be lost across a
+--    reconnect, cannot be NULL, and is independently reviewable before it
+--    executes.
+
+UPDATE result_pool_funding_alignment_sp
+SET sp_role = 'PRIMARY'
+WHERE id = @promoted_id;
+
+-- ============================================================
+-- 3. PROBE A — second active PRIMARY on the same alignment ⇒ MUST FAIL
+-- ============================================================
+INSERT INTO result_pool_funding_alignment_sp
+  (alignment_id, sp_code, sp_role, is_active, created_at)
+VALUES
+  (@test_alignment_id, 'ZZPROBE_A', 'PRIMARY', 1, NOW(6));
+-- EXPECTED: ERROR 1062 (23000): Duplicate entry '<alignment_id-value>' for key
+--           'result_pool_funding_alignment_sp.idx_rpfas_active_primary'
+-- (the exact duplicate-key value is @test_alignment_id's numeric value, since
+-- that's what the generated column evaluates to for both the existing PRIMARY
+-- row and this new insert attempt)
+--
+-- ⚠ THIS ERROR IS EXPECTED AND BY DESIGN — see RUN INSTRUCTIONS above.
+-- Continue to Probe B; do not stop here.
+-- ⚠ If this raises ERROR 1048 rather than 1062, `@test_alignment_id` is
+--   NULL — see RUN INSTRUCTIONS; this is NOT a pass.
+
+-- ============================================================
+-- 4. PROBE B — three active CONTRIBUTING rows, same alignment ⇒ MUST SUCCEED
+-- ============================================================
+INSERT INTO result_pool_funding_alignment_sp
+  (alignment_id, sp_code, sp_role, is_active, created_at)
+VALUES
+  (@test_alignment_id, 'ZZPROBE_B1', 'CONTRIBUTING', 1, NOW(6)),
+  (@test_alignment_id, 'ZZPROBE_B2', 'CONTRIBUTING', 1, NOW(6)),
+  (@test_alignment_id, 'ZZPROBE_B3', 'CONTRIBUTING', 1, NOW(6));
+-- EXPECTED: Query OK, 3 rows affected. (This is the probe that catches the
+-- trap in constraint 1 — if the expression's value ever incorporated
+-- sp_role, e.g. CONCAT(alignment_id, ':', sp_role), a SECOND CONTRIBUTING row
+-- would collide on a duplicate CONCAT value and this INSERT would fail
+-- instead of succeeding.)
+-- ⚠ If this fails with ERROR 1048 rather than succeeding,
+--   `@test_alignment_id` is NULL — this is NOT trap detection and the DDL
+--   is not implicated.
+
+-- ============================================================
+-- 5. PROBE C — deactivate the PRIMARY, insert a new active PRIMARY ⇒ MUST SUCCEED
+-- ============================================================
+UPDATE result_pool_funding_alignment_sp
+SET is_active = 0
+WHERE id = @promoted_id;
+
+INSERT INTO result_pool_funding_alignment_sp
+  (alignment_id, sp_code, sp_role, is_active, created_at)
+VALUES
+  (@test_alignment_id, 'ZZPROBE_C', 'PRIMARY', 1, NOW(6));
+-- EXPECTED: Query OK, 1 row affected. (The deactivated row's generated column
+-- is now NULL — is_active=0 fails the IF condition — so it no longer
+-- occupies the unique slot; the new active PRIMARY row inserts cleanly.)
+
+-- ============================================================
+-- 6. PROBE C2 — AC.4 says the alignment can be re-saved ANY NUMBER of
+--    times, not just once. Demonstrate the n>=2 shape: TWO inactive PRIMARY
+--    rows coexisting with one active PRIMARY on the same alignment — the
+--    exact shape a plain UNIQUE(result_id, is_active) could not survive
+--    (see 1779190000014) ⇒ MUST SUCCEED
+-- ============================================================
+UPDATE result_pool_funding_alignment_sp SET is_active = 0 WHERE sp_code = 'ZZPROBE_C';
+INSERT INTO result_pool_funding_alignment_sp
+  (alignment_id, sp_code, sp_role, is_active, created_at)
+VALUES (@test_alignment_id, 'ZZPROBE_C2', 'PRIMARY', 1, NOW(6));
+-- EXPECTED: succeeds, leaving TWO inactive PRIMARY rows on this alignment
+-- (@promoted_id and ZZPROBE_C) plus one active PRIMARY (ZZPROBE_C2).
+
+-- ============================================================
+-- 7. PRE-CLEANUP IDENTITY CHECK — refuse to run cleanup blind
+-- ============================================================
+-- @test_alignment_id and @promoted_id are SESSION variables. A lost or new
+-- connection resets both to NULL, and `WHERE id = NULL` / `WHERE
+-- alignment_id = NULL` evaluate to UNKNOWN — never TRUE. A cleanup run
+-- blind in that state would match ZERO rows with NO error and NO warning,
+-- while the DELETE in step 8 (keyed on literal sp_code values) still fires
+-- and makes cleanup LOOK successful. This check is the fix for that.
+SELECT @test_alignment_id AS alignment_id, @promoted_id AS promoted_row_id;
+-- ⛔ STOP if either is NULL: the session was lost. Do NOT run step 8 as
+--    written. Instead re-derive @promoted_id with:
+--      SELECT id INTO @promoted_id FROM result_pool_funding_alignment_sp
+--      WHERE sp_role = 'PRIMARY' AND sp_code NOT LIKE 'ZZPROBE%';
+--    and verify it returns EXACTLY ONE row before proceeding. If it returns
+--    zero rows or more than one, STOP and investigate by hand — do not guess.
+
+-- ============================================================
+-- 8. CLEANUP — delete exactly what steps 2-6 added/changed
+-- ============================================================
+-- ORDER IS LOAD-BEARING: this DELETE MUST run before the reactivation
+-- UPDATE below. ZZPROBE_C2 is an ACTIVE PRIMARY row still holding the
+-- unique slot (idx_rpfas_active_primary) for @test_alignment_id at this
+-- point. Reactivating @promoted_id first — or reordering these statements
+-- "for tidiness" — would attempt to create a SECOND active PRIMARY on the
+-- same alignment and fail with 1062, leaving the promoted row deactivated.
+-- Deleting ZZPROBE_C2 first frees the unique slot before anything else
+-- claims it.
+DELETE FROM result_pool_funding_alignment_sp
+WHERE sp_code IN ('ZZPROBE_B1', 'ZZPROBE_B2', 'ZZPROBE_B3', 'ZZPROBE_C', 'ZZPROBE_C2');
+-- (ZZPROBE_A is not deleted here because its INSERT in step 3 never
+-- committed — it errored and was rejected by the unique index.)
+-- Scoped only by the literal sp_code prefix, with no alignment predicate —
+-- kept exactly as reviewed. This is the one cleanup statement that SURVIVES
+-- a lost session, because it targets rows by their distinctive literal
+-- values rather than by re-deriving identity from session state. The two
+-- UPDATEs below now follow the same principle by targeting @promoted_id
+-- directly instead of re-deriving it.
+
+-- Undo Probe C/C2's deactivation of the ORIGINAL promoted row — scoped to
+-- the CAPTURED id, never re-derived by predicate. The old predicate-based
+-- `WHERE alignment_id = @test_alignment_id AND sp_role = 'PRIMARY' AND
+-- is_active = 0` would match EVERY historically-deactivated PRIMARY row on
+-- the alignment once real PRIMARY data exists (post-T-06) — not just this
+-- probe's row — and would try to reactivate all of them in one UPDATE,
+-- failing with 1062 (statement rolled back) and leaving the alignment with
+-- NO active PRIMARY at all. `WHERE id = @promoted_id` can only ever match
+-- the one row this session promoted, so that failure mode is now
+-- structurally impossible.
+UPDATE result_pool_funding_alignment_sp
+SET is_active = 1
+WHERE id = @promoted_id;
+
+-- Undo the step-2 setup promotion, restoring the legacy NULL state — again
+-- scoped to the captured id, never re-derived. The old
+-- `WHERE alignment_id = @test_alignment_id AND sp_role = 'PRIMARY'` would
+-- wipe the role from EVERY PRIMARY row on the alignment, including real
+-- rows the probes never touched — unrecoverable loss of real data.
+-- `WHERE id = @promoted_id` makes that impossible.
+UPDATE result_pool_funding_alignment_sp
+SET sp_role = NULL
+WHERE id = @promoted_id;
+
+-- POST-CLEANUP ASSERTION — tests the actual column the probes write, which
+-- the step-10 checksum cannot (it is blind to sp_role by design; see step
+-- 1's note). This closes the loop with a check that would fail loudly if
+-- cleanup silently no-op'd under the lost-session scenario above.
+SELECT COUNT(*) AS must_be_zero FROM result_pool_funding_alignment_sp WHERE sp_role IS NOT NULL;
+
+-- ============================================================
+-- 9. R-BIL-126 AC.3 CHECK — an is_read_only legacy alignment is unmutated
+-- ============================================================
+-- is_read_only is computed, not stored: platform_code = 'PRMS' OR is_synced_to_prms = 1,
+-- both on `results`, joined via result_pool_funding_alignment.result_id.
+-- (Join and predicate below are unchanged from the prior draft — verified
+-- correct by the Reviewer; only the assertion shape changes.)
+--
+-- NO PRE-MIGRATION SNAPSHOT IS NEEDED OR TAKEN HERE: this package's own
+-- header pins step 0 to run AFTER up() has already landed via CI/CD, and no
+-- step anywhere instructs anyone to capture a baseline before that point —
+-- once CI/CD applies the migration, the snapshot can no longer be taken.
+-- Since up() provably issues no DML, the falsifiable, WHOLE-POPULATION
+-- check is a COUNT, not a sampled diff (the previous `LIMIT 20` certified
+-- nothing about the rows outside the sample, against R-BIL-126 AC.1's
+-- whole-population claim). If a genuine row-for-row diff against a real
+-- pre-migration snapshot is wanted, step 0 must be RESCHEDULED to run
+-- BEFORE the CI/CD deploy and its output stored — that is a scheduling
+-- change to when this package runs, not something retrofittable here.
+SELECT COUNT(*) AS must_be_zero
+FROM result_pool_funding_alignment_sp sp
+JOIN result_pool_funding_alignment rpfa ON rpfa.id = sp.alignment_id
+JOIN results r ON r.result_id = rpfa.result_id
+WHERE (r.platform_code = 'PRMS' OR r.is_synced_to_prms = 1)
+  AND sp.sp_role IS NOT NULL;
+-- EXPECTED: 0 — no is_read_only-backing row carries a role, over the WHOLE
+-- population.
+
+-- ============================================================
+-- 10. POST-MIGRATION RE-CHECK — must equal step 1 exactly
+-- ============================================================
+SELECT COUNT(*) AS row_count FROM result_pool_funding_alignment_sp;
+SELECT SUM(CRC32(CONCAT_WS('|', id, alignment_id, sp_code, is_active))) AS checksum
+FROM result_pool_funding_alignment_sp;
+-- EXPECTED: identical to step 1's output for (id, alignment_id, sp_code,
+-- is_active). This checksum is BLIND TO sp_role AND updated_at BY DESIGN —
+-- see step 1's note and step 8's dedicated sp_role assertion. `updated_at`
+-- on @promoted_id has PERMANENTLY CHANGED (ON UPDATE CURRENT_TIMESTAMP(6)
+-- fired on promotion and again on restoration) — this single-row drift on
+-- a shared DEV row is ACCEPTED and NOT restored; "identical" above refers
+-- only to the four checksummed columns, not byte-identity of the row. The
+-- AUTO_INCREMENT counter also advances by 5 and does not reset; cosmetic.
+```
+
+**Implementer's own caveat on the v1 package, verbatim — SUPERSEDED, retained as history:** *"The
+`SET @test_alignment_id = (...)` setup query assumes at least one seeded alignment has ≥2 active SP
+rows in DEV. If DEV's seed data doesn't satisfy that (e.g. only single-SP alignments), the person
+running this package will need to seed one first — flagging this rather than guessing at DEV's
+actual current contents, which I have no access to."*
+
+> **⚠ Superseded by v2 (Reviewer advisory, applied as GAP 3).** The threshold is now
+> **`HAVING COUNT(*) >= 1`**, not `>= 2`. `>= 2` was stricter than the probes need — only **one**
+> active row is ever promoted, and Probe B creates its own `CONTRIBUTING` rows rather than requiring
+> pre-seeded ones. `>= 1` lets the package run against more DEV seed shapes **without weakening any
+> probe**, and removes the needless "seed more data" detour the caveat above describes.
+>
+> **K-003 note.** The literal-string sweep for the superseded threshold found **two** stale sites,
+> not one: this caveat (flagged by the Implementer, which correctly declined to edit outside its
+> scope) **and** the step-2 SETUP comment header at the top of the SQL block, which **nobody named**.
+> The third hit — `n>=2` in Probe C2's header — is a **different claim** (two *inactive* PRIMARY rows
+> coexisting with one active, the R-BIL-121 AC.4 shape) and was correctly left unchanged. This is
+> exactly the pattern K-003 exists for: a finding's cited-site list is a starting point, never the
+> scope. Forward sweep run and re-grepped to confirm closure.
+
+#### ADVISORY (4R lens findings) — recorded, non-gating
+
+1. **RELIABILITY — `down()` asymmetry.** `down()` splits the two `DROP COLUMN`s into two `ALTER`s,
+   causing **two** full rebuilds (dropping a STORED generated column is `ALGORITHM=COPY`, and
+   dropping `sp_role` rebuilds again) — while `up()` combines its two `ADD COLUMN`s precisely to
+   avoid that (RA-10). The file justifies the split on dependency order, which forces the *sequence*
+   but not the *statement count*: `ALTER TABLE … DROP COLUMN active_primary_alignment, DROP COLUMN
+   sp_role` is legal and rebuilds once. Not a spec violation — `design.md` §3.1 normatively specifies
+   `up()` only — and low impact per `requirements.md` §1.1.
+2. **READABILITY/RISK — a factual error in the reasoning, not the code.** The Implementer's claim
+   that a separate index `ALTER` is *"unavoidable"* is **wrong** about MySQL: `ADD COLUMN … , ADD
+   UNIQUE INDEX …` compose in one statement. The two-statement form is correct **because §3.1
+   mandates it normatively**, not because MySQL requires it. Worth correcting before it propagates —
+   this file's comment block is the closest thing the repo has to migration doctrine.
+3. **RISK — collation note covers case but not padding.** `utf8mb4_unicode_520_ci` is also PAD SPACE,
+   so `'PRIMARY  '` satisfies the condition too. Same safe direction as the case nuance (it *widens*
+   what the index catches); one clause on the existing comment would close it.
+
+#### Forward pointers
+
+| Target | Pointer |
+| --- | --- |
+| **Whoever runs the probes on DEV** | **HOLD** — the package above is UNAUDITED. Get a B-only Reviewer verdict on items 1–6 first. It will run against a **shared** database. |
+| **T-13** | Automates all three invariant probes against the `TEST` datasource — this is the real discharge path for R-BIL-121 AC.3/AC.4. `ARI_TEST_MYSQL_*` is present in the symlinked `.env`. |
+| **T-03** | Depends on T-02's migration **existing**, not on it being verified. `sp_role` on the entity is T-03; **do not** map `active_primary_alignment` (TypeORM would try to write it). |
+| **`/akili-archive`** | ADVISORY 2 — correct the "unavoidable" claim in the migration's comment block before it becomes doctrine. |
+
+#### Constitution Impact
+
+**None.** No module created or reshaped, no public surface changed. Schema-only, additive, nullable,
+reversible. No CodeGraph re-index needed (migrations are excluded from the index).
+
+#### Verification result
+
+✅ `npx eslint` on the migration — clean (**K-001**; a Prettier error was fixed **by hand**, not `--fix`)
+✅ `npm run build` — clean; migration compiled into `dist/db/migrations/`
+✅ `git status` — exactly one new file under `src/db/migrations/`
+✅ `up()` character-identical to `design.md` §3.1
+❌ **Migration forward/revert/forward — NOT RUN** (CI/CD owns this)
+❌ **Three direct-SQL invariant probes — NOT RUN**
+❌ **Probe package itself — NOT AUDITED** (hold above)
+
+---
+
+#### 🔴 Attempt 1 — Reviewer §B verdict: **`STATUS: FAIL`** (probe package only)
+
+Delivered after the §A/§C PASS, once the package was written to disk (the routing fix above). **The
+FAIL is entirely on the SQL package; the migration file passes with zero findings and was NOT
+re-opened** — reworking it would mean reworking the one artifact that is correct.
+
+**Two items came back clean and are now closed:**
+
+- **Probe A fails for the right reason (item 9) — CONFIRMED.** `@test_alignment_id` is drawn from
+  `result_pool_funding_alignment_sp` itself, so it satisfies `fk_rpfas_alignment` **by
+  construction** and the FK cannot fire. `sp_code` is supplied (9 chars into `varchar(50) NOT
+  NULL`); `id`, `created_by`, `updated_by`, `deleted_at`, `updated_at` are safely omitted; and
+  `active_primary_alignment` is **correctly** omitted — supplying a generated column raises
+  `ER_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN`. **The only constraint that can fire is
+  `idx_rpfas_active_primary`.** The expected `ERROR 1062` text is also correctly table-qualified for
+  MySQL 8.0.19+.
+- **Probe B is the trap-catcher, and the ONLY one (item 10) — CONFIRMED, and this is load-bearing.**
+  Verified against the trap variant `CONCAT(alignment_id, ':', sp_role)`: **Probe A would still fail
+  with 1062 under the trap** (both rows → `'<id>:PRIMARY'`), so **Probe A cannot discriminate**
+  correct from trapped. Probe B's second row collides on `'<id>:CONTRIBUTING'` and the multi-row
+  INSERT fails atomically → red. And nothing else catches it — under the trap the *migration itself
+  still applies cleanly*, because every legacy row has `sp_role = NULL` ⇒ `CONCAT(...)` → `NULL`.
+
+**FAIL issues — 5, of which 3 can damage real rows in shared DEV:**
+
+| # | Issue | Violated rule | Remediation |
+| --- | --- | --- | --- |
+| **1** | **Cleanup `UPDATE`s re-find their target by predicate, not identity.** Step 2 promotes an *unidentified* row (`LIMIT 1`, no `ORDER BY`, `id` never captured); cleanup re-derives it as `sp_role = 'PRIMARY'`. Safe **only** because no backfill means no row carries a role — a timing coincidence, not a property of the SQL. The package is deferred with **no ordering constraint relative to T-06**, the task in this same spec that starts writing `'PRIMARY'` into DEV. Run it after T-06 reaches DEV on an alignment with one active + one or more historically deactivated PRIMARY rows — **exactly the state R-BIL-121 AC.4 declares legal** — and the resurrection `UPDATE` matches every historical inactive PRIMARY, fails 1062, and leaves the alignment with **no active Primary at all**; the final `UPDATE … SET sp_role = NULL` then wipes the role from **every** PRIMARY row on that alignment. Unrecoverable loss of real data. Step 2's promotion has the mirror flaw — it can overwrite a row that already holds a real role. | `tasks.md` T-02 Verification (lines 130–131, "against a **seeded DEV database**"); `requirements.md` §1.1 (line 255) *"the DEV rows are real enough to break"* | Capture identity: `SELECT id INTO @promoted_id … WHERE … AND sp_role IS NULL ORDER BY id LIMIT 1`, then scope **every** subsequent `UPDATE` as `WHERE id = @promoted_id`, dropping the `sp_role`/`is_active` predicates. The added `AND sp_role IS NULL` makes hijacking a real role impossible. |
+| **2** | **A lost session silently degrades cleanup into a partial no-op.** `@test_alignment_id` is session-scoped; in a new connection it is `NULL`, and `WHERE alignment_id = NULL` is UNKNOWN — **both cleanup `UPDATE`s match zero rows, no error, no warning**. The `DELETE` still fires (keyed on `sp_code` literals), so the `ZZPROBE_*` rows vanish and cleanup *looks* successful. Residue: the promoted **real seeded row** is left `is_active = 0` **and** `sp_role = 'PRIMARY'`. This is the realistic failure mode for a human running the package across a reconnect. | `tasks.md` T-02 disqualifier (line 133); `requirements.md` R-BIL-126 AC.1 (line 265) | Refuse to run blind: `SELECT @test_alignment_id, @promoted_id;` with an explicit **⛔ STOP if either is NULL**, plus a re-derivation recipe. Close with `SELECT COUNT(*) AS must_be_zero … WHERE sp_role IS NOT NULL`. |
+| **3** | **Probe A is designed to error, so `mysql < package.sql` aborts there and skips everything after — cleanup included.** The package carries no run instruction. A runner who pipes the file in gets: promoted row mutated, probes B and C never run, **cleanup never run**. | `tasks.md` T-02 Verification (line 131) + Done criteria (line 138) — all three probes required "including the expected failure", unreachable if execution aborts | Add a run header: run interactively statement-by-statement, or with `mysql --force`; state that Probe A **is expected** to raise 1062 and execution must continue past it; and if piped without `--force`, jump straight to cleanup. |
+| **4** | **Step 7's AC.3 check presupposes a snapshot nobody is instructed to take**, and samples 20 rows instead of testing the population. The package pins step 1 to run **after** `up()` lands, migrations reach DEV only via CI/CD, and no step instructs anyone to capture a pre-migration baseline — so once CI/CD applies it, the snapshot can no longer be taken. `ORDER BY sp.id LIMIT 20` certifies nothing about the rest. *(The query's schema was otherwise verified correct — it faithfully reproduces the computed `is_read_only`.)* | `requirements.md` R-BIL-126 AC.1 (line 265), AC.3 (line 267); `tasks.md` T-02 Presence-assertion caveat (line 134) | No snapshot needed — `up()` provably issues no DML, so run **before any probe**: `SELECT COUNT(*) … WHERE sp_role IS NOT NULL` and `… WHERE active_primary_alignment IS NOT NULL`, both expected `0`. Whole-population, falsifiable. Keep the `is_read_only` join as the AC.3 slice but drop the `LIMIT`. |
+| **5** | **Step 8's checksum is structurally blind to the mutations the package itself causes.** It covers `(id, alignment_id, sp_code, is_active)` — correct per the task — but the probes write **`sp_role`**, and each write bumps `updated_at` via `ON UPDATE CURRENT_TIMESTAMP(6)`. So step 8 can report "identical" while `updated_at` has permanently changed and, under issue 2, while `sp_role` is still wrong. | `tasks.md` T-02 Presence-assertion caveat (line 134) — a green check that structurally cannot observe the property it is offered as evidence for | State the blindness inline; add the `sp_role`-aware post-cleanup assertion from issue 2; acknowledge `updated_at` drift on one DEV row as accepted rather than implying byte-identity. |
+
+**Item 12 — does the package discharge R-BIL-121 AC.3/AC.4 as written?**
+
+- **AC.3 — YES.** Probe A discharges it, for the right reason.
+- **AC.4 — PARTIALLY.** Probe C shows one deactivate→reinsert cycle, but AC.4 says *"any number of
+  times"* and the package never produces the **n ≥ 2** shape: two inactive PRIMARY rows coexisting
+  with one active. **That is precisely the failure mode this module already suffered** —
+  `1779190000014` exists because a plain `UNIQUE(result_id, is_active)` collided on the *second*
+  deactivated row. The generated-column idiom does handle it, but the package does not show it.
+- **NOT COVERED AT ALL — and this gap has no owner anywhere:** T-02 done-criterion 1 (line 136),
+  *"Forward + revert + forward all clean"*. The package has no vehicle for `migration:dev:execute` /
+  `migration:revert` / re-execute, so the **R-BIL-126 AC.5 + NFR-BIL-120 reversibility evidence is
+  currently unowned**. Understandable given CI/CD owns migrations, but recorded as an open gap
+  rather than assumed covered.
+
+**ADVISORY (probe package):** the cleanup `DELETE` is scoped only by `sp_code IN ('ZZPROBE_…')` with
+no alignment scoping — safe given the distinctive prefix, and in fact **more robust than the
+`UPDATE`s because it survives a lost session**. Worth keeping, and worth noting as the pattern the
+two `UPDATE`s should have followed.
+
+
+#### 🔴 Attempt 2 — Reviewer §B re-verdict on v2: **`STATUS: FAIL`** (4 new defects)
+
+**All eight remediations from the first FAIL landed and landed correctly** — the Reviewer re-walked
+each against the on-disk text and confirmed none is cosmetic. Confirmed working:
+
+- Identity scoping (three statements key on `@promoted_id`; `AND sp_role IS NULL` closes the
+  mirror-image hijack) — **the post-T-06 data-loss path is now structurally impossible**.
+- The load-bearing DELETE-before-UPDATE comment, correctly re-pointed at `ZZPROBE_C2`.
+- **`>= 1` is safe** — walked with an alignment holding exactly one active SP row: Probe A still
+  collides (1062); **Probe B's trap-catching power comes entirely from rows it creates**, so
+  pre-seeded CONTRIBUTING rows were never part of it. `>= 2` was pure friction.
+- **Probe C2's n≥2 shape is correct and fully reversed by cleanup** — traced step by step; the
+  promoted row ends `is_active = 1, sp_role = NULL`, exactly as it began.
+- The K-003 sweep **did not over-correct** — `n>=2` in Probe C2's header is intact and still means
+  "two inactive PRIMARY rows", and the superseded v1 caveat reads as history, not instruction.
+
+**Four NEW defects introduced by the rewrite. Issues 1 and 2 compound.**
+
+| # | Issue | Fix |
+| --- | --- | --- |
+| **1** | **`SELECT … INTO @promoted_id` leaves the variable UNCHANGED when no row matches** (MySQL warning **1329**), unlike `SET @x = (subquery)` which correctly yields `NULL`. The package tells the runner to *"STOP … restart at step 2"* **in the same session** — on that restart `@promoted_id` **retains the previous run's id**, so the ⛔ guard never fires. Chain: step 2 promotes a **stale row on a different alignment** → the new alignment's slot is free → **Probe A SUCCEEDS** → recorded as "the index did not fire" = a **false FAIL against a certified-correct migration** → cleanup then runs `is_active = 1` / `sp_role = NULL` against the stale row, **resurrecting it** if it was legitimately inactive. The v2 hazard reintroduced through a different door. Same defect in step 7's fallback re-derivation. | `SET @promoted_id = NULL;` immediately before **both** `SELECT … INTO` statements, with a comment naming warning 1329 |
+| **2** | **Cleanup omits `ZZPROBE_A`** on the assumption Probe A always fails. It succeeds in exactly two cases — broken DDL, or issue 1's stale-variable path — and in both the row survives in shared DEV as an **active PRIMARY permanently occupying that alignment's unique slot**, silently breaking the next legitimate save with no trace of its origin. **A cleanup must be outcome-independent: it runs precisely when something went wrong, which is when residue is least acceptable.** | Add `'ZZPROBE_A'` to the DELETE list (no-op when absent, essential when present) + replace the justification comment |
+| **3** | **Two mutually exclusive execution modes, neither declared — and step 7's guard fires a FALSE ⛔ STOP on the mode the package recommends.** A runner who substitutes literals correctly and then reconnects gets step 7 = `(NULL, NULL)` → *"do NOT run step 8"* — **even though step 8 now contains only literals, is immune to session loss, and is exactly what must run.** It then redirects to the predicate-based re-derivation the rewrite existed to remove. Mechanical root: a **wrong enumeration** — step 6 contains **no** `@promoted_id`, while step **7 does**, so the substitution list is wrong in both directions. | Correct the list to *"steps 5, 7 and 8"*; rewrite step 7 as a **substitution-aware self-check** (a NULL is EXPECTED and harmless in literal mode); add *"write both numbers down"* to step 2 |
+| **4** | **Four `must_be_zero` assertions silently expire when T-06 reaches DEV.** All four assert that **no** row carries a role — legitimately non-zero once `resolvePrimarySpCode` ships, at which point the package **reports failure on a healthy database** and the runner cannot distinguish that from a real defect. v2 fixed the *destructive* half of the post-T-06 problem; the *assertion* half still assumes pre-T-06, and the package is deferred with no deadline. | A `⏳ PRECONDITION — RUN THIS BEFORE T-06 REACHES DEV` banner in the header, naming T-06 as the writer that invalidates the four assertions |
+
+**ADVISORY (v2):** `HAVING COUNT(*) >= 1` is a **tautology** — every `GROUP BY` group has ≥1 row; the
+clause could be dropped entirely (the rationale comment is the part worth keeping) · step 9's AC.3
+check returns only a `COUNT`, giving no diagnostic on failure — append "re-run without the COUNT
+wrapper before escalating" · the header says the `AUTO_INCREMENT` counter advances by 5; six INSERTs
+are attempted and InnoDB allocates for the rejected `ZZPROBE_A` too, so it is **6** · with `>= 1` the
+chosen alignment may hold exactly one active SP row, left deactivated in-flight — anyone opening that
+result in STAR mid-run sees an alignment with no active SP (transient, DEV-only, worth one line).
+
