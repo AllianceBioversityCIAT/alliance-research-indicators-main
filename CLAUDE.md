@@ -148,7 +148,7 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 ### 4.3 Shared
 - **Lint/format:** `npm run lint` in each package (eslint + prettier). Don't bypass `husky` hooks.
 - **Commits / PRs:** match existing style — `<type>(<module>): <subject>` (e.g. `fix(results.service): ...`). Never `--no-verify` without an explicit human approval.
-- **CodeGraph:** `.codegraph/` is initialized (machine-local, gitignored). Prefer `codegraph_*` tools for symbol lookup, callers/callees, and impact analysis before broad file scanning.
+- **CodeGraph:** the index lives at **`server/researchindicators/.codegraph/`** (machine-local, gitignored) — **not** at the repo root, so pass that path as `projectPath` when querying. *(Location corrected 2026-08-13 by the `/akili-archive` factual-claims sweep: this line previously read "`.codegraph/` is initialized", which sent agents looking at the repo root, finding nothing, and concluding CodeGraph was unavailable.)* The client package has **no** index — use Read/Grep/Glob there. Prefer `codegraph_*` tools for symbol lookup, callers/callees and impact analysis before broad file scanning, and note the index reflects the last re-index, not the working tree.
 
 ---
 
