@@ -105,6 +105,7 @@ Per task, declare:
 - Which `*.spec.ts` files are added or updated.
 - Coverage target if differing from the global 60% threshold.
 - E2E test cases (happy path + at least one auth failure + at least one role/status denial when applicable).
+- A **`Disqualifies` clause**: what would make the evidence inconclusive. **A fixture whose N units are built from identical defaults cannot distinguish per-unit scoping from a batch-wide bug — vary at least one discriminating field per unit.** *(Kaizen KZ-004)*
 
 A task is NOT done until:
 - `npm run lint` passes.
@@ -138,6 +139,7 @@ Append-only table for the lifetime of the spec.
 
 The spec is complete when:
 - [ ] All `T-<NN>` tasks are `done`.
+- [ ] **Someone has exercised the feature in the running product, BEFORE `/akili-validate` issues a verdict — not after.** Automated gates verify the system against the spec's own description of itself; only a human at the screen can falsify that description. Where a manual gate is named as a substitute control for a known coverage gap, it is the first check, not the last. *(Kaizen KZ-007)*
 - [ ] All requirement-level ACs are checked.
 - [ ] Coverage thresholds are still green.
 - [ ] Swagger documents every new endpoint.

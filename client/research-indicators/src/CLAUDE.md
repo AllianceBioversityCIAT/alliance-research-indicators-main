@@ -135,6 +135,7 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - **Forms**: reactive forms; wrapped PrimeNG inputs from `styles/custom-fields.scss` & `styles/custom-prime-force-styles.scss` — not raw PrimeNG controls.
 - **Colors & spacing**: token utility classes (`.abc-*`, `.atc-*`, `.rs-*`, `.fs-*`) or CSS variables (`var(--ac-*)`). **No hex literals in component code.**
 - **Dark mode**: rely on tokens — never branch on `isDarkMode()` for color decisions.
+- **URL-addressable filter state**: where a screen's filters are shareable via the query string, the `URL ⇄ state` mapping lives in a **pure codec module** beside the feature — `pages/platform/pages/results-center/url/` is the reference implementation (frozen slug vocabulary + `parse`/`serialize`; no DI, no router, no signals). The **component** owns reading and writing it, never a `providedIn: 'root'` service, which would rewrite the address bar of every other route that injects the same singleton. Vocabularies are frozen constants, never derived from display names. *(Spec: `docs/specs/archive/2026-08-13-results-center--url-filters`; the durable contract is in [`../../../docs/ux-ui/design.md`](../../../docs/ux-ui/design.md) §12.2.)*
 - **i18n**: not yet wired. Don't add a parallel i18n mechanism — file an open question instead.
 - **Strict TS**: `strict`, `noImplicitOverride`, `noPropertyAccessFromIndexSignature`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `strictTemplates`. Don't loosen these in `tsconfig.json`.
 
@@ -149,6 +150,8 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - Component tests: cover role-conditional rendering, signal-driven state transitions, form validity, error surfaces.
 - Coverage floors (project-wide, enforced by `jest.config.ts`): statements 40%, branches 20%, lines 45%, functions 30%. Don't regress on changed files.
 - Excluded from coverage by design: `app.config.ts`, `app.routes.ts`, `shared/sockets/websocket.service.ts`, `shared/components/alert/alert.component.ts`.
+- **When a spec stubs a child component, assert the stub renders/evaluates what the real one does** (projected content, host bindings) — or use the real component. A stub with `template: ''` cannot prove anything about projected controls. *(Kaizen KZ-001)*
+- **If a change touches a component rendered by many screens, run the full suite before reporting** — targeted suites confirm the brief was followed, not that the blast radius is clean. *(Kaizen KZ-003)*
 
 ---
 

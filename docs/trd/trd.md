@@ -289,7 +289,7 @@ interface MainResponse<T> {
 - Every controller MUST declare `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, and per-param `@ApiQuery`/`@ApiBody`.
 - Routes composed in `domain/routes/main.routes.ts` via `RouterModule.register(mainRoute)`; nested children for sub-resources (`/results/:code/evidences`). Per-result routes use the `RESULT_CODE` token + `@GetResultVersion()` (populates `_resultsUtil.resultId/resultCode/platformCode`).
 - Pagination/sorting: `page`, `limit`, `sort-order` (`ASC`/`DESC`), `sort-field` (entity enum). Default `DESC` on `code` unless a spec says otherwise.
-- **AI ingestion:** `POST /api/v1/results/ai/formalize` (any authenticated user); `POST /api/v1/results/ai/formalize/bulk` (`@Roles(TECHNICAL_SUPPORT, CENTER_ADMIN, MEL_REGIONAL_EXPERT)`, strict `ValidationPipe`). Bulk surfaces per-row `error` + `message_error` for partial failures so the pipeline can retry per item.
+- **AI ingestion:** `POST /api/results/ai/formalize` (any authenticated user); `POST /api/results/ai/formalize/bulk` (`@Roles(TECHNICAL_SUPPORT, CENTER_ADMIN, MEL_REGIONAL_EXPERT)`, strict `ValidationPipe`). **Both mount unversioned** — neither handler declares `@Version(...)` (`results.controller.ts:636,657`) and no `defaultVersion` is configured, so `/api/v1/results/ai/formalize*` returns `404` (D-T11-b). Bulk surfaces per-row `error` + `message_error` for partial failures so the pipeline can retry per item.
 - **RabbitMQ:** `Transport.RMQ`, queue `ARI_QUEUE`, durable. Handlers in `domain/tools/broker/` (`AlianceManagementApp`, `AiRoarMiningApp`, `SelfApp`, `MessageMicroservice`). Message envelopes documented per pattern in the broker module spec.
 - **Socket.IO:** server gateway `domain/tools/socket/server.gateway.ts`; event taxonomy captured in a `docs/specs/socket/` module spec — never invented inline.
 
@@ -370,7 +370,7 @@ The client mirrors these so users don't hit surprises mid-flow (backend still wi
 | Reactive streams (HTTP/WS) | **RxJS** | services + interceptors |
 | Local component state | Signals (preferred) or component fields | inside components |
 | Persisted state | `localStorage` (tokens, theme) via cache services | `cache.service.ts`, `dark-mode.service.ts` |
-| URL state | Angular Router (params, query params) | `app.routes.ts` |
+| URL state | Angular Router (params, query params) | `app.routes.ts`; for **shareable filter state**, a pure `parse`/`serialize` codec beside the feature (reference: `results-center/url/`) read and written by the **component** — never by a `providedIn: 'root'` service, which would rewrite the address bar of every route sharing that singleton |
 
 **No NgRx** — service-per-domain + signals is the established pattern. **No two-way binding** for cross-cutting state; use signals + setters.
 

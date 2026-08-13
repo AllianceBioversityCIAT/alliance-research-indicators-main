@@ -17,6 +17,7 @@ import { GetAllIndicators } from '../../../../shared/interfaces/get-all-indicato
 import { Table, TableLazyLoadEvent } from 'primeng/table';
 import { ApiService } from '../../../../shared/services/api.service';
 import { MultiselectComponent } from '../../../../shared/components/custom-fields/multiselect/multiselect.component';
+import type { ResultsCenterUrlState } from './url/results-center-url.codec';
 
 interface ResultsCenterPersistedState {
   myResultsFilterItemId: string;
@@ -46,6 +47,14 @@ export class ResultsCenterService {
   ];
   myResultsFilterItem = signal<MenuItem | undefined>(this.myResultsFilterItems[0]);
   pinnedTab = signal<string>('all');
+  /**
+   * D-URL-15: monotonic counter expressing user intent to mutate filters.
+   * The write effect's ONLY tracked dependency — it must advance for every
+   * user-facing mutator and MUST NOT advance for load/restore/other-route paths.
+   * See design.md §6.2 for the full increment / does-not-increment contract.
+   */
+  private readonly _userFilterMutations = signal(0);
+  readonly userFilterMutations = this._userFilterMutations.asReadonly();
   loading = signal(false);
   list = signal<Result[]>([]);
   tableFilters = signal(new TableFilters());
@@ -283,35 +292,38 @@ export class ResultsCenterService {
     }
 
     if ((active['indicator-codes-filter'] ?? []).length > 0) {
-      const selected = this.tableFilters().indicators as { indicator_id: number; name: string }[];
+      // `name` is optional (D-URL-10/D-URL-18): a URL-seeded entry carries
+      // only `indicator_id` until the control list backfills its label, so
+      // the `?? ''` below is a real transient, not defensive noise.
+      const selected = this.tableFilters().indicators as { indicator_id: number; name?: string }[];
       selected.forEach(i => {
         if (i) filters.push({ label: 'INDICATOR', value: i.name ?? '', id: i.indicator_id });
       });
     }
 
     if ((active['status-codes'] ?? []).length > 0) {
-      const selected = this.tableFilters().statusCodes as { result_status_id: number; name: string }[];
+      const selected = this.tableFilters().statusCodes;
       selected.forEach(s => {
         if (s) filters.push({ label: 'STATUS', value: s.name ?? '', id: s.result_status_id });
       });
     }
 
     if ((active['platform-code'] ?? []).length > 0) {
-      const selected = (this.tableFilters().sources ?? []) as { platform_code: string; name: string }[];
+      const selected = this.tableFilters().sources ?? [];
       selected.forEach(s => {
         if (s) filters.push({ label: 'SOURCE', value: s.name ?? '', id: s.platform_code });
       });
     }
 
     if ((active['contract-codes'] ?? []).length > 0) {
-      const selected = this.tableFilters().contracts as { agreement_id: string; display_label?: string }[];
+      const selected = this.tableFilters().contracts;
       selected.forEach(c => {
         if (c) filters.push({ label: 'PROJECT', value: c.display_label || c.agreement_id, id: c.agreement_id });
       });
     }
 
     if ((active['lever-codes'] ?? []).length > 0) {
-      const selected = this.tableFilters().levers as { id: number; name?: string; short_name?: string }[];
+      const selected = this.tableFilters().levers;
       selected.forEach(l => {
         if (l) filters.push({ label: 'LEVER', value: l.short_name || l.name || '', id: l.id });
       });
@@ -329,6 +341,8 @@ export class ResultsCenterService {
 
   removeFilter(label: string, id?: string | number): void {
     if (label === 'INDICATOR TAB') {
+      // D-URL-15: this delegated onSelectFilterTab(0) call is removeFilter's
+      // single userFilterMutations bump for this branch — do not add another.
       this.onSelectFilterTab(0);
       return;
     }
@@ -375,6 +389,8 @@ export class ResultsCenterService {
       }
     }
 
+    // D-URL-15: this delegated applyFilters() call is removeFilter's single
+    // userFilterMutations bump for this branch — do not add another.
     this.applyFilters();
   }
 
@@ -431,6 +447,17 @@ export class ResultsCenterService {
 
   private invalidateResultsFetchDedupe(): void {
     this.lastSuccessfulResultsFetchKey = null;
+  }
+
+  /**
+   * D-URL-15 — advances the `userFilterMutations` counter. Call this from a
+   * user-facing mutator exactly once per invocation (design.md §6.2's table).
+   * Internal delegations between mutators (e.g. `removeFilter` → `onSelectFilterTab`,
+   * `clearAllFilters` → `onSelectFilterTab`) must bump through exactly one call site —
+   * see the `skipBump` option on `onSelectFilterTab`.
+   */
+  noteUserFilterMutation(): void {
+    this._userFilterMutations.update(count => count + 1);
   }
 
   invalidateResultsListFetchCache(): void {
@@ -665,6 +692,7 @@ export class ResultsCenterService {
   }
 
   applyFilters = () => {
+    this.noteUserFilterMutation();
     this.invalidateResultsFetchDedupe();
     const currentTab = this.myResultsFilterItem();
     const preserveCreateUserCodes = currentTab?.id === 'my' ? this.resultsFilter()['create-user-codes'] || [] : [];
@@ -695,7 +723,10 @@ export class ResultsCenterService {
     this.main();
   };
 
-  onSelectFilterTab(indicatorId: number, options?: { skipMain?: boolean }) {
+  onSelectFilterTab(indicatorId: number, options?: { skipMain?: boolean; skipBump?: boolean }) {
+    if (!options?.skipBump) {
+      this.noteUserFilterMutation();
+    }
     this.invalidateResultsFetchDedupe();
     this.api.indicatorTabs.lazy().list.update(prev =>
       prev.map((item: GetAllIndicators) => ({
@@ -730,25 +761,103 @@ export class ResultsCenterService {
     }
   }
 
-  applyStatusFilterFromHomeLink(statusId: number, statusName?: string, options?: { skipMain?: boolean }) {
+  /**
+   * D-URL: `seedFromUrl()` — one method, all state (design.md §7.1). Writes
+   * `tableFilters`, `resultsFilter`, `appliedFilters` and the my/all scope
+   * ATOMICALLY from one already-resolved `{ filters, scope }` pair (the
+   * codec's own shape — `parse(paramMap)` from `results-center-url.codec.ts`,
+   * with `scope` already defaulted by the caller per design §6.1 step 3).
+   * Replaces the hand-duplicated multi-signal writes that make state desync
+   * (design.md §8 D3) the recurring defect class here — `applyFilters`
+   * hand-writes this same seven-key `ResultFilter` object twice into two
+   * signals (design §7.1); this method builds it once and uses it for both.
+   *
+   * Order matters and mirrors every existing mutator (`applyFilters:692`,
+   * `onSelectFilterTab:726`, `clearAllFilters:838`):
+   *
+   * 1. `invalidateResultsFetchDedupe()` FIRST, before any signal is
+   *    written. `lastSuccessfulResultsFetchKey` survives across component
+   *    instances on this root singleton; skipping this makes `main()`
+   *    early-return and the user sees "filter applied, table unchanged"
+   *    with no error anywhere (JD-21).
+   * 2. `tableFilters` — option-**value**-only objects (D-URL-10):
+   *    `{ result_status_id }`, `{ platform_code }`, `{ agreement_id }`,
+   *    `{ report_year } `. Seeding the option's `optionLabel` key (`name` /
+   *    `select_label`) would stop `MultiselectComponent`'s label backfill
+   *    from ever running (it only backfills items *missing* the label key —
+   *    `multiselect.component.ts:187-192`), freezing the seeded string as
+   *    the chip label forever — the exact bug `applyStatusFilterFromHomeLink`
+   *    has today (renders the literal `'Status'`).
+   *    `tableFilters.indicators` is deliberately never written here —
+   *    `indicator` seeds `indicator-codes-tabs` only, below (design §7.2's
+   *    "indicator is deliberately absent from this table" blockquote): the
+   *    indicator multiselect is `@if`-hidden whenever a tab is set
+   *    (`table-filters-sidebar.component.html:2`), so a seeded entry would
+   *    render no chip while still inflating `countTableFiltersSelected`.
+   * 3. `resultsFilter` + `appliedFilters` — the wire keys, built as a single
+   *    object and used for BOTH signals.
+   * 4. `myResultsFilterItem` + `create-user-codes` — from the resolved
+   *    my/all scope (never a `sec_user_id`-bearing token from the URL
+   *    itself — NFR-RCU-003 — the scope is expressed purely as `'my' |
+   *    'all'` and the id is resolved here, client-side, from the cache).
+   *
+   * MUST NOT call `noteUserFilterMutation()` (T-05): this is the read path,
+   * not a user-facing mutation — bumping the counter here would fire the
+   * write effect (design §6.2) immediately after load.
+   *
+   * A **presence** assertion here (the signals hold the right ids) cannot
+   * prove the sidebar chip renders — the transient blank-label window
+   * before the control list resolves is documented and expected (design
+   * §7.2); the rendered proof belongs to T-11, taken after that resolution.
+   */
+  seedFromUrl(url: ResultsCenterUrlState): void {
     this.invalidateResultsFetchDedupe();
-    const displayName = statusName?.trim() ? statusName.trim() : 'Status';
+
+    const { filters, scope } = url;
+
     this.tableFilters.update(prev => ({
       ...prev,
-      statusCodes: [{ result_status_id: statusId, name: displayName }]
+      statusCodes: (filters.status ?? []).map(result_status_id => ({ result_status_id })),
+      sources: (filters.source ?? []).map(platform_code => ({ platform_code })),
+      contracts: (filters.contract ?? []).map(agreement_id => ({ agreement_id })),
+      years: (filters.year ?? []).map(report_year => ({ report_year })),
+      // D-URL-18 — the SIDEBAR MULTISELECT (`indicators`, plural), seeded
+      // option-value-key-only like every sibling above so the label backfill
+      // still runs and the chip reads a real indicator name.
+      //
+      // This does NOT contradict step 2's "never written here", which forbids
+      // seeding the TAB (`indicator`, singular) into this collection: a tab
+      // `@if`-destroys the very multiselect whose backfill the mechanism
+      // depends on. `parse` guarantees the two are never both set — a
+      // resolved tab suppresses `indicators` outright — so this key is
+      // populated only when no tab is active and the multiselect renders.
+      indicators: (filters.indicators ?? []).map(indicator_id => ({ indicator_id }))
     }));
-    this.resultsFilter.update(prev => ({
-      ...prev,
-      'status-codes': [statusId]
-    }));
-    this.appliedFilters.update(prev => ({
-      ...prev,
-      'status-codes': [statusId]
-    }));
-    this.resetResultsTablePaginatorToFirstPage();
-    if (!options?.skipMain) {
-      void this.main();
-    }
+
+    const isMyScope = scope === 'my';
+    const createUserCodes = isMyScope ? [this.cache.dataCache().user.sec_user_id.toString()] : [];
+
+    // Built once, used for BOTH signals (design §7.1 — the fix for
+    // `applyFilters`'s same-object-twice hazard).
+    const seededFilter: ResultFilter = {
+      'indicator-codes': [],
+      'lever-codes': [],
+      // D-URL-18 — the sidebar multiselect's wire key. Mutually exclusive
+      // with the tab below: `parse` suppresses `indicators` whenever a tab
+      // resolved, so at most one of these two is ever non-empty.
+      'indicator-codes-filter': filters.indicators ?? [],
+      'indicator-codes-tabs': filters.indicator !== undefined ? [filters.indicator] : [],
+      'status-codes': filters.status ?? [],
+      'contract-codes': filters.contract ?? [],
+      'platform-code': filters.source ?? [],
+      years: filters.year ?? [],
+      'create-user-codes': createUserCodes
+    };
+
+    this.resultsFilter.set(seededFilter);
+    this.appliedFilters.set(seededFilter);
+
+    this.myResultsFilterItem.set(isMyScope ? this.myResultsFilterItems[1] : this.myResultsFilterItems[0]);
   }
 
   /** Fixed pending-revision table on project dashboard: status 5, current contract, all results. */
@@ -862,6 +971,8 @@ export class ResultsCenterService {
 
     this.searchInput.set('');
 
+    // D-URL-15: clearAllFilters' single userFilterMutations bump comes from this
+    // delegated onSelectFilterTab(0) call — do not add a second bump here.
     this.onSelectFilterTab(0);
 
     setTimeout(() => {
@@ -923,7 +1034,9 @@ export class ResultsCenterService {
       table.sortOrder = -1;
     }
     this.resetResultsTablePaginatorToFirstPage();
-    this.onSelectFilterTab(0);
+    // D-URL-15 / R3-1: clearAllFiltersWithPreserve must NOT advance userFilterMutations —
+    // it is reached only from the modal / links-to-result flows, not a Results Center user action.
+    this.onSelectFilterTab(0, { skipBump: true });
   }
 
   cleanMultiselects() {
@@ -1035,7 +1148,7 @@ export class ResultsCenterService {
     return [...words, ...permutations].join(' | ');
   }
 
-  private syncIndicatorTabSelection(indicatorId: number): void {
+  syncIndicatorTabSelection(indicatorId: number): void {
     this.api.indicatorTabs.lazy().list.update(prev =>
       prev.map((item: GetAllIndicators) => ({
         ...item,

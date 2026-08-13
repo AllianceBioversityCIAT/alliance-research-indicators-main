@@ -122,6 +122,7 @@ import {
 } from '../ai-reports/dto/create-ai-report.dto';
 import { ResultAlignmentOperationsService } from './portfolio-handlers/sections/alignment/shared/result-alignment-operations.service';
 import { PortfoliosService } from '../portfolios/portfolios.service';
+import { CapdevBulkNotificationService } from '../ai-reports/notifications/capdev-bulk-notification.service';
 import { DeleteResultsByParametersDto } from './dto/delete-results-params.dto';
 
 @Injectable()
@@ -167,6 +168,7 @@ export class ResultsService {
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
     private readonly _portfolioService: PortfoliosService,
     private readonly _aiReportsService: AiReportsService,
+    private readonly _capdevBulkNotificationService: CapdevBulkNotificationService,
   ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -1091,7 +1093,24 @@ export class ResultsService {
       resultsCreated.push(newResult);
     }
     iaMetadataReport.bulkUploadResults = iaMetadataReportResults;
-    await this._aiReportsService.create(iaMetadataReport);
+    const process = await this._aiReportsService.create(iaMetadataReport);
+
+    // R-CBU-010 / design.md §6.6 — outer containment boundary: nothing
+    // thrown, rejected or timed out from the CapDev notification stage may
+    // reach this method's return path. The bulk upload has already
+    // persisted by this point, so a notification failure here must never
+    // roll back or fail the response.
+    try {
+      await this._capdevBulkNotificationService.dispatch(
+        process.id,
+        metadata?.contacts,
+      );
+    } catch (error) {
+      this.logger.error(
+        `CapDev bulk upload notification failed for process ${process?.id}: ${error?.message ?? error}`,
+      );
+    }
+
     return {
       results_errors: resultsCreated.filter((el) => (el as any).error),
       results_created: resultsCreated.filter((el) => !(el as any).error),

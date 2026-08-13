@@ -11,6 +11,7 @@ import { ActionsService } from '@shared/services/actions.service';
 import { ResultsCenterService } from '@pages/platform/pages/results-center/results-center.service';
 import { Result } from '@shared/interfaces/result/result.interface';
 import { mapOtherResultLinkPayloadToResult } from '@shared/utils/map-link-other-result-to-result';
+import { GetResultsService } from '@shared/services/control-list/get-results.service';
 
 jest.mock('@shared/constants/indicator-icon.constants', () => ({
   getIndicatorIcon: jest.fn().mockReturnValue({ icon: 'pi pi-star', color: '#000' })
@@ -370,6 +371,169 @@ describe('LinksToResultComponent', () => {
     });
     expect(component.linkedResults()).toEqual(original);
     expect(component.saving()).toBe(false);
+  });
+
+  // ===========================================================================
+  // T-12 — Shared-consumer isolation (NFR-RCU-005). Every `it` above provides
+  // `ResultsCenterService` as a hand-rolled mock (KZ-001) — `clearAllFiltersWithPreserve`
+  // is a bare `jest.fn()`, so there is no real filter-state signal for a URL
+  // write effect to react to; that harness cannot observe URL leakage even in
+  // principle. This block swaps in the REAL `ResultsCenterService` for
+  // `openSearchLinkedResults`' `clearAllFiltersWithPreserve()` call (design.md
+  // §6.2's consumer table: `links-to-result.component.ts:169`, route
+  // `/result/:code/…`).
+  //
+  // `component.navigate('back' | 'next')` is deliberately never called in this
+  // block — it legitimately calls `router.navigate` itself (already covered
+  // above) and would contaminate the very count this block exists to isolate.
+  // The guarantee under test is structural: this component never constructs
+  // `ResultsCenterComponent`, so the URL write effect (which lives only in
+  // that component's injector) cannot exist here, and `router.navigate` must
+  // be zero regardless of what `clearAllFiltersWithPreserve` itself does to
+  // filter state.
+  //
+  // Rework attempt 2 (NFR-RCU-005 reliability fix): `TestBed.flushEffects()`
+  // now runs between the mutation and the assertions. `realFixture
+  // .detectChanges()` is deliberately NOT used here (unlike select-linked
+  // -results-modal): this block's minimal `cacheServiceMock` only stubs the
+  // three fields `openSearchLinkedResults`'s path needs, and the real
+  // template's `FormHeaderComponent` reads `cache.showSectionHeaderActions()`
+  // — calling `detectChanges()` throws `TypeError: ctx.cache
+  // .showSectionHeaderActions is not a function` (verified). `TestBed
+  // .flushEffects()` alone still flushes the root-provided
+  // `ResultsCenterService`'s effect scheduler — the exact surface a
+  // relocated `urlWriteEffect` would occupy — without rendering.
+  //
+  // `clearAllFiltersWithPreserve` is DELIBERATELY NON-INCREMENTING (design.md
+  // §6.2's table; `results-center.service.ts:1023` ends at
+  // `onSelectFilterTab(0, { skipBump: true })`), so of the two structural
+  // mutants proven in the task report: the COUNTER-GATED variant
+  // (`effect(() => { userFilterMutations(); navigate([]); })`) stays GREEN
+  // here — correctly, because production never bumps the counter on this
+  // path, so a counter-gated effect never fires regardless of where it lives.
+  // The UNCONDITIONAL/state-watching variant (`effect(() => { resultsFilter();
+  // navigate([]); })`) goes RED here, because `resultsFilter` IS written by
+  // `clearAllFiltersWithPreserve` and the flush lets that effect run.
+  // ===========================================================================
+  describe('shared-consumer isolation (NFR-RCU-005, T-12, real ResultsCenterService)', () => {
+    let realFixture: ComponentFixture<LinksToResultComponent>;
+    let realComponent: LinksToResultComponent;
+    let realResultsCenterService: ResultsCenterService;
+    let navigateSpy: jest.Mock;
+
+    beforeEach(async () => {
+      const sharedApiMock = {
+        indicatorTabs: {
+          lazy: jest.fn().mockReturnValue({ isLoading: signal(false), hasValue: signal(false), list: signal<any[]>([]) })
+        },
+        GET_LinkedResults: jest.fn().mockResolvedValue({ data: { link_results: [] } }),
+        PATCH_LinkedResults: jest.fn()
+      } as unknown as jest.Mocked<ApiService>;
+      const getResultsServiceMock = { fetchPaginated: jest.fn().mockResolvedValue({ results: [], total: 0 }) };
+      const cacheServiceMock = {
+        dataCache: signal({ user: { sec_user_id: 1 } }),
+        getCurrentNumericResultId: jest.fn().mockReturnValue(123),
+        currentResultId: signal('123')
+      } as unknown as jest.Mocked<CacheService>;
+      navigateSpy = jest.fn().mockResolvedValue(true);
+      const routerDouble = { navigate: navigateSpy } as unknown as jest.Mocked<Router>;
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [LinksToResultComponent],
+        providers: [
+          // REAL service — explicitly listed so DI constructs an actual
+          // instance, mirroring the T-11 exemplar's technique
+          // (results-center.component.spec.ts) for the same class.
+          ResultsCenterService,
+          { provide: Router, useValue: routerDouble },
+          { provide: CacheService, useValue: cacheServiceMock },
+          { provide: HttpClient, useValue: { get: jest.fn(), post: jest.fn(), patch: jest.fn() } },
+          { provide: ApiService, useValue: sharedApiMock },
+          { provide: GetResultsService, useValue: getResultsServiceMock },
+          {
+            provide: AllModalsService,
+            useValue: {
+              modalConfig: signal({ selectLinkedResults: { isOpen: false, title: 'Existing Results', isWide: true } }),
+              openModal: jest.fn(),
+              setRefreshLinkedResults: jest.fn(),
+              syncSelectedResults: Object.assign(jest.fn().mockReturnValue([]), { set: jest.fn() })
+            }
+          },
+          { provide: ActionsService, useValue: { showToast: jest.fn() } },
+          { provide: SubmissionService, useValue: { isEditableStatus: jest.fn().mockReturnValue(true) } },
+          { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: jest.fn().mockReturnValue(null) } } } }
+        ]
+      }).compileComponents();
+
+      realFixture = TestBed.createComponent(LinksToResultComponent);
+      realComponent = realFixture.componentInstance;
+      realResultsCenterService = TestBed.inject(ResultsCenterService);
+    });
+
+    afterEach(() => {
+      TestBed.resetTestingModule();
+    });
+
+    it('fires zero router.navigate while openSearchLinkedResults drives a REAL clearAllFiltersWithPreserve mutation', () => {
+      // Seed non-default values so clearing them is an observable, not
+      // vacuous, positive control.
+      realResultsCenterService.tableFilters.set({
+        indicators: [{ indicator_id: 42, name: 'Stale' }],
+        statusCodes: [{ result_status_id: 5, name: 'Pending Revision' }],
+        sources: [],
+        years: [],
+        contracts: [{ agreement_id: 'STALE-FROM-ANOTHER-ROUTE' }],
+        levers: []
+      } as any);
+      // Also seed `resultsFilter`'s indicator keys with stale sentinels — the
+      // conformance-lens RELIABILITY advisory flagged the original
+      // `indicator-codes-filter` assertion as vacuous, because the seed above
+      // only ever touched `tableFilters`, so that key held its unseeded
+      // default ([]) whether or not `clearAllFiltersWithPreserve` ran.
+      realResultsCenterService.resultsFilter.set({
+        'indicator-codes': [],
+        'lever-codes': [],
+        'indicator-codes-tabs': [99],
+        'indicator-codes-filter': [99],
+        'status-codes': [],
+        'contract-codes': [],
+        'platform-code': [],
+        years: [],
+        'create-user-codes': []
+      });
+
+      realComponent.openSearchLinkedResults();
+
+      // Root-effect flush between the mutation above and the assertions
+      // below — see block comment for why `detectChanges()` is not used
+      // here and for which structural mutant this block can/cannot catch.
+      TestBed.flushEffects();
+
+      // Positive control — `clearAllFiltersWithPreserve()` really ran against
+      // the REAL service: the stale table filters are gone.
+      expect(realResultsCenterService.tableFilters().indicators).toEqual([]);
+      expect(realResultsCenterService.tableFilters().contracts).toEqual([]);
+      // Both indicator keys on `resultsFilter` are cleared to `[]` — NOT to
+      // the preserved `MODAL_INDICATOR_CODES` array passed into
+      // `clearAllFiltersWithPreserve`. This deviates from the Reviewer's
+      // literal suggested assertion (`toEqual([...MODAL_INDICATOR_CODES])`),
+      // which does not hold against current, correct production: the
+      // method's own trailing `onSelectFilterTab(0, { skipBump: true })`
+      // (`results-center.service.ts:1023`) unconditionally resets
+      // `indicator-codes-tabs` to `[]` for `indicatorId === 0`
+      // (`results-center.service.ts:740`) — already documented in
+      // `results-center.service.spec.ts:2067-2068,2082-2083` ("onSelectFilterTab(0)
+      // is called at the end, which resets indicator-codes-tabs to []").
+      // Seeding a stale (non-default) `[99]` sentinel above and asserting it
+      // clears to `[]` here is what makes this a genuine, non-vacuous
+      // positive control instead.
+      expect(realResultsCenterService.resultsFilter()['indicator-codes-filter']).toEqual([]);
+      expect(realResultsCenterService.resultsFilter()['indicator-codes-tabs']).toEqual([]);
+
+      // Negative control — the actual T-12 guarantee.
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
   });
 });
 
