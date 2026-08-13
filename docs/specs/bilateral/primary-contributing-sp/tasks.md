@@ -571,7 +571,7 @@ graph TD
 - **Estimated LOC:** ~180
 - **Effort:** L
 - **Skills:** `nestjs-expert`, `systematic-debugging`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 2; see [`./execution.md`](./execution.md) → T-13). Ran **in parallel with T-14**. **894 insertions vs a ~180 estimate — the tripwire is recorded as CROSSED and ACCEPTED, with the estimate flagged as the defective artifact, not the deliverable.** ⚠️ **The `TEST`-datasource premise in this entry is FALSE** — that host is an AWS RDS unreachable from the dev VPN. Ran against an isolated MySQL **8.0.45** container (DEV-parity engine); see execution.md → "Environment resolution". **Evidence, not theatre:** the Reviewer stopped the container and re-ran — 9/9 red, `ECONNREFUSED`, no skip, no fallback — and mutation-tested the generation-expression matchers (green on real DDL, 3/4 red on the `CONCAT` trap). **The trap gate is the N-active-`CONTRIBUTING` test, NOT the second-`PRIMARY` test** — the latter stays green under the trap. 🔴 **Repo-level finding: the migration chain cannot build a database from scratch** — it dies at migration 84 on `sec_template`, a table with no DDL anywhere in version control, while 15+ later migrations write to it. → `/akili-propose`. **Seam 1 closed as VOID, not discharged:** `_user` is never read, and `updateAlignment` returns `getAlignment`'s own output, so R-BIL-123 AC.2 was structurally discharged by construction all along.
 
 ---
 

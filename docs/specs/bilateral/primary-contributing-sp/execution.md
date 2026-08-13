@@ -3153,3 +3153,251 @@ Using `--ac-green-700` as text would have produced near-black on a dark surface.
 offered as proof of compilation. No superseded-string sweep in scope.
 
 ---
+
+## T-13 — `TEST`-datasource integration test: PATCH → read-back round-trip
+
+**Attempt 1 verdict:** `STATUS: FAIL` (Reviewer `opus`, ≠ Implementer `sonnet`) — **one issue, comment-only.**
+**Diff:** 4 new files, **855 insertions**, zero production changes. Ran in parallel with T-14.
+
+**The FAIL is not about the tests.** The suite was verified as genuinely strong; a single comment asserts a
+false fact with the words *"confirmed by grep"* when the grep disproves it. Recorded here in full because
+the verification work below stands independently of the rework.
+
+### The disqualification gate — the suite is evidence, not theatre
+
+`tasks.md` T-13's disqualifier is that a suite passing *"because the datasource silently fell back"* is
+inconclusive. The Reviewer **stopped the container and re-ran**:
+
+| State | Result |
+| --- | --- |
+| `docker stop ari-t13-mysql` | **9 failed / 9 total, exit 1, zero `✓` marks.** `connect ECONNREFUSED 127.0.0.1:33107` → `TypeORMError: Connection is not established`, raised in `beforeAll` **and** `afterAll`. **No skip, no green, no fallback.** |
+| restarted, healthy | 3 consecutive runs **9/9**, exit 0, identical test-name lists (`diff` clean across all three), 5.7s / 5.4s / 4.0s; a 4th confirming run after the Reviewer's own scratch experiments: 9/9 |
+
+Supporting structure verified: `resolveT13Config` reads only `T13_MYSQL_*`; `createT13DataSource` sets
+`synchronize: false` **and** `migrationsRun: false` (`synchronize` appears exactly once in the diff, set
+`false`); `resetAndBuildT13Schema` throws if `active_primary_alignment` is absent after the migration runs.
+
+### The `information_schema` assertion is a gate, not a log — proven by mutation
+
+The `console.log` in `beforeAll` is decoration; the real assertions are four `expect(expr)` matchers plus
+`expect(Number(indexRows[0].NON_UNIQUE)).toBe(0)`. The Reviewer **mutation-tested them against two real
+MySQL-emitted expressions**, building both the good and the trapped DDL in a scratch database and reading
+`GENERATION_EXPRESSION` back:
+
+```
+REAL      if(((`is_active` = 1) and (`sp_role` = _utf8mb4'PRIMARY')),`alignment_id`,NULL)  => GREEN (4/4)
+SABOTAGED if((`is_active` = 1),concat(`alignment_id`,_utf8mb4':',`sp_role`),NULL)          => RED   (3/4 fail)
+```
+
+Jest project isolation confirmed by `--listTests`: the root config selects **321 files, none under `test/`**
+— and isolation rests on `rootDir: "src"`, **not** on the filename suffix, which is worth knowing before
+anyone "simplifies" the config. Full unit suite still **321/321 suites, 2105/2105 tests, exit 0**.
+
+### Per-test discriminating power — every test reddens under its own named defect
+
+| # | Test | Would it redden? |
+| --- | --- | --- |
+| 2 | generation expression + UNIQUE index | **Yes — empirically proven** (mutation table above) |
+| 3 | 2nd active `PRIMARY` → `ER_DUP_ENTRY` | Yes for a missing index/column — **but GREEN under the CONCAT trap** (the sabotaged table still throws `Duplicate entry '1:PRIMARY'`). **This test alone is not the trap gate**, exactly as `design.md` §3.1 warns |
+| 4 | N active `CONTRIBUTING` accepted | **Yes — the trap gate, and it holds.** Under the sabotage the 2nd `CONTRIBUTING` throws `Duplicate entry '1:CONTRIBUTING'` so the 4-row `toEqual` never runs. Agrees with the Leader's hand-proof Probe B |
+| 5 | deactivate → reinsert | Yes — a deactivated row would keep a non-NULL generated value. Agrees with Probe C |
+| 6 | cross-alignment independence | Yes — **the assertion without which 3–5 are all consistent with a globally-unique index.** Agrees with Probe D |
+| 7 | round trip, both roles | **Yes, via the raw-SQL read-back at `:408-428`** — both roles observed, `sp_code`-ascending order asserted by array position |
+| 9 | legacy `sp_role = NULL` + `is_read_only` | **Split** — see below |
+
+**Test 9's split is the one honest weakness.** The `role: null` half is genuinely DB-backed. The
+`is_read_only: true` half is **not discriminating**: `bilateral.service.ts:586` derives it as
+`isPrmsSourced || isSyncedToPrms`, both read from `context` — which is the **mocked**
+`findPoolFundingAlignmentContext` seeded with `is_synced_to_prms: true` at `:524-535`. **That assertion
+re-reads its own input and cannot fail for any DB or migration reason.** It structurally cannot be
+DB-backed, since the `results` stub has no such column.
+
+**One named FAIL-mode is not gated here:** `tasks.md`'s *"a `sp_roles` carrier that reads the wrong variable
+returns roles for a non-eligible fixture"* — all three contexts set `is_pool_funding_contributor: true`. It
+**is** covered at `bilateral.service.spec.ts:288-319` (T-08 / RA-04). Pointer recorded so the claim stays
+accurate; advisory, not a gate.
+
+### Adjudication 1 — budget: 855 lines vs ~180 (4.75×)
+
+Measured: **647 code / 134 comment / 74 blank** — the *code* overrun is **3.6×**, not 4.75×.
+
+**Ruling: the tripwire is recorded as crossed and accepted, with the ~180 estimate flagged as the defective
+artifact — not the deliverable.** F-7 was honoured exactly (no `AppModule`, no supertest, no auth/JWT, no
+controller); the 194-line support pair is the "minimum config to run it" the task authorizes; the extra
+cross-alignment test was Leader-requested (`execution.md` Probe D). Not redundant with the 2105-test unit
+suite, which mocks the repository — T-13's whole value is the real generated column, real UNIQUE index and
+a real committed transaction.
+
+> *"A real-MySQL harness in a repo whose migration chain is broken at #84 cannot be built in 180 lines, and
+> no reading of the task made that estimate reachable."*
+
+**The real inflation is copy-paste, not scope:** the 20-provider `Test.createTestingModule` block is
+duplicated verbatim (`:322-374`, `:583-635`) and the `catalog` const twice more — ~70 lines a shared factory
+would erase.
+
+### Adjudication 2 — Seam 1: **close as VOID, not as discharged**
+
+Independently verified: `getAlignment(resultId, resultCode, _user: User)` at `:540-543`; a grep for `_user`
+across the whole service returns only `:543` and `:1464` — **never read**. Eligibility is computed at `:558`
+from `context`, which comes from `findPoolFundingAlignmentContext(resultId)` — **keyed on `resultId`, never
+on `user`.**
+
+**The T-08 Reviewer's rationale was factually wrong about the shipped code.** The seam is latent, not live.
+
+**And T-13's `expect(independentGet).toEqual(patchResponse)` discharges less than claimed** — because
+`updateAlignment` **returns `getAlignment`'s own output** (`:871`), both sides of that equality are the same
+function over the same unchanged state and the same mocks. It is a **determinism check**; it would redden
+only if `getAlignment` carried hidden per-call state. **R-BIL-123 AC.2 is structurally discharged by
+construction and always was.** The real evidence in test 7 is the raw-SQL read-back. Nothing covers
+`user`-dependent read behaviour **because no such behaviour exists**.
+
+### Adjudication 3 — the hand-written piece: one half true, one half false
+
+**Route (a) really is unusable — confirmed empirically.** Against a throwaway `ari_t13_chain` database:
+**83 migrations applied, then `InsertTemplates1751474908040` failed** on `` delete from `sec_template` `` with
+`ER_NO_SUCH_TABLE` (1146), then `ROLLBACK`. A grep for `CREATE TABLE ... sec_%` across all 305 migrations
+returns **zero** — `sec_template` has **no DDL anywhere in version control**, and 15+ later migrations write
+to it. **Route (b) was the correct call.**
+
+**The `results` claim is FALSE — this is the FAIL.** `t13-schema.ts:24-27` asserts *"no migration in this
+repository creates that legacy table (it predates the migration history — confirmed by grep)"*. Both halves
+are wrong: `src/db/migrations/1726504510058-createdResultEntities.ts:29` creates it, with the matching
+`DROP TABLE` in `down()` at `:82`. **The negative was reachable by grep and was simply not confirmed** —
+violating **K-003**, in an artifact whose stated purpose is to record provenance. The Reviewer's exhaustive
+sweep found exactly one bare `` `results` `` CREATE among ~48 `result*` table names, zero `RENAME TABLE`, and
+zero programmatic `createTable(` in any of the 305 migrations.
+
+**This is the same failure class this spec has now corrected five times** — `requirements.md:15`'s backfill
+phrase, `CLAUDE.md`'s CodeGraph path, T-08's Seam 1 premise, T-13's own `TEST`-datasource premise, and now
+this. **The pattern is a confident negative asserted without the grep that would settle it.**
+
+The stub is also **materially less faithful than the real table**: it omits `result_official_code bigint NOT
+NULL`, so the fixture `INSERT INTO results (result_id) VALUES (?)` would fail outright against a
+migration-built `results`. Remediation is comment-only — the stub stays, but the record must say it is a
+**deliberate, justified deviation** (the real migration's `up()` also adds a FK to `agresso_contracts`, a
+table it does not create) **rather than a forced one**.
+
+### ADVISORY (4R) — recorded
+
+1. **RISK (repo-level, outside this diff) — the migration chain cannot build a database from scratch.** It
+   dies at migration **84** on `sec_template`, a table with **no DDL anywhere in version control**, while
+   15+ later migrations write to it. There may be further pre-existing-table assumptions among the 222
+   unrun migrations. **This is a standing disaster-recovery gap** — a fresh environment cannot be
+   provisioned from this repository. **T-13 is the first task in this spec to have proven it empirically.**
+   → `/akili-propose`.
+2. **RELIABILITY — duplicated `createTestingModule`** (`:322-374`, `:583-635`) and `catalog` (`:281-296`,
+   `:537-552`). ~70 lines, and the real cost is silent drift between the two modules. Largest contributor
+   to the overrun.
+3. **RELIABILITY — test 8 mutates the shared `findContext` mock at `:442`**, making the round-trip describe
+   order-dependent. Works under Jest's declaration order; **breaks silently under `--randomize`**.
+4. **RESILIENCE — `jest-integration.json` is wired to no npm script and no CI job**, and depends on a
+   container nothing provisions. *"It will rot unrun."* → Leader promoted the `test:integration` script into
+   the rework.
+5. **RISK — `t13-data-source.ts` hardcodes the password `t13root` as a default.** A committed credential
+   literal that will be copied. → Leader promoted "require `T13_MYSQL_PASSWORD`, fail loudly" into the
+   rework; it also strengthens the no-silent-fallback guarantee that makes this suite evidence at all.
+6. **READABILITY — two `afterAll` hooks** (`:388`, `:501`) separated by 100 lines of test bodies.
+
+**K-001 respected** — `npx eslint` cited throughout, never `npm run lint`; `git status` showed exactly 4
+added files and zero modifications under `server/`.
+
+---
+
+### T-13 — attempt 2: `STATUS: PASS`
+
+**Diff:** 894 insertions (was 855, delta **+39**). **Comment-only in `t13-schema.ts`**, plus the two
+advisories the Leader promoted into scope.
+
+#### The fix was verified, not merely reworded
+
+The attempt-1 defect was a confident negative nobody grepped. A replacement comment that is *plausible*
+would have failed for the same reason, so the Reviewer checked **every assertion in the new block against
+source — and the two load-bearing ones empirically, against the live container**:
+
+| Assertion | Verdict |
+| --- | --- |
+| `results` **is** created by `CreatedResultEntities1726504510058:29` | **TRUE** |
+| `:38` adds a FK to `agresso_contracts`, which that migration does **not** create | **TRUE** — `agresso_contracts` belongs to `1722609316360:13` |
+| **"invoking it would fail on that FK, not succeed"** — the new load-bearing claim | **TRUE, empirically**: replayed `:38` verbatim in a scratch schema → `ERROR 1824 (HY000): Failed to open the referenced table 'agresso_contracts'` |
+| **"the fixture's `INSERT INTO results (result_id)` would fail against the real DDL"** | **TRUE, empirically**: real `:29` DDL created, exact insert run → `ERROR 1364 (HY000): Field 'result_official_code' doesn't have a default value` (and `sql_mode` includes `STRICT_TRANS_TABLES`, so it is not mode-contingent) |
+
+**The stub is a *forced* deviation, not an unjustified one** — stronger than the comment itself claims.
+This is the exact inverse of the attempt-1 defect.
+
+#### K-003 — the sweep, re-run by the Reviewer
+
+All three literal phrases (`predates the migration history`, `no migration in this repository creates`,
+`confirmed by grep`) return **zero hits** across `test/`, `src/`, `docs/`. The only repo-wide survivors are
+in this file at the T-13 FAIL entry, where the superseded string is **quoted as the recorded defect** —
+that is the K-003 artifact itself, not a survival.
+
+**And the Implementer caught themselves mid-fix**: their first replacement reused *"predates the migration
+history"* in a true-but-different sense (*"there is no migration that predates the migration history to
+fall back on"*) and they reworded it to keep the literal string at zero. **That is K-003 applied to one's
+own output**, which is the version almost nobody does.
+
+The Reviewer also checked for a *new* unverified confident negative — the failure class, not the wording.
+The three negatives in the new block ("does not create", "this file never builds", "no earlier migration to
+fall back on") are all checkable and all checked.
+
+#### Delta arithmetic — a regression proof without re-reading the file
+
+> 855 + **39** = 894, where 39 = 1 (`package.json`) + 13 (`t13-data-source`) + 25 (`t13-schema`: −8/+33). **Exact closure.**
+
+Therefore the 651-line spec file and `jest-integration.json` are **byte-identical to attempt 1**, and
+`t13-schema.ts` changed **only inside the comment block**. `RESULTS_STUB_DDL` unchanged (no fidelity raise,
+no `result_official_code` added — the scope boundary held), provenance assertions unchanged, all 9 test
+bodies unchanged. Suite **9/9 twice**, agreeing.
+
+#### The two promoted advisories
+
+**`T13_MYSQL_PASSWORD` is now required.** The `|| 't13root'` default is gone; the sole surviving `t13root`
+literal is **inert message text** at `t13-data-source.ts:43`. Unset run reproduced with `env -u`: **9/9
+failed, none passed, no silent fallback.** The Reviewer captured the output *head*, which the Implementer's
+report did not, and ruled the secondary teardown error **non-masking** — the explicit message leads and is
+the stated cause for **8 of 9** tests. **This strengthens the single property that makes this suite evidence
+at all.**
+
+**`test:integration` added.** Exactly one line at `package.json:25`; nothing else moved. No collision —
+proven by `--listTests`, not by reading regexes: the root config lists **0** integration files (double
+isolation: outside `rootDir: src`, *and* `integration-spec` has a hyphen where the regex needs `\.spec`),
+`test:e2e` lists 0. A naive `grep -i integration` returns 5 pre-existing `tip-integration`/`toc-integration`
+**unit** specs under `src/` — unrelated, and worth knowing before someone "cleans up" the config.
+
+#### ADVISORY (4R) — recorded
+
+1. **READABILITY — the grep incantation quoted in the comment is mis-escaped and returns ZERO hits if
+   copy-pasted.** The migration source holds escaped backticks inside a TS template literal, so the pattern
+   needs `` 'CREATE TABLE \\\`results\\\`' `` (or `grep -F`). **The underlying fact is true and verified**;
+   the Implementer clearly ran a working variant and mis-transcribed it. Not gating — the file and line are
+   cited alongside — but *"a maintainer who runs the printed command gets nothing and could re-derive exactly
+   the confusion this comment exists to prevent."*
+2. **READABILITY — two imprecisions in the same paragraph.** (a) *"the six `AuditableEntity` columns
+   (`created_at`, `created_by`, `updated_at`, `updated_by`, `is_active`)"* — the **count six is correct**, the
+   list names five; `deleted_at` is the sixth (reaching `results` via `1732023678699:104`). (b) *"diverges in
+   two ways"* understates it — the stub also omits `version_id`, `title`, `description`, `indicator_id`,
+   `geo_scope_id`. All five are NULLable, **so the INSERT-would-fail consequence still rests correctly on
+   `result_official_code` alone.**
+3. **RESILIENCE — `afterAll(dropT13Schema)` throws a secondary error on the unset-password path** because
+   `beforeAll` aborted before `dataSource` was assigned. Ruled non-masking, but `if (!dataSource) return;`
+   would keep the tail as clean as the head *"on the one guard that protects this suite's credibility."*
+
+---
+
+## T-02 status — two of four items now discharged, still `[~]`
+
+T-13's PASS is the discharge path recorded at `execution.md:672`. Re-scoring T-02's open ledger:
+
+| Item | Before T-13 | Now |
+| --- | --- | --- |
+| `idx_rpfas_active_primary` rejects a second active `PRIMARY` (R-BIL-121 **AC.3**) | ❌ UNVERIFIED | ✅ **DISCHARGED** — automated, real schema built by the migration's own `up()` |
+| The index permits **unlimited** active `CONTRIBUTING` rows (**AC.4**) | ❌ UNVERIFIED | ✅ **DISCHARGED** — and mutation-proven to be *the* trap gate |
+| Row count + checksum preserved over **seeded** data (NFR-BIL-120) | ❌ UNVERIFIED | ❌ **STILL UNVERIFIED** — T-13 builds from an empty schema; this needs the migration applied over populated data, which only happens on a real deploy |
+| An `is_read_only` legacy alignment is unmutated (R-BIL-126 AC.3) | ❌ UNVERIFIED | ⚠️ **PARTIAL** — the `role: null` half is DB-backed; the `is_read_only` half re-reads a mocked `context` and cannot fail for any DB reason |
+
+**T-02 remains `[~]`.** The remaining two items are not reachable from this workstation: NFR-BIL-120 requires
+the migration to run over seeded production-shaped data, and this project's topology puts that behind a
+DevOps branch push. **That is the correct place for it** — it is a deployment verification, not a test.
+Recorded so nobody later reads T-13's green as covering it.
+
+---
