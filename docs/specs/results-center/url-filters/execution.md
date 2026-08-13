@@ -306,7 +306,20 @@ The re-review also confirmed the fix cannot break a previously-passing state: an
 
 ---
 
-## 5. OPEN — two non-functional requirements whose prescribed verification is owned by no task
+## 5. RESOLVED — non-functional requirements whose prescribed verification was owned by no task
+
+> **USER DECISION (2026-08-12): assign all four to existing tasks.** No new task created; three existing tasks gained a done-check, and two document inaccuracies were corrected. Amendments applied the same day:
+>
+> | Gap | Assigned to | Site |
+> | --- | --- | --- |
+> | NFR-RCU-002 **layer 2** (runtime completeness warning) | **T-06** — where the control lists resolve | `tasks.md` T-06 covered-requirements line + done-check + a scope note; `design.md` §10.1 runtime row now names T-06; `tasks.md` §3 row split by layer |
+> | NFR-RCU-003 **written-URL** assertion | **T-08** — the first task that calls `router.navigate` | `tasks.md` T-08 done-check + rationale note; §3 row split between the structural (T-03) and real (T-08) verification |
+> | R3-1 **rendered** my/all click | **T-11** — its harness rewrite is what makes a DOM click possible | `tasks.md` T-11 done-check, plus a **new Disqualifies clause** forbidding the rewrite from dropping T-05's counter assertions |
+> | `design.md` §6.2's false "the counter does not move" clause | Corrected in place | §6.2, with a note that the isolation guarantee is **component destruction alone**, and that T-12 must assert that rather than a frozen counter |
+>
+> **Why NFR-RCU-002's §3 row was split by layer:** the requirement is explicit that layer 1 *cannot* detect a server-side addition. Recording both layers under one row is what let the unimplemented half hide behind the implemented one for three review rounds — the coverage table said "covered" and was not lying about layer 1.
+
+### Original escalation (retained as the record of what was found)
 
 **Raised by the T-03 Reviewer, 2026-08-12. Pending a user decision; not actionable by the Leader alone, because creating or widening tasks is scope the user never approved.**
 

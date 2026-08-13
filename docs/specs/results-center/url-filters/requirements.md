@@ -355,7 +355,7 @@ Per the constitution: name what this spec can get wrong, then say which command 
 | D1 | Codec maps a token to the wrong filter or drops a value | `npm test -- --silent` (client) — codec unit tests, round-trip property | No |
 | D2 | Navigation loop / duplicate fetch | Component test counting navigate + fetch calls (NFR-RCU-001) | No |
 | D3 | **State desync** — the API filter applies but the sidebar chip or tab strip does not (three signals, one of them forgotten) | Component test asserting all three signals *and* the rendered chip, per R-RCU-002 AC.3 | No |
-| D4 | Vocabulary drift when an indicator is added | Parity test (NFR-RCU-002) | No |
+| D4 | Vocabulary drift when an indicator is added | Parity test = **layer 1 only** (T-01); the layer that actually detects a server-side addition is the **runtime completeness warning**, NFR-RCU-002 layer 2 (T-06) | **Partly** — layer 1 is blind to it by construction |
 | D5 | Regression in Home links or the project dashboard | **Full** client suite, not targeted specs *(KZ-003)* | No |
 | D6 | **Server emits a URL the client cannot parse** | ⚠️ **No automated gate crosses the package boundary.** Client tests never run the server's link builder; server tests never run the client's parser | **Yes** |
 
@@ -405,7 +405,7 @@ Q1 and Q2 are resolved in `design.md` as design decisions; both recommendations 
 | R-RCU-006 | Legacy parameters keep working, permanently | D1, D5 |
 | R-RCU-007 | Every link producer emits the canonical scheme | D5, D6 |
 | NFR-RCU-001 | No navigation loop, no duplicate fetch | D2 |
-| NFR-RCU-002 | Vocabulary parity enforced by test | D4 |
+| NFR-RCU-002 | Vocabulary drift detected in **two layers** — fixture parity (test, T-01) **and** runtime completeness warning (T-06) | D4 |
 | NFR-RCU-003 | No user identifiers in the URL | D1 |
 | NFR-RCU-004 | History hygiene | D2 |
 | NFR-RCU-005 | Shared-consumer isolation | D5 |

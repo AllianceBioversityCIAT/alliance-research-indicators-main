@@ -117,7 +117,7 @@ graph TD
 
 ---
 
-### T-04 [ ] — `seedFromUrl()` on `ResultsCenterService`
+### T-04 [~] — `seedFromUrl()` on `ResultsCenterService`
 
 - **Requirements covered:** R-RCU-002 AC.3/AC.5/AC.6/AC.7, R-RCU-006 AC.3
 - **Files touched:** `…/results-center/results-center.service.ts`, `…/results-center.service.spec.ts`
@@ -169,7 +169,7 @@ graph TD
 
 ### T-06 [ ] — Read path: parse, precedence, scope, toast
 
-- **Requirements covered:** R-RCU-002 (both scenarios + AC.2/AC.4/AC.6/AC.7), R-RCU-004 (scenario + all ACs), R-RCU-005 AC.2/AC.3, R-RCU-006 (both scenarios)
+- **Requirements covered:** R-RCU-002 (both scenarios + AC.2/AC.4/AC.6/AC.7), R-RCU-004 (scenario + all ACs), R-RCU-005 AC.2/AC.3, R-RCU-006 (both scenarios), **NFR-RCU-002 (layer 2)** *(assigned 2026-08-12 during execution)*
 - **Files touched:** `…/results-center/results-center.component.ts`
 - **Description:** Wire the codec into `initializeState()` per design §6.1. Init-only, from `route.snapshot` — **never a `queryParamMap` subscription** (D-URL-5); that is the structural reason a write cannot re-enter a read.
 - **Implementation notes:**
@@ -186,6 +186,9 @@ graph TD
   - [ ] An all-invalid link renders the unfiltered page with the toast and does **not** restore.
   - [ ] The toast fires once per navigation regardless of how many tokens were dropped.
   - [ ] A token containing markup cannot alter the toast's rendering.
+  - [ ] **NFR-RCU-002 layer 2 — when the control list resolves, any id with no slug emits a console warning naming that id** *(assigned here 2026-08-12; previously owned by no task)*.
+- **NFR-RCU-002 layer 2 — added during execution.** Requirements §NFR-RCU-002 specifies verification in **two** layers and says layer 1 cannot see a server-side addition: *"This is the layer that actually sees a server-side addition, and it fires in every dev and QA session."* Design §10.1 listed it as a "Runtime | dev/QA console" row with **no owning task**, and §3's coverage table mapped NFR-RCU-002 to T-01 — whose line reads "layer 1" only. It lands here because this is where the control lists resolve. It is also the named mitigation for the write-side gap in `execution.md` §5.2 (`serialize` silently drops an id absent from the frozen map). Scope: a `console.warn` in dev/QA naming the unmapped id(s) — **not** a toast, not a blocking error, and **no change to `serialize`'s signature**.
+- **Toast safety — carried from the T-02 review.** `DroppedUrlToken.value` holds the **raw, unescaped** token. Design §7.4's guarantee is *non-interpolation*, so the toast MUST read only `dropped.length` (and per-parameter counts) — **never `dropped[i].value`**. That is what makes "a token containing markup cannot alter the toast's rendering" structural rather than a matter of escaping correctly.
 - **Disqualifies:** a hand-rolled `ActivatedRoute` returning a canned snapshot tests the assertion, **not the parsing** *(KZ-001)* — the harness from T-11 is required for these checks to count.
 - **Dependencies:** T-02, T-04 · **Effort:** L · **Skills:** `angular-developer`
 
@@ -229,12 +232,16 @@ graph TD
   - [ ] Browser history depth after N filter changes is unchanged (R-RCU-003 AC.4).
   - [ ] `?utm_source=email` survives the first filter change.
   - [ ] `?tab=my` no longer self-destructs (JD-9 guard).
+  - [ ] **NFR-RCU-003 — the written URL never contains the cached `sec_user_id`, asserted on the resulting URL string for both scopes** *(assigned here 2026-08-12; see below)*.
+- **NFR-RCU-003 lands here too — added during execution.** §3's coverage table mapped NFR-RCU-003 to **T-03 alone**, but the requirement's own *How verified* reads: *"asserted by a test that **the written URL** never contains the cached user id."* A written URL is a component-level artifact that the pure codec cannot produce — T-03's codec-level test is a structural argument only (`serialize` never receives a user id, so its assertion cannot fail), which its own comment states honestly. T-08 is the first task that actually calls `router.navigate`, so the real assertion belongs here.
+- **The counter's ordering contract — carried from the T-05 review, read before writing the effect.** `noteUserFilterMutation()` must be called **only after the state it publishes has been written.** T-05's `togglePin` failed review for bumping before an `await`: the effect flushed at the await boundary, serialized *pre-mutation* state, no-opped on the loop guard, and never fired again because its only tracked dependency did not move a second time — silently losing the write. `onActiveItemChange` and `applyFilters` still bump *before* their mutations and are safe **only** because both are wholly synchronous; if this task makes either path async ahead of its `.set()` calls, that defect returns.
+- **Type hazard at the boundary — carried from the T-03 review.** `serialize` now calls `.toUpperCase()` on every `filters.contract` element. `results-center.service.ts:315` casts `tableFilters().contracts`, and both `get-contracts-by-user.interface.ts:2` and `find-contracts.interface.ts:12` declare `agreement_id?: string` — so a runtime `undefined` would throw a `TypeError` inside this effect. Narrow the type at the boundary here, or accept that the codec needs `String(code).toUpperCase()`.
 - **Disqualifies:** asserting on the object passed to `router.navigate` is a presence assertion about the *call*, not the resulting URL — R2-1 lives in the merge, so at least the clearing checks must assert the router's resulting URL. A history-depth check that never navigates twice cannot fail.
 - **Dependencies:** T-03, T-05, T-06 · **Effort:** L · **Skills:** `angular-developer`
 
 ---
 
-### T-09 [ ] — Home link producers
+### T-09 [~] — Home link producers
 
 - **Requirements covered:** R-RCU-007 AC.1, **AC.1b**, AC.3
 - **Files touched:** `…/home/components/data-overview/data-overview.component.html` + `.ts` + `.spec.ts`, `…/home/components/main-actions/main-actions.component.html`
@@ -283,7 +290,9 @@ graph TD
   - [ ] The suite drives a real param map; no canned snapshot remains.
   - [ ] The component renders; chips and the tab strip are assertable from the DOM.
   - [ ] All pre-existing behavioral cases still pass under the new harness.
-- **Disqualifies:** porting the old assertions onto the new harness without removing the fabricated service mock leaves the same blindness with more ceremony *(KZ-001)*.
+  - [ ] **A rendered click on the My/All tab strip advances `userFilterMutations`** — the template-binding half of T-05's R3-1 guard *(assigned here 2026-08-12; see below)*.
+- **T-05's R3-1 guard is completed here — added during execution.** T-05's done-check requires the my/all increment be "asserted through the template binding, not by calling the service method directly." The pre-rewrite harness overrides the template with `<div></div>`, so a DOM click was structurally impossible; the Leader authorized asserting through the component's handler instead (`component.onActiveItemChange(...)` with a mocked service), which the Reviewer accepted as satisfying the Disqualifies clause's operative requirement. **This rewrite is what makes the rendered assertion possible, so it must carry it** — otherwise the template-binding half of a dual-judge-confirmed regression guard disappears with the old harness and nothing records that it was ever owed.
+- **Disqualifies:** porting the old assertions onto the new harness without removing the fabricated service mock leaves the same blindness with more ceremony *(KZ-001)*. **Also disqualifying:** dropping T-05's counter assertions (`component.spec.ts` `describe('onActiveItemChange')` / `describe('togglePin')` / the two `not.toHaveBeenCalled()` cases in `describe('loadMyResults')` and `describe('loadAllResults')`) rather than carrying them onto the new harness — they are the R3-1 and R2-5 guards.
 - **Dependencies:** T-06, T-08 · **Effort:** L · **Skills:** `angular-developer`
 
 ---
@@ -296,6 +305,7 @@ graph TD
 - **Implementation notes:**
   - `initializeProjectDashboardResultsTable` is called **only** from `project-dashboard.component.ts:215`; `project-detail.component.ts` never references it (JD-8). The existing dashboard spec mocks the service wholesale and must be extended with a real-service case.
   - Assert **zero** `router.navigate` from service-level filter mutations on each of those routes.
+  - **Assert the right guarantee: the component is destroyed, NOT that the counter is frozen** *(added 2026-08-12 — see the correction note in `design.md` §6.2)*. `resetState()` → `clearAllFilters()` **does** advance `userFilterMutations` from `/project-detail`, so "the counter does not move off-route" is false and a test written against it would be asserting a non-guarantee. The real guarantee is D-URL-9's lifecycle one: the effect lives in `ResultsCenterComponent`'s injector and is destroyed with the component, so zero `router.navigate` is the correct observable — which is what the checks below already assert.
 - **Acceptance / done check:**
   - [ ] Each of the four surfaces mutates filters with zero `router.navigate`.
   - [ ] The project dashboard's fixed table is behaviorally unchanged.
@@ -331,10 +341,14 @@ Closure is at **scenario and clause** granularity, not requirement ID.
 | R-RCU-007 scenario (+ both clauses) | T-10 |
 | R-RCU-007 AC.1, AC.1b, AC.2, AC.3 | T-09, T-10 |
 | NFR-RCU-001 | T-08 |
-| NFR-RCU-002 | T-01 |
-| NFR-RCU-003 | T-03 |
+| NFR-RCU-002 layer 1 (fixture parity) | T-01 |
+| **NFR-RCU-002 layer 2 (runtime completeness warning)** | **T-06** *(assigned 2026-08-12 during execution — previously owned by no task)* |
+| NFR-RCU-003 (structural: codec never receives an id) | T-03 |
+| **NFR-RCU-003 (written-URL assertion — the requirement's own prescribed verification)** | **T-08** *(assigned 2026-08-12 during execution — previously owned by no task)* |
 | NFR-RCU-004 | T-08 |
 | NFR-RCU-005 | T-05, T-12 |
+
+**Coverage corrections made during execution (2026-08-12).** Three verifications the spec prescribes were owned by no task; each is now assigned to the task that can actually perform it, and no new task was created. Full reasoning in `execution.md` §5. NFR-RCU-002 is split by layer because §NFR-RCU-002 is explicit that layer 1 *cannot* detect a server-side addition — recording them as one row let the unimplemented half hide behind the implemented one. The R3-1 template-binding assertion was likewise added to **T-11**, which is the task whose harness rewrite makes it possible.
 
 **Carried findings:** R3-1 → T-05 · R3-2 → T-03 · R3-3 → T-01 · R3-4 → T-03.
 

@@ -218,7 +218,9 @@ The component's effect declares **`userFilterMutations()` as its only tracked de
 
 - It cannot fire during the read path or restore, because those do not increment *(closes R2-2, R2-5)*.
 - Its mandatory first run at creation sees the counter at its entry value and **no-ops by explicit guard** — not by luck of comparison *(closes R2-2)*.
-- A cross-route mutation cannot reach it twice over: the counter does not move, and the component is destroyed anyway *(preserves the isolation both judges verified)*.
+- A cross-route mutation cannot reach the effect, because **the component that owns it is destroyed** *(preserves the isolation both judges verified)*.
+
+> **Corrected 2026-08-12 during execution (T-05).** This bullet previously read *"the counter does not move, and the component is destroyed anyway"*. The first clause is **false**: `resetState()` (`results-center.service.ts:973`) calls `clearAllFilters()`, which increments, and its only caller is `project-detail.component.ts:171` — a different route. So a cross-route mutation *can* move the counter. The isolation guarantee is therefore **exactly one thing: component destruction** — which is what D-URL-9 always claimed and what makes it a lifecycle guarantee rather than a convention. Harmless in practice (the effect captures its entry baseline at creation, so bumps that happened while it did not exist are absorbed), but **T-12 must assert the right guarantee — component destroyed, not counter frozen.**
 
 This also matches R-RCU-003's own wording, which scopes the write to filters changed **"through the UI"** — the reactive design could not express that distinction; an intent counter can.
 
@@ -355,7 +357,7 @@ Neither imports the other. A spelling change on either side turns one test red. 
 | Component | `project-detail`, `select-linked-results-modal`, `links-to-result` specs | D5 — no `router.navigate` from service-level filter mutations on those routes |
 | Component | `data-overview.component.spec.ts` | Producer change — currently asserts `{ statusTab: 7, statusLabel: 'Submitted' }` (lines 153-163) |
 | Server unit | `capdev-bulk-notification.service.spec.ts` | D6 half — the literal |
-| Runtime | dev/QA console | NFR-RCU-002 layer 2 — completeness warning when a control-list id has no slug |
+| Runtime | dev/QA console — **owned by T-06** *(assigned 2026-08-12; this row previously named no task)* | NFR-RCU-002 layer 2 — completeness warning when a control-list id has no slug. Also the named mitigation for the write-side gap in `execution.md` §5.2: `serialize` silently omits an id absent from the frozen map, so a link can under-describe the view. Layer 2 is the only thing that surfaces such an id |
 | Full suite | `npm test -- --silent` (**whole client suite**) | D5 *(KZ-003)* |
 | Manual | HITL | D6 — paste the server-built string into a running client |
 
