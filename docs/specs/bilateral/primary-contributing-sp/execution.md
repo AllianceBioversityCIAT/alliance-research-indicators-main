@@ -1454,3 +1454,51 @@ fact inferred from a shell prompt should have been stated as an inference and ch
 would have been read rather than guessed. Recommending `/akili-constitution` Step 6B after this run.
 
 ---
+
+### 🖥️ Local environment contract — stated by the user, 2026-08-13
+
+This is the `## Local Environment` contract `docs/infrastructure.md` is missing, and whose absence
+caused the topology error corrected above.
+
+| Tier | Local story |
+| --- | --- |
+| **Client** (`client/research-indicators`) | Runs locally; **dockerizable** |
+| **Server** (`server/researchindicators`) | Runs locally; **dockerizable** |
+| **Database** | **No local MySQL.** Points at the **`dev` MySQL on the on-premise Alliance environment** |
+| **Precondition** | **VPN must be connected** to reach that database |
+
+**Pre-check for any environment-dependent verification** (`/akili-execute` Step 2.1): *is the VPN up,
+and is the `dev` MySQL reachable?* If not, the check is blocked — and per `.agents/leader.md`
+*"Deferring a check"*, that assumption must be **probed**, not assumed, before a task is parked.
+
+#### What this unblocks
+
+**T-03's `/swagger` visual check.** T-03 requires `primary_sp_code`, `role` (including `null`) and
+the three new `400` codes to be **seen rendered** — its disqualifier is explicit that *"the
+annotations are in the source" is not a substitute*, and that if the app cannot be started the
+criterion is **unmet, not waived**. With VPN + the linked `.env`, the server boots and that criterion
+becomes reachable.
+
+#### ⚠ What this does NOT change — and the new risk it introduces
+
+1. **The migration/probe story is unchanged.** Reaching the `dev` database from a laptop does not
+   make hand-running migrations correct: promotion is DevOps-triggered by branch pushes. `dev` MySQL
+   is **shared on-premise infrastructure**, and every caution recorded against the probe package
+   still applies at full strength. **T-13 remains the better discharge path** — it needs no VPN, no
+   shared-state access, and re-runs forever.
+2. **🔴 NEW RISK — a local server pointed at shared `dev` MySQL WRITES to shared data.**
+   `orm.config.ts` sets `synchronize: false` and `migrationsRun: false`, so **booting alone alters no
+   schema** — that part is safe. But the app is fully live against real shared rows: any `PATCH`
+   exercised locally (deliberately, or by a test click, or by the client's autosave) **mutates the
+   same rows every other developer is using**. There is no local database to absorb mistakes.
+   - For **T-03** this is acceptable: the criterion is *view `/swagger`*, which needs boot, not
+     writes. **Boot, view, stop — exercise no mutating endpoint against `dev`.**
+   - For any later task wanting a real round-trip, that is **T-13's** job against the `TEST`
+     datasource (`ARI_TEST_MYSQL_*`, already in the linked `.env`), **not** a manual poke at `dev`.
+
+**Recommendation:** promote this table into `docs/infrastructure.md` as a `## Local Environment`
+section (`/akili-constitution` Step 6B). It is constitutional content — it belongs where the next
+agent will read it, not only in one spec's audit trail. **Not done unilaterally: editing a
+constitutional document is the user's call.**
+
+---
