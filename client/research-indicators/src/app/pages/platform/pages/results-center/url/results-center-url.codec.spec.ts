@@ -83,6 +83,107 @@ describe('results-center-url.codec — parse', () => {
   });
 
   // ---------------------------------------------------------------------
+  // D-URL-18 — `indicators` (plural) is the SIDEBAR MULTISELECT, a filter
+  // distinct from the `indicator` TAB above.
+  //
+  // Disqualifies (design §10.3 discipline): a suite that only ever drives
+  // `indicator` cannot tell these two apart — which is exactly how the
+  // original gap shipped green through 6,479 tests. Every case below
+  // asserts the two destinations SEPARATELY, so a regression collapsing one
+  // into the other turns red instead of passing on the survivor.
+  // ---------------------------------------------------------------------
+  describe('indicators (plural) — the sidebar multiselect (D-URL-18)', () => {
+    it('resolves a multi-value list to ids, order preserved', () => {
+      const { filters } = parse(
+        convertToParamMap({ indicators: 'oicr,capacity-sharing-for-development,policy-change' }),
+      );
+      // Input order is 5,1,4 — deliberately NOT ascending, so an
+      // implementation that loses order cannot pass by accident.
+      expect(filters.indicators).toEqual([5, 1, 4]);
+    });
+
+    it('lands on the multiselect and leaves the TAB untouched — different filters', () => {
+      const { filters } = parse(convertToParamMap({ indicators: 'policy-change' }));
+      expect(filters.indicators).toEqual([4]);
+      expect(filters.indicator).toBeUndefined();
+    });
+
+    it('the singular `indicator` still lands on the TAB and leaves the multiselect untouched', () => {
+      const { filters } = parse(convertToParamMap({ indicator: 'policy-change' }));
+      expect(filters.indicator).toBe(4);
+      expect(filters.indicators).toBeUndefined();
+    });
+
+    it('a set tab SUPPRESSES indicators entirely — the tab hides the multiselect', () => {
+      const { filters } = parse(
+        convertToParamMap({ indicator: 'oicr', indicators: 'policy-change,innovation-dev' }),
+      );
+      expect(filters.indicator).toBe(5);
+      expect(filters.indicators).toBeUndefined();
+    });
+
+    it('suppression is order-independent — same result whichever key comes first', () => {
+      const a = parse(convertToParamMap({ indicators: 'policy-change', indicator: 'oicr' }));
+      const b = parse(convertToParamMap({ indicator: 'oicr', indicators: 'policy-change' }));
+      expect(a.filters).toEqual(b.filters);
+      expect(a.filters.indicator).toBe(5);
+      expect(a.filters.indicators).toBeUndefined();
+    });
+
+    it('a SUPPRESSED indicators is not reported as dropped — superseded, not invalid', () => {
+      const { dropped } = parse(
+        convertToParamMap({ indicator: 'oicr', indicators: 'policy-change' }),
+      );
+      // `dropped` drives a "part of this link was not recognized" toast
+      // (R-RCU-005). A valid, merely superseded parameter must not fire it —
+      // same disposition as `statusLabel` (R-RCU-006 AC.3).
+      expect(dropped).toEqual([]);
+    });
+
+    it('an invalid token drops individually while the valid ones still apply', () => {
+      const { filters, dropped } = parse(
+        convertToParamMap({ indicators: 'oicr,not-a-real-indicator,policy-change' }),
+      );
+      expect(filters.indicators).toEqual([5, 4]);
+      expect(dropped).toContainEqual({
+        param: 'indicators',
+        value: 'not-a-real-indicator',
+        reason: 'invalid-value',
+      });
+    });
+
+    it('is case-insensitive on its values, like every other vocabulary token', () => {
+      const { filters } = parse(convertToParamMap({ indicators: 'OICR,Policy-Change' }));
+      expect(filters.indicators).toEqual([5, 4]);
+    });
+
+    it('folds its own key name, so ?INDICATORS= still resolves (R-RCU-001 AC.3)', () => {
+      const { filters } = parse(convertToParamMap({ INDICATORS: 'oicr' }));
+      expect(filters.indicators).toEqual([5]);
+    });
+
+    it('counts as a recognized parameter, so it suppresses restore (R-RCU-004 AC.1)', () => {
+      expect(parse(convertToParamMap({ indicators: 'oicr' })).hadRecognizedParam).toBe(true);
+    });
+
+    it('a repeated key is flattened via getAll(), never reduced to the first (R-RCU-005 AC.4)', () => {
+      const { filters } = parse(convertToParamMap({ indicators: ['oicr', 'policy-change'] }));
+      expect(filters.indicators).toEqual([5, 4]);
+    });
+
+    it('a list over the 50-value bound is dropped whole (R-RCU-005 AC.4)', () => {
+      const overBound = Array.from({ length: 51 }, () => 'oicr').join(',');
+      const { filters, dropped } = parse(convertToParamMap({ indicators: overBound }));
+      expect(filters.indicators).toBeUndefined();
+      expect(dropped).toContainEqual({
+        param: 'indicators',
+        value: overBound,
+        reason: 'too-many-values',
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------
   // R-RCU-005 AC.1 — one bad token among good ones
   // ---------------------------------------------------------------------
   describe('one invalid parameter never blocks a valid one (R-RCU-005 AC.1)', () => {
@@ -380,10 +481,11 @@ describe('results-center-url.codec — serialize', () => {
   // is the merge-based test below, per design §10.3's disqualifier)
   // ---------------------------------------------------------------------
   describe('every inactive canonical key and every legacy key is null (R3-2)', () => {
-    it('a fully empty state nulls all six canonical keys and all three legacy keys', () => {
+    it('a fully empty state nulls all seven canonical keys and all three legacy keys', () => {
       const params = serialize(emptyState);
       expect(params).toEqual({
         indicator: null,
+        indicators: null, // D-URL-18 — the sidebar multiselect
         contract: null,
         status: null,
         year: null,
@@ -399,6 +501,7 @@ describe('results-center-url.codec — serialize', () => {
       const params = serialize({ filters: { contract: ['A100'] }, scope: 'all' });
       expect(params['contract']).toBe('A100');
       expect(params['indicator']).toBeNull();
+      expect(params['indicators']).toBeNull();
       expect(params['status']).toBeNull();
       expect(params['year']).toBeNull();
       expect(params['source']).toBeNull();
@@ -501,6 +604,51 @@ describe('results-center-url.codec — serialize', () => {
   });
 
   // ---------------------------------------------------------------------
+  // D-URL-18 — serialize side of the sidebar multiselect
+  // ---------------------------------------------------------------------
+  describe('indicators (plural) serialization (D-URL-18)', () => {
+    it('serializes the multiselect to a comma list, order preserved', () => {
+      const params = serialize({ filters: { indicators: [5, 1, 4] }, scope: 'all' });
+      expect(params['indicators']).toBe('oicr,capacity-sharing-for-development,policy-change');
+    });
+
+    it('emits indicator=null while emitting indicators — the tab is inactive', () => {
+      const params = serialize({ filters: { indicators: [4] }, scope: 'all' });
+      expect(params['indicators']).toBe('policy-change');
+      expect(params['indicator']).toBeNull();
+    });
+
+    it('emits indicator while nulling indicators — the tab wins, never both', () => {
+      const params = serialize({ filters: { indicator: 5, indicators: [4] }, scope: 'all' });
+      expect(params['indicator']).toBe('oicr');
+      expect(params['indicators']).toBeNull();
+    });
+
+    it('is null when the multiselect is empty, so merge clears it from the address bar', () => {
+      const currentParams = { indicators: 'policy-change', source: 'star' };
+      const merged = mergeParams(
+        currentParams,
+        serialize({ filters: { source: ['STAR'] }, scope: 'all' }),
+      );
+      // R2-1 — asserted on the resulting URL params, not the serializer
+      // output: clearing the multiselect must REMOVE the key, not leave
+      // `?indicators=` behind for a reload to resurrect.
+      expect(merged).toEqual({ source: 'star' });
+      expect('indicators' in merged).toBe(false);
+    });
+
+    it('an id with no slug is omitted rather than emitted raw (NFR-RCU-002 layer 2 surfaces it)', () => {
+      const params = serialize({ filters: { indicators: [5, 999] }, scope: 'all' });
+      expect(params['indicators']).toBe('oicr');
+    });
+
+    it('every id unslugged collapses the whole parameter to null, not to an empty string', () => {
+      const params = serialize({ filters: { indicators: [999] }, scope: 'all' });
+      expect(params['indicators']).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------
   // R-RCU-003 AC.2 — round-trip, all six parameters, distinguishable
   // values per KZ-004 ("a fixture whose N units are built from identical
   // defaults cannot distinguish per-unit scoping from a batch-wide bug")
@@ -526,6 +674,47 @@ describe('results-center-url.codec — serialize', () => {
 
       expect(reparsed.filters).toEqual(state.filters);
       expect(reparsed.scope).toBe(state.scope);
+    });
+
+    // D-URL-18 — the tab variant above can NEVER exercise the multiselect,
+    // because a set `indicator` suppresses `indicators` by design. The
+    // seventh parameter therefore needs its own round-trip, or the branch
+    // the user actually hit stays unproven.
+    it('reproduces a state exercising the sidebar multiselect instead of the tab', () => {
+      const state: ResultsCenterUrlState = {
+        filters: {
+          indicators: [5, 1, 4], // three distinct ids, deliberately unsorted
+          contract: ['A100', 'S192'],
+          status: [2, 6],
+          year: [2024, 2025],
+          source: ['STAR', 'PRMS'],
+        },
+        scope: 'my',
+      };
+
+      const reparsed = parse(convertToParamMap(mergeParams({}, serialize(state))));
+
+      expect(reparsed.filters).toEqual(state.filters);
+      expect(reparsed.scope).toBe(state.scope);
+      // Explicit: the multiselect did not silently migrate onto the tab.
+      expect(reparsed.filters.indicator).toBeUndefined();
+    });
+
+    it('reproduces the exact URL from the reported defect: ?indicators=…&source=star', () => {
+      // The screenshot that opened this defect: ALL INDICATORS tab active,
+      // "Capacity Sharing for Development" chosen in the sidebar multiselect,
+      // STAR source — and an address bar that read only `?source=star`.
+      const state: ResultsCenterUrlState = {
+        filters: { indicators: [1], source: ['STAR'] },
+        scope: 'all',
+      };
+
+      const urlParams = mergeParams({}, serialize(state));
+      expect(urlParams).toEqual({
+        indicators: 'capacity-sharing-for-development',
+        source: 'star',
+      });
+      expect(parse(convertToParamMap(urlParams)).filters).toEqual(state.filters);
     });
   });
 

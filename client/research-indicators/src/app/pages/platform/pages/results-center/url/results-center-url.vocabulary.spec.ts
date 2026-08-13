@@ -161,9 +161,28 @@ describe('results-center-url.vocabulary', () => {
   });
 
   describe('recognized parameter names (R3-3 regression guard)', () => {
-    it('lists exactly the six canonical parameters, lower-case, no lever (D-URL-6)', () => {
-      expect(CANONICAL_PARAM_NAMES).toEqual(['indicator', 'contract', 'status', 'year', 'source', 'tab']);
+    it('lists exactly the seven canonical parameters, lower-case, no lever (D-URL-6, D-URL-18)', () => {
+      expect(CANONICAL_PARAM_NAMES).toEqual([
+        'indicator',
+        'indicators',
+        'contract',
+        'status',
+        'year',
+        'source',
+        'tab',
+      ]);
       expect(CANONICAL_PARAM_NAMES).not.toContain('lever');
+    });
+
+    it('carries indicator and indicators as two SEPARATE parameters (D-URL-18)', () => {
+      // Not a plural spelling of one filter: the tab strip
+      // (`indicator-codes-tabs`) and the sidebar multiselect
+      // (`indicator-codes-filter`) are different controls on different wire
+      // keys. Collapsing them is the defect this parameter was added to fix.
+      expect(CANONICAL_PARAM_NAMES).toContain('indicator');
+      expect(CANONICAL_PARAM_NAMES).toContain('indicators');
+      expect(isRecognizedParamName('indicators')).toBe(true);
+      expect(isRecognizedParamName('INDICATORS')).toBe(true);
     });
 
     it('stores the legacy parameter list already lower-case-folded, not in its original camelCase spelling', () => {

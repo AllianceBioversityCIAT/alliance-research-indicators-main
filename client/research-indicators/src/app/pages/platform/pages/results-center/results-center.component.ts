@@ -286,10 +286,18 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
     const year = resultsFilter['years'] ?? [];
     const source = resultsFilter['platform-code'] ?? [];
     const indicator = resultsFilter['indicator-codes-tabs']?.[0];
+    // D-URL-18 — the sidebar multiselect. A DIFFERENT filter from the tab
+    // above, on a different wire key. Without this read the multiselect's
+    // selection never reached the address bar at all: it filtered the table
+    // and rendered a chip, then vanished on reload or share — leaving
+    // R-RCU-001 and R-RCU-003 AC.1 unmet for the indicator dimension, the
+    // one users reach for most.
+    const indicators = resultsFilter['indicator-codes-filter'] ?? [];
 
     return {
       filters: {
         ...(indicator !== undefined ? { indicator } : {}),
+        ...(indicators.length > 0 ? { indicators } : {}),
         ...(contract.length > 0 ? { contract } : {}),
         ...(status.length > 0 ? { status } : {}),
         ...(year.length > 0 ? { year } : {}),
@@ -393,23 +401,21 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
     // carry over from a previous route either. This is a plain signal write
     // on the service's already-public `tableFilters`, not a service-file change.
     //
-    // Reviewer fix (attempt 2, precedence lens) — `indicators` joins `levers`
-    // here for the same reason and the same leak class, with a larger blast
-    // radius: `seedFromUrl` deliberately never writes `tableFilters.indicators`
-    // (design §7.2 / T-04's done-check — the codec's `indicator` seeds
-    // `resultsFilter`/`appliedFilters['indicator-codes-filter']`, never the
-    // sidebar's `tableFilters.indicators`), so a stale value inherited from
-    // the root singleton on a prior route survives untouched into this deep
-    // link. That inflates `countTableFiltersSelected`, renders the sidebar
-    // multiselect as if the link named an indicator it did not, and would
-    // make the user's next Apply inject an indicator filter the link never
-    // named (`applyFilters` maps `tableFilters().indicators` straight to
-    // `'indicator-codes-filter'`). Clearing it here is the opposite operation
-    // of what §7.2 forbids: §7.2 bars *seeding the URL's `indicator`* into
-    // `tableFilters.indicators`; this clears stale state a previous route
-    // left behind and seeds nothing into it — do not "restore" this leak by
-    // reading the two as the same rule.
-    this.resultsCenterService.tableFilters.update(prev => ({ ...prev, levers: [], indicators: [] }));
+    // `indicators` USED TO be cleared here alongside `levers`, added by
+    // T-11's precedence lens to stop a stale sidebar selection leaking in
+    // from a prior route on the shared singleton. **D-URL-18 moved that
+    // responsibility into `seedFromUrl`, and this line must NOT clear it
+    // again.** `seedFromUrl` now writes
+    // `indicators: (filters.indicators ?? []).map(...)` unconditionally, so
+    // it already resets the slot to `[]` on a link that names no
+    // `indicators` — the exact leak the old clear existed to close — while
+    // a link that DOES name them seeds them. Clearing here after the seed
+    // would wipe the freshly seeded multiselect on every `?indicators=`
+    // deep link and silently restore the original defect.
+    //
+    // `levers` stays: `lever` has no URL representation at all (D-URL-6), so
+    // `seedFromUrl` never touches that slot and nothing else resets it.
+    this.resultsCenterService.tableFilters.update(prev => ({ ...prev, levers: [] }));
 
     // Hand-off 3 (T-04 review) — `seedFromUrl` deliberately never calls
     // `resetResultsTablePaginatorToFirstPage()` (that method is private to

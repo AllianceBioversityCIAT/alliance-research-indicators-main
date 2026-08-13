@@ -118,6 +118,23 @@ The slug is **not** a kebab of the display name for ids 2 and 5 — the server's
 
 **`indicator` is single-value** (D-URL-12). It writes `indicator-codes-tabs`, which holds exactly one id; the sidebar's indicator multiselect is hidden whenever a tab is set (`table-filters-sidebar.component.html:2`). A comma in `indicator` is an invalid token, rejected via R-RCU-005 — never truncated to the first value.
 
+### 5.1b `indicators` — the sidebar multiselect, multi-value (D-URL-18)
+
+**Added 2026-08-13, post-validation.** The clause above is true and was never the problem. What it left implicit is the converse: *when no tab is set, the multiselect is **visible and fully usable***, and it writes a **different wire key**.
+
+| Control | Wire key | Parameter | Cardinality | Rendered as |
+| --- | --- | --- | --- | --- |
+| Indicator tab strip | `indicator-codes-tabs` | `indicator` | exactly one | active tab |
+| Sidebar Indicator multiselect | `indicator-codes-filter` | `indicators` | many | chip(s) |
+
+`indicators` resolves against the **same frozen slug map** as `indicator` (§5.1), so the two can never drift into two spellings of one vocabulary — only their cardinality and destination differ. It is multi-value under the §5.5 bounds, order-preserving, and case-insensitive on its values like every other vocabulary token.
+
+**Precedence: a resolved `indicator` suppresses `indicators` entirely**, order-independently. The tab hides the multiselect, so seeding both would apply a filter through a control the user can neither see nor clear. A suppressed `indicators` is **not** reported in `dropped` — it is valid, merely superseded, and `dropped` drives the "part of this link was not recognized" toast. The precedent is `statusLabel` (R-RCU-006 AC.3), likewise accepted and ignored in silence.
+
+Symmetrically, `serialize` never emits both, and gates on **the tab's presence rather than its slug resolving**: an unslugged tab id still hides the multiselect, so emitting `indicator: null` alongside an `indicators` value would describe a screen that does not exist.
+
+> **Why this was missed, recorded because the mechanism matters more than the fix.** §7.2's R2-3 blockquote reasoned correctly that `indicator` must never be seeded into `tableFilters.indicators` — seeding it `@if`-destroys the very multiselect whose label backfill the mechanism depends on. That reasoning is intact and still holds. But it was written about the **read** path and never followed through to the **write** path, where the conclusion is the opposite: the multiselect the tab hides is a control the user *does* reach whenever no tab is set, and nothing was serializing it. The two indicator filters were treated as one throughout, in requirements (`R-RCU-001` "six parameters"), design (this section), and tests.
+
 ### 5.2 `status` — multi-value
 
 Authored from the `allResultStatus` control list the filter actually offers (25 rows, dev database, 2026-08-12). Slugs were seeded once by mechanical kebab-casing; **the map is the contract, the derivation is not** (D-URL-2).
@@ -418,6 +435,8 @@ A green command that does **not** count as evidence:
 | **D-URL-15** | 2026-08-12 | **The write effect's only tracked dependency is a `userFilterMutations` counter**; filter state is read untracked | *(R2-2, R2-5)* An unconditional effect fires at creation with stale cross-route state, and again on the restore path — which then made session restore self-disabling. Intent, not state, is the correct trigger, and it is what R-RCU-003's "through the UI" wording always meant |
 | **D-URL-16** | 2026-08-12 | **The serializer emits explicit `null` for every inactive canonical parameter** | *(R2-1)* `merge` preserves omitted keys and strips only nulls. Omitting made filters addable but never removable, and let a reload resurrect a filter the user had cleared |
 | **D-URL-17** | 2026-08-13 | **The results table's own `lazyLoadOnInit` fetch is out of scope. R-RCU-002 AC.4 and NFR-RCU-001 are narrowed to the URL layer, and the defect is split into `bugfix/results-center-double-fetch`** | *(T-11 Pivot Record, `execution.md` §9 — user decision, option C.)* `p-table [lazy]="true"` with no `lazyLoadOnInit="false"` fires `onLazyLoad` → `handleResultsTableLazyLoad` → an unconditional `void this.main()` during the table's own init, racing `initializeState`'s seeded call; the filter states differ, so the `fetchKey`s differ and the dedupe cannot collapse them. **The wiring is present on `main` and predates this spec** — url-filters neither caused it nor promised to fix it, and the fix touches a table rendered on four routes, so it earns its own requirements and its own review rather than a thirteenth task on a spec already re-baselined twice. **Rejected:** fixing it here (reopens budget and the approval gate for an unrelated defect on a shared component); amending the AC and stopping (converts a live defect into permanent documented behavior with nothing tracking it). **This is also the spec's clearest KZ-001 datum — recurrence 5, found by the very task written to end the pattern** |
+
+| **D-URL-18** | 2026-08-13 | **`indicators` (plural) is a seventh canonical parameter carrying the sidebar indicator multiselect (`indicator-codes-filter`); `indicator` keeps the tab strip (`indicator-codes-tabs`), single-value and unchanged. A resolved tab suppresses `indicators` on both read and write** | *(Post-validation defect, found by the product owner in manual testing.)* The Results Center has **two** indicator filters on two wire keys, and this spec treated them as one — so the sidebar multiselect had **no URL representation at all**: it filtered the table, rendered a chip, and was silently lost on reload or share. **R-RCU-001 and R-RCU-003 AC.1 were both unmet** for the indicator dimension, the one the CapDev use case depends on most. Two parameters rather than one multi-value `indicator`, because the two controls are mutually exclusive but **not interchangeable**: a single-value `indicator` emitted from the multiselect would re-read as a *tab*, changing the rendered UI and the wire key, breaking the R-RCU-003 AC.2 round-trip. **Rejected:** making `indicator` multi-value (breaks round-trip on the one-value case, reverses D-URL-12); deferring to a follow-on spec (unlike D-URL-17's pre-existing defect, this is an unmet AC of *this* spec — archiving would convert an acknowledged gap into unowned debt) |
 
 ### Reversion challenge — D-URL-8 *(Step 2.3)*
 

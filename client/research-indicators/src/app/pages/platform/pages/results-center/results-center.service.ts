@@ -292,7 +292,10 @@ export class ResultsCenterService {
     }
 
     if ((active['indicator-codes-filter'] ?? []).length > 0) {
-      const selected = this.tableFilters().indicators as { indicator_id: number; name: string }[];
+      // `name` is optional (D-URL-10/D-URL-18): a URL-seeded entry carries
+      // only `indicator_id` until the control list backfills its label, so
+      // the `?? ''` below is a real transient, not defensive noise.
+      const selected = this.tableFilters().indicators as { indicator_id: number; name?: string }[];
       selected.forEach(i => {
         if (i) filters.push({ label: 'INDICATOR', value: i.name ?? '', id: i.indicator_id });
       });
@@ -817,8 +820,18 @@ export class ResultsCenterService {
       statusCodes: (filters.status ?? []).map(result_status_id => ({ result_status_id })),
       sources: (filters.source ?? []).map(platform_code => ({ platform_code })),
       contracts: (filters.contract ?? []).map(agreement_id => ({ agreement_id })),
-      years: (filters.year ?? []).map(report_year => ({ report_year }))
-      // `indicators` intentionally absent — see the doc comment above.
+      years: (filters.year ?? []).map(report_year => ({ report_year })),
+      // D-URL-18 — the SIDEBAR MULTISELECT (`indicators`, plural), seeded
+      // option-value-key-only like every sibling above so the label backfill
+      // still runs and the chip reads a real indicator name.
+      //
+      // This does NOT contradict step 2's "never written here", which forbids
+      // seeding the TAB (`indicator`, singular) into this collection: a tab
+      // `@if`-destroys the very multiselect whose backfill the mechanism
+      // depends on. `parse` guarantees the two are never both set — a
+      // resolved tab suppresses `indicators` outright — so this key is
+      // populated only when no tab is active and the multiselect renders.
+      indicators: (filters.indicators ?? []).map(indicator_id => ({ indicator_id }))
     }));
 
     const isMyScope = scope === 'my';
@@ -829,7 +842,10 @@ export class ResultsCenterService {
     const seededFilter: ResultFilter = {
       'indicator-codes': [],
       'lever-codes': [],
-      'indicator-codes-filter': [],
+      // D-URL-18 — the sidebar multiselect's wire key. Mutually exclusive
+      // with the tab below: `parse` suppresses `indicators` whenever a tab
+      // resolved, so at most one of these two is ever non-empty.
+      'indicator-codes-filter': filters.indicators ?? [],
       'indicator-codes-tabs': filters.indicator !== undefined ? [filters.indicator] : [],
       'status-codes': filters.status ?? [],
       'contract-codes': filters.contract ?? [],

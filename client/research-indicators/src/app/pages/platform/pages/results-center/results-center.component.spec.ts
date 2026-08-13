@@ -1203,6 +1203,79 @@ describe('ResultsCenterComponent', () => {
       expect(chipLabels).toHaveLength(1);
       expect(chipLabels[0]).toBe('Project: A100 - Test Project');
     });
+
+    // -------------------------------------------------------------------
+    // D-URL-18 — READ path for the sidebar indicator multiselect.
+    //
+    // Its sibling above ("should seed from a canonical parameter…") seeds
+    // via `?indicator=`, which lands on the TAB. Nothing in this describe
+    // block reached `indicator-codes-filter` at all before this test, which
+    // is why a deep link could not carry the sidebar's indicator selection.
+    // -------------------------------------------------------------------
+    it('seeds the sidebar multiselect from ?indicators= without touching the tab (D-URL-18)', async () => {
+      await navigateTo('?indicators=capacity-sharing-for-development,policy-change');
+
+      // The multiselect's wire key, order preserved.
+      expect(rcService.resultsFilter()['indicator-codes-filter']).toEqual([1, 4]);
+      expect(rcService.appliedFilters()['indicator-codes-filter']).toEqual([1, 4]);
+
+      // The TAB stays empty — otherwise the sidebar control `@if`-vanishes
+      // and the user cannot see or clear the filter that is being applied.
+      expect(rcService.resultsFilter()['indicator-codes-tabs']).toEqual([]);
+
+      // D-URL-10 — value key ONLY. Seeding `name` here would freeze the
+      // seeded string as the chip label forever, because
+      // `MultiselectComponent` backfills labels only for items MISSING the
+      // label key.
+      expect(rcService.tableFilters().indicators).toEqual([
+        { indicator_id: 1 },
+        { indicator_id: 4 }
+      ]);
+      for (const seeded of rcService.tableFilters().indicators) {
+        expect(Object.hasOwn(seeded, 'name')).toBe(false);
+      }
+    });
+
+    it('lets a tab deep link suppress a stale ?indicators= in the same URL (D-URL-18)', async () => {
+      await navigateTo('?indicator=oicr&indicators=policy-change');
+
+      expect(rcService.resultsFilter()['indicator-codes-tabs']).toEqual([5]);
+      expect(rcService.resultsFilter()['indicator-codes-filter']).toEqual([]);
+      expect(rcService.tableFilters().indicators).toEqual([]);
+    });
+
+    it('renders an INDICATOR chip for a seeded multiselect once its control list resolves (D3, rendered, D-URL-18)', async () => {
+      await navigateTo('?indicators=capacity-sharing-for-development');
+
+      // The label must arrive from the control list, never from the URL —
+      // the same proof the PROJECT chip test above demands.
+      rcService.tableFilters.update(prev => ({
+        ...prev,
+        indicators: prev.indicators.map(i => ({ ...i, name: 'Capacity Sharing for Development' }))
+      }));
+      harness.fixture.detectChanges();
+      TestBed.flushEffects();
+      harness.fixture.detectChanges();
+
+      const tableHost = harness.fixture.nativeElement.querySelector('app-results-center-table') as HTMLElement | null;
+      expect(tableHost).toBeTruthy();
+      const chipContainer = tableHost!.querySelector('div.mt-3.mb-1.items-center') as HTMLElement | null;
+      expect(chipContainer).toBeTruthy();
+      const chipLabels = Array.from(chipContainer!.querySelectorAll('span.text-sm')).map(
+        (el: any) => (el.textContent as string)?.trim()
+      );
+      expect(chipLabels).toHaveLength(1);
+      // No "Indicator: " prefix — `getFilterDisplayText`
+      // (`results-center-table.component.ts:127-132`) prefixes ONLY the
+      // PROJECT chip and renders every other chip's bare value. This matches
+      // the reported screenshot, where the chip read exactly this string.
+      expect(chipLabels[0]).toBe('Capacity Sharing for Development');
+      // The label came from the control-list backfill, never from the URL:
+      // the slug in the address bar is kebab-case and lower-case, so a chip
+      // reading the URL token verbatim would render
+      // "capacity-sharing-for-development" instead.
+      expect(chipLabels[0]).not.toContain('-');
+    });
   });
 
   // T-07 — indicator tab-strip sync effect (design.md §7.3, requirements.md
@@ -1547,6 +1620,70 @@ describe('ResultsCenterComponent', () => {
       rcService.resultsFilter.update((prev: any) => ({ ...prev, 'indicator-codes-tabs': [] }));
       await bumpAndFlush();
       expect(resultingQueryString()).not.toContain('indicator');
+    });
+
+    // -------------------------------------------------------------------
+    // D-URL-18 — the SIDEBAR INDICATOR MULTISELECT.
+    //
+    // The `it` above is named "indicator TAB filter" and drives
+    // `indicator-codes-tabs`. AC.1's own text says "each of the five
+    // SIDEBAR filters", and the sidebar's Indicator control writes a
+    // different key — `indicator-codes-filter`. That mismatch is how this
+    // shipped: the AC was credited to a test of the neighbouring filter,
+    // and the multiselect's selection never reached the address bar at all.
+    //
+    // Disqualifies: a version of this test that drives
+    // `indicator-codes-tabs` proves the tab path over again and re-opens the
+    // gap. It must drive `indicator-codes-filter` and nothing else.
+    // -------------------------------------------------------------------
+    it('applies, changes and clears the sidebar indicator multiselect (AC.1, R2-1, D-URL-18)', async () => {
+      rcService.resultsFilter.update((prev: any) => ({
+        ...prev,
+        'indicator-codes-filter': [1] // capacity-sharing-for-development
+      }));
+      await bumpAndFlush();
+      expect(resultingQueryString()).toBe('indicators=capacity-sharing-for-development');
+
+      // Multi-value, unsorted on purpose — the tab strip could never
+      // produce this, so it can only pass through the multiselect path.
+      rcService.resultsFilter.update((prev: any) => ({
+        ...prev,
+        'indicator-codes-filter': [5, 4] // oicr, policy-change
+      }));
+      await bumpAndFlush();
+      expect(resultingQueryString()).toBe('indicators=oicr,policy-change');
+
+      // R2-1 — clearing must REMOVE the key from the address bar, not leave
+      // `?indicators=` for a reload to resurrect.
+      rcService.resultsFilter.update((prev: any) => ({ ...prev, 'indicator-codes-filter': [] }));
+      await bumpAndFlush();
+      expect(resultingQueryString()).not.toContain('indicators');
+    });
+
+    it('reproduces the reported defect URL — multiselect + source together (D-URL-18)', async () => {
+      // The exact screen from the bug report: ALL INDICATORS tab (no tab
+      // set), "Capacity Sharing for Development" picked in the sidebar, and
+      // the STAR source. Before D-URL-18 this produced `?source=star` alone
+      // and the indicator was silently lost on reload.
+      rcService.resultsFilter.update((prev: any) => ({
+        ...prev,
+        'indicator-codes-tabs': [],
+        'indicator-codes-filter': [1],
+        'platform-code': ['STAR']
+      }));
+      await bumpAndFlush();
+      expect(resultingQueryString()).toBe('indicators=capacity-sharing-for-development&source=star');
+    });
+
+    it('never writes both indicator keys at once — a set tab wins (D-URL-18)', async () => {
+      rcService.resultsFilter.update((prev: any) => ({
+        ...prev,
+        'indicator-codes-tabs': [5], // oicr
+        'indicator-codes-filter': [4] // stale multiselect value, hidden by the tab
+      }));
+      await bumpAndFlush();
+      expect(resultingQueryString()).toBe('indicator=oicr');
+      expect(resultingQueryString()).not.toContain('indicators=');
     });
 
     it('applies and clears the `tab` scope (AC.1, R2-1, R3-4)', async () => {

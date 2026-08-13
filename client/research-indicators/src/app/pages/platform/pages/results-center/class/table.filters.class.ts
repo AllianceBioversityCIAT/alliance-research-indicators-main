@@ -11,7 +11,11 @@ export class TableFilters {
   // the rest of `GetYear` is backfilled once the control list resolves.
   years: ({ report_year: number } & Partial<GetYear>)[] = [];
   contracts: { agreement_id: string; display_label?: string }[] = [];
-  indicators: { indicator_id: number; name: string }[] = [];
+  // Same D-URL-10 reasoning, applied by D-URL-18: `seedFromUrl()` seeds
+  // `{ indicator_id }` only for the `indicators` (plural) URL parameter — the
+  // SIDEBAR MULTISELECT, not the tab strip — so the label backfill still runs
+  // and the chip reads a real indicator name instead of a frozen seeded one.
+  indicators: { indicator_id: number; name?: string }[] = [];
   // Same D-URL-10 reasoning: `seedFromUrl()` seeds `{ platform_code }` only.
   sources: ({ platform_code: string } & Partial<PlatformSourceFilter>)[] = [];
 }

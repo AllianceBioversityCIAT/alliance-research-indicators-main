@@ -329,6 +329,31 @@ graph TD
 
 ---
 
+### T-13 [x] — `indicators` (plural): the sidebar indicator multiselect in the URL
+
+> **Added 2026-08-13, after `/akili-validate` returned PASS.** Not a re-scope and not an advisory promoted to a task: a **defect against two already-approved ACs**, found by the product owner in manual testing. See `design.md` §12 → **D-URL-18**.
+
+- **Requirements covered:** R-RCU-001 (seven parameters), R-RCU-003 AC.1 (the Indicator row), R-RCU-002 AC.1/AC.3
+- **Files touched:** `url/results-center-url.vocabulary.ts` (+ `.spec.ts`), `url/results-center-url.codec.ts` (+ `.spec.ts`), `class/table.filters.class.ts`, `results-center.service.ts` (+ `.spec.ts`), `results-center.component.ts` (+ `.spec.ts`)
+- **Description:** The Results Center has **two** indicator filters — the tab strip (`indicator-codes-tabs`) and the sidebar multiselect (`indicator-codes-filter`) — and the spec covered only the first. The multiselect filtered the table and rendered a chip but never reached the address bar, so it was lost on reload and unshareable. Add `indicators` (plural, multi-value) for it; leave `indicator` (singular, tab, single-value) untouched so every delivered CapDev email keeps working.
+- **Implementation notes:**
+  - Precedence both ways: a resolved `indicator` **suppresses** `indicators` on read and nulls it on write. Gate the write on the **tab's presence**, not on its slug resolving.
+  - A suppressed `indicators` is **not** a dropped token — valid but superseded, same disposition as `statusLabel`.
+  - `seedFromUrl` now owns `tableFilters.indicators` in **both** directions. Consequently the component's post-seed `tableFilters.update(… indicators: [])` clear — added by T-11's precedence lens — **had to be removed**, or it would wipe the freshly seeded multiselect on every `?indicators=` link. `levers` stays in that clear: `lever` has no URL representation (D-URL-6), so nothing else resets it.
+  - Seed value-key-only (`{ indicator_id }`) per D-URL-10, which required widening `TableFilters.indicators.name` to optional — the same change T-04 already made for `statusCodes`.
+- **Acceptance / done check:**
+  - [x] `?indicators=a,b` seeds the multiselect, preserves order, and leaves the tab empty.
+  - [x] The sidebar multiselect's selection round-trips: applied → URL → reload → identical state, with its own round-trip case (the tab variant structurally cannot exercise it).
+  - [x] Clearing the multiselect **removes** the key from the address bar (R2-1), asserted on the resulting URL string.
+  - [x] A set tab suppresses `indicators` on read and write, order-independently, and emits no `dropped`.
+  - [x] The rendered **INDICATOR chip** shows the control-list label, not the URL slug.
+  - [x] The reported defect URL is reproduced end to end: `?indicators=capacity-sharing-for-development&source=star`.
+  - [x] Full client suite green: **309 suites / 6,507 tests**, coverage 99.27 / 98.08 / 99.5 / 99.17.
+- **Disqualifies:** a test that drives `indicator-codes-tabs` proves the **tab** path and re-opens this exact gap — the whole defect is that AC.1 was credited to a test named *"applies, changes and clears the indicator tab filter"*. Every check above must drive `indicator-codes-filter`. A vocabulary test asserting "exactly six canonical parameters" must be updated to seven rather than deleted: it is the guard that fired when this landed.
+- **Dependencies:** T-02, T-03, T-04, T-08 · **Effort:** M · **Skills:** `angular-developer`
+
+---
+
 ## 3. Requirement → task coverage
 
 Closure is at **scenario and clause** granularity, not requirement ID.
@@ -397,11 +422,11 @@ PR descriptions follow `cognitive-doc-design` review-empathy rules: what to revi
 
 ## 6. Done definition
 
-- [x] All T-01 … T-12 are `done`. *(T-12 PASS 2026-08-13; nine of twelve passed on attempt 1, three consumed one rework round each — T-08, T-11, T-12.)*
-- [x] Every requirement AC **and every scenario clause** in §3 is checked. *(NFR-RCU-001 as narrowed by D-URL-17 — the whole-page request count is deferred to `bugfix/results-center-double-fetch`.)*
+- [x] All T-01 … T-13 are `done`. *(T-12 PASS 2026-08-13; nine of twelve passed on attempt 1, three consumed one rework round each — T-08, T-11, T-12. **T-13 added 2026-08-13 post-validation** — a defect against two approved ACs, found by the product owner in manual testing; see D-URL-18.)*
+- [x] Every requirement AC **and every scenario clause** in §3 is checked. *(NFR-RCU-001 as narrowed by D-URL-17 — the whole-page request count is deferred to `bugfix/results-center-double-fetch`. **R-RCU-001 and R-RCU-003 AC.1 were re-opened and re-closed by T-13**: they had been marked satisfied while the sidebar indicator multiselect had no URL parameter at all.)*
 - [x] R3-1 … R3-4 regression guards are green.
-- [x] Client coverage floors hold (statements 40 / branches 20 / lines 45 / functions 30). *(Measured at T-12: 99.27 / 98.09 / 99.5 / 99.17.)*
-- [x] Full client suite green — not a targeted run. *(309 suites / 6,479 tests, `npm test -- --silent` from `client/research-indicators`; the 309 count independently corroborated by a spec-file glob during T-12 review.)*
+- [x] Client coverage floors hold (statements 40 / branches 20 / lines 45 / functions 30). *(Re-measured at T-13: 99.27 / 98.08 / 99.5 / 99.17.)*
+- [x] Full client suite green — not a targeted run. *(**Re-run at T-13: 309 suites / 6,507 tests**, `npm test -- --silent` from `client/research-indicators`. Was 6,479 at T-12; T-13 added 28.)*
 - [ ] **The manual cross-package check (D6) has been performed and recorded.** ⚠️ **OPEN — not a task, and no automated gate covers it.** Paste the string the server's `buildStarLink` produces into a running client and confirm the filtered view *(this line also named `CAPDEV_INDICATOR_TAB_QUERY`; T-10 deleted that constant — struck at `/akili-validate` 2026-08-13)*. See requirements.md §8 D6: no test in either package crosses the boundary; the twin literals in T-02 and T-10 are the only substitute control. **Human action required before this spec can be archived.**
 
   **Substitute control 1 — VERIFIED 2026-08-13 (static, by the closing Leader; does not discharge the checkbox).** The two literals were traced to source and compared byte for byte on the **same** query string:

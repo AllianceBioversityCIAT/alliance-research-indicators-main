@@ -1359,15 +1359,42 @@ describe('ResultsCenterService', () => {
       });
     });
 
-    it('does not seed tableFilters.indicators when indicator is seeded — it goes to indicator-codes-tabs only', () => {
+    // D-URL-18 revised this contract. It previously asserted `toBe(sentinel)`
+    // — that `seedFromUrl` left `tableFilters.indicators` byte-identical and
+    // untouched — and the COMPONENT cleared the slot afterwards. That split
+    // ownership is what let the sidebar multiselect fall outside the URL
+    // layer entirely. `seedFromUrl` now owns the slot in both directions:
+    // cleared when the URL names no `indicators`, seeded when it does.
+    //
+    // The tab half of the rule is unchanged and still asserted below: the
+    // singular `indicator` must NEVER land in `tableFilters.indicators`,
+    // because seeding it `@if`-destroys the multiselect (design §7.2).
+    it('clears a stale tableFilters.indicators when the tab `indicator` is seeded — the tab never lands there', () => {
       const sentinel = [{ indicator_id: 99, name: 'stale sidebar selection' }];
       service.tableFilters.update(prev => ({ ...prev, indicators: sentinel }));
 
       service.seedFromUrl({ filters: { indicator: 1 }, scope: 'all' });
 
-      expect(service.tableFilters().indicators).toBe(sentinel);
+      // Not the sentinel, and NOT `[{ indicator_id: 1 }]` either — the tab
+      // goes to its own wire key and nowhere near the sidebar collection.
+      expect(service.tableFilters().indicators).toEqual([]);
       expect(service.resultsFilter()['indicator-codes-tabs']).toEqual([1]);
       expect(service.appliedFilters()['indicator-codes-tabs']).toEqual([1]);
+      expect(service.resultsFilter()['indicator-codes-filter']).toEqual([]);
+    });
+
+    it('seeds tableFilters.indicators and indicator-codes-filter from the plural `indicators` (D-URL-18)', () => {
+      service.seedFromUrl({ filters: { indicators: [1, 4] }, scope: 'all' });
+
+      expect(service.resultsFilter()['indicator-codes-filter']).toEqual([1, 4]);
+      expect(service.appliedFilters()['indicator-codes-filter']).toEqual([1, 4]);
+      // D-URL-10 — value key only, so the label backfill still runs.
+      expect(service.tableFilters().indicators).toEqual([{ indicator_id: 1 }, { indicator_id: 4 }]);
+      service.tableFilters().indicators.forEach(entry => {
+        expect(Object.hasOwn(entry as object, 'name')).toBe(false);
+      });
+      // The tab stays clear — the two are mutually exclusive.
+      expect(service.resultsFilter()['indicator-codes-tabs']).toEqual([]);
     });
 
     it('leaves indicator-codes-tabs empty when indicator is absent from the URL', () => {

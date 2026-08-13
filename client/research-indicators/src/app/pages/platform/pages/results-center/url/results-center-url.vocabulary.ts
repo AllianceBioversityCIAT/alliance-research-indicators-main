@@ -135,9 +135,32 @@ export type TabScope = (typeof TAB_SCOPE_VALUES)[number];
 // recognized parameter names — folded (R3-3, design §6.1 step 1)
 // ---------------------------------------------------------------------------
 
-/** The six canonical parameters (R-RCU-001). Stored already lower-case. */
+/**
+ * The seven canonical parameters (R-RCU-001). Stored already lower-case.
+ *
+ * **`indicator` and `indicators` are two different filters, not a typo pair**
+ * (D-URL-18). The Results Center exposes the indicator dimension through two
+ * distinct controls writing two distinct wire keys:
+ *
+ * | Control | Wire key | Parameter | Cardinality |
+ * | --- | --- | --- | --- |
+ * | Tab strip | `indicator-codes-tabs` | `indicator` | exactly one |
+ * | Sidebar multiselect | `indicator-codes-filter` | `indicators` | many |
+ *
+ * They are **mutually exclusive in the UI**: the multiselect is `@if`-gated on
+ * `!resultsFilter()['indicator-codes-tabs']?.length`
+ * (`table-filters-sidebar.component.html:2`), so a set tab hides it. That
+ * exclusivity is what makes two parameters safe rather than merely redundant —
+ * only one can be active at a time, and on collision `indicator` wins, because
+ * the tab is what the user would actually be looking at.
+ *
+ * `indicator` stays single-value and unchanged: it is the parameter every
+ * already-delivered CapDev email carries, and D-URL-12's reasoning (a comma is
+ * unrepresentable in a one-id tab strip) still holds for it.
+ */
 export const CANONICAL_PARAM_NAMES = [
   'indicator',
+  'indicators',
   'contract',
   'status',
   'year',

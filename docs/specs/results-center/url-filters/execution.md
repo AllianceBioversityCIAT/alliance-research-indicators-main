@@ -1304,3 +1304,89 @@ The substituted seed-and-clear (`[99]` sentinels into both keys, asserted clear 
 4. **RISK (conformance lens)** — `TestBed.flushEffects()` is `@developerPreview` in this Angular version and is superseded by `TestBed.tick()` in later ones. Already used in **19** spec files in this codebase, so this diff adds no new exposure — but an Angular bump will touch all of them at once.
 
 Advisories 1 and 2 are the two worth carrying out of this spec. 1 is a latent coverage loss with a one-line fix; 2 is a live production defect with two callers relying on behavior that does not exist.
+
+---
+
+## 12. T-13 — `indicators` (plural): the sidebar indicator multiselect in the URL
+
+**Added 2026-08-13, after `/akili-validate` had already returned PASS.** Not scope creep and not an advisory promoted to a task — a defect against two approved acceptance criteria, reported by the product owner from manual testing of the running client.
+
+### The report
+
+A screenshot of `http://localhost:4200/results-center?source=star` showing:
+
+- the tab strip on **ALL INDICATORS** (no tab set),
+- **"Capacity Sharing for Development"** selected in the sidebar's Indicator multiselect (`1 items selected`),
+- both filters applied — chips rendered, `Apply Filters (2)`, table correctly filtered,
+- and an address bar carrying **only** `?source=star`.
+
+Owner's framing, which was the right one: *"todos los filtros se aplican menos uno … el del indicador y justo ese es el que se necesita más que todos."*
+
+### Diagnosis — two indicator filters, one parameter
+
+| Control | Wire key | Parameter before T-13 |
+| --- | --- | --- |
+| Indicator tab strip | `indicator-codes-tabs` | `indicator` ✅ |
+| **Sidebar Indicator multiselect** | `indicator-codes-filter` | **none** ❌ |
+
+`grep 'indicator-codes-filter' results-center-url.codec.ts` returned **nothing**: the codec never knew the key existed. `buildUrlStateFromCurrentFilters` read `indicator-codes-tabs` only. So the multiselect's selection was applied to the table and rendered as a chip, then lost on every reload and absent from every shared link.
+
+**Requirements breached:** R-RCU-001 (*"Each filter the sidebar actually exposes SHALL have exactly one canonical query parameter"* — the sidebar exposes Indicator) and R-RCU-003 AC.1 (*"each of the five sidebar filters"*).
+
+### Why 6,479 tests, two reviewer lenses and a validation pass all missed it
+
+The AC.1 indicator test is named, verbatim:
+
+```
+it('applies, changes and clears the indicator tab filter (AC.1, R2-1)', …)
+  rcService.resultsFilter.update(prev => ({ ...prev, 'indicator-codes-tabs': [1] }))
+```
+
+It knew it was testing the tab. It was credited against an AC whose text says *sidebar*. The suite could not distinguish the two indicator filters because **it only ever drove one of them** — KZ-004's exact shape (*"a fixture that cannot distinguish a correct implementation from a broken one"*), now at recurrence 2, and KZ-002's (*"enumerate by what renders"*) at recurrence 4.
+
+The root cause upstream is design.md §7.2's R2-3 blockquote. Its reasoning — never seed `indicator` into `tableFilters.indicators`, because doing so `@if`-destroys the multiselect whose label backfill the mechanism depends on — is **correct and still holds**. But it was written about the *read* path and never followed through to the *write* path, where the converse applies: whenever no tab is set, the multiselect is visible, usable, and was being serialized by nobody.
+
+**`/akili-validate` marked R-RCU-003 PASS and was wrong to.** It verified that six tests existed, one per canonical parameter, and that they matched the six declared parameters. It did not verify that the `indicator` test drove the *surface the AC names*. Recorded plainly because a validation phase that checks a traceability table against itself is the same defect class as the tests it audits.
+
+### Fix — D-URL-18
+
+Seventh canonical parameter, `indicators` (plural, multi-value) → `indicator-codes-filter`. `indicator` (singular, tab, single-value) untouched, so every delivered CapDev email keeps working. Mutual exclusivity enforced both ways: a resolved tab suppresses `indicators` on read and nulls it on write, order-independently, gated on the tab's **presence** rather than its slug resolving.
+
+**Rejected — making `indicator` multi-value** (one value → tab, many → multiselect). It reads better and adds no parameter, but breaks the R-RCU-003 AC.2 round-trip on the one-value case: picking a single indicator in the multiselect would serialize `indicator=oicr` and re-read as a **tab**, changing both the rendered UI and the wire key sent to the API. **Rejected — deferring to a follow-on spec.** Unlike D-URL-17's double fetch, which was a pre-existing defect this spec merely discovered, this is an unmet AC of *this* spec; archiving would have converted an acknowledged gap into unowned debt.
+
+### One non-obvious consequence, caught by a failing test rather than by reading
+
+`seedFromUrl` now owns `tableFilters.indicators` in both directions. The component's post-seed clear —
+
+```ts
+this.resultsCenterService.tableFilters.update(prev => ({ ...prev, levers: [], indicators: [] }));
+```
+
+— was added by **T-11's precedence lens** to stop a stale sidebar selection leaking in from a prior route on the shared singleton. Left in place it now wipes the freshly seeded multiselect on **every** `?indicators=` deep link, silently restoring the original defect. It was reduced to `levers: []` only; `seedFromUrl`'s unconditional `(filters.indicators ?? []).map(...)` already resets the slot on a link that names no `indicators`, which is the leak the clear existed to close. `levers` stays because `lever` has no URL representation at all (D-URL-6), so nothing else resets it.
+
+This is worth naming: **a correct fix from one review round became a defect once ownership of the same slot moved.** The failing test that caught it was the new read-path one, not review.
+
+### Two pinned-contract tests failed, exactly as designed
+
+- `results-center-url.vocabulary.spec.ts` — *"lists exactly the six canonical parameters"*
+- `results-center-url.codec.spec.ts` — *"a fully empty state nulls all six canonical keys"*
+
+Both are exhaustive contract pins, and both went red the moment the vocabulary grew. Updated to seven rather than loosened — that they fired is the argument for keeping them exhaustive.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Full client suite | **309/309 suites · 6,507/6,507 tests** (+28 over T-12's 6,479) |
+| Coverage | 99.27 / 98.08 / 99.5 / 99.17 — unchanged within noise, all floors cleared |
+| Client lint | clean |
+| Client type-check (`tsconfig.app.json`) | clean |
+| Server suite | untouched by this task (client-only change) |
+
+New coverage: 12 parse cases, 6 serialize cases, 2 round-trips (including the reported URL reproduced literally), 4 component write-path cases, 3 component read-path cases including the rendered INDICATOR chip, and 2 service seeding cases.
+
+### Kaizen carry-forward
+
+**This is the strongest datum the spec produced, and it outranks the LOC-budget lesson.** The defect was found by a human looking at the screen, after: 6,479 passing tests, mutation testing on four shared consumers, two independent reviewer lenses on the largest task, and a full `/akili-validate` audit. Every one of those checks verified the system against **its own description of itself** — a traceability table that said "six parameters" and six tests that matched it. None of them asked whether the description enumerated what the screen actually renders.
+
+KZ-002 already says *enumerate by what renders, not by where the feature lives*. Its scope needs widening: it was applied to **components on a route** and needs to reach **controls in a component**. Two controls writing two wire keys are two filters, whatever the design doc calls them.

@@ -60,7 +60,12 @@ Requirements use `R-RCU-<NNN>` (Results Center URL); non-functional use `NFR-RCU
 
 - Inputs: query parameters on `/results-center`.
 - Behavior:
-  - Each filter the sidebar actually exposes SHALL have exactly one canonical query parameter: `indicator`, `contract`, `status`, `year`, `source`, plus `tab` for the my/all scope. **Six parameters.**
+  - Each filter the sidebar actually exposes SHALL have exactly one canonical query parameter: `indicator`, `indicators`, `contract`, `status`, `year`, `source`, plus `tab` for the my/all scope. **Seven parameters.**
+
+    > ⚠️ **Corrected 2026-08-13, post-validation (D-URL-18).** This clause read **"Six parameters"** and omitted `indicators`. The omission was not a typo — it followed from design.md §7.2 treating the indicator tab strip and the sidebar indicator multiselect as **one** filter. They are two, on two wire keys (`indicator-codes-tabs` vs `indicator-codes-filter`), and the sidebar one had **no query parameter at all**: it filtered the table and rendered a chip, then vanished on reload or share. Found by the product owner in manual testing, after the full suite, both reviewer lenses and `/akili-validate` had all passed. See §11.
+
+  - **`indicators` (plural) is the sidebar multiselect; `indicator` (singular) is the tab strip.** They are mutually exclusive in the UI — `table-filters-sidebar.component.html:2` `@if`-gates the multiselect on `!resultsFilter()['indicator-codes-tabs']?.length` — so at most one is ever active. On collision the canonical resolution is **`indicator` wins and `indicators` is ignored**, deterministically and independent of parameter order. A superseded `indicators` is NOT reported as a dropped token: it is valid, merely inapplicable, exactly like `statusLabel` under R-RCU-006 AC.3.
+  - **`indicators` is multi-value** (comma-separated, order preserved, subject to the §5.5 bounds), because the multiselect it represents accepts many. This does **not** weaken D-URL-12: `indicator` remains single-value, since the tab strip it represents holds exactly one id.
   - Multi-value parameters SHALL use a comma-separated list (`?contract=A100,S192`). `contract`, `status`, `year` and `source` are multi-value.
   - **`indicator` is single-value.** It drives the indicator tab strip (`indicator-codes-tabs`), which holds exactly one id and renders exactly one active tab; the sidebar's indicator multiselect is *hidden* whenever a tab is set (`table-filters-sidebar.component.html:2`). A comma-separated `indicator` is therefore unrepresentable and SHALL be rejected as an invalid token per R-RCU-005, not silently truncated to its first value.
   - `contract`, `year` and `source` SHALL use their existing natural keys (`agreement_id`, report year, `platform_code`) — these are already human-readable and MUST NOT be re-encoded.
@@ -158,7 +163,7 @@ Requirements use `R-RCU-<NNN>` (Results Center URL); non-functional use `NFR-RCU
 
 **Acceptance criteria:**
 
-- [ ] AC.1 — Applying, changing and clearing each of the five sidebar filters (plus `tab`) updates the URL correspondingly.
+- [ ] AC.1 — Applying, changing and clearing each of the five sidebar filters (plus `tab`) updates the URL correspondingly. **The five are Indicator, Status, Project, Year and Source — named explicitly here because "the indicator filter" is ambiguous and that ambiguity is exactly what went wrong.** The Indicator row of this AC means the **sidebar multiselect** (`indicator-codes-filter` → `indicators`). The tab strip (`indicator-codes-tabs` → `indicator`) is a *sixth* surface and is covered separately; a test that drives the tab does **not** discharge this AC. *(Clarified 2026-08-13 — D-URL-18. The original AC was credited to a test literally named "applies, changes and clears the indicator **tab** filter", which is how the multiselect shipped with no URL representation at all.)*
 - [ ] AC.2 — The written URL, re-read, reproduces the identical filter state (round-trip).
 - [ ] AC.3 — A filter change produces zero additional results requests beyond the one the change itself causes.
 - [ ] AC.4 — Browser history depth after N filter changes is unchanged from before them.

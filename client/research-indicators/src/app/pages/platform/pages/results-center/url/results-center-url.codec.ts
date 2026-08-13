@@ -44,8 +44,18 @@ import {
  * via `dropped`).
  */
 export interface ResultsCenterUrlFilters {
-  /** `indicator-codes-tabs` — single id (D-URL-12). */
+  /** `indicator-codes-tabs` — single id (D-URL-12). The **tab strip**. */
   readonly indicator?: number;
+  /**
+   * `indicator-codes-filter` — the **sidebar multiselect**, many ids, order
+   * preserved (D-URL-18).
+   *
+   * A different filter from {@link ResultsCenterUrlFilters.indicator}, not a
+   * plural spelling of it: different control, different wire key, different
+   * cardinality. See `results-center-url.vocabulary.ts` →
+   * `CANONICAL_PARAM_NAMES` for why both exist and which wins on collision.
+   */
+  readonly indicators?: number[];
   /** `contract-codes` — upper-cased `agreement_id` values, order preserved. */
   readonly contract?: string[];
   /** `status-codes` — resolved `result_status_id` values, order preserved. */
@@ -240,6 +250,16 @@ function resolveSourceToken(token: string): string | undefined {
   return SOURCE_SLUG_TO_PLATFORM_CODE.get(token.toLowerCase());
 }
 
+/**
+ * `indicators` (plural) — the sidebar multiselect (D-URL-18). Resolves
+ * against the **same frozen slug map** as the single-value `indicator`, so
+ * the two parameters can never drift into two spellings of one vocabulary;
+ * only their cardinality and their destination wire key differ.
+ */
+function resolveIndicatorFilterToken(token: string): number | undefined {
+  return INDICATOR_SLUG_TO_ID.get(token.toLowerCase());
+}
+
 // ---------------------------------------------------------------------------
 // indicator — single-value (D-URL-12)
 // ---------------------------------------------------------------------------
@@ -409,6 +429,25 @@ export function parse(paramMap: ParamMap): ParsedResultsCenterUrl {
       ? resolveIndicatorValue(indicatorRaw, dropped)
       : resolveLegacyIndicatorTab(rawValuesFor(paramMap, groups, 'indicatortab'), dropped);
 
+  // indicators (plural) — the sidebar multiselect (D-URL-18).
+  //
+  // Precedence: a resolved `indicator` (tab) SUPPRESSES `indicators`
+  // entirely, because the tab strip hides the multiselect
+  // (`table-filters-sidebar.component.html:2`) — seeding both would apply a
+  // filter through a control the user cannot see or clear.
+  //
+  // A suppressed `indicators` is NOT reported in `dropped`. `dropped` means
+  // "this token was invalid" and drives a warning toast (R-RCU-005); a
+  // superseded-but-perfectly-valid parameter is neither. The precedent is
+  // `statusLabel`, which R-RCU-006 AC.3 likewise accepts and ignores in
+  // silence. Invalid tokens *within* `indicators` still drop normally
+  // whenever the parameter is not suppressed.
+  const indicatorsTokens = splitMultiValue(rawValuesFor(paramMap, groups, 'indicators'));
+  const indicators =
+    indicator !== undefined
+      ? undefined
+      : resolveMultiValueParam('indicators', indicatorsTokens, dropped, resolveIndicatorFilterToken);
+
   // status — canonical, else legacy statusTab. statusLabel is never consulted
   // for its value (see the doc comment above) — only statustab feeds the
   // legacy fallback.
@@ -432,6 +471,7 @@ export function parse(paramMap: ParamMap): ParsedResultsCenterUrl {
 
   const filters: ResultsCenterUrlFilters = {
     ...(indicator !== undefined ? { indicator } : {}),
+    ...(indicators !== undefined ? { indicators } : {}),
     ...(contract !== undefined ? { contract } : {}),
     ...(status !== undefined ? { status } : {}),
     ...(year !== undefined ? { year } : {}),
@@ -499,8 +539,27 @@ export function serialize(state: ResultsCenterUrlState): Record<string, string |
     .map((code) => PLATFORM_CODE_TO_SOURCE_SLUG.get(code))
     .filter((slug): slug is string => slug !== undefined);
 
+  // D-URL-18 — the sidebar multiselect. Resolved through the same frozen map
+  // as the tab, and like `status`/`source` an id with no slug is silently
+  // omitted rather than emitted raw; NFR-RCU-002 layer 2 is what surfaces
+  // such an id at runtime.
+  const indicatorFilterSlugs = (filters.indicators ?? [])
+    .map((id) => INDICATOR_ID_TO_SLUG.get(id))
+    .filter((slug): slug is string => slug !== undefined);
+
   const params: Record<string, string | null> = {
     indicator: indicatorSlug ?? null,
+    // Never emit both: a set tab hides the multiselect, so emitting the
+    // stale multiselect alongside it would write a filter the user cannot
+    // see — and `parse` would suppress it on the way back in anyway, which
+    // is exactly the asymmetry that breaks the R-RCU-003 AC.2 round-trip.
+    // Gated on the TAB'S PRESENCE, not on its slug resolving. An unslugged
+    // tab id still hides the multiselect, so `indicator: null` plus an
+    // emitted `indicators` would describe a screen that does not exist.
+    indicators:
+      filters.indicator === undefined && indicatorFilterSlugs.length > 0
+        ? indicatorFilterSlugs.join(',')
+        : null,
     contract:
       filters.contract && filters.contract.length > 0
         ? filters.contract.map((code) => code.toUpperCase()).join(',')
