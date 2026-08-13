@@ -319,6 +319,25 @@ describe('results-center-url.codec — parse', () => {
       expect(filters.indicator).toBe(1);
       expect(filters.contract).toEqual(['A100']);
     });
+
+    // The CapDev email link gained `source=star` (quick/capdev-email-url-source,
+    // 2026-08-13) so the recipient lands on the results that upload actually
+    // created. This keeps the D6 twin-literal control matched to the FULL
+    // string the server now emits — without it, the control still covers the
+    // indicator slug but no longer the link as sent.
+    it('parsing the full server-emitted triple ?source=star&indicator=…&contract=A1048 resolves all three', () => {
+      const { filters, dropped } = parse(
+        convertToParamMap({
+          source: 'star',
+          indicator: 'capacity-sharing-for-development',
+          contract: 'A1048',
+        }),
+      );
+      expect(filters.source).toEqual(['STAR']);
+      expect(filters.indicator).toBe(1);
+      expect(filters.contract).toEqual(['A1048']);
+      expect(dropped).toEqual([]);
+    });
   });
 
   // ---------------------------------------------------------------------

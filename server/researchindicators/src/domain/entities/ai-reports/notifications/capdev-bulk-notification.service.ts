@@ -8,6 +8,7 @@ import { EnvAppConfigUtil } from '../../../shared/utils/env-app-config.util';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { cleanName } from '../../../shared/utils/object.utils';
 import { QueryIndicatorsEnum } from '../../indicators/enum/indicators.enum';
+import { ReportingPlatformEnum } from '../../results/enum/reporting-platform.enum';
 import {
   CapdevBulkEmailTemplateDto,
   CapdevMetricsTemplateFields,
@@ -562,7 +563,7 @@ export class CapdevBulkNotificationService {
 
   /**
    * `{AppConfig.ARI_CLIENT_HOST}/results-center` + the canonical
-   * `indicator`/`contract` query pair, via the existing
+   * `source`/`indicator`/`contract` query triple, via the existing
    * `COMPLETE_CLIENT_HOST` helper (`app-config.util.ts`) rather than
    * string-concatenating the host by hand (R-CBU-007 AC.3 — never a
    * hard-coded host). `contract` is the notified group's own
@@ -571,10 +572,27 @@ export class CapdevBulkNotificationService {
    * (`results-center-url.codec.ts`) — this literal is one half of the
    * cross-package contract (design.md §8); no automated gate crosses that
    * boundary (D6).
+   *
+   * `source` scopes the view to the results this upload actually created.
+   * The slug is derived, not hard-coded: the client builds its own source
+   * vocabulary by lower-casing `platform_code`
+   * (`results-center-url.vocabulary.ts` → `SOURCE_SLUG_TO_PLATFORM_CODE`),
+   * so applying `.toLowerCase()` to `ReportingPlatformEnum.STAR` follows
+   * the same rule from the same value rather than restating `'star'` as a
+   * third spelling.
+   *
+   * **Scoping is intentional — confirmed by the product owner 2026-08-13.**
+   * The recipient lands on STAR-platform results only. This is correct
+   * because the CapDev bulk upload never creates results on any other
+   * platform, so `source=star` describes exactly the set the email is about
+   * ("the uploaded Capacity Development activities") and cannot hide any of
+   * it. **Do not remove this parameter as an over-restriction** — it is a
+   * settled decision, not an unresolved narrowing.
    */
   private buildStarLink(agreementId: string): string {
+    const source = ReportingPlatformEnum.STAR.toLowerCase();
     return this.appConfig.COMPLETE_CLIENT_HOST(
-      `/results-center?indicator=${QueryIndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}&contract=${agreementId}`,
+      `/results-center?source=${source}&indicator=${QueryIndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}&contract=${agreementId}`,
     );
   }
 

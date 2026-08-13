@@ -422,10 +422,10 @@ describe('CapdevBulkNotificationService', () => {
       };
 
       expect(hrefOf(0)).toBe(
-        `${HOST}/results-center?indicator=capacity-sharing-for-development&contract=A100`,
+        `${HOST}/results-center?source=star&indicator=capacity-sharing-for-development&contract=A100`,
       );
       expect(hrefOf(1)).toBe(
-        `${HOST}/results-center?indicator=capacity-sharing-for-development&contract=B200`,
+        `${HOST}/results-center?source=star&indicator=capacity-sharing-for-development&contract=B200`,
       );
     });
 
@@ -434,7 +434,7 @@ describe('CapdevBulkNotificationService', () => {
     // cannot detect a spelling drift on either side (Disqualifies clause).
     // This literal is byte-identical to the one asserted in the client's
     // `results-center-url.codec.spec.ts` (T-02).
-    it('emits the exact literal `/results-center?indicator=capacity-sharing-for-development&contract=A100` required by the cross-package contract (design.md §8)', async () => {
+    it('emits the exact literal `/results-center?source=star&indicator=capacity-sharing-for-development&contract=A100` required by the cross-package contract (design.md §8)', async () => {
       const { service, sendEmail } = await createService({
         template: REAL_TEMPLATE_HTML,
       });
@@ -445,7 +445,7 @@ describe('CapdevBulkNotificationService', () => {
       const href = body.match(/href="([^"]+)"/)?.[1];
 
       expect(href).toBe(
-        `${HOST}/results-center?indicator=capacity-sharing-for-development&contract=A100`,
+        `${HOST}/results-center?source=star&indicator=capacity-sharing-for-development&contract=A100`,
       );
     });
 
