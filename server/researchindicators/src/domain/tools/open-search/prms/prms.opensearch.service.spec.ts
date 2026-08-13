@@ -1136,12 +1136,16 @@ describe('PrmsOpenSearchService', () => {
           innovation_readiness_id: 14,
           innovation_readiness_explanation: 'We chose readiness level 3',
           anticipated_users_id: 2,
-          expected_outcome: 'The framework is providing methods',
-          intended_beneficiaries_description:
-            'The framework is providing methods',
           no_sex_age_disaggregation: false,
         }),
       );
+      // `addressing_demands` is intentionally NOT mapped: the PRMS text does not
+      // satisfy STAR's display rules for these fields, so they stay empty until
+      // the rules are revisited.
+      expect(out[0].innovationDev.expected_outcome).toBeUndefined();
+      expect(
+        out[0].innovationDev.intended_beneficiaries_description,
+      ).toBeUndefined();
       expect(out[0].innovationDev.actors).toHaveLength(2);
       expect(out[0].innovationDev.institution_types).toEqual([
         expect.objectContaining({
