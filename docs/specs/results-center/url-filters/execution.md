@@ -75,3 +75,60 @@ The targeted Jest run prints a global coverage-threshold failure alongside the p
 
 **Final verification result:** 31/31 tests pass, lint clean, Reviewer `PASS` on attempt 1. Budget consumed: 1 of 12 tasks, ~441 LOC of ~1000, 1 of 3 review rounds used on this task (1 round).
 
+---
+
+### T-10 — Server: CapDev email link
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** — with one **undischarged manual gate** (see below); the task is code-complete but D6 is not closed |
+| Date | 2026-08-12 |
+| Implementer attempts | 1 |
+| Requirements covered | R-RCU-007 AC.2, AC.3 (server half only — the client half of AC.3 is T-09's), defect class D6 |
+| Wave | Ran concurrently with T-02 (client). Cross-package parallelism per `.agents/leader.md` — separate `node_modules`, build outputs and ports |
+
+**Files changed**
+
+- `server/researchindicators/src/domain/entities/ai-reports/notifications/capdev-bulk-notification.service.ts` — `buildStarLink` takes `agreementId: string`; emits `/results-center?indicator=${QueryIndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}&contract=${agreementId}` via `COMPLETE_CLIENT_HOST`; call site passes `input.agreementId`; `CAPDEV_INDICATOR_TAB_QUERY` deleted; `IndicatorsEnum` import replaced with `QueryIndicatorsEnum`
+- `…/capdev-bulk-notification.service.spec.ts` — new `describe('sendGroupNotification — STAR link (R-RCU-007, D6)')` with 3 cases
+
+**Attempt 1 — Implementer (T2 `sonnet`, effort `medium`)**
+
+Verification, from `server/researchindicators`:
+
+- `npm test -- --silent --testPathPattern=capdev-bulk-notification` → `Test Suites: 2 passed, 2 total`, `Tests: 89 passed, 89 total`
+- `npm run lint -- --quiet` → clean; `git status` re-checked after (the script carries `--fix`): no additional mutations
+- Leader independently confirmed by grep that `IndicatorsEnum` is fully gone (only `QueryIndicatorsEnum` remains, at the import and the one usage)
+
+**Attempt 1 — Reviewer verdict (T3 `opus`, lens-checklist mode): `STATUS: PASS`**
+
+> The diff implements exactly the one-string change `design.md` §4/§6.3 specifies — `buildStarLink(input.agreementId)` via `COMPLETE_CLIENT_HOST`, canonical `indicator`/`contract` pair, `CAPDEV_INDICATOR_TAB_QUERY` removed — and all three T-10 done checks hold: per-group scoping proven across two differing agreement ids, zero `indicatorTab` producers server-wide, and the D6 literal asserted verbatim with a byte-identical twin on the client.
+
+**Rulings on the five points the Leader raised**
+
+| # | Question | Ruling |
+| --- | --- | --- |
+| 1 | Does the D6 literal bite, given the code composes the slug from `QueryIndicatorsEnum` while the test asserts the expanded string? | **Satisfied, and stronger than a retyped literal.** The obligation is on the *test* (requirements §8 control 1; T-10 says "the **spec** must assert the exact literal"). The frozen wire value lives only in the test, so editing the enum turns the suite **red** — the test does not follow the change |
+| 2 | Is the `href` regex safe against the real template? | **Safe.** `capdev-bulk-summary.html:21` contains **exactly one** `href` (`<a href="{{{starLink}}}">`); a server-wide grep finds no second anchor and no `mailto`. Asserting through the rendered body is *stronger* than calling the private method — it proves the link reached `starLink` and survived real Handlebars |
+| 3 | Do two sequential calls on one instance genuinely discriminate per-group scoping (KZ-004)? | **Yes.** A regression capturing the first group's id into instance state makes `hrefOf(1)` return `contract=A100` and fails; a hard-coded constant fails both |
+| 4 | Any surviving server-side `indicatorTab` producer? | **None.** Server-wide grep for `indicatorTab\|statusTab\|statusLabel` returns only the new negative assertion. The seeding migration carries only `{{{starLink}}}`, so the append-only rule needs no migration edit |
+| 5 | Is the client-first rollout order (design §11) a defect in this diff? | **No — out of scope for this gate.** §11 governs *deployment*; `tasks.md` §5 already sequences T-02 into PR 1 and T-10 into PR 3, and §11's backout note says the new link degrades to R-RCU-005 behavior if the client half is absent. It is the Leader's release concern, recorded below |
+
+**⚠️ Undischarged manual gate — D6 is NOT closed by this PASS**
+
+`requirements.md` §8 substitute control 2 mandates a human paste-the-built-link-into-a-running-client check "at the Phase-3 HITL pause **and again after execution**". The Reviewer confirmed it remains genuinely required: nothing in this diff crosses the package boundary — the server suite never runs the client parser and vice versa. The Implementer correctly declined it as unautomatable rather than substituting a weaker proxy. **This must be performed by a human before the spec's Done Definition can be checked.**
+
+**Release note carried forward (not a task, not scope)**
+
+Design §11 requires **client first, then server**. This branch now carries the server half (T-10) while the client parser (T-02) is in the same wave. Both land on one branch here per the user's branch decision, so the ordering obligation moves entirely to deploy time: the server's new link must not reach production before the client parser does. Recorded here because the three-PR split that would have enforced it is harder to cut on a shared branch.
+
+**ADVISORY (recorded only; never gated, and per the Advisory rule none may become a task or widen one)**
+
+1. *Risk.* The "never hard-code the host" clause is **not discriminated** by any test — the `appConfig` mock returns the same `HOST` from both `ARI_CLIENT_HOST` and `COMPLETE_CLIENT_HOST`, so a hand-concatenated variant would pass every assertion in the file. Conformance rests on code inspection. Pre-existing property shared by the older AC.3 check, not introduced here. One-line close: make `COMPLETE_CLIENT_HOST` a `jest.fn` and assert `toHaveBeenCalledWith(...)`.
+2. *Resilience.* `agreementId` is interpolated raw, with no `encodeURIComponent`. Requirements §8 A1 *assumes* URL-safe ids and design §5.4 pins the client validator to `^[A-Za-z0-9._-]{1,32}$`, but the server neither encodes nor validates — an id containing `&`, `#`, `?` or a space would emit a link the client silently mis-parses. `encodeURIComponent` is a no-op for every conforming id, so it would be free insurance.
+3. *Readability.* The second test is a strict subset of the first's first assertion, yet uses a different extraction path (local `hrefOf` closure vs. `extractBody` + inline regex) for the same job. One shared helper would make a future template change a one-line fix.
+4. *Reliability.* The strongest available AC.2 evidence was left unused: the existing `dispatchThreeGroups` harness already resolves an email per contract, so one loop there would extend per-group link scoping across the real `dispatch` plumbing rather than just `sendGroupNotification`.
+5. *Risk (low).* `{{{starLink}}}` is a triple-stash, so the `&` reaches the body unescaped. Not a practical decode hazard (`&contract` is not a legacy semicolon-less named reference); the theoretical failure mode is a strict mail sanitizer re-escaping the attribute. If ever addressed, the fix belongs in the **template**, not the built string — changing the string would break the cross-package literal.
+
+**Final verification result:** 89/89 tests pass, lint clean, Reviewer `PASS` on attempt 1. **D6 manual gate outstanding.**
+

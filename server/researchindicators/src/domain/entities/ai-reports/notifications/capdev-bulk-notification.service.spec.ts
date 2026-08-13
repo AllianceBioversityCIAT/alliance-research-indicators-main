@@ -397,6 +397,70 @@ describe('CapdevBulkNotificationService', () => {
     });
   });
 
+  // -----------------------------------------------------------------------
+  // R-RCU-007 AC.2/AC.3, defect class D6 — the STAR link (`buildStarLink`)
+  //
+  // KZ-004: a fixture whose units share one `agreementId` cannot prove
+  // per-unit scoping. Every case below drives at least two groups with
+  // DIFFERENT agreement ids so a batch-wide-or-hard-coded regression turns
+  // this red rather than passing vacuously.
+  // -----------------------------------------------------------------------
+  describe('sendGroupNotification — STAR link (R-RCU-007, D6)', () => {
+    it("carries the notified group's own agreement_id in `contract` — never a batch-wide or hard-coded value — for two groups with different ids", async () => {
+      const { service, sendEmail } = await createService({
+        template: REAL_TEMPLATE_HTML,
+      });
+
+      await service.sendGroupNotification(buildInput({ agreementId: 'A100' }));
+      await service.sendGroupNotification(buildInput({ agreementId: 'B200' }));
+
+      const hrefOf = (callIndex: number) => {
+        const body = (
+          sendEmail.mock.calls[callIndex][0].message.socketFile as Buffer
+        ).toString('utf-8');
+        return body.match(/href="([^"]+)"/)?.[1];
+      };
+
+      expect(hrefOf(0)).toBe(
+        `${HOST}/results-center?indicator=capacity-sharing-for-development&contract=A100`,
+      );
+      expect(hrefOf(1)).toBe(
+        `${HOST}/results-center?indicator=capacity-sharing-for-development&contract=B200`,
+      );
+    });
+
+    // design.md §8 cross-package contract / tasks.md T-10 — the exact
+    // literal, not a `.toContain('results-center')` presence check, which
+    // cannot detect a spelling drift on either side (Disqualifies clause).
+    // This literal is byte-identical to the one asserted in the client's
+    // `results-center-url.codec.spec.ts` (T-02).
+    it('emits the exact literal `/results-center?indicator=capacity-sharing-for-development&contract=A100` required by the cross-package contract (design.md §8)', async () => {
+      const { service, sendEmail } = await createService({
+        template: REAL_TEMPLATE_HTML,
+      });
+
+      await service.sendGroupNotification(buildInput({ agreementId: 'A100' }));
+
+      const body = extractBody(sendEmail);
+      const href = body.match(/href="([^"]+)"/)?.[1];
+
+      expect(href).toBe(
+        `${HOST}/results-center?indicator=capacity-sharing-for-development&contract=A100`,
+      );
+    });
+
+    it('never emits `indicatorTab` (the retired query key)', async () => {
+      const { service, sendEmail } = await createService({
+        template: REAL_TEMPLATE_HTML,
+      });
+
+      await service.sendGroupNotification(buildInput({ agreementId: 'A100' }));
+
+      const body = extractBody(sendEmail);
+      expect(body).not.toContain('indicatorTab');
+    });
+  });
+
   describe('sendGroupNotification — missing/inactive template (NO_TEMPLATE)', () => {
     it('treats a `findOne`-throw (no active row) as NO_TEMPLATE: zero sendEmail calls, exactly one error log', async () => {
       const { service, sendEmail } = await createService(null);

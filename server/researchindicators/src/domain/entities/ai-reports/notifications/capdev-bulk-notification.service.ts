@@ -7,7 +7,7 @@ import { AppConfig } from '../../../shared/utils/app-config.util';
 import { EnvAppConfigUtil } from '../../../shared/utils/env-app-config.util';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { cleanName } from '../../../shared/utils/object.utils';
-import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
+import { QueryIndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import {
   CapdevBulkEmailTemplateDto,
   CapdevMetricsTemplateFields,
@@ -79,14 +79,6 @@ export interface CapdevGroupSendInput {
    */
   tokenOwner: CapdevBulkTokenOwnerDto;
 }
-
-/**
- * Query-string stance for design.md §15 Q1 (open, non-blocking): preselects
- * the CapDev indicator tab on `results-center`. A wrong query string
- * degrades to a correct page rather than a broken link, so this is not
- * treated as load-bearing.
- */
-const CAPDEV_INDICATOR_TAB_QUERY = `indicatorTab=${IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}`;
 
 /**
  * The `notification_status` derivation table (tasks.md T-09), written as
@@ -569,14 +561,20 @@ export class CapdevBulkNotificationService {
   }
 
   /**
-   * `{AppConfig.ARI_CLIENT_HOST}/results-center` + the CapDev tab query
-   * string, via the existing `COMPLETE_CLIENT_HOST` helper
-   * (`app-config.util.ts`) rather than string-concatenating the host by
-   * hand (R-CBU-007 AC.3 — never a hard-coded host).
+   * `{AppConfig.ARI_CLIENT_HOST}/results-center` + the canonical
+   * `indicator`/`contract` query pair, via the existing
+   * `COMPLETE_CLIENT_HOST` helper (`app-config.util.ts`) rather than
+   * string-concatenating the host by hand (R-CBU-007 AC.3 — never a
+   * hard-coded host). `contract` is the notified group's own
+   * `agreement_id` — never a batch-wide or hard-coded value (R-RCU-007
+   * AC.2). The `indicator` slug is byte-identical to the client's parser
+   * (`results-center-url.codec.ts`) — this literal is one half of the
+   * cross-package contract (design.md §8); no automated gate crosses that
+   * boundary (D6).
    */
-  private buildStarLink(): string {
+  private buildStarLink(agreementId: string): string {
     return this.appConfig.COMPLETE_CLIENT_HOST(
-      `/results-center?${CAPDEV_INDICATOR_TAB_QUERY}`,
+      `/results-center?indicator=${QueryIndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}&contract=${agreementId}`,
     );
   }
 
@@ -594,7 +592,7 @@ export class CapdevBulkNotificationService {
       endDate: input.metrics.endDate,
       participantsCount: input.metrics.participantsCount,
       percentageWomen: input.metrics.percentageWomen,
-      starLink: this.buildStarLink(),
+      starLink: this.buildStarLink(input.agreementId),
       tokenOwnerName,
       tokenOwnerEmail,
     };

@@ -70,7 +70,7 @@ graph TD
 
 ---
 
-### T-02 [ ] — Codec: `parse`
+### T-02 [~] — Codec: `parse`
 
 - **Requirements covered:** R-RCU-001 AC.3, R-RCU-002 (both scenarios), R-RCU-005 (both scenarios + all ACs), R-RCU-006 (both scenarios + AC.1/AC.2/AC.3)
 - **Files touched:** `…/url/results-center-url.codec.ts` (new), `…/url/results-center-url.codec.spec.ts` (new)
@@ -252,7 +252,7 @@ graph TD
 
 ---
 
-### T-10 [ ] — Server: CapDev email link
+### T-10 [x] — Server: CapDev email link
 
 - **Requirements covered:** R-RCU-007 AC.2, defect class D6
 - **Files touched:** `server/…/notifications/capdev-bulk-notification.service.ts` + `.spec.ts`
