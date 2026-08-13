@@ -101,7 +101,10 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
       await this.loadPinnedTabPreference();
       this.loadMyResults(true);
       if (hasIndicator) {
-        this.resultsCenterService.onSelectFilterTab(Number(indicatorTabParam), { skipMain: true });
+        // D-URL-15: this is the legacy indicatorTab load path (a home-link deep link
+        // being applied on init), not a user-facing mutation — it must not advance
+        // userFilterMutations or it would trigger the write effect right after load.
+        this.resultsCenterService.onSelectFilterTab(Number(indicatorTabParam), { skipMain: true, skipBump: true });
       }
       if (hasStatus) {
         this.resultsCenterService.applyStatusFilterFromHomeLink(Number(statusTabParam), statusLabelParam ?? undefined, {
@@ -188,6 +191,10 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
   }
 
   onActiveItemChange = (event: MenuItem): void => {
+    // D-URL-15 / R3-1: the my/all tab switch is a user-facing mutation, and this is
+    // the component's own handler bound from the template (results-center.component.html:14) —
+    // the increment MUST live here, not in the service's dead onActiveItemChange.
+    this.resultsCenterService.noteUserFilterMutation();
     this.resultsCenterService.cleanFilters();
 
     if (event.id === 'my') {
@@ -266,6 +273,16 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
       } else {
         this.loadAllResults();
       }
+
+      // D-URL-15 / R3-1: the pin toggle is a user-facing mutation, and this is the
+      // component's own handler (reached via onPinIconClick, bound in the template
+      // at results-center.component.html:17) — the increment MUST live here. It is
+      // published only AFTER the state it publishes has been written (post-`await`
+      // signal mutation above): T-08's effect tracks this counter as its only
+      // dependency and reads filter state untracked, so bumping before the mutation
+      // would let the effect serialize stale (pre-toggle) state, no-op on the loop
+      // guard, and never fire again once the real mutation lands.
+      this.resultsCenterService.noteUserFilterMutation();
 
       setTimeout(() => {
         this.resultsCenterService.cleanMultiselects();

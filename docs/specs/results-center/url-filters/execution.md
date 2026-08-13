@@ -336,6 +336,66 @@ The Reviewer ruled this **(b) a genuine gap, not (c) a FAIL**, because every alt
 
 Raised by the T-05 Reviewer. T-05's done-check wants the my/all counter increment "asserted through the template binding"; the current harness makes a DOM click impossible, so the Leader authorized asserting through the component handler instead (accepted by the Reviewer). But **T-11's done-check does not mention a rendered my/all click asserting the counter**, so the template-binding half will silently vanish once T-11 rewrites that spec.
 
+### T-05 — `userFilterMutations` counter (carried R3-1)
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS on attempt 2** (1 rework round consumed) |
+| Date | 2026-08-12 |
+| Implementer attempts | 2 |
+| Requirements covered | R-RCU-003 (write trigger), R-RCU-004 AC.2, NFR-RCU-005 (partially — the counter is inert until T-08) |
+| Wave | Ran concurrently with T-03 (both client — deliberate exception, see wave note) |
+
+**Files changed:** `results-center.service.ts`, `results-center.component.ts`, `results-center.service.spec.ts`, `results-center.component.spec.ts` (+168 net across attempt 1; +3 assertions and one moved line at attempt 2).
+
+**Design:** a private `_userFilterMutations` signal exposed read-only as `userFilterMutations`, advanced through a single public `noteUserFilterMutation()`. `onSelectFilterTab` gained a `skipBump?: boolean` so its non-user-facing callers can suppress the increment.
+
+#### Attempt 1 — Implementer (T2 `sonnet`, effort `high`) → Reviewer `STATUS: FAIL` (2 issues)
+
+Verification was green (360→358 tests, `tsc` clean, lint clean) and the Reviewer passed the substance — but found two defects, the first of which is the most instructive finding of the run so far:
+
+> **Issue 1 — `togglePin` advances the counter *before* the state mutation it is supposed to publish, across an `await`.** … The click handler returns at the first `await`, Angular runs change detection, and the component effect flushes there — with the counter already at `N+1` and the state still **pre-toggle**. Step 4's loop guard then makes that run a no-op, the PATCH resolves, `loadMyResults()` mutates state — and the effect never re-runs, because its only tracked dependency did not move again. Net result: **the pin toggle changes the scope and wipes six filter collections, and the address bar is never updated.** That is verbatim R3-1's symptom reproduced through the very handler T-05 was written to fix. … A correctness property that holds only when the framework declines to flush during a network round-trip is not a property.
+> **Violated Rule:** `design.md` §6.2 (the `togglePin` mutator row with Steps 1-3, and the claim that D-URL-15 closes R2-2); `requirements.md` R-RCU-003 AC.1/AC.2; `tasks.md` §0 **R3-1**.
+
+> **Issue 2 — the `loadMyResults` / `loadAllResults` row of the "must not increment" column has no assertion anywhere.** Production code is correct… But nothing pins it. A future bump added inside either method — the exact edit judgment.md R2-5 warns about — fails no test.
+> **Violated Rule:** `tasks.md` § T-05 Acceptance item 2; T-05's Disqualifies ("A counter test that never exercises the 'must not' column proves half the contract"); design.md §6.2's blockquote.
+
+**Note on how this was found.** The Leader asked whether bumping on *attempt* rather than *success* was correct (the error path). The Reviewer answered a sharper question: the defect bites on the **success** path, and attempt-vs-success is a side issue the correct fix resolves for free. Recorded because it is the clearest case in this run of an independent audit outperforming the Leader's own framing of a concern.
+
+#### Attempt 2 — Implementer (T2 `sonnet`, effort **`xhigh`**) → Reviewer `STATUS: PASS`
+
+The bump moved to after the `if (newPinnedTab === 'my') … else …` branch, still inside `try`. Three assertions added: `not.toHaveBeenCalled()` in each of `describe('loadMyResults')` / `describe('loadAllResults')`, plus one in the existing rejected-PATCH case. Verification: 360/360, `tsc` clean, lint clean.
+
+> **Reviewer PASS summary:** Both prior FAIL issues are closed for the reasons they were raised — the `togglePin` bump now lives inside a single synchronous block after every filter-state write (including `main()`'s pre-await `create-user-codes` normalization), so no effect flush can ever see an advanced counter over stale state, and a rejected PATCH provably cannot bump given the complete four-site call-site enumeration; the `loadMyResults`/`loadAllResults` "must not increment" rows now have real assertions with clean per-test mock state. The success path still bumps exactly once on both the `my` and `all` branches, and no attempt-1 behavior was weakened.
+
+The re-review closed the one gap the remedy did not cover on its own: `loadMyResults()` fires `void main()`, so the Leader asked whether `main()` mutates filter state *asynchronously* after the bump. It does write `create-user-codes` (`service.ts:496-519`) — but **before its first `await`** (`:542`), so inside the same synchronous block, ahead of the bump. After the await it writes only `resultsTableTotalRecords`, `list`, `lastSuccessfulResultsFetchKey`, `loading` — none of which the codec serializes. **No async window remains.**
+
+#### Rulings on the six points raised at attempt 1
+
+| # | Question | Ruling |
+| --- | --- | --- |
+| 1 | `togglePin` bumping before its async work | **Defect — but not the attempt-vs-success question.** FAIL issue 1 |
+| 2 | Bump-by-delegation for `removeFilter` / `clearAllFilters` | **Conformant.** §6.2's column heading is "Increments" — a behavioral contract, not "calls `noteUserFilterMutation`". Both advance exactly once, asserted at the named sites, and both delegated bumps land *after* their state writes, so neither reproduces issue 1 |
+| 3 | `skipBump` added to the legacy `indicatorTab` load path — a site the §6.2 table never names | **Correct, in scope, and R-RCU-006-preserving.** Without it a plain `?indicatorTab=1` page load would advance the counter after effect creation and fire the write effect *during the read path* — exactly what §6.2 claims cannot happen. `component.ts` is a T-05 file, and the flag holds T-05's own invariant. Related asymmetry confirmed right: `applyStatusFilterFromHomeLink` writes signals directly and reaches no bumping method, so the `statusTab` load path needed no flag |
+| 4 | Two pre-existing component-spec assertions modified | **Strengthening, masks nothing.** `toHaveBeenCalledWith` stays an exact-object match, so they now *pin* `skipBump: true` and fail if it is dropped |
+| 5 | Does the component-side R3-1 assertion prove the counter advances? | **The two-part composition is sound.** The Disqualifies clause's operative requirement is "the assertion must go through the component's handler", and `component.onActiveItemChange` / `component.togglePin` are exactly what the template binds (`html:14`, `html:17`→`onPinIconClick`→`togglePin`). The component spec proves the call; the service spec proves the call advances the signal; the counter has one write path. A DOM click is structurally impossible under the current harness — T-11 owns that. **Residual → §5.4** |
+| 6 | `removeFilter`'s early return not bumping | **Correct.** Unrecognized label, mutates nothing; a bump there would fire the effect for a non-event |
+
+#### ADVISORY (recorded only; none may become a task or widen one)
+
+1. **Reliability — the invariant that just failed is undocumented at two other call sites.** `onActiveItemChange` (`component.ts:197`) and `applyFilters` (`service.ts:691`) still bump *before* their mutations. Safe **today** only because both are wholly synchronous — the moment either gains an `await` ahead of its `.set()` calls, the exact defect just fixed in `togglePin` returns. The rule currently lives only in `togglePin`'s comment. **Leader action: carry verbatim into the T-08 brief** (T-08 is the counter's only consumer): the contract is *call `noteUserFilterMutation()` only after the state you publish has been written*.
+2. *Risk.* Verification was targeted, not the whole-client suite design §10.1 requires for D5 (KZ-003). Acceptable here — the counter has no reader until T-08, so blast radius outside these files is nil — but **the full-suite run remains owed**, and T-12 is where that debt is booked.
+3. *Reliability.* Bump-by-delegation is load-bearing on two inline comments; a note on `applyFilters`/`onSelectFilterTab` that they are *bump-carrying delegates* would show the constraint at the site being edited.
+4. *Readability.* `skipBump` reads as an escape hatch; `fromLoadPath: true` would make a future caller choose it for the right reason. Low value — T-06 replaces the only current user.
+
+**Final verification result:** 360/360 tests, `tsc` clean, lint clean, Reviewer `PASS` on attempt 2.
+
+---
+
+### Wave note — two client tasks run concurrently (deliberate exception)
+
+`.agents/leader.md` warns that two tasks in one package are not safely parallel because they share `node_modules`, build output and ports. T-03 and T-05 were run concurrently anyway, **at the user's explicit request**, with four mitigations the Leader put in place instead of refusing: (1) disjoint file sets, verified before launch; (2) repo-wide git commands (`stash`/`checkout`/`restore`/`clean`/`reset`) **forbidden in both briefs**, with the reason and the path-scoped substitute given — a direct response to the T-02 incident; (3) disjoint, narrowed `--testPathPattern` runs, with the full-suite run reserved to the Leader on a quiet tree; (4) a cross-worker rule — an error in a file outside your own list is the other worker's transient state, do not fix it, re-run once, report. **Outcome: no interference.** Both workers reported clean `git status` bleed-checks, and neither ever saw the other's transient state.
+
 ### 5.5 A design §6.2 sentence is now literally false
 
 `design.md` §6.2 states a cross-route mutation "cannot reach it twice over: **the counter does not move**". That is no longer true: `resetState()` (`service.ts:973`) calls `clearAllFilters()`, which now bumps, and its only caller is `project-detail.component.ts:171` — **a different route**. Harmless under T-08 (the effect captures its entry baseline at creation, so pre-existing bumps are absorbed, and the component is destroyed off-route anyway), but T-12 would otherwise be written to assert the wrong guarantee — *counter frozen* rather than *component destroyed*. Per the constitution's "fix the document, don't let docs and code drift" rule this is a one-clause doc correction rather than a scope question, and the Leader will make it unless told otherwise.

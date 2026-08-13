@@ -139,7 +139,7 @@ graph TD
 
 ---
 
-### T-05 [~] — `userFilterMutations` counter (carries R3-1)
+### T-05 [x] — `userFilterMutations` counter (carries R3-1)
 
 - **Requirements covered:** R-RCU-003 (write trigger), R-RCU-004 AC.2, NFR-RCU-005
 - **Files touched:** `…/results-center/results-center.service.ts`, `…/results-center/results-center.component.ts`, `…/results-center.service.spec.ts`

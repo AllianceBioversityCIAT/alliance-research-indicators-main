@@ -46,6 +46,14 @@ export class ResultsCenterService {
   ];
   myResultsFilterItem = signal<MenuItem | undefined>(this.myResultsFilterItems[0]);
   pinnedTab = signal<string>('all');
+  /**
+   * D-URL-15: monotonic counter expressing user intent to mutate filters.
+   * The write effect's ONLY tracked dependency — it must advance for every
+   * user-facing mutator and MUST NOT advance for load/restore/other-route paths.
+   * See design.md §6.2 for the full increment / does-not-increment contract.
+   */
+  private readonly _userFilterMutations = signal(0);
+  readonly userFilterMutations = this._userFilterMutations.asReadonly();
   loading = signal(false);
   list = signal<Result[]>([]);
   tableFilters = signal(new TableFilters());
@@ -329,6 +337,8 @@ export class ResultsCenterService {
 
   removeFilter(label: string, id?: string | number): void {
     if (label === 'INDICATOR TAB') {
+      // D-URL-15: this delegated onSelectFilterTab(0) call is removeFilter's
+      // single userFilterMutations bump for this branch — do not add another.
       this.onSelectFilterTab(0);
       return;
     }
@@ -375,6 +385,8 @@ export class ResultsCenterService {
       }
     }
 
+    // D-URL-15: this delegated applyFilters() call is removeFilter's single
+    // userFilterMutations bump for this branch — do not add another.
     this.applyFilters();
   }
 
@@ -431,6 +443,17 @@ export class ResultsCenterService {
 
   private invalidateResultsFetchDedupe(): void {
     this.lastSuccessfulResultsFetchKey = null;
+  }
+
+  /**
+   * D-URL-15 — advances the `userFilterMutations` counter. Call this from a
+   * user-facing mutator exactly once per invocation (design.md §6.2's table).
+   * Internal delegations between mutators (e.g. `removeFilter` → `onSelectFilterTab`,
+   * `clearAllFilters` → `onSelectFilterTab`) must bump through exactly one call site —
+   * see the `skipBump` option on `onSelectFilterTab`.
+   */
+  noteUserFilterMutation(): void {
+    this._userFilterMutations.update(count => count + 1);
   }
 
   invalidateResultsListFetchCache(): void {
@@ -665,6 +688,7 @@ export class ResultsCenterService {
   }
 
   applyFilters = () => {
+    this.noteUserFilterMutation();
     this.invalidateResultsFetchDedupe();
     const currentTab = this.myResultsFilterItem();
     const preserveCreateUserCodes = currentTab?.id === 'my' ? this.resultsFilter()['create-user-codes'] || [] : [];
@@ -695,7 +719,10 @@ export class ResultsCenterService {
     this.main();
   };
 
-  onSelectFilterTab(indicatorId: number, options?: { skipMain?: boolean }) {
+  onSelectFilterTab(indicatorId: number, options?: { skipMain?: boolean; skipBump?: boolean }) {
+    if (!options?.skipBump) {
+      this.noteUserFilterMutation();
+    }
     this.invalidateResultsFetchDedupe();
     this.api.indicatorTabs.lazy().list.update(prev =>
       prev.map((item: GetAllIndicators) => ({
@@ -862,6 +889,8 @@ export class ResultsCenterService {
 
     this.searchInput.set('');
 
+    // D-URL-15: clearAllFilters' single userFilterMutations bump comes from this
+    // delegated onSelectFilterTab(0) call — do not add a second bump here.
     this.onSelectFilterTab(0);
 
     setTimeout(() => {
@@ -923,7 +952,9 @@ export class ResultsCenterService {
       table.sortOrder = -1;
     }
     this.resetResultsTablePaginatorToFirstPage();
-    this.onSelectFilterTab(0);
+    // D-URL-15 / R3-1: clearAllFiltersWithPreserve must NOT advance userFilterMutations —
+    // it is reached only from the modal / links-to-result flows, not a Results Center user action.
+    this.onSelectFilterTab(0, { skipBump: true });
   }
 
   cleanMultiselects() {

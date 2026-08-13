@@ -32,6 +32,7 @@ describe('ResultsCenterComponent', () => {
       clearAllFilters: jest.fn(),
       onSelectFilterTab: jest.fn(),
       onActiveItemChange: jest.fn(),
+      noteUserFilterMutation: jest.fn(),
       resultsFilter: signal({
         'create-user-codes': [],
         'indicator-codes': [],
@@ -218,7 +219,8 @@ describe('ResultsCenterComponent', () => {
       expect(mockResultsCenterService.restorePersistedState).not.toHaveBeenCalled();
       expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
       expect(loadMyResultsSpy).toHaveBeenCalledWith(true);
-      expect(mockResultsCenterService.onSelectFilterTab).toHaveBeenCalledWith(42, { skipMain: true });
+      // D-URL-15: this is the legacy indicatorTab load path, not a user mutation — skipBump: true.
+      expect(mockResultsCenterService.onSelectFilterTab).toHaveBeenCalledWith(42, { skipMain: true, skipBump: true });
       expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
       expect(mockResultsCenterService.activateStatePersistence).toHaveBeenCalledWith('results-center');
       expect(mockRouter.navigate).toHaveBeenCalledWith(
@@ -294,7 +296,8 @@ describe('ResultsCenterComponent', () => {
 
       await (component as any).initializeState();
 
-      expect(mockResultsCenterService.onSelectFilterTab).toHaveBeenCalledWith(3, { skipMain: true });
+      // D-URL-15: this is the legacy indicatorTab load path, not a user mutation — skipBump: true.
+      expect(mockResultsCenterService.onSelectFilterTab).toHaveBeenCalledWith(3, { skipMain: true, skipBump: true });
       expect(mockResultsCenterService.applyStatusFilterFromHomeLink).toHaveBeenCalledWith(11, 'Postpone', {
         skipMain: true
       });
@@ -429,6 +432,19 @@ describe('ResultsCenterComponent', () => {
       expect(mockResultsCenterService.cleanFilters).toHaveBeenCalled();
       expect(mockResultsCenterService.searchInput()).toBe('test search');
     });
+
+    // D-URL-15 / R3-1 regression guard: the userFilterMutations increment for the
+    // my/all tab switch must go through THIS component handler — asserted here,
+    // not by calling ResultsCenterService.onActiveItemChange (which has no production
+    // caller and would pass on dead code).
+    it('should advance userFilterMutations exactly once (R3-1)', () => {
+      const event: MenuItem = { id: 'my', label: 'My Results' };
+      jest.spyOn(component, 'loadMyResults').mockImplementation();
+
+      component.onActiveItemChange(event);
+
+      expect(mockResultsCenterService.noteUserFilterMutation).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('loadMyResults', () => {
@@ -475,6 +491,15 @@ describe('ResultsCenterComponent', () => {
       component.loadMyResults();
 
       expect(mockResultsCenterService.resultsFilter()['indicator-codes-tabs']).toEqual([]);
+    });
+
+    // T-05 §Acceptance item 2 / design.md §6.2 "must not increment" column:
+    // loadMyResults is also reached from the read path (seedFromUrl), so a bump
+    // added here would re-open R2-5. Nothing pinned this before.
+    it('should not advance userFilterMutations', () => {
+      component.loadMyResults();
+
+      expect(mockResultsCenterService.noteUserFilterMutation).not.toHaveBeenCalled();
     });
   });
 
@@ -523,6 +548,15 @@ describe('ResultsCenterComponent', () => {
 
       expect(mockResultsCenterService.resultsFilter()['indicator-codes-tabs']).toEqual([]);
     });
+
+    // T-05 §Acceptance item 2 / design.md §6.2 "must not increment" column:
+    // loadAllResults is also reached from the read path (seedFromUrl), so a bump
+    // added here would re-open R2-5. Nothing pinned this before.
+    it('should not advance userFilterMutations', () => {
+      component.loadAllResults();
+
+      expect(mockResultsCenterService.noteUserFilterMutation).not.toHaveBeenCalled();
+    });
   });
 
   describe('togglePin', () => {
@@ -564,6 +598,19 @@ describe('ResultsCenterComponent', () => {
       });
     });
 
+    // D-URL-15 / R3-1 regression guard: the pin toggle is a component-owned
+    // user-facing mutation — asserted through this handler, not the service.
+    it('should advance userFilterMutations exactly once (R3-1)', async () => {
+      component.pinnedTab.set('all');
+      mockApiService.PATCH_Configuration.mockResolvedValue({} as any);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('my');
+
+      await component.togglePin('my');
+      jest.runAllTimers();
+
+      expect(mockResultsCenterService.noteUserFilterMutation).toHaveBeenCalledTimes(1);
+    });
+
     it('should unpin tab when toggling same tab', async () => {
       component.pinnedTab.set('all');
       mockApiService.PATCH_Configuration.mockResolvedValue({} as any);
@@ -588,6 +635,10 @@ describe('ResultsCenterComponent', () => {
       expect(consoleSpy).toHaveBeenCalledWith('Error updating pinned tab:', expect.any(Error));
       expect(mockActionsService.showToast).toHaveBeenCalled();
       expect(component.loadingPin()).toBe(false);
+      // Reviewer fix (attempt 2): the bump now lives after the state mutation,
+      // inside the `if (newPinnedTab === 'my') … else …` branch — a rejected
+      // PATCH_Configuration never reaches that branch, so it must never fire.
+      expect(mockResultsCenterService.noteUserFilterMutation).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
     });

@@ -1177,6 +1177,98 @@ describe('ResultsCenterService', () => {
     });
   });
 
+  describe('userFilterMutations counter (D-URL-15)', () => {
+    it('starts at 0', () => {
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('applyFilters advances it exactly once', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.applyFilters();
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('onSelectFilterTab advances it exactly once', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.onSelectFilterTab(1);
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('onSelectFilterTab does NOT advance it when skipBump is set (load-path callers)', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.onSelectFilterTab(1, { skipBump: true });
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('removeFilter (INDICATOR TAB branch, delegates to onSelectFilterTab) advances it exactly once', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.removeFilter('INDICATOR TAB');
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('removeFilter (normal label, delegates to applyFilters) advances it exactly once', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.tableFilters.set({
+        indicators: [],
+        statusCodes: [],
+        years: [],
+        contracts: [],
+        levers: [{ id: 1 }, { id: 2 }]
+      } as any);
+      service.removeFilter('LEVER', 1);
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('clearAllFilters advances it exactly once, not twice, despite delegating to onSelectFilterTab', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.clearAllFilters();
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('clearAllFiltersWithPreserve does NOT advance it, even though it delegates to onSelectFilterTab', () => {
+      service.clearAllFiltersWithPreserve([1, 2]);
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('initializeProjectDashboardResultsTable does NOT advance it', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.initializeProjectDashboardResultsTable('D514');
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('restorePersistedState does NOT advance it', () => {
+      const getItemSpy = jest.spyOn(Storage.prototype, 'getItem').mockReturnValue(
+        JSON.stringify({
+          myResultsFilterItemId: 'all',
+          tableFilters: {},
+          resultsFilter: {},
+          appliedFilters: {},
+          searchInput: '',
+          primaryContractId: null,
+          resultsTablePaginatorFirst: 0,
+          resultsTablePaginatorRows: 10,
+          resultsTableSortField: 'result_official_code',
+          resultsTableSortOrder: -1
+        })
+      );
+
+      try {
+        expect(service.restorePersistedState('demo')).toBe(true);
+        expect(service.userFilterMutations()).toBe(0);
+      } finally {
+        getItemSpy.mockRestore();
+      }
+    });
+
+    it('main() does NOT advance it', async () => {
+      await service.main();
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    // Note: seedFromUrl does not exist yet (T-04 builds it) — its "must not increment"
+    // row cannot be tested until that method exists.
+  });
+
   describe('initializeProjectDashboardResultsTable', () => {
     it('sets pending revision status, contract context, and loads all results', () => {
       const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
