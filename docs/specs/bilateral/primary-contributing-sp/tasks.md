@@ -143,7 +143,7 @@ graph TD
 - **Estimated LOC:** ~70
 - **Effort:** M
 - **Skills:** `nestjs-expert`, `systematic-debugging` (if the DDL misbehaves)
-- **Status:** todo
+- **Status:** **`[~]` in-progress** (2026-08-13) — **migration authored, reviewed PASS, committed `77f7e4f8`; probe package audited after 3 review rounds. The DB invariant is UNVERIFIED — no probe has been run.** See [`./execution.md`](./execution.md) → T-02. **⚠ The manual probes must run BEFORE T-06 reaches DEV** (T-06 writes `sp_role`, invalidating four `must_be_zero` assertions), or be re-scoped. Durable alternative: **T-13** automates all three probes against the `TEST` datasource. **Unowned gap:** forward+revert+forward (done-criterion 1) has no vehicle — CI/CD owns migrations.
 
 ---
 

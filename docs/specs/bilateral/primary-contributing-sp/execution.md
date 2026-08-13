@@ -759,7 +759,17 @@ no pre-existing row can have `sp_role = 'PRIMARY'` — but that protects the cle
 `WHERE` is genuinely conjunctive on `sp_role = 'PRIMARY'` **and** the setup touched only the one
 promoted row.
 
-#### DEFERRED VERIFICATION PACKAGE — v2, REWRITTEN AFTER §B FAIL, NOT YET RUN
+#### DEFERRED VERIFICATION PACKAGE — v3, NOT YET RUN
+
+v3 fixes four defects the Reviewer found in v2: (1) `SELECT … INTO` not NULLing
+`@promoted_id` on a same-session restart, letting a stale row from a prior run
+mask the migration's own guarantee behind a false FAIL; (2) a cleanup DELETE that
+leaked `ZZPROBE_A` as an active PRIMARY exactly when something had already gone
+wrong; (3) an undeclared two-mode step 7 whose guard blocked the safe,
+literal-substituted path and redirected to re-derivation logic this package
+exists to eliminate, plus a wrong `@promoted_id` substitution list; (4) four
+`must_be_zero` assertions that are only valid before T-06 ships a real writer of
+`sp_role`.
 
 Column list confirmed from source: `created_at, created_by, updated_at, updated_by, is_active
 (tinyint default 1), deleted_at, id (bigint PK AUTO_INCREMENT), alignment_id (bigint NOT NULL),
@@ -792,9 +802,22 @@ sp_code (varchar(50) NOT NULL)` + this migration's `sp_role` and generated
 -- elsewhere (e.g. T-13's automated probes against the TEST datasource),
 -- not invented here.
 --
+-- ⏳ PRECONDITION — RUN THIS BEFORE T-06 REACHES DEV.
+-- Every `must_be_zero` assertion below (steps 1, 8, 9) rests on "no writer has
+-- ever written sp_role". T-06 (resolvePrimarySpCode) is that writer. Once it is
+-- deployed to DEV, `sp_role IS NOT NULL` is legitimately non-zero and those four
+-- assertions are INVALID — a non-zero result then means nothing. If T-06 has
+-- already shipped to DEV, this package needs re-scoping before it is run.
+--
+-- NOTE — TRANSIENT MID-RUN STATE, DEV-ONLY. With the `>= 1` threshold (step 2),
+-- the chosen alignment may hold exactly one active SP row. Between steps 5 and 8
+-- that row is deactivated in-flight by Probe C/C2 before cleanup restores it —
+-- anyone opening that alignment in STAR mid-run will see it with no active SP.
+-- This is expected and self-heals at cleanup; it is not a bug.
+--
 -- ⚠⚠⚠ CRITICAL — THE NULL -> ERROR 1048 INVERSION ⚠⚠⚠
 -- `@test_alignment_id` and `@promoted_id` are SESSION variables (step 2).
--- `SET @test_alignment_id = (SELECT … HAVING …)` silently returns NULL if no
+-- `SET @test_alignment_id = (SELECT … GROUP BY …)` silently returns NULL if no
 -- alignment qualifies, OR in a fresh/reconnected session that never ran
 -- step 2 on this connection. When `@test_alignment_id` is NULL,
 -- `@promoted_id` is also NULL, and step 2's UPDATE `WHERE id = @promoted_id`
@@ -865,13 +888,14 @@ SET @test_alignment_id = (
   SELECT alignment_id FROM result_pool_funding_alignment_sp
   WHERE is_active = 1
   GROUP BY alignment_id
-  HAVING COUNT(*) >= 1
   LIMIT 1
 );
--- >= 1 suffices: only ONE active row is ever promoted (below), and Probe B
+-- No minimum group size is enforced: every GROUP BY group already has >= 1
+-- row by definition, so a `HAVING COUNT(*) >= 1` here would be a tautology
+-- (dropped). Only ONE active row is ever promoted (below), and Probe B
 -- (step 4) creates its own CONTRIBUTING rows rather than requiring
--- pre-seeded ones. >= 1 lets this package run against more DEV seed shapes
--- without weakening any probe.
+-- pre-seeded ones — no minimum row count is needed, and this lets the
+-- package run against more DEV seed shapes without weakening any probe.
 SELECT @test_alignment_id AS chosen_alignment_id;
 -- ⛔ If NULL: STOP. Run no further statement. Seed DEV, then restart at step 2.
 -- ✅ If non-NULL: replace EVERY `@test_alignment_id` in steps 3-6 with the
@@ -885,6 +909,8 @@ SELECT @test_alignment_id AS chosen_alignment_id;
 -- on that alignment to PRIMARY, and capture its id. The added `sp_role IS
 -- NULL` makes it impossible to hijack a row that already holds a real role
 -- — the mirror-image half of FAIL issue 1.
+SET @promoted_id = NULL;   -- SELECT ... INTO leaves the prior value on 0 rows (warning 1329);
+                           -- without this the ⛔ NULL guard below cannot fire on a same-session re-run.
 SELECT id INTO @promoted_id
 FROM result_pool_funding_alignment_sp
 WHERE alignment_id = @test_alignment_id AND is_active = 1 AND sp_role IS NULL
@@ -893,11 +919,14 @@ SELECT @promoted_id AS promoted_row_id;
 -- ⛔ If NULL: STOP. Every active row on this alignment already holds a role;
 --    choose a different @test_alignment_id or seed a role-free active row
 --    first, then restart at step 2.
--- ✅ If non-NULL: replace EVERY `@promoted_id` in steps 5, 6 and 8 with the
---    literal number printed above before running them, for the same reason
---    as `@test_alignment_id` above — a literal cannot be lost across a
---    reconnect, cannot be NULL, and is independently reviewable before it
---    executes.
+-- ✅ If non-NULL: replace EVERY `@promoted_id` in the UPDATE immediately below
+--    AND in steps 5, 7 and 8 with the literal number printed above before
+--    running them, for the same reason as `@test_alignment_id` above — a
+--    literal cannot be lost across a reconnect, cannot be NULL, and is
+--    independently reviewable before it executes. (The UPDATE below runs in
+--    this same block, so the window is tiny — substituting there too closes
+--    it completely at zero cost.) Write both numbers down before continuing —
+--    they are the only durable record of what this run must undo.
 
 UPDATE result_pool_funding_alignment_sp
 SET sp_role = 'PRIMARY'
@@ -977,13 +1006,37 @@ VALUES (@test_alignment_id, 'ZZPROBE_C2', 'PRIMARY', 1, NOW(6));
 -- blind in that state would match ZERO rows with NO error and NO warning,
 -- while the DELETE in step 8 (keyed on literal sp_code values) still fires
 -- and makes cleanup LOOK successful. This check is the fix for that.
+--
+-- WHICH MODE ARE YOU IN? Read the branch that applies to you.
+--
+-- (a) You did NOT substitute literals: ⛔ STOP if either value below is NULL —
+--     the session was lost. The probe rows are still removable: step 8's DELETE
+--     is literal-scoped and works regardless. But the two UPDATEs below will
+--     silently match nothing. To finish by hand:
+--       1. Run step 8's DELETE as written (it needs no variables).
+--       2. Take the promoted_row_id you wrote down at step 2. If you did not
+--          write it down, find it with:
+--            SELECT id, alignment_id, sp_code, is_active, sp_role
+--            FROM result_pool_funding_alignment_sp
+--            WHERE sp_role = 'PRIMARY' AND sp_code NOT LIKE 'ZZPROBE%';
+--          CONFIRM BY EYE that exactly one row is returned and that it is the
+--          row you promoted. If zero or more than one, STOP and escalate — do
+--          not guess.
+--       3. Run step 8's two UPDATEs with that LITERAL id substituted for
+--          @promoted_id.
+--       4. Run the post-cleanup assertion; it must return 0.
+--     NOTE: this is a HUMAN-VERIFIED LOOKUP, not a re-derivation the script
+--     executes. A person confirms the row before anything writes to it. An
+--     TWO earlier drafts had the script re-derive it automatically — v1's
+--     cleanup UPDATEs (removed in v2) and v2's step-7 fallback (removed in
+--     v3). That is the defect class this package was rewritten twice to
+--     remove; do not reinstate it in any form.
+--
+-- (b) You DID substitute literals (the required path): steps 3-8 contain NO
+--     session variables and this is only a SELF-CHECK — confirm the two numbers
+--     you substituted match the ones printed at step 2, then run step 8. A NULL
+--     below is EXPECTED and harmless in this mode; it does not block cleanup.
 SELECT @test_alignment_id AS alignment_id, @promoted_id AS promoted_row_id;
--- ⛔ STOP if either is NULL: the session was lost. Do NOT run step 8 as
---    written. Instead re-derive @promoted_id with:
---      SELECT id INTO @promoted_id FROM result_pool_funding_alignment_sp
---      WHERE sp_role = 'PRIMARY' AND sp_code NOT LIKE 'ZZPROBE%';
---    and verify it returns EXACTLY ONE row before proceeding. If it returns
---    zero rows or more than one, STOP and investigate by hand — do not guess.
 
 -- ============================================================
 -- 8. CLEANUP — delete exactly what steps 2-6 added/changed
@@ -997,9 +1050,10 @@ SELECT @test_alignment_id AS alignment_id, @promoted_id AS promoted_row_id;
 -- Deleting ZZPROBE_C2 first frees the unique slot before anything else
 -- claims it.
 DELETE FROM result_pool_funding_alignment_sp
-WHERE sp_code IN ('ZZPROBE_B1', 'ZZPROBE_B2', 'ZZPROBE_B3', 'ZZPROBE_C', 'ZZPROBE_C2');
--- (ZZPROBE_A is not deleted here because its INSERT in step 3 never
--- committed — it errored and was rejected by the unique index.)
+WHERE sp_code IN ('ZZPROBE_A', 'ZZPROBE_B1', 'ZZPROBE_B2', 'ZZPROBE_B3', 'ZZPROBE_C', 'ZZPROBE_C2');
+-- `ZZPROBE_A` is included defensively: its INSERT is expected to be rejected,
+-- but if Probe A ever succeeds (broken DDL, or a stale `@promoted_id`) the row
+-- would otherwise persist as an active PRIMARY holding the unique slot.
 -- Scoped only by the literal sp_code prefix, with no alignment predicate —
 -- kept exactly as reviewed. This is the one cleanup statement that SURVIVES
 -- a lost session, because it targets rows by their distinctive literal
@@ -1063,7 +1117,8 @@ JOIN results r ON r.result_id = rpfa.result_id
 WHERE (r.platform_code = 'PRMS' OR r.is_synced_to_prms = 1)
   AND sp.sp_role IS NOT NULL;
 -- EXPECTED: 0 — no is_read_only-backing row carries a role, over the WHOLE
--- population.
+-- population. If non-zero, re-run without the COUNT wrapper to list the
+-- offending rows before escalating.
 
 -- ============================================================
 -- 10. POST-MIGRATION RE-CHECK — must equal step 1 exactly
@@ -1078,7 +1133,7 @@ FROM result_pool_funding_alignment_sp;
 -- fired on promotion and again on restoration) — this single-row drift on
 -- a shared DEV row is ACCEPTED and NOT restored; "identical" above refers
 -- only to the four checksummed columns, not byte-identity of the row. The
--- AUTO_INCREMENT counter also advances by 5 and does not reset; cosmetic.
+-- AUTO_INCREMENT counter also advances by 6 and does not reset; cosmetic.
 ```
 
 **Implementer's own caveat on the v1 package, verbatim — SUPERSEDED, retained as history:** *"The
@@ -1087,8 +1142,13 @@ rows in DEV. If DEV's seed data doesn't satisfy that (e.g. only single-SP alignm
 running this package will need to seed one first — flagging this rather than guessing at DEV's
 actual current contents, which I have no access to."*
 
-> **⚠ Superseded by v2 (Reviewer advisory, applied as GAP 3).** The threshold is now
-> **`HAVING COUNT(*) >= 1`**, not `>= 2`. `>= 2` was stricter than the probes need — only **one**
+> **⚠ Superseded twice — final state: there is NO `HAVING` clause at all.** v2 relaxed `>= 2` to
+> `>= 1` (Reviewer advisory, GAP 3); **v3 then dropped the clause entirely**, because
+> `HAVING COUNT(*) >= 1` is a **tautology** — every `GROUP BY` group has at least one row by
+> definition. The rationale comment survives in the package; the clause does not. *(This note is
+> itself a K-003 artefact: written at v2, it asserted `>= 1` as the live value and went stale one
+> round later. Caught by the v3 re-grep, corrected here — the sweep has to be re-run after **every**
+> round, not once.)* `>= 2` was stricter than the probes need — only **one**
 > active row is ever promoted, and Probe B creates its own `CONTRIBUTING` rows rather than requiring
 > pre-seeded ones. `>= 1` lets the package run against more DEV seed shapes **without weakening any
 > probe**, and removes the needless "seed more data" detour the caveat above describes.
@@ -1231,3 +1291,118 @@ are attempted and InnoDB allocates for the rejected `ZZPROBE_A` too, so it is **
 chosen alignment may hold exactly one active SP row, left deactivated in-flight — anyone opening that
 result in STAR mid-run sees an alignment with no active SP (transient, DEV-only, worth one line).
 
+
+#### ✅ Attempt 3 — Reviewer §B verdict on v3: **`STATUS: PASS`**
+
+All four v2 defects correctly closed, each fix in the right place. **Full state trace from step 1 to
+step 10 returns `@promoted_id`'s row to `is_active = 1, sp_role = NULL` — its exact starting state.**
+Every executable hazard found across three review rounds is closed. **Safe for a human to run against
+shared DEV**, on the required literal-substitution path.
+
+**Adjudications the Reviewer confirmed:**
+
+- **The Leader's brief contained a genuine contradiction, and the Implementer was right to flag it.**
+  FIX 1 said guard *both* `SELECT … INTO` statements; FIX 3, in the same brief, **deleted the second
+  one**. Exactly **one** survives (`:914`), with `SET @promoted_id = NULL;` immediately above it
+  (`:912`). The other two occurrences of that string are in historical findings tables, not
+  executable SQL. Applying FIX 3 as specified and FIX 1 to the survivor was correct on all counts.
+- **The self-corrected placement error is genuinely absent.** Verified in file order: `SET … NULL`
+  (`:912`) → `SELECT … INTO` (`:914-917`) → `SELECT … AS promoted_row_id` (`:918`) → promoting
+  `UPDATE` (`:929-931`). The draft error — `SET … NULL` landing *between* the `SELECT … INTO` and the
+  `UPDATE` — would have made the UPDATE match zero rows and silently skip the promotion. **The guard
+  fires only when the `SELECT … INTO` genuinely found nothing.**
+- **Dropping `HAVING` changes no behaviour** — semantically identical, `ONLY_FULL_GROUP_BY`-clean.
+- **All 18 deletions attributed**, none orphaned. (A naive `grep '^-'` reports only 3 because 15
+  deleted lines are SQL comments starting `--`; git's `--numstat` is authoritative.)
+
+#### Post-PASS: all four ADVISORIES applied, using the Reviewer's verbatim text
+
+**Leader decision, recorded because it bends a rule.** `/akili-execute` §2.4 says an advisory "is
+recorded and dies there… you may not widen an existing task to absorb it." I applied these anyway.
+Reasoning:
+
+- **This is not scope growth into new work.** T-02's deliverable already *includes* the deferred
+  verification package; these advisories improve that same artifact, mint no task, and add no
+  requirement.
+- **These are the most-vetted findings in the run, not the least** — three independent review rounds
+  on one artifact. The rule's stated rationale (advisories are the weakest-evidenced findings) does
+  not describe them.
+- **The remediation text is the auditor's own**, applied verbatim, so `author ≠ auditor` holds for
+  the content.
+- **The artifact is SQL a human will run against a shared database.** The Reviewer confirmed the
+  recovery gap is **real** — it classified it non-gating on *severity*, not on correctness, and
+  explicitly invited the Leader to overrule that reading.
+
+| Advisory | Applied |
+| --- | --- |
+| **1 — recovery gap (highest value)** | The ⛔ branch now carries a 4-step **human-verified** manual recovery recipe, with an explicit note that it is a lookup a person confirms — **not** a re-derivation the script executes — and a warning not to reinstate the automated version the package was rewritten twice to remove. |
+| **2 — branch order** | Step 7 now opens *"WHICH MODE ARE YOU IN?"* and puts the **⛔ dangerous branch first**. Previously the reassuring *"a NULL is harmless"* line came first, so a skimmer could carry it into the mode where it is not. |
+| **3 — `HAVING` residue** | The RUN INSTRUCTIONS illustration `SET @test_alignment_id = (SELECT … HAVING …)` corrected to `(SELECT … GROUP BY …)`. |
+| **4 — substitution window** | Step 2's own `UPDATE … WHERE id = @promoted_id` added to the substitution instruction, closing the last window at zero cost. |
+
+#### 🔁 K-003 again — and this time the stale site was the Leader's own correction note
+
+The v3 re-grep for `HAVING` found **two** hits. One is the rationale comment (correct, intended to
+survive). The other was the **Leader's own supersession note**, written at v2, asserting *"the
+threshold is now `HAVING COUNT(*) >= 1`"* — **stale one round later**, once v3 dropped the clause
+entirely.
+
+A correction note that goes stale is still a stale site. Corrected in place, with the final state
+recorded: **there is no `HAVING` clause at all.**
+
+**The lesson, third occurrence in this spec:** the sweep must be re-run after **every** round, not
+once per finding. K-003 has now failed 3× on C1, 4× in this spec's judgment rounds, and twice inside
+T-02's own rework — the second time on text written *by the person running the sweep*.
+
+
+#### ✅ Confirmation read on the Leader's post-PASS edits — **CLEAN, no findings**
+
+The Leader authored four edits after the PASS and asked the Reviewer to confirm them rather than be
+the last word on its own text. Verdict: **all four match intent, nothing lost in the reorder, residue
+sweep clean.**
+
+- **The Leader's one original sentence is historically correct.** *"…the defect this package was
+  rewritten twice to remove"* — **"twice" holds**: predicate-based re-derivation appeared in two
+  places, each removed by a separate rewrite (v1's cleanup `UPDATE`s → removed in v2; v2's step-7
+  fallback → removed in v3). The Reviewer flagged one imprecision — *"an earlier draft"* read
+  singular while *"twice"* referred to the **defect class** — noting the operative instruction was
+  unambiguous regardless. **Tightened anyway** to name both drafts and both removals explicitly.
+- **Reordered step 7 loses nothing.** Branch (a) carries the ⛔ STOP, all four recovery steps, the
+  CONFIRM-BY-EYE gate, the escalate-on-zero-or-many rule and the HUMAN-VERIFIED-LOOKUP note; branch
+  (b) still tells the substituted runner everything it needs. The preamble survives above both. **The
+  dangerous branch now reads first — that is the fix.**
+- **Residue sweep clean, and broader than the Leader's.** The Reviewer swept strings a `HAVING` grep
+  would miss: `"5, 6 and 8"` → **zero hits** (v2's wrong substitution list fully gone);
+  `"advances by 5"` → only inside the verbatim record of its own advisory, live text correctly reads
+  6; `"LIMIT 20"` → only the comment explaining its removal plus the historical table; the v2 heading
+  → gone. Live `HAVING` and `>= 2` hits are the two intended ones (the drop-rationale comment, and
+  Probe C2's genuinely different `n>=2`).
+- **On the Leader's partial overrule:** *"I think you read it correctly. I classified ADV 1 on
+  severity, not correctness, and said so — the gap was real and I left the decision with you.
+  Applying a one-paragraph fix to SQL a human runs against a shared database is the right call."*
+
+### T-02 — final state
+
+| Claim | Status |
+| --- | --- |
+| Migration artifact conforms to `design.md` §3.1; lints, builds, committed at `77f7e4f8` | ✅ **PASS** |
+| Probe package is safe and correct for a human to run against shared DEV | ✅ **AUDITED** (3 rounds, 9 defects closed) |
+| `idx_rpfas_active_primary` rejects a second active `PRIMARY` (R-BIL-121 AC.3) | ❌ **UNVERIFIED** |
+| The index permits unlimited active `CONTRIBUTING` rows (R-BIL-121 AC.4) | ❌ **UNVERIFIED** |
+| Row count + checksum preserved over seeded data (NFR-BIL-120) | ❌ **UNVERIFIED** |
+| `is_read_only` legacy alignment unmutated (R-BIL-126 AC.3) | ❌ **UNVERIFIED** |
+| Forward + revert + forward (T-02 done-criterion 1, R-BIL-126 AC.5) | ❌ **UNOWNED GAP** — no vehicle in this package; CI/CD owns migrations |
+
+**Status `[~]` is correct and deliberate.** The audit certifies only that the SQL is **safe and
+correct to execute** — never that the index behaves correctly. Per `tasks.md` line 138 that evidence
+exists only once the probes run **and their verbatim output is recorded**.
+
+**Two routes close it:** a human runs the v3 package against DEV **before T-06 ships** (the ⏳
+PRECONDITION banner explains why that deadline is real), or **T-13** automates all three probes
+against the `TEST` datasource — the durable path, and the one that survives future changes.
+
+**⚠ T-06 ordering constraint, now load-bearing in two directions:** T-06 is the writer that
+invalidates the package's four `must_be_zero` assertions. Whoever runs the manual probes must do so
+**before** T-06 reaches DEV, or re-scope them first.
+
+---
