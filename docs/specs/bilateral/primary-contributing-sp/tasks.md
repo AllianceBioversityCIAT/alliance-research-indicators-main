@@ -667,7 +667,7 @@ graph TD
 - **Estimated LOC:** ~240
 - **Effort:** L
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-15). 163 insertions / 28 deletions, **no SCSS** — D-C2-10's "reuse verbatim" was literal. **AC.5's single render is UNREPRESENTABLE, not merely unlikely** (`Map` keyed on `sp_code`; the Reviewer failed to construct a duplicate through any input path, including a server-side duplicate). **The `toc_alignments: []` trap was traced to the server gate at `bilateral.service.ts:703` and proven unreachable via `canSave()` — but the dead `: []` branch survives at `:724-726`, ~400 lines from its guard → `/akili-archive`.** 🔵 **Lifecycle risk checked and cleared:** `@for`→`@if` makes Angular REUSE the block instance instead of recreating it; per-SP writable state would have leaked and made AC.4 quietly wrong. The block is `input()`+`computed()` only, so AC.4 is safe. ⚠️ **Version-lock stranding PERSISTS — silently now instead of contradictorily.** It is a **spec contradiction** (AC.4 mandates the re-block, AC.5 mandates the disable; together they mandate the trap), not a code defect → T-16 §12.2 open behavior. **→ T-16: the both-orphaned-and-stale row's `data-testid` is `pf-alignment-stale-<sp>`, NOT `pf-alignment-orphaned-<sp>`** — query `[data-orphaned]`/`[data-stale]` instead, or a correct implementation gets a red test written against it.
 
 ---
 

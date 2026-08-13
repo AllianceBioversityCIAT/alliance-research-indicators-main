@@ -44,6 +44,18 @@ interface AlignmentFormData {
   toc_drafts: SpAlignmentDraft[];
 }
 
+// @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-129, design.md §6.4
+// A saved ToC row rendered read-only for one of two reasons (or both, never
+// twice — see readOnlyTocSummaries below): it belongs to an SP that is no
+// longer Primary (`isOrphaned`), or its `toc_result_id` no longer resolves in
+// the live catalog (`isStale`, the pre-existing AC-08.4 concept). Module-private
+// — not part of any exported surface, so it cannot widen a consumer's type.
+interface ReadOnlyTocSummary {
+  alignment: SavedTocAlignment;
+  isOrphaned: boolean;
+  isStale: boolean;
+}
+
 @Component({
   selector: 'app-pool-funding-alignment',
   imports: [
@@ -137,6 +149,11 @@ export default class PoolFundingAlignmentComponent {
     'Theory of Change alignment is only editable on the live 2026 version of this result. The alignment below is read-only.';
   // AC-08.4 — stale snapshot warning tag (display-only).
   readonly STALE_SNAPSHOT_TAG = 'Stale — catalog item no longer available';
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-129
+  // Read-only orphan tag (display-only) — reuses the stale tag's `.pf-stale-tag`
+  // visual treatment verbatim (D-C2-10); only the copy differs.
+  readonly ORPHANED_TOC_TAG = 'Not the current Primary — read-only';
+  readonly NO_TOC_ALIGNMENT_MESSAGE = 'No Theory of Change alignment recorded.';
   // REQ-BIL-TM2-10 / D-6a — destructive SP-deselect confirmation copy (OQ-5 default).
   readonly DESELECT_CONFIRM_SUMMARY = 'Remove Science Program?';
   readonly DESELECT_CONFIRM_DETAIL =
@@ -245,6 +262,21 @@ export default class PoolFundingAlignmentComponent {
     return this.formData().selected_sps.filter(sp => sp.official_code !== primary);
   });
 
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-128 AC.1/AC.4/AC.5
+  // The ONLY SP the ToC block renders for. `null` when no Primary is chosen
+  // (AC.5 — no block renders) or the Primary isn't among the currently
+  // selected SPs (defensive; `syncDraftsToSelection` already clears
+  // `primary_sp_code` when its SP is deselected, R-BIL-127 AC.4). Single
+  // source of truth for AC.1 ("exactly one block, for the Primary") and AC.4
+  // ("changing the Primary moves the rendered block") — both are automatic
+  // consequences of this one computed changing identity, not two behaviors
+  // to keep in sync.
+  readonly primarySelectedSp = computed<SelectedScienceProgram | null>(() => {
+    const primary = this.primarySpCode();
+    if (!primary) return null;
+    return this.formData().selected_sps.find(sp => sp.official_code === primary) ?? null;
+  });
+
   // AC.5 — read-only and version-locked states disable the Primary control
   // alongside the existing picker (which itself disables on !editable() ||
   // isReadOnly()); version-locked is an ADDITIONAL trigger specific to the
@@ -259,8 +291,23 @@ export default class PoolFundingAlignmentComponent {
   // whenever the Primary selector is visible, interactive, and unanswered —
   // including on load for a legacy alignment with selected SPs but no role
   // yet (R-BIL-126).
+  //
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15, T-14 review ADVISORY 2
+  // (promoted to in-scope). Also gated on !versionLocked(): `primaryControlDisabled`
+  // already disables the Primary radio group under a version lock (matching
+  // `blocksDisabled`'s formula), but this message ignored that and kept demanding
+  // an action the disabled control forbids — and since deselecting the SP holding
+  // Primary is still possible via the (not version-lock-disabled) SP picker while
+  // the radio group is frozen, the Primary became unrecoverable except by reload.
+  // Minimal fix: suppress the message. Do NOT also disable the SP picker under
+  // version-lock — that changes shipped, tested behaviour outside this task.
+  // Spec ambiguity this closes: R-BIL-127 AC.5 mandates the version-locked
+  // DISABLE on "the Primary control... alongside the existing picker", but the
+  // existing picker itself has no version-lock disable — only
+  // `!editable() || isReadOnly()` — so "alongside" and "matching" are not the
+  // same claim, and AC.5's Details line reads as the latter.
   readonly primaryRequiredMessage = computed<string | null>(() => {
-    if (!this.editable() || this.isReadOnly()) return null;
+    if (!this.editable() || this.isReadOnly() || this.versionLocked()) return null;
     const form = this.formData();
     if (form.has_contribution !== true || form.selected_sps.length === 0) return null;
     return form.primary_sp_code ? null : this.PRIMARY_SP_REQUIRED_MESSAGE;
@@ -273,7 +320,7 @@ export default class PoolFundingAlignmentComponent {
     if (!this.editable() || this.isReadOnly() || !this.isDirty() || !hasMinimalSelection) return false;
     // R-BIL-127 AC.3 — with has_contribution === true, a Primary must be chosen.
     if (form.has_contribution === true && !form.primary_sp_code) return false;
-    // Block save until every RENDERED block is answered: the per-SP ToC question
+    // Block save until the RENDERED block is answered: the per-SP ToC question
     // is required (*), so unanswered (null) blocks too, as does a "Yes" below the
     // Level + HLO floor (R-BIL-112 AC.1-4). A "Yes" carrying Level + HLO is
     // saveable even without an indicator (the completeness half of this gate was
@@ -281,11 +328,16 @@ export default class PoolFundingAlignmentComponent {
     // (AC-04.3), so this gate is skipped then.
     // @sdd-spec docs/specs/bilateral/toc-optional-mapping/design.md §8 (D-C1-4 — the archived
     // save-gating-ux spec this line used to cite never existed under any name; see Finding 1)
-    if (this.showHloSection() && this.showTocBlocks() && !this.versionLocked()) {
-      for (const sp of form.selected_sps) {
-        const draft = form.toc_drafts.find(d => d.sp_code === sp.official_code);
-        if (!draft || !this.isDraftSaveable(draft)) return false;
-      }
+    //
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-128 AC.2
+    // Narrowed from "every selected SP" to "the Primary's draft only" — only one
+    // block is rendered now (T-15), and a Contributing SP without a ToC answer
+    // must not block save. `form.primary_sp_code` is guaranteed set here: the
+    // `has_contribution === true && !form.primary_sp_code` clause above already
+    // returned false otherwise.
+    if (this.showHloSection() && this.showTocBlocks() && !this.versionLocked() && form.primary_sp_code) {
+      const draft = form.toc_drafts.find(d => d.sp_code === form.primary_sp_code);
+      if (!draft || !this.isDraftSaveable(draft)) return false;
     }
     return true;
   });
@@ -315,6 +367,45 @@ export default class PoolFundingAlignmentComponent {
   readonly staleSnapshots = computed<SavedTocAlignment[]>(() => {
     const saved = this.alignment()?.toc_alignments ?? [];
     return saved.filter(a => a.aligns_with_toc && this.isStaleSaved(a));
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-129, design.md §6.1/§6.4
+  // Saved ACTIVE ToC rows whose sp_code is not the current Primary (R-BIL-125
+  // retains them; the read-back's ToC filter is role-agnostic — design.md §5.3 —
+  // so `toc_alignments` already carries every active row here regardless of
+  // role). `this.alignment()?.toc_alignments` IS the active set: a deactivated
+  // row is excluded server-side, never returned at all. Deliberately does not
+  // filter on `aligns_with_toc` — an orphaned "No" row is still retained data
+  // that must not silently vanish (R-BIL-129's rationale draws no distinction).
+  readonly orphanedTocAlignments = computed<SavedTocAlignment[]>(() => {
+    const primary = this.primarySpCode();
+    const saved = this.alignment()?.toc_alignments ?? [];
+    return saved.filter(a => a.sp_code !== primary);
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-129 AC.5, design.md §6.4
+  // "A row that is both orphaned and stale renders ONCE" — unioned by sp_code
+  // through a Map, never concatenated. This makes the duplicate structurally
+  // UNREPRESENTABLE, not merely unlikely: a Map key can hold only one entry, so
+  // a second write for the same sp_code (from the stale pass) merges the
+  // `isStale` flag onto the existing entry instead of appending a sibling
+  // element the template would then render a second time. The same reasoning
+  // T-14 used for `primary_sp_code` being one field rather than a per-SP flag.
+  // A `concat`-based implementation would only fail AC.5's discriminating
+  // fixture (a row genuinely both orphaned AND stale); on any fixture that is
+  // only one of the two, concat and union are indistinguishable — which is
+  // exactly `tasks.md`'s stated disqualifier, and exactly why this is a Map,
+  // not a list append.
+  readonly readOnlyTocSummaries = computed<ReadOnlyTocSummary[]>(() => {
+    const bySp = new Map<string, ReadOnlyTocSummary>();
+    for (const row of this.orphanedTocAlignments()) {
+      bySp.set(row.sp_code, { alignment: row, isOrphaned: true, isStale: false });
+    }
+    for (const row of this.staleSnapshots()) {
+      const existing = bySp.get(row.sp_code);
+      bySp.set(row.sp_code, existing ? { ...existing, isStale: true } : { alignment: row, isOrphaned: false, isStale: true });
+    }
+    return [...bySp.values()];
   });
 
   constructor() {
@@ -621,6 +712,18 @@ export default class PoolFundingAlignmentComponent {
     const form = this.formData();
     // AC-09.1 — when version-locked, do NOT submit toc_alignments at all.
     const includeToc = form.has_contribution === true && this.showTocBlocks() && !this.versionLocked();
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-128 AC.3
+    // The PATCH body carries AT MOST ONE toc_alignments entry, for the Primary —
+    // never the full `form.toc_drafts` set (that would resubmit every
+    // Contributing SP's stale/empty draft, which the server now rejects with
+    // `toc_alignment_not_primary_sp`, R-BIL-124). Filtering `toc_drafts` down to
+    // the Primary's sp_code before handing it to `writeDtoFromDrafts` makes a
+    // second entry structurally impossible: the array literally cannot contain
+    // more than one draft once filtered by a single equality check, and
+    // `writeDtoFromDrafts` never adds entries beyond what it's given.
+    const primaryDraft = form.primary_sp_code
+      ? form.toc_drafts.filter(d => d.sp_code === form.primary_sp_code)
+      : [];
     const body: UpdatePoolFundingAlignmentDto = {
       has_contribution: form.has_contribution as boolean,
       ...(form.has_contribution ? { sp_codes: form.selected_sps.map(sp => sp.official_code) } : {}),
@@ -628,7 +731,7 @@ export default class PoolFundingAlignmentComponent {
       // true and no Primary is chosen, so `form.primary_sp_code` is populated
       // whenever it is sent; omitted (not sent as undefined/empty) otherwise.
       ...(form.has_contribution && form.primary_sp_code ? { primary_sp_code: form.primary_sp_code } : {}),
-      ...(includeToc ? { toc_alignments: this.bilateralService.writeDtoFromDrafts(form.toc_drafts) } : {})
+      ...(includeToc ? { toc_alignments: this.bilateralService.writeDtoFromDrafts(primaryDraft) } : {})
     };
 
     const result = await this.bilateralService.patchAlignment(this.resultCode(), body);

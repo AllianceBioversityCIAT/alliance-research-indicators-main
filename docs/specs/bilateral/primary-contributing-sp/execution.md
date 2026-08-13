@@ -3401,3 +3401,156 @@ DevOps branch push. **That is the correct place for it** — it is a deployment 
 Recorded so nobody later reads T-13's green as covering it.
 
 ---
+
+## T-15 — Client: ToC block for the Primary only, plus the read-only orphan summary
+
+**Attempts:** 1 · **Verdict:** `STATUS: PASS` (Reviewer `opus`, ≠ Implementer `sonnet`) · **Diff:** 2 files,
+**163 insertions / 28 deletions** against a ~240 estimate. **No SCSS changed** — D-C2-10's "reuse the stale
+markup verbatim" turned out to be literal: `.pf-stale-snapshot` and `.pf-stale-tag` already existed.
+
+### The two highest-risk properties were made structural, not incidental
+
+**AC.5 — a duplicate is unrepresentable.** `readOnlyTocSummaries` keys a `Map<string, ReadOnlyTocSummary>`
+on `sp_code`: the orphan pass writes, the stale pass merges `isStale` onto the existing entry. The Reviewer
+tried to construct a duplicate through every input path and could not:
+
+| Path | Result |
+| --- | --- |
+| row in **both** collections (the discriminating fixture) | second `set` spreads onto `existing` — **one** entry |
+| two saved rows with the same `sp_code` from the server | `Map.set` collapses them — **more robust than the spec requires**, and it also dedupes a case `@for … track` would otherwise throw `NG0955` on |
+| `sp_code` null/undefined | typed non-nullable; even a leaked null collapses to one key |
+| the Primary's own row being stale | one entry, `data-testid` preserved, AC-08.4 markup byte-compatible |
+
+**A second-order property the Implementer did not claim:** `staleSnapshots` filters on `aligns_with_toc`,
+`orphanedTocAlignments` does not — so **no stale row is lost** by the union, and orphaned "No" rows are
+newly surfaced. Both directions correct.
+
+**AC.3 — at most one payload entry**, by a filter on scalar equality that cannot yield two. `toc_drafts` is
+itself rebuilt as `selected_sps.map(...)`, one draft per SP, so it cannot hold two for one code.
+
+### The empty-array trap I flagged: traced to the server, proven unreachable — and left as a trap
+
+I briefed the Reviewer that a **present-but-empty** `toc_alignments: []` would trip the server's version
+gate, because `if (dto.toc_alignments)` is truthy for `[]`. Confirmed at `bilateral.service.ts:703`. **The
+client cannot emit it today**, proven by chaining the guards: `includeToc` requires
+`has_contribution === true && showTocBlocks() && !versionLocked()`; `onSave` early-returns on `!canSave()`;
+`canSave` requires `primary_sp_code` and `selected_sps.length >= 1`. So all four conditions of the ToC clause
+hold whenever `includeToc` does, `isDraftSaveable` has already returned true, and exactly one entry is
+emitted. **`toc_alignments` is either absent or a one-element array. Never `[]`.**
+
+But the `: []` fallback at `:724-726` is **dead code that survives the task**, and the two guards live ~400
+lines apart — see ADVISORY 1.
+
+### R-BIL-129 AC.3/AC.4 — proven by structural absence, not by a container-class check
+
+`tasks.md`'s presence-assertion caveat says asserting the container class exists does **not** prove
+non-editability. The Reviewer read the **entire rendered subtree** (`.html:287-321`): `div`, `strong`, `span`
+and interpolations only — no `ngModel`, no `p-radioButton`/`p-dropdown`/`p-select`, no
+`input`/`textarea`/`button`, no `(click)`/`(change)`. And grepped all of `src/`: the three orphan signals have
+**zero references** outside this component, and appear in no path feeding `onSave`, `isDirty` or `canSave`.
+
+### A non-obvious risk the Reviewer checked and cleared
+
+Replacing `@for … track sp.official_code` with `@if (…; as sp)` **changes the block's lifecycle**: when the
+Primary changes, Angular now **reuses** the same `SpTocAlignmentBlockComponent` instance with new inputs
+instead of destroying and recreating a per-SP view. **If the block held per-SP writable state, the previous
+Primary's state would leak into the new one and R-BIL-128 AC.4 would be quietly wrong.** It does not — the
+block is entirely `input()` + `computed()`, and its only writable signal is `selectPanelWidthPx`, re-set on
+every panel show. **AC.4 is safe.** Nobody asked for this check; it is the kind of defect that ships green.
+
+### The version-lock fix closes the *message*, not the *state*
+
+The contradiction T-14's review found — *a red message demanding an action every control forbids* — is gone.
+**The stranding is not:** version-locked + deselect the Primary's SP → `primary_sp_code` cleared → `canSave()`
+false → radio group disabled → re-selecting the SP does not restore Primary; the only non-destructive
+recovery is a reload. **What changed is that the block is now silent rather than misleadingly explained.**
+
+Not gated, and T-15 was right not to fix it: **this is a spec-level contradiction, not an implementation
+defect.** R-BIL-127 **AC.4** mandates the re-block; **AC.5** mandates disabling the control under version
+lock; together they mandate the trap. → T-16's §12.2 entry, as an open behavior.
+
+**AC tension to record rather than gate:** AC.3's literal text (*"`canSave()` is false **and** an inline
+message names what is missing"*) is now narrowed by a third suppressor. Consistent with how `isReadOnly()`
+was already treated at `HEAD`, so not a new class of deviation — **but T-16 must assert AC.3 on an editable,
+unlocked fixture or it will encode the narrowing as the requirement.**
+
+### Red-test ledger — reproduced exactly
+
+**31 failed / 59 passed / 90**, against T-14's recorded **28 / 62 / 90**. Net **+3**, and the Reviewer
+reconciled all 31: 28 baseline-consistent, 3 new — all block-count assertions, none touching
+`onSave`/`canSave`, all green at baseline because T-14 changed nothing about block rendering, all red now for
+the intended reason (no fixture sets a Primary → `primarySelectedSp()` null → zero blocks). **Zero
+unexpected flips in either direction; 28 + 3 = 31 with no cause left unrepresented.**
+
+### Ruling on the unauthorized copy
+
+The spec **is** genuinely silent on an orphaned row that answered "No" — R-BIL-129 and `design.md` §6.4 say
+nothing about `aligns_with_toc: false`. The Implementer's characterisation was accurate.
+
+**Rendering "No" rows at all is right, and better-grounded than they argued.** `design.md` §5.2 (`:224`):
+*"an explicit `aligns_with_toc: false` for a Contributing SP is also a write, and it too must be rejected
+rather than silently nulling a retained row."* **The spec treats a "No" row as retained data the server
+actively protects** — excluding it would make data the server refuses to overwrite invisible in the UI,
+precisely the failure R-BIL-129 exists to prevent.
+
+**On the string itself — CHANGE, advisory not gating.** *"No Theory of Change alignment **recorded**"* states
+the absence of a record; what is stored is an explicit negative answer, which **is** a record. For a summary
+whose whole purpose is *"data that is still stored does not vanish from the screen"*, that copy works against
+the requirement it serves, and a user cannot distinguish it from an unanswered row. → **"Not aligned with the
+Theory of Change."** And `ORPHANED_TOC_TAG` (*"Not the current Primary — read-only"*) is unspecified copy of
+the same class **which the Implementer did not flag**. Both belong in §12.2 as decisions taken in the spec's
+absence — **not as design conformance.**
+
+### The type gate — the available argument was stronger than the one offered
+
+The Implementer's type-safety-by-construction argument holds on every clause (verified: `ReadOnlyTocSummary`
+unexported at `:53`; other additions purely additive; `primaryRequiredMessage`/`canSave`/`onSave` signatures
+unchanged; sole consumer is `app.routes.ts:109`). **But it understated what was available:**
+
+> *"`npm run build` is not a partial gate for this diff — it is a **complete** one. `app.routes.ts` is in
+> `tsconfig.app.json`'s transitive graph from `main.ts`, and `strictTemplates` is on, so `ng build`
+> type-checks the **template** too — which is where most of this diff lives. The one thing `ng build` cannot
+> see is `*.spec.ts`, and **this diff touches no spec file**. So for T-15 the inert `tsc` gate costs nothing
+> at all."*
+
+Build exit 0, `pool-funding-alignment` not among the pre-existing warnings.
+
+**On `npm run s-lint`** (352 pre-existing project-wide problems): the scoped reading is *sound but vacuous
+here* — the diff has zero SCSS, so the honest report is **"N/A — no SCSS changed"**, not "zero problems in my
+files", which implies the gate discriminated when it could not have. **Carry forward: a project-wide gate
+already red cannot fail on a new violation, and "zero in my files" is only evidence from a per-file
+invocation (`npx stylelint <path>`).**
+
+**K-003 sweep:** `"every selected SP"`, `"per selected SP"`, `"one block per"`, `"independent block"` — two
+surviving hits, both correct (`:252` describes the *Primary selector*, true; `:333` a deliberate "narrowed
+from" note). No dead helper, no dead computed, no comment still describing N blocks.
+
+### ADVISORY (4R) — recorded
+
+1. **RELIABILITY — the dead `: []` branch is a trap that outlives the task.** `:724-726` falls back to `[]`
+   when `primary_sp_code` is falsy. Unreachable today, **but the two guards live ~400 lines apart and
+   `includeToc` does not itself mention the Primary** — so any future relaxation of `canSave`'s `:322` clause
+   silently starts emitting `toc_alignments: []`, **truthy** at the server's `:703` gate, firing
+   `409 toc_mapping_version_locked` on a save carrying no ToC intent at all. Fix: fold emptiness into the gate
+   — `...(includeToc && primaryDraft.length > 0 ? … : {})` — making the omission structural. **Out of T-16's
+   remit (spec-only); → `/akili-archive`.**
+2. **RELIABILITY — version-lock stranding persists, silently.** Spec contradiction, not code defect (above).
+   → §12.2 open behavior; **and consider whether the version-locked banner (`.html:268-274`) should say
+   Primary changes are frozen — it currently explains only the ToC lock.**
+3. **READABILITY — the `data-testid` for a both-orphaned-and-stale row is `pf-alignment-stale-<sp>`**, not
+   `pf-alignment-orphaned-<sp>` (`.html:291`, ternary on `row.isStale`). Right call for AC-08.4 compatibility,
+   **but a T-16 test querying `[data-testid="pf-alignment-orphaned-SP06"]` finds nothing and could be misread
+   as "renders zero times."** `[data-orphaned]`/`[data-stale]` are the discriminating selectors. → **the most
+   likely way a correct implementation gets a red test written against it. Must be in T-16's brief.**
+4. **RISK — an unsaved deselection now surfaces new read-only cards.** `orphanedTocAlignments` filters on
+   Primary only, not on current selection, so a deselected-but-unsaved `SP09` renders as *"Not the current
+   Primary — read-only"* until the save lands. Faithful ("still stored server-side") and matches how
+   `staleSnapshots` already behaved — **but before T-15 it only happened for stale rows and now it happens for
+   every non-Primary row.** → human's eye at the HITL pause. Not a violation; R-BIL-129 defines the set by
+   Primary, exactly as implemented.
+5. **RISK — the AC.6 visual gap is inherited, not closed, and T-15 adds a second badge to it.**
+   `ORPHANED_TOC_TAG` reuses `.pf-stale-tag` verbatim, inheriting the `bg-[#fcfcfc]` contrast problem exactly
+   (~1.6:1 in dark mode). Nothing in T-15 worsens it and nothing in T-15 could fix it without leaving remit —
+   **but the orphan tag is now a second load-bearing non-colour cue on that unfixed surface.**
+
+---
