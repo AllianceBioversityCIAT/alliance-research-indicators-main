@@ -47,7 +47,28 @@ describe('ResultsCenterComponent', () => {
       onSelectFilterTab: jest.fn(),
       onActiveItemChange: jest.fn(),
       noteUserFilterMutation: jest.fn(),
-      seedFromUrl: jest.fn(),
+      // T-07 / KZ-001 — this fidelity double mirrors the two real methods'
+      // production bodies (results-center.service.ts:810-845 and :1135-1142)
+      // closely enough that the T-07 effect's second-visit test can actually
+      // fail: `seedFromUrl` writes `indicator-codes-tabs` the same way the
+      // real seeding does, and `syncIndicatorTabSelection` mutates the SAME
+      // `indicatorTabsListSignal` the effect reads through `mockApiService`,
+      // not a detached stub the assertion can't see.
+      seedFromUrl: jest.fn(({ filters, scope }: any) => {
+        mockResultsCenterService.resultsFilter.update((prev: any) => ({
+          ...prev,
+          'indicator-codes-tabs': filters?.indicator !== undefined ? [filters.indicator] : []
+        }));
+        void scope;
+      }),
+      syncIndicatorTabSelection: jest.fn((indicatorId: number) => {
+        indicatorTabsListSignal.update((prev: any[]) =>
+          prev.map(item => ({
+            ...item,
+            active: item.indicator_id === indicatorId
+          }))
+        );
+      }),
       tableFilters: signal({ indicators: [], statusCodes: [], sources: [], contracts: [], levers: [], years: [] }),
       resultsTablePaginatorFirst: signal(0),
       resultsFilter: signal({
@@ -534,6 +555,155 @@ describe('ResultsCenterComponent', () => {
       TestBed.flushEffects();
 
       expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // T-07 — indicator tab-strip sync effect (design.md §7.3, requirements.md
+  // R-RCU-002 CapDev scenario / AC.3). The "All Indicators" id-0 row plus
+  // TWO other distinct indicator ids are present in every fixture below
+  // (KZ-004): a list of one tab cannot distinguish "activates the right
+  // tab" from "activates every tab", so each assertion checks that EXACTLY
+  // one tab is `active` and that it is the right one.
+  //
+  // Harness note: `TestBed.flushEffects()` only runs an effect that has
+  // been (re-)marked dirty by a **new** `fixture.detectChanges()` pass —
+  // calling it on its own a second time, with no intervening
+  // `detectChanges()`, is a no-op even though a tracked signal changed in
+  // between (verified empirically against this Angular version). `ngOnInit`
+  // itself only fires on a fixture's FIRST `detectChanges()` call, never on
+  // later ones, so calling `detectChanges()` more than once is always safe
+  // — only that first call risks colliding with this harness's convention
+  // of driving `initializeState()` directly (see the class-level KZ-001
+  // comment). Every test below therefore neutralizes `initializeState` for
+  // that one unavoidable first `detectChanges()` pass, restores it, then
+  // drives the real scenario through the real `initializeState()` call.
+  describe('indicator tab-strip sync effect (T-07)', () => {
+    it('activates the right tab on a first visit (deep link, design §7.3)', async () => {
+      // The component's constructor already created the effect; this first
+      // `detectChanges()` pass is what lets `flushEffects()` run its
+      // creation-time execution (over the still-unseeded default state).
+      // `initializeState` is neutralized here purely to stop the
+      // `ngOnInit`-triggered call from firing this test's real scenario
+      // early — the manual, awaited call below is the one under test.
+      jest.spyOn(component as any, 'initializeState').mockResolvedValue(undefined);
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      (component as any).initializeState.mockRestore();
+
+      currentQueryParams = { indicator: 'capacity-sharing-for-development' }; // -> id 1
+      indicatorTabsListSignal.set([{ indicator_id: 0 }, { indicator_id: 1 }, { indicator_id: 4 }] as any);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      const active = indicatorTabsListSignal().filter((item: any) => item.active);
+      expect(active).toHaveLength(1);
+      expect(active[0].indicator_id).toBe(1);
+    });
+
+    // The R-RCU-002 "the filter value is correct even if the strip has not
+    // yet synced" done-check. Deliberately never calls `detectChanges()` /
+    // `flushEffects()` after seeding — design §7.3: "the filter value ... is
+    // written immediately, so the fetch is correct regardless" of whether
+    // the visual `active` flag has caught up yet.
+    it('applies the correct filter value even before the tab strip has synced', async () => {
+      currentQueryParams = { indicator: 'capacity-sharing-for-development' };
+      indicatorTabsListSignal.set([{ indicator_id: 0 }, { indicator_id: 1 }, { indicator_id: 4 }] as any);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { indicator: 1 },
+        scope: 'all'
+      });
+      expect(mockResultsCenterService.resultsFilter()['indicator-codes-tabs']).toEqual([1]);
+      // The visual sync has deliberately not been flushed yet.
+      expect(indicatorTabsListSignal().some((item: any) => item.active)).toBe(false);
+    });
+
+    // JD-7 / R2-7 regression guard — the only check in this task that can
+    // detect the defect class. A fresh `TestBed` per case simulates a fresh
+    // session, so both visits below share the ONE endpoint instance
+    // (`indicatorTabsLoadingSignal` / `indicatorTabsListSignal`, both closed
+    // over by the single `mockApiService.indicatorTabs.lazy` from this
+    // `beforeEach`) across TWO component mounts inside this one `it()`.
+    //
+    // The ordering design §7.3 names: an effect runs once at creation, and
+    // on a repeat visit `isLoading()` is already permanently `false`
+    // (cached list), so that run lands BEFORE the awaited
+    // `loadPinnedTabPreference()` inside `initializeState()` — and therefore
+    // before `seedFromUrl()` — resolves. Visit 2's FIRST `detectChanges()` +
+    // `flushEffects()` pair below (before `initializeState()` is even
+    // called) reproduces exactly that early run, over the state visit 1
+    // left behind. An effect keyed on `isLoading()` alone would consume its
+    // one lifetime run right there and never react to `resultsFilter()`
+    // changing afterward; visit 2's SECOND `detectChanges()` +
+    // `flushEffects()` pair, after `seedFromUrl` has run, is what such an
+    // effect could never reach.
+    it('activates the right tab on a second visit within the same session (JD-7 / R2-7)', async () => {
+      // --- Visit 1 (uses the fixture/component from beforeEach) ---
+      jest.spyOn(component as any, 'initializeState').mockResolvedValue(undefined);
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      (component as any).initializeState.mockRestore();
+
+      currentQueryParams = { indicator: 'capacity-sharing-for-development' }; // -> id 1
+      indicatorTabsListSignal.set([{ indicator_id: 0 }, { indicator_id: 1 }, { indicator_id: 4 }] as any);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      let active = indicatorTabsListSignal().filter((item: any) => item.active);
+      expect(active).toHaveLength(1);
+      expect(active[0].indicator_id).toBe(1);
+
+      // Visit 1 ends: the component (and its effect) is destroyed, exactly
+      // as ResultsCenterComponent is destroyed on route change. The service
+      // singleton, the API endpoint's `isLoading`/`list` signals and the
+      // resultsFilter left behind all persist — a real repeat visit's
+      // starting condition.
+      fixture.destroy();
+
+      // Repeat-visit precondition (design §7.3): `isLoading()` is already
+      // permanently `false` because the list is cached from visit 1 — it
+      // never flips back to `true` for visit 2, so an effect keyed on it
+      // alone gets no second signal to react to.
+      expect(indicatorTabsLoadingSignal()).toBe(false);
+
+      // --- Visit 2 (second visit within the same session): a SECOND
+      // component instance from the SAME TestBed module — same
+      // `mockApiService`, same `indicatorTabsLoadingSignal` /
+      // `indicatorTabsListSignal`, same `mockResultsCenterService` — never a
+      // fresh `configureTestingModule()` / fresh signals.
+      const fixture2: ComponentFixture<ResultsCenterComponent> = TestBed.createComponent(ResultsCenterComponent);
+      const component2 = fixture2.componentInstance;
+
+      // Early run, over visit 1's leftover state (`indicator-codes-tabs`
+      // still `[1]` on the shared singleton, `isLoading()` still `false`) —
+      // this is the pre-seed run an `isLoading()`-only effect would consume
+      // as its one lifetime run for this component instance.
+      jest.spyOn(component2 as any, 'initializeState').mockResolvedValue(undefined);
+      fixture2.detectChanges();
+      TestBed.flushEffects();
+      (component2 as any).initializeState.mockRestore();
+
+      currentQueryParams = { indicator: 'policy-change' }; // -> id 4, a DIFFERENT tab than visit 1
+      jest.spyOn(component2 as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component2 as any).initializeState();
+      fixture2.detectChanges();
+      TestBed.flushEffects();
+
+      active = indicatorTabsListSignal().filter((item: any) => item.active);
+      expect(active).toHaveLength(1);
+      expect(active[0].indicator_id).toBe(4);
+
+      fixture2.destroy();
     });
   });
 

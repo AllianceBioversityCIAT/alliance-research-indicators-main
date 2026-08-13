@@ -195,19 +195,21 @@ graph TD
 
 ---
 
-### T-07 [ ] — Tab-strip sync effect
+### T-07 [x] — Tab-strip sync effect
 
 - **Requirements covered:** R-RCU-002 (CapDev scenario, "the Capacity Sharing tab is the active tab"), R-RCU-002 AC.3
-- **Files touched:** `…/results-center/results-center.component.ts`
+- **Files touched:** `…/results-center/results-center.component.ts` · `…/results-center/results-center.service.ts` (visibility only) · `…/results-center/results-center.component.spec.ts` — *the last two authorized by the Leader 2026-08-13; see `execution.md` T-07. `syncIndicatorTabSelection` must become public so the component effect can call it, because duplicating its `list.update` mapping into the component is the D3 state-desync defect class this spec exists to close; the spec file is required by this task's own done-checks.*
 - **Description:** A component-scoped effect that sets the visual `active` flag on the indicator tab strip, re-armed on every visit.
 - **Implementation notes:**
   - Track **both** `indicatorTabs.lazy().isLoading()` **and** `resultsFilter()['indicator-codes-tabs']` (D-URL-14). Keying on the loading signal alone reproduces JD-7: on a repeat visit the list is already cached with `isLoading()` permanently `false`, so the effect's single creation-run lands before `seedFromUrl()` and never re-runs.
-  - Requires `allowSignalWrites: true` — it writes signals transitively through `lazy()`.
-  - Do **not** repair or depend on the singleton's self-destructing `onChangeList` (`results-center.service.ts:405-430`); it is out of scope.
+  - **Both reads go above the `isLoading` guard, not below it.** Angular re-collects dependencies per run, so an early `return` placed before the `resultsFilter()` read leaves a creation-run-while-loading tracking `isLoading` alone — the very state D-URL-14 forbids.
+  - **Do not pass `allowSignalWrites`** *(corrected 2026-08-13)*. An earlier version of this note called it required; on Angular 19.1.6 it is a deprecated no-op and passing it emits a dev-mode warning. Follow T-06's two effects in the same file, which omit it. See design §7.3.
+  - **Never read `list()` in the effect body** — it writes that signal via `list.update()` (an untracked read); reading it would create a cycle that never settles.
+  - Do **not** repair or depend on the singleton's self-destructing `onChangeList`; it is out of scope. Locate it by content — search `results-center.service.ts` for `onChangeList = effect(` — never by line number (a `:405-430` citation here had already drifted 13 lines).
 - **Acceptance / done check:**
-  - [ ] A deep link activates the right tab on a **first** visit.
-  - [ ] A deep link activates the right tab on a **second visit within the same session** — the JD-7 / R2-7 regression guard.
-  - [ ] The filter value is correct even if the strip has not yet synced.
+  - [x] A deep link activates the right tab on a **first** visit.
+  - [x] A deep link activates the right tab on a **second visit within the same session** — the JD-7 / R2-7 regression guard. Both mounts share one endpoint instance inside a single `it()`; proved able to fail via an `untracked()` probe on the filter dependency.
+  - [x] The filter value is correct even if the strip has not yet synced.
 - **Disqualifies:** a single-visit test cannot detect this defect class at all; the second-visit case is the test. Mounting a fresh `TestBed` per case simulates a fresh session and therefore does **not** reproduce it — the two visits must share one endpoint instance.
 - **Dependencies:** T-06 · **Effort:** S · **Skills:** `angular-developer`
 

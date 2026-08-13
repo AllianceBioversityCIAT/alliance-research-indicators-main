@@ -144,6 +144,46 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
   });
 
   /**
+   * T-07 — indicator tab-strip sync effect (design.md §7.3, requirements.md
+   * R-RCU-002 CapDev scenario / AC.3). `syncIndicatorTabSelection` maps over
+   * `api.indicatorTabs.lazy().list()`, which is normally empty at
+   * `ngOnInit`. The singleton's self-heal (`onChangeList`,
+   * results-center.service.ts:405-430) calls `destroy()` on its first
+   * successful run, so once any earlier route has triggered it, a second
+   * visit to Results Center in the same session seeds `active` into a list
+   * that is never re-synced. This component-scoped effect replaces it,
+   * created and destroyed with the component so it re-arms on every visit —
+   * out of scope to repair or depend on `onChangeList` itself.
+   *
+   * Tracks BOTH `indicatorTabs.lazy().isLoading()` AND
+   * `resultsFilter()['indicator-codes-tabs']` (D-URL-14 / R2-7). Keying on
+   * `isLoading()` alone reproduces JD-7: an effect runs once at creation,
+   * and on a repeat visit the list is already cached with `isLoading()`
+   * permanently `false`, so that single run lands *before* `seedFromUrl()`
+   * — which happens after `initializeState()`'s awaited
+   * `loadPinnedTabPreference()` — writing `active: false` everywhere with
+   * no re-run. Tracking the filter signal makes the seed itself the
+   * trigger, so ordering stops mattering.
+   *
+   * `list()` is never read here as a tracked dependency — this effect
+   * writes `indicatorTabs.lazy().list` via `syncIndicatorTabSelection`,
+   * which uses `list.update(prev => ...)` (an untracked read); reading
+   * `list()` directly in this body would create a self-triggering cycle.
+   *
+   * No `allowSignalWrites` option is needed on this Angular version: the
+   * flag is deprecated and writes from an effect are always allowed (see
+   * the doc comment at :103-104).
+   */
+  private readonly indicatorTabStripSync = effect(() => {
+    const isLoading = this.api.indicatorTabs.lazy().isLoading();
+    const indicatorCodesTabs = this.resultsCenterService.resultsFilter()['indicator-codes-tabs'];
+    if (isLoading) {
+      return;
+    }
+    this.resultsCenterService.syncIndicatorTabSelection(indicatorCodesTabs?.[0] ?? 0);
+  });
+
+  /**
    * T-06 read path (design.md §6.1). Init-only, from `route.snapshot` —
    * never a `queryParamMap` subscription (D-URL-5): the component does not
    * listen for query-param changes, so the write path (T-08) cannot re-enter

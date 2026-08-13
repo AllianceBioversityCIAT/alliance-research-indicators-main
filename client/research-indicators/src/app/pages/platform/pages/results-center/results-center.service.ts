@@ -1132,7 +1132,7 @@ export class ResultsCenterService {
     return [...words, ...permutations].join(' | ');
   }
 
-  private syncIndicatorTabSelection(indicatorId: number): void {
+  syncIndicatorTabSelection(indicatorId: number): void {
     this.api.indicatorTabs.lazy().list.update(prev =>
       prev.map((item: GetAllIndicators) => ({
         ...item,

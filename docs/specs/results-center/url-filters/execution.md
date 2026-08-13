@@ -6,7 +6,7 @@
 | --- | --- |
 | Spec path | `docs/specs/results-center/url-filters` |
 | Approval Mode | `gated` (from `proposal.md` Document Control) — the Leader pauses for the user after every task |
-| Budget (`design.md` §13) | 12 tasks · ~1000 LOC · 3 review rounds |
+| Budget (`design.md` §13) | 12 tasks · **~3200 LOC** · 3 review rounds — *re-baselined from ~1000 by user decision 2026-08-12 after the tripwire breach at §3; the original figure did not account for the ~1,000-line spec-harness rewrite it was raised to accommodate (JD-14). Corrected here 2026-08-13: this row still read ~1000 for four tasks after the re-baseline, which is the same close-the-prose-leave-the-number failure JD-14 was.* |
 | Branch | `AC-1607-Send-bulk-upload-completion-email-with-CapDev-metrics` — **user decision, 2026-08-12.** The branch already carries the archived CapDev notification spec; the Leader flagged that the two specs' commits will interleave and that this makes the three-PR split in `tasks.md` §5 harder to cut. The user chose to stay on it |
 | Leader model / tier | Opus 5 (1M) — T1, matches the `## Model Routing` registry |
 | Implementer wrapper | `.claude/agents/akili-implementer.md` → T2 (`sonnet`) |
@@ -617,3 +617,114 @@ A grep is required because 1359 pre-existing errors would otherwise bury the sig
 `design.md` §6.2 states a cross-route mutation "cannot reach it twice over: **the counter does not move**". That is no longer true: `resetState()` (`service.ts:973`) calls `clearAllFilters()`, which now bumps, and its only caller is `project-detail.component.ts:171` — **a different route**. Harmless under T-08 (the effect captures its entry baseline at creation, so pre-existing bumps are absorbed, and the component is destroyed off-route anyway), but T-12 would otherwise be written to assert the wrong guarantee — *counter frozen* rather than *component destroyed*. Per the constitution's "fix the document, don't let docs and code drift" rule this is a one-clause doc correction rather than a scope question, and the Leader will make it unless told otherwise.
 
 
+
+---
+
+## 6. Task Execution History (continued)
+
+### T-07 — Tab-strip sync effect
+
+| | |
+| --- | --- |
+| **Status** | `[x]` — PASS on attempt 1 |
+| **Commit** | see below |
+| **Requirements** | R-RCU-002 (CapDev scenario), R-RCU-002 AC.3 · design §7.3 · D-URL-14 / R2-7 · JD-7 |
+| **Implementer** | `akili-implementer` (T2, `sonnet`), effort `high` |
+| **Reviewer** | `akili-reviewer` (T3, `opus`), lens-checklist mode |
+| **Attempts** | 1 |
+
+#### Files changed — three, two beyond the task's declared list
+
+`tasks.md` T-07 declared **Files touched** as `results-center.component.ts` alone. Two more were needed and are Leader-authorized:
+
+| File | Change | Justification |
+| --- | --- | --- |
+| `results-center.component.ts` | +40 — the `indicatorTabStripSync` effect | the task |
+| `results-center.service.ts` | +1/−1 — `syncIndicatorTabSelection` `private` → public | mechanical enabler; body byte-identical. The alternative (duplicating the `list.update` mapping into the component) is the D3 state-desync defect class this spec exists to close |
+| `results-center.component.spec.ts` | +172 — three done-check tests + a fidelity double | the task's own done-checks mandate tests; a task cannot be verified without them |
+
+Neither was escalated as a scope question: one is a single token with no behavior change, the other is demanded by the acceptance criteria. Both are recorded here and T-07's **Files touched** line is amended to match, following the precedent set on T-08.
+
+#### The mechanism
+
+```ts
+private readonly indicatorTabStripSync = effect(() => {
+  const isLoading = this.api.indicatorTabs.lazy().isLoading();
+  const indicatorCodesTabs = this.resultsCenterService.resultsFilter()['indicator-codes-tabs'];
+  if (isLoading) {
+    return;
+  }
+  this.resultsCenterService.syncIndicatorTabSelection(indicatorCodesTabs?.[0] ?? 0);
+});
+```
+
+**Both reads sit above the guard, and that placement is load-bearing** — the Reviewer's finding, not the brief's. Angular re-collects dependencies per run, so moving the `resultsFilter()` read below `if (isLoading) return;` would leave a creation-run-while-loading tracking `isLoading` **only** — precisely the single-dependency state D-URL-14 rules out. Correctness would usually survive by luck, because the eventual `isLoading` false-flip re-runs the effect and re-reads the filter; it would break for a seed arriving *during* loading. The current form is the literal reading of the decision and the robust one.
+
+#### Cycle freedom — verified at the framework source
+
+The effect writes `indicatorTabs.lazy().list` and must never read `list()`. The Reviewer confirmed the untracked-read claim rather than accepting it: `WritableSignal.update` → `signalUpdateFn(node, fn)` → `signalSetFn(node, updater(node.value))` (`@angular/core/fesm2022/primitives/signals.mjs:469-474`) reads `node.value` as a direct field access with no producer/consumer registration. The effect therefore never becomes a consumer of `list`. Cross-effect interaction also terminates: T-07 writes `list` → T-06's completeness effect (which *does* read `list()`) re-runs → writes nothing back.
+
+#### `allowSignalWrites` — the spec is the artifact that was wrong
+
+design §7.3 and `tasks.md:205` both state the effect **requires** `allowSignalWrites: true`. On Angular 19.1.6 it is a deprecated no-op, and the Leader directed the Implementer to omit it, following the precedent T-06 had already established in the same file (`results-center.component.ts:103-104`). The Reviewer confirmed at three independent sites: `core/index.d.ts:2653-2656` marks the option `@deprecated no longer required, signal writes are allowed by default`; `core.mjs:40768-40769` emits a dev-mode `console.warn` when it *is* passed; and `BASE_EFFECT_NODE` hard-sets `consumerAllowSignalWrites: true` (`core.mjs:40815-40819`). Omitting it is not merely equivalent but marginally better — it avoids the deprecation warning that the singleton's `onChangeList` still triggers. **Both spec sentences corrected.**
+
+#### The regression guard actually guards
+
+T-07's **Disqualifies** clause is unusually strict: a single-visit test cannot detect this defect class at all, and a fresh `TestBed` per case *also* cannot, because it simulates a fresh session. The two visits must share one endpoint instance.
+
+Satisfied genuinely. `indicatorTabsLoadingSignal` / `indicatorTabsListSignal` are closed over by the single `mockApiService.indicatorTabs.lazy` from one `beforeEach`; visit 2 is a second `TestBed.createComponent` on the same configured module with no re-`configureTestingModule`; the assertion reads the shared list signal. The Reviewer verified all three conditions the JD-7 ordering needs are present — a creation-run before the seed, the seed landing later, and **no `isLoading` transition in between** to re-arm an `isLoading`-only effect — and noted two independent reasons the red is the right red: the assertion targets tab id **4** while visit 1 leaves id **1** behind (a stale pass cannot masquerade as a correct one), and the Implementer's `untracked()` probe turned the tests red on exactly the D-URL-14 property.
+
+One property emerged that the design asserted but no test had exercised: `fixture.destroy()` destroys the effect, because it is a *view* effect (`createViewEffect`, `core.mjs:40776-40778`). Visit 2's sync therefore provably comes from a **new effect instance** — design §7.3's "re-arms on every visit" claim, now under test rather than assumed.
+
+#### The shared-mock blast radius — claim not taken on trust
+
+The highest-risk item in the diff is not the effect; it is that `seedFromUrl` went from an inert `jest.fn()` to a fidelity double that **mutates `resultsFilter`**, inside the `beforeEach` shared by every test in a 1,090-line file. The Implementer asserted no other test asserts on `resultsFilter()` after `initializeState()`. The Leader's brief instructed the Reviewer to verify that by reading the file, on the grounds that a green suite is equally consistent with the claim being true and with another assertion having been silently weakened into vacuity.
+
+It read all 1,090 lines. Every `resultsFilter` occurrence outside the T-07 block belongs to `loadMyResults` / `loadAllResults` describes that call the component method directly and never reach `initializeState`, so the new body never executes there; every other `initializeState()` test asserts only on `seedFromUrl` arguments, `main` call counts, `tableFilters`, paginator, `router.navigate` and toasts — none of which the double writes. It also checked a second-order effect nobody had raised: the T-07 effect now runs inside **T-06's** tests, firing `syncIndicatorTabSelection(0)` and rewriting the list. Neither satisfies nor breaks the `console.warn` assertions there; if anything it strengthens the "warns only once per id" case.
+
+And the double's *fidelity* is anchored rather than asserted: the real `seedFromUrl`'s `indicator → indicator-codes-tabs` mapping is independently pinned by `results-center.service.spec.ts:1362-1377`, so production drifting from the double turns a service test red. Likewise the now-public real `syncIndicatorTabSelection` is exercised through `restorePersistedState` (`results-center.service.spec.ts:2199-2254`), so the production body is not left proved only by its own double — the KZ-001 trap this task was most exposed to.
+
+#### Verification
+
+| Check | Result |
+| --- | --- |
+| Targeted (`--testPathPattern "results-center"`) | 9 suites, 471 tests, pass |
+| Full client suite (KZ-003 — a root-singleton API surface changed) | **309 suites, 6451 tests, pass**; coverage 99.27 / 98.13 / 99.17 / 99.5 |
+| Type check (corrected probe) | **1354 lines — identical to the T-04 baseline**; `NO ERRORS IN T-07 FILES` |
+| KZ-001 red/green probe | dual dependency removed via `untracked()` → first-visit **and** second-visit tests red; restored → 471 green |
+
+#### PROCESS FINDING — the §5.4 remedy was correct; relocating it broke it
+
+**The recipe recorded at §5.4 was not wrong.** It writes the probe to `./tsconfig.probe.json` — inside the package — which is exactly right. What went wrong is that the Leader **re-typed it into the T-07 brief at a different path** (`/tmp/tsconfig.t07probe.json`), following this session's convention of keeping temporary files out of the project. `extends` and `exclude` globs resolve relative to the **config file's own location**, not the cwd, so `"extends": "./tsconfig.json"` became `/tmp/tsconfig.json` and failed:
+
+```
+error TS5083: Cannot read file '/tmp/tsconfig.json'.
+```
+
+TypeScript then continued with **default compiler options** — no path aliases, no `include` — and swept every reachable file, including a stale `list-routes.ts` left in an unrelated session's scratchpad. Output: **2227 lines** of a different program's errors. Re-run by the Leader with the probe inside the package: **1354 lines, byte-for-byte the pre-existing baseline**, and no errors in T-07's files. The type evidence for T-07 is clean; the first measurement simply was not of this codebase.
+
+Two lessons, and the second is the useful one:
+
+1. **A verified recipe is copied verbatim, never re-derived or relocated.** §5.4 already held the working command. The Leader paraphrased it to fit a convention (scratchpad hygiene) that silently conflicts with how `tsconfig` resolves paths. That convention is right for scripts and outputs and wrong for a config file with a relative `extends` — such a file is not a loose temporary artifact, it is a node in a path graph.
+2. **§5.4's own generalization was incomplete.** It recommended preferring "a command whose output proves it did the work (a count, a file list) over one whose only signal is silence." A count *was* produced — 2227 — and it proved nothing, because the command had silently changed **what it was counting**. The missing requirement: a verification command must **fail loudly when its own configuration does not apply**. `tsc` prints `TS5083` on line 1 and then compiles something else anyway. Here the grep survived (accidentally correct); the count, which was §5.4's recommended safeguard, is precisely what misled.
+
+**For T-08 / T-11 / T-12:** copy the §5.4 block unchanged, probe config in the package directory. Assert the baseline explicitly — `1354` — instead of reading it as informational, and treat `TS5083` / `TS6053` anywhere in the output as an aborted run rather than a finding. A *changed* baseline is now itself a signal.
+
+**Credit:** the Implementer had a clean grep and could have called the check passed. It reported the unexplained number instead, in `Not Done / Assumptions`, with an explicit "I can't attest to why the baseline moved." The finding exists because a worker declined to round an anomaly down to a green check.
+
+#### ADVISORY (recorded, non-gating, no owner)
+
+Per the Advisory rule these are recorded and die here — none may become a task or widen one. Escalated to the user in the same report as this entry.
+
+1. **Effect churn (reliability, not correctness).** Reading `resultsFilter()` tracks the whole signal, so the effect re-runs on any filter-key change — including `main()`'s `create-user-codes` normalization (`results-center.service.ts:501-519`), which fires on every fetch under the My-results tab. Each run writes a new list array with no equality guard, so `list()` consumers re-run per fetch. Idempotent for `active`, and consistent with `onChangeList`'s own idiom; an early return when the target tab is already the sole active one would remove it cheaply if profiling ever shows it.
+2. **A stale line citation was introduced into production code.** The new doc comment cites `onChangeList` at `results-center.service.ts:405-430`; it lives at `:418-443`. The error is inherited verbatim from design §7.3. The §7.3 citation is corrected to content-based; **the code comment is left as-is** — the Leader writes no production code, and an advisory may not widen a task to fix it. Recorded for whichever future task next opens that file.
+3. **Carry-forward to T-11 — two things the harness rewrite must not normalize.** (a) The fidelity double is what gives both regression guards their discriminating power; replacing it with an inert `jest.fn()` or with the real service makes them vacuous or relocates the seam. Whichever T-11 chooses, it must re-run the `untracked()` red/green probe to prove the dual dependency is still gated. (b) The `some(active) === false` assertion in done-check 3's test is true only because that test never calls `detectChanges()`. If T-11 adds a `detectChanges()` to `beforeEach` — a very natural rewrite — that assertion goes red for a *correct* behavior change, and the tempting fix is to delete it rather than re-express done-check 3 as "the filter value is right at the moment `main()` fires."
+4. **Carry-forward to T-08 — no conflict found.** T-08's write effect tracks only `userFilterMutations()`, which T-07 never bumps, so T-07's extra `list` writes cannot induce spurious navigations; neither effect reads the other's written signal.
+5. **Carry-forward to T-12.** T-07 adds a second public writer of `api.indicatorTabs.lazy().list` on the root singleton. If T-12 narrows that shared surface, the constraint to preserve is that the writer stays a **single named method** — duplicating the mapping into the component is the D3 defect class.
+
+#### Spec documents corrected with this task
+
+| Document | Correction |
+| --- | --- |
+| `design.md` §7.3 | the `allowSignalWrites: true` requirement sentence (false on Angular 19.1.6); `onChangeList` line citation → content-based |
+| `tasks.md` T-07 | the same `allowSignalWrites` note; the `onChangeList` citation; **Files touched** amended to the three authorized files |
