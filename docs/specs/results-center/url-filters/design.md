@@ -189,7 +189,7 @@ The codec resolves `source` from this constant at parse time, exactly like `indi
 6. Call `service.seedFromUrl({ filters, scope })` — one call that writes all state (§7.1) **before** any fetch.
 7. Fire exactly one `main()` (R-RCU-002 AC.4).
 8. If `dropped` is non-empty → one toast, counts only, once per navigation (R-RCU-005 AC.2/AC.3).
-9. **Wipe nothing.** Both existing wipes are removed — `112-121` *and* `133-138` (D-URL-8).
+9. **Wipe nothing.** Both existing wipes are removed (D-URL-8) — **by T-08, not by T-06.** *(Clarified 2026-08-13: this step describes the **end state**. T-06 implements steps 1–8 and deliberately **keeps** the wipe, because design §12's ordering constraint forbids removing it before the write path exists. T-06 merged the two wipes into one `router.navigate` call; T-08 deletes that single call. **Locate it by content, never by the old `112-121`/`133-138` line ranges, which now point at T-06's NFR-RCU-002 layer-2 warning effects** — see `tasks.md` T-08.)*
 
 ### 6.2 Write path — component-owned, driven by user intent
 

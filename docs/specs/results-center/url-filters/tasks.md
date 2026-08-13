@@ -168,7 +168,7 @@ graph TD
 
 ---
 
-### T-06 [ ] — Read path: parse, precedence, scope, toast
+### T-06 [x] — Read path: parse, precedence, scope, toast
 
 - **Requirements covered:** R-RCU-002 (both scenarios + AC.2/AC.4/AC.6/AC.7), R-RCU-004 (scenario + all ACs), R-RCU-005 AC.2/AC.3, R-RCU-006 (both scenarios), **NFR-RCU-002 (layer 2)** *(assigned 2026-08-12 during execution)*
 - **Files touched:** `…/results-center/results-center.component.ts`
@@ -223,7 +223,11 @@ graph TD
   - Guard: on the mandatory first run (counter still at its entry value), **return**.
   - Compare the **merged** result (`{...current, ...next}` with nulls stripped) against the current query string — comparing raw serializations navigates on every run whenever an unrecognized parameter is present.
   - `router.navigate([], { relativeTo, queryParams, queryParamsHandling: 'merge', replaceUrl: true })`.
-  - **Remove both wipes** — `results-center.component.ts:112-121` **and** `:133-138`. The second one clears `tab` and was missed in an earlier draft (JD-9).
+  - **Remove the wipe — locate it by CONTENT, never by line number** *(corrected 2026-08-13)*. **T-06 merged the two wipes into a single call.** Find the one `await this.router.navigate([], …)` at the end of `initializeState()` whose `queryParams` is exactly `{ indicatorTab: null, statusTab: null, statusLabel: null, tab: null }`, together with its preceding comment block (which opens "T-08 removes both pre-existing query-parameter wipes…"). Deleting that single statement discharges **both** D-URL-8 halves.
+  - > ⚠️ **DO NOT use the line ranges `112-121` / `133-138`.** They were correct before T-06 and are now **actively dangerous**: in the current tree they point at the bodies of `indicatorVocabularyCompletenessCheck` and `statusVocabularyCompletenessCheck` — the **NFR-RCU-002 layer-2 mitigation T-06 added**. Deleting by line number would destroy that mitigation *and* leave the wipe in place: the exact inverse of D-URL-8. This spec has now been bitten by stale line numbers twice (JD-9, then this), which is why the pointer above is content-based.
+  - **Replace the "two ranges" check with two content checks.** After the change: `router.navigate` must appear in `results-center.component.ts` **only** inside the new write effect, and a grep for `indicatorTab|statusTab|statusLabel` in that file must return **zero** hits (the codec owns those keys per R3-2).
+  - **`results-center.component.spec.ts` is authorized for this task** *(added 2026-08-13)*. T-06 added two assertions that the wipe *happens*; removing it turns them red, and the tempting "fix" is to re-add the wipe. T-11 rewrites this spec but runs **after** T-08, so T-08 must update those two cases itself.
+  - **Write the R2-2 guard against the post-deletion file.** T-06's intermediate state fires one `router.navigate` on every seeded init (all four nulls are no-ops on a canonical-only link). "Zero `router.navigate` during init" is only true once this wipe is gone — assert it after your own deletion, not against the tree you inherit.
 - **Acceptance / done check:**
   - [ ] Applying, changing and clearing each sidebar filter (plus `tab`) updates the URL correspondingly (R-RCU-003 AC.1).
   - [ ] **Clearing a filter removes its key from the address bar** — the R2-1 guard; assert the resulting URL string, not the serializer output.

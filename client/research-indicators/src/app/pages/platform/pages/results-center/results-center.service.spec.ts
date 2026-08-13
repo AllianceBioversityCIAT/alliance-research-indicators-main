@@ -1293,56 +1293,13 @@ describe('ResultsCenterService', () => {
     });
   });
 
-  describe('applyStatusFilterFromHomeLink', () => {
-    it('sets status on tableFilters and results filters and calls main by default', () => {
-      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
-
-      service.applyStatusFilterFromHomeLink(5, 'Approved');
-
-      expect(service.tableFilters().statusCodes).toEqual([{ result_status_id: 5, name: 'Approved' }]);
-      expect(service.resultsFilter()['status-codes']).toEqual([5]);
-      expect(service.appliedFilters()['status-codes']).toEqual([5]);
-      expect(mainSpy).toHaveBeenCalled();
-    });
-
-    it('does not call main when skipMain is true', () => {
-      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
-
-      service.applyStatusFilterFromHomeLink(3, 'Draft', { skipMain: true });
-
-      expect(service.tableFilters().statusCodes[0]).toEqual({ result_status_id: 3, name: 'Draft' });
-      expect(mainSpy).not.toHaveBeenCalled();
-    });
-
-    it('uses display name Status when statusName is omitted', () => {
-      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
-
-      service.applyStatusFilterFromHomeLink(9);
-
-      expect(service.tableFilters().statusCodes[0].name).toBe('Status');
-    });
-
-    it('trims statusName', () => {
-      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
-
-      service.applyStatusFilterFromHomeLink(2, '  Submitted  ');
-
-      expect(service.tableFilters().statusCodes[0].name).toBe('Submitted');
-    });
-
-    it('preserves an indicator id a sibling legacy onSelectFilterTab call just set', () => {
-      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
-      // Mirrors results-center.component.ts:99-113: onSelectFilterTab(indicatorId)
-      // runs before applyStatusFilterFromHomeLink when both legacy params are present.
-      service.onSelectFilterTab(4, { skipMain: true, skipBump: true });
-
-      service.applyStatusFilterFromHomeLink(6, 'Approved');
-
-      expect(service.resultsFilter()['indicator-codes-tabs']).toEqual([4]);
-      expect(service.appliedFilters()['indicator-codes-tabs']).toEqual([4]);
-      expect(service.resultsFilter()['status-codes']).toEqual([6]);
-    });
-  });
+  // `applyStatusFilterFromHomeLink` was deleted in T-06: its only caller
+  // (`results-center.component.ts:110`) is gone now that `initializeState()`
+  // resolves legacy `statusTab`/`statusLabel` through the codec's own
+  // `resolveLegacyStatusTab` plus a single `seedFromUrl` call (design §6.1).
+  // The coverage this describe block used to provide over "seed only the
+  // value key" and "preserve a sibling legacy indicator id" is superseded by
+  // `seedFromUrl`'s own tests below and by `results-center.component.spec.ts`.
 
   // T-04: seedFromUrl() — one method, all state (design.md §7.1).
   describe('seedFromUrl', () => {

@@ -519,6 +519,59 @@ Every reader on all four routes was checked individually: `getActiveFilters`, `a
 
 ---
 
+### T-06 — Read path: parse, precedence, scope, toast
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS on attempt 2** (1 rework round) |
+| Date | 2026-08-13 |
+| Review mode | **Parallel lens panel** (effort `xhigh`): precedence (gate) · reliability · risk. Attempt 1: risk PASS, reliability PASS, **precedence FAIL** |
+| Requirements covered | R-RCU-002 (both scenarios + AC.2/AC.4/AC.6/AC.7), R-RCU-004 (all ACs), R-RCU-005 AC.2/AC.3, R-RCU-006 (both scenarios), **NFR-RCU-002 layer 2** |
+| Files | `results-center.component.ts`, `results-center.component.spec.ts` (bounded authorization), `results-center.service.ts` (deleted `applyStatusFilterFromHomeLink`), `results-center.service.spec.ts` (its now-uncompilable describe) |
+
+`initializeState()` rewritten onto the codec: init-only from `route.snapshot` (D-URL-5), `hadRecognizedParam` gating restore, explicit scope resolution, one `seedFromUrl` then one `main()`, toast, and two new `effect()`s for NFR-RCU-002 layer 2.
+
+**Verification:** probe `tsc` clean for changed files · full suite **309 suites / 6448 tests** · lint clean. Leader independently verified all four fixes and the toast/navigate line order.
+
+#### The scope tensions the Leader resolved before spawning
+
+1. **`design.md` §6.1 step 9 vs `tasks.md` T-06 contradicted each other** — step 9 says "Wipe nothing. Both existing wipes are removed"; T-06 says "Do not remove the wipes here." Resolved in favor of T-06: §6.1 describes the **end state** after T-08, and design §12's ordering constraint is explicit that removing the wipes before the write path exists loses the user's refinement on reload and permanently suppresses session restore. `design.md` §6.1 step 9 was amended to say so.
+2. **T-06 had no test file in scope, but rewriting `initializeState` breaks ~8 existing cases — and its Disqualifies clause requires T-11's harness, which depends on T-06.** Resolved with a bounded authorization: keep the spec green and **swap the canned `ActivatedRoute` snapshot for a real `ParamMap`** (the half of KZ-001 achievable now), but **not** drop the template override or swap in the real service (T-11's ~1,000-line rewrite).
+
+#### Attempt 1 — the three lenses each found what the others did not
+
+**precedence → FAIL:** stale `tableFilters.indicators`. The Implementer closed this leak class for `levers` and the paginator but left `indicators`, which has the larger blast radius — after an in-app navigation to a deep link (T-09's Home cards), the badge counts indicators the view does not apply, the multiselect shows them selected, and **the user's next Apply silently injects an indicator filter the link never named**. Also a regression against the deleted path: the old legacy branch called `onSelectFilterTab(...)`, which cleared it. Violated R-RCU-002 **AC.3** (three-signal parity), assigned jointly to T-06 by `tasks.md` §3. The lens also noted the Leader had recorded this very item in §5 as "a T-06/T-08 decision" — T-06 decided the `levers` half and left this one **neither fixed nor recorded**.
+
+It further corrected the Implementer's done-check accounting from 6/7 to **5/7**: "exactly one results request" proved only a mocked `main()` call on two of four paths, and **"the filter is applied before that request" was not asserted at all.**
+
+**reliability → PASS**, with two questions only the Leader could settle (it has no Bash). Checked against `git show HEAD`:
+- **A real regression, confirmed:** the base awaited `loadPinnedTabPreference()` **unconditionally on both branches** (base `:101`, `:133`); the new code skipped it when `tab` was present, leaving `component.pinnedTab` at `'all'` so `orderedFilterItems()`/`isPinned()` render **the pin star on the wrong row**. The new spec had pinned the wrong behavior.
+- `resetState` never called by base `initializeState` (stale mock leftovers, no regression); `primaryContractId.set(null)` twice in the base too (pre-existing).
+
+It also caught that the Implementer **inverted design §6.1's own step order** — toast is step 8, wipe is step 9, and the code did the reverse. Consequence: a rejected navigation swallows the R-RCU-005 notice **entirely** plus an unhandled rejection. A mandatory notice must not be contingent on an unrelated router call.
+
+**risk → PASS**, and its finding was the most urgent of the three despite not being in the diff: **`tasks.md` T-08's line ranges `112-121`/`133-138` now point at the NFR-RCU-002 layer-2 warning effects T-06 just added.** An Implementer following T-08 literally would **delete the mitigation and leave the wipe** — the exact inverse of D-URL-8. It supplied the content-based replacement pointer verbatim, which the Leader applied to `tasks.md` T-08, `design.md` §6.1 step 9 and D-URL-8, plus `requirements.md`. It also raised T-06's `levers` clear from "avoids a badge inflation" to a real defect fix: `applyFilters` maps `tableFilters().levers` → `'lever-codes'`, so **the first sidebar Apply after a deep link would have re-applied a lever the user never picked on that route.**
+
+*The panel's value, recorded for Kaizen:* three lenses produced three disjoint findings. A single checklist Reviewer looking at the diff would not have opened `tasks.md` T-08 to check whether the refactor invalidated its pointers — that came from a lens whose explicit mandate was "assess damage to the tasks still ahead."
+
+#### Attempt 2 (effort `xhigh` held — the tier↔effort rule forbids `max` on T2) → `STATUS: PASS`
+
+Four fixes, batched into one attempt rather than two so the 3-attempt ceiling was not burned on partial feedback: `indicators: []` added alongside `levers: []`; `loadPinnedTabPreference()` made unconditional with `urlScope ?? preferred`; a `catch` degrading to `'all'` (in scope *because* fix 2 widened that call's blast radius to every deep link); toast moved above the navigate. Plus 5 new tests: stale-`indicators`, lone-`?tab=my` guard, preference-rejection unit + end-to-end, and toast-survives-rejected-navigate.
+
+> **Reviewer PASS summary:** All four fixes are present, spec-conformant, and evidenced by assertions that can fail; FIX 1 in particular is a *clearing* operation that design §7.2 does not prohibit and that `onSelectFilterTab` already establishes as the canonical companion to setting `indicator-codes-tabs`, so it closes R-RCU-002 AC.3 without breaching T-04 or T-07.
+
+**The ruling that mattered most** — the Leader asked whether the remediation traded one non-conformance for another, since T-04's done-check says `tableFilters.indicators` stays untouched. Ruled **no**, on three grounds: §7.2 prohibits *seeding*, and its stated rationale is that a seeded entry "would render no chip while still inflating `countTableFiltersSelected`" — writing `[]` can do neither, so it *serves* the rule; T-04's done-check is a property of `seedFromUrl`, which still never writes the key; and decisively, **`onSelectFilterTab` clears `tableFilters.indicators: []` in the same operation that sets `indicator-codes-tabs`**, so the fix converges on the codebase's own consistent-tab-state definition. T-07 is unaffected — nothing derives `indicator-codes-tabs` from `tableFilters.indicators`.
+
+**Final done-check accounting (corrected):** 5 newly proved · 2 pre-existing proved · 1 (rendered DOM chip/tab-strip parity) **deferred to T-11**, which is correct and expected.
+
+#### ADVISORY (recorded only)
+1. *Reliability.* The pinned-`my` branch still stubs `loadMyResults`, so "exactly one request" is proved compositionally there rather than end-to-end as pinned-`all` now is. Asymmetric; unstubbing would mirror fix 4.
+2. *Readability.* The new `catch` is silent while `togglePin`'s logs. A `console.warn` would match local precedent.
+3. **Carry-forward for T-08.** `initializeState` still rejects if `router.navigate` rejects (reached via `void this.initializeState()`). T-08 deletes that statement — **but if T-08's write effect calls `router.navigate` without handling rejection, the same unhandled-rejection class reappears inside an `effect()`.** Relay into the T-08 brief.
+4. *Scope note.* Layer 2 warns in production builds as well as dev/QA — a superset of `tasks.md`'s "dev/QA console" wording. Recorded as deliberate.
+
+---
+
 ### 🚨 PROCESS FINDING — `npx tsc --noEmit` was reporting nothing for five tasks, and that was not evidence
 
 **Discovered 2026-08-12 while adjudicating T-04's FAIL. This invalidates a verification command this run had been trusting since T-02.**

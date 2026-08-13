@@ -844,55 +844,6 @@ export class ResultsCenterService {
     this.myResultsFilterItem.set(isMyScope ? this.myResultsFilterItems[1] : this.myResultsFilterItems[0]);
   }
 
-  /**
-   * Legacy Home-link seeding for `?statusTab=<id>&statusLabel=<text>`
-   * (R-RCU-006). **Folded into `seedFromUrl` (T-04) rather than duplicating
-   * its state-writing logic** — the only thing unique to this call site is
-   * the label write below, which `seedFromUrl` deliberately never does
-   * (D-URL-10). This method survives only until T-06 rewires
-   * `ResultsCenterComponent.initializeState()` onto the codec's own
-   * `status` slug resolution (which already recognizes legacy `statusTab`,
-   * `results-center-url.codec.ts:resolveLegacyStatusTab`) plus a single
-   * `seedFromUrl` call carrying every filter at once; at that point this
-   * method has no caller left and can be deleted (out of this task's file
-   * scope — `results-center.component.ts` is T-06's).
-   *
-   * The current caller (`results-center.component.ts:110`) always invokes
-   * this immediately after `loadMyResults(true)` has already reset
-   * `resultsFilter`/`appliedFilters` to a blank baseline (and, when
-   * `?indicatorTab=` was also present, after `onSelectFilterTab` has just
-   * written `indicator-codes-tabs`) — so re-establishing the full seeded
-   * state here, while preserving whatever indicator id a sibling legacy call
-   * just set, matches today's observable behavior; this is not intended as
-   * a general-purpose partial-merge method.
-   */
-  applyStatusFilterFromHomeLink(statusId: number, statusName?: string, options?: { skipMain?: boolean }) {
-    const displayName = statusName?.trim() ? statusName.trim() : 'Status';
-    const preservedIndicatorId = this.resultsFilter()['indicator-codes-tabs']?.[0];
-    const scope: 'my' | 'all' = this.myResultsFilterItem()?.id === 'my' ? 'my' : 'all';
-
-    this.seedFromUrl({
-      filters: {
-        ...(preservedIndicatorId !== undefined ? { indicator: preservedIndicatorId } : {}),
-        status: [statusId]
-      },
-      scope
-    });
-
-    // The one piece `seedFromUrl` deliberately never writes (D-URL-10): this
-    // legacy call site keeps its display label until T-06 removes it. Do
-    // not copy this pattern into any new caller.
-    this.tableFilters.update(prev => ({
-      ...prev,
-      statusCodes: [{ result_status_id: statusId, name: displayName }]
-    }));
-
-    this.resetResultsTablePaginatorToFirstPage();
-    if (!options?.skipMain) {
-      void this.main();
-    }
-  }
-
   /** Fixed pending-revision table on project dashboard: status 5, current contract, all results. */
   initializeProjectDashboardResultsTable(contractId: string): void {
     this.invalidateResultsFetchDedupe();

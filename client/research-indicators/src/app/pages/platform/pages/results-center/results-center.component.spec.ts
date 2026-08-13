@@ -1,10 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import ResultsCenterComponent from './results-center.component';
 import { ResultsCenterService } from './results-center.service';
 import { CacheService } from '../../../../shared/services/cache/cache.service';
 import { ApiService } from '../../../../shared/services/api.service';
 import { ActionsService } from '../../../../shared/services/actions.service';
+import { GetAllResultStatusService } from '@shared/services/control-list/get-all-result-status.service';
 import { MenuItem } from 'primeng/api';
 import { signal } from '@angular/core';
 
@@ -15,8 +16,21 @@ describe('ResultsCenterComponent', () => {
   let mockCacheService: jest.Mocked<CacheService>;
   let mockApiService: jest.Mocked<ApiService>;
   let mockActionsService: jest.Mocked<ActionsService>;
+  let mockResultStatusService: { loading: ReturnType<typeof signal<boolean>>; list: ReturnType<typeof signal<any[]>> };
   let mockRouter: { navigate: jest.Mock };
-  let queryParamGet: jest.Mock;
+  /**
+   * T-06 / KZ-001 — the double for `ActivatedRoute.snapshot.queryParamMap` is
+   * now a **real** `ParamMap` built by Angular's own `convertToParamMap`, not
+   * a canned `{ get: fn }` stub. `parse()` (`results-center-url.codec.ts`)
+   * reads `paramMap.keys` and calls `paramMap.getAll(key)` — a hand-rolled
+   * `get`-only double would test the assertion, not the parsing, which is
+   * exactly what T-06's Disqualifies clause (citing KZ-001) rules out. Tests
+   * set `currentQueryParams` before calling `initializeState()`; the getter
+   * below rebuilds the `ParamMap` from whatever it currently holds.
+   */
+  let currentQueryParams: Record<string, string | readonly string[]>;
+  let indicatorTabsLoadingSignal: ReturnType<typeof signal<boolean>>;
+  let indicatorTabsListSignal: ReturnType<typeof signal<any[]>>;
 
   beforeEach(async () => {
     jest.useFakeTimers();
@@ -33,6 +47,9 @@ describe('ResultsCenterComponent', () => {
       onSelectFilterTab: jest.fn(),
       onActiveItemChange: jest.fn(),
       noteUserFilterMutation: jest.fn(),
+      seedFromUrl: jest.fn(),
+      tableFilters: signal({ indicators: [], statusCodes: [], sources: [], contracts: [], levers: [], years: [] }),
+      resultsTablePaginatorFirst: signal(0),
       resultsFilter: signal({
         'create-user-codes': [],
         'indicator-codes': [],
@@ -63,8 +80,7 @@ describe('ResultsCenterComponent', () => {
       pinnedTab: signal('all'),
       activateStatePersistence: jest.fn(),
       deactivateStatePersistence: jest.fn(),
-      restorePersistedState: jest.fn().mockReturnValue(false),
-      applyStatusFilterFromHomeLink: jest.fn()
+      restorePersistedState: jest.fn().mockReturnValue(false)
     } as any;
 
     mockCacheService = {
@@ -75,21 +91,36 @@ describe('ResultsCenterComponent', () => {
       })
     } as any;
 
+    indicatorTabsLoadingSignal = signal(false);
+    indicatorTabsListSignal = signal([]);
+
     mockApiService = {
       GET_Configuration: jest.fn(),
-      PATCH_Configuration: jest.fn()
+      PATCH_Configuration: jest.fn(),
+      indicatorTabs: {
+        lazy: jest.fn().mockReturnValue({
+          isLoading: indicatorTabsLoadingSignal,
+          hasValue: signal(false),
+          list: indicatorTabsListSignal
+        })
+      }
     } as any;
 
     mockActionsService = {
       showToast: jest.fn()
     } as any;
 
+    mockResultStatusService = {
+      loading: signal(false),
+      list: signal([])
+    };
+
     mockApiService.GET_Configuration.mockResolvedValue({
       data: { all: '0', self: '0' }
     } as any);
     sessionStorage.clear();
 
-    queryParamGet = jest.fn().mockReturnValue(null);
+    currentQueryParams = {};
     mockRouter = { navigate: jest.fn().mockResolvedValue(true) };
 
     await TestBed.configureTestingModule({
@@ -99,11 +130,12 @@ describe('ResultsCenterComponent', () => {
         { provide: CacheService, useValue: mockCacheService },
         { provide: ApiService, useValue: mockApiService },
         { provide: ActionsService, useValue: mockActionsService },
+        { provide: GetAllResultStatusService, useValue: mockResultStatusService },
         {
           provide: ActivatedRoute,
           useValue: {
-            snapshot: {
-              queryParamMap: { get: (key: string) => queryParamGet(key) }
+            get snapshot() {
+              return { queryParamMap: convertToParamMap(currentQueryParams) };
             }
           }
         },
@@ -143,7 +175,9 @@ describe('ResultsCenterComponent', () => {
   });
 
   describe('initializeState', () => {
-    it('should restore persisted state and call main', async () => {
+    // --- No recognized parameter (R-RCU-004 AC.2 / AC.3) — unchanged path ---
+
+    it('should restore persisted state and call main when there is no recognized parameter', async () => {
       mockResultsCenterService.restorePersistedState.mockReturnValue(true);
       mockResultsCenterService.main.mockResolvedValue(undefined);
       const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
@@ -156,7 +190,12 @@ describe('ResultsCenterComponent', () => {
       expect(mockResultsCenterService.restorePersistedState).toHaveBeenCalledWith('results-center');
       expect(mockResultsCenterService.activateStatePersistence).toHaveBeenCalledWith('results-center');
       expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
-      expect(mockResultsCenterService.main).toHaveBeenCalled();
+      // Reviewer fix (attempt 2, precedence lens) — tighten from bare
+      // `toHaveBeenCalled()`: this is one of the two done-check gaps the
+      // panel found unproved ("exactly one results request on initial load"
+      // proved on only two of four paths).
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+      expect(mockResultsCenterService.seedFromUrl).not.toHaveBeenCalled();
     });
 
     it('should load my results when no restored state and preferred tab is my', async () => {
@@ -177,131 +216,324 @@ describe('ResultsCenterComponent', () => {
       mockResultsCenterService.restorePersistedState.mockReturnValue(false);
       const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
       const loadMyResultsSpy = jest.spyOn(component, 'loadMyResults').mockImplementation();
-      const loadAllResultsSpy = jest.spyOn(component, 'loadAllResults').mockImplementation();
+      // Reviewer fix (attempt 2, precedence lens) — call through instead of
+      // stubbing: this path previously asserted nothing about `main()` at
+      // all. `loadAllResults()`'s real implementation is what fires `main()`
+      // on this branch, so it must not be replaced to prove the request count.
+      const loadAllResultsSpy = jest.spyOn(component, 'loadAllResults');
 
       await (component as any).initializeState();
 
       expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
       expect(loadAllResultsSpy).toHaveBeenCalled();
       expect(loadMyResultsSpy).not.toHaveBeenCalled();
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
     });
 
-    it('should load my results and strip tab query when ?tab=my (e.g. from home main actions)', async () => {
-      queryParamGet.mockImplementation((key: string) => (key === 'tab' ? 'my' : null));
-      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
-      const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
-      const loadMyResultsSpy = jest.spyOn(component, 'loadMyResults').mockImplementation();
-      const loadAllResultsSpy = jest.spyOn(component, 'loadAllResults').mockImplementation();
+    it('should restore persisted state when an unrecognized parameter alone (?utm_source) is present (R-RCU-004 AC.3)', async () => {
+      currentQueryParams = { utm_source: 'email' };
+      mockResultsCenterService.restorePersistedState.mockReturnValue(true);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
 
       await (component as any).initializeState();
 
-      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
-      expect(loadMyResultsSpy).toHaveBeenCalled();
-      expect(loadAllResultsSpy).not.toHaveBeenCalled();
-      expect(mockRouter.navigate).toHaveBeenCalledWith(
-        [],
-        expect.objectContaining({
-          queryParams: { tab: null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true
-        })
-      );
+      expect(mockResultsCenterService.restorePersistedState).toHaveBeenCalledWith('results-center');
+      expect(mockResultsCenterService.seedFromUrl).not.toHaveBeenCalled();
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
     });
 
-    it('should apply indicator tab from query param, skip restore, and clear URL', async () => {
-      queryParamGet.mockImplementation((key: string) => (key === 'indicatorTab' ? '42' : null));
-      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+    // --- Recognized canonical/legacy parameter (R-RCU-002/004/005/006) ---
+
+    it('should seed from a canonical parameter, suppress restore, fetch once, and wipe the legacy+tab keys', async () => {
+      currentQueryParams = { contract: 'A100' };
       const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
-      const loadMyResultsSpy = jest.spyOn(component, 'loadMyResults');
 
       await (component as any).initializeState();
 
       expect(mockResultsCenterService.restorePersistedState).not.toHaveBeenCalled();
-      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
-      expect(loadMyResultsSpy).toHaveBeenCalledWith(true);
-      // D-URL-15: this is the legacy indicatorTab load path, not a user mutation — skipBump: true.
-      expect(mockResultsCenterService.onSelectFilterTab).toHaveBeenCalledWith(42, { skipMain: true, skipBump: true });
-      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
       expect(mockResultsCenterService.activateStatePersistence).toHaveBeenCalledWith('results-center');
+      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { contract: ['A100'] },
+        scope: 'all'
+      });
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+      // Reviewer fix (attempt 2, precedence lens) — the filter must be
+      // applied (seeded) BEFORE the results request fires. Statement order
+      // alone made this true but no assertion evidenced it; this closes
+      // that gap directly on mock invocation order.
+      expect(mockResultsCenterService.seedFromUrl.mock.invocationCallOrder[0]).toBeLessThan(
+        mockResultsCenterService.main.mock.invocationCallOrder[0]
+      );
+      // Hand-off 4 (T-04 review) — a stale cross-route lever selection must
+      // not survive a deep link that names no lever.
+      expect(mockResultsCenterService.tableFilters().levers).toEqual([]);
+      // Hand-off 3 (T-04 review) — page resets to 1 for the new filter.
+      expect(mockResultsCenterService.resultsTablePaginatorFirst()).toBe(0);
       expect(mockRouter.navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null },
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, tab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
+      expect(mockActionsService.showToast).not.toHaveBeenCalled();
+    });
+
+    // Reviewer fix (attempt 2, precedence lens) — FIX 1. `seedFromUrl`
+    // deliberately never writes `tableFilters.indicators` (design §7.2), so a
+    // stale value left by a previous route (e.g. `/project-detail`) must be
+    // cleared by the component, exactly like `levers`.
+    it('should clear a stale tableFilters.indicators inherited from another route on a deep link that names no indicator', async () => {
+      currentQueryParams = { contract: 'A100' };
+      mockResultsCenterService.tableFilters.set({
+        indicators: [42],
+        statusCodes: [],
+        sources: [],
+        contracts: [],
+        levers: [7],
+        years: []
+      });
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.tableFilters().indicators).toEqual([]);
+      expect(mockResultsCenterService.tableFilters().levers).toEqual([]);
+    });
+
+    it('should resolve the scope from `tab` when present and combine it with another filter, still resolving the pinned preference as fallback only (R-RCU-002 AC.7)', async () => {
+      currentQueryParams = { tab: 'my', contract: 'A100' };
+      // Reviewer fix (attempt 2, precedence lens) — FIX 2. `tab=my` must win
+      // the scope even though `loadPinnedTabPreference` is now always
+      // resolved (it populates `pinnedTab`, which drives the tab strip order
+      // independently of the URL's scope). Resolve it to a DIFFERENT value
+      // ('all') to prove `urlScope`, not the preference, decided the scope.
+      const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { contract: ['A100'] },
+        scope: 'my'
+      });
+    });
+
+    // Reviewer fix (attempt 2, precedence lens) — FIX 4 regression guard: a
+    // lone `?tab=my` is the one deliberate behavior change versus the base
+    // revision (session restore suppressed) and it previously rested only on
+    // a combined `?tab=my&contract=A100` case.
+    it('should suppress restore and seed an empty filter set for a lone `?tab=my` deep link (R2-5)', async () => {
+      currentQueryParams = { tab: 'my' };
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.restorePersistedState).not.toHaveBeenCalled();
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: {},
+        scope: 'my'
+      });
+    });
+
+    it('should resolve the scope from the pinned-tab preference when `tab` is absent (R-RCU-002 AC.6)', async () => {
+      currentQueryParams = { contract: 'A100' };
+      const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('my');
+
+      await (component as any).initializeState();
+
+      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { contract: ['A100'] },
+        scope: 'my'
+      });
+    });
+
+    it('should resolve a legacy indicatorTab through the codec and seed it (R-RCU-006)', async () => {
+      currentQueryParams = { indicatorTab: '1' };
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.restorePersistedState).not.toHaveBeenCalled();
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { indicator: 1 },
+        scope: 'all'
+      });
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, tab: null },
           queryParamsHandling: 'merge',
           replaceUrl: true
         })
       );
     });
 
-    it('should apply status filter from query param, load My Results, and clear URL', async () => {
-      queryParamGet.mockImplementation((key: string) => {
-        if (key === 'statusTab') {
-          return '6';
-        }
-        if (key === 'statusLabel') {
-          return 'Submitted';
-        }
-        return null;
-      });
-      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
-      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
-      const loadMyResultsSpy = jest.spyOn(component, 'loadMyResults');
-
-      await (component as any).initializeState();
-
-      expect(loadMyResultsSpy).toHaveBeenCalledWith(true);
-      expect(mockResultsCenterService.applyStatusFilterFromHomeLink).toHaveBeenCalledWith(6, 'Submitted', {
-        skipMain: true
-      });
-      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
-      expect(mockResultsCenterService.onSelectFilterTab).not.toHaveBeenCalled();
-      expect(mockRouter.navigate).toHaveBeenCalledWith(
-        [],
-        expect.objectContaining({
-          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true
-        })
-      );
-    });
-
-    it('should pass undefined statusLabel when statusLabel query param is absent', async () => {
-      queryParamGet.mockImplementation((key: string) => (key === 'statusTab' ? '9' : null));
-      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+    it('should resolve a legacy statusTab through the codec and ignore statusLabel (R-RCU-006 AC.3)', async () => {
+      currentQueryParams = { statusTab: '2', statusLabel: 'Submitted' };
       jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
 
       await (component as any).initializeState();
 
-      expect(mockResultsCenterService.applyStatusFilterFromHomeLink).toHaveBeenCalledWith(9, undefined, {
-        skipMain: true
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { status: [2] },
+        scope: 'all'
       });
     });
 
-    it('should apply both indicator tab and status filter when both query params are present', async () => {
-      queryParamGet.mockImplementation((key: string) => {
-        if (key === 'indicatorTab') {
-          return '3';
-        }
-        if (key === 'statusTab') {
-          return '11';
-        }
-        if (key === 'statusLabel') {
-          return 'Postpone';
-        }
-        return null;
-      });
-      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+    it('should let the canonical `indicator` win over a legacy `indicatorTab` deterministically (R-RCU-006 AC.2)', async () => {
+      currentQueryParams = { indicatorTab: '1', indicator: 'policy-change' };
       jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
-      jest.spyOn(component, 'loadMyResults');
 
       await (component as any).initializeState();
 
-      // D-URL-15: this is the legacy indicatorTab load path, not a user mutation — skipBump: true.
-      expect(mockResultsCenterService.onSelectFilterTab).toHaveBeenCalledWith(3, { skipMain: true, skipBump: true });
-      expect(mockResultsCenterService.applyStatusFilterFromHomeLink).toHaveBeenCalledWith(11, 'Postpone', {
-        skipMain: true
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { indicator: 4 },
+        scope: 'all'
+      });
+    });
+
+    // --- R-RCU-005 — invalid input degrades to a usable page ---
+
+    it('should apply the valid contract filter and drop the invalid indicator, showing one toast (bad-token scenario)', async () => {
+      currentQueryParams = { indicator: 'not-a-real-indicator', contract: 'A100' };
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { contract: ['A100'] },
+        scope: 'all'
+      });
+      expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+    });
+
+    it('should render the unfiltered page with a toast and NOT fall through to restore for a wholly invalid link (R-RCU-005 second scenario)', async () => {
+      currentQueryParams = { indicator: 'not-a-real-indicator' };
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.restorePersistedState).not.toHaveBeenCalled();
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: {},
+        scope: 'all'
       });
       expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+      expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+    });
+
+    it('should fire the toast exactly once no matter how many tokens were dropped', async () => {
+      currentQueryParams = { indicator: 'not-a-real-indicator', status: 'also-bad,and-this-too' };
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+    });
+
+    // Reviewer fix (attempt 2, reliability lens) — FIX 3. design §6.1 orders
+    // the toast (step 8) BEFORE the wipe/`router.navigate` (step 9). A
+    // rejected navigation must not be able to swallow the R-RCU-005 notice.
+    it('should still show the dropped-token toast even when the trailing router.navigate rejects', async () => {
+      currentQueryParams = { indicator: 'not-a-real-indicator', contract: 'A100' };
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      mockRouter.navigate.mockRejectedValue(new Error('navigation cancelled by guard'));
+
+      await expect((component as any).initializeState()).rejects.toThrow('navigation cancelled by guard');
+
+      expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+    });
+
+    it('should never let a dropped token’s raw value reach the toast (markup cannot alter its rendering)', async () => {
+      const maliciousToken = '<script>alert(1)</script>';
+      currentQueryParams = { status: maliciousToken };
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+
+      expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+      const toastArg = mockActionsService.showToast.mock.calls[0][0];
+      expect(`${toastArg.summary} ${toastArg.detail}`).not.toContain(maliciousToken);
+      expect(`${toastArg.summary} ${toastArg.detail}`).not.toContain('<script>');
+    });
+  });
+
+  // NFR-RCU-002 layer 2 — "the layer that actually sees a server-side
+  // addition" (requirements.md). Assigned to T-06 during execution.
+  describe('vocabulary completeness warning (NFR-RCU-002 layer 2)', () => {
+    let consoleWarnSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('warns naming an indicator id that has no URL slug once the indicator control list resolves', () => {
+      indicatorTabsListSignal.set([{ indicator_id: 1 } as any, { indicator_id: 99 } as any]);
+
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('indicator id 99'));
+      expect(consoleWarnSpy).not.toHaveBeenCalledWith(expect.stringContaining('indicator id 1 '));
+    });
+
+    it('does not warn about the synthetic "All Indicators" id 0 row', () => {
+      indicatorTabsListSignal.set([{ indicator_id: 0 } as any]);
+
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
+
+    it('does not warn while the indicator control list is still loading', () => {
+      indicatorTabsLoadingSignal.set(true);
+      indicatorTabsListSignal.set([{ indicator_id: 99 } as any]);
+
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
+
+    it('warns only once per indicator id across repeated resolutions', () => {
+      indicatorTabsListSignal.set([{ indicator_id: 99 } as any]);
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      indicatorTabsListSignal.set([{ indicator_id: 99 } as any, { indicator_id: 1 } as any]);
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      const warningsForId99 = consoleWarnSpy.mock.calls.filter(call => String(call[0]).includes('indicator id 99'));
+      expect(warningsForId99).toHaveLength(1);
+    });
+
+    it('warns naming a status id that has no URL slug once the status control list resolves', () => {
+      mockResultStatusService.list.set([{ result_status_id: 2 } as any, { result_status_id: 999 } as any]);
+
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('status id 999'));
+    });
+
+    it('does not warn while the status control list is still loading', () => {
+      mockResultStatusService.loading.set(true);
+      mockResultStatusService.list.set([{ result_status_id: 999 } as any]);
+
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -405,6 +637,35 @@ describe('ResultsCenterComponent', () => {
       expect(result).toBe('all');
       expect(component.pinnedTab()).toBe('all');
       expect(component.loadingPin()).toBe(false);
+    });
+
+    // Reviewer fix (attempt 2, reliability lens) — FIX 2b. Fix 2 makes this
+    // call unconditional on every deep link, widening its blast radius: a
+    // rejecting GET_Configuration must degrade to 'all', not propagate and
+    // abort `initializeState` before `seedFromUrl`/`main()` ever run.
+    it('should resolve to \'all\' when GET_Configuration rejects', async () => {
+      mockApiService.GET_Configuration.mockRejectedValue(new Error('config unavailable'));
+
+      const result = await (component as any).loadPinnedTabPreference();
+
+      expect(result).toBe('all');
+      expect(component.pinnedTab()).toBe('all');
+      expect(component.loadingPin()).toBe(false);
+    });
+
+    // Same hazard, evidenced end-to-end through the read path: a rejecting
+    // preference lookup must still seed and fetch from the URL alone.
+    it('should still seed and fetch from the URL when the pinned-tab preference lookup rejects (FIX 2b)', async () => {
+      currentQueryParams = { contract: 'A100' };
+      mockApiService.GET_Configuration.mockRejectedValue(new Error('config unavailable'));
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.seedFromUrl).toHaveBeenCalledWith({
+        filters: { contract: ['A100'] },
+        scope: 'all'
+      });
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
     });
   });
 
