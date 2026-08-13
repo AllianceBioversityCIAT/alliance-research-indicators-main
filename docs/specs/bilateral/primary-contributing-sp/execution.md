@@ -2116,3 +2116,34 @@ per AC.
 > every round, and re-grep to confirm.**"
 
 ---
+
+### 📌 NFR-BIL-122 baseline — captured BEFORE T-08, for T-09
+
+**Recorded 2026-08-13, while T-08 was still in flight and the pre-change tree was trivially readable.**
+
+T-09's disqualifier is explicit: *"a query count asserted as `≤ 2` or against a hard-coded number
+nobody derived is not evidence — **capture the count on `HEAD` before T-08's change** and assert
+equality against that recorded baseline."* Once T-08 commits, that becomes git archaeology. So it is
+recorded here instead.
+
+| Field | Value |
+| --- | --- |
+| **Baseline ref** | `e154c75b` — the last commit **before** T-08 |
+| **File** | `server/researchindicators/src/domain/entities/bilateral/repositories/result-pool-funding-alignment.repository.ts` |
+| **Method** | `findActiveAlignmentByResultId` |
+| **Database round-trips** | **1** — a single `this.query(...)` at **line 34** |
+| **Re-derive with** | `git show e154c75b:<path> \| grep -cE "getRawMany\|getMany\|getRawOne\|getOne\|\.query\("` |
+
+**What T-09 must assert:** that `findActiveAlignmentByResultId` still issues **exactly one**
+round-trip **with `sp_role` selected** — i.e. that T-08's carrier rides the **existing** join rather
+than adding a second query. **The number to assert is `1`, and it is derived, not guessed.**
+
+**The specific regression this guards:** implementing `sp_roles` as a second `find()` call. It is easy
+to write by accident, produces correct output, and is invisible to any shape assertion — **only a
+call count on the query-builder/manager mock can see it.** Per T-09: *"a count that cannot go up
+because the mock only permits one call is measuring the mock, not the repository."*
+
+**If query counts prove unobservable in the harness, NFR-BIL-122 is recorded UNVERIFIED** — T-09's
+own done-criteria say so explicitly. A shape assertion is **not** a substitute; it cannot see the
+defect.
+
