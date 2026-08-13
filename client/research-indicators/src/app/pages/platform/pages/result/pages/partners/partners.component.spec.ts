@@ -17,7 +17,8 @@ describe('PartnersComponent', () => {
   const mockCache = {
     getCurrentNumericResultId: jest.fn().mockReturnValue(7),
     currentResultId: jest.fn().mockReturnValue('ROAR-7'),
-    currentResultIndicatorSectionPath: jest.fn().mockReturnValue('general-information')
+    currentResultIndicatorSectionPath: jest.fn().mockReturnValue('general-information'),
+    isExternalResult: jest.fn().mockReturnValue(false)
   };
   const mockApi = {
     GET_Partners: jest.fn(),
@@ -71,6 +72,7 @@ describe('PartnersComponent', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockCache.isExternalResult.mockReturnValue(false);
   });
 
   it('should create', () => {
@@ -145,6 +147,24 @@ describe('PartnersComponent', () => {
 
   it('setSectionAndOpenModal should set section and open modal', () => {
     component.setSectionAndOpenModal('partners');
+    expect(mockModals.setPartnerRequestSection).toHaveBeenCalledWith('partners');
+    expect(mockModals.openModal).toHaveBeenCalledWith('requestPartner');
+  });
+
+  it('setSectionAndOpenModal should not open the modal for an external result', () => {
+    mockCache.isExternalResult.mockReturnValue(true);
+
+    component.setSectionAndOpenModal('partners');
+
+    expect(mockModals.setPartnerRequestSection).not.toHaveBeenCalled();
+    expect(mockModals.openModal).not.toHaveBeenCalled();
+  });
+
+  it('setSectionAndOpenModal should still open the modal for a STAR result', () => {
+    mockCache.isExternalResult.mockReturnValue(false);
+
+    component.setSectionAndOpenModal('partners');
+
     expect(mockModals.setPartnerRequestSection).toHaveBeenCalledWith('partners');
     expect(mockModals.openModal).toHaveBeenCalledWith('requestPartner');
   });

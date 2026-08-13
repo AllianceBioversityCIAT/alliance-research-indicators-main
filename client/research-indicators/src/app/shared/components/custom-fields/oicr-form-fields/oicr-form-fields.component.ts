@@ -48,6 +48,8 @@ export class OicrFormFieldsComponent {
   @Input() showOicrNo = false;
   @Input() showGeneralComment = true;
   @Input() isOicrNoDisabled = false;
+  /** External-result / non-editable-status gate for this shared component. Defaults to false so existing consumers (e.g. the create-result modal) are unaffected. */
+  @Input() disabled = false;
   @Input() clearOicrSelection: () => void = () => {
     // Default empty implementation - can be overridden by parent component
   };

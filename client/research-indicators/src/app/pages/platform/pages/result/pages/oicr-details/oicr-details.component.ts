@@ -79,6 +79,7 @@ export default class OicrDetailsComponent {
   }
 
   onAddContactPerson() {
+    if (this.cache.isExternalResult()) return;
     this.allModalsService.toggleModal('addContactPerson');
   }
 
@@ -110,6 +111,7 @@ export default class OicrDetailsComponent {
 
   async onDeleteContactPerson(row: ContactPersonRow) {
     if (!row?.id) return;
+    if (this.cache.isExternalResult()) return;
     const resultId = this.cache.getCurrentNumericResultId();
     const res = await this.api.DELETE_AutorContact(row.id, resultId);
     if (res.successfulRequest) {
@@ -313,6 +315,7 @@ export default class OicrDetailsComponent {
   }
 
   clearOicrSelection(): void {
+    if (this.cache.isExternalResult() || !this.submission.isEditableStatus()) return;
     this.body.update(current => ({
       ...current,
       link_result: { external_oicr_id: 0 }

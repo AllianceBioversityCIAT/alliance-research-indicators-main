@@ -64,6 +64,7 @@ export const cacheServiceMock = {
   navbarHeight: signal(0),
   showSubmissionHistory: signal(false),
   isMyResult: jest.fn().mockReturnValue(true),
+  isExternalResult: jest.fn().mockReturnValue(false),
   extractNumericId: jest.fn((id: string | number) => {
     if (typeof id === 'number') return id;
     const parts = String(id).split('-');

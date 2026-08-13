@@ -20,6 +20,8 @@ export class QuantificationItemComponent implements OnInit, OnChanges {
   @Input() index!: number;
   @Input() quantNumber = 1;
   @Input() headerLabel = 'ACTUAL COUNT';
+  /** External-result / non-editable-status gate, passed from the parent call site. Defaults to false so this component's own editable-status behavior is unaffected. */
+  @Input() disabled = false;
   @Output() update = new EventEmitter<QuantificationItemData>();
   @Output() delete = new EventEmitter<void>();
 

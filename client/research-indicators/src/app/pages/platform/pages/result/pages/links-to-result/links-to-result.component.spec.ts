@@ -40,7 +40,8 @@ describe('LinksToResultComponent', () => {
       hasSmallScreen: jest.fn().mockReturnValue(false),
       isSidebarCollapsed: jest.fn().mockReturnValue(false),
       headerHeight: signal(0),
-      navbarHeight: signal(0)
+      navbarHeight: signal(0),
+      isExternalResult: jest.fn().mockReturnValue(false)
     } as unknown as jest.Mocked<CacheService>;
 
     apiService = {

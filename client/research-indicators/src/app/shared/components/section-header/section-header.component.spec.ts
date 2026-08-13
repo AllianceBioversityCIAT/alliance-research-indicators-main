@@ -95,7 +95,8 @@ describe('SectionHeaderComponent', () => {
       currentMetadata: signal({
         status_id: 5
       }),
-      isSidebarCollapsed: signal<boolean>(false)
+      isSidebarCollapsed: signal<boolean>(false),
+      isExternalResult: signal<boolean>(false)
     };
 
     // Mock isMyResult method separately
@@ -336,6 +337,41 @@ describe('SectionHeaderComponent', () => {
     expect(component.showDeleteOption()).toBe(false);
     const items = component.items();
     expect(items[0].items?.length).toBe(0);
+  });
+
+  it('F-1: should not show delete option for an external result even for an admin (status_id 5)', () => {
+    (rolesService.isAdmin as jest.Mock).mockReturnValue(true);
+    cacheService.currentMetadata?.set({ status_id: 5 });
+    (cacheService as any).isExternalResult.set(true);
+    fixture.detectChanges();
+
+    expect(component.showDeleteOption()).toBe(false);
+    const items = component.items();
+    expect(items[0].items?.length).toBe(0);
+  });
+
+  it('F-1: the confirm-delete handler must NOT call DELETE_Result for an external result (method-level guard)', async () => {
+    // Obtain the command/confirm callback while the result is still STAR-origin (so the item is present in
+    // the menu and the confirm dialog can be triggered), then flip to external and invoke the confirm
+    // handler directly — simulating it being reached despite the UI gate, mirroring the belt-and-braces
+    // pattern already used by onDeleteContactPerson().
+    (rolesService.isAdmin as jest.Mock).mockReturnValue(true);
+    fixture.detectChanges();
+    const deleteMenuItem = component.items().find(item => item.items?.some(subItem => subItem.label === 'Delete Result'));
+    const deleteCommand = deleteMenuItem?.items?.find(item => item.label === 'Delete Result')?.command;
+    expect(deleteCommand).toBeDefined();
+
+    const fakeEvent = { originalEvent: new Event('click'), item: {} } as MenuItemCommandEvent;
+    deleteCommand?.(fakeEvent);
+    const lastCall = (actionsService.showGlobalAlert as jest.Mock).mock.calls.pop()?.[0];
+    expect(lastCall).toBeDefined();
+
+    (cacheService as any).isExternalResult.set(true);
+    await lastCall.confirmCallback.event();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(apiService.DELETE_Result).not.toHaveBeenCalled();
   });
 
   it('should handle delete result when API call is unsuccessful', () => {

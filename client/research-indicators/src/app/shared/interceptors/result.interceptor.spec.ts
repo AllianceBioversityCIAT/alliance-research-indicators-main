@@ -3,6 +3,7 @@ import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpHeaders } from '@ang
 import { of } from 'rxjs';
 import { Router } from '@angular/router';
 import { resultInterceptor } from './result.interceptor';
+import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 
 describe('resultInterceptor', () => {
   const interceptor: HttpInterceptorFn = (req, next) => TestBed.runInInjectionContext(() => resultInterceptor(req, next));
@@ -331,6 +332,40 @@ describe('resultInterceptor', () => {
       expect(calledRequest.headers.has('X-Use-Year')).toBe(false);
       expect(calledRequest.url).toBe('http://test.com/api/data?reportYear=2023&reportingPlatforms=PRMS');
     });
+
+    it('should add AICCRA platform when URL contains AICCRA-27233', () => {
+      const headers = new HttpHeaders().set('X-Use-Year', 'true');
+      const request = new HttpRequest('GET', 'http://test.com/api/data', null, { headers });
+
+      mockRouter.url = '/result/AICCRA-27233/general-information';
+      mockRouter.parseUrl.mockReturnValue({
+        queryParams: { version: '2023' }
+      });
+
+      interceptor(request, mockHandler);
+
+      const calledRequest = mockHandler.mock.calls[0][0];
+      expect(calledRequest.headers.has('X-Use-Year')).toBe(false);
+      expect(calledRequest.url).toBe('http://test.com/api/data?reportYear=2023&reportingPlatforms=AICCRA');
+    });
+
+    // Guards the bug class, not just AICCRA: the alternation used to be a hardcoded
+    // subset of PLATFORM_CODES. Any code added to that constant must be resolvable here,
+    // or its results silently fall back to platform_code='STAR' server-side.
+    it.each(Object.values(PLATFORM_CODES).filter(code => code !== PLATFORM_CODES.STAR))(
+      'resolves %s from the URL so the platform is never silently defaulted to STAR',
+      platformCode => {
+        const headers = new HttpHeaders().set('X-Use-Year', 'true');
+        const request = new HttpRequest('GET', 'http://test.com/api/data', null, { headers });
+
+        mockRouter.url = `/result/${platformCode}-27233/general-information`;
+        mockRouter.parseUrl.mockReturnValue({ queryParams: {} });
+
+        interceptor(request, mockHandler);
+
+        expect(mockHandler.mock.calls[0][0].url).toBe(`http://test.com/api/data?reportingPlatforms=${platformCode}`);
+      }
+    );
 
     it('should add STAR platform when URL contains only result/2804', () => {
       const headers = new HttpHeaders().set('X-Use-Year', 'true');

@@ -3,6 +3,9 @@ import { QuantificationItemComponent, QuantificationItemData } from './quantific
 import { SubmissionService } from '@shared/services/submission.service';
 import { SimpleChange } from '@angular/core';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { By } from '@angular/platform-browser';
+import { InputComponent } from '@shared/components/custom-fields/input/input.component';
+import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
 
 describe('QuantificationItemComponent', () => {
   let component: QuantificationItemComponent;
@@ -64,6 +67,37 @@ describe('QuantificationItemComponent', () => {
     it('should accept headerLabel input', () => {
       component.headerLabel = 'Custom Label';
       expect(component.headerLabel).toBe('Custom Label');
+    });
+
+    it('should default disabled to false', () => {
+      expect(component.disabled).toBe(false);
+    });
+  });
+
+  describe('disabled input (F-4)', () => {
+    it('leaves Number, Unit and Comments enabled by default', () => {
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const textareas = fixture.debugElement.queryAll(By.directive(TextareaComponent));
+
+      expect(inputs.length).toBe(2);
+      inputs.forEach(i => expect((i.componentInstance as InputComponent).disabled).toBe(false));
+      expect(textareas.length).toBe(1);
+      expect((textareas[0].componentInstance as TextareaComponent).disabled).toBe(false);
+    });
+
+    it('disables Number, Unit and Comments when true (external result)', () => {
+      component.disabled = true;
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const textareas = fixture.debugElement.queryAll(By.directive(TextareaComponent));
+
+      expect(inputs.length).toBe(2);
+      inputs.forEach(i => expect((i.componentInstance as InputComponent).disabled).toBe(true));
+      expect(textareas.length).toBe(1);
+      expect((textareas[0].componentInstance as TextareaComponent).disabled).toBe(true);
     });
   });
 

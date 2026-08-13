@@ -130,7 +130,7 @@
               <div class="flex flex-col items-center">
                 <button pButton type="button" class="!rounded-full !border-2 !font-['Space_Grotesk'] !border-[#1689CA] !text-[16px] !w-8 !h-8 !flex !items-center !justify-center !text-lg !font-[400] transition-all duration-200
                     {{ selectedStep() === n ? '!bg-[#1689CA] !text-white' : '!bg-white !text-[#1689CA]' }}"
-                  (click)="selectStep(n)" [pTooltip]="getStepTooltip(n)" escape="false" tooltipPosition="top"
+                  (click)="selectStep(n)" [disabled]="!submission.isEditableStatus()" [pTooltip]="getStepTooltip(n)" escape="false" tooltipPosition="top"
                   [attr.aria-label]="'Seleccionar nivel ' + n">
                   {{ n }}
                 </button>

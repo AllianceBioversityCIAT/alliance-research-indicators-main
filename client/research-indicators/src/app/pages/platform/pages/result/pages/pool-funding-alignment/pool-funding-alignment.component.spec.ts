@@ -160,7 +160,8 @@ describe('PoolFundingAlignmentComponent', () => {
       currentResultIsLoading: signal(false),
       isSidebarCollapsed: () => false,
       hasSmallScreen: () => false,
-      showSectionHeaderActions: () => false
+      showSectionHeaderActions: () => false,
+      isExternalResult: () => false
     };
 
     const routeMock = {
@@ -213,7 +214,8 @@ describe('PoolFundingAlignmentComponent', () => {
       currentResultIsLoading: signal(false),
       isSidebarCollapsed: () => false,
       hasSmallScreen: () => false,
-      showSectionHeaderActions: () => false
+      showSectionHeaderActions: () => false,
+      isExternalResult: () => false
     };
     const altGet = jest.fn().mockResolvedValue(null);
     await TestBed.configureTestingModule({
@@ -294,7 +296,8 @@ describe('PoolFundingAlignmentComponent', () => {
             currentResultIsLoading: signal(false),
             isSidebarCollapsed: () => false,
             hasSmallScreen: () => false,
-            showSectionHeaderActions: () => false
+            showSectionHeaderActions: () => false,
+            isExternalResult: () => false
           }
         },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: (k: string) => (k === 'id' ? 'RES-001' : null) } } } },
@@ -472,7 +475,8 @@ describe('PoolFundingAlignmentComponent', () => {
         currentResultIsLoading: signal(false),
         isSidebarCollapsed: () => false,
         hasSmallScreen: () => false,
-        showSectionHeaderActions: () => false
+        showSectionHeaderActions: () => false,
+        isExternalResult: () => false
       };
       await TestBed.configureTestingModule({
         imports: [PoolFundingAlignmentComponent, HttpClientTestingModule],
@@ -570,7 +574,8 @@ describe('PoolFundingAlignmentComponent', () => {
               currentResultIsLoading: signal(false),
               isSidebarCollapsed: () => false,
               hasSmallScreen: () => false,
-              showSectionHeaderActions: () => false
+              showSectionHeaderActions: () => false,
+              isExternalResult: () => false
             }
           },
           { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: (k: string) => (k === 'id' ? 'RES-001' : null) } } } },
