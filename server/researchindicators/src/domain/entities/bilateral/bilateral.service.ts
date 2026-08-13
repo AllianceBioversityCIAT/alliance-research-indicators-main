@@ -669,7 +669,9 @@ export class BilateralService {
       throw new ConflictException('Result is already synced to PRMS');
     }
 
-    const leverCodes = await this.normalizeLeverCodes(
+    // T-05 / RA-02: `validCodes` (the full per-result catalog) is not
+    // consumed yet — T-06's `resolvePrimarySpCode` is the first caller.
+    const { codes: leverCodes } = await this.normalizeLeverCodes(
       dto,
       resultId,
       resultCode,
@@ -1324,14 +1326,23 @@ export class BilateralService {
    *
    * Validation skipped when `has_contribution === false` (codes are dropped
    * per the existing R-BIL-014 behavior).
+   *
+   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-05 / RA-02
+   *
+   * Returns the per-result catalog (`validCodes`) alongside the selected
+   * `codes`, instead of discarding it as before (design.md §5.1 "How step 3
+   * gets the catalog — normative"). This lets T-06's `resolvePrimarySpCode`
+   * validate `primary_sp_code` against the full catalog without a second
+   * `getScienceProgramsForResult` call. `validCodes` is empty on the
+   * `has_contribution === false` path — the catalog is never fetched there.
    */
   private async normalizeLeverCodes(
     dto: UpdatePoolFundingAlignmentDto,
     resultId: number,
     resultCode: string,
-  ): Promise<string[]> {
+  ): Promise<{ codes: string[]; validCodes: Set<string> }> {
     if (!dto.has_contribution) {
-      return [];
+      return { codes: [], validCodes: new Set() };
     }
 
     // Prefer sp_codes (new) over lever_codes (legacy back-compat).
@@ -1365,7 +1376,7 @@ export class BilateralService {
       });
     }
 
-    return codes;
+    return { codes, validCodes };
   }
 
   private toHistoryPayload(

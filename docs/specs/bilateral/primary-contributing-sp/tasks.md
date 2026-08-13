@@ -251,7 +251,7 @@ graph TD
 - **Estimated LOC:** ~60
 - **Effort:** S
 - **Skills:** `nestjs-expert`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-05). **Note:** `normalizeLeverCodes.spec.ts:155` remains **un-re-based and owned by T-11**; T-05 added an assertion after that block without touching it.
 
 ---
 

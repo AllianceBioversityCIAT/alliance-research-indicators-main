@@ -172,6 +172,9 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
       19792,
       '19792',
     );
+    // T-05 / RA-02: the return-shape widening must not add a second catalog
+    // fetch — the call count stays exactly what it was before this task.
+    expect(service.getScienceProgramsForResult).toHaveBeenCalledTimes(1);
     expect(transaction).toHaveBeenCalledTimes(1);
   });
 
@@ -247,5 +250,80 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
     };
     expect(response.message.unknown_sp_codes).toEqual(['SP01']);
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-05 / RA-02
+  //
+  // `normalizeLeverCodes` is private and `validCodes` has no observable
+  // effect through the public `updateAlignment` seam yet (T-06's
+  // `resolvePrimarySpCode` is its first consumer) — so these tests invoke
+  // the method directly. TS `private` is compile-time only; the cast below
+  // just gives the direct call a typed shape instead of `any`.
+  type NormalizeLeverCodesSeam = {
+    normalizeLeverCodes: (
+      dto: UpdatePoolFundingAlignmentDto,
+      resultId: number,
+      resultCode: string,
+    ) => Promise<{ codes: string[]; validCodes: Set<string> }>;
+  };
+
+  const callNormalizeLeverCodes = (
+    dto: UpdatePoolFundingAlignmentDto,
+    resultId = 19792,
+    resultCode = '19792',
+  ) =>
+    (service as unknown as NormalizeLeverCodesSeam).normalizeLeverCodes(
+      dto,
+      resultId,
+      resultCode,
+    );
+
+  it('T-05 — validCodes holds the full per-result catalog, not just the selected codes', async () => {
+    // Catalog {SP09, SP10} strictly exceeds selected {SP09} — SP10 is valid
+    // for the result but was never chosen. This is the discriminating shape
+    // required by the task: a catalog equal to sp_codes cannot tell
+    // `validCodes = catalog` apart from the plausible wrong implementation
+    // `validCodes = new Set(codes)`, because the two would coincide.
+    const getScienceProgramsSpy = jest
+      .spyOn(service, 'getScienceProgramsForResult')
+      .mockResolvedValueOnce(mappedSpResponse(['SP09', 'SP10']));
+
+    const dto: UpdatePoolFundingAlignmentDto = {
+      has_contribution: true,
+      sp_codes: ['SP09'],
+    };
+
+    const result = await callNormalizeLeverCodes(dto);
+
+    expect(result.codes).toEqual(['SP09']);
+    // Behavioral check (not a presence assertion): validCodes must contain
+    // SP10, which is absent from sp_codes/codes. A validCodes built from the
+    // selected set alone would not contain it.
+    expect(result.validCodes.has('SP10')).toBe(true);
+    expect(result.validCodes).toEqual(new Set(['SP09', 'SP10']));
+    // No second catalog fetch — validCodes comes from the same call that
+    // already validates `codes`.
+    expect(getScienceProgramsSpy).toHaveBeenCalledTimes(1);
+    expect(getScienceProgramsSpy).toHaveBeenCalledWith(19792, '19792');
+  });
+
+  it('T-05 — has_contribution=false returns an empty validCodes and never fetches the catalog', async () => {
+    const getScienceProgramsSpy = jest.spyOn(
+      service,
+      'getScienceProgramsForResult',
+    );
+
+    const dto: UpdatePoolFundingAlignmentDto = {
+      has_contribution: false,
+      sp_codes: ['SP99'],
+    };
+
+    const result = await callNormalizeLeverCodes(dto);
+
+    expect(result.codes).toEqual([]);
+    // has_contribution=false never reaches the catalog fetch (R-BIL-014),
+    // so an empty Set is the honest value here, not a lie of omission.
+    expect(result.validCodes.size).toBe(0);
+    expect(getScienceProgramsSpy).not.toHaveBeenCalled();
   });
 });

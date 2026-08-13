@@ -44,11 +44,17 @@ checkbox convention. The mapping used throughout this log:
 
 | | Budgeted | Actual to date | Tripwire |
 | --- | --- | --- | --- |
-| Tasks completed | 16 | **2** (T-01, T-04) | > 19 |
-| Insertions | ~2,575 | **241** | > 3,120 |
-| Review rounds | 16 | **2** | > 20 |
+| Tasks completed | 16 | **3** (T-01, T-04, T-05) | > 19 |
+| Insertions | ~2,575 | **334** | > 3,120 |
+| Review rounds | 16 | **3** | > 20 |
 
-No tripwire approached. T-04 came in at 120 insertions against a ~50 estimate
+No tripwire approached. T-05 came in at 93 insertions against a ~60 estimate
+(+55%), again concentrated in test lines (78 of 93). Cumulative **334 of ~2,575
+across 3 of 16 tasks** — about 13% of the insertion budget for 19% of the tasks,
+so tracking slightly under. All three completed tasks passed on attempt 1 with
+zero rework attempts consumed, against a budget of 16 review rounds for 16 tasks.
+
+T-04 came in at 120 insertions against a ~50 estimate
 (+140% on the task; the overage is entirely test lines — 70 of the 120 — and the
 production extraction itself was 50). Cumulative 241 of ~2,575 across 2 of 16
 tasks, i.e. tracking at roughly the budgeted rate overall. Recorded, not
@@ -437,5 +443,189 @@ normal end-of-spec sync.
 ✅ `npx eslint` on both files — clean (**K-001**; `npm run lint` never cited)
 ✅ `git diff --numstat` on the spec file — **70 / 0**, zero deletions (R-BIL-130 AC.2)
 ✅ R-BIL-097 AC.2 block SHA still `94573605…`, matching T-01's artifact
+
+---
+
+### T-05 — `normalizeLeverCodes` returns its catalog instead of discarding it
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **1** (of 3 permitted) |
+| **Reviewer verdicts** | 1 × `PASS` |
+| **Rework attempts consumed** | 0 |
+| **Requirements covered** | enabling change for **R-BIL-122 AC.2** · **RA-02** |
+| **Dependencies** | T-01 ✅ |
+| **Estimated / actual LOC** | ~60 / **93 insertions, 4 deletions** (15/4 production, 78/0 test) |
+
+#### Leader decisions before dispatch
+
+| Decision | Rationale |
+| --- | --- |
+| **Skills: `nestjs-expert`, `tdd`** — no deviation | Signature widening plus a test-design problem; both earn their place. |
+| **Effort: `medium`** — **deliberately lowered** from the `high` used on T-01 and T-04 | The code change is genuinely mechanical; the difficulty is entirely in the discriminating-fixture requirement, which is better addressed by emphasis in the brief than by a higher dial. Running every task at `high` dilutes the signal. **Calibration confirmed correct — PASS on attempt 1.** |
+| **Parallelism: none** | T-02 is the only other eligible task and remains environment-blocked (no seeded DEV MySQL). |
+
+#### The change
+
+`normalizeLeverCodes` (`bilateral.service.ts:1339`) widened from `Promise<string[]>`
+to `Promise<{ codes: string[]; validCodes: Set<string> }>`. The method **already
+built** that `Set` internally and discarded it; this only stops the discard, so
+T-06's `resolvePrimarySpCode` can validate `primary_sp_code` against the full
+per-result catalog **without a second `getScienceProgramsForResult` call** —
+which would otherwise fan out to `findPoolFundingAlignmentContext` +
+`findActiveByAgreementId` + CLARISA on *every* PATCH.
+
+Single call site (`:674`) destructures `const { codes: leverCodes } = …`, so
+`leverCodes` keeps its old name and type and every downstream consumer —
+`validateTocAlignments` (`:702`), `new Set(leverCodes)` for the R-BIL-093 cascade
+(`:713`), `leverCodes.length` (`:758`), the SP-row map (`:760`), `lever_codes`
+(`:805`) — is untouched.
+
+#### `has_contribution === false` → `validCodes: new Set()`
+
+The catalog is never fetched on that path (R-BIL-014), so an empty `Set` is the
+honest value — it records *"no catalog was consulted"*, not *"the catalog is
+empty"*.
+
+**The Reviewer strengthened this analysis beyond the Implementer's claim:** on the
+`has_contribution === true` path an empty `validCodes` is **unreachable** — empty
+`codes` throws first, and non-empty `codes` against an empty catalog throws
+`unknown_sp_codes`. So at the return statement, `validCodes.size === 0` ⟺
+`has_contribution === false`. The footgun is **latent, not live**. But the
+protection is **conventional, not structural** (`Set<string>` cannot distinguish
+the two states, and `strictNullChecks: false` means a `| null` type would not be
+enforced either) — see ADVISORY 1 and the T-06 forward pointer.
+
+#### Falsification — precise, not blunt
+
+Sabotage: changed **only the final return** to `return { codes, validCodes: new
+Set(codes) }`, deliberately leaving the *internal* `validCodes` used by the
+unknown-codes filter intact.
+
+```
+✕ T-05 — validCodes holds the full per-result catalog, not just the selected codes
+  expect(result.validCodes.has('SP10')).toBe(true);
+  Expected: true   Received: false
+Tests: 1 failed, 5 passed, 6 total
+```
+
+All four pre-existing R-BIL-070 scenarios and the `has_contribution=false` test
+stayed **green** under the sabotage — the fixture isolates the catalog-vs-selected
+defect specifically rather than causing general breakage. Reverted.
+
+**The Reviewer confirmed the isolation is faithful, not understated:** `validCodes
+= new Set(codes)` is *exactly* the wrong implementation `tasks.md` T-05 names.
+Sabotaging the internal `Set` instead would have broken the `unknown_sp_codes`
+filter — a **different** defect, already covered by scenarios 2 and 4.
+
+#### Discriminating fixture — the task's central disqualifier
+
+`mappedSpResponse(['SP09','SP10'])` (spec `:64-78`) against `sp_codes: ['SP09']`:
+catalog `{SP09, SP10}` **strictly exceeds** selected `{SP09}`, and the test asserts
+`validCodes.has('SP10')` — a code valid for the result but absent from the
+selection. Verified at source by the Reviewer.
+
+This matters because T-05's disqualifier is explicit: a fixture where `sp_codes`
+equals the catalog **cannot distinguish** the right implementation from the wrong
+one, since the two collections coincide whenever every valid SP is selected.
+
+| Test | Catalog | Selected | Discriminating? |
+| --- | --- | --- | --- |
+| R-BIL-070 scenario 1 (`:155`, untouched) | {SP09,SP10} | {SP09} | yes (pre-existing) |
+| scenario 2 | {SP09,SP10} | {SP09,SP99} | n/a — 400 path |
+| scenario 3 (`has_contribution=false`) | never fetched | ignored | n/a |
+| scenario 4 (unmapped) | {} | {SP01} | n/a — 400 path |
+| **T-05 catalog test** | **{SP09,SP10}** | **{SP09}** | **yes — SP10 is the surplus** |
+| T-05 `has_contribution=false` | never fetched | ignored | asserts `size === 0` + zero fetches |
+
+#### Reviewer verdict (`opus`) — **`STATUS: PASS`**
+
+Re-ran every gate itself: `npx tsc -p tsconfig.json --noEmit` (exit 0), `npm run
+build` (both stages), `npx eslint` (exit 0), `npx jest` (11 suites, **172 passed +
+1 todo**), `git status --porcelain`.
+
+Notable rulings:
+
+1. **`codes` is provably byte-identical.** The Reviewer accounted for the entire
+   `15/4` numstat across **six** edit sites (call-site comment, destructure, JSDoc,
+   return annotation, both returns) and concluded there is **no room for a hidden
+   edit**. The validation body appears as unchanged context under `git diff -U15`.
+2. **The private-seam cast is precedented in this codebase** — the identical
+   `as unknown as` idiom appears at `clarisa-projects.service.spec.ts:60`,
+   `clarisa-cgiar-entities.service.spec.ts:52`, `reports.controller.spec.ts:112`,
+   alongside widespread `service['privateMember']` access elsewhere. Not novel.
+3. **It does not weaken the evidence, because two seams cover two halves:**
+   `codes` is proven through the **public** `updateAlignment` path by the four
+   pre-existing scenarios (a wrong destructure would make `leverCodes` undefined
+   and blow up at `new Set(leverCodes)`), while `validCodes` — which has no public
+   observable until T-06 — is proven at the private seam. Combined, no gap.
+4. **K-002 covered on both halves.** `tsconfig.json` has no `include` and excludes
+   only `node_modules`/`dist`/`vite.config.ts`, so `tsc --noEmit` type-checked the
+   spec file too; server Jest uses ts-jest **without** `isolatedModules`, so specs
+   are type-checked at test time as well. (Note: this is the *server* tier — the
+   client tier's `isolatedModules: true` is what made K-002 bite.)
+5. **K-003 sweep independently verified.** `Promise<string[]>` now has 2 hits in
+   `src/`, both in `open-search/core/base-open-search-api.ts` and unrelated. Zero
+   remaining for this method. No prose in `src/` or the archived C1 spec claims a
+   `string[]` return.
+6. **`:155` not re-based.** 78/0, zero deletions. The added
+   `toHaveBeenCalledTimes(1)` lands at `:177`, *after* that block's existing
+   assertions, leaving its claim and line number intact — and T-05's own done
+   criterion ("assert the mock's call count is unchanged") makes that block its
+   natural home. **Not a T-11 encroachment.**
+
+#### ADVISORY (4R lens findings) — recorded, non-gating
+
+1. **RELIABILITY — input for T-06's brief.** `validCodes: new Set()` on the
+   `has_contribution === false` path is protected only by step ordering, and
+   nothing *enforces* that T-06 keeps design §5.1 step 1 first. **Concrete
+   suggestion, carried into T-06's forward pointer:** T-06 should pin the ordering
+   *behaviourally* — one test sending `has_contribution: false` **with a garbage
+   `primary_sp_code`**, asserting `resolvePrimarySpCode` still returns `null`
+   without consulting `validCodes`. That makes a future re-order go **red** rather
+   than silently produce `primary_sp_not_selected`.
+2. **READABILITY.** `NormalizeLeverCodesSeam` is a hand-written duplicate reached
+   through `as unknown as`, so it is **not** structurally tied to the real
+   signature — a future widening would compile against a stale literal. Runtime
+   value assertions still fail loudly, so exposure is limited to a misleading type.
+   A derived alias is unavailable (indexed access on a `private` member errors), so
+   the cheapest fix is **deletion, not derivation**: once T-06 makes `validCodes`
+   observable through `updateAlignment`, re-point these two tests at the public
+   seam and drop the local type.
+3. **RISK — doc drift, outside T-05's file scope.** `design.md:212` and
+   `judgment.md:80` still assert in the **present tense** that `normalizeLeverCodes`
+   *"is `Promise<string[]>`"*. Both are records of superseded reasoning
+   (`design.md:214` supplies the normative resolution two lines later), so this is
+   **not** a K-003 breach — K-003 binds corrections, and editing spec docs is
+   outside T-05's declared file list. Suggest a `(before T-05)` tense marker at
+   T-11 or archive time. **Separately:** `design.md:216` says the signature change
+   is *"listed in §2.1"*, but §2.1's `bilateral.service.ts` bullet (`:66`) names
+   role resolution, persistence, read-back, ToC restriction and the extracted
+   version gate — **not** the `normalizeLeverCodes` signature change. A
+   pre-existing spec gap, worth one line at archive time.
+
+#### Forward pointers — carry into the named task's brief
+
+| Target task | Pointer |
+| --- | --- |
+| **T-06** | **(a)** `resolvePrimarySpCode` takes `validCodes` as a parameter — do **not** call `getScienceProgramsForResult` a second time (RA-02). **(b)** ADVISORY 1: pin the step-1-first ordering behaviourally with a `has_contribution: false` + garbage `primary_sp_code` test asserting `null` and no `validCodes` consult. **(c)** ADVISORY 2: once `validCodes` is observable through `updateAlignment`, re-point T-05's two private-seam tests at the public seam and delete `NormalizeLeverCodesSeam`. **(d)** T-04's obligations still stand — promote the AC.4 `it.todo` **and** re-run the "gate left in place" sabotage to confirm it now goes RED. |
+| **T-11** | `normalizeLeverCodes.spec.ts:155` is **still un-re-based and still yours** — it PATCHes `has_contribution: true, sp_codes: ['SP09']` with no `primary_sp_code` and asserts `resolves.toBeDefined()`; it will receive `400 primary_sp_required` once T-06 lands. T-05 added an assertion at `:177` *after* that block without touching it. Scenarios 2 and 4 survive (`normalizeLeverCodes` runs first); scenario 3 is `has_contribution: false`. |
+| **`/akili-archive`** | ADVISORY 3 — tense-mark `design.md:212` and `judgment.md:80`; fix `design.md:216`'s claim that the signature change is listed in §2.1 (it is not). |
+
+#### Constitution Impact
+
+**None.** `normalizeLeverCodes` is `private`; no module created or reshaped, no
+public surface changed, no HTTP contract touched, no Swagger obligation.
+
+#### Final verification result
+
+✅ `npx jest src/domain/entities/bilateral --coverage=false` — 11 suites, **172 passed, 1 todo**
+✅ `npm run build` — clean (nest + vite admin)
+✅ `npx tsc -p tsconfig.json --noEmit` — clean (Reviewer, independently; covers the spec file too)
+✅ `npx eslint` on both files — clean (**K-001**)
+✅ `git diff --numstat` — spec **78 / 0** (zero deletions, `:155` intact), service **15 / 4**
+✅ T-01/T-04 protected block still hashes `94573605…`
 
 ---
