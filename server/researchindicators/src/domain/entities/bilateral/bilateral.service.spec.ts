@@ -25,6 +25,9 @@ import { TocIntegrationService } from '../../tools/toc-integration/toc-integrati
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
+import { ResultPoolFundingAlignmentSp } from './entities/result-pool-funding-alignment-sp.entity';
+import { ResultPoolFundingAlignment } from './entities/result-pool-funding-alignment.entity';
+import { ResultReviewHistory } from '../result-review-history/entities/result-review-history.entity';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.6 / NFR-BIL-070
 //
@@ -649,6 +652,295 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       ).resolves.toBeDefined();
 
       expect(deactivateForSps).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // updateAlignment — resolvePrimarySpCode + role derivation + persistence
+  //
+  // The core of the spec: R-BIL-120 (persisted role), R-BIL-121 AC.1/AC.2
+  // (service-side "≥ 1 Primary"), R-BIL-122 (Primary must be selected, with
+  // the two rejection paths kept distinguishable), R-BIL-126 AC.4 (legacy
+  // repair), R-BIL-130 AC.4 promotion lives in the tocAlignments spec.
+  //
+  // A dedicated `scopedManager` is used here (rather than the shared
+  // `fakeManager`, which returns the SAME mock repo for every entity) so the
+  // SP-row save can be asserted by its OWN spy — the disqualifier is
+  // explicit that a presence-assertion ("a sp_role field was passed") is not
+  // enough; the full (sp_code, sp_role) PAIRS must be asserted per row.
+  //
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-120, R-BIL-121, R-BIL-122, R-BIL-126
+  // ---------------------------------------------------------------------------
+  describe('updateAlignment — resolvePrimarySpCode + role persistence (T-06)', () => {
+    const alignmentSpSave = jest.fn().mockResolvedValue([]);
+    const alignmentSpUpdate = jest.fn();
+    const alignmentSave = jest.fn().mockResolvedValue({ id: 501 });
+    const alignmentUpdate = jest.fn();
+    const historySave = jest.fn().mockResolvedValue({ id: 1 });
+
+    const scopedManager = {
+      getRepository: (entity: unknown) => {
+        if (entity === ResultPoolFundingAlignmentSp) {
+          return { save: alignmentSpSave, update: alignmentSpUpdate };
+        }
+        if (entity === ResultPoolFundingAlignment) {
+          return { save: alignmentSave, update: alignmentUpdate };
+        }
+        if (entity === ResultReviewHistory) {
+          return { save: historySave };
+        }
+        throw new Error(
+          `T-06 scopedManager: unexpected getRepository(${String(entity)})`,
+        );
+      },
+    } as unknown as EntityManager;
+
+    const eligibleContext = () => ({
+      result_id: 19792,
+      result_official_code: 19792,
+      is_pool_funding_contributor: true,
+      is_synced_to_prms: false,
+      platform_code: 'STAR',
+      report_year_id: 2026,
+    });
+
+    const spRolePairs = (call: unknown) =>
+      (call as { sp_code: string; sp_role: string }[]).map((row) => [
+        row.sp_code,
+        row.sp_role,
+      ]);
+
+    beforeEach(() => {
+      transaction.mockImplementation(async (cb) => cb(scopedManager));
+      jest.spyOn(service, 'getAlignment').mockResolvedValue({} as never);
+      jest.spyOn(service, 'getScienceProgramsForResult').mockResolvedValue({
+        result_code: '19792',
+        mapping_status: 'mapped',
+        clarisa_project: { id: 1, short_name: 'p' },
+        science_programs: ['SP06', 'SP09'].map((code) => ({
+          code,
+          name: `name-of-${code}`,
+          category: null,
+          color: null,
+          icon_key: null,
+          allocation: 50,
+        })),
+      });
+    });
+
+    it('AC.1 + AC.3 — persists SP06 as PRIMARY and SP09 as CONTRIBUTING, exactly one row each (sp_codes keeps its meaning — Primary not sent twice)', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP06', 'SP09'],
+        primary_sp_code: 'SP06',
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, user),
+      ).resolves.toBeDefined();
+
+      expect(alignmentSpSave).toHaveBeenCalledTimes(1);
+      const [rows] = alignmentSpSave.mock.calls[0];
+      expect(rows).toHaveLength(2);
+      expect(spRolePairs(rows)).toEqual([
+        ['SP06', 'PRIMARY'],
+        ['SP09', 'CONTRIBUTING'],
+      ]);
+    });
+
+    it('AC.2 — has_contribution:false persists ZERO SP rows and does not require primary_sp_code', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = { has_contribution: false };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, user),
+      ).resolves.toBeDefined();
+
+      expect(alignmentSpSave).not.toHaveBeenCalled();
+    });
+
+    it('AC.4 — lever_codes + primary_sp_code behaves identically to sp_codes + primary_sp_code', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        lever_codes: ['SP06', 'SP09'],
+        primary_sp_code: 'SP06',
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, user),
+      ).resolves.toBeDefined();
+
+      const [rows] = alignmentSpSave.mock.calls[0];
+      expect(spRolePairs(rows)).toEqual([
+        ['SP06', 'PRIMARY'],
+        ['SP09', 'CONTRIBUTING'],
+      ]);
+    });
+
+    it('R-BIL-121 AC.1 — primary_sp_code absent ⇒ 400 primary_sp_required, nothing persisted', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP06'],
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: { primary_sp: { code: string } };
+      };
+      expect(response.message.primary_sp.code).toBe('primary_sp_required');
+      // Rejected pre-transaction: no partial write observable.
+      expect(transaction).not.toHaveBeenCalled();
+      expect(alignmentSpSave).not.toHaveBeenCalled();
+    });
+
+    it.each(['', '   '])(
+      'R-BIL-121 AC.2 — primary_sp_code %j is treated as absent ⇒ the same 400, nothing persisted',
+      async (value) => {
+        findContext.mockResolvedValueOnce(eligibleContext());
+        findActiveAlignment.mockResolvedValueOnce(null);
+
+        const dto: UpdatePoolFundingAlignmentDto = {
+          has_contribution: true,
+          sp_codes: ['SP06'],
+          primary_sp_code: value,
+        };
+
+        let thrown: HttpException | undefined;
+        try {
+          await service.updateAlignment(19792, '19792', dto, user);
+        } catch (err) {
+          thrown = err as HttpException;
+        }
+
+        expect(thrown).toBeInstanceOf(BadRequestException);
+        const response = thrown!.getResponse() as {
+          message: { primary_sp: { code: string } };
+        };
+        expect(response.message.primary_sp.code).toBe('primary_sp_required');
+        expect(transaction).not.toHaveBeenCalled();
+        expect(alignmentSpSave).not.toHaveBeenCalled();
+      },
+    );
+
+    // R-BIL-122 AC.4 — AC.1 and AC.2 below are TWO DISTINCT tests asserting
+    // DIFFERENT error payloads (errors.primary_sp vs errors.unknown_sp_codes).
+    // A single test covering only one case does not discharge the other,
+    // however green — both are required and neither is a proxy for it.
+    it('R-BIL-122 AC.1 — primary_sp_code valid for the result but unselected ⇒ 400 primary_sp_not_selected (errors.primary_sp)', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP06'],
+        primary_sp_code: 'SP09', // valid for the result, but not selected
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: {
+          primary_sp?: { code: string };
+          unknown_sp_codes?: string[];
+        };
+      };
+      expect(response.message.primary_sp?.code).toBe('primary_sp_not_selected');
+      expect(response.message.unknown_sp_codes).toBeUndefined();
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it('R-BIL-122 AC.2 — primary_sp_code NOT a valid SP for the result ⇒ the pre-existing 400 errors.unknown_sp_codes (distinct payload from AC.1)', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP06'],
+        primary_sp_code: 'SP99', // not a valid SP for this result at all
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: {
+          primary_sp?: { code: string };
+          unknown_sp_codes?: string[];
+        };
+      };
+      expect(response.message.unknown_sp_codes).toEqual(['SP99']);
+      expect(response.message.primary_sp).toBeUndefined();
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
+    it('R-BIL-126 AC.4 — a legacy (sp_role = NULL) editable alignment is repaired by one normal PATCH', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      // Previous alignment shaped exactly like a pre-migration legacy
+      // alignment: two SP rows, no role concept (represented here by the
+      // absence of any role field on the read model — sp_role = NULL rows
+      // read back as plain lever_code entries, R-BIL-126 AC.2).
+      findActiveAlignment.mockResolvedValueOnce({
+        id: 77,
+        result_id: 19792,
+        has_contribution: true,
+        selected_levers: [
+          { lever_code: 'SP06', lever_name: 'SP06' },
+          { lever_code: 'SP09', lever_name: 'SP09' },
+        ],
+      });
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP06', 'SP09'],
+        primary_sp_code: 'SP09',
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, user),
+      ).resolves.toBeDefined();
+
+      // The legacy rows are deactivated exactly as before (unchanged
+      // behavior) …
+      expect(alignmentSpUpdate).toHaveBeenCalledWith(
+        { alignment_id: 77, is_active: true },
+        expect.objectContaining({ is_active: false }),
+      );
+      // … and the freshly-written rows carry a real role: the alignment is
+      // "repaired" by the ordinary write path, no special migration case.
+      const [rows] = alignmentSpSave.mock.calls[0];
+      expect(spRolePairs(rows)).toEqual([
+        ['SP06', 'CONTRIBUTING'],
+        ['SP09', 'PRIMARY'],
+      ]);
     });
   });
 

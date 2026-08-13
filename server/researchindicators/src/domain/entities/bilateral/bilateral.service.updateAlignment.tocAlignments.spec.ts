@@ -1073,13 +1073,35 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         expect(deactivateForSps).not.toHaveBeenCalled();
       });
 
-      // AC.4 depends on `resolvePrimarySpCode` (T-06), which has not landed
-      // yet in this branch. T-06 must PROMOTE this to a real assertion on a
-      // 2026 result asserting `primary_sp_required` still fires — not
-      // invent new behaviour here, and not leave it silently skipped.
-      it.todo(
-        'AC.4 — on a 2026 result, primary_sp_required still fires (the gate does not mask Primary validation where it does not apply) — promote from todo in T-06',
-      );
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-130 AC.4
+      //
+      // Promoted from `it.todo` (T-04 forward obligation (a)): the version
+      // gate does not fire on a live-2026 result (it is not locked), so this
+      // proves Primary validation is NOT masked where the gate does not
+      // apply — a real assertion, not adjacent behaviour.
+      it('AC.4 — on a 2026 result, primary_sp_required still fires (the gate does not mask Primary validation where it does not apply)', async () => {
+        findContext.mockResolvedValue(baseContext({ report_year_id: 2026 }));
+
+        let thrown: HttpException | undefined;
+        try {
+          await service.updateAlignment(
+            19792,
+            '19792',
+            patchDto([sp01Yes()]),
+            user,
+          );
+        } catch (err) {
+          thrown = err as HttpException;
+        }
+
+        expect(thrown).toBeInstanceOf(BadRequestException);
+        const response = thrown!.getResponse() as {
+          message: { primary_sp: { code: string } };
+        };
+        expect(response.message.primary_sp.code).toBe('primary_sp_required');
+        expect(transaction).not.toHaveBeenCalled();
+        expect(getTocResults).not.toHaveBeenCalled();
+      });
     });
 
     // -----------------------------------------------------------------------

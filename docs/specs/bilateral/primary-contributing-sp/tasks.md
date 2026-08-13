@@ -296,11 +296,13 @@ graph TD
 - **Estimated LOC:** ~220
 - **Effort:** L
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-06). **R-BIL-130 is now FALSIFIED, not merely asserted** — T-04's deferred sabotage was re-run and goes red, reproduced independently by the Reviewer. **The suite is now 41 red by design** — all proven by mutation to be missing-`primary_sp_code` blocks owned by **T-11**, none a regression. **⚠ T-06's coverage (83.08/73.28/84.29/83.02) is a RED-suite figure and is NOT a valid T-11 baseline.**
 
 ---
 
 ### T-07 — ToC alignments accepted for the Primary SP only
+
+> **⚠ PIVOT RECORD OPEN — read [`./execution.md`](./execution.md) → *Pivot Record: T-07* before starting.** Two spec defects were found pre-emptively during T-06's review: (1) this task's done-criterion *"T-01's pins green"* is **unsatisfiable**, because T-11 re-bases those pins and runs *after* this task; (2) **37 of the 41 currently-red blocks are in this task's own file** and are **T-11's to re-base, not yours** — touching them bypasses T-11's mandatory assertion ledger (the D-9 defect). **The amendment is drafted and awaiting user approval; `tasks.md` is unchanged below.**
 
 - **Requirements covered:** **R-BIL-124** (AC.1–AC.5) · **R-BIL-125** AC.1/AC.2/AC.3 · defect classes **D-1**, **D-7**
 - **Files touched (intended):**

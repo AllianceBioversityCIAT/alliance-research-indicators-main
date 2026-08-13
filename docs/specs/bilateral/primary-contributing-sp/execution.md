@@ -1634,3 +1634,228 @@ breaking change to the envelope.
 ✅ No mutating endpoint fired against shared `dev`
 
 ---
+
+### T-06 — `resolvePrimarySpCode` + role derivation + `sp_role` persistence
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **1** (of 3 permitted) |
+| **Reviewer verdicts** | 1 × `PASS` |
+| **Rework attempts consumed** | 0 |
+| **Requirements covered** | **R-BIL-120** AC.1–AC.4 · **R-BIL-121** AC.1/AC.2 · **R-BIL-122** AC.1–AC.4 · R-BIL-126 AC.4 · **R-BIL-130 AC.4** (promoted) · **D-C2-4**, **D-C2-15** · defect class **D-1** |
+| **Dependencies** | T-03 ✅ · T-04 ✅ · T-05 ✅ |
+| **Estimated / actual LOC** | ~220 / **489 insertions, 56 deletions** (111/3 production, 378/53 test) |
+
+#### Leader decisions before dispatch
+
+| Decision | Rationale |
+| --- | --- |
+| **Skills: `nestjs-expert`, `error-handling-patterns`, `tdd`** — no deviation | The task is an error-taxonomy problem as much as a logic one. |
+| **Effort: `xhigh`** | Largest task in the spec; four distinct wrong implementations each needing its own red test; carries inherited obligations from two prior tasks. |
+| **Pre-empted a file-list trap** | T-06's list names the SP repository, but it is a bare `Repository` subclass and the save goes through `manager.getRepository(...)`. Briefed: **verify first, leave it alone if untouched, do not invent a change to satisfy a list.** T-03 had already proved this spec's file lists imprecise. **Outcome: correctly untouched.** |
+
+#### The implementation
+
+`resolvePrimarySpCode(dto, effectiveSpCodes, validCodes): string | null` at `bilateral.service.ts:885+`,
+called at `:700` — **after** T-04's version gate (`:689-691`), **before** `validateTocAlignments`
+(`:706`), all **pre-transaction**. Role derived at the save site (`:784`):
+`sp_role: spCode === primarySpCode ? 'PRIMARY' : 'CONTRIBUTING'`.
+
+The five steps map 1:1 onto `design.md` §5.1. **Step 1 returns before `validCodes` is touched** —
+the ordering T-05's ADVISORY 1 flagged as unenforceable by type, **now enforced by test**.
+
+#### 🔬 The Reviewer mutation-tested the red suite — this is the finding that matters
+
+The suite is **41 red**, all pre-existing blocks lacking `primary_sp_code`. Rather than spot-check
+that claim, the Reviewer **proved** it: it neutralised `resolvePrimarySpCode` to `return null`
+unconditionally (leaving the `sp_role` write active) and re-ran.
+
+> **41 failures → 0.** The only remaining failures were T-06's own 10 new tests.
+
+Two conclusions, neither obtainable by inspection:
+1. **Every one of the 41 is caused solely by the missing `primary_sp_code`. None is a regression.**
+2. **The `sp_role` field addition broke zero pre-existing tests** — an extra key in a
+   `toHaveBeenCalledWith` row literal was the plausible hidden regression, and it did not materialise.
+
+**The same experiment doubles as a mutation test of the new suite:** all 10 new/re-pointed tests
+detect the neutralised implementation. **There is no tautological test in the added set.**
+
+#### ✅ T-04's forward obligation — DISCHARGED, independently reproduced
+
+Since T-04 landed, **R-BIL-130's central claim had been asserted but never falsified** — the sabotage
+could not bite until `resolvePrimarySpCode` existed. The Reviewer **re-ran it itself** rather than
+accept the Implementer's report: moved the gate back inside `validateTocAlignments`, ran `-t "R-BIL-130"`:
+
+- **AC.1 → RED**: `Expected constructor: ConflictException / Received constructor: BadRequestException`
+- **AC.3 → RED** as a bonus (the legacy-body bypass also breaks)
+- **AC.4 → stays green**, correctly — on a 2026 result the gate is irrelevant
+
+> **R-BIL-130 is now genuinely falsifiable and has been falsified under sabotage.** This was the
+> longest-outstanding item in the run.
+
+Working tree restored after every experiment — `bilateral.service.ts` SHA-256
+`c5e61115b956b5cd887efc45463bccb2f62eda691f47757517ce3dbeb698f106`, numstat back to 111/3.
+
+#### Other verified findings
+
+- **Step 3 is load-bearing, proven by mutation.** Deleting the `validCodes.has` check turns **only**
+  R-BIL-122 AC.2 red — exactly the claimed defect, nothing else. `normalizeLeverCodes` genuinely
+  never inspects `primary_sp_code`.
+- **The `unknown_sp_codes` payload is the real contract, not a lookalike** — the Reviewer diffed both
+  throw sites and found them byte-identical in envelope, key, description string and array shape.
+- **R-BIL-122 AC.4 — both halves of both assertions exist.** AC.1 asserts
+  `primary_sp.code === 'primary_sp_not_selected'` **and** `unknown_sp_codes` undefined; AC.2 asserts
+  the inverse. **Neither test can pass under the other's implementation.**
+- **AC.1 asserts pairs, and R-BIL-126 AC.4 asserts the INVERTED pairing**
+  (`SP06⇒CONTRIBUTING, SP09⇒PRIMARY`), so a "first row is always PRIMARY" implementation cannot pass
+  both. Stronger than the done-criterion required.
+- **Sabotage 3's asymmetry is correct isolation, not a weak test.** Removing `.trim()` leaves `""`
+  falsy, so `""` stays green while `"   "` goes red. `""` discriminates the falsy-check; `"   "`
+  discriminates the trim — two properties, two mutants. **A red `""` would have been the *less*
+  informative outcome.**
+- **Casing / collation — no divergence, no action.** `includes` (array) and `has` (Set) agree by
+  construction: both operands are trimmed and case-preserved from the same call. `primary_sp_code:
+  "sp06"` against `sp_codes: ["SP06"]` fails at step 3 as `unknown_sp_codes` — **identical to how
+  `sp_codes: ["sp06"]` already behaves today**, so uniform with the shipped contract. The
+  `utf8mb4_unicode_520_ci` case-insensitivity never bites, because only catalog-exact codes reach
+  T-02's index.
+- **T-05's obligations fully discharged.** `NormalizeLeverCodesSeam` and `callNormalizeLeverCodes`
+  **deleted**; the `−46` is fully attributable (seam ~10 + helper ~11 + two old bodies ~25). The
+  re-pointed test proves the original claim **harder** — catalog `{SP09,SP10}` ⊋ selected `{SP09}`,
+  and under the wrong `validCodes = new Set(codes)` it goes red. `getScienceProgramsForResult` still
+  called exactly once (RA-02 preserved).
+- **Scope boundary held.** `primarySpCode` is consumed **only** at the `sp_role` derivation and is
+  deliberately **not** threaded into `validateTocAlignments`. That is the correct T-06/T-07 line:
+  **T-06 produces the resolved Primary, T-07 consumes it.** Wiring it early would have made T-07's
+  rule untestable in isolation.
+
+#### ⚠ Coverage — sound for THIS gate, but not a baseline
+
+`npm run test:cov` (Reviewer re-ran): **83.08 / 73.28 / 84.29 / 83.02** — all four metrics ≥ 60%,
+13–23 points clear. A red suite generally **under**-counts (throwing tests execute fewer lines), so
+this is conservative and the ≥60% criterion is discharged.
+
+> **🔴 Do NOT use these as T-11's comparison baseline.** T-11's criterion is stricter — *"no metric
+> lower than before this task"* — and a delta against a **red-run** measurement is meaningless.
+> **T-11 must take a fresh measurement once the suite is green.**
+
+#### ADVISORY (4R) — recorded, non-gating
+
+1. **RISK/READABILITY.** `resolvePrimarySpCode(dto, effectiveSpCodes, validCodes)` carries an unstated
+   invariant — `validCodes ⊇ effectiveSpCodes` — true only because both come from the same
+   `normalizeLeverCodes` call. Worth a one-line note on the signature.
+2. **READABILITY.** `'PRIMARY'`/`'CONTRIBUTING'` are bare literals at `:784` while
+   `update-pool-funding-alignment.dto.ts:79` already declares the union. **T-08 and T-10 will need the
+   same two literals** — a shared `SpRole` union would make all three agree by type rather than
+   convention. **Cheapest to introduce at T-08.**
+3. **RELIABILITY — a trap for T-08/T-10.** T-06's describe sets
+   `transaction.mockImplementation(async (cb) => cb(scopedManager))`, and the file's
+   `jest.clearAllMocks()` clears calls but **not implementations** — so `scopedManager` leaks into
+   every describe running after it in `bilateral.service.spec.ts`. Harmless today (verified), but
+   `scopedManager` **throws on any unexpected entity**, and **T-08 and T-10 both add describes to this
+   file**. A `transaction.mockReset()` in a scoped `afterEach` closes it.
+4. **RESILIENCE.** `@MaxLength(50)` is evaluated pre-trim, so a 50-char code padded to 51 yields a
+   class-validator error rather than `primary_sp_required`. Unreachable in practice (~4-char codes);
+   noted so it is not rediscovered as a defect.
+
+#### Forward pointers
+
+| Target | Pointer |
+| --- | --- |
+| **T-07** | **(a)** Consume `primarySpCode` — T-06 deliberately did not thread it into `validateTocAlignments`. **(b)** See the **Pivot Record below** — T-07's done-criterion re: T-01's pins is unsatisfiable as written. **(c)** 37 of the 41 red blocks are in **T-07's own file** — do **not** re-base them (see Pivot Record §2). |
+| **T-08** | ADVISORY 2 — introduce the shared `SpRole` union here. ADVISORY 3 — add `transaction.mockReset()`; `scopedManager` throws on unexpected entities and you are adding describes to that file. Also T-03's pointer: **drop the `?` from `role`**. |
+| **T-10** | ADVISORY 3 applies equally — you also add describes to `bilateral.service.spec.ts`. |
+| **T-11** | **Take a FRESH coverage measurement once green** — T-06's 83.08/73.28/84.29/83.02 is a red-suite figure and is not a valid baseline. The 41 red tests at `it`-granularity vs the design's "28 blocks" at `describe`-granularity are **not directly comparable** — reconcile using your own census granularity, and report the discrepancy rather than adopting either number silently (RB-6). |
+
+#### Constitution Impact
+
+**None.** No module created or reshaped, no public surface change beyond the already-declared T-03
+fields. `resolvePrimarySpCode` is `private`.
+
+#### Final verification result
+
+✅ `npx jest src/domain/entities/bilateral` — 147 passed, **41 failed (all T-11-owned, proven by mutation)**
+✅ `npm run test:cov` — **83.08 / 73.28 / 84.29 / 83.02**, all ≥ 60% (Reviewer re-ran independently)
+✅ `npx eslint` — clean; `npx prettier --check` — clean; `npx tsc --noEmit` — clean (**K-001**: two Prettier issues fixed **by hand**, no `--fix`; zero collateral churn)
+✅ `npm run build` — clean
+✅ **:216 block SHA still `94573605…`** — additions only in that file
+✅ All four T-06 sabotages **plus two Reviewer-devised extras** land on exactly their target tests
+
+---
+
+## Pivot Record: T-07 — done-criterion unsatisfiable as written (raised pre-emptively, before T-07 starts)
+
+**Trigger.** Reviewer discovery during T-06's audit. **Not an implementation defect** — T-06 passed
+with zero findings. This is a defect in the **approved `tasks.md`**, surfaced early enough to fix
+before it costs a rework attempt.
+
+**Status: awaiting user approval. `tasks.md` has NOT been amended.** The Pivot Protocol's literal
+order is amend-then-approve; I have inverted it deliberately — `tasks.md` is approved scope and the
+mode is `gated`, so changing it before the user has seen the reasoning would be the wrong risk to
+take on a document the user owns. The exact proposed text is below, ready to apply.
+
+### Problem 1 — the criterion the Leader raised
+
+T-01's two cascade pins (`bilateral.service.spec.ts:610`, `:637`) are among T-06's 41 red tests —
+they PATCH `has_contribution: true` with no `primary_sp_code`.
+
+But **T-07's done-criteria require them green**: *"R-BIL-125 AC.3: removing an SP from `sp_codes`
+still deactivates its ToC row — T-01's pins green"*, and T-07's verification says *"T-01's cascade
+pins must still pass unmodified."*
+
+**T-11, which re-bases them, depends on T-06 AND T-07 — so it runs after T-07.** As written, T-07
+cannot discharge its own criterion.
+
+**Reviewer's adjudication — the answer is "the criterion is mis-worded", and the spec contains its
+own evidence:**
+
+1. **T-07's operational check already permits the fix.** The verification line is *"`git diff` shows
+   no deletions in the pinned blocks."* Adding `primary_sp_code` to a fixture is an **addition**. The
+   English gloss ("pass unmodified") and the operationalisation disagree — and **the
+   operationalisation is the one that actually detects the defect it targets**: a pin quietly gutted.
+2. **The spec has a protected-block mechanism and deliberately did not apply it here.**
+   `tocAlignments.spec.ts:216` is guarded three ways — "**OFF LIMITS**", an explicit *"adding
+   `primary_sp_code` to that fixture is the D-8 defect, not a re-base"*, and a SHA-256 pin. **T-01's
+   cascade pins carry none of that**, and T-11 lists `bilateral.service.spec.ts` at 13 re-base blocks
+   with no carve-out. **The spec knows how to say "never touch this" and chose not to say it here.**
+3. **The criterion is unsatisfiable for T-07 for the identical reason it was excused for T-06.** Both
+   leave the suite red by design; T-11 is the single task that makes it green. Excusing T-06 while
+   holding T-07 to a green-suite criterion is the inconsistency — **not the DAG**.
+
+### Problem 2 — the sharper one, which the Leader did NOT raise
+
+**37 of the 41 red blocks live in `tocAlignments.spec.ts` — T-07's OWN test file.** Those 37 are
+T-11's to re-base.
+
+So T-07 will work inside a file where its own `npx jest src/domain/entities/bilateral` verification
+comes back red, **with 37 one-line fixes sitting right there**. That is a live invitation to silently
+do T-11's job **without the mandatory assertion ledger** — **precisely the D-9 defect T-11 exists to
+prevent**, and it would arrive looking like helpfulness.
+
+### Proposed amendment — three edits to `tasks.md`, no requirement or design change
+
+1. **T-07 done-criterion** (currently *"R-BIL-125 AC.3 … T-01's pins green"*) →
+   > *"R-BIL-125 AC.3 — T-07 adds no cascade trigger: `git diff` shows **no deletions** inside T-01's
+   > two pinned blocks, and **no change to the `deactivateForSps` call site**. The pins' green re-base
+   > remains **T-11's**, exactly as for T-06. R-BIL-125 AC.3 is finally discharged at T-11, not here."*
+2. **T-07 verification** — replace *"T-01's cascade pins must still pass unmodified"* with the
+   no-deletions check **plus** a production-diff check that the cascade logic is byte-identical.
+3. **T-07 scope boundary — add explicitly:**
+   > *"**The suite is red when you start (41 blocks, T-06). That is expected.** 37 of them are in
+   > `tocAlignments.spec.ts` — **your own file** — and they are **T-11's to re-base, not yours**.
+   > Demonstrate your own tests green with a filtered run (`npx jest … -t "<your pattern>"`); do
+   > **not** add `primary_sp_code` to any block you did not author. Re-basing them here would bypass
+   > T-11's mandatory assertion ledger — the D-9 defect."*
+
+**Also record:** R-BIL-125 AC.3 is discharged at **T-11**, not T-07.
+
+### Why this is not scope growth
+No requirement changes. No design decision is reversed. No task is added or removed. The amendment
+**corrects a criterion that cannot be satisfied** and **makes an existing scope boundary explicit**
+where the file layout actively invites crossing it. T-07 can still prove its real claim without a
+green suite: structurally (cascade call site untouched) and behaviourally on its own fixtures —
+`tocAlignments.spec.ts` already carries a cascade test T-07 owns and will supply a Primary to.
+
+---

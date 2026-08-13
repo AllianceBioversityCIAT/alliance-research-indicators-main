@@ -252,38 +252,18 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
     expect(transaction).not.toHaveBeenCalled();
   });
 
-  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-05 / RA-02
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / RA-02, T-05 ADVISORY 2
   //
-  // `normalizeLeverCodes` is private and `validCodes` has no observable
-  // effect through the public `updateAlignment` seam yet (T-06's
-  // `resolvePrimarySpCode` is its first consumer) — so these tests invoke
-  // the method directly. TS `private` is compile-time only; the cast below
-  // just gives the direct call a typed shape instead of `any`.
-  type NormalizeLeverCodesSeam = {
-    normalizeLeverCodes: (
-      dto: UpdatePoolFundingAlignmentDto,
-      resultId: number,
-      resultCode: string,
-    ) => Promise<{ codes: string[]; validCodes: Set<string> }>;
-  };
-
-  const callNormalizeLeverCodes = (
-    dto: UpdatePoolFundingAlignmentDto,
-    resultId = 19792,
-    resultCode = '19792',
-  ) =>
-    (service as unknown as NormalizeLeverCodesSeam).normalizeLeverCodes(
-      dto,
-      resultId,
-      resultCode,
-    );
-
-  it('T-05 — validCodes holds the full per-result catalog, not just the selected codes', async () => {
-    // Catalog {SP09, SP10} strictly exceeds selected {SP09} — SP10 is valid
-    // for the result but was never chosen. This is the discriminating shape
-    // required by the task: a catalog equal to sp_codes cannot tell
-    // `validCodes = catalog` apart from the plausible wrong implementation
-    // `validCodes = new Set(codes)`, because the two would coincide.
+  // T-05's two private-seam tests (`normalizeLeverCodes` invoked directly
+  // via an `as unknown as` cast, deleted here) proved `validCodes` before it
+  // had any public observable. Now that T-06's `resolvePrimarySpCode` is
+  // wired through `updateAlignment`, both claims are genuinely dischargeable
+  // through the PUBLIC seam, so they are re-pointed rather than kept at the
+  // private one — T-05's forward pointer named this re-point explicitly,
+  // conditioned on "once validCodes is observable through updateAlignment."
+  it('T-06 — validCodes really is the FULL per-result catalog: a code valid for the result but unselected as Primary returns primary_sp_not_selected, not unknown_sp_codes', async () => {
+    findContext.mockResolvedValue(baseContext);
+    findActiveAlignment.mockResolvedValueOnce(null);
     const getScienceProgramsSpy = jest
       .spyOn(service, 'getScienceProgramsForResult')
       .mockResolvedValueOnce(mappedSpResponse(['SP09', 'SP10']));
@@ -291,23 +271,54 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP09'],
+      // SP10 is valid for the result (full catalog) but was never selected
+      // — the exact discriminating shape T-05 required: a catalog equal to
+      // sp_codes cannot tell `validCodes = catalog` apart from the wrong
+      // `validCodes = new Set(codes)`, because the two would coincide.
+      primary_sp_code: 'SP10',
     };
 
-    const result = await callNormalizeLeverCodes(dto);
+    let thrown: HttpException | undefined;
+    try {
+      await service.updateAlignment(19792, '19792', dto, user);
+    } catch (err) {
+      thrown = err as HttpException;
+    }
 
-    expect(result.codes).toEqual(['SP09']);
-    // Behavioral check (not a presence assertion): validCodes must contain
-    // SP10, which is absent from sp_codes/codes. A validCodes built from the
-    // selected set alone would not contain it.
-    expect(result.validCodes.has('SP10')).toBe(true);
-    expect(result.validCodes).toEqual(new Set(['SP09', 'SP10']));
-    // No second catalog fetch — validCodes comes from the same call that
-    // already validates `codes`.
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as {
+      message: {
+        primary_sp?: { code: string };
+        unknown_sp_codes?: string[];
+      };
+    };
+    // A `validCodes` built from the selected set alone would report SP10 as
+    // unknown_sp_codes instead — this is the behavioral check, not a
+    // presence-assertion.
+    expect(response.message.primary_sp?.code).toBe('primary_sp_not_selected');
+    expect(response.message.unknown_sp_codes).toBeUndefined();
+    // No second catalog fetch — validCodes rides the same call that already
+    // validates sp_codes (RA-02).
     expect(getScienceProgramsSpy).toHaveBeenCalledTimes(1);
     expect(getScienceProgramsSpy).toHaveBeenCalledWith(19792, '19792');
+    expect(transaction).not.toHaveBeenCalled();
   });
 
-  it('T-05 — has_contribution=false returns an empty validCodes and never fetches the catalog', async () => {
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / T-05 ADVISORY 1
+  //
+  // Pins design.md §5.1 step 1 running FIRST, behaviourally: with
+  // has_contribution:false, `resolvePrimarySpCode` must return null WITHOUT
+  // ever consulting `validCodes` — even when primary_sp_code is garbage. A
+  // future re-order that checked `primary_sp_code` before `has_contribution`
+  // would either throw on the garbage code or fetch the catalog; neither
+  // happens here, so a re-order goes red instead of silently producing
+  // primary_sp_not_selected (T-05's ADVISORY 1 concrete suggestion). This
+  // also supersedes T-05's old "empty validCodes" private-seam test — the
+  // property that matters is that the catalog is never consulted, not the
+  // literal Set size, and that is what this proves via the public seam.
+  it('T-06 — has_contribution:false resolves the Primary as null WITHOUT consulting validCodes, even with a garbage primary_sp_code', async () => {
+    findContext.mockResolvedValue(baseContext);
+    findActiveAlignment.mockResolvedValueOnce(null);
     const getScienceProgramsSpy = jest.spyOn(
       service,
       'getScienceProgramsForResult',
@@ -316,14 +327,14 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: false,
       sp_codes: ['SP99'],
+      primary_sp_code: 'NOT-A-REAL-CODE',
     };
 
-    const result = await callNormalizeLeverCodes(dto);
+    await expect(
+      service.updateAlignment(19792, '19792', dto, user),
+    ).resolves.toBeDefined();
 
-    expect(result.codes).toEqual([]);
-    // has_contribution=false never reaches the catalog fetch (R-BIL-014),
-    // so an empty Set is the honest value here, not a lie of omission.
-    expect(result.validCodes.size).toBe(0);
     expect(getScienceProgramsSpy).not.toHaveBeenCalled();
+    expect(transaction).toHaveBeenCalledTimes(1);
   });
 });

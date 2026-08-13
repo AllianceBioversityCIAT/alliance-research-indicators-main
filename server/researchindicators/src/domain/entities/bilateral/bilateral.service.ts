@@ -669,9 +669,10 @@ export class BilateralService {
       throw new ConflictException('Result is already synced to PRMS');
     }
 
-    // T-05 / RA-02: `validCodes` (the full per-result catalog) is not
-    // consumed yet — T-06's `resolvePrimarySpCode` is the first caller.
-    const { codes: leverCodes } = await this.normalizeLeverCodes(
+    // T-05 / RA-02: `validCodes` (the full per-result catalog) rides the
+    // same call so T-06's `resolvePrimarySpCode` below can validate
+    // `primary_sp_code` without a second `getScienceProgramsForResult` call.
+    const { codes: leverCodes, validCodes } = await this.normalizeLeverCodes(
       dto,
       resultId,
       resultCode,
@@ -687,6 +688,20 @@ export class BilateralService {
     if (dto.toc_alignments) {
       this.assertTocMappingVersionUnlocked(context);
     }
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-120..122, D-C2-15
+    //
+    // Primary resolution (design.md §4 step 3, §5.1) runs BEFORE the
+    // transaction opens too, so a rejection here observes no partial write
+    // (R-BIL-121's atomicity clause) — same reasoning as the version gate
+    // above. Positioned after it (R-BIL-130) and before
+    // `validateTocAlignments`, which needs the resolved Primary for the
+    // T-07 restriction (not wired through yet — that is T-07's scope).
+    const primarySpCode = this.resolvePrimarySpCode(
+      dto,
+      leverCodes,
+      validCodes,
+    );
 
     // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092..094, R-BIL-097
     //
@@ -762,6 +777,11 @@ export class BilateralService {
             // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3
             // / R-BIL-073 — entity property renamed `lever_code` → `sp_code`.
             sp_code: spCode,
+            // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06
+            // / R-BIL-120 AC.1, D-C2-4 — role is DERIVED from the resolved
+            // Primary and STORED explicitly on every row (never transmitted
+            // per-row on the wire).
+            sp_role: spCode === primarySpCode ? 'PRIMARY' : 'CONTRIBUTING',
             created_by: actorUserId,
             updated_by: actorUserId,
           })),
@@ -863,6 +883,94 @@ export class BilateralService {
         },
       });
     }
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-120, R-BIL-121, R-BIL-122, D-C2-15
+   *
+   * Resolves the Primary SP for this save. `design.md` §5.1 is normative —
+   * the five steps below map 1:1 onto it. Runs BEFORE the transaction opens
+   * (called from the pre-transaction block in `updateAlignment`, right after
+   * the T-04 version gate), so a rejection here observes no partial write
+   * (R-BIL-121's atomicity clause) — same reasoning as the version gate.
+   * Positioned after it (R-BIL-130: the shipped 409 keeps winning) and
+   * before `validateTocAlignments`, which will need the resolved Primary for
+   * the T-07 restriction — wiring it through is T-07's job, not this one's.
+   *
+   *   1. `has_contribution === false` → `null`. No SP rows are written and
+   *      `primary_sp_code` is ignored (R-BIL-014). Returns BEFORE touching
+   *      `validCodes` — the ordering `normalizeLeverCodes` (T-05 / RA-02
+   *      ADVISORY 1) leaves unenforced by type, so this step returning
+   *      first is what makes it true in practice.
+   *   2. Trim `primary_sp_code`. Empty, whitespace-only, or absent →
+   *      `400 errors.primary_sp.code = "primary_sp_required"` (R-BIL-121
+   *      AC.1/AC.2).
+   *   3. Not in the full per-result catalog (`validCodes` — T-05's widened
+   *      `normalizeLeverCodes`, RA-02) → the EXISTING
+   *      `400 errors.unknown_sp_codes` contract, carrying the offending
+   *      code. Without this step an unknown Primary would return
+   *      `primary_sp_not_selected` instead, and R-BIL-122 AC.2 would be
+   *      undischargeable — `normalizeLeverCodes` never inspects
+   *      `primary_sp_code`, so this is the only place that catches it
+   *      (design.md §5.1 "Step 3 is not redundant…").
+   *   4. In the catalog but not in the effective `sp_codes` →
+   *      `400 primary_sp_not_selected` (R-BIL-122 AC.1).
+   *   5. Return the trimmed code. Each persisted SP row derives
+   *      `sp_role = (sp_code === primary) ? 'PRIMARY' : 'CONTRIBUTING'` at
+   *      the call site (R-BIL-120 AC.1). Role is DERIVED, never transmitted
+   *      per-row on the wire, so "one SP in both roles" is unrepresentable
+   *      and mutual exclusion needs NO runtime check (D-C2-1; R-BIL-122
+   *      AC.3 is satisfied structurally — none is added here).
+   */
+  private resolvePrimarySpCode(
+    dto: UpdatePoolFundingAlignmentDto,
+    effectiveSpCodes: string[],
+    validCodes: Set<string>,
+  ): string | null {
+    if (!dto.has_contribution) {
+      return null;
+    }
+
+    const trimmed = dto.primary_sp_code?.trim();
+    if (!trimmed) {
+      throw new BadRequestException({
+        message: {
+          description: 'A Primary Science Program is required',
+          primary_sp: {
+            code: 'primary_sp_required',
+            description:
+              'primary_sp_code is required when has_contribution is true',
+          },
+        },
+      });
+    }
+
+    if (!validCodes.has(trimmed)) {
+      // Existing errors.unknown_sp_codes contract (normalizeLeverCodes,
+      // T-15.1) — carries the offending code so R-BIL-122 AC.2 stays
+      // distinguishable from AC.1 below, rather than both collapsing onto
+      // primary_sp_not_selected.
+      throw new BadRequestException({
+        message: {
+          description: 'Unknown Science Program codes',
+          unknown_sp_codes: [trimmed],
+        },
+      });
+    }
+
+    if (!effectiveSpCodes.includes(trimmed)) {
+      throw new BadRequestException({
+        message: {
+          description: 'The Primary Science Program must be selected',
+          primary_sp: {
+            code: 'primary_sp_not_selected',
+            description: 'primary_sp_code must be one of the selected sp_codes',
+          },
+        },
+      });
+    }
+
+    return trimmed;
   }
 
   /**
