@@ -16,18 +16,22 @@
 
 ## 2. Summary
 
-**Verdict: PASS — 0 FAIL. Archive is blocked on exactly one item, and it is a human action, not a defect.**
+> ### ⚠️ This report was revised on 2026-08-13 after its own verdict was proven wrong.
+>
+> The original pass declared **0 FAIL** and called the spec archive-ready pending one manual check. The product owner then ran the app and found that **the sidebar's Indicator filter never reached the URL** — an unmet requirement, not a nice-to-have. The verdict below is the corrected one. §6 and §9 record what the first pass got wrong and why, unedited, because a validation phase that quietly fixes its own miss teaches nothing.
+
+**Verdict: PASS (revised) — 1 FAIL found and remediated under T-13. Archive is blocked on one human action.**
 
 | Result | Count | Detail |
 | --- | --- | --- |
-| **FAIL** | **0** | — |
-| **WARN** | **5** | 1 open (W-1), 1 recorded and routed to Kaizen (W-2), 3 corrected during this phase (W-3…W-5) |
+| **FAIL** | **1 → 0** | **F-1** — R-RCU-001 + R-RCU-003 AC.1 unmet for the sidebar indicator multiselect. **Fixed by T-13 / D-URL-18** and re-verified |
+| **WARN** | **5** | 1 open (W-1), 1 routed to Kaizen (W-2), 3 corrected during this phase (W-3…W-5) |
 | **BLOCKED** | 0 | — |
-| **Advisory** | 5 | 4 carried forward from `execution.md`; 1 of them independently re-verified here |
+| **Advisory** | 5 | 4 carried from `execution.md`; 1 independently re-verified here |
 
-Every functional and non-functional requirement is implemented and gated by a test that can fail. Both suites are green, both packages lint clean, the client type-checks. The single thing standing between this spec and archive is the **D6 manual cross-package check** — the blind spot the spec itself named up front and never pretended to have closed.
+After T-13, every functional and non-functional requirement is implemented and gated by a test that can fail. The full client suite is green at **309 suites / 6,507 tests**, both packages lint clean, the client type-checks. The one remaining blocker is the **D6 manual cross-package check** — the blind spot the spec named up front and never claimed to have closed.
 
-**The three documentation corrections applied here are all the same defect class this spec has been fighting all along:** a figure or citation that was true when written, carried forward after it stopped being true. That is the fourth recurrence, and it is the Kaizen datum.
+**Two Kaizen data came out of this validation, and the second is worth more than the first.** The three documentation corrections in §8 are all the familiar class — a figure true when written, carried forward after it stopped being true. **F-1 is a different and sharper one:** every automated gate verified the system against *its own description of itself*, and none asked whether that description enumerated what the screen actually renders.
 
 ---
 
@@ -71,8 +75,8 @@ All commands run fresh during this validation, on a tree with no uncommitted cod
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Client tests | `npm test -- --silent` | **PASS** — 309/309 suites · 6,479/6,479 tests · 21.1 s |
-| Client coverage | (same run) | **PASS** — statements **99.27%** · branches **98.09%** · functions **99.17%** · lines **99.5%** |
+| Client tests | `npm test -- --silent` | **PASS** — **309/309 suites · 6,507/6,507 tests** *(re-run after T-13; was 6,479 before it)* |
+| Client coverage | (same run) | **PASS** — statements **99.27%** · branches **98.08%** · functions **99.17%** · lines **99.5%** |
 | Server tests | `npm test -- --silent` | **PASS** — 328/328 suites · 2,217/2,217 tests · 21.5 s |
 | Client lint | `npm run lint -- --quiet` | **PASS** — all files pass |
 | Server lint | `npm run lint -- --quiet` | **PASS** — exit 0 |
@@ -91,9 +95,9 @@ Verified at **scenario and clause granularity** — every `BUT it must NOT` and 
 
 | Req | Verdict | Evidence |
 | --- | --- | --- |
-| **R-RCU-001** — canonical vocabulary | **PASS** | Six params in `CANONICAL_PARAM_NAMES`. AC.3 (`?CONTRACT=a100`) asserted with that literal. AC.4 bidirectional parity + uniqueness in `vocabulary.spec.ts`. AC.5 — slugs byte-identical to `QueryIndicatorsEnum`; `cap_sharing` absent from the URL layer |
+| **R-RCU-001** — canonical vocabulary | **FAIL → PASS** | **Originally marked PASS in error.** Seven params now in `CANONICAL_PARAM_NAMES` after T-13; the sidebar Indicator multiselect had no parameter at all. AC.3 (`?CONTRACT=a100`) asserted with that literal. AC.4 bidirectional parity + uniqueness. AC.5 — slugs byte-identical to `QueryIndicatorsEnum`; `cap_sharing` absent |
 | **R-RCU-002** — deep link applies | **PASS** *(AC.4 as narrowed by D-URL-17)* | Read path `results-center.component.ts:327-436`. AC.3 state parity asserted on rendered DOM after control-list resolution. AC.6/AC.7 scope resolution covered both directions. **AC.4 is verified only for the URL layer** — see the scope-correction note below |
-| **R-RCU-003** — filters written back | **PASS** | `urlWriteEffect` `:213-260`. Six tests, one per canonical param. AC.2 round-trip property. AC.3 zero extra fetches. AC.4 history depth — `replaceUrl`, `relativeTo`, `queryParamsHandling: 'merge'` pinned on **every** call. R2-1 guard asserts the resulting URL **string**, not the serializer output |
+| **R-RCU-003** — filters written back | **FAIL → PASS** | **AC.1 originally marked PASS in error — see F-1 below.** `urlWriteEffect` `:213-260`. Now seven write tests plus T-13's four, including a dedicated sidebar-multiselect round-trip (the tab variant structurally cannot exercise it). AC.3 zero extra fetches. AC.4 history depth — `replaceUrl`, `relativeTo`, `queryParamsHandling: 'merge'` pinned on **every** call. R2-1 guard asserts the resulting URL **string**, not the serializer output |
 | **R-RCU-004** — URL beats session | **PASS** | `hadRecognizedParam` gate. AC.3 (`?utm_source=email` alone does not suppress restore) explicitly asserted |
 | **R-RCU-005** — invalid degrades | **PASS** | Per-token validation; bounds `MAX_LIST_PARAM_VALUES = 50` / `MAX_PARAM_TOKEN_LENGTH = 64`; `getAll()` flattening. AC.2 one toast per navigation. AC.3 satisfied structurally — the toast names **counts, never values**, which is stronger than escaping |
 | **R-RCU-006** — legacy forever | **PASS** | **R3-3 verified by direct read**: `LEGACY_PARAM_NAMES = ['indicatortab','statustab','statuslabel']` stored **folded** (`vocabulary.ts:162`), so folded incoming keys match. This is the single line that, if regressed, silently breaks every delivered email. AC.3 — `statusLabel`'s value never reaches the chip (label resolved from the control list per D-URL-10) |
@@ -103,6 +107,25 @@ Verified at **scenario and clause granularity** — every `BUT it must NOT` and 
 | **NFR-RCU-003** — no user ids in URL | **PASS** | `serialize` emits only `tab`. Asserted on the written URL **string** for both scopes, with the sentinel seeded into `create-user-codes` — the same signal key production writes to — after attempt 1's version was found structurally incapable of failing |
 | **NFR-RCU-004** — history hygiene | **PASS** | `replaceUrl: true` pinned on every navigate call |
 | **NFR-RCU-005** — shared-consumer isolation | **PASS** | All four consumers carry real-service isolation blocks. The dashboard block uses the **real** `ResultsCenterService` with a **positive control** (asserts the fixed `status-codes: [5]` filter actually landed), so it cannot pass against deleted production wiring — KZ-001 discipline correctly applied |
+
+### F-1 — the FAIL this report originally missed
+
+**Found by the product owner in manual testing, after this report had already passed the spec.**
+
+The Results Center exposes the indicator dimension through **two** controls on **two** wire keys. The spec treated them as one:
+
+| Control | Wire key | Parameter, originally |
+| --- | --- | --- |
+| Indicator tab strip | `indicator-codes-tabs` | `indicator` ✅ |
+| **Sidebar Indicator multiselect** | `indicator-codes-filter` | **none** ❌ |
+
+The multiselect is `@if`-gated on the tab being empty (`table-filters-sidebar.component.html:2`), so with **ALL INDICATORS** active it is visible and fully usable — and nothing serialized it. It filtered the table and rendered a chip, then vanished on reload and was absent from every shared link. Reproduced exactly: `?source=star` in the address bar while two filters were applied on screen.
+
+**Why every gate missed it.** The AC.1 indicator test is named, verbatim, `'applies, changes and clears the indicator tab filter (AC.1, R2-1)'` and drives `indicator-codes-tabs`. AC.1's text says *"each of the five **sidebar** filters"*. The suite could not tell the two apart because it only ever drove one — KZ-004's exact shape.
+
+**Why this report missed it.** §6 originally checked that six tests existed, one per canonical parameter, and that they matched the six declared parameters. It never asked whether the `indicator` test drove *the surface the AC names*. **A traceability table checked against itself is the same defect class as the tests it audits** — and that is the sharpest Kaizen datum this spec produced.
+
+**Remediated by T-13 / D-URL-18** — `indicators` (plural, multi-value) → `indicator-codes-filter`, with `indicator` (tab, single-value) untouched so delivered CapDev links keep working; mutual exclusivity enforced on read and write. Full detail in `execution.md` §12.
 
 ### The one narrowed claim, restated plainly
 
@@ -233,6 +256,7 @@ Pass conditions: (1) the view loads already filtered, with no unfiltered flash-t
 
 | # | Item | Severity | Owner | Status |
 | --- | --- | --- | --- | --- |
+| **F-1** | Sidebar indicator multiselect had no URL parameter — R-RCU-001 + R-RCU-003 AC.1 unmet | **FAIL** | T-13 / D-URL-18 | ✅ **Fixed and re-verified** |
 | **W-1** | Perform the D6 manual cross-package check | **Blocks archive** | **Human (d.casanas)** | ⏳ **OPEN** |
 | W-2 | Final LOC +26% over re-baseline #2; projection error recurred a 4th time | Process | `/akili-archive` Kaizen | Recorded in `design.md` §13 |
 | W-3 | Stale review-rounds cell | Doc | — | ✅ Fixed |
@@ -252,11 +276,11 @@ Pass conditions: (1) the view loads already filtered, with no unfiltered flash-t
 
 | Criterion | Status |
 | --- | --- |
-| All required tasks `[x]` | ✅ 12/12 |
-| No unresolved FAIL | ✅ 0 FAIL |
+| All required tasks `[x]` | ✅ **13/13** (T-13 added post-validation) |
+| No unresolved FAIL | ✅ F-1 found, fixed under T-13, re-verified |
 | WARNs accepted or followed up | ✅ 3 fixed here · 1 routed to Kaizen · **1 open (W-1)** |
-| Tests cover key requirements and scenarios | ✅ Both suites green; coverage ~60 points above every floor |
-| Drift reflected in the docs | ✅ Four figure/citation defects corrected with closure sweeps |
+| Tests cover key requirements and scenarios | ✅ 309 suites / 6,507 tests green; coverage ~60 points above every floor |
+| Drift reflected in the docs | ✅ Four figure/citation defects corrected with closure sweeps; D-URL-18 recorded in requirements, design, tasks, execution and the UX/UI decisions log |
 | User has reviewed the summary | ⏳ Pending |
 
 ### Verdict
@@ -271,11 +295,12 @@ Once W-1 is recorded:
 /akili-archive docs/specs/results-center/url-filters
 ```
 
-**Carry into the archive phase — the three things worth more than the code:**
+**Carry into the archive phase — in this order:**
 
-1. **KZ candidate (highest value): a re-baseline must correct the *basis*, not just the total.** This spec breached its LOC budget three times and mis-projected a fourth, every time by carrying a superseded per-item estimate under a corrected sum. The fourth instance occurred *inside the note diagnosing the third*. Task count and review rounds never moved once — only the estimate did.
-2. **A-2 is a live production defect** with two call sites relying on behavior that does not exist. Needs `/akili-propose`.
-3. **KZ-001 reached recurrence 5** — found by the very task written to end the pattern (T-11). The kaizen log already flags that a third variant should merge KZ-001 and KZ-004 into one lesson: *prove the test can fail*. This is the datum that justifies the merge.
+1. **KZ candidate, highest value: every automated gate verified the system against its own description of itself.** F-1 survived 6,479 tests, mutation testing on four shared consumers, two independent reviewer lenses, and this validation pass — then fell to one person looking at the screen. The traceability table said "six parameters"; six tests matched it; nothing asked whether six was the right number. **KZ-002 already says *enumerate by what renders* — its scope needs widening from "components on a route" to "controls in a component".** Two controls writing two wire keys are two filters, whatever the design doc calls them.
+2. **A re-baseline must correct the *basis*, not just the total.** This spec breached its LOC budget three times and mis-projected a fourth, every time by carrying a superseded per-item estimate under a corrected sum. The fourth instance occurred *inside the note diagnosing the third*.
+3. **A-2 is a live production defect** with two call sites relying on behavior that does not exist. Needs `/akili-propose`.
+4. **KZ-001 reached recurrence 5** — found by the very task written to end the pattern (T-11). The kaizen log already flags that a third variant should merge KZ-001 and KZ-004 into one lesson: *prove the test can fail*. F-1 makes that merge overdue.
 
 ---
 
