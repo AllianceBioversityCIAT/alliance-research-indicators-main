@@ -1,9 +1,11 @@
 import { Component, Input, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { ApiService } from '@shared/services/api.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
+import { GetResultsService } from '@shared/services/control-list/get-results.service';
+import { CacheService } from '@shared/services/cache/cache.service';
 import { GetGeoScopeService } from '@shared/services/get-geo-scope.service';
 import { GetTopContributorsContractsService } from '@shared/services/get-top-contributors-contracts.service';
 import { GetTopMainContactPersonsService } from '@shared/services/get-top-main-contact-persons.service';
@@ -843,6 +845,151 @@ describe('ProjectDashboardComponent', () => {
       expect(component.overviewSourceDocuments()).toEqual([]);
       expect(component.executiveOverviewGeneratedAt()).toBeNull();
       expect(component.executiveOverviewLoading()).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // T-12 — Shared-consumer isolation (NFR-RCU-005, requirements.md; design.md
+  // §6.2). `initializeProjectDashboardResultsTable` (`:215`) is the ONLY caller
+  // of that service method (design.md's own consumer table), and this is the
+  // spec design.md/tasks.md T-12 names by file+line as the place the guard is
+  // proven. Every other `it` above uses `resultsCenterServiceMock` — a whole
+  // mocked service (KZ-001) that cannot observe URL leakage, because it has no
+  // `router.navigate` to leak through in the first place. This block replaces
+  // the mock with the REAL `ResultsCenterService` for exactly this purpose.
+  //
+  // The guarantee under test is NOT "userFilterMutations stays frozen" — design
+  // .md §6.2's 2026-08-12 correction is explicit that a cross-route mutation
+  // CAN move that counter (see `resetState()`/`clearAllFilters()` from
+  // `project-detail.component.ts`). The guarantee is structural: the URL write
+  // effect lives only in `ResultsCenterComponent`'s injector, and
+  // `ResultsCenterComponent` is never instantiated on this route, so
+  // `router.navigate` must be zero regardless of what the counter does.
+  //
+  // Rework attempt 2 (NFR-RCU-005 reliability fix): `setupWithRealResultsCenterService`
+  // already flushes root effects (`detectChanges` / `whenStable` / `detectChanges`
+  // — the ONLY block of the four that did before this rework), so a relocated
+  // `urlWriteEffect` sitting on the root-provided `ResultsCenterService` would
+  // actually run before the assertion below reads `navigateSpy`. A second,
+  // explicit `TestBed.flushEffects()` is added purely for symmetry/documentation
+  // with the other three blocks, not because this one was missing a flush point.
+  // Which mutant variant this block can and cannot catch (verified with the
+  // Reviewer's structural mutant, reverted after proof — see task report):
+  //   - COUNTER-GATED variant (`effect(() => { userFilterMutations(); navigate([]); })`):
+  //     stays GREEN here. `initializeProjectDashboardResultsTable` (results-center
+  //     .service.ts:848-879) never bumps `userFilterMutations` by design (design.md
+  //     §6.2's own table lists it under "does NOT increment") — the counter never
+  //     moves, so the mutant effect never fires. That is production's actual
+  //     contract, not a hole in this test.
+  //   - UNCONDITIONAL/state-watching variant (`effect(() => { resultsFilter(); navigate([]); })`):
+  //     goes RED here, because `resultsFilter` IS written by the fixed-table seed
+  //     and the flush above lets that effect run.
+  // ===========================================================================
+  describe('shared-consumer isolation (NFR-RCU-005, T-12, real ResultsCenterService)', () => {
+    let realResultsCenterService: ResultsCenterService;
+    let navigateSpy: jest.Mock;
+
+    async function setupWithRealResultsCenterService(): Promise<void> {
+      // Minimal doubles for ResultsCenterService's OWN dependencies — not the
+      // component's. `indicatorTabs.lazy()` backs the service's self-
+      // destroying `onChangeList` effect (results-center.service.ts:418);
+      // without it the effect throws on construction.
+      const indicatorTabsListSignal = signal<any[]>([]);
+      const sharedApiMock = {
+        GET_ResultsCount: jest.fn().mockResolvedValue({ data: {} }),
+        GET_Results: jest.fn().mockResolvedValue({ data: { results: [] } }),
+        indicatorTabs: {
+          lazy: jest.fn().mockReturnValue({
+            isLoading: signal(false),
+            hasValue: signal(false),
+            list: indicatorTabsListSignal
+          })
+        }
+      } as unknown as jest.Mocked<ApiService>;
+      const getResultsServiceMock = { fetchPaginated: jest.fn().mockResolvedValue({ results: [], total: 0 }) };
+      const cacheServiceMock = { dataCache: signal({ user: { sec_user_id: 1 } }) } as unknown as jest.Mocked<CacheService>;
+      navigateSpy = jest.fn().mockResolvedValue(true);
+      const routerMock = { navigate: navigateSpy } as unknown as jest.Mocked<Router>;
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [ProjectDashboardComponent],
+        providers: [
+          // REAL service — explicitly listed (not `useValue`) so DI
+          // constructs an actual instance, mirroring the T-11 exemplar's
+          // technique for the same class (results-center.component.spec.ts).
+          ResultsCenterService,
+          { provide: ActivatedRoute, useValue: { parent: { snapshot: { paramMap: convertToParamMap({ id: 'C-1' }) } } } },
+          { provide: ApiService, useValue: sharedApiMock },
+          { provide: GetResultsService, useValue: getResultsServiceMock },
+          { provide: CacheService, useValue: cacheServiceMock },
+          { provide: Router, useValue: routerMock },
+          { provide: ProjectUtilsService, useValue: { getLeverName: jest.fn(), sortIndicators: jest.fn((items: any[]) => items) } },
+          { provide: FileManagerService, useValue: { uploadFile: jest.fn() } },
+          { provide: DocumentOverviewService, useValue: { fetchDocumentOverviewSummary: jest.fn().mockResolvedValue({}), generateDocumentOverview: jest.fn(), deleteDocumentOverviewFiles: jest.fn() } },
+          { provide: RolesService, useValue: { isAdmin: jest.fn().mockReturnValue(false) } },
+          { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } }
+        ]
+      })
+        .overrideComponent(ProjectDashboardComponent, {
+          remove: {
+            imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent],
+            providers: [
+              GetTopContributorsContractsService,
+              GetTopMainContactPersonsService,
+              GetTopPartnersService,
+              GetTopPrimaryLeversService,
+              GetGeoScopeService
+            ]
+          },
+          add: {
+            imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
+            providers: [
+              { provide: GetTopContributorsContractsService, useValue: createRankedServiceMock() },
+              { provide: GetTopMainContactPersonsService, useValue: createRankedServiceMock() },
+              { provide: GetTopPartnersService, useValue: createRankedServiceMock() },
+              { provide: GetTopPrimaryLeversService, useValue: createRankedServiceMock() },
+              { provide: GetGeoScopeService, useValue: { main: jest.fn() } }
+            ]
+          }
+        })
+        .compileComponents();
+
+      const dashboardFixture = TestBed.createComponent(ProjectDashboardComponent);
+      realResultsCenterService = TestBed.inject(ResultsCenterService);
+      dashboardFixture.detectChanges();
+      await dashboardFixture.whenStable();
+      dashboardFixture.detectChanges();
+    }
+
+    afterEach(() => {
+      TestBed.resetTestingModule();
+    });
+
+    it('drives the fixed-table mutation on the REAL service and fires zero router.navigate', async () => {
+      await setupWithRealResultsCenterService();
+
+      // Explicit flush between the mutation (above, inside setup) and the
+      // assertions below — see the block comment for which mutant variant
+      // this can and cannot catch.
+      TestBed.flushEffects();
+
+      // Positive control — proves `initializeProjectDashboardResultsTable`
+      // actually ran against the REAL service (not a spy on a mock that would
+      // pass even if the production wiring were deleted): the fixed filter
+      // (design.md's `status-codes: [5]`, "Pending Revision") is observably
+      // set on the real signals.
+      expect(realResultsCenterService.primaryContractId()).toBe('C-1');
+      expect(realResultsCenterService.resultsFilter()['status-codes']).toEqual([5]);
+      expect(realResultsCenterService.appliedFilters()['status-codes']).toEqual([5]);
+      expect(realResultsCenterService.tableFilters().statusCodes).toEqual([{ result_status_id: 5, name: 'Pending Revision' }]);
+
+      // Negative control — the actual guarantee under test. Nothing on this
+      // route ever constructs `ResultsCenterComponent`, so its injector-scoped
+      // write effect cannot exist here; this asserts that with a REAL,
+      // observable Router double rather than assuming it from the absence of
+      // a component.
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
   });
 });

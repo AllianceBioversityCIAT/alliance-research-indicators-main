@@ -311,7 +311,7 @@ graph TD
 
 ---
 
-### T-12 [ ] — Shared-consumer isolation
+### T-12 [x] — Shared-consumer isolation
 
 - **Requirements covered:** NFR-RCU-005
 - **Files touched:** `…/project-dashboard/project-dashboard.component.spec.ts`, `…/project-detail/project-detail.component.spec.ts`, `…/select-linked-results-modal/…spec.ts`, `…/links-to-result/…spec.ts`
@@ -321,9 +321,9 @@ graph TD
   - Assert **zero** `router.navigate` from service-level filter mutations on each of those routes.
   - **Assert the right guarantee: the component is destroyed, NOT that the counter is frozen** *(added 2026-08-12 — see the correction note in `design.md` §6.2)*. `resetState()` → `clearAllFilters()` **does** advance `userFilterMutations` from `/project-detail`, so "the counter does not move off-route" is false and a test written against it would be asserting a non-guarantee. The real guarantee is D-URL-9's lifecycle one: the effect lives in `ResultsCenterComponent`'s injector and is destroyed with the component, so zero `router.navigate` is the correct observable — which is what the checks below already assert.
 - **Acceptance / done check:**
-  - [ ] Each of the four surfaces mutates filters with zero `router.navigate`.
-  - [ ] The project dashboard's fixed table is behaviorally unchanged.
-  - [ ] Full client suite green: `npm test -- --silent`.
+  - [x] Each of the four surfaces mutates filters with zero `router.navigate`.
+  - [x] The project dashboard's fixed table is behaviorally unchanged.
+  - [x] Full client suite green: `npm test -- --silent`.
 - **Disqualifies:** a targeted `--testPathPattern=results-center` run is **not** evidence for this task regardless of exit code *(KZ-003)* — the shared singleton means only a full-suite run bounds the blast radius. A spec that mocks `ResultsCenterService` cannot observe URL leakage and does not satisfy the check.
 - **Dependencies:** T-05, T-08 · **Effort:** M · **Skills:** `angular-developer`
 
@@ -397,10 +397,10 @@ PR descriptions follow `cognitive-doc-design` review-empathy rules: what to revi
 
 ## 6. Done definition
 
-- [ ] All T-01 … T-12 are `done`.
-- [ ] Every requirement AC **and every scenario clause** in §3 is checked.
-- [ ] R3-1 … R3-4 regression guards are green.
-- [ ] Client coverage floors hold (statements 40 / branches 20 / lines 45 / functions 30).
-- [ ] Full client suite green — not a targeted run.
-- [ ] The manual cross-package check (D6) has been performed and recorded.
-- [ ] `docs/ux-ui/design.md` decisions log records the URL vocabulary as a durable contract.
+- [x] All T-01 … T-12 are `done`. *(T-12 PASS 2026-08-13; nine of twelve passed on attempt 1, three consumed one rework round each — T-08, T-11, T-12.)*
+- [x] Every requirement AC **and every scenario clause** in §3 is checked. *(NFR-RCU-001 as narrowed by D-URL-17 — the whole-page request count is deferred to `bugfix/results-center-double-fetch`.)*
+- [x] R3-1 … R3-4 regression guards are green.
+- [x] Client coverage floors hold (statements 40 / branches 20 / lines 45 / functions 30). *(Measured at T-12: 99.27 / 98.09 / 99.5 / 99.17.)*
+- [x] Full client suite green — not a targeted run. *(309 suites / 6,479 tests, `npm test -- --silent` from `client/research-indicators`; the 309 count independently corroborated by a spec-file glob during T-12 review.)*
+- [ ] **The manual cross-package check (D6) has been performed and recorded.** ⚠️ **OPEN — not a task, and no automated gate covers it.** Paste the string the server's `buildStarLink` / `CAPDEV_INDICATOR_TAB_QUERY` produces into a running client and confirm the filtered view. See requirements.md §8 D6: no test in either package crosses the boundary; the twin literals in T-02 and T-10 are the only substitute control. **Human action required before this spec can be archived.**
+- [ ] **`docs/ux-ui/design.md` decisions log records the URL vocabulary as a durable contract.** ⚠️ **OPEN — not a task.** Belongs to `/akili-archive`'s constitution sync.

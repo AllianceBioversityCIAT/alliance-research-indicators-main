@@ -1130,3 +1130,177 @@ Verified rather than argued: nothing is staged (`git diff --cached --stat` empty
 8. **READABILITY —** the rendered tab-strip click targets `[class*="cursor-pointer"]`. Both lenses judged it **fail-safe** (a template change breaks the counter assertion rather than faking a pass) but brittle; scoping to `app-indicators-tab-filter` would say what it means.
 
 Advisories 1, 2 and 3 are the three worth carrying forward. 1 is a live instance of the defect class this task closed; 2 is a genuine cross-spec dependency; 3 is a scope-honesty note, not a defect.
+
+---
+
+## 10. Budget variance at T-12 — recorded by the Leader, **not** escalated
+
+Re-baseline #2 (§8) set **~4,600 LOC**, itemizing the two remaining tasks as T-11 ~1,000 and T-12 ~200. T-11 actually landed **~1,489 code insertions** (commit `d934f1fe`: 1,933 total insertions minus 444 lines of `execution.md`/`tasks.md`/`design.md`/`proposal.md` edits carried in the same commit). The spec therefore stood at **~4,889 at 11 of 12 tasks — over the whole-spec budget before T-12 began.**
+
+**The Leader did not stop and escalate, and the reasoning is recorded here so the user can overrule it.** `/akili-execute` §2.4's tripwire exists so a mis-sized spec is caught while the cost is still recoverable. Nothing about this variance is recoverable or forward-looking:
+
+- The entire overrun sits inside **T-11, which is done, reviewed on two lenses, and committed.** Escalating would ask the user to re-approve spent work.
+- **T-12's own line item (~200) is unchanged and intact** — the only forward spend, and it is inside budget.
+- The two dimensions that measure *scope* have never moved in any revision: **tasks 12, review rounds 3**.
+
+This is consistent with both prior re-baselines, which were LOC-estimation errors rather than scope growth, and at both of which the user chose full scope. Recording rather than escalating is the Leader's call; if the user disagrees, the remedy is to de-scope T-12, which would ship **NFR-RCU-005 unverified**.
+
+**Projected final: ~5,100 (+11% vs ~4,600).** No fourth re-baseline is proposed — three LOC re-baselines on one spec is itself the finding, and it belongs in Kaizen at `/akili-archive`, not in another budget row.
+
+---
+
+## 11. Task Execution History (continued)
+
+### T-12 — Shared-consumer isolation
+
+| Field | Value |
+| --- | --- |
+| Status | **IN PROGRESS — attempt 1 FAILED, attempt 2 dispatched** |
+| Date | 2026-08-13 |
+| Requirements covered | NFR-RCU-005 |
+| Implementer attempts | 2 of 3 (1 rework round consumed) |
+| Review mode | **Parallel lens** (2 lenses: conformance = gate, reliability) — triggered by the Leader's `xhigh` effort selection |
+
+**Leader effort deviation, recorded.** `tasks.md` T-12 carries **Effort: M**; the Leader raised it to **`xhigh`**. Reason: both rework rounds this spec has consumed (T-08, T-11) were the same defect class — *an assertion that passes for every implementation, including a broken one* — and T-12 is four files whose central assertion (`expect(navigateSpy).not.toHaveBeenCalled()`) is green by default. `xhigh` also selects parallel-lens review, which is what caught the class both prior times. **The raise was vindicated:** the single-lens checklist mode that `M` would have selected is unlikely to have produced the finding below, which required reading Angular's installed testing source.
+
+Skills assigned: `angular-developer` (task default, unchanged) for attempt 1; `angular-developer` + `systematic-debugging` for attempt 2.
+
+#### Attempt 1 — Implementer (T2 `sonnet`, effort `xhigh`)
+
+**Files changed** — test files only, additive, **+476 / −2** (the two deletions are same-line import widenings):
+
+- `…/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (+125)
+- `…/project-detail/project-detail.component.spec.ts` (+139)
+- `…/result/pages/links-to-result/links-to-result.component.spec.ts` (+105)
+- `…/all-modals/modals-content/select-linked-results-modal/select-linked-results-modal.component.spec.ts` (+107)
+
+Each file gains one `describe('shared-consumer isolation (NFR-RCU-005, T-12, real ResultsCenterService)')` block providing the **real** `ResultsCenterService` through DI (bare class token, not `useValue`), replacing that file's pre-existing wholesale mock for these tests only — the KZ-001 requirement, since a mocked service has no `router.navigate` to leak through and cannot observe the guarantee even in principle.
+
+**Verification:** `npm test -- --silent` from `client/research-indicators` → **309 suites / 6,479 tests passed**; coverage 99.27 / 98.09 / 99.17 / 99.5 vs floors 40/20/45/30. `npm run lint -- --quiet` clean, `git status` re-checked after the `--fix`, no mutation. **`Not Done / Assumptions`: none declared.**
+
+**Leader-verified independently** (not taken on report): `git status --short` + `git diff --stat` over the whole tree returns only the four spec files plus the Leader's own `tasks.md` status marker. **Zero production files touched** — the highest-value check on this task, because attempt 1's mutant exercise reported an attempt to edit `results-center.service.ts`.
+
+#### Attempt 1 — Reviewer verdicts: **split — conformance PASS, reliability FAIL**
+
+| Lens | Verdict | Notes |
+| --- | --- | --- |
+| conformance (gate) | **PASS** | done-checks hold; call sites, constants and isolation verified from source |
+| reliability | **FAIL** | 1 issue + 3 advisories — the assertions cannot fail on the defect they exist to catch |
+
+**What conformance established, by verification rather than acceptance** — recorded because it survives into attempt 2 and should not be re-derived:
+
+- **All five call sites in design.md §6.2's consumer table verify at the exact lines cited**: `project-dashboard.component.ts:215`, `project-detail.component.ts:156` and `:171`, `select-linked-results-modal.component.ts:137`, `links-to-result.component.ts:169`.
+- **The increment / no-increment table was checked against `results-center.service.ts`, not against the design doc.** `applyFilters` bumps at `:692`; `resetState` → `clearAllFilters` bumps exactly once via the delegated `onSelectFilterTab(0)` at `:960` (the `:958` comment explicitly warns against a second bump); `clearAllFiltersWithPreserve` passes `skipBump: true` at `:1023`, guarded at `:724`, so it genuinely **does not** bump; `initializeProjectDashboardResultsTable` (`:848-879`) contains no bump at all. Each block's counter assertion — **or its deliberate absence** — matches. **The trap design.md §6.2 flagged on 2026-08-12 is avoided: the tests assert the counter *moves* where it moves, and never assert it frozen.**
+- **The dashboard positive control matches production verbatim** (`status-codes: [5]` / `Pending Revision` / `primaryContractId`, `:848-879`), and the lens traced the follow-on `void this.main()` (`:878` → `:489`) to confirm the `else if` branch never rewrites `status-codes`, so the assertion survives `whenStable()`.
+- **No outer mock shadows the real service in any of the four** — `TestBed.resetTestingModule()` placement checked file by file, including that the modal's pre-existing `overrideComponent` is cleared and deliberately re-applied.
+- **KZ-003 satisfied with independent corroboration.** The lens cannot run commands, but a glob of `client/research-indicators/src/**/*.spec.ts` returns **exactly 309 files**, matching the reported 309 suites — read-only evidence that the run was the full suite and not the `--testPathPattern` subset the task explicitly disqualifies.
+- **Template blanking ruled legitimate on traced grounds, not waved through.** `ResultsCenterComponent` — sole owner of `urlWriteEffect` (`results-center.component.ts:213`) — is referenced from exactly one place in the entire non-spec source tree (`app.routes.ts:172`, its own lazy route), and `grep 'effect('` across `results-center/components/**` returns no matches, so the un-rendered subtree contains no reactive URL writer the negative control could have caught. The blanking also **predates T-12** in both files (`project-detail.component.spec.ts:131-137`, `select-linked-results-modal.component.spec.ts:130`).
+
+**The reliability FAIL — the finding, derived from the installed framework source:**
+
+> Three of the four blocks assert `expect(navigateSpy).not.toHaveBeenCalled()` with **no effect-flush point between the mutation and the assertion**, so they cannot fail on the defect NFR-RCU-005 exists to catch. `setup-jest.ts:6` uses `setupZoneTestEnv()`, so `ComponentFixture.autoDetect` defaults false (`@angular/core/fesm2022/testing.mjs:233-234`) and root effects flush **only** inside `detectChanges()` (`testing.mjs:291`) or `TestBed.flushEffects()` (`testing.mjs:2189-2192`). If `urlWriteEffect` were relocated into the root-provided `ResultsCenterService` — the exact inversion D-URL-9 forbids — the effect would be queued and never run, and all three assertions would pass.
+
+And the fourth block does not save it: `project-dashboard` **does** flush, but its mutator never bumps the counter, so a counter-gated effect returns at its entry guard. Same for `links-to-result` (`skipBump: true`). **Net: zero of the four surfaces can currently fail on a relocated `effect()`.**
+
+The lens's discrimination matrix, which is the substantive result of this review:
+
+| Defect variant | dashboard | project-detail ×2 | links-to-result | modal |
+| --- | --- | --- | --- | --- |
+| Imperative `router.navigate` inside a service mutator (synchronous) | red | red | red | red |
+| Root `effect()` watching filter state unconditionally (the round-1 design) | **red** | green | green | green |
+| Root `effect()` gated on `userFilterMutations` (**the literal D-URL-9 inversion**) | green (no bump) | **green — should be red** | green (no bump) | **green — should be red** |
+
+**Why attempt 1's own mutant exercise did not catch this.** The Implementer proved its assertions with **runtime monkey-patch mutants** — wrapping a real service method so it *also* called `router.navigate` synchronously. That proves row 1 of the matrix and nothing below it: the mutant's navigate is synchronous and the real defect's is not, and the two differ **precisely on the axis the missing flush erases**. This is why the Leader escalated the mutant technique to the Reviewers rather than accepting or rejecting it inline — it is the shape (*"my test passes and here is why that is fine"*) that needs an auditor.
+
+**Leader adjudication — the FAIL is in scope, and the two lenses do not actually conflict.** Conformance asked *"did the mutation really run against the real service"* and proved yes from source. Reliability asked the different question — *"would a leak be observed"* — and answered no from framework source. Both are correct; the second is the one T-12's Description makes the task's purpose (*"the component-scoped effect means none of them can write the URL — **this task verifies that rather than assuming it**"*). A test that cannot observe the leak is the Disqualifies clause's own operative failure. **Rework attempt 2 authorized; 1 of 3 rounds consumed.**
+
+**Effort held at `xhigh` for attempt 2 — the same recorded deviation as T-11 attempt 2.** The rework rule says bump one level; attempt 1 already ran T2 `sonnet` at `xhigh`, which is T2's ceiling, and the tier↔effort rule forbids `max` on a cheaper tier while directing tier escalation instead. That escalation is refused: the Reviewer wrappers are T3 `opus`, and moving the Implementer to opus collapses `author ≠ auditor` on the exact axis that produced the finding. The rework rule's premise — *a failed fix is usually under-thinking* — does not fit: nothing was re-attempted and failed, and the remediation is now precise (insert a flush; prove it with a structural root-injector effect mutant).
+
+**Attempt 2 brief additionally instructs honesty about the two blocks that still cannot go red.** `project-dashboard` and `links-to-result` drive deliberately non-incrementing mutators, so a counter-gated effect will never fire for them. The Implementer is explicitly told **not** to manufacture a counter bump to force red — that would test a path production does not have — but to run the unconditional-effect variant against them instead and state in each block comment which variant that block does and does not discriminate against.
+
+**ADVISORY from attempt 1 (recorded, non-gating; per §2.4 none may become or widen a task):**
+
+1. **RELIABILITY (reliability lens)** — `links-to-result`'s positive control contains one **vacuous** assertion: `expect(resultsFilter()['indicator-codes-filter']).toEqual([])` passes on the default value, because the seed only wrote `tableFilters`. The discriminating alternative is `'indicator-codes-tabs'` equal to `MODAL_INDICATOR_CODES` (`results-center.service.ts:996`), which only `clearAllFiltersWithPreserve` can produce and which also pins the *preserve* half of the method's contract. **Folded into attempt 2** — it is a defect in an assertion the FAIL already requires reworking, not new scope.
+2. **RELIABILITY (conformance lens)** — the modal block restores its `globalThis.open` spy with `openSpy.mockRestore()` as the **last statement of the `it`**; an earlier assertion throwing leaks the spy into later tests. Move to `afterEach` or `try/finally`. **Folded into attempt 2.**
+3. **RELIABILITY (reliability lens)** — `clearAllFilters` leaves two escapes running past the end of each synchronous test: `setTimeout(() => this.cleanMultiselects(), 0)` (`:962-964`) and an unawaited `this.main()` (`:975`), both resolving after `resetTestingModule()` has torn down the injector. Harmless today; the standard source of cross-file *"cannot log after tests are done"* noise. **Offered to attempt 2 as optional** — apply only if it is a clean 2–3 line change.
+4. **RELIABILITY (conformance lens)** — the `project-detail` block's inner `routerDouble.events` Subject is never `complete()`d. `takeUntilDestroyed` + `resetTestingModule()` covers it; hygiene only.
+5. **READABILITY (both lenses, converging)** — the block comments are the strongest part of the diff and correctly restate design.md §6.2's 2026-08-12 correction, but they do not record **which defect variant each block discriminates against** — the one fact a maintainer cannot recover from the code. **Folded into attempt 2.**
+6. **READABILITY (conformance lens)** — `links-to-result` and the modal create `realFixture` but never call `detectChanges()`, so their templates never render either: the same effective scope as the two blocks that blank the template, but arrived at *implicitly*. One comment line would spare the next reader the trace.
+7. **RISK / scope note (conformance lens), carried out of this spec** — design.md §6.2's consumer table has a **fifth** row, `results-center-table.component.ts:249` (`removeFilter` → `applyFilters`, route "both"), which no block exercises: the dashboard stubs that component out and the other three never instantiate it. T-12's done-check and Files-touched list name **four** surfaces, so this is out of scope by construction — but the table's five rows against the task's four surfaces reads as a discrepancy on a future pass. **Recorded, not actioned** (§2.4: an advisory may not widen a task).
+
+**Verification-scope note from the reliability lens, discharged by the Leader:** it was given the diff but not the Implementer's command output, and correctly declined to treat the diff as evidence for the full-suite done-check. That check is discharged above — by the Implementer's reported counts **and** by the conformance lens's independent 309-spec-file glob.
+
+#### Attempt 2 — Implementer (T2 `sonnet`, effort `xhigh` unchanged — deviation recorded above)
+
+**Files changed** — same four spec files, still test-only. Cumulative vs `HEAD` (attempt 1 was never committed, so both attempts are one uncommitted change set): **+707 / −2** across the four, materialized for review at `…/scratchpad/T-12-attempt2.diff` (677 lines).
+
+**The fix.** A root-effect flush now sits between every mutator call and its `expect(navigateSpy).not.toHaveBeenCalled()`:
+
+| Block | Flush | Form |
+| --- | --- | --- |
+| `project-dashboard` | `:147` | pre-existing `detectChanges`/`whenStable`/`detectChanges` **+** explicit `TestBed.flushEffects()` |
+| `project-detail` ×2 | `:314`, `:336` | `TestBed.flushEffects()` **alone** — deviation A |
+| `links-to-result` | `:502` | `TestBed.flushEffects()` **alone** — deviation B |
+| modal | `:662-663` | `realFixture.detectChanges(); TestBed.flushEffects();` |
+
+**Verification:** `npm test -- --silent` from `client/research-indicators` → **309 suites / 6,479 tests passed** (unchanged from attempt 1 — the fix strengthens existing assertions rather than adding tests); coverage 99.27 / 98.09 / 99.17 / 99.5 vs floors 40/20/45/30. `npm run lint -- --quiet` clean, `git status` unchanged after the `--fix`.
+
+**Leader-verified independently, not taken on report:** `git status --short` shows only the four spec files (plus the Leader's own `execution.md`/`tasks.md` edits), and `grep -rn "runInInjectionContext\|mutantEffect\|MUTANT"` across all four returns nothing — **zero mutant residue, zero production files touched.** This was the highest residue risk of the run, because attempt 2's mutants were *structural* (a live root-injector `effect()`) rather than attempt 1's monkey-patches.
+
+#### Attempt 2 — Reviewer verdicts: **both lenses PASS**
+
+| Lens | Verdict | Notes |
+| --- | --- | --- |
+| conformance (gate) | **PASS** | FAIL closed; additive-only; all three deviations correct |
+| reliability | **PASS** | flush verified mechanically to reach the root scheduler; matrix re-derived from source |
+
+**The load-bearing verification — `flushEffects()` genuinely reaches the defect surface.** Both lenses established it independently, and the reliability lens carried it further, through three source files:
+
+- `testing.mjs:2189-2192` — `flushEffects()` flushes `ɵMicrotaskEffectScheduler` **and** `ɵEffectScheduler`.
+- `core.mjs:40776-40787` — `effect()` outside a `ViewContext` calls `createRootEffect(effectFn, injector.get(EffectScheduler), …)`; `EffectScheduler` is `providedIn: 'root'` (`core.mjs:23172-23178`).
+- `ResultsCenterService` is `providedIn: 'root'` (`results-center.service.ts:34-36`) and is listed bare in every block's `providers`, so DI builds it in the **environment** injector — no `ViewContext` — and a relocated `urlWriteEffect` is therefore a **root** effect on `ɵEffectScheduler`.
+
+The reliability lens added the fact that closes the question and corrects its own attempt-1 prescription: `flushEffects()` is a **superset** of what `detectChanges()` flushes on the non-zoneless path (`testing.mjs:269, 291, 300`), which adds only change detection — something the mutant does not need. *"My attempt-1 remediation prescribed `detectChanges(); flushEffects();` — the `detectChanges()` half was never necessary for the flush, only (I assumed) for safety. It was not safe."*
+
+**The discrimination matrix, re-derived deductively from the mutator bodies rather than read off the Implementer's run:**
+
+| Block | (a) sync navigate in mutator | (b) unconditional root effect | (c) counter-gated root effect (**the literal D-URL-9 inversion**) |
+| --- | --- | --- | --- |
+| `project-detail` #1 (`ngOnInit`→`resetState`→`clearAllFilters`) | RED | RED | **RED** — bump via `:960` → `:724-726` |
+| `project-detail` #2 (`applyFilters`) | RED | RED | **RED** — `noteUserFilterMutation()` at `:692` |
+| modal (`clearAllFilters`) | RED | RED | **RED** — same `:960` path |
+| `project-dashboard` | RED | RED | **GREEN — correct** (`:848-879` has no bump) |
+| `links-to-result` | RED | RED | **GREEN — correct** (`:1023` `skipBump: true`, guard `:724`) |
+
+Compare attempt 1's matrix: **every cell of column (c) was green, three of them wrongly.** The FAIL is closed on its own terms.
+
+**The reviewer refuted two of the Implementer's own cells — in the Implementer's favour.** The report marked variant (b) "not tested" for `project-detail` and the modal; the lens showed that is a conservative *under*-claim, not a gap: an unconditional root effect fires its mandatory creation run and `navigateSpy` is never cleared in the committed tests, and separately all five mutators write `resultsFilter` (`:921`, `:697`, `:921`, `:1006`, `:876`). **All five blocks are RED for variant (b).**
+
+**Why the two GREENs are not blind spots**, stated once because it is the substantive result: on those two routes production's counter never moves, so a counter-gated service-level effect is *behaviorally identical to no effect*. Every variant that can leak is caught where it can occur. Both lenses reached this independently, and both checked it against design.md §6.2's "Does not increment" column rather than asserting it.
+
+**The mutant harness was audited, not assumed.** Reported order: register mutant → baseline flush (consumes the mandatory creation run) → `navigateSpy.mockClear()` → run real mutator → test flush → assert. The lens ruled it cannot **manufacture** a red (after the clear, a second run needs a tracked signal to change, and only the mutator changes them) and cannot **mask** one (masking needs the baseline flush *after* the mutator; it lands before). It further noted the clear+baseline pattern is the faithful emulation of production's entry-value guard at `results-center.component.ts:211-217` — which is what makes it a fair proxy rather than a strawman.
+
+#### The three deviations — both lenses adjudicated each, and the Implementer was right on all three
+
+**A. `project-detail` used `flushEffects()` alone, refusing the prescribed `detectChanges(); flushEffects();`.** **Accepted by both lenses — and the prescribed form would have broken the tests.** `ProjectDetailComponent.ngOnInit()` (`:69-90` → `:163-176`) is non-idempotent: it reaches `resetState()` → `clearAllFilters()` → one counter bump, and appends a fresh `router.events.subscribe`. Angular fires `ngOnInit` on a view's first `detectChanges()` regardless of a manual call, so `it` #1 would have become `mutationsBefore + 2`, and `it` #2 — which never calls `ngOnInit` — would have had `resetState()` wipe `indicator-codes-filter` back to `[]` *and* add a bump after the baseline was captured, **breaking both its assertions.** A declared deviation with a verified mechanism, which is the right way to decline a remediation.
+
+**B. `links-to-result` used `flushEffects()` alone.** **Accepted.** `detectChanges()` was tried and threw `TypeError: ctx.cache.showSectionHeaderActions is not a function` — verified structurally: the component imports `FormHeaderComponent` (`:23`), its template renders `<app-form-header />` (`.html:2`), and `form-header.component.html:1` opens with `@if (this.cache.showSectionHeaderActions())`, a `signal(false)` (`cache.service.ts:38`) the block's minimal cache mock omits. Declining to render costs nothing here: the defect under test is a **root** effect that `flushEffects()` reaches without a view, and the component's only `router.navigate` (`:147-166`) is deliberately excluded and covered elsewhere. The reliability lens added that rendering would have *added* false-red risk from child components' own router usage.
+
+**C. The Implementer refused the reliability lens's prescribed assertion value and called it factually wrong. It was right, and the lens said so plainly.** The attempt-1 advisory told it to assert `resultsFilter()['indicator-codes-tabs']` equals `[...MODAL_INDICATOR_CODES]`, citing `results-center.service.ts:996`. But `:996` writes `'indicator-codes-tabs': preserved` and `:1023` then calls `onSelectFilterTab(0, { skipBump: true })`, which at `:740` sets `indicatorId === 0 ? [] : [indicatorId]` → **`[]`**. The preserved value is written and immediately overwritten. The Implementer's corroboration is verbatim and accurate: `results-center.service.spec.ts:2067-2068` and `:2082-2083` already assert `[]` with a comment naming the same cause. **The prescribed assertion would have failed against current, correct production.** The reliability lens also found a second defect in its own advice: `MODAL_INDICATOR_CODES` is a module-local non-exported const (`links-to-result.component.ts:19`), so the assertion was not even importable. Its verdict, recorded verbatim because a reviewer overturning itself is the strongest evidence the loop works: *"Recorded: my attempt-1 advisory value was factually wrong."*
+
+The substituted seed-and-clear (`[99]` sentinels into both keys, asserted clear to `[]`) was verified discriminating by both lenses: `openSearchLinkedResults` (`:168-171`) calls only `clearAllFiltersWithPreserve` plus a mocked `openModal`, and nothing else in the block resets those keys — so without the mutator running, both stay `[99]` and both assertions fail. The original `indicator-codes-filter` assertion, which passed on the default value, is genuinely fixed rather than relocated.
+
+**Also cleared:** the modal's `openSpy?.mockRestore()` is now unconditional in `afterEach` (a thrown assertion can no longer leak the `globalThis.open` spy); no flush-induced legitimate navigate exists — the reliability lens enumerated every effect reachable in the four TestBeds (`persistViewState` `:264-284`, `onChangeList` `:418-443`, the dashboard constructor effect, the modal's two field effects, `LinksToResultComponent`'s constructor effect) and none navigates; isolation still sound with `resetTestingModule()` on both sides and `sessionStorage.clear()` in `project-detail` — now *necessary*, since `persistViewState` genuinely fires in `it` #1 and writes storage.
+
+**Declared `Not Done` #1 — the `clearAllFilters` teardown escapes — accepted as harmless, verified rather than waved through.** `setTimeout(cleanMultiselects, 0)` (`:962-964`) fires post-test against `multiselectRefs() === {}` (`resetState` sets it at `:1045`) and each clear is `try`-wrapped (`:1030-1034`); the unawaited `main()` (`:975`) is `try`-wrapped (`:493`) against a resolved mock and writes only signals, which survive injector destruction. The added flushes introduce no new timers. It was marked optional in the brief and is a **service-side** change, outside T-12's four authorized files.
+
+**T-12 status: PASS on attempt 2 of 3.** One rework round consumed. The spec's review-round budget of 3 was never exceeded on any task: T-08 (1), T-11 (1), T-12 (1) — nine of twelve tasks passed on the first attempt.
+
+#### ADVISORY from attempt 2 (recorded, non-gating; per §2.4 none may become or widen a task)
+
+1. **RELIABILITY — the two GREEN cells are correct today but *incidental*.** They hold only while `initializeProjectDashboardResultsTable` and `clearAllFiltersWithPreserve` stay non-incrementing. A one-line change adding a bump would silently convert those blocks from "correct GREEN" to "unfalsifiable for variant (c)" **with no test turning red.** The durable pin is one line each — `expect(realResultsCenterService.userFilterMutations()).toBe(mutationsBefore)` — which would make design.md §6.2's "Does not increment" column an asserted contract rather than a comment. **Not actioned:** §2.4 forbids an advisory widening a task. This is the single most valuable carry-forward from T-12 and belongs in a follow-on decision, not here.
+2. **RISK — a production defect found, out of scope, needs its own spec.** `clearAllFiltersWithPreserve`'s `preserveIndicatorCodes` argument is **dead**: `:996` writes it into `indicator-codes-tabs` and `:1023`'s `onSelectFilterTab(0, { skipBump: true })` unconditionally overwrites it with `[]` (`:740`). **Both** call sites — `links-to-result.component.ts:169` and `select-linked-results-modal.component.ts:262` — pass `[...MODAL_INDICATOR_CODES]` in the apparent belief the modal's indicator-tab scoping survives. It does not. The existing service spec at `:2067` documents the symptom as an explanatory note rather than flagging it as a defect, which is how it has survived. **This is the second live production defect this spec has surfaced without being asked to** (the first became `bugfix/results-center-double-fetch` under D-URL-17). Same disposition: record, do not fix here, let `/akili-propose` decide.
+3. **READABILITY (both lenses)** — the four block comments have grown to 20–45 lines each and now carry mutation-testing rationale that corresponds to **no code in the tree**, since the mutants are reverted. The content is correct and valuable; the reliability lens's question is whether its durable home is `execution.md` (where it now is, above) rather than four copies of adjacent prose in four spec files.
+4. **RISK (conformance lens)** — `TestBed.flushEffects()` is `@developerPreview` in this Angular version and is superseded by `TestBed.tick()` in later ones. Already used in **19** spec files in this codebase, so this diff adds no new exposure — but an Angular bump will touch all of them at once.
+
+Advisories 1 and 2 are the two worth carrying out of this spec. 1 is a latent coverage loss with a one-line fix; 2 is a live production defect with two callers relying on behavior that does not exist.
