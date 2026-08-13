@@ -162,6 +162,15 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP09'],
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+      // re-base: has_contribution:true now requires a resolved Primary
+      // (R-BIL-121). Fixture-only change — the claim under test (a code
+      // in the per-result list lets updateAlignment proceed) is untouched.
+      // Scenarios 2 and 4 need no change (normalizeLeverCodes' unknown_
+      // sp_codes check runs first and still intercepts them); scenario 3
+      // needs no change (has_contribution:false skips Primary resolution
+      // entirely).
+      primary_sp_code: 'SP09',
     };
 
     await expect(

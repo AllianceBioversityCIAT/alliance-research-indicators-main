@@ -201,6 +201,11 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP01'],
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+      // re-base: has_contribution:true now requires a resolved Primary
+      // (R-BIL-121). Fixture-only change — the claim under test (a legacy
+      // body bypasses the version gate) is untouched.
+      primary_sp_code: 'SP01',
     };
 
     await expect(
@@ -213,6 +218,11 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     expect(deactivateForSps).not.toHaveBeenCalled();
   });
 
+  // ⚠ OFF LIMITS (T-11) — R-BIL-097 AC.2 / R-BIL-130 AC.2. This block MUST
+  // pass unmodified — adding `primary_sp_code` here is the D-8 defect, not
+  // a re-base. It stays green because the version gate
+  // (`assertTocMappingVersionUnlocked`) fires before Primary validation
+  // for ANY request carrying `toc_alignments`, primary_sp_code or not.
   it('version gate — toc_alignments on a non-2026 live version → 409 toc_mapping_version_locked, nothing persisted (R-BIL-097 AC.2)', async () => {
     findContext.mockResolvedValue(baseContext({ report_year_id: 2025 }));
     findActiveAlignment.mockResolvedValue(null);
@@ -254,9 +264,24 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     findActiveAlignment.mockResolvedValue(null);
     getTocResults.mockResolvedValue(sp01OutputCatalog);
 
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+    //
+    // Re-based with a restructure, not a plain fixture edit: the ORIGINAL
+    // request wrote BOTH SP01 ("Yes") and SP03 ("No") in one PATCH. T-07
+    // (R-BIL-124) now rejects any toc_alignments entry for a selected SP
+    // that is not the Primary, so a request naming SP01 as Primary can no
+    // longer also carry SP03's "No" entry — that half of this smoke test
+    // is retired, not merely re-fixtured, because no primary_sp_code
+    // choice can make BOTH halves valid simultaneously. The retired half
+    // is NOT left uncovered: the "No" shape (zero snapshot keys) is
+    // proven independently by "AC.2 — { sp_code, aligns_with_toc: false }
+    // …" above (with SP03 as ITS OWN Primary), and T-07's own
+    // "an explicit aligns_with_toc: false for a Contributing SP is
+    // REJECTED …" test proves the rejection this test used to not exhibit.
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP01', 'SP03'],
+      primary_sp_code: 'SP01',
       toc_alignments: [
         {
           sp_code: 'SP01',
@@ -266,7 +291,6 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
           indicator_id: 5972,
           quantitative_contribution: 3,
         },
-        { sp_code: 'SP03', aligns_with_toc: false },
       ],
     };
 
@@ -278,9 +302,8 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     expect(getTocResults).toHaveBeenCalledTimes(1);
     expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
 
-    expect(upsertForSp).toHaveBeenCalledTimes(2);
-    expect(upsertForSp).toHaveBeenNthCalledWith(
-      1,
+    expect(upsertForSp).toHaveBeenCalledTimes(1);
+    expect(upsertForSp).toHaveBeenCalledWith(
       {
         result_id: 19792,
         sp_code: 'SP01',
@@ -300,16 +323,6 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       42,
       fakeManager,
     );
-    expect(upsertForSp).toHaveBeenNthCalledWith(
-      2,
-      {
-        result_id: 19792,
-        sp_code: 'SP03',
-        aligns_with_toc: false,
-      },
-      42,
-      fakeManager,
-    );
     expect(deactivateForSps).not.toHaveBeenCalled();
     expect(emit).toHaveBeenCalledTimes(1);
   });
@@ -322,6 +335,9 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP01', 'SP03'],
+      // T-11 re-base — fixture-only change; the claim under test (both
+      // per-alignment errors are collected atomically) is untouched.
+      primary_sp_code: 'SP01',
       toc_alignments: [
         // level OUTCOME is not allowed for capacity_sharing → level_not_allowed.
         {
@@ -402,6 +418,9 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP01'],
+      // T-11 re-base — fixture-only change; the claim under test (PATCH
+      // returns the getAlignment read-back verbatim) is untouched.
+      primary_sp_code: 'SP01',
       toc_alignments: [
         {
           sp_code: 'SP01',
@@ -435,6 +454,9 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP01'], // SP03 deselected; no toc_alignments in the body
+      // T-11 re-base — fixture-only change; the claim under test (the
+      // cascade) is untouched.
+      primary_sp_code: 'SP01',
     };
 
     await expect(
@@ -469,6 +491,8 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP01', 'SP03'], // both stay selected; no toc_alignments
+      // T-11 re-base — fixture-only change (see the sibling test above).
+      primary_sp_code: 'SP01',
     };
 
     await expect(
@@ -541,13 +565,27 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       quantitative_contribution: contribution,
     });
 
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+    //
+    // `primarySpCode` is OPTIONAL and OMITTED by default (no field at all)
+    // — NOT defaulted to a real code. Two blocks in this describe
+    // (`R-BIL-130` AC.1 and AC.4) depend specifically on a request with NO
+    // `primary_sp_code`, to prove the version gate fires ahead of Primary
+    // validation and that Primary validation fires where the gate does not
+    // apply. Defaulting this parameter would silently defeat both claims
+    // while leaving them green — the exact D-9 defect this task exists to
+    // prevent. Every other call site passes `'SP01'` explicitly.
     const patchDto = (
       tocAlignments: UpdatePoolFundingAlignmentDto['toc_alignments'],
       spCodes: string[] = ['SP01', 'SP03'],
+      primarySpCode?: string,
     ): UpdatePoolFundingAlignmentDto => ({
       has_contribution: true,
       sp_codes: spCodes,
       toc_alignments: tocAlignments,
+      ...(primarySpCode !== undefined
+        ? { primary_sp_code: primarySpCode }
+        : {}),
     });
 
     const expectAtomic400 = async (
@@ -585,18 +623,20 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     // -----------------------------------------------------------------------
     describe('R-BIL-092 — per-SP write independence + upsert semantics', () => {
       it('AC.1 — PATCH for SP01+SP03 then PATCH changing only SP01: second call writes ONLY SP01, SP03 row never touched', async () => {
-        // First PATCH: alignments for both SPs.
-        await service.updateAlignment(
-          19792,
-          '19792',
-          patchDto([sp01Yes(), { sp_code: 'SP03', aligns_with_toc: false }]),
-          user,
-        );
-        expect(upsertForSp).toHaveBeenCalledTimes(2);
-
-        // Saved state now has both rows active.
-        upsertForSp.mockClear();
-        deactivateForSps.mockClear();
+        // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+        //
+        // Re-based with a restructure, not a plain fixture edit: the
+        // ORIGINAL first PATCH wrote BOTH SP01 and SP03's ToC entries in
+        // one request. T-07 (R-BIL-124) now rejects any toc_alignments
+        // entry for a selected SP that is not the Primary
+        // (`toc_alignment_not_primary_sp`), so a request naming SP01 as
+        // Primary can no longer also write SP03's entry — that half of the
+        // scenario is now categorically impossible, not merely
+        // under-fixtured. The claim this test exists to prove — "a second
+        // PATCH touching only SP01 never touches SP03's row" — does not
+        // require SP03's row to have been written BY THIS TEST; seeding it
+        // directly (as the sibling R-BIL-093 tests already do) proves the
+        // identical claim without attempting a write R-BIL-124 forbids.
         findActiveTocRows.mockResolvedValue([
           { id: 10, sp_code: 'SP01' },
           { id: 11, sp_code: 'SP03' },
@@ -606,7 +646,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Yes(6001, 5)]),
+          patchDto([sp01Yes(6001, 5)], undefined, 'SP01'),
           user,
         );
 
@@ -624,7 +664,14 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([{ sp_code: 'SP03', aligns_with_toc: false }]),
+          patchDto(
+            [{ sp_code: 'SP03', aligns_with_toc: false }],
+            undefined,
+            // T-11: SP03 is the (only) SP with a toc_alignments entry here,
+            // so SP03 — not SP01 — must be the resolved Primary, or T-07's
+            // toc_alignment_not_primary_sp rule rejects this exact entry.
+            'SP03',
+          ),
           user,
         );
 
@@ -654,7 +701,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Yes(6001, 5)], ['SP01']),
+          patchDto([sp01Yes(6001, 5)], ['SP01'], 'SP01'),
           user,
         );
 
@@ -696,7 +743,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Yes()], ['SP01']), // SP03 deselected
+          patchDto([sp01Yes()], ['SP01'], 'SP01'), // SP03 deselected
           user,
         );
 
@@ -721,7 +768,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Yes()], ['SP01', 'SP03']), // SP03 re-added
+          patchDto([sp01Yes()], ['SP01', 'SP03'], 'SP01'), // SP03 re-added
           user,
         );
 
@@ -738,26 +785,29 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     // R-BIL-094 — per-alignment validation (atomic 400s)
     // -----------------------------------------------------------------------
     describe('R-BIL-094 — per-alignment validation errors', () => {
-      it('AC.1 — unknown indicator_id for SP01 + valid SP03 entry → single 400 identifying SP01/indicator_id; the valid SP03 entry is NOT persisted', async () => {
-        const errors = await expectAtomic400(
-          patchDto([
-            sp01Yes(9999), // not in the (SP01, OUTPUT) catalog
-            { sp_code: 'SP03', aligns_with_toc: false }, // valid
-          ]),
-        );
-
-        expect(errors).toEqual([
-          {
-            sp_code: 'SP01',
-            field: 'indicator_id',
-            error: 'unknown_indicator_id',
-          },
-        ]);
-      });
-
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+      //
+      // RETIRED (deleted, not re-fixtured): "AC.1 — unknown indicator_id
+      // for SP01 + valid SP03 entry → single 400 identifying SP01/
+      // indicator_id; the valid SP03 entry is NOT persisted". Its claim
+      // required an INVALID entry from one SP to co-occur with an
+      // otherwise-VALID entry from a SECOND, DIFFERENT SP in the same
+      // batch. T-07 (R-BIL-124) makes that scenario structurally
+      // unreachable: whichever SP is not the resolved Primary now fails
+      // with `toc_alignment_not_primary_sp` regardless of its own
+      // content, so a second SP's entry can never again be "valid" in the
+      // sense this test required — there is no primary_sp_code choice
+      // that preserves the original two-outcome shape. No gap is left
+      // uncovered: the surviving half (a single invalid Primary entry
+      // yields exactly one `unknown_indicator_id` error) duplicates
+      // "error code: unknown_indicator_id — indicator absent under a
+      // valid toc_result" below in this same describe, and the
+      // atomic-400-with-multiple-simultaneous-errors property is already
+      // proven by T-07's own "AC.4 — ≥2 simultaneous per-alignment errors
+      // are returned together; nothing persisted" test.
       it('AC.2 — level OUTCOME on a Capacity Sharing result → 400 level_not_allowed, catalog never consulted for that entry', async () => {
         const errors = await expectAtomic400(
-          patchDto([{ ...sp01Yes(), level: 'OUTCOME' }]),
+          patchDto([{ ...sp01Yes(), level: 'OUTCOME' }], undefined, 'SP01'),
         );
 
         expect(errors).toEqual([
@@ -795,10 +845,14 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
       it('error code: duplicate_sp_code — repeated sp_code entries collapse into one per-SP error', async () => {
         const errors = await expectAtomic400(
-          patchDto([
-            { sp_code: 'SP01', aligns_with_toc: false },
-            { sp_code: 'SP01', aligns_with_toc: false },
-          ]),
+          patchDto(
+            [
+              { sp_code: 'SP01', aligns_with_toc: false },
+              { sp_code: 'SP01', aligns_with_toc: false },
+            ],
+            undefined,
+            'SP01',
+          ),
         );
 
         expect(errors).toEqual([
@@ -808,7 +862,11 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
       it('error code: sp_not_selected — alignment for an SP outside the effective sp_codes', async () => {
         const errors = await expectAtomic400(
-          patchDto([{ sp_code: 'SP99', aligns_with_toc: false }]),
+          patchDto(
+            [{ sp_code: 'SP99', aligns_with_toc: false }],
+            undefined,
+            'SP01',
+          ),
         );
 
         expect(errors).toEqual([
@@ -819,7 +877,11 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
       it('error code: missing_required_fields — bare "Yes" names both floor fields, level + toc_result_id, and ONLY those (R-BIL-111 §5.1, R-BIL-111 AC.4)', async () => {
         const errors = await expectAtomic400(
-          patchDto([{ sp_code: 'SP01', aligns_with_toc: true }]),
+          patchDto(
+            [{ sp_code: 'SP01', aligns_with_toc: true }],
+            undefined,
+            'SP01',
+          ),
         );
 
         // Required floor for aligns_with_toc: true is level + toc_result_id
@@ -840,14 +902,18 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
       it('error code: missing_required_fields — a single missing floor field yields exactly one entry naming it', async () => {
         const errors = await expectAtomic400(
-          patchDto([
-            {
-              sp_code: 'SP01',
-              aligns_with_toc: true,
-              level: 'OUTPUT',
-              // toc_result_id missing
-            },
-          ]),
+          patchDto(
+            [
+              {
+                sp_code: 'SP01',
+                aligns_with_toc: true,
+                level: 'OUTPUT',
+                // toc_result_id missing
+              },
+            ],
+            undefined,
+            'SP01',
+          ),
         );
 
         expect(errors).toEqual([
@@ -861,7 +927,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
       it('error code: unknown_toc_result_id — toc_result_id absent from the (SP, level) catalog', async () => {
         const errors = await expectAtomic400(
-          patchDto([{ ...sp01Yes(), toc_result_id: 9999 }]),
+          patchDto([{ ...sp01Yes(), toc_result_id: 9999 }], undefined, 'SP01'),
         );
 
         expect(errors).toEqual([
@@ -874,7 +940,9 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       });
 
       it('error code: unknown_indicator_id — indicator absent under a valid toc_result', async () => {
-        const errors = await expectAtomic400(patchDto([sp01Yes(9999)]));
+        const errors = await expectAtomic400(
+          patchDto([sp01Yes(9999)], undefined, 'SP01'),
+        );
 
         expect(errors).toEqual([
           {
@@ -890,16 +958,27 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     // R-BIL-095 — snapshots: populated on "Yes", null on "No", drift-proof
     // -----------------------------------------------------------------------
     describe('R-BIL-095 — display snapshots', () => {
-      it('AC.2 — "Yes" upsert carries every snapshot field from the catalog; "No" upsert carries none (exact payloads)', async () => {
+      it('AC.2 — "Yes" upsert carries every snapshot field from the catalog (exact payload)', async () => {
+        // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+        //
+        // Re-based with a restructure: T-07 (R-BIL-124) now rejects a
+        // toc_alignments entry from any selected SP that is not the
+        // Primary, so the original "No" half for SP03 (co-occurring with
+        // SP01's "Yes" as Primary) is retired here for the same reason as
+        // the top-level "happy path" test above — no primary_sp_code
+        // choice keeps both halves valid at once. The "No" exact-payload
+        // shape is proven independently by "AC.2 — { sp_code,
+        // aligns_with_toc: false } …" in the R-BIL-092 describe above
+        // (with SP03 as ITS OWN Primary).
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Yes(), { sp_code: 'SP03', aligns_with_toc: false }]),
+          patchDto([sp01Yes()], undefined, 'SP01'),
           user,
         );
 
-        expect(upsertForSp).toHaveBeenNthCalledWith(
-          1,
+        expect(upsertForSp).toHaveBeenCalledTimes(1);
+        expect(upsertForSp).toHaveBeenCalledWith(
           {
             result_id: 19792,
             sp_code: 'SP01',
@@ -920,21 +999,31 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
           42,
           fakeManager,
         );
-        // The "No" payload has NO snapshot keys at all — the repository
-        // nulls every ToC/snapshot column (T-05 spec pins the nulling).
-        expect(upsertForSp).toHaveBeenNthCalledWith(
-          2,
-          { result_id: 19792, sp_code: 'SP03', aligns_with_toc: false },
-          42,
-          fakeManager,
-        );
       });
 
       it('AC.1 + R-BIL-096 AC.1 — save → upstream goes empty → read-back still serves the saved snapshots (SP01 "Yes" + SP03 "No"), zero upstream calls', async () => {
-        // Real read-back for this test: the saved rows round-trip through
-        // an in-memory store standing in for the snapshot table.
+        // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+        //
+        // Re-based with a restructure: the ORIGINAL PATCH wrote BOTH SP01
+        // ("Yes") and SP03 ("No") in the SAME request, which T-07
+        // (R-BIL-124) now forbids (only the Primary's entry may be
+        // written). The read-back claim this test proves — a "No" row
+        // survives an upstream catalog drift exactly like a "Yes" row
+        // does — does not require SP03's "No" to have been written BY
+        // THIS PATCH; seeding it directly into the in-memory store as a
+        // PRE-EXISTING row (as if saved by an earlier, now-impossible-to-
+        // repeat request) proves the identical claim without attempting a
+        // write R-BIL-124 forbids. This PATCH now writes only SP01
+        // (Primary).
         (service.getAlignment as unknown as jest.SpyInstance).mockRestore();
-        const savedRows: Record<string, unknown>[] = [];
+        const savedRows: Record<string, unknown>[] = [
+          {
+            id: 1,
+            result_id: 19792,
+            sp_code: 'SP03',
+            aligns_with_toc: false,
+          },
+        ];
         upsertForSp.mockImplementation(async (input) => {
           savedRows.push({ id: savedRows.length + 1, ...input });
           return savedRows[savedRows.length - 1];
@@ -944,11 +1033,27 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         const patchResponse = await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Yes(), { sp_code: 'SP03', aligns_with_toc: false }]),
+          patchDto([sp01Yes()], undefined, 'SP01'),
           user,
         );
 
+        // T-11: order reflects the seed order (SP03 pre-existing, SP01
+        // freshly written by this PATCH) — this test's claim is about
+        // snapshot survival through the catalog drift, not row order.
         const expectedTocAlignments = [
+          {
+            sp_code: 'SP03',
+            aligns_with_toc: false,
+            level: null,
+            toc_result_id: null,
+            indicator_id: null,
+            quantitative_contribution: null,
+            toc_result_title: null,
+            indicator_description: null,
+            unit_of_measurement: null,
+            target_value: null,
+            target_year: null,
+          },
           {
             sp_code: 'SP01',
             aligns_with_toc: true,
@@ -962,19 +1067,6 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
             unit_of_measurement: 'Number',
             target_value: '10',
             target_year: 2026,
-          },
-          {
-            sp_code: 'SP03',
-            aligns_with_toc: false,
-            level: null,
-            toc_result_id: null,
-            indicator_id: null,
-            quantitative_contribution: null,
-            toc_result_title: null,
-            indicator_description: null,
-            unit_of_measurement: null,
-            target_value: null,
-            target_year: null,
           },
         ];
         expect(patchResponse.toc_alignments).toEqual(expectedTocAlignments);
@@ -1003,7 +1095,12 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         findContext.mockResolvedValue(baseContext({ report_year_id: '2026' }));
 
         await expect(
-          service.updateAlignment(19792, '19792', patchDto([sp01Yes()]), user),
+          service.updateAlignment(
+            19792,
+            '19792',
+            patchDto([sp01Yes()], undefined, 'SP01'),
+            user,
+          ),
         ).resolves.toBeDefined();
 
         expect(transaction).toHaveBeenCalledTimes(1);
@@ -1020,6 +1117,11 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     // instead of inside it — see design.md §4 step 2.
     // -----------------------------------------------------------------------
     describe('R-BIL-130 — version gate vs Primary validation ordering (T-04)', () => {
+      // ⚠ T-11: AC.1 and AC.4 below MUST keep calling `patchDto` with NO
+      // 3rd argument — their entire claim depends on the request having no
+      // `primary_sp_code`. Only AC.3 (has_contribution:true but no
+      // toc_alignments at all, so it reaches Primary validation) is a
+      // genuine re-base target.
       it('AC.1 — has_contribution:true + toc_alignments present + non-2026 live version + no primary_sp_code → 409 toc_mapping_version_locked, NOT 400 (report_year_id: 2025)', async () => {
         findContext.mockResolvedValue(baseContext({ report_year_id: 2025 }));
 
@@ -1061,6 +1163,11 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         const dto: UpdatePoolFundingAlignmentDto = {
           has_contribution: true,
           sp_codes: ['SP01', 'SP03'],
+          // T-11 re-base — fixture-only change; the claim under test (a
+          // legacy body bypasses the version gate) is untouched. This
+          // block DOES reach resolvePrimarySpCode (no toc_alignments, so
+          // the gate is skipped, but Primary resolution always runs).
+          primary_sp_code: 'SP01',
         };
 
         await expect(
@@ -1116,7 +1223,12 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         );
 
         await expect(
-          service.updateAlignment(19792, '19792', patchDto([sp01Yes()]), user),
+          service.updateAlignment(
+            19792,
+            '19792',
+            patchDto([sp01Yes()], undefined, 'SP01'),
+            user,
+          ),
         ).rejects.toBeInstanceOf(ServiceUnavailableException);
 
         expect(transaction).not.toHaveBeenCalled();
@@ -1155,6 +1267,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
                 },
               ],
               ['SP01'],
+              'SP01',
             ),
             user,
           );
@@ -1180,6 +1293,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
           patchDto(
             [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT' }],
             ['SP01'],
+            'SP01',
           ),
         );
 
@@ -1195,7 +1309,11 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
       it('R-BIL-111 — bare "Yes" (both floor fields absent) rejects naming level AND toc_result_id', async () => {
         const errors = await expectAtomic400(
-          patchDto([{ sp_code: 'SP01', aligns_with_toc: true }], ['SP01']),
+          patchDto(
+            [{ sp_code: 'SP01', aligns_with_toc: true }],
+            ['SP01'],
+            'SP01',
+          ),
         );
 
         expect(errors).toEqual([
@@ -1221,6 +1339,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
               { sp_code: 'SP99', aligns_with_toc: false }, // forces the 400 without reaching the return map
             ],
             ['SP01'],
+            'SP01',
           ),
         );
 
@@ -1245,6 +1364,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
               },
             ],
             ['SP01'],
+            'SP01',
           ),
         );
 
@@ -1263,7 +1383,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       it('R-BIL-113 — "Relaxation does not admit garbage": a foreign indicator_id still rejects with unknown_indicator_id, and the identical request is accepted at the validation layer once indicator_id is omitted entirely', async () => {
         // Half 1 — a foreign indicator_id is still rejected.
         const errors = await expectAtomic400(
-          patchDto([sp01Yes(9999)], ['SP01']),
+          patchDto([sp01Yes(9999)], ['SP01'], 'SP01'),
         );
         expect(errors).toEqual([
           {
@@ -1291,6 +1411,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
                 },
               ],
               ['SP01'],
+              'SP01',
             ),
             user,
           );
@@ -1301,72 +1422,128 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       });
 
       it('D-V2-8 atomicity holds across the new floor and the new error code: any single failure in the batch blocks persistence for the whole batch', async () => {
-        await expectAtomic400(
+        // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+        //
+        // NOT in the red-suite count: `expectAtomic400` only asserts
+        // `BadRequestException` + nothing persisted, so this test stayed
+        // GREEN even with no primary_sp_code — but it was proving the
+        // WRONG thing. Without a Primary, `resolvePrimarySpCode` throws
+        // `primary_sp_required` before `validateTocAlignments` ever saw
+        // the two entries below — a false green (D-9), found by the
+        // predicate census, not the test run.
+        //
+        // ⚠ Adding `primary_sp_code: 'SP01'` does NOT restore the test's
+        // ORIGINAL claim ("atomicity spans the untouched floor check AND
+        // the new contribution guard IN THE SAME BATCH"). T-07 (R-BIL-124)
+        // now rejects SP03's entry with `toc_alignment_not_primary_sp`
+        // BEFORE it ever reaches the contribution-without-indicator check
+        // — the same short-circuit that broke the other multi-SP tests
+        // above. There is no primary_sp_code choice that lets BOTH SP01's
+        // floor violation AND SP03's contribution violation be reached in
+        // one batch: whichever SP is not Primary is rejected for THAT
+        // reason instead. What the test genuinely proves now — asserted
+        // explicitly below rather than left implicit — is that atomicity
+        // still holds across a floor violation (Primary) and a
+        // primary-restriction violation (Contributing) together; the
+        // contribution_without_indicator half of the original claim is
+        // retired as unreachable in a 2-SP batch, and D-V2-8 with
+        // MULTIPLE simultaneous errors is already proven generally by
+        // T-07's own "AC.4 — ≥2 simultaneous per-alignment errors are
+        // returned together" test.
+        const errors = await expectAtomic400(
           patchDto(
             [
-              { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT' }, // missing toc_result_id
+              { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT' }, // Primary — missing toc_result_id
               {
                 sp_code: 'SP03',
                 aligns_with_toc: true,
                 level: 'OUTPUT',
                 toc_result_id: 5187,
                 quantitative_contribution: 5,
-              }, // contribution_without_indicator
+              }, // Contributing — rejected before the contribution check is ever reached
             ],
             ['SP01', 'SP03'],
+            'SP01',
           ),
         );
+        expect(errors).toEqual(
+          expect.arrayContaining([
+            {
+              sp_code: 'SP01',
+              field: 'toc_result_id',
+              error: 'missing_required_fields',
+            },
+            {
+              sp_code: 'SP03',
+              field: 'sp_code',
+              error: 'toc_alignment_not_primary_sp',
+            },
+          ]),
+        );
+        expect(errors).toHaveLength(2);
         // expectAtomic400 already asserts transaction/upsertForSp/
         // deactivateForSps were never called — pinning atomicity across
-        // BOTH the untouched floor check and the new contribution guard in
-        // the same batch.
+        // the two simultaneous errors above.
       });
 
       describe('NFR-BIL-110 — fan-out stays deduplicated', () => {
-        it('one getTocResults call per distinct (sp_code, level) combo on a mixed batch; a partial entry correctly contributes a call (0→1 — an intended increase, not a regression, design §6.1)', async () => {
+        // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+        //
+        // RETIRED (deleted, not re-fixtured): "one getTocResults call per
+        // distinct (sp_code, level) combo on a mixed batch …". Its claim
+        // required TWO DIFFERENT SPs to each independently reach the
+        // catalog-consultation stage in one request (a "mixed batch" of
+        // catalog calls to de-duplicate across). T-07 (R-BIL-124) makes
+        // that unreachable: only the resolved Primary's entry can ever
+        // reach `getTocResults` — every other selected SP's entry now
+        // short-circuits to `toc_alignment_not_primary_sp` before the
+        // catalog is ever consulted. With at most one SP able to trigger a
+        // catalog call per request, "fan-out across a mixed batch" no
+        // longer describes a reachable scenario; no primary_sp_code choice
+        // restores it. The surviving single-entry claim (a partial entry
+        // for the Primary still triggers exactly one catalog call) is a
+        // duplicate of "T-03: validation layer: Level + HLO only … clears
+        // validation" above, which already asserts
+        // `getTocResults` called once.
+        it('zero getTocResults calls when every entry fails the required floor', async () => {
           const errors = await expectAtomic400(
             patchDto(
               [
-                // Partial — no indicator_id. Clears the floor, so it now
-                // requires a catalog call to validate its toc_result_id.
-                {
-                  sp_code: 'SP01',
-                  aligns_with_toc: true,
-                  level: 'OUTPUT',
-                  toc_result_id: 5187,
-                },
-                // Complete — unaffected by this spec.
-                { ...sp01Yes(), sp_code: 'SP03' },
-                // Forces the batch to 400 before construction, keeping this
-                // test clear of the (out-of-scope) snapshot return map.
-                { sp_code: 'SP99', aligns_with_toc: false },
+                { sp_code: 'SP01', aligns_with_toc: true }, // bare "Yes" — Primary's own entry
+                { sp_code: 'SP03', aligns_with_toc: true, level: 'OUTPUT' }, // Contributing — rejected before the floor is even checked
               ],
-              ['SP01', 'SP03'],
+              undefined,
+              'SP01',
             ),
           );
 
-          expect(errors).toEqual([
-            { sp_code: 'SP99', field: 'sp_code', error: 'sp_not_selected' },
-          ]);
-          // One call per distinct (sp_code, level) combo — do NOT assert
-          // zero calls for the partial SP01 entry (design §6.1 — that
-          // would be a backwards, false-green assertion).
-          expect(getTocResults).toHaveBeenCalledTimes(2);
-          expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
-          expect(getTocResults).toHaveBeenCalledWith('SP03', 'OUTPUT');
-        });
-
-        it('zero getTocResults calls when every entry fails the required floor', async () => {
-          const errors = await expectAtomic400(
-            patchDto([
-              { sp_code: 'SP01', aligns_with_toc: true }, // bare "Yes"
-              { sp_code: 'SP03', aligns_with_toc: true, level: 'OUTPUT' }, // missing toc_result_id
+          // T-11: SP03 is Contributing under this spec, so it now fails
+          // `toc_alignment_not_primary_sp` (T-07) rather than reaching the
+          // floor check at all — the ORIGINAL claim that EVERY entry fails
+          // specifically as `missing_required_fields` no longer holds for
+          // SP03. The claim this test's NAME actually makes — zero catalog
+          // calls when nothing clears validation — is unaffected: neither
+          // entry reaches `getTocResults`, for whichever reason.
+          expect(errors).toEqual(
+            expect.arrayContaining([
+              {
+                sp_code: 'SP01',
+                field: 'level',
+                error: 'missing_required_fields',
+              },
+              {
+                sp_code: 'SP01',
+                field: 'toc_result_id',
+                error: 'missing_required_fields',
+              },
+              {
+                sp_code: 'SP03',
+                field: 'sp_code',
+                error: 'toc_alignment_not_primary_sp',
+              },
             ]),
           );
-
-          expect(
-            errors.every((error) => error.error === 'missing_required_fields'),
-          ).toBe(true);
+          expect(errors).toHaveLength(3);
           expect(getTocResults).not.toHaveBeenCalled();
         });
       });
@@ -1395,7 +1572,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
           service.updateAlignment(
             19792,
             '19792',
-            patchDto([sp01Partial()], ['SP01']),
+            patchDto([sp01Partial()], ['SP01'], 'SP01'),
             user,
           ),
         ).resolves.toBeDefined();
@@ -1407,7 +1584,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Partial()], ['SP01']),
+          patchDto([sp01Partial()], ['SP01'], 'SP01'),
           user,
         );
 
@@ -1437,7 +1614,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Yes()], ['SP01']),
+          patchDto([sp01Yes()], ['SP01'], 'SP01'),
           user,
         );
 
@@ -1473,7 +1650,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         const patchResponse = await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Partial()], ['SP01']),
+          patchDto([sp01Partial()], ['SP01'], 'SP01'),
           user,
         );
 
@@ -1520,7 +1697,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         await service.updateAlignment(
           19792,
           '19792',
-          patchDto([sp01Partial()], ['SP01', 'SP03']),
+          patchDto([sp01Partial()], ['SP01', 'SP03'], 'SP01'),
           user,
         );
 

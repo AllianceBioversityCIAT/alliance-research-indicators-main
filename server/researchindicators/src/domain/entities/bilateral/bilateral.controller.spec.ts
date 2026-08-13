@@ -160,9 +160,18 @@ describe('BilateralController (T-15.6)', () => {
     });
 
     it('PATCH / → forwards the body to updateAlignment', async () => {
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+      // re-base: the service is fully mocked here (bilateral.updateAlignment
+      // below), so this fixture never reaches resolvePrimarySpCode and the
+      // block does not currently fail — but has_contribution:true without
+      // primary_sp_code no longer represents a well-formed request under
+      // R-BIL-121, and this test's own claim ("the controller forwards the
+      // body verbatim") is sharper with a representative body. Fixture-only
+      // change — the assertion (dto forwarded byte-for-byte) is untouched.
       const dto: UpdatePoolFundingAlignmentDto = {
         has_contribution: true,
         sp_codes: ['SP01'],
+        primary_sp_code: 'SP01',
       };
       bilateral.updateAlignment.mockResolvedValueOnce({});
 

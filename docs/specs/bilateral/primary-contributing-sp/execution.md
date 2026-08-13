@@ -2701,3 +2701,136 @@ committed between the Reviewer's two observations*, not because it was reverted.
 ✅ Working tree restored and checksum-verified after **every** sabotage
 
 ---
+
+### T-11 — Re-base the five server spec files with an assertion ledger
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **1** (of 3) · **Reviewer verdicts** 1 × `PASS` · **rework consumed 0** |
+| **Requirements covered** | non-regression for R-BIL-120–R-BIL-126 · defect class **D-9** · `design.md` §11 item 1 |
+| **Dependencies** | T-06 ✅ · T-07 ✅ |
+| **Estimated / actual LOC** | ~290 / **374 insertions, 253 deletions** · **zero production files** |
+| **Suite** | **41 red → 212/212 GREEN** (full server: 2105/2105) |
+
+> **The review method here was the diff, not the test results.** A green suite is the *expected*
+> outcome of D-9. The Reviewer walked all **253 deletions** hunk by hunk; **every one is
+> attributable.**
+
+#### 🔴 FINDING 1 — the census is 43, not 28. `tasks.md`'s table is wrong in BOTH directions.
+
+Predicate: *a block is in scope only if it **reaches `resolvePrimarySpCode` at runtime*** — not merely
+if it contains `has_contribution: true`.
+
+| File | `tasks.md` | Actual (Implementer **and** Reviewer, independently) |
+| --- | --- | --- |
+| `bilateral.service.spec.ts` | 13 | **2** — the rest are **read-path mock returns**, never sent as requests |
+| `tocAlignments.spec.ts` | 8 | **38** — the ~37-block T-08 write matrix is **absent from the summary row** |
+| `sourceReadOnlyGate.spec.ts` | 3 | **1** — scenarios 2–3 throw `ConflictException` first |
+| `normalizeLeverCodes.spec.ts` | 3 | **1** |
+| `bilateral.controller.spec.ts` | 1 | **1** |
+| **Total** | **28** | **43** |
+
+**`tasks.md`'s `normalizeLeverCodes` row (3) contradicts `tasks.md`'s own T-11 implementation note
+(1). The note is right; the table is wrong.**
+
+The Reviewer settled this **structurally, not by trusting green**: `ConflictException` is a *different
+class* from `primary_sp_required`'s `BadRequestException`, so a misordering would **redden** those
+blocks rather than hide in them; `normalizeLeverCodes` is called at `:690`, structurally ahead of
+`:715`.
+
+> **RB-6's third miss.** The Implementer reported the discrepancy rather than adopting either number —
+> which is the done criterion. **→ `/akili-archive`: correct T-11's file table to 2 / 38 / 1 / 1 / 1 = 43.**
+
+#### 🔴 FINDING 2 — a pre-existing FALSE GREEN, invisible to red/green
+
+`D-V2-8 atomicity` was **never among the 41 red**. Its helper `expectAtomic400` (`:591-613`) asserts
+only `BadRequestException` + non-persistence **and returns** `response.message.toc_alignments` — which
+the old test **discarded**. So when `resolvePrimarySpCode` (`:715`) threw `primary_sp_required` ahead
+of `validateTocAlignments` (`:730`), the undefined return went unnoticed and **the block stayed green
+while proving nothing about either guard named in its own title.**
+
+**A pre-existing D-9 defect, catchable only by the predicate census.** The correction asserts
+`arrayContaining` of the two exact simultaneous errors **plus** `toHaveLength(2)` — *strictly stronger
+than the original, which asserted neither*. The Reviewer swept for the same pattern: **zero remaining
+`expectAtomic400` call sites discard the return.**
+
+#### 🔴 FINDING 3 — T-07 made two pre-existing tests structurally unconstructable
+
+R-BIL-124 pushes `toc_alignment_not_primary_sp` and `continue`s **before** the floor check and before
+`catalogChecks.push` (`bilateral.service.ts:1090-1096`). Consequence: **no `primary_sp_code` choice**
+can keep a two-SP-write scenario valid.
+
+| Retired | Verdict |
+| --- | --- |
+| **`R-BIL-094 AC.1`** — "unknown `indicator_id` for SP01 **+ a valid SP03 entry**" | **Justified.** With Primary=SP01 the SP03 entry yields a *second* error (breaking "single 400"); with Primary=SP03 the SP01 entry never reaches the indicator check. **Restructuring could not save it** — the claim is about an in-batch *write* of a second valid entry; seeding creates read-side state, not a second valid batch entry. Surviving half maps to `:947`, which asserts the **identical single-element array** and, via `expectAtomic400`, the "nothing persisted" half. |
+| **`NFR-BIL-110`** — "one `getTocResults` call per distinct combo, mixed batch" | **Acceptable; the ledger's reason is OVERSTATED — see ADVISORY 1.** |
+
+**The Leader's specific suspicion was WRONG, and the Reviewer proved it.** I doubted that a
+**call-count** claim could live in a "validation-clears" test. It can: `tocAlignments.spec.ts:1254`
+**does** carry `expect(getTocResults).toHaveBeenCalledTimes(1)` and
+`toHaveBeenCalledWith('SP01','OUTPUT')` (`:1287-1288`), on exactly a partial Level+HLO-only fixture.
+**That is the retired test's "a partial entry contributes a call (0→1)" claim, verbatim.**
+
+#### The three RESTRUCTURINGS — preserved, not weakened
+- **`R-BIL-092 AC.1`** — the deleted first PATCH asserted `upsertForSp` called **twice**, i.e. *behaviour
+  R-BIL-124 now forbids*; **keeping it would be asserting a dead contract.** The surviving claim is
+  asserted at `:655-660` with call counts and per-call `sp_code` checks. Seeding supplies the same
+  starting state the deleted PATCH produced.
+- **The "No" exact-payload claim** relocates to `R-BIL-092 AC.2` (`:663`) — **byte-identical arguments,
+  including the `42, fakeManager` tail.** A true relocation, not a neighbour.
+- **`R-BIL-095 AC.1 + R-BIL-096 AC.1`** — the Leader's worry (does seeding bypass the write path?)
+  **does not bite**: SP01's "Yes" row — *the one that actually carries snapshots* — is **still written
+  by this PATCH** and read back after the catalog empties. Only SP03's "No" is seeded, and a "No" row
+  **has no snapshots to survive drift**. Claim untouched.
+
+#### Deletion accounting — all 253
+`service.spec` **−110** = T-08's superseded describe (92) + its 18-line header.
+`tocAlignments` **−143** = happy-path SP03 half (13) + `R-BIL-092 AC.1` first PATCH (13) +
+`R-BIL-094 AC.1` (17) + `R-BIL-095 AC.2` "No" assertion (9) + `NFR-BIL-110` (30) + the
+`R-BIL-095 AC.1` block move (net 0) + Prettier reflow of `patchDto(…)` call sites. **No orphans.**
+
+#### The four inherited obligations — all discharged
+1. **Stale fixture fixed** — `R-BIL-126 AC.4` now carries the two `sp_role: null` rows its comment
+   always claimed. Outcome unchanged (`find(role === 'PRIMARY')` → undefined either way), but now via
+   the **legacy-rows path it describes** rather than the absent-carrier path.
+2. **`?? []` guard NOT deleted** — production untouched; removability **recorded, not acted on**. Scope
+   boundary held.
+3. **T-08's superseded describe deleted** — T-09's file verified a **strict superset line by line**
+   (`:163`, `:121`, `:207`), and T-09's version is *stronger* (two rows, order pinned, a
+   `lever_name`-fallback sibling the deleted block never had).
+4. **T-12's un-dischargeable criterion — vacuously satisfied, correctly.** **No ledger row points to
+   the ToC repository spec**, because **T-11 deleted no isolation claim**: `R-BIL-118 AC.3` (`:1679`)
+   survives with a fixture-only change.
+
+#### Verification
+✅ bilateral **212/212**; full server **2105/2105** green
+✅ Coverage **83.66 / 75.08 / 84.85 / 83.66** — **reproduced by the Reviewer from `coverage/clover.xml`
+   to the digit** (9967/11913, 2103/2801, 2011/2370). All ≥ 60; **no metric decreased**
+✅ **`:216` byte-identical** — block moved to line **226**; content-anchored SHA `94573605…` reproduced
+   independently. *(The Leader's first check used the stale line range and produced a false mismatch —
+   content anchoring, decided at T-01, is what prevented a false alarm on the spec's most-protected test.)*
+✅ **Zero production files** · `npx tsc --noEmit` clean · `npx eslint` clean (**K-001**)
+
+⚠ **Coverage BEFORE rests on the Implementer's measurement** — it cannot be reproduced read-only (needs
+a stash). It **disclosed the ordering gap itself** (measured AFTER first, then stashed for BEFORE), all
+deltas are ≥ 0, and structurally a drop was never plausible since every deletion is duplicated
+elsewhere and no production line moved.
+
+#### ADVISORY (4R) — recorded
+1. **RELIABILITY — and the honest framing matters.** NFR-BIL-110's **per-combo fan-out is now
+   unexercised on any valid request**; a regression fetching the catalog once per *entry* rather than
+   per *combo* would not redden this suite. **But the retired test never proved dedup either** — two
+   entries in two distinct combos cannot distinguish per-combo from per-entry. **This is pre-existing
+   thinness the retirement made visible, not a regression T-11 introduced.** → record at
+   `/akili-archive` against **`bilateral-module/toc-mapping-v2`**, which owns the NFR.
+2. **RISK — `patchDto`'s optional third parameter is now load-bearing.** If anyone gives it a default,
+   **`R-BIL-130 AC.1` and `AC.4` silently stop proving** that the version gate precedes Primary
+   validation — and stay green. The Implementer wrote a prominent warning (`:565-574`); a mechanical
+   guard would be one assertion that `patchDto([], undefined)` yields no `primary_sp_code` key.
+3. **READABILITY.** Several ledger comments run 15–20 lines inside test bodies. They are **this task's
+   evidence** so they earn their place now; compress the fixture-only ones at `/akili-archive` and keep
+   the two retirement rationales in full.
+
+---

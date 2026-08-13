@@ -876,6 +876,11 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       const dto: UpdatePoolFundingAlignmentDto = {
         has_contribution: true,
         sp_codes: ['SP01'], // SP03 leaves sp_codes
+        // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+        // re-base: has_contribution:true now requires a resolved Primary
+        // (R-BIL-121). Fixture-only change — the claim under test (the
+        // cascade decision) is untouched.
+        primary_sp_code: 'SP01',
       };
 
       await expect(
@@ -902,6 +907,8 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       const dto: UpdatePoolFundingAlignmentDto = {
         has_contribution: true,
         sp_codes: ['SP01', 'SP03'], // both stay selected
+        // T-11 re-base (see the sibling test above) — fixture-only change.
+        primary_sp_code: 'SP01',
       };
 
       await expect(
@@ -1214,6 +1221,16 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         selected_levers: [
           { lever_code: 'SP06', lever_name: 'SP06' },
           { lever_code: 'SP09', lever_name: 'SP09' },
+        ],
+        // T-11 (inherited from T-10): this fixture's own comment above
+        // claims it represents "sp_role = NULL rows" (a legacy alignment),
+        // but omitted `sp_roles` entirely — the `?? []` guard at
+        // bilateral.service.ts:~1552 was masking that gap, not a
+        // production need. Given the two null-role rows the comment
+        // describes.
+        sp_roles: [
+          { sp_code: 'SP06', sp_role: null },
+          { sp_code: 'SP09', sp_role: null },
         ],
       });
 
@@ -1753,115 +1770,18 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// ResultPoolFundingAlignmentRepository.findActiveAlignmentByResultId —
-// sp_roles LEFT JOIN null-sp_code guard (RA-08)
+// @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
 //
-// @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123
-//
-// This is deliberately a REPOSITORY-level test, not a `BilateralService`
-// test with `findActiveAlignmentByResultId` mocked: the eligibility-gate
-// test above and this one are NOT interchangeable (both would show `[]` in
-// the passing case), and asserting on a mock's own canned return would be
-// tautological — the actual guard being proven here is inside
-// `result-pool-funding-alignment.repository.ts`, filtering the raw row
-// shape a real LEFT JOIN produces when an alignment has zero active SP
-// rows (one row, with `sp_code`/`sp_role` NULL, same shape `selected_levers`
-// already guards against via `Boolean(row.lever_code)`).
-//
-// A dedicated repository spec FILE (`result-pool-funding-alignment
-// .repository.spec.ts`) is T-09's scope (NFR-BIL-122's query-count
-// assertion + R-BIL-123 AC.3); this single targeted test stays in this
-// file per T-08's own task instructions and does not create that file.
+// The `ResultPoolFundingAlignmentRepository — sp_roles LEFT JOIN
+// null-sp_code guard (T-08 / RA-08)` describe that used to live here has
+// been DELETED, not re-based (T-09's forward pointer, T-11 inherited
+// obligation #2). T-09 created
+// `repositories/result-pool-funding-alignment.repository.spec.ts` as a
+// strict superset:
+//   - zero-active-SP-rows guard         -> that file, line ~163
+//   - AC.3 selected_levers leak guard   -> that file, line ~207
+//   - mixed-row sp_roles case           -> that file, line ~121 (plus a
+//     null-sp_role and a lever_name-fallback case this describe never had)
+// Nothing here had a claim without a home; this is a plain duplicate
+// removal, not a relocation with a gap.
 // ---------------------------------------------------------------------------
-describe('ResultPoolFundingAlignmentRepository — sp_roles LEFT JOIN null-sp_code guard (T-08 / RA-08)', () => {
-  it('an alignment with zero active SP rows yields sp_roles: [] and selected_levers: [], not a phantom { sp_code: null } member', async () => {
-    const dataSource = {
-      createEntityManager: jest.fn().mockReturnValue({}),
-    } as unknown as DataSource;
-    const repository = new ResultPoolFundingAlignmentRepository(dataSource);
-
-    // The raw row shape a real LEFT JOIN with zero active
-    // `result_pool_funding_alignment_sp` rows actually produces: exactly
-    // one row, carrying the parent alignment's columns, with every
-    // rpfas.* column (including sp_code and sp_role) NULL.
-    jest.spyOn(repository, 'query').mockResolvedValue([
-      {
-        id: 501,
-        result_id: 19792,
-        has_contribution: 1,
-        lever_code: null,
-        lever_name: null,
-        sp_code: null,
-        sp_role: null,
-      },
-    ]);
-
-    const out = await repository.findActiveAlignmentByResultId(19792);
-
-    expect(out?.selected_levers).toEqual([]);
-    expect(out?.sp_roles).toEqual([]);
-  });
-
-  it('a mixed result (one active SP row) keeps only the non-null sp_code entry in sp_roles', async () => {
-    const dataSource = {
-      createEntityManager: jest.fn().mockReturnValue({}),
-    } as unknown as DataSource;
-    const repository = new ResultPoolFundingAlignmentRepository(dataSource);
-
-    jest.spyOn(repository, 'query').mockResolvedValue([
-      {
-        id: 501,
-        result_id: 19792,
-        has_contribution: 1,
-        lever_code: 'SP06',
-        lever_name: 'SP06',
-        sp_code: 'SP06',
-        sp_role: 'PRIMARY',
-      },
-    ]);
-
-    const out = await repository.findActiveAlignmentByResultId(19792);
-
-    expect(out?.sp_roles).toEqual([{ sp_code: 'SP06', sp_role: 'PRIMARY' }]);
-  });
-
-  // R-BIL-123 AC.3 — this MUST run against the real repository construction,
-  // not a `BilateralService` test with `findActiveAlignmentByResultId`
-  // mocked: a service-level fixture that hand-writes `selected_levers` as a
-  // literal (as the `bilateral.service.spec.ts` "AC.3" test above does)
-  // cannot detect `sp_role` being leaked onto `selected_levers` INSIDE the
-  // repository — it only reflects whatever the mock was told to return.
-  // (Verified empirically during T-08's falsification pass: leaking
-  // `sp_role` onto `selected_levers` in the repository left that
-  // service-level test green.) This test builds `selected_levers` from the
-  // same raw row the `sp_roles` tests above use, so a leak shows up as an
-  // unexpected key.
-  it('AC.3 — selected_levers carries ONLY lever_code/lever_name; sp_role never leaks onto it, even though the same row supplies both', async () => {
-    const dataSource = {
-      createEntityManager: jest.fn().mockReturnValue({}),
-    } as unknown as DataSource;
-    const repository = new ResultPoolFundingAlignmentRepository(dataSource);
-
-    jest.spyOn(repository, 'query').mockResolvedValue([
-      {
-        id: 501,
-        result_id: 19792,
-        has_contribution: 1,
-        lever_code: 'SP06',
-        lever_name: 'SP06',
-        sp_code: 'SP06',
-        sp_role: 'PRIMARY',
-      },
-    ]);
-
-    const out = await repository.findActiveAlignmentByResultId(19792);
-
-    expect(out?.selected_levers).toEqual([
-      { lever_code: 'SP06', lever_name: 'SP06' },
-    ]);
-    expect(Object.keys(out?.selected_levers[0] ?? {}).sort()).toEqual([
-      'lever_code',
-      'lever_name',
-    ]);
-  });
-});

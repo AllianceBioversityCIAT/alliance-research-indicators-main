@@ -502,7 +502,7 @@ graph TD
 - **Estimated LOC:** ~290
 - **Effort:** L
 - **Skills:** `nestjs-expert`, `tdd`, `systematic-debugging`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-11). **Suite 41 red → 212/212 GREEN**; zero production files; all **253 deletions** attributable. **🔴 The file table above is WRONG — actual census is 2 / 38 / 1 / 1 / 1 = 43** (RB-6's third miss; the `normalizeLeverCodes` row also contradicts this task's own implementation note, and the note is right). **🔴 A pre-existing FALSE GREEN found** (`D-V2-8 atomicity` proved nothing — its helper's return was discarded). **🔴 T-07 made 2 tests structurally unconstructable — retired with named homes; 3 restructured.**
 
 ---
 
