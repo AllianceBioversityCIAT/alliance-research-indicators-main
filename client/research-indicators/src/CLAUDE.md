@@ -177,3 +177,21 @@ These bind every change inside `src/`. Full text in [`../../../docs/prd.md`](../
 - **C-4** WCAG 2.1 AA on every changed screen.
 - **C-5** Respect `angular.json` bundle budgets (initial ≤ 3 MB error / 2 MB warning; component styles ≤ 8 kB / 4 kB).
 - **C-6** New routes are lazy-loaded standalone components.
+
+---
+
+## ⚠ Test code is neither linted nor type-checked (Kaizen K-002)
+
+Two independent gaps mean **a green test suite does not mean the code compiles**:
+
+- the flat ESLint config **ignores `*.spec.ts`** (`"File ignored because no matching configuration was supplied"`), so `npm run lint` covers production files only;
+- Jest runs **`isolatedModules: true`** under `jest-preset-angular`, so `ts-jest` performs **no type-checking** at all.
+
+A spec once shipped **6,239 passing tests over a tree that failed `npm run build` with `TS2345`**.
+**`npm run build` is the only client type gate — run it before claiming a change is verified.**
+Note `ng build` uses `tsconfig.app.json` (`files: [src/main.ts]`), so a green build still does not
+type-check the specs; `npx tsc -p tsconfig.spec.json --noEmit` is a separate gate.
+
+Related: `src/environments/environment.ts` is **gitignored with no committed template**, so a clean
+checkout cannot build or test until it is created — and a wrongly-typed hand-written stub breaks the
+build while leaving every test green.

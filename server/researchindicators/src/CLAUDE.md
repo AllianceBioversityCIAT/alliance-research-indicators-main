@@ -186,7 +186,8 @@ npm run dev                         # NestJS + Vite (admin) together
 npm run start:dev                   # NestJS only (watch)
 npm run dev:admin                   # Vite only (admin) on :5173
 npm run build                       # build NestJS + admin
-npm run lint                        # eslint --fix
+npm run lint                        # eslint --fix  ⚠ MUTATES — see below
+npx eslint <path>                   # verification gate (read-only, no --fix)
 npm test                            # jest unit
 npm run test:cov                    # jest coverage
 npm run test:e2e                    # jest e2e (test/jest-e2e.json)
@@ -197,6 +198,13 @@ npm run migration:revert
 ```
 
 ---
+
+> **⚠ `npm run lint` cannot verify anything (Kaizen K-001).** It is `eslint --fix`: it rewrites the
+> working tree and exits `0`, so it makes the thing it checks true as a side effect of checking it.
+> A spec once reported "lint clean" across ~10 tasks while the **committed branch failed Prettier** —
+> the green runs only passed because the auto-fix was already sitting in the working tree, uncommitted.
+> **For verification use `npx eslint <path>` (no `--fix`).** To check what is actually committed:
+> `git show HEAD:<path> | npx eslint --stdin --stdin-filename <path>`.
 
 ## 12. Where to look next
 
