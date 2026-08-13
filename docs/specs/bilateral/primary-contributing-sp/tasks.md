@@ -419,7 +419,7 @@ graph TD
 - **Estimated LOC:** ~120
 - **Effort:** M
 - **Skills:** `nestjs-expert`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-09). **NFR-BIL-122 VERIFIED.** The repository had **no spec at all** before this (F-4); coverage 0% → **94.12%**. The count gate is falsified real — a second `this.query(...)` reddens **only** the count assertion, five shape tests stay green. **⚠ Doc-accuracy note:** this task's claim that a second `find()` *"makes the query-count assertion red"* is **imprecise** — `find()` bypasses `Repository.query`; what catches it is the bare `{}` entity manager. Both mechanisms together verify the NFR. **→ T-11: delete T-08's now-superseded `ResultPoolFundingAlignmentRepository` describe at `bilateral.service.spec.ts:~1524-1615` while re-basing that file.**
 
 ---
 

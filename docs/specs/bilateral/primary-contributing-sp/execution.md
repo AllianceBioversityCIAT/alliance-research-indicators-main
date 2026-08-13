@@ -2342,3 +2342,136 @@ no remaining task goes near it.
 ✅ Production files md5-identical between attempts; only the spec file moved
 
 ---
+
+### T-09 — NEW `result-pool-funding-alignment.repository.spec.ts`
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **1** (of 3) · **Reviewer verdicts** 1 × `PASS` · **rework consumed 0** |
+| **Requirements covered** | **NFR-BIL-122 (its only home) — VERIFIED** · R-BIL-123 AC.3 |
+| **Dependencies** | T-08 ✅ |
+| **Estimated / actual LOC** | ~120 / **one new file, 6 tests** · **no production change** |
+
+**Coverage on the repository itself: 0% → 94.12% statements, 100% functions.** It had **no spec at
+all** before this task (finding F-4).
+
+#### 🔬 The query-count gate is REAL — one red, five green
+
+The Reviewer re-ran the falsification rather than accept it. Injecting a second
+`await this.query('SELECT 1')` into `findActiveAlignmentByResultId`:
+
+```
+✕ issues exactly ONE this.query(...) call … — equals the e154c75b baseline of 1
+    Expected number of calls: 1     Received number of calls: 2
+✓ produces sp_roles from the SAME rows …
+✓ an alignment with zero active SP rows …
+✓ a null sp_role … passed through as null
+✓ selected_levers carries ONLY lever_code/lever_name …
+✓ falls back to lever_code when lever_name is null …
+```
+
+> **The count assertion is the ONLY thing that sees the defect.** That is precisely the inverse of
+> the disqualifier, and the strongest available evidence for this NFR.
+
+**Not measuring the mock:** the spy uses `mockResolvedValue` (not `…Once`), so it answers unbounded
+calls — the count is free to rise and nothing structurally caps it at 1.
+
+**Baseline sound:** re-derived independently ⇒ **1**, both at `e154c75b` and on the current file.
+`findActiveAlignmentByResultId` is straight-line — one `await this.query(...)`, no loop, no
+conditional — so **source occurrences == runtime round-trips here.** (The heuristic would *not*
+generalise to a query inside a `for` or behind an `if`; irrelevant to this file, worth knowing.)
+
+#### 🔴 The `find()` question — answered, and the answer differs from `tasks.md`
+
+The Leader asked whether a spy on `query` can see the defect NFR-BIL-122 actually names — a second
+**`find()`**. The Reviewer injected exactly that defect. Result: **all 6 tests red**, but with
+
+```
+TypeError: Cannot read properties of undefined (reading 'getMetadata')
+  at ResultPoolFundingAlignmentRepository.find (repository/Repository.ts:544:39)
+```
+
+| Claim | Verdict |
+| --- | --- |
+| The **count assertion** catches a second `find()` | ❌ **No.** `find()` routes through the entity manager, never `Repository.query`; `querySpy` never increments. |
+| The **file** catches a second `find()` | ✅ **Yes** — but by a *different mechanism*: `createEntityManager` returns a bare `{}`, so any real ORM path throws immediately. |
+| **NFR-BIL-122 is verified** | ✅ **Yes** — by **two complementary mechanisms**: the count gate catches a second `this.query(...)`; the empty manager catches a second `find()` / `findOne()` / `createQueryBuilder()`. No round-trip path exists in this repository that touches neither. |
+
+**⚠ `tasks.md` T-09 contains an imprecise claim:** *"implementing `sp_roles` as a second `find()` call
+makes the query-count assertion red."* **The file reddens; the count assertion does not.** Doc-accuracy
+note for archive — **not rework**, since the requirement is genuinely verified.
+
+#### Leader post-PASS action — one comment, because the guarantee was invisible
+
+The Reviewer flagged that the `find()` safety net **depends entirely on `createEntityManager`
+returning bare `{}`**. Enrich that mock — e.g. to `{ find: jest.fn() }`, a natural "improvement" — and
+the `TypeError` disappears, **leaving only the count gate, which is blind to the defect the
+requirement names.**
+
+**Applied** (Leader, post-PASS, using the Reviewer's rationale): a comment on `buildRepository`
+marking the empty `{}` as **load-bearing**, explaining both mechanisms and instructing that a future
+test needing a populated manager should use its own data source.
+
+**Reasoning, same test as T-02's advisory application:** this is not scope growth into new work — it
+is **documentation of a real, invisible coupling** inside the artifact under review, in the same
+category as T-07's `primarySpCode === null` comment that the Reviewer explicitly told us to preserve.
+**A property nobody can see is a property the next maintainer deletes by accident.** The `return null`
+coverage advisory was **not** applied — that would be a new test, which *is* scope growth.
+Re-verified after the edit: **17/17 repositories green**, `npx eslint` clean, `npx tsc --noEmit` clean.
+
+#### Other confirmations
+- **`Object.keys` leak guard falsified and fires.** Adding `sp_role` to the `selected_levers`
+  projection reddens **line 223** specifically — the per-field assertions (`:217-220`) all **passed**.
+  Only the key-set guard caught the leak.
+- **NULL-`sp_code` fixture is the real `LEFT JOIN` output**, not invented — and `lever_name` is
+  correctly `null` because `COALESCE(...)` also resolves NULL when the `clarisa_levers` join fails on
+  a NULL `sp_code`. Matches T-08's already-PASSed fixture byte for byte.
+- **Row order** is asserted, and proves the repository's `.filter().map()` **does not reorder**. It
+  does **not** prove the SQL `ORDER BY rpfas.sp_code ASC` — `query` is mocked, the SQL never runs.
+  That `ORDER BY` is pre-existing and untouched, so this is a **scope limit, not a gap**.
+- **No new red, verified by cause:** all 4 failing suites trace to the same root —
+  `BadRequestException` at `bilateral.service.ts:956` from pre-T-06 fixtures lacking
+  `primary_sp_code`. **Zero failures in `repositories/`.**
+- **Coverage recomputed by the Reviewer from `coverage-final.json`**, not taken on report:
+  **83.55 / 74.44 / 84.85 / 83.54**, all ≥ 60. Repository file **94.12% stmts, 100% funcs**.
+- **Tree restored** — production SHA-256 `042d3580…32fd9` identical before the first injection and
+  after the last revert.
+
+#### Duplication — T-09 was right; **T-11 should consolidate**
+
+T-08 placed three repository-level tests in `bilateral.service.spec.ts:1524-1615` because T-09's file
+did not yet exist. T-09 **duplicated** rather than moved them, leaving T-08's untouched.
+
+**Reviewer's ruling: correct call now, consolidate later.** T-09's scope boundary is *"one new spec
+file, no production change"*; relocating another PASSed task's tests would be scope creep.
+**T-09's file is a strict superset** — the NULL-`sp_code` guard is an exact reproduction; T-08's
+single-row tests are subsumed by T-09's two-row versions, which additionally prove order.
+
+**Calibration worth keeping:** the "maintenance trap" framing **overstates the risk**. Both copies
+exercise the *same* production method, so they **cannot drift in the dangerous direction** — a change
+to `findActiveAlignmentByResultId` reddens both, and neither can go silently stale while the other
+passes. The real cost is duplicate noise plus three repository tests sitting in a service spec.
+
+**→ Forward pointer: T-11 deletes `describe('ResultPoolFundingAlignmentRepository — sp_roles LEFT JOIN
+null-sp_code guard (T-08 / RA-08)')` (`bilateral.service.spec.ts` ~`:1524-1615`)** while it is already
+re-basing that file. Costs it nothing; avoids a second trip into a PASSed file.
+
+#### ADVISORY (4R) — recorded
+1. **RELIABILITY.** `return null` at `result-pool-funding-alignment.repository.ts:80` (the "no
+   alignment" path) is the single uncovered statement. A four-line test would take it to 100%.
+   **Not applied — a new test is scope growth.**
+2. **RESILIENCE.** The empty-`{}` fragility — **applied**, see above.
+3. **READABILITY.** The new file's 37-line header explaining the duplication decision is longer than
+   the tests it precedes. Justified while both copies exist; **most of it can go when T-11 consolidates.**
+
+#### Final verification
+✅ `npx jest .../repositories` — **17 passed** (both repository specs)
+✅ full suite — **41 failed (unchanged, T-11's) / 168 passed / 209**
+✅ `npm run test:cov` — **83.55 / 74.44 / 84.85 / 83.54**, all ≥ 60 (red-suite figure)
+✅ `npx tsc -p tsconfig.json --noEmit` — clean (**the complete gate**; `npm run build` typechecks no specs)
+✅ `npx eslint` — clean (**K-001**)
+✅ **Production untouched** — `git diff --stat` on the repository is empty
+
+---
