@@ -19,6 +19,14 @@ describe('ResultsCenterComponent', () => {
   let mockResultStatusService: { loading: ReturnType<typeof signal<boolean>>; list: ReturnType<typeof signal<any[]>> };
   let mockRouter: { navigate: jest.Mock };
   /**
+   * REWORK (attempt 2, conformance issue 2 / reliability issue 1) — named so
+   * the T-08 write-effect tests can assert `relativeTo` against the SAME
+   * instance the component's `ActivatedRoute` injection resolves to, rather
+   * than only asserting `replaceUrl`. Previously this was an anonymous
+   * object literal inline in `providers`, unreachable from a test.
+   */
+  let mockActivatedRoute: ActivatedRoute;
+  /**
    * T-06 / KZ-001 — the double for `ActivatedRoute.snapshot.queryParamMap` is
    * now a **real** `ParamMap` built by Angular's own `convertToParamMap`, not
    * a canned `{ get: fn }` stub. `parse()` (`results-center-url.codec.ts`)
@@ -31,9 +39,18 @@ describe('ResultsCenterComponent', () => {
   let currentQueryParams: Record<string, string | readonly string[]>;
   let indicatorTabsLoadingSignal: ReturnType<typeof signal<boolean>>;
   let indicatorTabsListSignal: ReturnType<typeof signal<any[]>>;
+  /**
+   * T-08 / D-URL-15 — the write effect's ONLY tracked dependency. A fidelity
+   * double (KZ-001) matters here specifically: `noteUserFilterMutation` must
+   * actually advance THIS signal for the effect under test to ever run, the
+   * same way the real `ResultsCenterService.noteUserFilterMutation`
+   * (`results-center.service.ts:456-457`) advances the real counter.
+   */
+  let userFilterMutationsSignal: ReturnType<typeof signal<number>>;
 
   beforeEach(async () => {
     jest.useFakeTimers();
+    userFilterMutationsSignal = signal(0);
 
     mockResultsCenterService = {
       resetState: jest.fn(),
@@ -46,7 +63,13 @@ describe('ResultsCenterComponent', () => {
       clearAllFilters: jest.fn(),
       onSelectFilterTab: jest.fn(),
       onActiveItemChange: jest.fn(),
-      noteUserFilterMutation: jest.fn(),
+      // T-08 / KZ-001 fidelity double — mirrors the real counter
+      // (results-center.service.ts:456-457): calling this must actually
+      // advance `userFilterMutationsSignal`, the write effect's only
+      // tracked dependency, or every T-08 test below would pass without the
+      // effect ever running.
+      userFilterMutations: userFilterMutationsSignal,
+      noteUserFilterMutation: jest.fn(() => userFilterMutationsSignal.update((count: number) => count + 1)),
       // T-07 / KZ-001 — this fidelity double mirrors the two real methods'
       // production bodies (results-center.service.ts:810-845 and :1135-1142)
       // closely enough that the T-07 effect's second-visit test can actually
@@ -142,7 +165,68 @@ describe('ResultsCenterComponent', () => {
     sessionStorage.clear();
 
     currentQueryParams = {};
-    mockRouter = { navigate: jest.fn().mockResolvedValue(true) };
+    mockActivatedRoute = {
+      // T-08 — `queryParams` is added here for the write effect's loop
+      // guard (design §6.2 step 4), built from the SAME
+      // `currentQueryParams` `queryParamMap` already reads, via the
+      // real `ParamMap` so multi-value/case behavior stays consistent
+      // between the two. Both are getters so a test that reassigns
+      // `currentQueryParams` mid-flow is reflected on the next read.
+      get snapshot() {
+        const queryParamMap = convertToParamMap(currentQueryParams);
+        const queryParams: Record<string, string> = {};
+        for (const key of queryParamMap.keys) {
+          queryParams[key] = queryParamMap.get(key) ?? '';
+        }
+        return { queryParamMap, queryParams };
+      }
+    } as unknown as ActivatedRoute;
+    mockRouter = {
+      // REWORK (attempt 2, conformance issue 2 / reliability issue 1) — this
+      // double now PERFORMS Angular's real `queryParamsHandling` contract
+      // against `currentQueryParams`, instead of a test-side helper
+      // recomputing a merge by hand after the fact (KZ-001 one level up —
+      // the previous `latestMergedParams()` reimplemented the merge and
+      // applied it unconditionally, ignoring whatever `queryParamsHandling`
+      // the component actually passed). HONORING each option (not just
+      // reading it) means a regression that drops `queryParamsHandling:
+      // 'merge'` — whether replaced by `'preserve'` or omitted outright —
+      // changes what `currentQueryParams` holds afterward, which is exactly
+      // what every `resultingQueryString()` assertion in the
+      // `write effect (T-08)` describe block below reads. This also makes
+      // `advanceCurrentQueryParamsToLatestResult()` unnecessary: the double
+      // advances `currentQueryParams` itself, synchronously, inside the
+      // same call the component makes.
+      navigate: jest.fn((_commands: unknown[], extras: any) => {
+        const next = (extras?.queryParams ?? {}) as Record<string, string | null>;
+        if (extras?.queryParamsHandling === 'merge') {
+          for (const [key, value] of Object.entries(next)) {
+            if (value === null) {
+              delete currentQueryParams[key];
+            } else {
+              currentQueryParams[key] = value;
+            }
+          }
+        } else if (extras?.queryParamsHandling === 'preserve') {
+          // Angular semantics: current query params survive untouched;
+          // `next` is ignored entirely.
+        } else {
+          // No handling (or an unrecognized value) — Angular's default
+          // REPLACES the whole query string with `next`, dropping every
+          // currently-held param `next` does not explicitly carry, and
+          // treating a `null` value there as "absent" rather than "clear
+          // this key".
+          const replaced: Record<string, string> = {};
+          for (const [key, value] of Object.entries(next)) {
+            if (value !== null) {
+              replaced[key] = value;
+            }
+          }
+          currentQueryParams = replaced;
+        }
+        return Promise.resolve(true);
+      })
+    };
 
     await TestBed.configureTestingModule({
       imports: [ResultsCenterComponent],
@@ -152,14 +236,7 @@ describe('ResultsCenterComponent', () => {
         { provide: ApiService, useValue: mockApiService },
         { provide: ActionsService, useValue: mockActionsService },
         { provide: GetAllResultStatusService, useValue: mockResultStatusService },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            get snapshot() {
-              return { queryParamMap: convertToParamMap(currentQueryParams) };
-            }
-          }
-        },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute },
         { provide: Router, useValue: mockRouter }
       ]
     })
@@ -265,7 +342,7 @@ describe('ResultsCenterComponent', () => {
 
     // --- Recognized canonical/legacy parameter (R-RCU-002/004/005/006) ---
 
-    it('should seed from a canonical parameter, suppress restore, fetch once, and wipe the legacy+tab keys', async () => {
+    it('should seed from a canonical parameter, suppress restore, fetch once, and NOT touch the URL (T-08 removed the wipe)', async () => {
       currentQueryParams = { contract: 'A100' };
       const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
 
@@ -291,14 +368,12 @@ describe('ResultsCenterComponent', () => {
       expect(mockResultsCenterService.tableFilters().levers).toEqual([]);
       // Hand-off 3 (T-04 review) — page resets to 1 for the new filter.
       expect(mockResultsCenterService.resultsTablePaginatorFirst()).toBe(0);
-      expect(mockRouter.navigate).toHaveBeenCalledWith(
-        [],
-        expect.objectContaining({
-          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, tab: null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true
-        })
-      );
+      // T-08 removed the legacy+tab wipe this test used to assert — seeding
+      // never advances `userFilterMutations`, so the write effect's entry
+      // guard means init must touch the router zero times (R2-2 guard).
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
       expect(mockActionsService.showToast).not.toHaveBeenCalled();
     });
 
@@ -372,7 +447,7 @@ describe('ResultsCenterComponent', () => {
       });
     });
 
-    it('should resolve a legacy indicatorTab through the codec and seed it (R-RCU-006)', async () => {
+    it('should resolve a legacy indicatorTab through the codec, seed it, and NOT touch the URL (T-08 removed the wipe)', async () => {
       currentQueryParams = { indicatorTab: '1' };
       jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
 
@@ -384,14 +459,12 @@ describe('ResultsCenterComponent', () => {
         scope: 'all'
       });
       expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
-      expect(mockRouter.navigate).toHaveBeenCalledWith(
-        [],
-        expect.objectContaining({
-          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, tab: null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true
-        })
-      );
+      // T-08 removed the wipe this test used to assert on — arriving on a
+      // legacy link is still just seeding (never a user-facing mutation),
+      // so the write effect's entry guard keeps `router.navigate` at zero.
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
     });
 
     it('should resolve a legacy statusTab through the codec and ignore statusLabel (R-RCU-006 AC.3)', async () => {
@@ -457,17 +530,22 @@ describe('ResultsCenterComponent', () => {
       expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
     });
 
-    // Reviewer fix (attempt 2, reliability lens) — FIX 3. design §6.1 orders
-    // the toast (step 8) BEFORE the wipe/`router.navigate` (step 9). A
-    // rejected navigation must not be able to swallow the R-RCU-005 notice.
-    it('should still show the dropped-token toast even when the trailing router.navigate rejects', async () => {
+    // T-08 removed the trailing wipe this test used to exercise (there is no
+    // longer any `router.navigate` call inside `initializeState` at all —
+    // see the R2-2 guard tests in the `write effect (T-08)` describe below).
+    // What survives from the original intent: the toast must still fire
+    // unconditionally on `dropped.length`, independent of anything
+    // router-related, and `initializeState` itself must resolve cleanly
+    // even with a poisoned router mock, because it never reaches it.
+    it('shows the dropped-token toast without ever touching the router during init (wipe removed by T-08)', async () => {
       currentQueryParams = { indicator: 'not-a-real-indicator', contract: 'A100' };
       jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
-      mockRouter.navigate.mockRejectedValue(new Error('navigation cancelled by guard'));
+      mockRouter.navigate.mockRejectedValue(new Error('should never be reached during init'));
 
-      await expect((component as any).initializeState()).rejects.toThrow('navigation cancelled by guard');
+      await (component as any).initializeState();
 
       expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
     });
 
     it('should never let a dropped token’s raw value reach the toast (markup cannot alter its rendering)', async () => {
@@ -704,6 +782,444 @@ describe('ResultsCenterComponent', () => {
       expect(active[0].indicator_id).toBe(4);
 
       fixture2.destroy();
+    });
+  });
+
+  // T-08 — the write effect (design.md §6.2, D-URL-9/D-URL-15). Covers
+  // R-RCU-003 (both scenarios + all ACs), NFR-RCU-001, NFR-RCU-003,
+  // NFR-RCU-004, and the R2-1/R2-2/R2-5/JD-9 regression guards.
+  describe('write effect (T-08)', () => {
+    /**
+     * A complete `ResultFilter`-shaped baseline with every key the write
+     * effect (`buildUrlStateFromCurrentFilters`) reads set to its "nothing
+     * selected" value. Tests spread over this and set only the key(s) under
+     * test, so an assertion about one filter can't be an accident of
+     * leftover state from another test.
+     */
+    const emptyResultsFilter = () => ({
+      'create-user-codes': [],
+      'indicator-codes': [],
+      'status-codes': [],
+      'contract-codes': [],
+      'lever-codes': [],
+      years: [],
+      'platform-code': [],
+      'indicator-codes-filter': [],
+      'indicator-codes-tabs': []
+    });
+
+    /**
+     * Mirrors the REAL ordering contract (design §6.2 / T-05 review
+     * hand-off, carried into T-08's brief): the mutator writes state FIRST,
+     * `noteUserFilterMutation()` SECOND. Calling this after setting
+     * `resultsFilter`/`myResultsFilterItem` is what makes the write
+     * effect's only tracked dependency actually move.
+     */
+    function bumpAndFlush(): void {
+      mockResultsCenterService.noteUserFilterMutation();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+    }
+
+    /**
+     * design §10.3 disqualifier — "asserting on the object passed to
+     * `router.navigate` is a presence assertion about the call, not the
+     * resulting URL". This reads the resulting URL's query string straight
+     * off `currentQueryParams`, which `mockRouter.navigate` (top-level
+     * `beforeEach`) now mutates ITSELF by actually applying the
+     * `queryParamsHandling` option the component passed — no test-side
+     * recomputation of the merge remains (REWORK, attempt 2: the previous
+     * `latestMergedParams()` reimplemented the merge unconditionally,
+     * blind to whatever `queryParamsHandling` value the component used).
+     */
+    function resultingQueryString(): string {
+      return Object.keys(currentQueryParams)
+        .sort()
+        .map(key => `${key}=${currentQueryParams[key]}`)
+        .join('&');
+    }
+
+    beforeEach(() => {
+      currentQueryParams = {};
+      mockResultsCenterService.resultsFilter.set(emptyResultsFilter());
+      mockResultsCenterService.myResultsFilterItem.set({ id: 'all', label: 'All Results' });
+
+      // Harness convention (see the T-07 describe block's class-level
+      // comment above): `ngOnInit`'s `void this.initializeState()` only
+      // fires on THIS fixture's first `detectChanges()` call. Neutralizing
+      // it here consumes that one unavoidable pass — including the write
+      // effect's own mandatory first run — so no test below (whether it
+      // drives `initializeState()` directly or only mutates filter
+      // signals) ever races an uncontrolled background `initializeState()`.
+      const initializeStateSpy = jest.spyOn(component as any, 'initializeState').mockResolvedValue(undefined);
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      initializeStateSpy.mockRestore();
+    });
+
+    it('never navigates on the mandatory first run (D-URL-15 entry guard)', () => {
+      // The mandatory first run already happened in this describe block's
+      // own `beforeEach`, with zero `userFilterMutations` calls — this
+      // re-asserts that outcome directly as its own guaranteed check,
+      // rather than leaving it only implicit in every other test's setup.
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+    });
+
+    it('never navigates on a FRESH component’s mandatory first run, even when creation-time filter state mismatches the current URL (D-URL-15 entry guard, not merge-guard luck)', () => {
+      // If the entry guard were missing, the ONLY thing that could still
+      // save a zero-navigate outcome is the NFR-RCU-001 merge guard — but
+      // only when creation-time state happens to already match the URL.
+      // Setting a filter the (still-empty) URL does not carry, on a BRAND
+      // NEW component whose effect has never run before, forces a genuine
+      // merge mismatch: `next` would carry `contract: 'Z999'`, which
+      // differs from an empty current query string. A pass here is
+      // evidence the entry guard itself is what returns early — not luck
+      // of the comparison happening to no-op (design §6.2 step 2).
+      fixture.destroy();
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['Z999'] }));
+      currentQueryParams = {};
+
+      const freshFixture = TestBed.createComponent(ResultsCenterComponent);
+      freshFixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+      freshFixture.destroy();
+    });
+
+    // --- R-RCU-003 AC.1 + R2-1 — apply, change, clear, per filter ---
+
+    it('applies, changes and clears the contract filter (AC.1, R2-1)', () => {
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['a100'] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('contract=A100');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['s192'] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('contract=S192');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': [] }));
+      bumpAndFlush();
+      // R2-1 — the address bar already carries `contract=S192` (simulated
+      // above); clearing must remove the KEY, not merely fail to add a new
+      // one. An `undefined`/omitted `next.contract` (rather than an
+      // explicit `null`) would leave this value untouched under merge.
+      expect(resultingQueryString()).not.toContain('contract');
+    });
+
+    it('applies, changes and clears the status filter (AC.1, R2-1)', () => {
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'status-codes': [2] })); // submitted
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('status=submitted');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'status-codes': [3] })); // accepted
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('status=accepted');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'status-codes': [] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).not.toContain('status');
+    });
+
+    it('applies, changes and clears the year filter (AC.1, R2-1)', () => {
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, years: [2024] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('year=2024');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, years: [2025] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('year=2025');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, years: [] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).not.toContain('year');
+    });
+
+    it('applies, changes and clears the source filter (AC.1, R2-1)', () => {
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'platform-code': ['STAR'] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('source=star');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'platform-code': ['TIP'] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('source=tip');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'platform-code': [] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).not.toContain('source');
+    });
+
+    it('applies, changes and clears the indicator tab filter (AC.1, R2-1)', () => {
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'indicator-codes-tabs': [1] })); // capacity-sharing-for-development
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('indicator=capacity-sharing-for-development');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'indicator-codes-tabs': [4] })); // policy-change
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('indicator=policy-change');
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'indicator-codes-tabs': [] }));
+      bumpAndFlush();
+      expect(resultingQueryString()).not.toContain('indicator');
+    });
+
+    it('applies and clears the `tab` scope (AC.1, R2-1, R3-4)', () => {
+      mockResultsCenterService.myResultsFilterItem.set({ id: 'my', label: 'My Results' });
+      bumpAndFlush();
+      expect(resultingQueryString()).toBe('tab=my');
+
+      // R3-4 — clearing back to `all` nulls `tab`; it must never emit the
+      // literal `tab=all` (that would leave a query string R-RCU-003
+      // requires to read with none at all).
+      mockResultsCenterService.myResultsFilterItem.set({ id: 'all', label: 'All Results' });
+      bumpAndFlush();
+      expect(resultingQueryString()).not.toContain('tab');
+    });
+
+    // --- NFR-RCU-001 — the loop guard itself, not just the entry guard ---
+
+    it('does not navigate again once the merged result is unchanged (NFR-RCU-001)', () => {
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['A100'] }));
+      bumpAndFlush();
+      expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
+
+      // Same resulting filter state, a fresh user-facing mutation (e.g. a
+      // re-apply of the identical selection) — `next` merged against the
+      // now-current address bar produces an IDENTICAL result.
+      mockResultsCenterService.noteUserFilterMutation();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
+    });
+
+    // REWORK (attempt 2) — FIX 4, promoted from advisory by explicit user
+    // decision. D-URL-15's whole point is that the write effect's ONLY
+    // TRACKED dependency is `userFilterMutations()`; every filter signal is
+    // read `untracked(...)`. Deleting that `untracked(...)` wrapper (inlining
+    // its body) fails no other test in this file, because no other test
+    // mutates `resultsFilter` WITHOUT also bumping the counter in the same
+    // flush — so nothing here proved the tracked-dependency contract until
+    // now. This mutates the filter signal alone, flushes, and asserts the
+    // effect did NOT re-run: if `untracked` were removed, the filter read
+    // above would register as a second tracked dependency, and this
+    // mutation alone would be enough to re-run the effect and navigate
+    // again.
+    it('does not re-run when a filter signal is mutated WITHOUT a matching userFilterMutations bump (D-URL-15 tracked-dependency guard)', () => {
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['A100'] }));
+      bumpAndFlush();
+      const navigateCallsAfterGenuineMutation = mockRouter.navigate.mock.calls.length;
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['Z999'] }));
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(mockRouter.navigate).toHaveBeenCalledTimes(navigateCallsAfterGenuineMutation);
+    });
+
+    // --- R2-2 — zero router.navigate during init with stale singleton state ---
+
+    it('fires zero router.navigate during init when arriving with stale singleton state from another route (R2-2)', () => {
+      // The shared `component` from this suite's `beforeEach` must not
+      // still be alive: its OWN write effect also tracks
+      // `userFilterMutationsSignal`, so bumping it below would otherwise
+      // fire that unrelated effect too, contaminating this test — exactly
+      // the cross-route isolation D-URL-9 relies on component destruction
+      // to prevent in production.
+      fixture.destroy();
+
+      // Stale state left on the shared singleton by a PRIOR route: a
+      // NONZERO mutation counter (never a hardcoded 0 the guard could get
+      // away with checking against) AND filter state that mismatches the
+      // empty URL this new route's address bar shows. A merge computed
+      // from this state WOULD force a navigate if the entry guard were the
+      // only thing broken — the NFR-RCU-001 merge guard alone cannot save
+      // this scenario, so a pass here is evidence of the entry guard
+      // itself, not luck of the merge comparison (design §6.2 step 2).
+      userFilterMutationsSignal.set(5);
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['Z999'] }));
+      currentQueryParams = {};
+
+      const staleFixture = TestBed.createComponent(ResultsCenterComponent);
+      staleFixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+      staleFixture.destroy();
+    });
+
+    // --- JD-9 — `?tab=my` no longer self-destructs on init ---
+
+    it('does not self-destruct a `?tab=my` deep link on init (JD-9)', async () => {
+      currentQueryParams = { tab: 'my' };
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+    });
+
+    // --- R2-5 — zero router.navigate on parameter-less restore, honoured again next load ---
+
+    it('fires zero router.navigate on a parameter-less visit that restores persisted state, honoured again on the next load (R2-5)', async () => {
+      currentQueryParams = {};
+      mockResultsCenterService.restorePersistedState.mockReturnValue(true);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+
+      await (component as any).initializeState();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+      expect(mockResultsCenterService.restorePersistedState).toHaveBeenCalledTimes(1);
+
+      // Next load — nothing about the first visit may disable restore.
+      await (component as any).initializeState();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+      expect(mockResultsCenterService.restorePersistedState).toHaveBeenCalledTimes(2);
+    });
+
+    // --- R-RCU-003 AC.3 — zero additional results requests ---
+
+    it('produces zero additional results requests when a filter change writes the URL (AC.3)', () => {
+      mockResultsCenterService.main.mockClear();
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['A100'] }));
+      bumpAndFlush();
+
+      expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
+      expect(mockResultsCenterService.main).not.toHaveBeenCalled();
+    });
+
+    // --- R-RCU-003 AC.4 / NFR-RCU-004 — flat history across N changes ---
+
+    it('keeps history depth flat (replaceUrl) across N filter changes (AC.4)', () => {
+      const contracts = ['A100', 'S192', 'B300'];
+      for (const agreementId of contracts) {
+        mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': [agreementId] }));
+        bumpAndFlush();
+      }
+
+      // A history-depth check that never navigates twice cannot fail
+      // (design §10.3) — three distinct filter values force three
+      // distinct navigations, not one repeated no-op.
+      expect(mockRouter.navigate).toHaveBeenCalledTimes(3);
+      for (const call of mockRouter.navigate.mock.calls) {
+        expect(call[1].replaceUrl).toBe(true);
+        // REWORK (attempt 2, conformance issue 2 / reliability issue 1) —
+        // the fallback direct assertion the reviewers asked for alongside
+        // (a): pin `relativeTo` to the SAME `ActivatedRoute` double the
+        // component injects, and `queryParamsHandling` to the exact literal
+        // `'merge'`, on every navigate call this test drove — not just one.
+        expect(call[1].relativeTo).toBe(mockActivatedRoute);
+        expect(call[1].queryParamsHandling).toBe('merge');
+      }
+    });
+
+    // --- R-RCU-004 AC.3 — an unrecognized parameter survives a filter change ---
+
+    it('preserves ?utm_source=email across the first filter change', () => {
+      currentQueryParams = { utm_source: 'email' };
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['A100'] }));
+      bumpAndFlush();
+
+      const params = resultingQueryString().split('&');
+      expect(params).toContain('utm_source=email');
+      expect(params).toContain('contract=A100');
+    });
+
+    // REWORK (attempt 2) — FIX 3 / reliability lens issue 2. No test in the
+    // pre-rework suite drove a filter mutation while a LEGACY parameter
+    // (`indicatorTab`) was present in the address bar — every write-effect
+    // test started from `{}` or `{ utm_source }`. This is the CapDev-email
+    // journey the spec narrates verbatim (design §6.2 "The null set is
+    // 'every key the codec parses'" / R3-2, tasks.md T-08's `?tab=my` and
+    // legacy done-checks): arrive at `?indicatorTab=1`, switch indicator
+    // through the UI, and the legacy key must disappear from the resulting
+    // URL — the exact behavior the two pre-existing wipes used to perform
+    // and that T-08 re-homed onto `serialize`'s trailing `null`s reaching
+    // the router under `merge`. `?utm_source=email` rides along in the SAME
+    // fixture to prove the unrecognized key survives the very same
+    // navigation that clears the legacy one.
+    it('clears a legacy `indicatorTab` param, writes the canonical `indicator` slug, and preserves `utm_source` on a real indicator mutation (R3-2 write-path guard)', () => {
+      currentQueryParams = { indicatorTab: '1', utm_source: 'email' };
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'indicator-codes-tabs': [4] })); // policy-change
+      bumpAndFlush();
+
+      const params = resultingQueryString().split('&');
+      expect(params.some(p => p.startsWith('indicatorTab='))).toBe(false);
+      expect(params).toContain('indicator=policy-change');
+      expect(params).toContain('utm_source=email');
+    });
+
+    // --- NFR-RCU-003 — no sec_user_id in the written URL, both scopes ---
+
+    // REWORK (attempt 2) — FIX 1 / conformance lens issue 1. The sentinel
+    // (`mockCacheService.dataCache().user.sec_user_id`, `123`) must actually
+    // be present in the state `buildUrlStateFromCurrentFilters` reads for
+    // this test to be capable of failing — the pre-rework version bumped
+    // with `create-user-codes` still `[]` from `emptyResultsFilter()`, so
+    // even a regression that made the write path serialize that key would
+    // stay green. Seeding it here mirrors what production seeding
+    // (`seedFromUrl` / `loadMyResults`) actually puts in that key.
+    it('never writes the cached sec_user_id into the URL for the `my` scope (NFR-RCU-003)', () => {
+      mockResultsCenterService.myResultsFilterItem.set({ id: 'my', label: 'My Results' });
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({
+        ...prev,
+        'create-user-codes': ['123'],
+        'contract-codes': ['A100']
+      }));
+      bumpAndFlush();
+
+      expect(resultingQueryString()).not.toContain('123');
+    });
+
+    it('never writes the cached sec_user_id into the URL for the `all` scope (NFR-RCU-003)', () => {
+      mockResultsCenterService.myResultsFilterItem.set({ id: 'all', label: 'All Results' });
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({
+        ...prev,
+        'create-user-codes': ['123'],
+        'contract-codes': ['A100']
+      }));
+      bumpAndFlush();
+
+      expect(resultingQueryString()).not.toContain('123');
+    });
+
+    // --- Type hazard at the boundary (T-03 review hand-off) ---
+
+    it('does not throw when a contract entry is `undefined` at runtime despite its declared string[] type', () => {
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({
+        ...prev,
+        'contract-codes': ['A100', undefined]
+      }));
+
+      expect(() => bumpAndFlush()).not.toThrow();
+      expect(resultingQueryString()).toBe('contract=A100');
+    });
+
+    // --- Rejection handling (carried from the T-06 review) ---
+
+    it('does not surface an unhandled rejection when router.navigate rejects', async () => {
+      mockRouter.navigate.mockRejectedValue(new Error('navigation cancelled by guard'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      mockResultsCenterService.resultsFilter.update((prev: any) => ({ ...prev, 'contract-codes': ['A100'] }));
+      bumpAndFlush();
+
+      // Let the rejected promise's `.catch` microtask run before asserting.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockRouter.navigate).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[results-center-url] Failed to write filters to the address bar',
+        expect.any(Error)
+      );
+
+      consoleErrorSpy.mockRestore();
     });
   });
 

@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, OnDestroy, computed, effect } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, computed, effect, untracked } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { IndicatorsTabFilterComponent } from './components/indicators-tab-filter/indicators-tab-filter.component';
 import { TableFiltersSidebarComponent } from './components/table-filters-sidebar/table-filters-sidebar.component';
@@ -12,8 +12,8 @@ import { ActionsService } from '../../../../shared/services/actions.service';
 import { MenuItem } from 'primeng/api';
 import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
 import { GetAllResultStatusService } from '@shared/services/control-list/get-all-result-status.service';
-import { parse } from './url/results-center-url.codec';
-import { INDICATOR_ID_TO_SLUG, STATUS_ID_TO_SLUG } from './url/results-center-url.vocabulary';
+import { parse, serialize, ResultsCenterUrlState } from './url/results-center-url.codec';
+import { INDICATOR_ID_TO_SLUG, STATUS_ID_TO_SLUG, TabScope } from './url/results-center-url.vocabulary';
 
 @Component({
   selector: 'app-results-center',
@@ -184,6 +184,136 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
   });
 
   /**
+   * T-08 — the write path (design.md §6.2, D-URL-9/D-URL-15). The
+   * counterpart to T-06's read path: whenever the user mutates a filter
+   * through the UI, this component-scoped effect rewrites the address bar
+   * to match. Owned by `ResultsCenterComponent`'s injector — never the
+   * service — so it is destroyed with the component and cannot rewrite the
+   * URL of another route the shared singleton is also mutated from
+   * (NFR-RCU-005; design §6.2 "Why this is structural, not a convention").
+   *
+   * **Tracked dependency: ONLY `resultsCenterService.userFilterMutations()`.**
+   * Every filter/scope signal `buildUrlStateFromCurrentFilters()` reads is
+   * read inside `untracked(...)` below — D-URL-15 requires this so the
+   * effect cannot fire during load, restore, or a cross-route mutation,
+   * none of which advance the counter (closes R2-2/R2-5).
+   *
+   * Guard (design §6.2 step 2): `writeEffectEntryMutationCount` captures the
+   * counter's value at effect CREATION, one field above this one so it
+   * initializes first. The mandatory first run always sees the counter
+   * still at that value and returns explicitly — not by luck of the merge
+   * comparison below happening to no-op.
+   *
+   * No `allowSignalWrites` option is needed on this Angular version: the
+   * flag is deprecated and writes from an effect are always allowed (see
+   * the doc comment at :103-104).
+   */
+  private readonly writeEffectEntryMutationCount = this.resultsCenterService.userFilterMutations();
+
+  private readonly urlWriteEffect = effect(() => {
+    const mutationCount = this.resultsCenterService.userFilterMutations();
+    if (mutationCount === this.writeEffectEntryMutationCount) {
+      return;
+    }
+
+    untracked(() => {
+      const state = this.buildUrlStateFromCurrentFilters();
+      const next = serialize(state);
+
+      // design §6.2 step 4 — compare the MERGED result (nulls stripped),
+      // not the raw serialization, against the current query string. A
+      // raw-serialization comparison would navigate on every run whenever
+      // an unrecognized parameter such as `?utm_source` is present, because
+      // `next` never carries that key at all.
+      const currentParams = this.route.snapshot.queryParams as Record<string, string>;
+      const merged: Record<string, string> = { ...currentParams };
+      for (const [key, value] of Object.entries(next)) {
+        if (value === null) {
+          delete merged[key];
+        } else {
+          merged[key] = value;
+        }
+      }
+
+      if (ResultsCenterComponent.paramsEqual(merged, currentParams)) {
+        // NFR-RCU-001 loop guard — the merged result is identical to what
+        // the address bar already shows, so navigating would be a no-op
+        // write (and, if it re-entered a read path, a loop).
+        return;
+      }
+
+      // Handle the rejection (carried from the T-06 review): an unhandled
+      // `router.navigate` rejection inside an `effect()` is the same defect
+      // class as the one `initializeState`'s removed `await` used to risk —
+      // just relocated. There is nothing meaningful to recover into here
+      // (no toast, no state to roll back), so this only prevents an
+      // unhandled promise rejection from surfacing.
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: next,
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      }).catch((error: unknown) => {
+        console.error('[results-center-url] Failed to write filters to the address bar', error);
+      });
+    });
+  });
+
+  /**
+   * The exact inverse of `ResultsCenterService.seedFromUrl()`'s mapping
+   * (`results-center.service.ts:810-845`) — kept in sync with it so a
+   * round-trip (`parse(serialize(state))` reproduces `state`) holds
+   * (R-RCU-003 AC.2). Called only from inside `untracked(...)` above; every
+   * signal read here must stay that way (D-URL-15).
+   *
+   * **Type hazard at the boundary** (T-03 review hand-off): `serialize`
+   * calls `.toUpperCase()` on every `contract` element. `TableFilters.contracts`
+   * ultimately traces back to `GetContractsByUser`/`FindContracts`, both of
+   * which declare `agreement_id?: string` — an `undefined` slipping through
+   * would throw a `TypeError` inside `serialize`. `resultsFilter()['contract-codes']`
+   * is typed `string[]`, but that type is reached through the same upstream
+   * cast, so the type guard below is a real runtime narrowing, not a
+   * formality.
+   */
+  private buildUrlStateFromCurrentFilters(): ResultsCenterUrlState {
+    const resultsFilter = this.resultsCenterService.resultsFilter();
+    const scope: TabScope = this.resultsCenterService.myResultsFilterItem()?.id === 'my' ? 'my' : 'all';
+
+    const contract = (resultsFilter['contract-codes'] ?? []).filter(
+      (code): code is string => typeof code === 'string' && code.length > 0
+    );
+    const status = resultsFilter['status-codes'] ?? [];
+    const year = resultsFilter['years'] ?? [];
+    const source = resultsFilter['platform-code'] ?? [];
+    const indicator = resultsFilter['indicator-codes-tabs']?.[0];
+
+    return {
+      filters: {
+        ...(indicator !== undefined ? { indicator } : {}),
+        ...(contract.length > 0 ? { contract } : {}),
+        ...(status.length > 0 ? { status } : {}),
+        ...(year.length > 0 ? { year } : {}),
+        ...(source.length > 0 ? { source } : {})
+      },
+      scope
+    };
+  }
+
+  /**
+   * design §6.2 step 4 — set-equality over key/value pairs, order-independent
+   * (`currentParams`/`merged` are built from different code paths, so key
+   * order is not meaningful here).
+   */
+  private static paramsEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+    const aKeys = Object.keys(a).sort();
+    const bKeys = Object.keys(b).sort();
+    if (aKeys.length !== bKeys.length) {
+      return false;
+    }
+    return aKeys.every((key, index) => key === bKeys[index] && a[key] === b[key]);
+  }
+
+  /**
    * T-06 read path (design.md §6.1). Init-only, from `route.snapshot` —
    * never a `queryParamMap` subscription (D-URL-5): the component does not
    * listen for query-param changes, so the write path (T-08) cannot re-enter
@@ -293,12 +423,10 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
     // — never fetch unfiltered and then re-fetch (R-RCU-002 AC.4).
     await this.resultsCenterService.main();
 
-    // Reviewer fix (attempt 2, reliability lens) — design §6.1 orders step 8
-    // (the toast) BEFORE step 9 (the wipe); this had the two reversed. A
-    // rejected navigation (e.g. a guard throwing on the query-param-change
-    // re-run below) must not be able to swallow the R-RCU-005 notice — AC.2
-    // requires it once per navigation, not contingent on an unrelated router
-    // call succeeding. Moved above `router.navigate` to restore that order.
+    // design §6.1 step 8 — the toast fires before this method returns,
+    // unconditionally on `dropped.length`, regardless of anything the write
+    // effect does afterward (T-08 removed the trailing wipe this used to be
+    // ordered against — see the comment below).
     if (dropped.length > 0) {
       // D-URL-4 / toast safety (T-02 review hand-off): name counts only.
       // `DroppedUrlToken.value` is the raw, unescaped token — reading it
@@ -314,28 +442,11 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
       });
     }
 
-    // T-08 removes both pre-existing query-parameter wipes together with the
-    // write path they depend on (design §12 "Reversion challenge" / D-URL-8)
-    // — splitting that removal into an earlier task is explicitly forbidden.
-    // Until T-08 lands, this component must keep nulling exactly the keys
-    // the pre-existing code always nulled: the three legacy names, in the
-    // original camelCase spelling an already-delivered CapDev email actually
-    // carries, plus `tab`. This looks vestigial against the new codec-driven
-    // shape — the canonical filter parameters (`indicator`, `contract`,
-    // `status`, `year`, `source`) are deliberately never nulled here, they
-    // are meant to stay in the address bar — but removing this call now
-    // would be exactly the split T-08's ordering constraint forbids.
-    await this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: {
-        indicatorTab: null,
-        statusTab: null,
-        statusLabel: null,
-        tab: null
-      },
-      queryParamsHandling: 'merge',
-      replaceUrl: true
-    });
+    // T-08 removed both pre-existing query-parameter wipes together with the
+    // write path they depended on (design §12 "Reversion challenge" /
+    // D-URL-8). The address bar is now kept in sync by `urlWriteEffect`
+    // above, which is safe to leave the URL alone here because it fires on
+    // user intent (`userFilterMutations`), never on this read path.
   }
 
   showSignal = signal(false);

@@ -728,3 +728,106 @@ Per the Advisory rule these are recorded and die here — none may become a task
 | --- | --- |
 | `design.md` §7.3 | the `allowSignalWrites: true` requirement sentence (false on Angular 19.1.6); `onChangeList` line citation → content-based |
 | `tasks.md` T-07 | the same `allowSignalWrites` note; the `onChangeList` citation; **Files touched** amended to the three authorized files |
+
+---
+
+## 7. Task Execution History (continued)
+
+### T-08 — Write effect + remove **both** wipes
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS on attempt 2** (1 rework round consumed) |
+| Date | 2026-08-13 |
+| Requirements covered | R-RCU-003 (both scenarios, AC.1/AC.3/AC.4), NFR-RCU-001, NFR-RCU-003, NFR-RCU-004 · D-URL-8, D-URL-9, D-URL-15 |
+| Files touched | `results-center.component.ts`, `results-center.component.spec.ts` — exactly the two authorized, confirmed by `git status` at both attempts |
+| Implementer | `akili-implementer` → T2 (`sonnet`), effort **xhigh** both attempts |
+| Reviewers | **parallel lens mode** (effort `xhigh` per `/akili-execute` §2.3) — three lenses on attempt 1, scoped re-review of the two failing lenses on attempt 2. All on T3 (`opus`); `author ≠ auditor` held on both axes throughout |
+| Skills assigned | `angular-developer`, `tdd` (attempt 1) · + `systematic-debugging` (attempt 2). **Deviation from the task's list:** `tdd` was added by the Leader — T-08's nine done-checks are literally test scenarios with expected values fixed by `requirements.md`, which is exactly where red→green pays |
+| Final verification | full client suite **309 suites / 6472 tests** green · lint clean, `--fix` mutated nothing · type probe **1354 lines = baseline exactly**, zero hits on T-08's files · coverage 99.27 / 98.08 / 99.17 / 99.5 against floors 40/20/45/30 |
+
+#### What landed
+
+The component-scoped write effect (`urlWriteEffect`) and the deletion of the merged query-parameter wipe, together — the ordering constraint design §12 makes non-negotiable. The effect tracks **only** `userFilterMutations()`, reads all filter state through `untracked()`, guards the mandatory first run against a creation-time counter baseline captured in the field declared immediately above it, compares the **merged** parameter result against the current query string, and navigates with `{ relativeTo, queryParamsHandling: 'merge', replaceUrl: true }` with the rejection handled.
+
+**The wipe was located by content and the trap was avoided.** `tasks.md` T-08 warned that the line ranges `112-121`/`133-138` now point at T-06's NFR-RCU-002 layer-2 mitigation. Both `indicatorVocabularyCompletenessCheck` and `statusVocabularyCompletenessCheck` survive untouched, and `router.navigate` appears in the production file at exactly one site — inside the new effect. The content-based pointer worked; this is the first time in this spec that a stale-line-number hazard was *anticipated* rather than discovered after the damage.
+
+#### Attempt 1 — three lenses, two FAILs
+
+**risk → PASS.** No defect in the diff. Verified the one line citation the diff introduces into production code (`results-center.service.ts:810-845` for `seedFromUrl`) is *exact* — notable because T-07 introduced a stale one and the advisory was carried forward. Also re-verified T-07's carry-forward: `syncIndicatorTabSelection` does not bump the counter, and the two effects share no signal, so no spurious navigation is inducible. Its findings were entirely document corrections, applied below.
+
+**conformance → FAIL (2).** Cleared design §6.2 steps 1–5 literally, D-URL-8's discharge, the NFR-RCU-002 survival, and T-06's two wipe assertions (correctly inverted, not deleted, wipe not re-added). **Adjudicated R-RCU-003 AC.2 in the Implementer's favour**: design §10.1's coverage table assigns round-trip to the codec unit row, and the test exists at `results-center-url.codec.spec.ts:504-525`. The "all ACs" phrase on T-08's *Requirements covered* line is over-broad relative to §10.1 and to T-08's own nine-item done-check list — a wording defect, not a coverage gap.
+
+**reliability → FAIL (2).** Cleared the untracked boundary, the entry-guard arithmetic, the counter ordering contract (verified no bumping path was made async ahead of its `.set()`s), the type guard, and rejection handling. Established that `route.snapshot` freshness is sound — a query-param-only navigation on a reused route reassigns the snapshot, and the only staleness window can produce a spurious `replaceUrl` write, never a loop.
+
+The four FAIL issues were **all about test fidelity, none about the implementation**. Production code was byte-identical between attempts.
+
+| # | Lens(es) | Finding |
+| --- | --- | --- |
+| 1 | conformance | **NFR-RCU-003's two tests were structurally incapable of failing** — the sentinel `123` was never placed into the state the effect serializes (`create-user-codes` stayed `[]`). This is the *precise* defect for which `tasks.md` moved the check off T-03 ("T-03's codec-level test is a structural argument only"). It arrived structural again |
+| 2 | conformance + reliability + risk | **The merge contract was reproduced by the test, not observed.** The helper `latestMergedParams()` reimplemented Angular's merge and never inspected `queryParamsHandling` on the call it read. `'merge'`→`'preserve'` means no filter ever reaches the address bar; omitting the option drops `?utm_source` — **both mutants left all ~20 new tests green**, including the one named for that done-check. Since design §6.2 makes the whole null-emission scheme (R2-1) *conditional* on `merge`, this single unasserted string carried the design decision |
+| 3 | reliability | **No write-path test with a legacy parameter present.** T-08 deleted the wipe and re-homed that behavior onto `serialize`'s trailing nulls reaching the router under merge — the CapDev-email journey the spec narrates verbatim. Production was correct; nothing would have gone red if the composition broke |
+
+Three lenses reaching finding 2 from three different directions is the strongest signal this panel has produced. A single checklist Reviewer would plausibly have accepted a helper that "computes the merge correctly".
+
+#### The promoted advisory — a recorded rule bend
+
+The reliability lens filed a fourth item as **ADVISORY**: deleting the `untracked(...)` wrapper entirely failed **no** test, leaving D-URL-15's tracked-dependency contract — the decision T-08 exists to implement — unverified. `/akili-execute` §2.4 forbids widening a task to absorb an advisory.
+
+**The Leader escalated the choice to the user rather than deciding it, and the user directed that it land in attempt 2.** Recorded here as an explicit, user-authorized deviation from the Advisory-Never-Widens rule, not as precedent. The alternative offered — defer to T-11 as an owned carry-forward in its Disqualifies clause — was declined in favour of verifying the contract in the task that creates it. The rule's purpose (stopping scope growth from the least-vetted findings) is real; the counter-argument accepted here is that this advisory was about the central design decision of the task under review, cost four lines, and lived in a file the Implementer already owned.
+
+#### Attempt 2 — all four fixed, each proven red/green
+
+The Implementer took the **stronger** option on finding 2 rather than the cheap one: `mockRouter.navigate` now has a real implementation executing Angular's `queryParamsHandling` semantics against accumulated state, and the two hand-rolled simulation helpers were **deleted outright** across 12 call sites.
+
+| Fix | Mutant applied | Result |
+| --- | --- | --- |
+| 1 — NFR-RCU-003 sentinel seeded in `create-user-codes` | serialize `create-user-codes` into `contract` | RED (both scopes) → reverted → GREEN |
+| 2 — router double executes the merge contract | `'merge'` → `'preserve'` | RED (11 tests) → GREEN |
+| 2 — *(second mutant)* | option deleted entirely | RED (3 tests) → GREEN |
+| 3 — legacy-parameter write test | no-op the codec's `LEGACY_PARAM_NAMES_ORIGINAL_CASE` loop | RED → GREEN |
+| 4 — `untracked` mutation-killer | inline the `untracked(...)` body | RED (2 navigates vs 1) → GREEN |
+
+**Both re-review lenses returned PASS.**
+
+The conformance lens verified the double against Angular v19's **actual** `createUrlTree`/`removeEmptyProps` source in `node_modules`, line by line, on all four sub-checks (null/empty-string handling, omitted-key preservation, the `preserve` branch, `replaceUrl`). Verdict: the double is faithful, and where it diverges it errs **stricter** — it cannot recreate the blindness it was built to fix.
+
+The reliability lens ran the probe-residue check **first**, correctly treating it as the finding that would dominate all others: the Fix 3 probe had edited `results-center-url.codec.ts`, a file outside the authorized set, and a half-reverted codec probe would not surface in a passing suite. The diff confirms that file appears nowhere and the production component carries only attempt 1's content. It also walked all 16 tests in the new block against a "the effect wrongly no-ops" regression — 14 go red — confirming the `mock.calls.at(-1)` hazard it had flagged on attempt 1 did not survive the refactor in a new shape.
+
+#### ADVISORY (recorded, non-gating, no owner)
+
+Per the Advisory rule these are recorded and die here — none may become a task or widen one. Escalated to the user in the same report as this entry.
+
+1. **The two NFR-RCU-003 tests remain vacuous under a *total* effect no-op** — raised independently by **both** re-review lenses. With `currentQueryParams` still `{}`, `resultingQueryString()` returns `''` and `not.toContain('123')` passes. One positive co-assertion (`toContain('contract=A100')`) or a `toHaveBeenCalledTimes(1)` closes it at zero cost. Low severity — fourteen sibling tests with identical setup would fail first. **Not folded into the rework: the advisory rule was already bent once this task by explicit user decision, and the Leader declined to bend it twice on its own authority.**
+2. **The double treats only `null` as "clear this key"; the real router's `removeEmptyProps` strips `null` **and** `undefined`.** Unreachable today (`serialize` is typed `Record<string, string | null>`), and the divergence errs strict, so the risk is a false RED on a future change rather than a missed defect. The inline comment near the contract-clearing assertion states the `undefined` case wrongly and would teach the next maintainer the wrong model.
+3. **`router.navigate` resolving `false`** (cancelled/blocked navigation) produces the same address-bar divergence as a rejection, with no log at all. `.catch` covers only the rejection half.
+4. **The `ActivatedRoute` double flattens multi-value params** to the first value where real Angular yields `string[]`; the component casts to `Record<string, string>` and `paramsEqual` compares with `===`. For a repeated key (`?contract=A100&contract=S192`, which T-02's done-check supports) production compares an array against a string and navigates once spuriously — self-correcting, not a loop, history-flat under `replaceUrl`. **Carry to T-11**, whose real-router harness is where the two sides stop being reconciled by coincidence.
+5. **The double advances `route.snapshot` synchronously** where the real router resolves asynchronously. No live path today — the write path never bumps the counter — but a future task that lets it, or that reintroduces a `queryParamMap` subscription, will not be caught by this harness.
+6. **`call[0]` (the commands array) is pinned by no test.** A regression to a non-empty command array would change the route path with the suite green. One line beside the existing `relativeTo` assertion closes it.
+
+#### 7.1 SPEC GAPS — two real holes, neither T-08's to fix
+
+Both surfaced during review, both are **design-level**, and per the Advisory rule neither may be absorbed into a task. Escalated to the user for a decision.
+
+1. **The sidebar indicator multiselect changes the table and writes nothing to the URL.** `applyFilters` writes it to `'indicator-codes-filter'` (`results-center.service.ts:704`); the write effect serializes only `'indicator-codes-tabs'`, faithfully per design §5.1. §5.1 hides the multiselect only *"whenever a tab is set"* — so with no tab set, a user can apply an indicator filter that changes what they see and produces no URL change at all. Against R-RCU-003 **AC.1** ("each of the five sidebar filters") this is a genuine hole. It belongs in D-URL-12's rationale or the decisions log, not in T-08's rework.
+2. **Case-varied keys are pinned in the URL forever.** `parse` folds keys, so arriving at `?CONTRACT=A100` is supported on read (R2-6). But `merge` matches keys case-sensitively, so the first mutation emits canonical `contract` while `CONTRACT=A100` survives — the URL carries both permanently, and the next load folds them into a duplicated value list. This is the same defect class R3-2 fixed for the legacy keys, one dimension over; design §6.2 addresses spelling only for `indicatorTab`/`statusTab`/`statusLabel`. Hand-typed URLs only.
+
+#### 7.2 Process findings
+
+**The verification recipe held this time.** Both attempts copied the §5.4 probe block verbatim with the config inside the package. Attempt 1 and attempt 2 both reported **exactly 1354** lines. The T-07 lesson ("a verified recipe is copied verbatim, never re-derived or relocated") was applied rather than re-learned — the first task in this spec where that is true.
+
+**A done-check can be wrong in the same way a line citation can.** T-08's own implementation note demanded that a grep for `indicatorTab|statusTab|statusLabel` return **zero** hits. Against the finished tree it returns 8 — every one a substring collision with `api.indicatorTabs` and T-07's `indicatorTabStripSync`. Word-bounded (`\b…\b`) it returns zero, and `router.navigate` appears exactly once. The wipe is genuinely gone; the *check* was unsatisfiable as written. This is the same defect class as the line-number trap the very same task block warns about, one layer up: **a verification instruction, like a citation, decays against the tree it was written for.** Corrected in `tasks.md` below.
+
+**Coverage floors were reported without being asked twice.** `npm run test:cov` does not exist in this package; coverage is collected by the standard `npm test`. The Implementer said so plainly instead of inventing a command or silently skipping the check.
+
+#### Spec documents corrected with this task
+
+All corrections below are the risk lens's findings, applied by the Leader per the constitution's *fix the document, don't let docs and code drift* rule.
+
+| Document | Correction |
+| --- | --- |
+| `tasks.md` T-08 | the unsatisfiable substring grep → word-bounded, with the `indicatorTabs` collision named |
+| `tasks.md` T-11 | line citations `101-108` / `112-117` → content-based (they now miss by ~70 lines); the `template: '<div></div>'` literal is written with backticks in the source, so the quoted grep finds nothing; Disqualifies clause extended so the T-08 block is **re-expressed against a real router, not ported** — its simulation helpers are now gone and porting the rest would double-merge |
+| `requirements.md` §1, R-RCU-006 | the two wipes described in present tense with the `112-121`/`133-138` ranges — the *same* citation `tasks.md` T-08 flags as "actively dangerous", never swept into these two documents. Now past tense, content-based |
+| `design.md` §6.1 step 9, §6.2, §12 D-URL-8, §11 | wipe references → past tense; D-URL-8's raw line ranges → content-based |
+| `design.md` §10.2 | "~1,000-line spec" → the file is now **1,550 lines**, which matters because T-11 is the budget's largest item |

@@ -189,7 +189,7 @@ The codec resolves `source` from this constant at parse time, exactly like `indi
 6. Call `service.seedFromUrl({ filters, scope })` — one call that writes all state (§7.1) **before** any fetch.
 7. Fire exactly one `main()` (R-RCU-002 AC.4).
 8. If `dropped` is non-empty → one toast, counts only, once per navigation (R-RCU-005 AC.2/AC.3).
-9. **Wipe nothing.** Both existing wipes are removed (D-URL-8) — **by T-08, not by T-06.** *(Clarified 2026-08-13: this step describes the **end state**. T-06 implements steps 1–8 and deliberately **keeps** the wipe, because design §12's ordering constraint forbids removing it before the write path exists. T-06 merged the two wipes into one `router.navigate` call; T-08 deletes that single call. **Locate it by content, never by the old `112-121`/`133-138` line ranges, which now point at T-06's NFR-RCU-002 layer-2 warning effects** — see `tasks.md` T-08.)*
+9. **Wipe nothing.** Both wipes are gone (D-URL-8), removed **by T-08, not by T-06.** *(Satisfied 2026-08-13. History, since the sequencing was the hard part: T-06 implemented steps 1–8 and deliberately **kept** the wipe, because §12's ordering constraint forbids removing it before the write path exists; it also merged the two wipes into one `router.navigate` call, which T-08 then deleted. **`initializeState` now performs no navigation at all** — the address bar is kept in sync by `urlWriteEffect`. The old `112-121`/`133-138` line ranges must never be used to find any of this: they point at T-06's NFR-RCU-002 layer-2 warning effects.)*
 
 ### 6.2 Write path — component-owned, driven by user intent
 
@@ -236,7 +236,7 @@ This also matches R-RCU-003's own wording, which scopes the write to filters cha
 
 `queryParamsHandling: 'merge'` is `{...current, ...new}` with only **null-valued** keys stripped. A key that is merely **omitted is preserved verbatim**. An earlier draft said "empty filters omitted (never `?contract=`)", which meant clearing `contract` serialized to `{}`, merge kept `?contract=A100`, and the address bar retained a filter the table no longer applied — and because the read path is init-only, a reload **resurrected a filter the user had explicitly cleared**. The same mechanism pinned rejected tokens and legacy parameters in the URL forever, since D-URL-8 removed both wipes.
 
-Emitting `null` for inactive parameters is exactly what the two existing wipes already do, and it is what makes `merge` safe. `merge` is still required: it is what preserves unrecognized parameters such as `?utm_source=…`, which R-RCU-004 AC.3 contemplates.
+Emitting `null` for inactive parameters is exactly what the two now-removed wipes used to do, and it is what makes `merge` safe. `merge` is still required: it is what preserves unrecognized parameters such as `?utm_source=…`, which R-RCU-004 AC.3 contemplates. *(Tense corrected post-T-08 — the wipes no longer exist; the justification is unchanged, and T-08's review confirmed against Angular v19's `createUrlTree`/`removeEmptyProps` source that `merge` strips null-valued keys and preserves omitted ones verbatim, which is precisely what this scheme relies on.)*
 
 **The null set is "every key the codec parses", not "every canonical key"** *(R3-2)*. `indicatorTab` / `statusTab` / `statusLabel` are read by the codec but are not canonical; scoping nulls to canonical keys alone left them pinned in the URL forever, because D-URL-8 removed the wipe that used to clear them. Arriving from a delivered email at `?indicatorTab=1` and switching indicator would emit `indicator: null` while the URL still read `?indicatorTab=1`, and the next load would re-apply the legacy value — the user could never leave it. **The codec parses these keys, therefore it owns clearing them.** Keys it does *not* parse are still never nulled: that is what protects `?utm_source`.
 
@@ -369,9 +369,11 @@ Neither imports the other. A spelling change on either side turns one test red. 
 
 ### 10.2 The existing component spec must be rewritten, not extended
 
-`results-center.component.spec.ts` currently does **both** disqualified things at once: a canned-snapshot `ActivatedRoute` double (lines 101-108) **and** `template: '<div></div>'` (112-117), over a fabricated service mock with no real signals. Nothing renders and no real state exists.
+`results-center.component.spec.ts` does **both** disqualified things at once: a fabricated `ActivatedRoute` double — the `{ provide: ActivatedRoute, useValue: { get snapshot() … } }` block — **and** a template override, the `.overrideComponent(ResultsCenterComponent, { set: { imports: [], template: … } })` call, over a fabricated service mock with no real signals. Nothing renders and no real state exists.
 
-Meeting §10.1 means dropping the template override, using the real `ResultsCenterService`, providing real control-list services for the child multiselects, and switching to a real router harness. **This is a rewrite of a ~1,000-line spec and is its own task in the budget** — the previous draft's estimate did not carry it.
+Meeting §10.1 means dropping the template override, using the real `ResultsCenterService`, providing real control-list services for the child multiselects, and switching to a real router harness. **This is a rewrite of a ~1,550-line spec and is its own task in the budget** — the previous draft's estimate did not carry it.
+
+> *Corrected 2026-08-13, post-T-08.* Three things in this section had decayed. **(1)** The line citations `101-108` / `112-117` now miss by ~70 lines (the real positions are `:170-188` and `:192-197`), so they are replaced with content-based pointers above — this spec has been bitten by stale line numbers three times now. **(2)** The template literal is written with **backticks** in the source, so the previously quoted `template: '<div></div>'` matches nothing under a literal grep. **(3)** T-06 already replaced the *canned snapshot* with a real `convertToParamMap`-built `ParamMap`, and T-08 added a derived `queryParams` getter over it — so what T-11 must remove is the **fabricated service mock**, not the param map. The file is now **1,550 lines** (was ~1,000 when this was written), which matters because T-11 is the budget's single largest item.
 
 ### 10.3 Disqualifying conditions
 
@@ -388,7 +390,7 @@ A green command that does **not** count as evidence:
 
 - **Deployment order: client first, then server.** A server emitting the new link before the client parses it points every delivered email at ignored parameters. Client-first is always safe (legacy still works).
 - **No feature flag** — additive on read; the write path is inert until a filter changes.
-- **Backout:** revert the client commit; the server's new link degrades to R-RCU-005 behavior (parameters ignored, page usable).
+- **Backout:** revert the client commit; the server's new link degrades to R-RCU-005 behavior (parameters ignored, page usable). *(Qualified 2026-08-13, post-T-08: revert the client work as a **whole**, never T-08 alone. Reverting T-08 in isolation restores `initializeState`'s wipe while leaving `serialize`'s trailing legacy nulls in place — two mechanisms clearing the same keys, one on init and one on every user mutation. D-URL-8's ordering constraint binds in the reverse direction too.)*
 - **Comms:** none external; only the URL behind `[STAR CapDev panel link]` changes.
 
 ---
@@ -404,7 +406,7 @@ A green command that does **not** count as evidence:
 | D-URL-5 | 2026-08-12 | Read path is **init-only from `route.snapshot`** | Structural loop guard: a write cannot re-enter a read that does not listen |
 | D-URL-6 | 2026-08-12 | `lever` excluded | No sidebar control renders it; a URL-only filter is a trap |
 | D-URL-7 | 2026-08-12 | `contract` not existence-validated | An invisible-but-real contract must yield an empty table; conflating leaks existence |
-| D-URL-8 | 2026-08-12 | **Remove both query-parameter wipes** — `112-121` **and** `133-138` | *Revised (JD-9): the previous draft named only the first, leaving `?tab=my` self-destructing* |
+| D-URL-8 | 2026-08-12 | **Remove both query-parameter wipes** — the `indicatorTab`/`statusTab`/`statusLabel` one and the `tab` one | *Revised (JD-9): the previous draft named only the first, leaving `?tab=my` self-destructing.* **Discharged by T-08, 2026-08-13** — T-06 had merged the two into one call; deleting it removed both. *Line ranges `112-121`/`133-138` struck from this row post-T-08: they now point at T-06's NFR-RCU-002 layer-2 mitigation, so following them would destroy it and leave the wipe — the exact inverse of this decision.* |
 | **D-URL-9** | 2026-08-12 | **The URL write is a component-scoped `effect()`, never a service method** | *(JD-3)* The service is a root singleton mutated from five surfaces on four routes; a service-level write rewrites `/project-detail` and `/result` URLs. Component ownership makes NFR-RCU-005 a lifecycle guarantee instead of a test |
 | **D-URL-10** | 2026-08-12 | **Seed only the option-value key; never the label key** | *(JD-2)* The multiselect backfills labels only for items *missing* the label key. Seeding the label freezes it forever and makes R-RCU-006 AC.3 unsatisfiable |
 | **D-URL-11** | 2026-08-12 | **`contract` is upper-cased on read and write**; case policy is per token class | *(JD-1)* A blanket "lower-case on write" made R-RCU-001 AC.3 and R-RCU-003 AC.2 mutually unsatisfiable and rendered `PROJECT: a100` |

@@ -14,7 +14,9 @@
 
 ## 1. Context
 
-The Results Center table has a filter sidebar whose state is **not addressable from the URL**. A partial mechanism exists — `results-center.component.ts:92-123` reads `indicatorTab`, `statusTab`, `statusLabel` and `tab` — but it has no contract parameter, uses opaque numeric ids, and **deletes the parameters from the address bar** immediately after applying them. There are **two** such wipes: lines 112-121 (`indicatorTab`/`statusTab`/`statusLabel`) and lines 133-138 (`tab`). No link survives a copy or a reload.
+The Results Center table has a filter sidebar whose state is **not addressable from the URL**. A partial mechanism existed — `results-center.component.ts` read `indicatorTab`, `statusTab`, `statusLabel` and `tab` — but it had no contract parameter, used opaque numeric ids, and **deleted the parameters from the address bar** immediately after applying them. There were **two** such wipes (one for `indicatorTab`/`statusTab`/`statusLabel`, one for `tab`). No link survived a copy or a reload.
+
+> *Tense corrected 2026-08-13, post-T-08.* This paragraph described the pre-spec world in the present tense and carried the raw line ranges `112-121` / `133-138`. Those ranges are now **actively dangerous** — in the current tree they point inside `indicatorVocabularyCompletenessCheck` and `statusVocabularyCompletenessCheck`, T-06's NFR-RCU-002 layer-2 mitigation — and `tasks.md` T-08 says so, but that warning was never swept into this document. T-06 merged the two wipes into a single call and T-08 deleted it: `initializeState` now performs no navigation at all, and the address bar is kept in sync by `urlWriteEffect`.
 
 The immediate driver is the `[STAR CapDev panel link]` slot in the CapDev bulk-upload completion email, which promises the Project Leader a view of *the uploaded* activities and therefore must carry both the **contract** and the **indicator**. The general need is broader: any filtered view should be shareable and reload-safe.
 
@@ -229,7 +231,7 @@ Requirements use `R-RCU-<NNN>` (Results Center URL); non-functional use `NFR-RCU
 **Details:**
 
 - Behavior: `indicatorTab=<id>`, `statusTab=<id>` and `statusLabel=<text>` remain accepted on read. They are **never emitted** by any producer after this change. This support has **no deprecation date** — see §9 R1.
-- **`tab` is not legacy.** It is a canonical parameter (R-RCU-001) that happens to predate this spec; it keeps its current spelling and its current producer. It is read *and* written, and its wipe at `results-center.component.ts:133-138` is removed along with the other one.
+- **`tab` is not legacy.** It is a canonical parameter (R-RCU-001) that happens to predate this spec; it keeps its current spelling and its current producer. It is read *and* written, and its wipe was removed along with the other one by T-08 — locate it by content, never by line number *(see §1's tense-correction note; the `133-138` citation this bullet used to carry now points inside T-06's NFR-RCU-002 mitigation)*.
 - `statusLabel` is accepted but its value is **ignored**: the display label is resolved from the client's own status control list.
 
 #### Scenario: Already-delivered CapDev email
