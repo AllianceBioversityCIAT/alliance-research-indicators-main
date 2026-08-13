@@ -182,7 +182,7 @@ graph TD
 - **Estimated LOC:** ~45
 - **Effort:** S
 - **Skills:** `nestjs-expert`, `api-design-principles`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-03). **⚠ File-list correction:** `bilateral-science-programs.response.dto.ts` above is **wrong** and was correctly left untouched — `SelectedScienceProgramResponse` lives in `update-pool-funding-alignment.dto.ts:31`; the unnamed file holds `BilateralScienceProgramItem` (the CLARISA catalog), where a role is meaningless. Provenance: `proposal.md:111`, superseded by `design.md` §4. **T-08 must drop the `?` from `role`.**
 
 ---
 

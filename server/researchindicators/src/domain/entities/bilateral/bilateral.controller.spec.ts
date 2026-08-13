@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpStatus } from '@nestjs/common';
+import { ArgumentMetadata, HttpStatus, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { BilateralController } from './bilateral.controller';
@@ -454,6 +454,31 @@ describe('BilateralController (T-15.6)', () => {
       }
     });
 
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-121, R-BIL-122, R-BIL-124
+    //
+    // The 400 vocabulary gains three codes with this spec: primary_sp_code
+    // absent/blank (R-BIL-121), primary_sp_code valid-but-unselected
+    // (R-BIL-122), and a toc_alignments entry naming a non-Primary SP
+    // (R-BIL-124). Asserted the same way as the pre-existing codes above —
+    // against the REGISTERED @ApiResponse description, not source presence.
+    it('PATCH / 400 description documents the three new primary-SP codes: primary_sp_required, primary_sp_not_selected, toc_alignment_not_primary_sp', () => {
+      const apiResponses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        BilateralController.prototype.updateAlignment,
+      ) as Record<string, { type?: unknown; description?: string }>;
+
+      expect(apiResponses).toBeDefined();
+      for (const code of [
+        'primary_sp_required',
+        'primary_sp_not_selected',
+        'toc_alignment_not_primary_sp',
+      ]) {
+        expect(apiResponses[HttpStatus.BAD_REQUEST].description).toContain(
+          code,
+        );
+      }
+    });
+
     it('AlignmentResponse carries @ApiProperty metadata for every top-level field', () => {
       const properties = (Reflect.getMetadata(
         DECORATORS.API_MODEL_PROPERTIES_ARRAY,
@@ -545,6 +570,102 @@ describe('BilateralController (T-15.6)', () => {
       expect(propertyMetadata?.description).toMatch(
         /independent of whether an indicator/,
       );
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-120, R-BIL-121, D-C2-12
+  //
+  // primary_sp_code is optional at the class-validator layer BY DESIGN
+  // (D-C2-12) — the conditional "required when has_contribution === true"
+  // rule lives in structural validation (T-06), not here. This block proves
+  // only the class-validator-level contract: type + length, and that the
+  // whitelist posture (forbidNonWhitelisted: true, wired on the PATCH
+  // handler in bilateral.controller.ts) still rejects an unknown field.
+  // ⚠ The pipe below MIRRORS the controller's options (bilateral.controller.ts
+  // :233-239) but is an INDEPENDENT re-implementation of them. The values match
+  // today — verified at review — so this block does exercise the real posture.
+  // It does NOT, however, guard against drift: deleting `forbidNonWhitelisted`
+  // from the controller would leave every test here green while the running app
+  // silently accepts unknown fields, losing R-5′'s loud failure. Closing that
+  // gap means reading the registered pipe off the handler
+  // (`Reflect.getMetadata(PIPES_METADATA, BilateralController.prototype
+  // .updateAlignment)`, the same idiom the neighbouring @ApiResponse tests use)
+  // or exporting one shared options const referenced from both sites.
+  describe('PATCH / body validation — primary_sp_code (T-03, R-BIL-121)', () => {
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    });
+    const metadata: ArgumentMetadata = {
+      type: 'body',
+      metatype: UpdatePoolFundingAlignmentDto,
+      data: undefined,
+    };
+
+    it('accepts a payload with primary_sp_code absent', async () => {
+      await expect(
+        pipe.transform(
+          { has_contribution: true, sp_codes: ['SP06'] },
+          metadata,
+        ),
+      ).resolves.toMatchObject({ has_contribution: true });
+    });
+
+    it('accepts a payload with primary_sp_code as a string', async () => {
+      await expect(
+        pipe.transform(
+          {
+            has_contribution: true,
+            sp_codes: ['SP06'],
+            primary_sp_code: 'SP06',
+          },
+          metadata,
+        ),
+      ).resolves.toMatchObject({ primary_sp_code: 'SP06' });
+    });
+
+    it('rejects primary_sp_code when it is not a string', async () => {
+      await expect(
+        pipe.transform(
+          {
+            has_contribution: true,
+            sp_codes: ['SP06'],
+            primary_sp_code: 123,
+          },
+          metadata,
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('rejects primary_sp_code longer than 50 characters', async () => {
+      await expect(
+        pipe.transform(
+          {
+            has_contribution: true,
+            sp_codes: ['SP06'],
+            primary_sp_code: 'S'.repeat(51),
+          },
+          metadata,
+        ),
+      ).rejects.toThrow();
+    });
+
+    // Falsifying this on the wrong implementation: dropping
+    // forbidNonWhitelisted (or the DTO decoration that whitelist strips
+    // against) from the pipe config makes this request succeed instead of
+    // throwing — the loud-failure posture R-5′ depends on.
+    it('rejects an unknown field (e.g. primary_sp) — forbidNonWhitelisted must still reject it', async () => {
+      await expect(
+        pipe.transform(
+          {
+            has_contribution: true,
+            sp_codes: ['SP06'],
+            primary_sp: 'SP06',
+          },
+          metadata,
+        ),
+      ).rejects.toThrow();
     });
   });
 });

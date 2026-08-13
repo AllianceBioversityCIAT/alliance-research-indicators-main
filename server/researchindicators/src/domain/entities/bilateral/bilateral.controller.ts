@@ -207,7 +207,7 @@ export class BilateralController {
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description:
-      'Validation failure — legacy errors.unknown_sp_codes (unchanged contract), or atomic per-alignment errors.toc_alignments[{ sp_code, field, error }] with error ∈ duplicate_sp_code | sp_not_selected | missing_required_fields | level_not_allowed | unknown_toc_result_id | unknown_indicator_id | contribution_without_indicator (R-BIL-094, R-BIL-113 AC.6; nothing persisted, D-V2-8)',
+      'Validation failure — legacy errors.unknown_sp_codes (unchanged contract), or errors.primary_sp.code ∈ primary_sp_required | primary_sp_not_selected (R-BIL-121, R-BIL-122), or atomic per-alignment errors.toc_alignments[{ sp_code, field, error }] with error ∈ duplicate_sp_code | sp_not_selected | missing_required_fields | level_not_allowed | unknown_toc_result_id | unknown_indicator_id | contribution_without_indicator | toc_alignment_not_primary_sp (R-BIL-094, R-BIL-113 AC.6, R-BIL-124; nothing persisted, D-V2-8)',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,

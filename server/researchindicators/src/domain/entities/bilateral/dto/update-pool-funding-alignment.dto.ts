@@ -51,6 +51,30 @@ export class SelectedScienceProgramResponse {
   // catalog), which doesn't carry allocations.
   @ApiPropertyOptional({ type: Number, nullable: true })
   allocation?: number | null;
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-120, R-BIL-123
+  // Derived from sp_role, never transmitted per-row on write (R-BIL-120 —
+  // the wire carries no per-row role field). `null` means role not yet
+  // chosen — reachable ONLY on legacy rows written before this migration
+  // (R-BIL-126); never produced by a write that passes R-BIL-121.
+  //
+  // TS-optional (`role?:`) even though `@ApiProperty` (not
+  // `@ApiPropertyOptional`) documents it as an always-present, nullable
+  // response field: T-03 is declarations-only (scope boundary — no service
+  // logic) and `toSelectedSciencePrograms` (bilateral.service.ts:621) does
+  // not populate `role` yet — that carrier wiring is T-08's job
+  // (`sp_roles`, design.md §4). The `?` exists solely so `npm run build`
+  // does not force an out-of-scope edit to that construction site; the
+  // Swagger contract is unaffected because `@ApiProperty` sets `required:
+  // true` in the OpenAPI schema regardless of TS-level optionality.
+  @ApiProperty({
+    enum: ['PRIMARY', 'CONTRIBUTING'],
+    nullable: true,
+    example: 'PRIMARY',
+    description:
+      'Role not yet chosen — legacy rows only. Every row written after this change always resolves to PRIMARY or CONTRIBUTING; null is unreachable on a fresh save (R-BIL-121) and appears only on alignments saved before this migration (R-BIL-126).',
+  })
+  role?: 'PRIMARY' | 'CONTRIBUTING' | null;
 }
 
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-095
@@ -326,6 +350,25 @@ export class UpdatePoolFundingAlignmentDto {
   @IsArray()
   @IsString({ each: true })
   lever_codes?: string[];
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-120, R-BIL-121, D-C2-12
+  //
+  // Optional at the class-validator layer BY DESIGN. The conditional
+  // requirement ("required when has_contribution === true") lives in
+  // structural validation (resolvePrimarySpCode, T-06) alongside the rest of
+  // the per-alignment 400 contract, keeping one error vocabulary rather than
+  // two — mirrors C1's placement of the ToC field-presence rules (D-C1-3).
+  // Do NOT add @IsNotEmpty or a conditional validator here.
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 50,
+    description:
+      'Science Program code designated as Primary. Required when has_contribution is true (returns 400 errors.primary_sp.code = "primary_sp_required" when absent, empty, or whitespace-only); ignored when has_contribution is false.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  primary_sp_code?: string;
 
   @ApiPropertyOptional({
     type: String,

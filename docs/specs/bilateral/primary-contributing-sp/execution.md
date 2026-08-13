@@ -1502,3 +1502,135 @@ agent will read it, not only in one spec's audit trail. **Not done unilaterally:
 constitutional document is the user's call.**
 
 ---
+
+### T-03 — Entity column, DTO fields, Swagger
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **1** (of 3 permitted) |
+| **Reviewer verdicts** | 1 × `PASS` |
+| **Rework attempts consumed** | 0 |
+| **Requirements covered** | R-BIL-120 (wire shape) · R-BIL-123 AC.3/AC.4 · **D-C2-1**, **D-C2-6**, **D-C2-12** |
+| **Dependencies** | T-02 (artifact) ✅ |
+| **Estimated / actual LOC** | ~45 / **176 insertions, 2 deletions** (61 production, 115 test) |
+
+#### Leader decisions before dispatch
+
+| Decision | Rationale |
+| --- | --- |
+| **Skills: `nestjs-expert`, `api-design-principles`** — no deviation | DTO/entity/Swagger surface work; both fit. |
+| **Effort: `medium`** | ~45 LOC of declarations; the risk is the manual `/swagger` gate, addressed by emphasis rather than dial. **Calibration confirmed — PASS on attempt 1.** |
+| **Environment pre-check RUN** (Step 2.1) | VPN up. `migration:show` (read-only) confirmed the `dev` MySQL reachable **and** that `AddSpRoleToAlignmentSp1786636994078` is **PENDING** — so `sp_role` does not exist in `dev`. Briefed as a hazard: once the entity declares it, any query through that repository fails `Unknown column 'sp_role'` — **expected, not a defect**. `/swagger` renders from decorators without querying, so the criterion stayed reachable. |
+| **Database-safety rules in the brief** | Boot → view `/swagger` → stop. **No mutating endpoint against shared `dev`.** `synchronize: false` + `migrationsRun: false` mean booting alters no schema. |
+
+#### The change
+
+`sp_role` on the entity (`varchar(20)`, nullable, **no** `@OpenSearchProperty`, `active_primary_alignment`
+**unmapped**); `primary_sp_code?: string` with `@IsOptional() @IsString() @MaxLength(50)` on the request
+DTO; `role: 'PRIMARY' | 'CONTRIBUTING' | null` on `SelectedScienceProgramResponse`; the `400`
+`@ApiResponse` description extended with the three new codes.
+
+#### `/swagger` — the manual gate, discharged twice over
+
+T-03's disqualifier is explicit that a green jest run proves nothing and *"the annotations are in the
+source"* is not a substitute. Both sides went past eyeballing:
+
+- **Implementer:** booted on `ARI_PORT=3099` (3001 was bound by an unrelated PID, left untouched) and
+  fetched **`/swagger-json`** — the exact document the UI renders. Stopped the app; **no mutating
+  endpoint fired**.
+- **Reviewer:** did **not** take that on report — it **re-derived the schema offline** with
+  `SchemaObjectFactory` + `ModelPropertiesAccessor`, **no boot, no DB, no port**, and reproduced it
+  exactly.
+
+Confirmed rendered: `role` → `{"type":"string","enum":["PRIMARY","CONTRIBUTING"],"nullable":true,…}`
+**and present in the schema's `required` array**; `primary_sp_code` → `{"type":"string","maxLength":50,…}`
+and **not** in `required`. That `enum` + `nullable` pair is precisely the failure the
+Presence-assertion caveat says a source-read cannot catch.
+
+#### Adjudications
+
+**1. `tasks.md`'s file list for T-03 is imprecise — the Implementer was right to leave
+`bilateral-science-programs.response.dto.ts` untouched.** `SelectedScienceProgramResponse` is
+declared in `update-pool-funding-alignment.dto.ts:31` (Leader-verified), a file that **was** touched.
+The unnamed file holds `BilateralScienceProgramItem` — the CLARISA catalog of SPs *assignable* to a
+result, where **a role is not merely unspecified but meaningless**: a catalog SP belongs to no
+alignment. The Reviewer traced the provenance: `proposal.md:111` lumps both DTO files under one row
+("Role on input + output"); `tasks.md:156` inherited that coarse pre-design line; **`design.md` is
+normative over the proposal** and resolves the output side to `SelectedScienceProgramResponse` alone.
+The heading is literally *"Files touched (**intended**)"*. **Not a rework item — correct
+`tasks.md:156` at archive time.**
+
+**2. `role?:` TS-optional is correct, and T-08 cannot silently ship it un-populated.** R-BIL-123 AC.4
+is a **Swagger-documentation** criterion and is discharged (verified above). The justification is
+load-bearing and the Reviewer checked it rather than accepting it: `toSelectedSciencePrograms`
+(`bilateral.service.ts:621-639`) builds its literal without `role`, so a TS-**required** field is a
+hard compile error there — exactly the out-of-scope `bilateral.service.ts` edit T-03's scope boundary
+forbids. **T-08 is forced to revisit it** because T-08's done criteria are **value** assertions, not
+presence assertions (*"exactly one entry with `role: \"PRIMARY\"`"*, *"`role: null` on every entry"*,
+*"Assert the value per `sp_code`"*) — and `undefined` fails both `'PRIMARY'` and `null`. The gate is
+T-08's own test contract, not the type system.
+
+**3. F-1 verified rather than assumed — with a bonus finding.** The Reviewer traced the mapping
+generator (`base-open-search-api.ts:318` + `nestedType` recursion at `:348`): the only roots are
+`ResultOpensearchDto`, `AgressoContractOpensearchDto`, `AllianceStaffOpensearchDto`, and
+`ResultPoolFundingAlignmentSp` is reachable from none. **Consequence worth recording: the
+*pre-existing* `@OpenSearchProperty` on `sp_code` (`:38`) is already inert** — which confirms F-1's
+premise rather than merely satisfying it.
+
+**4. The `400` description edit is strictly additive** — diffed **token-by-token** against
+`git show HEAD:`, not by eye. All 7 pre-existing codes present in original order; the only unmatched
+old token is `AC.6;` → `AC.6,`, a comma forced by appending `R-BIL-124`.
+
+#### ADVISORY (4R) — recorded; one was a factual falsehood and was corrected
+
+1. **🔴 RELIABILITY — a FALSE claim in the new spec file. Corrected by the Leader.** The block comment
+   asserted it *"Runs the SAME ValidationPipe configuration the controller uses — **not a
+   re-implementation** of it — so a drift in the controller's pipe options would also be caught
+   here."* **It is a re-implementation** — an independent object literal. Deleting
+   `forbidNonWhitelisted` from `bilateral.controller.ts:236` would leave every test in the block green
+   **while the running app silently accepts unknown fields**, losing exactly the R-5′ loud-failure
+   posture the comment claims to protect.
+   > **Leader action, and the line drawn:** the comment was rewritten to state accurately what the
+   > block does and does not guarantee, and to name both closure options (read the pipe off the
+   > handler via `Reflect.getMetadata(PIPES_METADATA, …)`, or export one shared options const).
+   > **The suggested mechanism was NOT implemented** — that would be scope growth an advisory may not
+   > cause. **Correcting a falsehood is honesty maintenance; implementing an improvement is not.**
+   > Re-verified after the edit: 11 suites, 178 passed + 1 todo; `npx eslint` exit 0.
+2. **READABILITY.** `role`'s Swagger description opens *"Role not yet chosen — legacy rows only."*, so
+   a consumer may read that as the meaning of `role` itself rather than of its `null` value.
+   Conformant (`tasks.md:163` only requires the `null` case be documented "and what it means"), but a
+   one-clause prefix would remove the misreading. **Not applied** — no falsehood, purely stylistic.
+3. **RISK — a real branch-state hazard.** Between this commit and T-06/T-07 landing, `/swagger`
+   advertises three `400` codes the server **cannot emit**, and accepts `primary_sp_code` while
+   **ignoring it entirely**. This is spec-directed (T-03's Description assigns the Swagger text to
+   this task), so it is not a defect — **but the branch must not ship to any consumer between T-03 and
+   T-06.** Reinforces RB-4 and the PR 2a/2b sequencing.
+
+#### Forward pointers
+
+| Target | Pointer |
+| --- | --- |
+| **T-08** | **Drop the `?` from `role`** when wiring the `sp_roles` carrier. Today the OpenAPI schema says `role` is always present (it is in `required`) while the TS type still admits `undefined` — and **`JSON.stringify` drops `undefined`**, so any path T-08 misses omits `role` from the wire entirely instead of emitting `null`, contradicting the published schema. T-08's value assertions catch it; tightening the type makes it unrepresentable. |
+| **T-06** | The conditional requirement for `primary_sp_code` is deferred here **by design** (D-C2-12) and owned by T-06 (`design.md` §5.1 step 2). The DTO's `@ApiPropertyOptional` description already carries the rule forward so it is not lost in the handoff. |
+| **T-11** | `bilateral.controller.spec.ts` is in your re-base census (1 block). The corrected pipe comment above names two closure options for the drift gap — **fix it only if it falls inside your scope**; it is not a re-base item. |
+| **`/akili-archive`** | Correct **`tasks.md:156`** — drop `bilateral-science-programs.response.dto.ts` from T-03's file list; the provenance is `proposal.md:111`'s coarse "Role on input + output" row, superseded by `design.md` §4. Also record that the pre-existing `@OpenSearchProperty` on `ResultPoolFundingAlignmentSp.sp_code` is **inert**. |
+| **Release** | ADVISORY 3 — do not ship this branch to a consumer between T-03 and T-06. |
+
+#### Constitution Impact
+
+**None.** No module created or reshaped. The HTTP surface gains an optional request field and a
+response field, both additive and documented — no new endpoint, no route/guard/pipe change, no
+breaking change to the envelope.
+
+#### Final verification result
+
+✅ `npx jest src/domain/entities/bilateral --coverage=false` — 11 suites, **178 passed, 1 todo** (re-run by the Leader after the ADVISORY-1 comment fix)
+✅ `npx eslint src/domain/entities/bilateral` — clean (**K-001**; Reviewer re-ran independently and confirmed no `--fix` mutation)
+✅ `npm run build` — clean · `npx tsc -p tsconfig.build.json --noEmit` — clean (Reviewer)
+✅ **`/swagger` visually confirmed** at `http://localhost:3099/swagger` + `/swagger-json`, and **independently re-derived offline** by the Reviewer
+✅ Unknown-field rejection (`forbidNonWhitelisted`) asserted — pipe options verified to match the controller's
+✅ No mutating endpoint fired against shared `dev`
+
+---
