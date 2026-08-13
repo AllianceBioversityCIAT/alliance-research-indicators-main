@@ -1032,6 +1032,61 @@ describe('SpTocAlignmentBlockComponent', () => {
     });
   });
 
+  // T-11 validation remediation — R-BIL-111 AC.1 / R-BIL-112 AC.3 made
+  // `indicator_id` and `quantitative_contribution` optional at the Level + HLO
+  // floor (isDraftSaveable, pool-funding-alignment.component.ts:688-696), but
+  // the template kept unconditionally rendering both fields as required. That
+  // mismatched a starred label and `aria-required="true"` against a field the
+  // save gate and server both accept empty. This suite pins the corrected,
+  // unconditional absence of the required affordance on both fields, and
+  // guards that Level/HLO — genuinely required by isDraftSaveable — keep theirs.
+  describe('required-marker drift (T-11) — indicator and contribution are optional', () => {
+    function floorDraft(): SpAlignmentDraft {
+      return emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null });
+    }
+
+    it('Indicator field: no required asterisk and no aria-required on the partial (Level + HLO only) draft', () => {
+      setup({ catalog: SP01_CAT, draft: floorDraft() });
+      fixture.detectChanges();
+      const label = fixture.nativeElement.querySelector('label[for="sp-toc-indicator-SP01"]') as HTMLElement | null;
+      const select = fixture.nativeElement.querySelector('[data-testid="sp-toc-indicator-SP01"]') as HTMLElement | null;
+      expect(label).not.toBeNull();
+      expect(select).not.toBeNull();
+      expect(label!.querySelector('.sp-toc-block__required')).toBeNull();
+      expect(select!.getAttribute('aria-required')).not.toBe('true');
+    });
+
+    it('Contribution field: no required asterisk and no aria-required once an indicator is selected', () => {
+      setup({ catalog: SP01_CAT, draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973 }) });
+      fixture.detectChanges();
+      const label = fixture.nativeElement.querySelector('label[for="sp-toc-contribution-input-SP01"]') as HTMLElement | null;
+      const input = fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-input-SP01"]') as HTMLElement | null;
+      expect(label).not.toBeNull();
+      expect(input).not.toBeNull();
+      expect(label!.querySelector('.sp-toc-block__required')).toBeNull();
+      expect(input!.getAttribute('aria-required')).not.toBe('true');
+    });
+
+    it('guard — Level and HLO fields still DO carry the required asterisk and aria-required', () => {
+      setup({ catalog: SP01_CAT, draft: floorDraft() });
+      fixture.detectChanges();
+      const levelLabel = fixture.nativeElement.querySelector('label[for="sp-toc-level-SP01"]') as HTMLElement | null;
+      const levelSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-level-SP01"]') as HTMLElement | null;
+      const hloLabel = fixture.nativeElement.querySelector('label[for="sp-toc-hlo-SP01"]') as HTMLElement | null;
+      const hloSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-hlo-SP01"]') as HTMLElement | null;
+
+      expect(levelLabel).not.toBeNull();
+      expect(levelSelect).not.toBeNull();
+      expect(hloLabel).not.toBeNull();
+      expect(hloSelect).not.toBeNull();
+
+      expect(levelLabel!.querySelector('.sp-toc-block__required')).not.toBeNull();
+      expect(levelSelect!.getAttribute('aria-required')).toBe('true');
+      expect(hloLabel!.querySelector('.sp-toc-block__required')).not.toBeNull();
+      expect(hloSelect!.getAttribute('aria-required')).toBe('true');
+    });
+  });
+
   // R-BIL-114 — client scenario "Partial row renders without error". T-09.
   // The draft below is exactly what `draftsFromSaved`
   // (shared/services/bilateral.service.ts:347-356) produces when it reloads a

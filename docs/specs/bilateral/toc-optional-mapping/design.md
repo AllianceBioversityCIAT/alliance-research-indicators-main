@@ -28,6 +28,14 @@ The exploration produced two findings that shrink the work materially:
 
 1. **Every ToC column is already nullable.** Migration `1779190000015` declares `level`, `toc_result_id`, `indicator_id`, `quantitative_contribution`, and all five snapshot columns `NULL`; only `aligns_with_toc` is `NOT NULL`. **No DDL.**
 2. **The template already renders every partial state correctly.** `sp-toc-alignment-block.component.html` is progressively disclosed — `@if (d.level)` gates the HLO field (:119), `@if (d.toc_result_id !== null)` gates the indicator field (:209), and `@if (selectedIndicator(); as indicator)` gates unit, target, and contribution (:281). A partial row renders exactly the DOM a user already sees mid-entry. **No template change, and R-BIL-116 AC.3 is satisfied by construction.**
+> **⚠ DRIFT — this finding was HALF WRONG (recorded 2026-08-13, surfaced by T-11 after independent validation).**
+> The *progressive-disclosure* half is correct and held: the `@if` gating needed no change and R-BIL-116 AC.3 is
+> indeed satisfied by construction. The **"no template change"** half was **false**. The template rendered the
+> **Indicator** and **Contribution** fields as unconditionally required — asterisk plus `aria-required="true"` —
+> the two fields *this very spec* made optional server-side and in the save gate. A contributor stopping at the
+> Level + HLO floor saw two starred fields and a screen reader announced two required fields, contradicting the
+> shipped behavior. **A template change was required and landed under T-11** (4 sites). No automated gate in this
+> spec could see it; **D7 — the human visual check — is the gate that would have.**
 
 The change is therefore *removing* restrictions, not adding machinery.
 
