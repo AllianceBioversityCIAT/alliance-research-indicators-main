@@ -475,6 +475,68 @@ Why it matters more than it looks: `design.md:255` is precisely the authoritativ
 
 ---
 
+### T-07 — Client save gate + payload writer
+
+- **Status:** ✅ **`[x]` COMPLETE — Reviewer PASS on attempt 1** (Claude Opus) · 0 rework
+- **Date:** 2026-08-12 · **Commit:** `0a8f4d41` (with T-09; files entangled)
+- **Requirements covered:** R-BIL-112 (AC.1–5), NFR-BIL-112
+
+**The spec's headline fix.** `writeDtoFromDrafts` `continue`d past an incomplete "Yes", omitting it from the request body — the PATCH succeeded, the UI reported success, and nothing persisted. The branch's own comment called it *"defensive only"*, and it was, until the gate was relaxed. Gate and writer therefore changed together.
+
+**Reviewer's independent findings:**
+
+- **Every modified pre-existing test verified as the minimum consequence, with its guard preserved or relocated.** Per-file counts vs `HEAD`: component `it(` 85→89, service 53→55; **no test or `describe` deleted**. The `>= 0` sign guard did not vanish — it moved with the behavior into a new `canSave` false test.
+- **The mock stub** (the sharpest risk — a stub drifting from the real writer makes component tests green against semantics that exist nowhere) was compared line by line against `bilateral.service.ts:371-390`: identical control flow, identical four conditional spreads. **No drift.**
+- **NFR-BIL-112 branches enumerated from the code**, not from the report. Field omission provably persists as a **clear** server-side, so clearing a saved indicator actually saves.
+- Reviewer re-ran the scoped suites itself: 2 suites / 144 tests, 0 skipped.
+
+**ADVISORY (carried to T-10):**
+- **A-1** — the component's PATCH-body test cannot fail on a real-writer regression, and **nothing type-checks the stub**: ESLint ignores `*.spec.ts` *and* Jest runs `isolatedModules: true`. Fix: have the mock delegate to `BilateralService.prototype.writeDtoFromDrafts`. *(Validation later showed this advisory understated the problem — see the Validation Findings section.)*
+- **A-2** — the code comment claims a below-floor "Yes" is emitted *"so the server can reject it"*, but 400s on `level`/`toc_result_id` **render nowhere**; the block renders only `aligns_with_toc` and `quantitative_contribution` errors. Not a live regression (the path is gated off by `canSave`), but the same gap already swallows `level_not_allowed`, `unknown_toc_result_id` and `unknown_indicator_id` on **reachable** saves. **Pre-existing; warrants its own ticket.**
+- **A-4** — T-07 adds **6** `it()` blocks, not the 9 the full-suite delta suggested; the rest was concurrent tasks sharing the worktree.
+
+---
+
+### T-08 — Question copy
+
+- **Status:** ✅ **`[x]` COMPLETE — Reviewer PASS on attempt 1** (Claude Opus) · 0 rework
+- **Date:** 2026-08-12 · **Commit:** `31453bfa` · **Requirements:** R-BIL-110 (AC.1–3)
+
+Reworded `ALIGN_QUESTION`. **No template change needed** — the question already rendered through the canonical `.label` class on the legend.
+
+**Reviewer's independent findings:**
+
+- String compared **codepoint-by-codepoint** against `requirements.md` AC.1, `design.md` §7.4 and `tasks.md` — all three agree, no internal conflict. The old string returns **zero** hits tree-wide.
+- **D-C1-2 verified by per-file site-text diff, not by count** — and this produced a **method finding**: the Implementer's tree-wide grep read **133**; the Reviewer measured **144** minutes later as T-07 landed. A count is also structurally unable to distinguish "unchanged" from "renamed plus a compensating mention". Every `aligns_with_toc` line in both files is byte-identical to `HEAD`.
+- **The Implementer's refusal to overclaim traceability was verified correct and explicitly not penalised:** it declined to label the `.label` test "AC.3", because AC.3 owns the Yes/No required-answer behavior while the `.label` obligation comes from the scenario's `AND IT MUST` clause, owned by no numbered AC.
+- **The Tailwind question was reasoned, not reflexed:** `class="label inline-block mb-1"` — `inline-block` and `mb-1` touch none of the four typographic properties §7.1 pins, so they co-exist with the canonical class rather than substituting for it, and they are pre-existing on `HEAD`.
+- **Method finding:** the flat ESLint config **ignores `*.spec.ts`** ("File ignored because no matching configuration was supplied"), so "lint clean" covers production files only.
+
+**D7 explicitly NOT claimed.** Placement, size and legibility remain unproven — jsdom has no layout engine.
+
+---
+
+### T-09 — Client partial render + reload
+
+- **Status:** ✅ **`[x]` COMPLETE — Reviewer PASS on attempt 1** (Claude Opus) · 0 rework
+- **Date:** 2026-08-12 · **Commit:** `0a8f4d41` (with T-07) · **Requirements:** R-BIL-114 (client scenario)
+
+**No production change was needed — design §7.3's prediction held exactly.** `draftsFromSaved` already null-coalesced every field; the Reviewer confirmed it byte-unchanged and verified T-09 contributed nothing to either modified production file.
+
+**Reviewer's independent findings:**
+
+- **T-09's contribution isolated** from T-07/T-02/T-08 by `git diff --numstat` plus line inspection: +64 in the block spec (one appended `describe`, 3 tests) and a +33 insertion at line 947 of the page spec (1 test). All 18 deletions in the page spec sit in **T-07's** regions.
+- **The `whenStable()` finding was verified real, not a workaround.** Read directly in `node_modules/@angular/forms`: `NgModel._updateValue` wraps `control.setValue` in `resolvedPromise.then()`, so the CVA write provably cannot run before the microtask queue drains. **User-visible consequence: none** — a microtask resolves before paint. Stock Angular behavior, already house convention in this suite.
+- **Positive display assertions, not absence:** the three `.p-select-label` assertions are the **only** ones in the entire suite; had `d.level` been null, PrimeNG would render the placeholder, so they cannot pass on an unrendered value.
+- **The coverage gap was verified genuine** — `SAVED_TOC_ALIGNMENTS_FIXTURE` contains only a *complete* "Yes" and a "No"; T-02's AC.3 pins a *mid-entry* cascade. **No saved *partial* row round-tripping existed anywhere.** Materially unlike T-06, where the guarantee was already pinned at `HEAD:496`.
+
+**ADVISORY (carried to T-10):**
+- **A-1** — one of the three block tests overlaps T-02's committed AC.3 test. Not gated, applying this spec's own precedent consistently: *"T-06 failed because 2 of 2 were fake-new; here the redundancy sits inside a real matrix."* *(Validation later corrected the "byte-identical" characterisation — see below.)*
+- **A-2** — the reload linkage is composed **by comment, not by machine**: `reloadedPartialDraft()` re-declares the shape as a literal and nothing type-checks it against `SavedTocAlignment`. **Same class as T-07's A-1** — fix both together or neither.
+- **A-3** — the null/undefined/NaN sweep runs on the **pre-microtask DOM**, so the settled DOM a user actually sees is never swept.
+
+---
+
 ## Blockers
 
 ### BL-1 — Claude session usage limit exhausted mid-loop (2026-08-12)

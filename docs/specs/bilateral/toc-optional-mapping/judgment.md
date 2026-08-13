@@ -1,5 +1,11 @@
 # Judgment Day — Findings Ledger
 
+> **⚠ SUPERSEDED CLAIMS (annotated 2026-08-13).** This is a point-in-time record of judgment round 1 and is
+> intentionally left otherwise unedited. Two of its claims were later proven **false** and must not be quoted forward:
+> the submission guarantee is **not** *"satisfied by accident, and untested"* (it holds structurally by row-presence
+> semantics, and was already covered at `function-handler.service.spec.ts:496` since `a77fffbb`), and migration
+> `1782950000000` does **not** contradict the §12.2 entry. See `execution.md` → Pivot Record: T-06.
+
 - **Target:** `design.md` (frozen at 2026-08-12), reviewed against `requirements.md`, `proposal.md`, `../mapping-adjustments/proposal.md`
 - **Mode:** blind dual review, two independent read-only judges
 - **Author model:** opus (design) · **Judge model:** sonnet ×2 (author ≠ auditor)
