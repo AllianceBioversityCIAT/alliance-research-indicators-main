@@ -355,10 +355,19 @@ export class BilateralService {
     }));
   }
 
-  // Save seam (design §4.4 + D-9): `aligns_with_toc === false` → bare No DTO (no
-  // cascade fields); complete Yes → full DTO; unanswered (`null`) or incomplete
-  // Yes drafts are omitted entirely — defensive only, `canSave` gates completeness
-  // upstream (T-BIL-TM2-04).
+  // Save seam (design §4.4, §7.2 + D-C1-5): `aligns_with_toc === false` → bare No
+  // DTO (no cascade fields). A "Yes" is ALWAYS emitted once answered — every
+  // optional field (`level`, `toc_result_id`, `indicator_id`,
+  // `quantitative_contribution`) is included only when set, omitted otherwise.
+  // Only the unanswered (`null`) case is skipped entirely (T-BIL-TM2-04).
+  //
+  // NFR-BIL-112: this seam used to `continue` past an incomplete "Yes",
+  // silently dropping the draft from the request body — the user saw success
+  // while nothing persisted. `isDraftSaveable` (component.ts) blocks save below
+  // the Level + HLO floor, so a below-floor "Yes" should not normally reach this
+  // function in the UI flow; but if it does, it is still emitted here rather
+  // than dropped, so the server can reject it (`missing_required_fields`)
+  // instead of STAR silently discarding the user's answer.
   writeDtoFromDrafts(drafts: SpAlignmentDraft[]): TocAlignmentWriteDto[] {
     const dtos: TocAlignmentWriteDto[] = [];
     for (const draft of drafts) {
@@ -367,22 +376,13 @@ export class BilateralService {
         continue;
       }
       if (draft.aligns_with_toc !== true) continue; // unanswered → omitted
-      if (
-        draft.level === null ||
-        draft.toc_result_id === null ||
-        draft.indicator_id === null ||
-        draft.quantitative_contribution === null ||
-        draft.quantitative_contribution < 0
-      ) {
-        continue; // incomplete Yes → omitted (D-9)
-      }
       dtos.push({
         sp_code: draft.sp_code,
         aligns_with_toc: true,
-        level: draft.level,
-        toc_result_id: draft.toc_result_id,
-        indicator_id: draft.indicator_id,
-        quantitative_contribution: draft.quantitative_contribution
+        ...(draft.level !== null ? { level: draft.level } : {}),
+        ...(draft.toc_result_id !== null ? { toc_result_id: draft.toc_result_id } : {}),
+        ...(draft.indicator_id !== null ? { indicator_id: draft.indicator_id } : {}),
+        ...(draft.quantitative_contribution !== null ? { quantitative_contribution: draft.quantitative_contribution } : {})
       });
     }
     return dtos;

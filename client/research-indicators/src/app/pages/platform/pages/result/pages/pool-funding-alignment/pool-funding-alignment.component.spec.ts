@@ -52,22 +52,13 @@ const writeDtoFromDrafts = (drafts: SpAlignmentDraft[]): TocAlignmentWriteDto[] 
       continue;
     }
     if (draft.aligns_with_toc !== true) continue;
-    if (
-      draft.level === null ||
-      draft.toc_result_id === null ||
-      draft.indicator_id === null ||
-      draft.quantitative_contribution === null ||
-      draft.quantitative_contribution < 0
-    ) {
-      continue;
-    }
     dtos.push({
       sp_code: draft.sp_code,
       aligns_with_toc: true,
-      level: draft.level,
-      toc_result_id: draft.toc_result_id,
-      indicator_id: draft.indicator_id,
-      quantitative_contribution: draft.quantitative_contribution
+      ...(draft.level !== null ? { level: draft.level } : {}),
+      ...(draft.toc_result_id !== null ? { toc_result_id: draft.toc_result_id } : {}),
+      ...(draft.indicator_id !== null ? { indicator_id: draft.indicator_id } : {}),
+      ...(draft.quantitative_contribution !== null ? { quantitative_contribution: draft.quantitative_contribution } : {})
     });
   }
   return dtos;
@@ -436,13 +427,38 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(component.canSave()).toBe(false);
     });
 
-    it('false while a rendered "Yes" draft is incomplete (D-9)', () => {
+    it('false while a rendered "Yes" draft is below the Level + HLO floor (missing toc_result_id)', () => {
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [sp('SP01')],
+        toc_drafts: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: null, indicator_id: null, quantitative_contribution: null }]
+      }));
+      expect(component.canSave()).toBe(false);
+    });
+
+    // R-BIL-112 AC.1/AC.2 — the defect being fixed: a "Yes" carrying Level + HLO
+    // but no indicator must NOT disable save (it used to, under the old
+    // completeness gate — D-C1-4 reverts that half).
+    it('true while a rendered "Yes" draft has Level + HLO but no indicator (partial, at the floor)', () => {
       tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
       component.onContributionChange(true);
       component.formData.update(f => ({
         ...f,
         selected_sps: [sp('SP01')],
         toc_drafts: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null }]
+      }));
+      expect(component.canSave()).toBe(true);
+    });
+
+    it('false while a rendered "Yes" draft supplies a negative quantitative_contribution', () => {
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [sp('SP01')],
+        toc_drafts: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: -1 }]
       }));
       expect(component.canSave()).toBe(false);
     });
@@ -837,6 +853,34 @@ describe('PoolFundingAlignmentComponent', () => {
       });
     });
 
+    // R-BIL-112 AC.1/AC.2/NFR-BIL-112 — the core fix: a "Yes" draft with
+    // Level + HLO but no indicator (1) does not disable save and (2) actually
+    // reaches the PATCH body instead of being silently dropped by the writer.
+    it('a Level + HLO draft with no indicator is PRESENT in the PATCH toc_alignments (partial draft reaches the server)', async () => {
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      currentAlignment.set({ ...baseAlignment, has_contribution: false });
+      component.seedFromServer(currentAlignment()!);
+      component.onContributionChange(true);
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.onSpSelectionChange();
+      component.onDraftChange({
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5187,
+        indicator_id: null,
+        quantitative_contribution: null
+      });
+
+      expect(component.canSave()).toBe(true);
+
+      patchAlignmentMock.mockResolvedValue({ ok: true, data: { ...baseAlignment, has_contribution: true } } as PatchAlignmentResult);
+      await component.onSave();
+
+      const [, body] = patchAlignmentMock.mock.calls[0];
+      expect(body.toc_alignments).toEqual([{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187 }]);
+    });
+
     it('omits toc_alignments when has_contribution=false', async () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: true, selected_science_programs: [{ code: 'SP01', name: 'A' }] });
       component.seedFromServer(currentAlignment()!);
@@ -899,6 +943,48 @@ describe('PoolFundingAlignmentComponent', () => {
       const sp03 = component.draftForSp('SP03');
       expect(sp01).toMatchObject({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
       expect(sp03).toMatchObject({ sp_code: 'SP03', aligns_with_toc: false, level: null, toc_result_id: null });
+    });
+
+    // R-BIL-114 — client scenario "Partial row renders without error". T-09.
+    // `SAVED_TOC_ALIGNMENTS_FIXTURE` above only exercises a COMPLETE "Yes"
+    // (SP01) and a "No" (SP03) — neither is a saved PARTIAL row. This pins the
+    // genuinely new reload case: a saved "Yes" carrying Level + HLO but no
+    // indicator round-trips through `draftsFromSaved`
+    // (bilateral.service.ts:347-356, unmodified by this task) with exactly the
+    // expected nulls — proving the RELOAD path, not the already-covered
+    // mid-entry cascade (R-BIL-116 AC.3 in the sibling block spec).
+    it('a saved partial row (Level + HLO, no indicator) reloads with indicator/contribution null and level/toc_result_id populated', () => {
+      const partialSaved: SavedTocAlignment = {
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5187,
+        indicator_id: null,
+        quantitative_contribution: null,
+        toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+        indicator_description: null,
+        unit_of_measurement: null,
+        target_value: null,
+        target_year: null
+      };
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP01', name: 'A' }],
+        toc_alignments: [partialSaved]
+      });
+      component.seedFromServer(currentAlignment()!);
+
+      const sp01 = component.draftForSp('SP01');
+      expect(sp01).toEqual({
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5187,
+        indicator_id: null,
+        quantitative_contribution: null
+      });
     });
   });
 
@@ -1535,16 +1621,28 @@ describe('PoolFundingAlignmentComponent', () => {
     });
 
     describe('REQ-BIL-SGU-05 — Save gating (no global footer hint)', () => {
-      it('canSave is false for an incomplete "Yes" draft', async () => {
+      // R-BIL-112 AC.2 — a "Yes" at the Level + HLO floor (no indicator) no longer
+      // disables save; this is the reverted half of the old completeness gate
+      // (D-C1-4). The save-hint absence assertion is unaffected either way.
+      it('canSave is true for a "Yes" draft at the Level + HLO floor (no indicator)', async () => {
         await selectSps(['SP01'], TOC_CATALOG_CAPSHARING_FIXTURE);
         component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null });
 
-        expect(component.canSave()).toBe(false);
+        expect(component.canSave()).toBe(true);
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('[data-testid="pf-alignment-save-hint"]')).toBeNull();
       });
 
-      it('canSave is false when only quantitative contribution is missing', async () => {
+      it('canSave is false for a "Yes" draft below the Level + HLO floor (missing toc_result_id)', async () => {
+        await selectSps(['SP01'], TOC_CATALOG_CAPSHARING_FIXTURE);
+        component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: null, indicator_id: null, quantitative_contribution: null });
+
+        expect(component.canSave()).toBe(false);
+      });
+
+      // R-BIL-112 AC.3 — quantitative_contribution is no longer required for
+      // saveability once an indicator is chosen.
+      it('canSave is true when only quantitative contribution is missing (indicator chosen)', async () => {
         await selectSps(['SP01'], TOC_CATALOG_CAPSHARING_FIXTURE);
         component.onDraftChange({
           sp_code: 'SP01',
@@ -1555,7 +1653,7 @@ describe('PoolFundingAlignmentComponent', () => {
           quantitative_contribution: null
         });
 
-        expect(component.canSave()).toBe(false);
+        expect(component.canSave()).toBe(true);
       });
 
       it('canSave is true when the "Yes" draft is complete with contribution 0', async () => {

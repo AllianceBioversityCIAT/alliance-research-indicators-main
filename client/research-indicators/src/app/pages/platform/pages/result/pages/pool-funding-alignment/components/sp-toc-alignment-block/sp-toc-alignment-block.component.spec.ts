@@ -1032,6 +1032,70 @@ describe('SpTocAlignmentBlockComponent', () => {
     });
   });
 
+  // R-BIL-114 — client scenario "Partial row renders without error". T-09.
+  // The draft below is exactly what `draftsFromSaved`
+  // (shared/services/bilateral.service.ts:347-356) produces when it reloads a
+  // SAVED partial alignment (Level + HLO, no indicator) — as opposed to the
+  // mid-entry partial state R-BIL-116 AC.3 already pins above. Since this pure
+  // block renders from `draft` alone (D-C1-6, no template change), the same
+  // shape proves the reload case too — this suite adds the assertions that
+  // AC.3 did not: Level/HLO actually render the saved values, the indicator
+  // select renders present-but-unselected (not a valid selection), and no
+  // literal null/undefined/NaN leaks into the rendered text anywhere in the
+  // block.
+  describe('R-BIL-114 — saved partial row reloads and renders without error', () => {
+    function reloadedPartialDraft(): SpAlignmentDraft {
+      return emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null });
+    }
+
+    it('Level and HLO render the saved values; the indicator select renders but nothing is selected', async () => {
+      setup({ catalog: SP01_CAT, draft: reloadedPartialDraft() });
+      fixture.detectChanges();
+      // NgModel's initial view→model write for `[ngModel]` runs inside a
+      // resolved-promise microtask (Angular forms internals), so the
+      // PrimeNG select's rendered label is not populated until a stable tick
+      // after the first `detectChanges()` — a second synchronous pass isn't
+      // enough. Confirmed by direct inspection of `Select`'s CVA state.
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const levelSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-level-SP01"]') as HTMLElement | null;
+      const hloSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-hlo-SP01"]') as HTMLElement | null;
+      const indicatorSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-indicator-SP01"]') as HTMLElement | null;
+
+      expect(levelSelect).not.toBeNull();
+      expect(hloSelect).not.toBeNull();
+      // The indicator field renders — gated only by `toc_result_id !== null`
+      // (:209) — even though nothing is selected yet (AC-06.2 by construction).
+      expect(indicatorSelect).not.toBeNull();
+
+      expect(levelSelect!.querySelector('.p-select-label')?.textContent?.trim()).toBe('High Level Output');
+      expect(hloSelect!.querySelector('.p-select-label')?.textContent?.trim()).toContain('HLO1.AOW1.IO1 Steer to impact');
+      // Placeholder text, not a stale/invalid selection — the empty indicator
+      // is not presented as a valid value.
+      expect(indicatorSelect!.querySelector('.p-select-label')?.textContent?.trim()).toBe('Select an indicator');
+      expect(component.selectedIndicator()).toBeNull();
+    });
+
+    it('unit, target, and the contribution panel do not render (gated behind selectedIndicator, R-BIL-116 AC.3)', () => {
+      setup({ catalog: SP01_CAT, draft: reloadedPartialDraft() });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-target-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-input-SP01"]')).toBeNull();
+    });
+
+    it('no literal null, undefined, or NaN text renders anywhere in the block', () => {
+      setup({ catalog: SP01_CAT, draft: reloadedPartialDraft() });
+      fixture.detectChanges();
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).not.toMatch(/\bnull\b/i);
+      expect(text).not.toMatch(/\bundefined\b/i);
+      expect(text).not.toMatch(/\bNaN\b/i);
+    });
+  });
+
   // --- disabled / version-locked (AC-09.1 block parts) -----------------------
   describe('disabled / version-locked rendering', () => {
     it('renders the current draft values read-only when disabled', () => {

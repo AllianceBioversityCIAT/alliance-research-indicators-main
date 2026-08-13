@@ -219,11 +219,14 @@ export default class PoolFundingAlignmentComponent {
     const form = this.formData();
     const hasMinimalSelection = form.has_contribution === false || form.selected_sps.length >= 1;
     if (!this.editable() || this.isReadOnly() || !this.isDirty() || !hasMinimalSelection) return false;
-    // Block save until every RENDERED block is answered + complete: the per-SP
-    // ToC question is required (*), so unanswered (null) blocks too, as does an
-    // incomplete "Yes" (D-9). No blocks render when allowed_levels is empty
+    // Block save until every RENDERED block is answered: the per-SP ToC question
+    // is required (*), so unanswered (null) blocks too, as does a "Yes" below the
+    // Level + HLO floor (R-BIL-112 AC.1-4). A "Yes" carrying Level + HLO is
+    // saveable even without an indicator (the completeness half of this gate was
+    // reverted — D-C1-4). No blocks render when allowed_levels is empty
     // (AC-04.3), so this gate is skipped then.
-    // @sdd-spec docs/specs/archive/2026-06-17-bilateral-module--toc-mapping-save-gating-ux (refines OQ-UX-3)
+    // @sdd-spec docs/specs/bilateral/toc-optional-mapping/design.md §8 (D-C1-4 — the archived
+    // save-gating-ux spec this line used to cite never existed under any name; see Finding 1)
     if (this.showHloSection() && this.showTocBlocks() && !this.versionLocked()) {
       for (const sp of form.selected_sps) {
         const draft = form.toc_drafts.find(d => d.sp_code === sp.official_code);
@@ -333,7 +336,8 @@ export default class PoolFundingAlignmentComponent {
   // AC-02.2/02.3 (D-6/D-6a) — reconcile the per-SP draft array: append empty drafts
   // for newly-added SPs; for a removed SP that holds a saved/in-progress alignment,
   // re-select it and ask the house destructive-confirm before applying the removal.
-  // @sdd-spec docs/specs/bilateral-module/toc-mapping-save-gating-ux
+  // @sdd-spec docs/specs/bilateral/toc-optional-mapping/design.md §14 OQ-C1-5 (this path
+  // never existed under any prefix; see Finding 1 — the rationale survives only in comments)
   // Non-re-entrant reconcile: the multiselect emits selectEvent *inside* its own
   // formData.update() whose outer `return { ...current }` would clobber a nested
   // reconcile write. Defer reconcileDrafts to after that update settles so the
@@ -440,7 +444,8 @@ export default class PoolFundingAlignmentComponent {
   }
 
   // T-BIL-TM2-04 — replace an SP's draft immutably (block never mutates inputs).
-  // @sdd-spec docs/specs/bilateral-module/toc-mapping-save-gating-ux
+  // @sdd-spec docs/specs/bilateral/toc-optional-mapping/design.md §14 OQ-C1-5 (this path
+  // never existed under any prefix; see Finding 1 — the rationale survives only in comments)
   // Upsert (insert-or-replace): if the SP's draft entry is momentarily absent
   // (e.g. selection reconcile not yet settled), append it instead of dropping the
   // answer — guarantees a "Yes"/edit is always recorded (REQ-BIL-SGU-01/02).
@@ -674,17 +679,19 @@ export default class PoolFundingAlignmentComponent {
   }
 
   // The per-SP ToC question is required (*), so a rendered draft is saveable only
-  // once answered: unanswered (null) blocks; "No" is complete; "Yes" needs the full
-  // cascade (D-9). Refines OQ-UX-3 (unanswered was previously treated as non-blocking).
+  // once answered: unanswered (null) blocks; "No" is complete; "Yes" needs at
+  // least Level + HLO — the floor (R-BIL-112 AC.1-3, A-1). `indicator_id` is free;
+  // `quantitative_contribution` is free but must be `>= 0` when supplied. Refines
+  // OQ-UX-3 (unanswered was previously treated as non-blocking); the completeness
+  // half of the former gate (requiring the full cascade) was reverted (D-C1-4) —
+  // see `writeDtoFromDrafts` (bilateral.service.ts) for the paired payload change.
   private isDraftSaveable(draft: SpAlignmentDraft): boolean {
     if (draft.aligns_with_toc === null) return false; // unanswered → required, blocks save
     if (draft.aligns_with_toc === false) return true; // "No" is a complete answer
     return (
       draft.level !== null &&
       draft.toc_result_id !== null &&
-      draft.indicator_id !== null &&
-      draft.quantitative_contribution !== null &&
-      draft.quantitative_contribution >= 0
+      (draft.quantitative_contribution === null || draft.quantitative_contribution >= 0)
     );
   }
 
