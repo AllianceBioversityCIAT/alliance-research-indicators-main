@@ -1406,3 +1406,51 @@ invalidates the package's four `must_be_zero` assertions. Whoever runs the manua
 **before** T-06 reaches DEV, or re-scope them first.
 
 ---
+
+### 📍 Environment topology — corrected by the user, 2026-08-13
+
+**Correction to a Leader error.** Earlier briefs and chat described the target database as
+*"MELIA-DEV (AWS, us-east-1)"*. **That was wrong.** It was inferred from the AWS profile shown in the
+user's **shell prompt** — the terminal's context, not this project's environment — and then repeated
+as fact. The string never reached any committed file or commit body (swept and confirmed), so the
+audit trail is clean of it; the error lived only in transient inter-agent briefs and chat.
+
+**The actual topology, per the user:**
+
+| Branch | Role | Where it runs |
+| --- | --- | --- |
+| `dev` | **testing** | **On-premise Alliance environment** |
+| `staging` | staging | — |
+| `main` | **production** | **Corporate AWS account** |
+
+**Deployment model:** everything is triggered by **DevOps on pushes to these branches**. Nothing is
+deployed by hand from a developer machine — which is the same constraint recorded throughout T-02
+above, now with the correct topology behind it.
+
+**What this changes for T-02, concretely:**
+
+- The manual probe package would run against the **on-premise Alliance `dev` environment**, not an
+  AWS RDS instance. Access and scheduling are a **DevOps/on-prem** question, not an AWS-console one.
+- **"Shared DEV" is still exactly right** — the caution throughout this entry stands unchanged. If
+  anything it hardens: an on-premise shared testing environment is the one every developer on this
+  project is pointed at.
+- The **⏳ PRECONDITION** stands unchanged: the probes must run **before T-06 reaches `dev`**, since
+  T-06 writes `sp_role` and invalidates four `must_be_zero` assertions.
+- **T-13's automated path is more attractive under this model, not less.** It runs against the
+  `TEST` datasource (`ARI_TEST_MYSQL_*`) inside the test suite, so it needs no on-prem access, no
+  DevOps scheduling window, and no branch promotion — and it re-runs on every future change instead
+  of once.
+
+**Bearing on RB-4 (`tasks.md` §7, the release constraint).** RB-4 requires PR 2b (server enforcement)
+and PR 3 (client) to ship **in the same release**. Under branch-driven promotion that means the same
+branch promotion — they must reach `dev`, then `staging`, then `main` **together**. A server that
+requires `primary_sp_code` promoted ahead of the client that sends it breaks every save of this
+section in whichever environment received it first. Recorded here because the mechanism (branch
+promotion, DevOps-triggered) is now explicit where RB-4 states only the intent.
+
+**Leader note on the error itself:** the fix is not just the correction. It is that an environment
+fact inferred from a shell prompt should have been stated as an inference and checked, not asserted.
+`docs/infrastructure.md` has **no `## Local Environment` section** — had one existed, the topology
+would have been read rather than guessed. Recommending `/akili-constitution` Step 6B after this run.
+
+---
