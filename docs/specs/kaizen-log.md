@@ -11,10 +11,36 @@ Continuous-improvement record across AKILI-SPECS specs. One entry per archived s
 | KZ-001 | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion. | **High** | 4 | Product | proposed |
 | KZ-002 | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives*. | **High** | 3 | Product | proposed |
 | KZ-003 | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean. | Medium | 1 | Product | proposed |
+| KZ-004 | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands. | Medium | 1 | Product + Methodology | proposed |
 
 ---
 
 ## Entries
+
+### 2026-08-13 — `bugfix/oicr-lever-dropdowns`
+
+**Outcome:** delivered, tester-validated (user-confirmed). Bug Mode red-before observation waived under explicit user mandate — repo had no `node_modules` during execution; functional tester validated afterward.
+
+#### Measure
+
+| Signal | Count | Source |
+| --- | --- | --- |
+| Tasks executed | 1 (T-01) | tasks.md |
+| Reviewer FAIL / rework cycles | 0 (in-session) | n/a — informal execute | 
+| HALTs / FATAL_FAILs | 0 | n/a |
+| Pivot records | 0 | n/a |
+| PRODUCT_BUGs | 0 | n/a |
+| Judgment Day severe findings | 0 | n/a |
+| Verification-gate waivers | 1 (red-before skipped — no node_modules) | tasks.md Execution Note |
+| Validation FAIL / WARN | 0 / 2 (absent formal reports, user-validated) | archive-summary.md W-1/W-2 |
+
+#### Lessons
+
+- **KZ-004 — Bug Mode ran without the stack's verification prerequisites installed.** (Product + Methodology, Medium)
+  - Root cause: the worktree had no `node_modules` when `/akili-execute` ran, so the mandatory Bug-Mode red-before observation and the full-suite green-after gate could not be run. The fix was applied blind under explicit user mandate; the red-before evidence is non-recoverable post-fix.
+  - Evidence: `tasks.md` Execution Note (waiver under user mandate 2026-08-13); `archive-summary.md` W-1.
+  - Standardization (Product): add one line to `AGENTS.md` Working Conventions — *"Before any verification gate (`npm test` / `npm run lint`), confirm `node_modules` is installed in the target package; a worktree without deps forces a Bug-Mode red-before/green-after waiver."* → **Deferred (Medium severity, no High — apply on next spec or on user approval).**
+  - Standardization (Methodology): propose upstream that `/akili-execute` (and `/akili-specify`'s testing strategy) pre-flight-check the verification command's prerequisites and surface the gap **before** the fix lands, so the red observation is never skipped post-hoc. → **Recorded for upstreaming to the AKILI methodology repository.**
 
 ### 2026-07-28 — `results-center/external-results-readonly-view`
 
