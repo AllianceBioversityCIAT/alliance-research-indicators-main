@@ -14,8 +14,10 @@ keep it at 10 rows or fewer.
 | KZ-004 | A fixture whose N units are built from identical defaults cannot distinguish per-unit scoping from a batch-wide bug. Vary at least one discriminating field per unit. | results/capdev-bulk-upload-notification | **High** | Product + Methodology | `docs/specs/general-setup/task.md` §5 | **Applied** |
 | KZ-005 | A rule that lives only in a test is a requirement gap, not coverage. Escalate it as an open decision; never let the test stand as the rule. | results/capdev-bulk-upload-notification | **High** | Product + Methodology | `docs/specs/general-setup/requirements.md` §3 | **Applied** |
 | KZ-006 | Sweep the claim, not the citation. A correction's grep pattern must come from the claim being corrected (`/v1`), not the citation that surfaced it (`api/v1`). | results/capdev-bulk-upload-notification | Medium | Product + Methodology | `docs/specs/general-setup/requirements.md` §3 | **Applied** |
-| KZ-001 | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion. | results-center/external-results-readonly-view | **High** (recurrence 4) | Product | `client/research-indicators/src/CLAUDE.md` | **Applied 2026-08-11** |
-| KZ-002 | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives*. | results-center/external-results-readonly-view | **High** (recurrence 3) | Product | `docs/specs/general-setup/requirements.md` §1 | **Applied 2026-08-11** |
+| KZ-001 | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion. | results-center/external-results-readonly-view · **url-filters** | **High** (recurrence **5**) | Product | `client/research-indicators/src/CLAUDE.md` | **Applied 2026-08-11** |
+| KZ-002 | Enumerate by *what renders*, not by *where the feature lives* — **and this reaches inside a component: two controls writing two different state keys are two filters, however the design doc names them.** | results-center/external-results-readonly-view · **url-filters** | **High** (recurrence **4**) | Product | `docs/specs/general-setup/requirements.md` §1 | **Applied 2026-08-11, widened 2026-08-13** |
+| KZ-007 | Exercise the feature in the running product **before** the validation verdict, not after. Automated gates verify the system against the spec's own description of itself; only a human at the screen can falsify that description. | results-center/url-filters | **High** | Product + Methodology | `docs/specs/general-setup/task.md` §8 | **Applied 2026-08-13** |
+| KZ-008 | A re-baseline must correct the **basis**, not just the total. A corrected sum carrying an uncorrected per-item estimate breaches again at the next measurement. | results-center/url-filters | Medium | **Methodology** | — *(upstream to AKILI; the template has no budget section to edit)* | **Recorded 2026-08-13** |
 | KZ-003 | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean. | results-center/external-results-readonly-view | Medium | Product | `client/research-indicators/src/CLAUDE.md` | **Applied 2026-08-11** |
 
 > **KZ-001 and KZ-004 are the same family, deliberately kept separate.** KZ-001 is about a **double's fidelity** — the substrate cannot express the behavior. KZ-004 is about a **fixture's discriminating power** — the substrate is fine, but the data cannot tell a correct implementation from a broken one. Both end in an assertion that could not have failed. **If a third variant appears, merge them into one lesson: *prove the test can fail*.**
@@ -23,6 +25,60 @@ keep it at 10 rows or fewer.
 ---
 
 ## Entries
+
+### 2026-08-13 — `results-center/url-filters`
+
+**Outcome:** delivered, archived. 13/13 tasks. The defect that mattered most was found by a human, after every automated gate had passed.
+
+#### Measure
+
+| Signal | Value | Source |
+| --- | --- | --- |
+| Tasks executed | **13** (12 planned + T-13 added post-validation) | `tasks.md` |
+| Reviewer FAIL rework attempts | **3** — T-08, T-11, T-12, one round each (budget 3) | `execution.md` |
+| HALTs / FATAL_FAILs | **0** | `execution.md` |
+| Pivots | **1** — T-11 → D-URL-17 | `execution.md` §9 |
+| PRODUCT_BUGs | n/a — TEST phase skipped by user decision | — |
+| Judgment-day severe findings | Round 1: **4 confirmed severe + 4 suspects**. Round 2: **4 regressions introduced by round 1's own fixes** | `judgment.md`, `design.md` §12 |
+| Validation FAIL / WARN | **1 / 5** — the FAIL found *after* the report first returned PASS | `validation-report.md` |
+| **Defects found by manual product use, post-validation** | **1 (F-1)** | `execution.md` §12 |
+| Budget re-baselines | **3 formal + 1 unrecorded projection miss**; final 5,810 vs ~4,600 (**+26%**) | `design.md` §13 |
+| Live production defects surfaced, out of scope | **2** — both routed to their own specs | `execution.md` advisories |
+
+**Not a clean run, and the interesting waste was not rework.** Three rework rounds out of thirteen tasks is healthy. The MUDA here was **verification that could not see the product**: an enormous, genuinely rigorous test mass validating the system against its own description.
+
+#### Learn
+
+**KZ-007 — Exercise the running product *before* the validation verdict, not after. (High, Product + Methodology)**
+
+- *Root cause (5W1H).* The sidebar's Indicator multiselect (`indicator-codes-filter`) had **no URL parameter at all** — it filtered the table, rendered a chip, and vanished on reload. It survived **6,479 passing tests, mutation testing across four shared consumers, two independent reviewer lenses, and a full `/akili-validate` audit**, then fell in minutes to the product owner opening the page. *Why did every gate miss it?* Each verified the implementation against the spec's enumeration — "six parameters", six tests, one per parameter. **No automated gate can falsify the enumeration itself.** The `/akili-validate` pass checked a traceability table against itself, which is the same defect class as the tests it audits.
+- *Evidence:* `execution.md` §12; `validation-report.md` §6 → F-1 (verdict revised after being proven wrong); the AC.1 test named `'applies, changes and clears the indicator **tab** filter'` discharging an AC whose text says *sidebar*.
+- *The sharpest detail:* D6's manual check was written into `requirements.md` §8 as a **substitute control for an acknowledged coverage gap** — and scheduled as the last item before archive. It turned out to be the only gate that could see the product, and it ran after the verdict it should have informed.
+- *Standardization:* one line in `docs/specs/general-setup/task.md` §8. → **Applied 2026-08-13 (user-approved)**
+- *Upstream:* `/akili-validate` declares archive-readiness without ever requiring the feature be exercised. Recommend a manual-pass gate in the command itself.
+
+**KZ-002 — widened, recurrence 4. (High, Product)**
+
+- *Root cause:* the same enumeration failure one level down. KZ-002 already said *enumerate by what renders, not by where the feature lives* — applied to **components on a route**. Here both indicator filters live in **one component**: a tab strip (`indicator-codes-tabs`) and a sidebar multiselect (`indicator-codes-filter`), two controls on two wire keys, treated as one filter throughout requirements, design and tests.
+- *Evidence:* `design.md` §7.2's R2-3 blockquote — correct about the read path, never followed through to the write path; `requirements.md` R-RCU-001 "Six parameters".
+- *Standardization:* widened the existing rule at `docs/specs/general-setup/requirements.md` §1 rather than adding a new lesson. → **Applied 2026-08-13 (user-approved)**
+
+**KZ-008 — A re-baseline must correct the *basis*, not just the total. (Medium, Methodology)**
+
+- *Root cause:* this spec's LOC budget moved ~1000 → ~3200 → ~4600 → **5,810 actual**, every time because a corrected *total* was built on an uncorrected *per-item* estimate. Re-baseline #1 carried a per-task average drawn from a three-task sample dominated by two pure-unit tasks. Re-baseline #2 diagnosed exactly that — and then **repeated it inside its own note**, projecting ~5,100 on a T-12 estimate of ~200 that landed at 607.
+- *Evidence:* `design.md` §13 → both re-baseline records + the final-measured note; `execution.md` §8, §11.
+- *Note:* the two budget dimensions that measure **scope** — task count (12) and review rounds (3) — never moved in any revision. Only the estimate did, four times. That is an estimation-process defect, not scope creep.
+- *Standardization:* **none local** — the `general-setup` templates carry no budget section, and adding one exceeds the 1–3 line rule. Recorded for upstream to the AKILI methodology repo.
+
+#### Standardize
+
+| Lesson | Edit | Status |
+| --- | --- | --- |
+| KZ-007 | `docs/specs/general-setup/task.md` §8 — manual product pass precedes the validation verdict | ✅ Applied |
+| KZ-002 | `docs/specs/general-setup/requirements.md` §1 — enumeration reaches inside a component | ✅ Applied (widened) |
+| KZ-008 | — | Recorded for upstream |
+
+> **KZ-001 incremented to recurrence 5** without a new lesson: T-06's overridden-template harness returned a false green that only T-11's real-render harness could expose — *found by the very task written to end the pattern*. The KZ-001/KZ-004 merge trigger is **not** fired: F-1 is an enumeration failure (KZ-002's family), not a test that could not fail.
 
 ### 2026-08-11 — `results/capdev-bulk-upload-notification`
 

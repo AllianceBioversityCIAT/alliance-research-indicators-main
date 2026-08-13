@@ -34,7 +34,7 @@ A short (≤ 200 words) statement of:
 
 Do NOT restate the PRD. Link to it.
 
-**Enumerate the affected surface by *what renders on the route*, not by the feature folder** — include the shared shell and shared field components. *(Kaizen KZ-002)*
+**Enumerate the affected surface by *what renders on the route*, not by the feature folder** — include the shared shell and shared field components. **This reaches inside a single component too: two controls writing two different state keys are two filters, however the design doc names them.** *(Kaizen KZ-002, recurrence 4)*
 
 ---
 

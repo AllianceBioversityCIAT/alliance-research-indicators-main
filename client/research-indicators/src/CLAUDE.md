@@ -135,6 +135,7 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - **Forms**: reactive forms; wrapped PrimeNG inputs from `styles/custom-fields.scss` & `styles/custom-prime-force-styles.scss` — not raw PrimeNG controls.
 - **Colors & spacing**: token utility classes (`.abc-*`, `.atc-*`, `.rs-*`, `.fs-*`) or CSS variables (`var(--ac-*)`). **No hex literals in component code.**
 - **Dark mode**: rely on tokens — never branch on `isDarkMode()` for color decisions.
+- **URL-addressable filter state**: where a screen's filters are shareable via the query string, the `URL ⇄ state` mapping lives in a **pure codec module** beside the feature — `pages/platform/pages/results-center/url/` is the reference implementation (frozen slug vocabulary + `parse`/`serialize`; no DI, no router, no signals). The **component** owns reading and writing it, never a `providedIn: 'root'` service, which would rewrite the address bar of every other route that injects the same singleton. Vocabularies are frozen constants, never derived from display names. *(Spec: `docs/specs/archive/2026-08-13-results-center--url-filters`; the durable contract is in [`../../../docs/ux-ui/design.md`](../../../docs/ux-ui/design.md) §12.2.)*
 - **i18n**: not yet wired. Don't add a parallel i18n mechanism — file an open question instead.
 - **Strict TS**: `strict`, `noImplicitOverride`, `noPropertyAccessFromIndexSignature`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `strictTemplates`. Don't loosen these in `tsconfig.json`.
 

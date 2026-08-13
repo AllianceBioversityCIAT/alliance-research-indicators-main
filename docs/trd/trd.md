@@ -367,7 +367,7 @@ The client mirrors these so users don't hit surprises mid-flow (backend still wi
 | Reactive streams (HTTP/WS) | **RxJS** | services + interceptors |
 | Local component state | Signals (preferred) or component fields | inside components |
 | Persisted state | `localStorage` (tokens, theme) via cache services | `cache.service.ts`, `dark-mode.service.ts` |
-| URL state | Angular Router (params, query params) | `app.routes.ts` |
+| URL state | Angular Router (params, query params) | `app.routes.ts`; for **shareable filter state**, a pure `parse`/`serialize` codec beside the feature (reference: `results-center/url/`) read and written by the **component** — never by a `providedIn: 'root'` service, which would rewrite the address bar of every route sharing that singleton |
 
 **No NgRx** — service-per-domain + signals is the established pattern. **No two-way binding** for cross-cutting state; use signals + setters.
 

@@ -137,6 +137,7 @@ Append-only table for the lifetime of the spec.
 
 The spec is complete when:
 - [ ] All `T-<NN>` tasks are `done`.
+- [ ] **Someone has exercised the feature in the running product, BEFORE `/akili-validate` issues a verdict — not after.** Automated gates verify the system against the spec's own description of itself; only a human at the screen can falsify that description. Where a manual gate is named as a substitute control for a known coverage gap, it is the first check, not the last. *(Kaizen KZ-007)*
 - [ ] All requirement-level ACs are checked.
 - [ ] Coverage thresholds are still green.
 - [ ] Swagger documents every new endpoint.
