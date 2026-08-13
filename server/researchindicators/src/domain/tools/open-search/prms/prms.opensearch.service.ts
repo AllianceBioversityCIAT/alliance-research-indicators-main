@@ -587,12 +587,6 @@ export class PrmsOpenSearchService
     }
     innovationDev.institution_types = institutionTypes;
 
-    if (demandTexts.size > 0) {
-      const outcome = [...demandTexts].join('\n');
-      innovationDev.expected_outcome = outcome;
-      innovationDev.intended_beneficiaries_description = outcome;
-    }
-
     innovationDev.no_sex_age_disaggregation =
       actors.length > 0 &&
       actors.every((actor) => actor.sex_age_disaggregation_not_apply === true);
