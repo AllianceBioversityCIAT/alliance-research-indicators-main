@@ -336,7 +336,7 @@ None. No entity, column, index, migration or OpenSearch field changes. The slug 
 
 None. `ResultFilter` wire keys (`indicator-codes-tabs`, `contract-codes`, `status-codes`, `lever-codes`, `years`, `platform-code`, `create-user-codes`) are unchanged. This spec adds a **URL layer above** the existing filter state, not a new server contract.
 
-The only server change is the string built by `buildStarLink` / `CAPDEV_INDICATOR_TAB_QUERY` in `capdev-bulk-notification.service.ts` — a value, not an endpoint.
+The only server change is the string built by `buildStarLink` in `capdev-bulk-notification.service.ts` — a value, not an endpoint. *(This sentence also named `CAPDEV_INDICATOR_TAB_QUERY`; **T-10 deleted that constant**, and a repository-wide grep now finds it nowhere in `server/…/src`. Present-tense citation struck at `/akili-validate` 2026-08-13.)*
 
 ---
 
