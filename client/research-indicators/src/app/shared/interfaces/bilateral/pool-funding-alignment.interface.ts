@@ -3,11 +3,30 @@ export interface AlignmentLever {
   lever_name: string;
 }
 
+/**
+ * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127, R-BIL-126
+ * Single source of truth for the SP role literal union, mirroring the backend's
+ * `SpRole` (`server/.../bilateral/dto/sp-role.type.ts`). `null` on the wire means
+ * "role not yet chosen" — reachable only on legacy rows written before the
+ * primary/contributing migration (R-BIL-126); never produced by a fresh write.
+ */
+export type SpRole = 'PRIMARY' | 'CONTRIBUTING';
+
 export interface AlignmentScienceProgram {
   code: string;
   name: string;
   category?: string | null;
   color?: string | null;
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127, R-BIL-126
+  // Always present on the wire (backend `SelectedScienceProgramResponse.role`,
+  // required-but-nullable — `null` only on legacy rows, R-BIL-126). Declared
+  // OPTIONAL here (not required) even though the backend always sends it:
+  // required would force every existing fixture across the 81KB client spec
+  // corpus that constructs `{ code, name }` literals to add `role`, which is
+  // T-16's job, not T-14's (scope boundary, tasks.md). Optional is
+  // behaviorally identical for every read site in this component —
+  // `sp.role === 'PRIMARY'` treats a missing role exactly like an absent one.
+  role?: SpRole | null;
 }
 
 export interface AlignmentResponse {
@@ -27,6 +46,13 @@ export interface UpdatePoolFundingAlignmentDto {
   has_contribution: boolean;
   sp_codes?: string[];
   lever_codes?: string[];
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
+  // Science Program code designated as Primary. Required by the server when
+  // has_contribution is true (400 errors.primary_sp.code = "primary_sp_required"
+  // when absent); ignored when has_contribution is false. The client validates
+  // this proactively in canSave() and must not rely on the server 400 for it
+  // (design.md §6.1) — see PoolFundingAlignmentComponent.canSave().
+  primary_sp_code?: string;
   justification?: string;
   toc_alignments?: TocAlignmentWriteDto[];
 }

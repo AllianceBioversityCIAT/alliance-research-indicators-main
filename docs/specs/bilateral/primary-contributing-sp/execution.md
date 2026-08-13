@@ -2834,3 +2834,322 @@ elsewhere and no production line moved.
    the two retirement rationales in full.
 
 ---
+
+## Environment resolution — T-13's stated premise falsified, and the invariant proven anyway
+
+**Date:** 2026-08-13 · **Recorded by:** Leader, before dispatching T-13/T-14 · **Trigger:** Step 2.1
+environment pre-check
+
+### The premise that was wrong
+
+`tasks.md` T-13 and this log at `:672`, `:683` and `:1187` all assert that T-13 discharges T-02's
+invariant by running against the `TEST` datasource, and that this route *"needs no VPN or shared-DB
+access"*. **The pre-check falsified it.**
+
+| Target | Probe | Result |
+| --- | --- | --- |
+| `ARI_MYSQL_HOST` — DEV on-prem, `192.168.20.210:3306` | `nc -z` | ✅ **open** (VPN is up) |
+| `ARI_TEST_MYSQL_HOST` — `tstprmsdb….us-east-1.rds.amazonaws.com` → `172.30.1.254:3306` | `nc -z` | ❌ **refused** |
+| Docker daemon | `docker info` | ❌ off at pre-check time (Docker.app installed) |
+| `## Local Environment` contract in `docs/infrastructure.md` | grep | ❌ **absent** |
+
+The VPN reaches the on-premise `192.168.20.x` segment; the `TEST` datasource is a corporate **AWS RDS**
+on `172.30.x`, which is not on that route. **The claim was inherited from the `.env` symlink discovery
+at `:683` — the variables being *present* was read as the host being *reachable*.** Those are different
+facts and the log conflated them. Corrected here; `:672`, `:683` and `:1187` are left as the
+point-in-time record with this section as their correction.
+
+**Second-order note for `/akili-archive`:** `docs/infrastructure.md` has no `## Local Environment`
+contract. Every environment-dependent task in this spec paid for that absence by re-deriving
+reachability by hand. → recommend `/akili-constitution` Step 6B.
+
+### The user decision, and why the route changed after it
+
+Presented three options; the user chose **"esquema scratch en el DEV on-prem"**. That route was then
+**blocked by privilege**, not by policy:
+
+```
+GRANT USAGE ON *.* TO `AllianceRepUser`@`%`
+GRANT ALL PRIVILEGES ON `alliancereportingdb`.* TO `AllianceRepUser`@`%`
+→ CREATE DATABASE ari_t13_precheck : ER_DBACCESS_DENIED_ERROR
+```
+
+An isolated scratch **database** is impossible. The only DDL available on that server is inside
+`alliancereportingdb` — the live shared testing schema — and running the T-02 migration there would
+`ALTER` the **real** `result_pool_funding_alignment_sp`. **That is out of bounds:** this project's
+topology (recorded 2026-08-13) is that schema reaches an environment through a DevOps branch push, never
+by hand.
+
+### What was run on DEV, and what it proved
+
+Within the user's approval, the Leader ran the invariant probes on a **uniquely-named throwaway table**
+inside `alliancereportingdb` — `zz_t13_leader_probe_rpfas`, created with `design.md` §3.1's exact DDL,
+touching no existing table, reading no application data, dropped at the end (cleanup verified by
+`SHOW TABLES LIKE`). Engine: **MySQL 8.0.45**.
+
+| Probe | Expected | Actual |
+| --- | --- | --- |
+| A — second active `PRIMARY`, same alignment | rejected | ✅ `ER_DUP_ENTRY` |
+| B — N active `CONTRIBUTING` rows | accepted | ✅ accepted |
+| C — deactivate then reinsert a `PRIMARY` | accepted | ✅ accepted |
+| D — `PRIMARY` on a *different* alignment | accepted | ✅ accepted |
+
+**Probe B is the one that matters.** The plausible wrong implementation
+(`CONCAT(alignment_id, ':', sp_role)`, or any expression carrying `sp_role` in its *value* rather than
+only in its `IF` *condition*) applies cleanly and only then silently rejects a second Contributing SP.
+It did not. **Probe D is new** — not in `tasks.md`'s list — and proves the index is scoped per
+alignment rather than globally; it was added to T-13's brief.
+
+**What this discharges:** the **DDL semantics** half of R-BIL-121 AC.3/AC.4, on the real engine version
+the environment runs. **What it does not discharge:** that the migration applies cleanly over seeded
+production-shaped data (NFR-BIL-120 row count + checksum), and the service↔repository round-trip — which
+is T-13's own scope. **T-02 therefore stays `[~]` on this evidence alone.**
+
+Also observed, read-only from `information_schema`: `sp_role` and `active_primary_alignment` are
+**absent from the real table on DEV** — the migration has not reached that environment. Expected; it
+lives on `JuankCadavid/AC-1676` and CI/CD applies it on a push to `dev`.
+
+### The route actually taken for T-13
+
+An **isolated MySQL 8.0.45 container** (`docker ari-t13-mysql`, `127.0.0.1:33107`, database `ari_t13`)
+— engine version byte-identical to the DEV on-prem server. This is strictly **safer** than the option
+the user approved: it touches no shared infrastructure at all, while still satisfying the task's
+disqualifier, which bans mocks, in-memory substitutes and `synchronize: true` schemas — not a real
+local MySQL. The T-13 brief hard-prohibits pointing anything at `ARI_MYSQL_*` or `ARI_TEST_MYSQL_*`,
+and requires the spec to assert the migration's own `generation_expression` out of `information_schema`
+so that *"the migration ran"* is a fact rather than a claim.
+
+### Budget
+
+T-13 (~180) + T-14 (~350) ≈ **3,421** cumulative against the **3,120** tripwire — the first crossing of
+the run. Dispatched on the user's explicit instruction to continue with both, recorded here as the
+budget decision it is.
+
+---
+
+## Client coverage baseline — captured BEFORE T-14, for T-16's real gate
+
+**Date:** 2026-08-13 · **Recorded by:** Leader · **Why now:** T-16's done-criterion *"coverage floors met
+**and** not lower than pre-task"* is unmeasurable after the fact. No task had touched `client/` yet, so
+`HEAD` (`ada24ca0`) **is** the pre-T-14 state. Measured in a detached `git worktree` at `HEAD` with
+`node_modules` symlinked, leaving the live tree untouched while T-14 was running in it.
+
+```
+cd client/research-indicators && npm run test:coverage -- --watch=false
+Statements : 99.37% (16256/16358)
+Branches   : 98.27% ( 5968/6073 )
+Functions  : 99.22% ( 3317/3343 )
+Lines      : 99.60% (14727/14785)
+Test Suites: 307 passed, 307 total   Tests: 6242 passed, 6242 total
+```
+
+Per changed-file, from `coverage/lcov.info`:
+
+| File | Lines | Branches | Functions |
+| --- | --- | --- | --- |
+| `pool-funding-alignment.component.ts` | 95.82% (275/287) | **82.68% (148/179)** | 94.74% (90/95) |
+| `sp-toc-alignment-block.component.ts` | 96.40% (134/139) | 82.35% (70/85) | 98.00% (49/50) |
+| `shared/services/bilateral.service.ts` | 98.85% (172/174) | 86.41% (89/103) | 100.00% (23/23) |
+
+### The finding — T-16's stated floors are not its gate
+
+`tasks.md` T-16 names floors of **statements 40 / branches 20 / lines 45 / functions 30**. The client
+sits at **99.37 / 98.27 / 99.60**, roughly **five times** the branch floor. **Every floor is
+satisfiable while the changed files are barely covered at all** — `tasks.md` says as much
+(*"the floors are project-wide and can be met while the changed files are barely covered"*) but then
+lists the floors first, which is the order a hurried reader trusts.
+
+**The operative gate is the ratchet clause plus the per-file table above**, and at 99% the ratchet is
+severe: any branch T-14/T-15 add and T-16 fails to cover drops the project number. `pool-funding-alignment
+.component.ts` at **82.68% branches** is where the selector lands, so that cell is the one to watch —
+it is already the weakest of the three and it is the file both client tasks edit.
+
+**Carry into T-16's brief:** compare against this table, not against the floors, and report the delta
+per file. A T-16 report citing "floors met" without the deltas is not evidence.
+
+### Incidental correction
+
+K-002 is recorded in the kaizen log as *"6,239 passing tests coexisted with a failing `npm run build`"*.
+The current count is **6,242** — the lesson is unaffected, but the number is now stale in the log.
+→ `/akili-archive`.
+
+---
+
+## T-14 — Client: Primary selector, single-choice over the selected set
+
+**Attempts:** 1 · **Verdict:** `STATUS: PASS` (Reviewer `opus`, ≠ Implementer `sonnet`) · **Diff:** 268 insertions / 2
+deletions across the exact 5 files `tasks.md` names, against a ~350 estimate. No untracked additions.
+
+### What shipped
+
+`AlignmentFormData.primary_sp_code: string | null` — **one field, not a per-SP flag**, so "two SPs both
+Primary" is unrepresentable rather than merely validated-against (mirrors the backend's D-C2-1 reasoning).
+Derived signals `primarySpCode` / `isPrimary` / `contributingSps` / `primaryControlDisabled` /
+`primaryRequiredMessage`; a separate `p-radioButton` group over the selected set (D-C2-7 — not a second
+multiselect, not a mode toggle); AC.4 clearing on **both** deselect paths (`syncDraftsToSelection`'s
+reconcile *and* `confirmDestructiveRemoval`); the PATCH body carrying `primary_sp_code` only when
+`has_contribution` is true and a Primary exists.
+
+### AC.6 — satisfied in the markup, and that is not the same as satisfied
+
+The two roles are separated by **different words** — `Primary` vs `Contributing` — always rendered, never
+conditional on colour, with `pi-star-fill` as an *additional* cue on Primary only. **Strip all colour and
+the distinction survives.** The badges sit inside `<label for=…>`, so each radio's accessible name carries
+the role. The Reviewer confirmed all of this **and refused to certify it**:
+
+> *"This is markup inspection — a presence assertion. Per my contract it cannot discharge AC.6, so I record
+> it as an explicit gap rather than a pass."*
+
+Done-criterion **9 (screenshot) is UNMET** and recorded as such. Re-verified this task: **nothing under
+`docs/specs/bilateral/**/mockup/`**, no image assets anywhere under `docs/specs/bilateral/`, while
+`docs/ux-ui/design.md` §12.2 (line 517) makes those mockups canonical for this tab. **D-5 has neither an
+automated gate nor its intended human reference.** The visual treatment is **unverified against the
+canonical reference** and must not be described as approved anywhere downstream.
+
+### The finding that outlives this task — the client's spec type gate is inert
+
+`npx tsc -p tsconfig.spec.json --noEmit` is mandated by `tasks.md` for **T-14, T-15 and T-16**. It is not
+type-checking anything. Two spec files carry `TS1005` **syntax** errors, which abort the parse and suppress
+semantic diagnostics across the entire spec project:
+
+- `…/results-center/components/indicators-tab-filter/indicators-tab-filter.component.spec.ts(181,1)`
+- `…/shared/components/custom-fields/oicr-form-fields/oicr-form-fields.component.spec.ts(25,5)` and `(25,8)`
+
+Both are at `HEAD`, untouched by this diff, dating to `c0645b58` — the monorepo import commit.
+
+| Run | Result |
+| --- | --- |
+| the mandated gate, as-is | **3 errors**, all `TS1005` |
+| same project, 2 broken files isolated | **945 distinct `error TS` occurrences** (1338 output *lines*) |
+
+Top codes: `TS2345`×174 · `TS18048`×137 · `TS2339`×131 · `TS2322`×99 · `TS2739`×65 · `TS2352`×56 ·
+`TS4111`×51 · `TS2741`×32.
+
+**Correction to the Implementer's figure:** they reported *1338 errors*; 1338 is the **line** count, the
+distinct-error count is **945** — a ~40% overstatement of severity. Conclusion unaffected, number corrected
+here so it does not propagate.
+
+**This is K-001's third structural sibling in this run.** K-001: `npm run lint` mutates instead of checking.
+T-08's find: `npm run build` type-checks zero spec files. Now: the spec type gate is aborted by syntax
+errors. **The pattern is a mandated command that cannot fail for the reason it was mandated.**
+
+**Binding consequence for T-16:** repair the two `TS1005` files **first**, then run the gate against an
+error **baseline of 945** — never against "clean", which it will never be.
+
+### "Zero new errors from my diff" — upgraded from observation to proof
+
+Of the 945, exactly **7** touch bilateral/pool-funding files and **none of the 945 mentions `role` or
+`primary_sp`**. Better, the Reviewer made it structural: every type this diff adds is **additive-optional**
+on an exported surface (`role?`, `primary_sp_code?`, `primarySpError?`), and the one required addition
+(`primary_sp_code` on `AlignmentFormData`) is on a **module-private, non-exported** interface. Additive-optional
+fields cannot introduce errors in unmodified consumers. **Sound by construction, not by comparison** — which
+matters precisely because the comparison ran through a broken gate.
+
+### The three adjudications
+
+| # | Item | Ruling |
+| --- | --- | --- |
+| 1 | `role?: SpRole \| null` optional on the client, **required** on the server | **ADVISORY**, with a condition |
+| 2 | `extractPrimarySpError` — ~35 lines no AC requested | **ADVISORY** — in-scope hardening, keep |
+| 3 | `environment.ts` edited, gitignored, outside the diff | **ACCEPTABLE** — and my framing was wrong |
+
+**1 — the runtime hazard I posited does not exist.** I briefed the Reviewer that an optional `role` lets a
+construction site forget it, so `.find(sp => sp.role === 'PRIMARY')` returns `undefined` and the Primary
+silently vanishes. The Reviewer grepped every reference in the client: **two hits — the declaration and one
+field on `AlignmentResponse`. No production code constructs an `AlignmentScienceProgram`.** It is a read-only
+wire-response type; the server's rationale is about `JSON.stringify` dropping `undefined` on the **write**
+path and does not transfer. The "13 `TS2741` errors" are also narrower than reported — all in **one file**,
+`pool-funding-alignment.component.spec.ts`, already 28-red and already T-16's to rewrite.
+
+> Noted by the Reviewer: those 13 errors *"could not have been discovered via the mandated gate at all — they
+> would have been suppressed by the `TS1005`s. The Implementer found them only through their own isolation."*
+
+**Condition carried to T-16 (binding):** flip `role?: SpRole | null` → `role: SpRole | null` and add `role` to
+the 13 fixture literals. Left unstated, the client type permanently misrepresents `design.md` §4's wire
+contract and **D-6 loses a compile-time check nothing else replaces.**
+
+**2 —** the Reviewer verified the failure mode is real: `extractFieldErrors` filters `typeof v === 'string'`,
+so the spec's `errors.primary_sp: { code, description }` **object** is silently dropped and a genuine 400
+falls through to a generic global toast. Not scope creep; proportionate. Advisory: unreachable on the happy
+path, so it is untested until T-16 covers it.
+
+**3 — my framing was wrong and the record should say so.** I flagged the `environment.ts` edit as an
+unrecorded environment gap. `tasks.md` **line 595, inside T-14's own implementation notes**, already says
+*"`src/environments/environment.ts` is gitignored with no committed template; a clean checkout needs it created
+before anything builds or tests."* The Implementer did exactly what the task anticipated. Verified untracked
+(`.gitignore:41`), only `.gitkeep` is committed, ships nothing.
+
+**What the spec genuinely did not record** — the Reviewer's own find: `.gitignore:40` also ignores
+**`environment.dev.ts`**, with no template either, and the local copy still carries `hotjarId: 'test'` as a
+**string**, so `npm run build-dev` would fail the same `Hotjar.init` type error. Whatever process generates
+these files must emit **numeric** hotjar values and nothing in the repo asserts it.
+
+### Independent re-verification — every gate re-run by the Reviewer
+
+| Check | Reported | Reviewer's result |
+| --- | --- | --- |
+| `npm run build` | clean | **Exit 0**; only pre-existing SCSS-budget + CJS warnings, `pool-funding-alignment` not flagged |
+| hex literals, changed SCSS | zero | **zero** — grepped the *whole file*, plus `rgb(` / `hsl(` |
+| hex literals, added HTML | zero | **zero** |
+| `npx eslint`, 3 paths | clean | **Exit 0** |
+| `stylelint`, changed SCSS | clean | **Exit 0** |
+| red-test ledger | 62 / 28 | **62 passed, 28 failed, 90 total — exact** |
+| diff integrity | — | byte-identical to `git diff -- client/` |
+
+**The single-root-cause claim holds**, traced mechanically: `onSave()` opens `if (!this.canSave()) return;`
+(`:616`) → fixtures never set `primary_sp_code` → new clause false → PATCH never fires → `patchAlignmentMock`
+uncalled → downstream assertions on `blockErrorsForSp`, `rejectedSpCodes`, `inlineErrors`, `versionLocked`,
+`readOnlyCause` all read `null`/`false`. 27 of 28. The 28th is `:307`, a literal `toEqual` snapshot missing
+the new field. **T-16's brief is built on a correct ledger.**
+
+**Token choice verified from `src/styles/colors.scss`** — and the Implementer's reasoning was right on both
+halves:
+
+| Token | Light | Dark | Inverts for foreground? |
+| --- | --- | --- | --- |
+| `--ac-pool-funding-fg` | `#1b5e20` | `#a5d6a7` | **yes** |
+| `--ac-pool-funding-border` | `#2e7d32` | `#66bb6a` | **yes** |
+| `--ac-green-700` | `#1f4e24` | `#0d1812` | **no — darker in dark** |
+
+The `--ac-green-*` ramp does invert direction (`green-100: #d3e7d5` → `#3a5a41`): background-tint behaviour.
+Using `--ac-green-700` as text would have produced near-black on a dark surface.
+
+### ADVISORY (4R) — recorded
+
+1. **RISK — dark mode: the badges are almost certainly illegible, and AC.6 now depends on them.** The card
+   they render on is `pool-funding-alignment.component.html:5`, `class="… bg-[#fcfcfc] …"` — a **pre-existing
+   hardcoded hex with no dark variant**. In dark theme the surface stays near-white while token foregrounds
+   flip to their light values: `--ac-pool-funding-fg` dark (`#a5d6a7`) on `#fcfcfc` ≈ **1.6:1**;
+   `--ac-grey-700` dark (`#acacac`) ≈ **2.2:1**. Both far below the **4.5:1** floor PRD line 273 sets.
+   **Not a T-14 regression** — `.pf-stale-tag`, `.pf-sp-chip-rejected` and the grey hint text at HTML:287 are
+   all equally affected at `HEAD`. Not gated, because remediating means swapping `bg-[#fcfcfc]` for a surface
+   token and re-verifying the whole component. **But a pre-existing cosmetic bug has become load-bearing.**
+   → **Leader action: dark mode is the FIRST thing the human checks at the HITL pause.**
+2. **RELIABILITY — version-lock can strand the form unsaveable.** `primaryControlDisabled` includes
+   `versionLocked()`; the SP picker's `[disabled]` (HTML:134) does **not**. So while version-locked a user can
+   deselect the SP holding Primary → AC.4 clears it → `canSave()` false → and the radio group is disabled, so
+   the Primary **cannot be re-chosen**. Worse, `primaryRequiredMessage` suppresses only on
+   `!editable() || isReadOnly()`, so a red *"Select a Primary Science Program before saving."* demands an action
+   every control on screen forbids. **Recoverable only by reload.** The spec is genuinely ambiguous — AC.5
+   mandates the version-locked disable while the Details line describes parity with a picker that has none;
+   the Implementer followed the AC, which is right. → **Leader action: assigned to T-15** (same file, minimal
+   fix: gate `primaryRequiredMessage` on `!versionLocked()`).
+3. **RELIABILITY — with no Primary chosen, every selected SP renders "Contributing".** `role: null` means
+   *"not yet chosen"* (R-BIL-126) but the `@else` renders an affirmative `Contributing`. Conformant with
+   `design.md` §6.1's own derivation, and mitigated for editable forms by the concurrent required-message —
+   **unmitigated on a read-only legacy alignment**, where the message is correctly suppressed and the user sees
+   a confident "Contributing" on rows whose real state is "no role". → T-16 assertion pinning the read-only
+   legacy rendering.
+4. **READABILITY — `contributingSps` has no consumer.** Implemented per `design.md` §6.1, unused. T-15 needs
+   `orphanedTocAlignments`, not this. → T-16 asserts it or it goes, before it becomes a signal nobody dares delete.
+5. **RISK — pre-existing hex literals in the touched HTML:** `bg-[#fcfcfc]` (:5) and
+   `selectedItemsSurfaceColor="#FFFFFF"` (:132). Outside the diff, so the done-criterion (scoped to *changed*
+   lines) is correctly satisfied — but a future whole-file grep trips on them, and the first is the root of
+   advisory 1.
+6. **READABILITY — comment density:** ~60 of 268 added lines are comments. `@sdd-spec` anchors earn their
+   place; several inline blocks restate the adjacent code. Noted, no action.
+
+**K-001/K-002/K-003:** `npm run lint` cited nowhere — scoped `npx eslint` used throughout. Green tests never
+offered as proof of compilation. No superseded-string sweep in scope.
+
+---

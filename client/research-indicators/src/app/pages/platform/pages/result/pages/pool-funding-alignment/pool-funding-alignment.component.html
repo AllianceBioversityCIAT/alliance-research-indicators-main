@@ -174,6 +174,67 @@
             }
           </section>
 
+          <!--
+            R-BIL-127 / design.md §6.3 — the Primary designation is a SEPARATE,
+            single-choice control over the already-selected set (D-C2-7): not a
+            second multiselect, not a mode toggle on app-multiselect above.
+            Renders once there is something to designate a Primary among.
+          -->
+          @if (formData().selected_sps.length >= 1) {
+            <section class="mb-6" data-testid="pf-alignment-primary-section">
+              <p id="pf-alignment-primary-question" class="label inline-block mb-2">
+                {{ PRIMARY_SP_LABEL }}<span class="text-red-500" aria-hidden="true">*</span>
+              </p>
+              <div role="radiogroup"
+                   aria-labelledby="pf-alignment-primary-question"
+                   aria-required="true"
+                   class="flex flex-col gap-2"
+                   data-testid="pf-alignment-primary-radio-group">
+                @for (sp of formData().selected_sps; track sp.official_code) {
+                  @let primarySp = findScienceProgram(sp.official_code);
+                  <div class="pf-primary-row flex items-center gap-3"
+                       [attr.data-testid]="'pf-alignment-primary-row-' + sp.official_code">
+                    <p-radioButton
+                      name="pf-alignment-primary"
+                      [inputId]="'pf-alignment-primary-' + sp.official_code"
+                      [value]="sp.official_code"
+                      [ngModel]="primarySpCode()"
+                      (ngModelChange)="onPrimaryChange($event)"
+                      [disabled]="primaryControlDisabled()"
+                      [attr.data-testid]="'pf-alignment-primary-radio-' + sp.official_code"></p-radioButton>
+                    <label [for]="'pf-alignment-primary-' + sp.official_code"
+                           class="option-label flex items-center gap-2 min-w-0 flex-wrap">
+                      <span class="truncate">
+                        <strong>{{ sp.official_code }} — {{ primarySp?.allocation ?? '—' }}%</strong> - {{ sp.name }}
+                      </span>
+                      <!--
+                        AC.6 — non-colour-only cue: a text label ("Primary"/"Contributing")
+                        always present, plus an icon on the Primary role only. Colour
+                        alone never carries the distinction (WCAG 2.1 AA 1.4.1, PRD C-4).
+                      -->
+                      @if (isPrimary(sp.official_code)) {
+                        <span class="pf-role-badge pf-role-badge--primary"
+                              [attr.data-testid]="'pf-alignment-role-primary-' + sp.official_code">
+                          <i class="pi pi-star-fill" aria-hidden="true"></i>
+                          {{ PRIMARY_ROLE_LABEL }}
+                        </span>
+                      } @else {
+                        <span class="pf-role-badge pf-role-badge--contributing"
+                              [attr.data-testid]="'pf-alignment-role-contributing-' + sp.official_code">
+                          {{ CONTRIBUTING_ROLE_LABEL }}
+                        </span>
+                      }
+                    </label>
+                  </div>
+                }
+              </div>
+              @if (primaryRequiredMessage() ?? inlineErrors()?.['primary_sp_code']; as msg) {
+                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
+                       data-testid="pf-alignment-error-primary_sp_code">{{ msg }}</small>
+              }
+            </section>
+          }
+
           @if (showHloSection() && hloSectionVisible()) {
             <section class="mb-6" data-testid="pf-alignment-hlo-section">
               <p class="label inline-block mb-3">

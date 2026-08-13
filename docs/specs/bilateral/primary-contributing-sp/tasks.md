@@ -620,7 +620,7 @@ graph TD
 - **Estimated LOC:** ~350
 - **Effort:** L
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-14). Ran **in parallel with T-13**. 268 insertions vs a ~350 estimate. **🔴 Finding that outlives this task: `npx tsc -p tsconfig.spec.json --noEmit` — the gate this file mandates for T-14, T-15 AND T-16 — is INERT.** Two pre-existing `TS1005` **syntax** errors (`indicators-tab-filter.component.spec.ts:181`, `oicr-form-fields.component.spec.ts:25`, both at `HEAD` since `c0645b58`) abort the parse and suppress semantic diagnostics across the whole spec project: the gate reports **3 errors**; isolating those two files reveals **945 distinct type errors**. **K-001's third structural sibling** — a mandated command that cannot fail for the reason it was mandated. **→ T-16 MUST repair the two files first, then gate against a 945-error baseline, never against "clean".** ⚠️ Done-criterion 9 (screenshot) **UNMET**; AC.6 is **unverified against the canonical reference** (mockups still absent — re-verified). **→ T-16 must also flip `role?: SpRole \| null` → `role:` and add `role` to the 13 fixture literals**, or D-6 loses a compile-time check nothing else replaces.
 
 ---
 

@@ -35,6 +35,11 @@ interface SelectedScienceProgram {
 interface AlignmentFormData {
   has_contribution: boolean | null;
   selected_sps: SelectedScienceProgram[];
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
+  // One field, not a per-SP flag — two SPs cannot both be Primary if there is
+  // only one slot. `null` = no Primary chosen (blocks save while
+  // has_contribution === true, R-BIL-127 AC.3).
+  primary_sp_code: string | null;
   // T-BIL-TM2-04 — per-SP ToC drafts, keyed by sp_code, order = SP selection order.
   toc_drafts: SpAlignmentDraft[];
 }
@@ -111,6 +116,15 @@ export default class PoolFundingAlignmentComponent {
   readonly INFO_BANNER = 'Select the High-Level Outputs (HLO) and related indicators this result contributes to.';
   readonly CONTRIBUTION_QUESTION = 'Does this result contribute to a Science Program or Accelerator?';
   readonly SP_PICKER_LABEL = 'Select the Science Program(s) this is related to';
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
+  // A separate, single-choice control over the already-selected set (D-C2-7) —
+  // not a second multiselect, not a mode toggle on the existing picker (design.md §6.3).
+  readonly PRIMARY_SP_LABEL = 'Select the Primary Science Program';
+  // AC.3 — inline message naming what is missing; computed client-side (primaryRequiredMessage
+  // below) so canSave() never relies on the server 400 for this.
+  readonly PRIMARY_SP_REQUIRED_MESSAGE = 'Select a Primary Science Program before saving.';
+  readonly PRIMARY_ROLE_LABEL = 'Primary';
+  readonly CONTRIBUTING_ROLE_LABEL = 'Contributing';
   readonly UNMAPPED_SP_MESSAGE =
     "This result isn't linked to a CLARISA project yet. Contact the bilateral operations team to register the project mapping.";
   readonly NO_SP_DEFINED_MESSAGE = 'The linked CLARISA project has no Science Programs defined.';
@@ -211,7 +225,45 @@ export default class PoolFundingAlignmentComponent {
   readonly formData = signal<AlignmentFormData>({
     has_contribution: null,
     selected_sps: [],
+    primary_sp_code: null,
     toc_drafts: []
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127, design.md §6.1
+  // Derived signals over the Primary designation. `contributingSps` is the
+  // selected set minus the Primary (spec-required derivation; not currently
+  // rendered directly — every selected SP is shown once in the Primary
+  // selector, with role read off `isPrimary`).
+  readonly primarySpCode = computed(() => this.formData().primary_sp_code);
+
+  isPrimary(code: string): boolean {
+    return this.primarySpCode() === code;
+  }
+
+  readonly contributingSps = computed(() => {
+    const primary = this.primarySpCode();
+    return this.formData().selected_sps.filter(sp => sp.official_code !== primary);
+  });
+
+  // AC.5 — read-only and version-locked states disable the Primary control
+  // alongside the existing picker (which itself disables on !editable() ||
+  // isReadOnly()); version-locked is an ADDITIONAL trigger specific to the
+  // Primary control (R-BIL-127 AC.5), since Primary feeds the ToC block
+  // gating (T-15) that is itself frozen during a version lock.
+  readonly primaryControlDisabled = computed(
+    () => !this.editable() || this.isReadOnly() || this.versionLocked()
+  );
+
+  // AC.3 — inline message naming what is missing, computed client-side so
+  // canSave() never relies on the server 400 for it (design.md §6.1). Shown
+  // whenever the Primary selector is visible, interactive, and unanswered —
+  // including on load for a legacy alignment with selected SPs but no role
+  // yet (R-BIL-126).
+  readonly primaryRequiredMessage = computed<string | null>(() => {
+    if (!this.editable() || this.isReadOnly()) return null;
+    const form = this.formData();
+    if (form.has_contribution !== true || form.selected_sps.length === 0) return null;
+    return form.primary_sp_code ? null : this.PRIMARY_SP_REQUIRED_MESSAGE;
   });
 
   // AR.1 — alignment edit is NOT gated by result_status.
@@ -219,6 +271,8 @@ export default class PoolFundingAlignmentComponent {
     const form = this.formData();
     const hasMinimalSelection = form.has_contribution === false || form.selected_sps.length >= 1;
     if (!this.editable() || this.isReadOnly() || !this.isDirty() || !hasMinimalSelection) return false;
+    // R-BIL-127 AC.3 — with has_contribution === true, a Primary must be chosen.
+    if (form.has_contribution === true && !form.primary_sp_code) return false;
     // Block save until every RENDERED block is answered: the per-SP ToC question
     // is required (*), so unanswered (null) blocks too, as does a "Yes" below the
     // Level + HLO floor (R-BIL-112 AC.1-4). A "Yes" carrying Level + HLO is
@@ -245,6 +299,7 @@ export default class PoolFundingAlignmentComponent {
     if (!this.sameCodeSet(server.selected_sps.map(sp => sp.official_code), form.selected_sps.map(sp => sp.official_code))) {
       return true;
     }
+    if (server.primary_sp_code !== form.primary_sp_code) return true;
     return !this.sameDraftSet(server.toc_drafts, form.toc_drafts);
   });
 
@@ -322,12 +377,30 @@ export default class PoolFundingAlignmentComponent {
       ...form,
       has_contribution: value,
       selected_sps: value === false ? [] : form.selected_sps,
+      // R-BIL-127 — no selected set, no Primary; ignored server-side anyway
+      // when has_contribution is false (R-BIL-014), but the form must not
+      // carry a stale value into a later "Yes" flip.
+      primary_sp_code: value === false ? null : form.primary_sp_code,
       toc_drafts: value === false ? [] : form.toc_drafts
     }));
     // Flipping to "No" clears the selection, so any rejected-code state is stale.
     if (value === false) {
       this.clearRejectedSpError();
       this.blockErrors.set({});
+    }
+  }
+
+  // R-BIL-127 AC.1/AC.2 — a single-choice control over the already-selected
+  // set. Choosing a new value structurally demotes the previous one: there is
+  // only one `primary_sp_code` field, so "two SPs both Primary" is
+  // unrepresentable (mirrors the backend's D-C2-1 reasoning).
+  onPrimaryChange(code: string): void {
+    this.formData.update(form => ({ ...form, primary_sp_code: code }));
+    const errors = this.inlineErrors();
+    if (errors?.['primary_sp_code']) {
+      const rest = { ...errors };
+      delete rest['primary_sp_code'];
+      this.inlineErrors.set(Object.keys(rest).length > 0 ? rest : null);
     }
   }
 
@@ -382,8 +455,17 @@ export default class PoolFundingAlignmentComponent {
     this.formData.update(form => {
       const existing = new Map(form.toc_drafts.map(d => [d.sp_code, d]));
       const toc_drafts = form.selected_sps.map(sp => existing.get(sp.official_code) ?? this.emptyDraft(sp.official_code));
-      return { ...form, toc_drafts };
+      // R-BIL-127 AC.4 — deselecting the SP holding Primary clears the
+      // Primary (and re-blocks save via canSave()'s primary_sp_code clause).
+      const primary_sp_code = this.primaryStillSelected(form.primary_sp_code, form.selected_sps)
+        ? form.primary_sp_code
+        : null;
+      return { ...form, toc_drafts, primary_sp_code };
     });
+  }
+
+  private primaryStillSelected(primarySpCode: string | null, selected: SelectedScienceProgram[]): boolean {
+    return !!primarySpCode && selected.some(sp => sp.official_code === primarySpCode);
   }
 
   // D-6a — re-select the removed SP (so its chip stays) and ask the house confirm.
@@ -414,6 +496,9 @@ export default class PoolFundingAlignmentComponent {
     this.formData.update(form => ({
       ...form,
       selected_sps: form.selected_sps.filter(sp => sp.official_code !== spCode),
+      // R-BIL-127 AC.4 — the confirmed removal is exactly the "deselecting
+      // the SP holding Primary" case; clear the Primary if it matches.
+      primary_sp_code: form.primary_sp_code === spCode ? null : form.primary_sp_code,
       toc_drafts: form.toc_drafts.filter(d => d.sp_code !== spCode)
     }));
     // Clear any block error scoped to the removed SP.
@@ -539,6 +624,10 @@ export default class PoolFundingAlignmentComponent {
     const body: UpdatePoolFundingAlignmentDto = {
       has_contribution: form.has_contribution as boolean,
       ...(form.has_contribution ? { sp_codes: form.selected_sps.map(sp => sp.official_code) } : {}),
+      // R-BIL-127 — canSave() already blocks this call when has_contribution is
+      // true and no Primary is chosen, so `form.primary_sp_code` is populated
+      // whenever it is sent; omitted (not sent as undefined/empty) otherwise.
+      ...(form.has_contribution && form.primary_sp_code ? { primary_sp_code: form.primary_sp_code } : {}),
       ...(includeToc ? { toc_alignments: this.bilateralService.writeDtoFromDrafts(form.toc_drafts) } : {})
     };
 
@@ -577,6 +666,16 @@ export default class PoolFundingAlignmentComponent {
         this.inlineErrors.set({
           ...(result.fieldErrors ?? {}),
           sp_codes: this.buildRejectedSpMessage(result.unknownSpCodes)
+        });
+        return;
+      }
+      // R-BIL-127 — defensive: canSave() should have prevented this from ever
+      // firing (design.md §6.1), but surface it inline rather than a global
+      // toast if it does (e.g. a race with another tab's edit).
+      if (result.primarySpError) {
+        this.inlineErrors.set({
+          ...(result.fieldErrors ?? {}),
+          primary_sp_code: result.primarySpError
         });
         return;
       }
@@ -653,6 +752,11 @@ export default class PoolFundingAlignmentComponent {
       : alignment.selected_levers
           .filter(l => !!l.lever_code)
           .map(l => ({ official_code: l.lever_code, name: l.lever_name }));
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127, R-BIL-126
+    // `null` when no SP carries role: 'PRIMARY' — the deprecated lever fallback
+    // above (no role data at all) and a legacy alignment (R-BIL-126, every role
+    // null) both land here correctly.
+    const primary_sp_code = (sps ?? []).find(sp => sp.role === 'PRIMARY')?.code ?? null;
     // AC-08.1 — pre-fill per-SP drafts from saved alignments, ordered by selection.
     const savedDrafts = this.bilateralService.draftsFromSaved(alignment.toc_alignments);
     const byCode = new Map(savedDrafts.map(d => [d.sp_code, d]));
@@ -662,6 +766,7 @@ export default class PoolFundingAlignmentComponent {
     return {
       has_contribution: alignment.has_contribution,
       selected_sps,
+      primary_sp_code,
       toc_drafts
     };
   }
