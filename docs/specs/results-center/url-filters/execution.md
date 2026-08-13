@@ -252,4 +252,92 @@ The sweep surfaced an unrelated live contradiction: `tasks.md` §5 prescribes a 
 
 **Tripwire status: resolved. It will not be re-raised unless actuals exceed ~3200 LOC**, at which point it is a genuine overrun rather than a bad estimate.
 
+---
+
+## 4. Task Execution History (continued)
+
+### T-03 — Codec: `serialize` (carried R3-2 and R3-4)
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS on attempt 2** (1 rework round consumed) |
+| Date | 2026-08-12 |
+| Implementer attempts | 2 |
+| Requirements covered | R-RCU-003 (both scenarios + AC.1/AC.2), R-RCU-004 AC.3, NFR-RCU-003 (structurally — see the ruling) |
+| Wave | Ran concurrently with T-05 (both client — a deliberate exception, see the wave note below) |
+
+**Files changed:** `client/…/results-center/url/results-center-url.codec.ts` (+94 net), `…/results-center-url.codec.spec.ts` (+251 net) — `serialize` appended to T-02's module without restructuring `parse`.
+
+#### Attempt 1 — Implementer (T2 `sonnet`, effort `high`) → Reviewer `STATUS: FAIL`
+
+Verification was green (83/83 tests, `tsc` clean for these files, lint clean), and the Reviewer passed the substance: R3-2's legacy-key nulling in **camelCase** with a merge-based proof, R3-4 both directions, `utm_source` survival, the round-trip fixture, and purity. **One issue failed it:**
+
+> **Discovered Issue:** `serialize` does not upper-case `contract` on the write side… `parse` guarantees that for URL-sourced state, but the write path's state is not URL-sourced: `results-center.service.ts:702,713` build `'contract-codes'` from `tableFilters().contracts.map(c => c.agreement_id)` — control-list values — and `restorePersistedState` reloads them from sessionStorage… Compounding it, the test that appears to cover this **cannot fail**: it is named *"comma-joined, **already upper-cased** list"* and feeds `['A100','S192']` — an input that produces identical output whether the upper-casing exists or not.
+> **Violated Rule:** `design.md` §5.4 (`contract` row: "Upper-cased on read **and write**") and §12 **D-URL-11**. Secondarily `requirements.md` R-RCU-003 AC.2.
+
+The second half is the more instructive half: the defect was not only a missing call, it was **a test that could not have caught it** — the same non-discriminating-fixture shape T-02's Disqualifies clause names for ordering.
+
+#### Attempt 2 — Implementer (T2 `sonnet`, effort **`xhigh`**, bumped per the rework rule) → Reviewer `STATUS: PASS`
+
+Fix: `filters.contract.map((code) => code.toUpperCase()).join(',')`. Fixture replaced with `['s192','a100']` → `'S192,A100'` — lower-case **and** non-alphabetical, so it fails on a removed `.toUpperCase()` *and* on an introduced `.sort()`. Both advisory items also taken (see below). Verification: 83/83 (unchanged count — fixtures only), `tsc` clean, lint clean.
+
+> **Reviewer PASS summary:** The single FAIL issue is genuinely closed — `serialize` now upper-cases `contract` before joining, satisfying design.md §5.4 / D-URL-11's "upper-cased on read **and** write" independently of its caller — and the replacement fixture `['s192','a100'] → 'S192,A100'` is falsifiable on both case and order, so the assertion can now actually fail. The two advisory edits strengthened the `year` fixture and corrected prose only; R3-2's merge-based proof, R3-4, the clear scenario, `utm_source`, the round-trip and purity are all intact.
+
+The re-review also confirmed the fix cannot break a previously-passing state: any state that round-tripped was already upper-case (because `parse` upper-cases unconditionally), so the new map is the identity on exactly those; lower-case states were *already* broken before the fix.
+
+#### Rulings on the four judgment calls raised at attempt 1
+
+| # | Question | Ruling |
+| --- | --- | --- |
+| 1 | Two legacy-name lists now exist — vocabulary's folded `LEGACY_PARAM_NAMES` and codec's local `LEGACY_PARAM_NAMES_ORIGINAL_CASE`. Drift hazard? | **Acceptable.** Verified at framework source: `Router.createUrlTree` spreads over the URL's **raw** keys (`router.mjs:5728`), so nulling `indicatortab` would add a new key and leave `indicatorTab=1` untouched — the folded list genuinely is the wrong shape for the output side. Also, adding a paired export to the vocabulary would reopen a `[x]`-closed task's file list. **But nothing protects it from drift** — see advisory 2 |
+| 2 | Is the NFR-RCU-003 test capable of failing? | **A structural tautology, but not a violation.** `serialize` never receives a user id, so the assertion cannot fail — yet it asserts exactly what the done-check words. `requirements.md` NFR-RCU-003's own *How verified* puts the real assertion on **the written URL**, a component-level artifact outside T-03's file list. The comment labels the limit honestly. **Coverage consequence escalated separately — see §5** |
+| 3 | `serialize` silently drops ids absent from the frozen map | **(b) SPEC GAP, not a FAIL** — routed to the user, not to rework. See §5 |
+| 4 | Round-trip vs. the Disqualifies clause | **Satisfied across the suite.** The clause disqualifies a round-trip test as R3-2 *evidence* and relocates that proof to a merge assertion, which the suite does in four places. Requiring the round-trip fixture to also carry a cleared filter would make it a worse round-trip test |
+
+#### ADVISORY (recorded only; none may become a task or widen one)
+
+1. *Reliability.* `.toUpperCase()` now dereferences every element of `filters.contract`, so a non-string the **runtime** can supply throws a `TypeError` where `join(',')` degraded silently. Reachable in principle: `results-center.service.ts:315` casts `tableFilters().contracts`, and both `get-contracts-by-user.interface.ts:2` and `find-contracts.interface.ts:12` declare `agreement_id?: string`. **Leader action: carry into the T-04/T-08 briefs** — narrow the type at the boundary, or the codec should use `String(code).toUpperCase()`.
+2. *Risk.* Nothing ties `LEGACY_PARAM_NAMES_ORIGINAL_CASE` to the vocabulary's list; a fourth legacy parameter would be parsed and never cleared, and the hand-enumerated nine-key `toEqual` would stay green. Suggested computed invariant: folded `Object.keys(serialize(emptyState))` equals `[...CANONICAL_PARAM_NAMES, ...LEGACY_PARAM_NAMES]`, sorted.
+3. *Resilience.* A case-varied legacy key (`?INDICATORTAB=1`) is parsed but never nulled, since only exact camelCase is emitted. Unsolvable without giving `serialize` the current params, which design §6.2 step 3 excludes by design. Recorded, not fixed.
+4. *Readability.* `'all'` and `undefined` both serialize to `tab: null`, so `'all'` does not round-trip — correct per R3-4 and asserted, but the round-trip block deserves a one-line note so nobody "fixes" it.
+5. *Readability.* The fixture comment explaining *why* those values were chosen is the most useful artifact to leave against a future tidy-up; worth mirroring above other order-sensitive fixtures.
+
+**Final verification result:** 83/83 tests, `tsc` clean for these files, lint clean, Reviewer `PASS` on attempt 2.
+
+---
+
+## 5. OPEN — two non-functional requirements whose prescribed verification is owned by no task
+
+**Raised by the T-03 Reviewer, 2026-08-12. Pending a user decision; not actionable by the Leader alone, because creating or widening tasks is scope the user never approved.**
+
+### 5.1 NFR-RCU-002 **layer 2** has no owning task
+
+`requirements.md` NFR-RCU-002 specifies verification in **two layers** and is explicit that one is insufficient:
+
+> 2. **Runtime completeness check** — when the relevant control list resolves, the codec compares it against the frozen map and emits a console warning naming any id with no slug. **This is the layer that actually sees a server-side addition**, and it fires in every dev and QA session.
+
+`design.md` §10.1 lists it as a "Runtime | dev/QA console" row **with no owning task**. `tasks.md` §3 maps NFR-RCU-002 to **T-01**, whose Requirements-covered line reads "NFR-RCU-002 (**layer 1**)". So layer 2 is specified in two constitutional documents and implemented by nobody.
+
+This matters more than a missing test, because layer 2 is the *named mitigation* for the §5.2 hazard below.
+
+### 5.2 The unmapped-id drop — a spec gap the Reviewer ruled is NOT a defect
+
+`serialize` maps ids to slugs and filters out misses, so an id present in **live filter state** but absent from the frozen 25-row map is silently omitted from the URL. If it is the only status selected, the key is stripped and a copied link shows **unfiltered** results while the user's table is filtered — against R-RCU-003's user story.
+
+The Reviewer ruled this **(b) a genuine gap, not (c) a FAIL**, because every alternative violates a different explicit decision: emitting the raw id breaks D-URL-2 and AC.2 (`parse` would reject `status=26`); omitting the key instead of nulling it breaks D-URL-16/R3-2 and would let `merge` pin a stale value — strictly worse; and reporting the drop needs a return channel that design §6.2 step 3 does not give `serialize`. **The implementation picked the least-bad option the spec leaves available**, and the id class involved is already an accepted residual risk under NFR-RCU-002.
+
+**Two things need a human decision:** (i) who implements the layer-2 completeness warning, and (ii) whether the write side should surface an unmapped id at all — which requires amending design §6.2 step 3 to give `serialize` a `dropped`-style channel.
+
+### 5.3 NFR-RCU-003's own prescribed verification is also unowned
+
+`requirements.md` NFR-RCU-003 → *How verified*: "asserted by a test that **the written URL** never contains the cached user id." A written URL is a component-level artifact. `tasks.md` §3 maps NFR-RCU-003 to **T-03 alone**, which cannot produce one. **Suggested placement: add it to T-08's check list**, where `router.navigate` is first exercised.
+
+### 5.4 T-11's done-check is missing the rendered half of T-05's guard
+
+Raised by the T-05 Reviewer. T-05's done-check wants the my/all counter increment "asserted through the template binding"; the current harness makes a DOM click impossible, so the Leader authorized asserting through the component handler instead (accepted by the Reviewer). But **T-11's done-check does not mention a rendered my/all click asserting the counter**, so the template-binding half will silently vanish once T-11 rewrites that spec.
+
+### 5.5 A design §6.2 sentence is now literally false
+
+`design.md` §6.2 states a cross-route mutation "cannot reach it twice over: **the counter does not move**". That is no longer true: `resetState()` (`service.ts:973`) calls `clearAllFilters()`, which now bumps, and its only caller is `project-detail.component.ts:171` — **a different route**. Harmless under T-08 (the effect captures its entry baseline at creation, so pre-existing bumps are absorbed, and the component is destroyed off-route anyway), but T-12 would otherwise be written to assert the wrong guarantee — *counter frozen* rather than *component destroyed*. Per the constitution's "fix the document, don't let docs and code drift" rule this is a one-clause doc correction rather than a scope question, and the Leader will make it unless told otherwise.
+
 

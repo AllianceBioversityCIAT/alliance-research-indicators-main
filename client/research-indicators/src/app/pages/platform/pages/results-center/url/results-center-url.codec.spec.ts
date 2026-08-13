@@ -1,6 +1,7 @@
 import { convertToParamMap } from '@angular/router';
 
-import { parse } from './results-center-url.codec';
+import { parse, serialize } from './results-center-url.codec';
+import type { ResultsCenterUrlState } from './results-center-url.codec';
 
 describe('results-center-url.codec — parse', () => {
   // ---------------------------------------------------------------------
@@ -300,6 +301,261 @@ describe('results-center-url.codec — parse', () => {
       const { filters } = parse(convertToParamMap({ contract: 'A100', year: '2025' }));
       expect(filters.contract).toEqual(['A100']);
       expect(filters.year).toEqual([2025]);
+    });
+  });
+});
+
+describe('results-center-url.codec — serialize', () => {
+  /**
+   * A minimal, faithful double for Angular's `queryParamsHandling: 'merge'`
+   * navigation semantics (design §6.2 step 5): `{...currentParams, ...next}`,
+   * then strip only the keys whose **merged** value is exactly `null`. A key
+   * `next` simply omits is not touched at all — it survives from `current`
+   * verbatim, exactly as an omitted key does under the real `Router` merge.
+   *
+   * Deliberately narrow, per KZ-001 ("a test double that doesn't render or
+   * evaluate what it stands in for produces a green suite over broken
+   * behavior"): this strips **only** `null`, never `undefined` and never
+   * `''`. This is deliberately stricter than the real router — Angular's
+   * `Router.removeEmptyProps` (`router.mjs:5861`) strips `null` **and**
+   * `undefined` — but the stricter double is safe here because `serialize`
+   * never emits `undefined`; `''` is preserved by both the double and the
+   * real router, which is the fidelity that actually matters for this test.
+   */
+  function mergeParams(
+    current: Record<string, string>,
+    next: Record<string, string | null>,
+  ): Record<string, string> {
+    const merged: Record<string, string | null> = { ...current, ...next };
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(merged)) {
+      if (value !== null) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  const emptyState: ResultsCenterUrlState = { filters: {}, scope: undefined };
+
+  // ---------------------------------------------------------------------
+  // R-RCU-003 AC.1 — each active canonical parameter serializes to its
+  // string form
+  // ---------------------------------------------------------------------
+  describe('each active canonical parameter serializes to its string form', () => {
+    it('indicator serializes to its slug', () => {
+      const params = serialize({ filters: { indicator: 5 }, scope: undefined }); // oicr
+      expect(params['indicator']).toBe('oicr');
+    });
+
+    it('contract serializes to a comma-joined, upper-cased list, order preserved (D-URL-11)', () => {
+      // Lower-case and out of alpha order: only fails to discriminate if the
+      // fixture is either already upper-case or already sorted. This one is
+      // neither — it fails if `.toUpperCase()` is removed (would read
+      // 's192,a100') and it fails if order were resorted (would read
+      // 'A100,S192' instead of the input order 'S192,A100').
+      const params = serialize({ filters: { contract: ['s192', 'a100'] }, scope: undefined });
+      expect(params['contract']).toBe('S192,A100');
+    });
+
+    it('status serializes ids back to slugs, order preserved', () => {
+      const params = serialize({ filters: { status: [2, 6] }, scope: undefined }); // submitted, approved
+      expect(params['status']).toBe('submitted,approved');
+    });
+
+    it('year serializes to a comma-joined list, order preserved', () => {
+      const params = serialize({ filters: { year: [2025, 2024] }, scope: undefined });
+      expect(params['year']).toBe('2025,2024');
+    });
+
+    it('source serializes platform codes back to slugs', () => {
+      const params = serialize({ filters: { source: ['STAR', 'PRMS'] }, scope: undefined });
+      expect(params['source']).toBe('star,prms');
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // R3-2 regression guard — every inactive canonical key AND every legacy
+  // key is null in the direct output (supporting check; the primary proof
+  // is the merge-based test below, per design §10.3's disqualifier)
+  // ---------------------------------------------------------------------
+  describe('every inactive canonical key and every legacy key is null (R3-2)', () => {
+    it('a fully empty state nulls all six canonical keys and all three legacy keys', () => {
+      const params = serialize(emptyState);
+      expect(params).toEqual({
+        indicator: null,
+        contract: null,
+        status: null,
+        year: null,
+        source: null,
+        tab: null,
+        indicatorTab: null,
+        statusTab: null,
+        statusLabel: null,
+      });
+    });
+
+    it('an active filter still nulls every *other* canonical key and all three legacy keys', () => {
+      const params = serialize({ filters: { contract: ['A100'] }, scope: 'all' });
+      expect(params['contract']).toBe('A100');
+      expect(params['indicator']).toBeNull();
+      expect(params['status']).toBeNull();
+      expect(params['year']).toBeNull();
+      expect(params['source']).toBeNull();
+      expect(params['tab']).toBeNull();
+      expect(params['indicatorTab']).toBeNull();
+      expect(params['statusTab']).toBeNull();
+      expect(params['statusLabel']).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // R3-2 regression guard — THE PRIMARY PROOF: asserted on the merged
+  // result, not on serialize's raw return (design §10.3 disqualifier:
+  // "Testing serialize in isolation without a merge simulation proves
+  // nothing about R3-2; assert the merged result").
+  // ---------------------------------------------------------------------
+  describe('R3-2 — legacy keys are actually cleared from the address bar under merge', () => {
+    it(
+      'currentParams { indicatorTab: "1" } (a delivered CapDev email) + switching to ' +
+        'All Indicators removes indicatorTab from the merged URL entirely',
+      () => {
+        const currentParams = { indicatorTab: '1' };
+        // The user switched to "All Indicators" — no canonical indicator filter anymore.
+        const stateWithNoIndicator: ResultsCenterUrlState = { filters: {}, scope: 'all' };
+
+        const next = serialize(stateWithNoIndicator);
+        const merged = mergeParams(currentParams, next);
+
+        expect('indicatorTab' in merged).toBe(false);
+      },
+    );
+
+    it('all three legacy keys are cleared together from a URL that carries all three', () => {
+      const currentParams = {
+        indicatorTab: '1',
+        statusTab: '2',
+        statusLabel: 'Submitted',
+      };
+      const merged = mergeParams(currentParams, serialize(emptyState));
+
+      expect('indicatorTab' in merged).toBe(false);
+      expect('statusTab' in merged).toBe(false);
+      expect('statusLabel' in merged).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // R-RCU-004 AC.3 — a key the codec does not parse is never touched
+  // ---------------------------------------------------------------------
+  describe('an unrecognized key survives merge untouched (R-RCU-004 AC.3)', () => {
+    it('?utm_source=email is neither emitted nor nulled, and survives alongside a real filter change', () => {
+      const currentParams = { utm_source: 'email' };
+      const state: ResultsCenterUrlState = { filters: { contract: ['A100'] }, scope: 'all' };
+
+      const next = serialize(state);
+      expect('utm_source' in next).toBe(false);
+
+      const merged = mergeParams(currentParams, next);
+      expect(merged['utm_source']).toBe('email');
+      expect(merged['contract']).toBe('A100');
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // R3-4 regression guard — tab is emitted only for scope "my"
+  // ---------------------------------------------------------------------
+  describe('R3-4 — tab is emitted only when scope is "my"', () => {
+    it('scope "my" serializes to tab: "my"', () => {
+      expect(serialize({ filters: {}, scope: 'my' })['tab']).toBe('my');
+    });
+
+    it('scope "all" serializes to tab: null', () => {
+      expect(serialize({ filters: {}, scope: 'all' })['tab']).toBeNull();
+    });
+
+    it('an unresolved (undefined) scope also serializes to tab: null, never a literal "undefined"', () => {
+      expect(serialize(emptyState)['tab']).toBeNull();
+    });
+
+    it(
+      'currentParams { tab: "my" } + switching to "all" removes tab from the merged URL — ' +
+        'never leaves /results-center?tab=all glued to a cleared view',
+      () => {
+        const currentParams = { tab: 'my' };
+        const merged = mergeParams(currentParams, serialize({ filters: {}, scope: 'all' }));
+        expect('tab' in merged).toBe(false);
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------------
+  // R-RCU-003 clear scenario — clearing all filters leaves no query string
+  // ---------------------------------------------------------------------
+  describe('clearing all filters leaves no query string (R-RCU-003 clear scenario)', () => {
+    it('currentParams { contract: "A100", year: "2025" } fully clears under merge', () => {
+      const currentParams = { contract: 'A100', year: '2025' };
+      const merged = mergeParams(currentParams, serialize({ filters: {}, scope: 'all' }));
+      expect(merged).toEqual({});
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // R-RCU-003 AC.2 — round-trip, all six parameters, distinguishable
+  // values per KZ-004 ("a fixture whose N units are built from identical
+  // defaults cannot distinguish per-unit scoping from a batch-wide bug")
+  // ---------------------------------------------------------------------
+  describe('round-trip: parse(serialize(state)) reproduces state (R-RCU-003 AC.2)', () => {
+    it('reproduces a state exercising all six parameters with distinguishable values', () => {
+      const state: ResultsCenterUrlState = {
+        filters: {
+          indicator: 5, // oicr — distinct from any status/source id below
+          contract: ['A100', 'S192'], // two distinct contract codes
+          status: [2, 6], // submitted, approved — two distinct ids
+          year: [2024, 2025], // two distinct years
+          source: ['STAR', 'PRMS'], // two distinct platform codes
+        },
+        scope: 'my',
+      };
+
+      const next = serialize(state);
+      // What actually lands in the address bar after a merge against an
+      // empty current URL — the shape a reload would re-parse.
+      const urlParams = mergeParams({}, next);
+      const reparsed = parse(convertToParamMap(urlParams));
+
+      expect(reparsed.filters).toEqual(state.filters);
+      expect(reparsed.scope).toBe(state.scope);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // NFR-RCU-003 — no output value equals the cached user identifier
+  // ---------------------------------------------------------------------
+  describe('NFR-RCU-003 — no output value equals the cached sec_user_id, for any scope', () => {
+    // Representative of `CacheService.dataCache().user.sec_user_id`
+    // (`client/research-indicators/src/app/shared/interfaces/cache.interface.ts`
+    // — `UserCache.sec_user_id: number`), the identifier the my/all scope
+    // must never leak. `serialize` never receives this value as an input at
+    // all — the scope is expressed purely as `TabScope`, so this asserts the
+    // *shape* of that guarantee: no output value can ever coincide with it.
+    const CACHED_SEC_USER_ID = '42';
+
+    it('scope "my" emits only the literal "my", never the user id', () => {
+      const params = serialize({
+        filters: { indicator: 5, contract: ['A100'], status: [2], year: [2024], source: ['STAR'] },
+        scope: 'my',
+      });
+      expect(params['tab']).toBe('my');
+      expect(Object.values(params)).not.toContain(CACHED_SEC_USER_ID);
+    });
+
+    it('scope "all" never emits the user id either', () => {
+      const params = serialize({
+        filters: { indicator: 5, contract: ['A100'], status: [2], year: [2024], source: ['STAR'] },
+        scope: 'all',
+      });
+      expect(Object.values(params)).not.toContain(CACHED_SEC_USER_ID);
     });
   });
 });

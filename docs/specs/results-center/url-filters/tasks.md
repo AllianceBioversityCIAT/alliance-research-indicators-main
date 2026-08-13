@@ -96,7 +96,7 @@ graph TD
 
 ---
 
-### T-03 [ ] — Codec: `serialize` (carries R3-2 and R3-4)
+### T-03 [x] — Codec: `serialize` (carries R3-2 and R3-4)
 
 - **Requirements covered:** R-RCU-003 (both scenarios + AC.1/AC.2), R-RCU-004 AC.3, NFR-RCU-003
 - **Files touched:** `…/url/results-center-url.codec.ts`, `…/url/results-center-url.codec.spec.ts`
@@ -139,7 +139,7 @@ graph TD
 
 ---
 
-### T-05 [ ] — `userFilterMutations` counter (carries R3-1)
+### T-05 [~] — `userFilterMutations` counter (carries R3-1)
 
 - **Requirements covered:** R-RCU-003 (write trigger), R-RCU-004 AC.2, NFR-RCU-005
 - **Files touched:** `…/results-center/results-center.service.ts`, `…/results-center/results-center.component.ts`, `…/results-center.service.spec.ts`

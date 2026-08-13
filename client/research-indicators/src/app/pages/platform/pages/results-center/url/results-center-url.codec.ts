@@ -7,6 +7,7 @@ import {
   INDICATOR_SLUG_TO_ID,
   MAX_LIST_PARAM_VALUES,
   MAX_PARAM_TOKEN_LENGTH,
+  PLATFORM_CODE_TO_SOURCE_SLUG,
   RECOGNIZED_PARAM_NAMES,
   SOURCE_SLUG_TO_PLATFORM_CODE,
   STATUS_ID_TO_SLUG,
@@ -19,10 +20,9 @@ import {
  * results-center-url.codec.ts
  *
  * Pure `URL ⇄ filter state` translation for the Results Center
- * (docs/specs/results-center/url-filters/design.md §2.1, D-URL-1). This file
- * currently exports only `parse` (T-02 of tasks.md); `serialize` is a
- * separate task (T-03) that extends this same module without restructuring
- * it.
+ * (docs/specs/results-center/url-filters/design.md §2.1, D-URL-1). Exports
+ * both directions: `parse` (T-02 of tasks.md, `URL → state`) and `serialize`
+ * (T-03, `state → URL params`, appended below without restructuring `parse`).
  *
  * **Purity contract**, mirrored from the server's
  * `capdev-recipients.builder.ts` (design §2): no DI, no `Router`, no
@@ -439,4 +439,93 @@ export function parse(paramMap: ParamMap): ParsedResultsCenterUrl {
   };
 
   return { filters, scope, dropped, hadRecognizedParam };
+}
+
+// ---------------------------------------------------------------------------
+// serialize (T-03) — the inverse direction, `state → URL params`
+// ---------------------------------------------------------------------------
+
+/**
+ * The three legacy parameter names in their **original camelCase spelling**
+ * — exactly how they appear in an already-delivered CapDev email and
+ * therefore exactly how they appear as keys on `currentParams` at merge
+ * time (`ActivatedRoute.snapshot.queryParams` reflects the URL's own
+ * casing, it does not fold it).
+ *
+ * `results-center-url.vocabulary.ts`'s `LEGACY_PARAM_NAMES` is the wrong
+ * shape for this: it is folded lower-case (`indicatortab`) for `parse`'s
+ * input-side lookup (R3-3). Nulling `indicatortab` would not clear
+ * `?indicatorTab=1` — `queryParamsHandling: 'merge'` matches keys by exact
+ * case, not folded — so this is a deliberately separate, local list for the
+ * output side, not a duplicate of the vocabulary's.
+ */
+const LEGACY_PARAM_NAMES_ORIGINAL_CASE = ['indicatorTab', 'statusTab', 'statusLabel'] as const;
+
+/**
+ * `state → params`, the inverse of {@link parse}.
+ *
+ * The result is consumed by a `queryParamsHandling: 'merge'` navigation
+ * (design §6.2 step 5): `{...currentParams, ...next}`, with only
+ * **null-valued** keys stripped from the merged result — a key this
+ * function simply omits is preserved **verbatim**. That is why every
+ * parameter this codec *parses* — the six canonical ones (R-RCU-001) *and*
+ * the three legacy ones (R-RCU-006) — is always present below, as either its
+ * active string value or an explicit `null`, never left out (R3-2, R3-4;
+ * design §6.2 "Why step 3 emits nulls" / "The null set is 'every key the
+ * codec parses'").
+ *
+ * A key this codec does **not** parse (`utm_source`, anything unrecognized)
+ * never appears in the returned object at all — that omission, not a null,
+ * is what keeps it alive under merge (R-RCU-004 AC.3). This function never
+ * needs to know the current URL to get that right: it only ever emits keys
+ * it owns.
+ *
+ * **Never serializes a user identifier** (NFR-RCU-003): the my/all scope is
+ * expressed purely as `tab: 'my' | null`, resolved client-side from the
+ * session cache by the caller — no `sec_user_id` or other identifier is an
+ * input to this function at all.
+ */
+export function serialize(state: ResultsCenterUrlState): Record<string, string | null> {
+  const { filters, scope } = state;
+
+  const indicatorSlug =
+    filters.indicator !== undefined ? INDICATOR_ID_TO_SLUG.get(filters.indicator) : undefined;
+
+  const statusSlugs = (filters.status ?? [])
+    .map((id) => STATUS_ID_TO_SLUG.get(id))
+    .filter((slug): slug is string => slug !== undefined);
+
+  const sourceSlugs = (filters.source ?? [])
+    .map((code) => PLATFORM_CODE_TO_SOURCE_SLUG.get(code))
+    .filter((slug): slug is string => slug !== undefined);
+
+  const params: Record<string, string | null> = {
+    indicator: indicatorSlug ?? null,
+    contract:
+      filters.contract && filters.contract.length > 0
+        ? filters.contract.map((code) => code.toUpperCase()).join(',')
+        : null,
+    status: statusSlugs.length > 0 ? statusSlugs.join(',') : null,
+    year: filters.year && filters.year.length > 0 ? filters.year.join(',') : null,
+    source: sourceSlugs.length > 0 ? sourceSlugs.join(',') : null,
+    // R3-4 — `tab` always resolves to `my` or `all` (design §6.1 step 3), so
+    // a literal "emit when active" reading would always emit it. Only `my`
+    // is ever written; `all` (and an unresolved scope) serialize to `null`,
+    // or clearing filters while scoped to `all` would leave `/results-center
+    // ?tab=all` glued to a URL R-RCU-003 requires to read with no query
+    // string at all (design §6.2 "Why `tab` needs its own rule").
+    tab: scope === 'my' ? 'my' : null,
+  };
+
+  // R3-2 — every legacy key the codec *parses* is nulled here too, in the
+  // original camelCase spelling currentParams actually carries. The codec
+  // parses these keys (R-RCU-006), so it owns clearing them; without this,
+  // arriving from a delivered email at `?indicatorTab=1` and switching away
+  // from it would leave `indicatorTab=1` in the address bar forever, and a
+  // reload would resurrect it.
+  for (const legacyName of LEGACY_PARAM_NAMES_ORIGINAL_CASE) {
+    params[legacyName] = null;
+  }
+
+  return params;
 }
