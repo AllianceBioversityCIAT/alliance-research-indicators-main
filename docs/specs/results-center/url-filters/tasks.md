@@ -2,13 +2,13 @@
 
 - **Module:** results-center (client) + results (server, link producer only)
 - **Spec id:** 2026-08-url-filters
-- **Status:** in progress — T-01, T-02, T-10 done (`/akili-execute`, 2026-08-12); see `execution.md`
+- **Status:** in progress — **T-01 … T-10 done** (`/akili-execute`, 2026-08-12 → 2026-08-13). T-11 in flight; T-12 pending. See `execution.md`. *(This row read "T-01, T-02, T-10 done" until 2026-08-13 — seven tasks stale. The per-task `[x]` markers in §2 were current throughout; this summary was not, which is why it is not a source of truth for status.)*
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
 - **Linked judgment:** ./judgment.md — **read §Round 3 before starting.** Four findings (R3-1 … R3-4) are open and are folded into T-01, T-03, T-05 and T-08 below
-- **Budget (design §13):** 12 tasks · **~3200 LOC** · 3 review rounds — *re-baselined 2026-08-12 during execution; the pre-execution ~1000 never carried §10.2's own ~1,000-line spec rewrite (see `design.md` §13 → Re-baseline record)*
-- **Last updated:** 2026-08-12
+- **Budget (design §13):** 12 tasks · **~4600 LOC** · 3 review rounds — *re-baselined **twice**, both by user decision at a tripwire escalation, both LOC-only: #1 2026-08-12 ~1000 → ~3200 (the pre-execution figure never carried §10.2's own ~1,000-line spec rewrite); #2 2026-08-13 ~3200 → ~4600 before T-11, because #1's corrected total carried an uncorrected per-task basis. Task count and review rounds have never moved. See `design.md` §13 → Re-baseline records and `execution.md` §8*
+- **Last updated:** 2026-08-13
 
 ---
 
@@ -177,11 +177,11 @@ graph TD
   - Resolve the my/all scope **explicitly**: `tab` when present, otherwise `loadPinnedTabPreference()`. Never leave it at whatever the root singleton held from a previous route (R-RCU-002 AC.6).
   - Any recognized filter parameter suppresses `restorePersistedState` entirely; an unrecognized parameter alone (`?utm_source`) does not (R-RCU-004 AC.3).
   - A wholly invalid link still counts as explicit navigation — it does **not** fall through to restore (R-RCU-005, second scenario).
-  - Exactly one `main()` for the initial load, **after** seeding — never fetch unfiltered and re-fetch.
+  - Exactly one `main()` **from this path** for the initial load, **after** seeding — never fetch unfiltered and re-fetch. *(Narrowed 2026-08-13, D-URL-17: the table's own `lazyLoadOnInit` fires a second, independent `main()` that predates this spec.)*
   - Toast once per navigation, naming counts not values (D-URL-4).
   - **Do not remove the wipes here** — that is T-08's, together with the write path.
 - **Acceptance / done check:**
-  - [ ] Exactly one results request on initial load (R-RCU-002 AC.4).
+  - [x] **The URL read path** issues exactly one results request on initial load, seeded before it fires (R-RCU-002 AC.4, **as amended 2026-08-13**). ⚠️ **Narrowed by D-URL-17, not satisfied as originally written.** The original check — "exactly one results request on initial load" — was passed against a harness whose template was overridden to `<div></div>`, so the table that issues a second fetch never rendered; T-11's real harness proved production issues **two** (PrimeNG `lazyLoadOnInit` → `handleResultsTableLazyLoad` → `main()`, wiring present on `main` and older than this spec). **T-06 is not re-run and its `[x]` stands on the amended clause:** it implemented and verified the read path, which is what it owned. The whole-page claim was never this task's to make and is now tracked in `docs/specs/bugfix/results-center-double-fetch`.
   - [ ] The filter is applied *before* that request.
   - [ ] A recognized parameter suppresses restore; `?utm_source=email` alone does not.
   - [ ] An all-invalid link renders the unfiltered page with the toast and does **not** restore.
@@ -284,23 +284,26 @@ graph TD
 
 ---
 
-### T-11 [ ] — Rewrite the Results Center component spec harness
+### T-11 [x] — Rewrite the Results Center component spec harness
+
+> **PASS on attempt 2 of 3, 2026-08-13.** Both re-review lenses (conformance = the gate, reliability) returned PASS. Attempt 1 was audited **FAIL by two lenses with six issues** — five of them *assertions that passed when they should not*, the exact class this task exists to eliminate — and all six were closed with red/green mutant proof. One rework round consumed; the spec's 3-round budget still holds at 11 of 12 tasks. Final: **1,836 lines** (1,514 insertions / 1,298 deletions vs `21276779`). Its first discovery — that R-RCU-002 AC.4 had **never held in production** — became **D-URL-17** and the new `bugfix/results-center-double-fetch` spec. Three advisories are carried forward, notably that the AC.4 ordering assertion is coupled to the still-unfixed double-fetch. Full record: `execution.md` §9.
 
 - **Requirements covered:** enables the rendered assertions for R-RCU-002 AC.3 and every T-06/T-08 check
 - **Files touched:** `…/results-center/results-center.component.spec.ts`
 - **Description:** The existing spec does **both** things design §10.3 disqualifies at once — a fabricated `ActivatedRoute` double **and** a template override, over a fabricated service mock with no real signals. Nothing renders and no real state exists, so it cannot test this feature.
 - **Implementation notes:**
+  - ⚠️ **SUPERSEDED BY ATTEMPT 1 (2026-08-13) — read this before acting on the pointers below.** The `.overrideComponent` call and the fabricated `mockResultsCenterService` are **gone**. The lightweight `ActivatedRoute`/`Router` doubles **survive deliberately**, serving the non-routed describes that mock `initializeState`; the routed describes use a real `RouterTestingHarness`. **Do not remove them** — the sentence below reads as an instruction to, and that reading is now wrong. All line ranges in this bullet are dead: the file is 1,639 lines and every position moved.
   - **Locate both by CONTENT, never by line number** *(corrected 2026-08-13, post-T-08)*. The `ActivatedRoute` double is the `{ provide: ActivatedRoute, useValue: { get snapshot() … } }` block; the template override is the `.overrideComponent(ResultsCenterComponent, { set: { imports: [], template: … } })` call. **The old citations `101-108` / `112-117` now miss by ~70 lines** — the real positions are `:170-188` and `:192-197`, and `101-108` today lands in the middle of the `appliedFilters` signal mock. Two further traps in the superseded wording: the template literal uses **backticks**, so a literal grep for `template: '<div></div>'` finds nothing; and T-06 already replaced the *canned snapshot* with a real `convertToParamMap`-built `ParamMap` (T-08 added a derived `queryParams` getter over it), so **what must go is the fabricated service mock, not the param map**.
   - Drop the template override; use the real `ResultsCenterService`; provide real control-list services for the child multiselects; use a real router/param-map harness.
   - Rendered chip assertions must be taken **after** the control lists resolve (design §7.2's documented transient).
-  - This is a rewrite of a **~1,550-line** spec — it is the single largest item in the budget and is scoped as its own task deliberately. *(Was ~1,000 when written; T-06 through T-08 added ~550 lines, 424 of them T-08's write-effect block.)*
+  - This is a rewrite of a **~1,550-line** spec — the single largest item in the budget, scoped as its own task deliberately. *(Was ~1,000 when written; T-06 through T-08 added ~550 lines, 424 of them T-08's write-effect block. **Attempt 1 landed at 1,639 lines — 1,316 insertions / 1,297 deletions.**)*
 - **Acceptance / done check:**
   - [ ] The suite drives a real param map; no canned snapshot remains.
   - [ ] The component renders; chips and the tab strip are assertable from the DOM.
   - [ ] All pre-existing behavioral cases still pass under the new harness.
   - [ ] **A rendered click on the My/All tab strip advances `userFilterMutations`** — the template-binding half of T-05's R3-1 guard *(assigned here 2026-08-12; see below)*.
 - **T-05's R3-1 guard is completed here — added during execution.** T-05's done-check requires the my/all increment be "asserted through the template binding, not by calling the service method directly." The pre-rewrite harness overrides the template with `<div></div>`, so a DOM click was structurally impossible; the Leader authorized asserting through the component's handler instead (`component.onActiveItemChange(...)` with a mocked service), which the Reviewer accepted as satisfying the Disqualifies clause's operative requirement. **This rewrite is what makes the rendered assertion possible, so it must carry it** — otherwise the template-binding half of a dual-judge-confirmed regression guard disappears with the old harness and nothing records that it was ever owed.
-- **Disqualifies:** porting the old assertions onto the new harness without removing the fabricated service mock leaves the same blindness with more ceremony *(KZ-001)*. **Also disqualifying:** dropping T-05's counter assertions (`component.spec.ts` `describe('onActiveItemChange')` / `describe('togglePin')` / the two `not.toHaveBeenCalled()` cases in `describe('loadMyResults')` and `describe('loadAllResults')`) rather than carrying them onto the new harness — they are the R3-1 and R2-5 guards. *(All six pointers verified still accurate post-T-08.)*
+- **Disqualifies:** porting the old assertions onto the new harness without removing the fabricated service mock leaves the same blindness with more ceremony *(KZ-001)*. **Also disqualifying:** dropping T-05's counter assertions (`component.spec.ts` `describe('onActiveItemChange')` / `describe('togglePin')` / the two `not.toHaveBeenCalled()` cases in `describe('loadMyResults')` and `describe('loadAllResults')`) rather than carrying them onto the new harness — they are the R3-1 and R2-5 guards. *(All six pointers verified still accurate post-T-08.)* **Re-described post-attempt-1:** all four were carried and **strengthened** — they now read `expect(resultsCenterService.userFilterMutations()).toBe(<before>)` against the **real** counter, because there is no `noteUserFilterMutation` double left to spy on. Locate them by that assertion, not by `not.toHaveBeenCalled()`, which no longer appears in them.
 - **T-08's block must be RE-EXPRESSED, not ported** *(added 2026-08-13, post-T-08)*. `describe('write effect (T-08)')` is now the largest block in the file (~424 lines, 16 tests) and is deliberately coupled to two things this rewrite destroys: the fabricated `mockResultsCenterService` (including the `noteUserFilterMutation` double that hand-advances `userFilterMutationsSignal`) and a `mockRouter.navigate` that **executes Angular's `queryParamsHandling` semantics itself** against accumulated state. That double is not a shortcut — T-08's review verified it line-by-line against Angular v19's `createUrlTree`/`removeEmptyProps`, and it is what makes the merge contract *observable* rather than recomputed by the assertion. **Ported literally onto a real router it double-merges and the tests become wrong; deleted, R2-1 and the `?utm_source` guard become unfalsifiable.** Re-express each against the real router's resulting URL and delete the simulation shims. Two carry-forwards for that work:
   - The real `snapshot.queryParams` yields `string[]` for a repeated key (`?contract=A100&contract=S192`, which T-02 supports) where the current double flattens to the first value, and the component casts to `Record<string, string>` and compares with `===`. Production navigates once spuriously — self-correcting, history-flat under `replaceUrl`, **not** a loop — but the real harness is where the two sides stop being reconciled by coincidence.
   - The `untracked(...)` mutation-killer (mutate `resultsFilter` **without** bumping the counter; assert the navigate count is unchanged) is the **only** verification D-URL-15's tracked-dependency contract has. It exists because a lens proved that deleting `untracked` failed no test. Carry it, or the central design decision of T-08 goes unverified again.
@@ -351,7 +354,7 @@ Closure is at **scenario and clause** granularity, not requirement ID.
 | R-RCU-006 AC.1–AC.4 | T-01, T-02, T-09 |
 | R-RCU-007 scenario (+ both clauses) | T-10 |
 | R-RCU-007 AC.1, AC.1b, AC.2, AC.3 | T-09, T-10 |
-| NFR-RCU-001 | T-08 |
+| NFR-RCU-001 (**URL layer only** — narrowed by D-URL-17, 2026-08-13) | T-08, T-11 · *whole-page request count deferred to `bugfix/results-center-double-fetch`* |
 | NFR-RCU-002 layer 1 (fixture parity) | T-01 |
 | **NFR-RCU-002 layer 2 (runtime completeness warning)** | **T-06** *(assigned 2026-08-12 during execution — previously owned by no task)* |
 | NFR-RCU-003 (structural: codec never receives an id) | T-03 |

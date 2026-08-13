@@ -187,7 +187,7 @@ The codec resolves `source` from this constant at parse time, exactly like `indi
 4. If `hadRecognizedParam` is false → unchanged behavior: `restorePersistedState`, pinned preference, `loadAllResults`/`loadMyResults`. **Exit.**
 5. If true → **skip `restorePersistedState` entirely** (R-RCU-004).
 6. Call `service.seedFromUrl({ filters, scope })` — one call that writes all state (§7.1) **before** any fetch.
-7. Fire exactly one `main()` (R-RCU-002 AC.4).
+7. Fire exactly one `main()` **from this path** (R-RCU-002 AC.4, as amended 2026-08-13). *The results table independently fires its own `main()` from `handleResultsTableLazyLoad` on init — pre-existing, not ours, and not suppressed here. See D-URL-17.*
 8. If `dropped` is non-empty → one toast, counts only, once per navigation (R-RCU-005 AC.2/AC.3).
 9. **Wipe nothing.** Both wipes are gone (D-URL-8), removed **by T-08, not by T-06.** *(Satisfied 2026-08-13. History, since the sequencing was the hard part: T-06 implemented steps 1–8 and deliberately **kept** the wipe, because §12's ordering constraint forbids removing it before the write path exists; it also merged the two wipes into one `router.navigate` call, which T-08 then deleted. **`initializeState` now performs no navigation at all** — the address bar is kept in sync by `urlWriteEffect`. The old `112-121`/`133-138` line ranges must never be used to find any of this: they point at T-06's NFR-RCU-002 layer-2 warning effects.)*
 
@@ -369,11 +369,13 @@ Neither imports the other. A spelling change on either side turns one test red. 
 
 ### 10.2 The existing component spec must be rewritten, not extended
 
-`results-center.component.spec.ts` does **both** disqualified things at once: a fabricated `ActivatedRoute` double — the `{ provide: ActivatedRoute, useValue: { get snapshot() … } }` block — **and** a template override, the `.overrideComponent(ResultsCenterComponent, { set: { imports: [], template: … } })` call, over a fabricated service mock with no real signals. Nothing renders and no real state exists.
+`results-center.component.spec.ts` **did** both disqualified things at once: a fabricated `ActivatedRoute` double — the `{ provide: ActivatedRoute, useValue: { get snapshot() … } }` block — **and** a template override, the `.overrideComponent(ResultsCenterComponent, { set: { imports: [], template: … } })` call, over a fabricated service mock with no real signals. Nothing rendered and no real state existed.
 
-Meeting §10.1 means dropping the template override, using the real `ResultsCenterService`, providing real control-list services for the child multiselects, and switching to a real router harness. **This is a rewrite of a ~1,550-line spec and is its own task in the budget** — the previous draft's estimate did not carry it.
+> *Past-tensed 2026-08-13 by T-11's review.* T-11 removed the template override and the fabricated service mock; the tree now renders with the real `ResultsCenterService`, real control-list services, and a real `RouterTestingHarness`. **The lightweight `ActivatedRoute`/`Router` doubles were deliberately retained** for the non-routed describes that mock `initializeState` — do not read this paragraph as an instruction to remove them. Same past-tensing discipline as §6.1 step 9 and D-URL-8 after T-08.
 
-> *Corrected 2026-08-13, post-T-08.* Three things in this section had decayed. **(1)** The line citations `101-108` / `112-117` now miss by ~70 lines (the real positions are `:170-188` and `:192-197`), so they are replaced with content-based pointers above — this spec has been bitten by stale line numbers three times now. **(2)** The template literal is written with **backticks** in the source, so the previously quoted `template: '<div></div>'` matches nothing under a literal grep. **(3)** T-06 already replaced the *canned snapshot* with a real `convertToParamMap`-built `ParamMap`, and T-08 added a derived `queryParams` getter over it — so what T-11 must remove is the **fabricated service mock**, not the param map. The file is now **1,550 lines** (was ~1,000 when this was written), which matters because T-11 is the budget's single largest item.
+Meeting §10.1 means dropping the template override, using the real `ResultsCenterService`, providing real control-list services for the child multiselects, and switching to a real router harness. **This was a rewrite of a ~1,550-line spec and was its own task in the budget** — the previous draft's estimate did not carry it. *(Post-T-11 the file is **1,639** lines: 1,316 insertions / 1,297 deletions.)*
+
+> *Corrected 2026-08-13, post-T-08.* Three things in this section had decayed. **(1)** The line citations `101-108` / `112-117` now miss by ~70 lines (the real positions are `:170-188` and `:192-197`), so they are replaced with content-based pointers above — this spec has been bitten by stale line numbers three times now. **(2)** The template literal is written with **backticks** in the source, so the previously quoted `template: '<div></div>'` matches nothing under a literal grep. **(3)** T-06 already replaced the *canned snapshot* with a real `convertToParamMap`-built `ParamMap`, and T-08 added a derived `queryParams` getter over it — so what T-11 must remove is the **fabricated service mock**, not the param map. The file was **1,550 lines** when that note was written (~1,000 when the section was), and is **1,639** after T-11 — which matters because T-11 was the budget's single largest item.
 
 ### 10.3 Disqualifying conditions
 
@@ -415,6 +417,7 @@ A green command that does **not** count as evidence:
 | **D-URL-14** | 2026-08-12 | **Tab-strip sync is a component-scoped effect** keyed on the loading signal **and** the filter signal | *(JD-7, revised R2-7)* `onChangeList` calls `destroy()` on first success on a root singleton. Keying the replacement on `isLoading()` alone reproduced the bug: on a repeat visit that signal is already `false`, so the effect's single run lands before the seed |
 | **D-URL-15** | 2026-08-12 | **The write effect's only tracked dependency is a `userFilterMutations` counter**; filter state is read untracked | *(R2-2, R2-5)* An unconditional effect fires at creation with stale cross-route state, and again on the restore path — which then made session restore self-disabling. Intent, not state, is the correct trigger, and it is what R-RCU-003's "through the UI" wording always meant |
 | **D-URL-16** | 2026-08-12 | **The serializer emits explicit `null` for every inactive canonical parameter** | *(R2-1)* `merge` preserves omitted keys and strips only nulls. Omitting made filters addable but never removable, and let a reload resurrect a filter the user had cleared |
+| **D-URL-17** | 2026-08-13 | **The results table's own `lazyLoadOnInit` fetch is out of scope. R-RCU-002 AC.4 and NFR-RCU-001 are narrowed to the URL layer, and the defect is split into `bugfix/results-center-double-fetch`** | *(T-11 Pivot Record, `execution.md` §9 — user decision, option C.)* `p-table [lazy]="true"` with no `lazyLoadOnInit="false"` fires `onLazyLoad` → `handleResultsTableLazyLoad` → an unconditional `void this.main()` during the table's own init, racing `initializeState`'s seeded call; the filter states differ, so the `fetchKey`s differ and the dedupe cannot collapse them. **The wiring is present on `main` and predates this spec** — url-filters neither caused it nor promised to fix it, and the fix touches a table rendered on four routes, so it earns its own requirements and its own review rather than a thirteenth task on a spec already re-baselined twice. **Rejected:** fixing it here (reopens budget and the approval gate for an unrelated defect on a shared component); amending the AC and stopping (converts a live defect into permanent documented behavior with nothing tracking it). **This is also the spec's clearest KZ-001 datum — recurrence 5, found by the very task written to end the pattern** |
 
 ### Reversion challenge — D-URL-8 *(Step 2.3)*
 
@@ -428,11 +431,11 @@ A green command that does **not** count as evidence:
 
 ## 13. Budget *(Step 2.4 — revised after Judgment Day)*
 
-| Metric | Draft 1 | Round 1 | Round 2 | **Re-baselined (execution)** | Why it moved |
-| --- | --- | --- | --- | --- | --- |
-| Tasks | 8 | 11 | 12 | **12** | Unchanged — the decomposition was right; only the LOC estimate was wrong |
-| LOC | ~630 | ~950 | ~1000 | **~3200** | See the arithmetic error below. The pre-execution figures never carried §10.2's own ~1,000-line spec rewrite, and undercounted the falsifiable-assertion cost this spec's Disqualifies clauses mandate |
-| Review rounds | 2 | 3 | 3 | **3** | Unchanged — and holding: T-01, T-02 and T-10 each passed on the first attempt with zero rework |
+| Metric | Draft 1 | Round 1 | Round 2 | Re-baselined #1 (after T-02) | **Re-baselined #2 (before T-11)** | Why it moved |
+| --- | --- | --- | --- | --- | --- | --- |
+| Tasks | 8 | 11 | 12 | 12 | **12** | Unchanged through every revision — the decomposition was right; only the LOC estimate was ever wrong |
+| LOC | ~630 | ~950 | ~1000 | ~3200 | **~4600** | Re-baseline #1's arithmetic error is below; #2's is the *same class one level down* — see the second record |
+| Review rounds | 2 | 3 | 3 | 3 | **3** | Unchanged — and still holding at 10 of 12 tasks: only T-08 consumed rework (1 round of 3) |
 
 Depth re-checked: **Standard still holds.** Not `Full` — no migration, no auth surface, no data model change, no rollback beyond a code revert. The LOC volume is test mass, not architectural surface. If execution exceeds these numbers, `/akili-execute` stops and escalates rather than continuing.
 
@@ -445,6 +448,20 @@ Measured after 3 of 12 tasks (T-01 441 · T-02 747 · T-10 ~80 = **~1268 LOC**, 
 Basis for ~3200: ~1268 actual for 3 tasks · T-11 ~1000 by its own §10.2 estimate · the remaining eight tasks at roughly the observed per-task average, weighted for T-06/T-08 being the largest wiring tasks.
 
 **Why this is a re-baseline and not a scope change:** zero rework has been consumed, no task grew beyond its stated scope, and the Reviewer judged the test volume *necessary* rather than gold-plated — this spec's Disqualifies clauses require assertions that can actually fail, which costs lines that a presence assertion would not. The LOC figure was wrong; the work is not. Decision recorded by the user at the tripwire escalation; full detail in `execution.md` §3.
+
+### Re-baseline record #2 — 2026-08-13, during `/akili-execute` before T-11
+
+**Re-baseline #1 was wrong in the same way its own predecessor was — a corrected total built on an uncorrected basis.** It read: *"the remaining eight tasks at roughly the observed per-task average"*. That average came from a **three-task sample dominated by two pure-unit tasks** (T-01 441, T-02 747, T-10 ~80), which put it near ~150 LOC/task once T-02 was treated as the outlier. The wiring tasks then landed at roughly **~440 insertions each** (T-04 376 · T-05 257 · T-06 622 · T-07 341 · T-08 825 · T-09 189), so the eight-task remainder cost ~2,600 where ~1,200 was carried.
+
+Measured before T-11, from `git show --stat` over this spec's ten code commits: **4,523 raw insertions, ≈3,400 of them code** (the balance is the `execution.md`/`tasks.md`/`design.md` edits landed in the same commits). Against a ~3,200 whole-spec figure with the single largest item still ahead.
+
+| | Budget #1 | Actual, 10/12 | Remaining | Projected |
+| --- | --- | --- | --- | --- |
+| LOC | ~3,200 | **~3,400** | T-11 ~1,000 · T-12 ~200 | **~4,600 (+44%)** |
+
+**Why this is again a re-baseline and not a scope change.** Task count is unchanged at 12 and review rounds are unchanged at 3 — of the two budget dimensions that measure *scope*, neither has moved in any revision. Only LOC has, three times, and every time as an estimation error. At the escalation the user chose to proceed at full scope over two named alternatives (de-scope T-11 to its carry-forward set; defer T-11 to a follow-on spec), both of which were declined because they pay in defect class **D3** — the state-desync class this spec exists to close — and in **KZ-001**, already at recurrence 4 and live inside the very file T-11 rewrites.
+
+**The lesson, for the Kaizen log at `/akili-archive`:** *a re-baseline must correct the **basis**, not just the total.* Both breaches in this spec were produced by carrying a superseded per-item estimate forward under a corrected sum — the same failure JD-14 was, and the same shape as KZ-006 (*sweep the claim, not the citation*). The remaining two tasks are the only ones this figure now extrapolates, and both are `*.spec.ts`-only, so the residual estimation risk is bounded to test mass with zero production surface.
 
 ---
 

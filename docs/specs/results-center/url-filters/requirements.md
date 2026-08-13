@@ -95,7 +95,11 @@ Requirements use `R-RCU-<NNN>` (Results Center URL); non-functional use `NFR-RCU
 **Details:**
 
 - Behavior: on component init, recognized parameters are parsed, validated, and applied to **all three** state signals (`tableFilters`, `resultsFilter`, `appliedFilters`) plus the indicator tab strip, before the first results fetch.
-- Outputs: one results request carrying the URL-derived filter; sidebar chips and tab strip reflecting it.
+- Outputs: one results request **from the URL read path**, carrying the URL-derived filter; sidebar chips and tab strip reflecting it.
+
+> ⚠️ **Scope correction, 2026-08-13 (Pivot Record, `execution.md` §9 — option C).** The clauses below originally promised *"exactly one results request for the initial load"*, full stop. T-11's real-render harness proved that false, and the cause is **not** in this spec's layer: the results table is `[lazy]="true"` with no `lazyLoadOnInit="false"` (`results-center-table.component.html:60,64`), so PrimeNG fires `onLazyLoad` → `handleResultsTableLazyLoad` → an unconditional `void this.main()` (`results-center.service.ts:594-612`) during the table's own init, independently of the URL. That wiring is present on `main` and **predates this spec entirely**; `main()`'s dedupe cannot collapse the two calls because the filter states, and therefore the `fetchKey`s, differ.
+>
+> This spec's guarantee is therefore restated as what it can actually own: **the URL read path contributes exactly one request, and it is seeded before it fires.** The table's own init-time fetch is pre-existing production behavior, out of scope here, and tracked as its own defect in **`docs/specs/bugfix/results-center-double-fetch`**. Do not read the amended clauses as a claim that a Results Center load issues one request in total — today it does not.
 
 #### Scenario: CapDev email link
 
@@ -104,7 +108,7 @@ Requirements use `R-RCU-<NNN>` (Results Center URL); non-functional use `NFR-RCU
 - THEN the table shows only results of contract `A100` under the Capacity Sharing indicator
 - AND the Capacity Sharing tab is the active tab in the strip
 - AND the filter sidebar shows a `PROJECT: A100` chip
-- BUT it must NOT issue more than one results request for the initial load
+- BUT **the URL read path** must NOT issue more than one results request for the initial load *(amended 2026-08-13 — see the scope correction above; the table's own `lazyLoadOnInit` fetch is a separate, pre-existing request this spec does not own)*
 - AND IT MUST apply the filter *before* the first request, never by fetching unfiltered and then re-fetching
 
 #### Scenario: Multi-value parameter
@@ -119,7 +123,7 @@ Requirements use `R-RCU-<NNN>` (Results Center URL); non-functional use `NFR-RCU
 - [ ] AC.1 — Every one of the six parameters, applied alone, filters the table.
 - [ ] AC.2 — Parameters combine: two different parameters in one URL both apply.
 - [ ] AC.3 — Sidebar chips and the tab strip match the applied filter — **state parity across all three signals is asserted, not just the API payload.**
-- [ ] AC.4 — Exactly one results request is issued for the initial load.
+- [ ] AC.4 — **The URL read path issues exactly one results request for the initial load, and it is seeded before it fires.** *(Amended 2026-08-13 per the Pivot Record, `execution.md` §9. The original wording — "Exactly one results request is issued for the initial load" — was proven false by T-11's real-render harness and was **never** true in production; the second request comes from the table's own `lazyLoadOnInit`, which predates this spec. Deferred to `docs/specs/bugfix/results-center-double-fetch`. **T-06's `[x]` stands on the amended clause, not the original one** — it verified the read path, which is what it implemented; it never had a harness that could see the table.)*
 - [ ] AC.5 — `?tab=my` scopes to the current user's results without the user id ever appearing in the URL.
 - [ ] AC.6 — A URL carrying **no** `tab` resolves the my/all scope from the user's pinned-tab preference, exactly as a parameter-less visit does today. The scope is never left at whatever the root-singleton service happened to hold from a previous route.
 - [ ] AC.7 — A URL carrying `tab=my` **together with** another filter applies both; the scope is not overwritten by the filter seeding, in either order.
@@ -289,8 +293,9 @@ Requirements use `R-RCU-<NNN>` (Results Center URL); non-functional use `NFR-RCU
 ### NFR-RCU-001 — No navigation loop, no duplicate fetch
 
 - **Category:** reliability
-- **Target:** initial load issues exactly 1 results request; any single filter change issues exactly 1; URL writes issue 0.
-- **How verified:** component test counting `router.navigate` invocations and results-service calls across load, change and clear.
+- **Target:** **the URL layer** issues 0 additional results requests: the read path contributes exactly 1 on initial load, any single filter change contributes exactly 1, and a URL **write** contributes 0. *(Amended 2026-08-13 — the original target read "initial load issues exactly 1 results request", a whole-page claim this spec's layer cannot make. See R-RCU-002's scope correction and the Pivot Record in `execution.md` §9.)*
+- **Not covered, and deliberately so:** the results table's own `lazyLoadOnInit` fetch, which fires from `handleResultsTableLazyLoad` independently of the URL and predates this spec. It means a real Results Center load currently issues **two** requests. Tracked in `docs/specs/bugfix/results-center-double-fetch`; **not** silently absorbed here.
+- **How verified:** component test counting `router.navigate` invocations and results-service calls across load, change and clear — asserted against the **real rendered component tree** (T-11), because the overridden-template harness that first "verified" this could not observe the table at all *(KZ-001, recurrence 5)*.
 
 ### NFR-RCU-002 — Vocabulary drift is detected, and the limits of that detection are stated
 
@@ -355,7 +360,7 @@ Per the constitution: name what this spec can get wrong, then say which command 
 | # | Defect class | Gate | Blind? |
 | --- | --- | --- | --- |
 | D1 | Codec maps a token to the wrong filter or drops a value | `npm test -- --silent` (client) — codec unit tests, round-trip property | No |
-| D2 | Navigation loop / duplicate fetch | Component test counting navigate + fetch calls (NFR-RCU-001) | No |
+| D2 | Navigation loop / duplicate fetch | Component test counting navigate + fetch calls (NFR-RCU-001) — **only valid against a real rendered tree.** This gate returned a false green for T-06: the overridden-template harness could not see the table that issues the duplicate fetch. Re-armed by T-11 | **Was blind, now not** |
 | D3 | **State desync** — the API filter applies but the sidebar chip or tab strip does not (three signals, one of them forgotten) | Component test asserting all three signals *and* the rendered chip, per R-RCU-002 AC.3 | No |
 | D4 | Vocabulary drift when an indicator is added | Parity test = **layer 1 only** (T-01); the layer that actually detects a server-side addition is the **runtime completeness warning**, NFR-RCU-002 layer 2 (T-06) | **Partly** — layer 1 is blind to it by construction |
 | D5 | Regression in Home links or the project dashboard | **Full** client suite, not targeted specs *(KZ-003)* | No |
