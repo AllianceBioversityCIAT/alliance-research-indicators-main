@@ -843,6 +843,8 @@ export class BilateralService {
         payload_after: {
           has_contribution: dto.has_contribution,
           lever_codes: leverCodes,
+          // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-10 / design.md §5.4
+          primary_sp_code: primarySpCode,
           // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06
           // (design §6.3 step 6) — the history entry mentions the ToC
           // alignment change ONLY when `toc_alignments` was submitted;
@@ -1536,6 +1538,19 @@ export class BilateralService {
     return { codes, validCodes };
   }
 
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-10 / design.md §5.4
+  //
+  // Widened to read the `sp_roles` carrier (T-08) instead of only
+  // `selected_levers[].lever_code`, which cannot see a role at all. This is
+  // what lets `payload_before` distinguish a Primary CHANGE from a Primary
+  // being set for the first time — the three cases from design.md §5.4:
+  //   1. had a Primary        -> that sp_code
+  //   2. legacy, no role      -> `null` (an OBJECT whose field is null)
+  //   3. no previous alignment -> `payload_before` stays `null` ITSELF
+  //      (handled by the early return below, unchanged)
+  // `?? []` guards a defensively-missing carrier (e.g. a pre-T-08 fixture
+  // shape) the same way case 2 is handled — no PRIMARY row found reports
+  // `null`, never a thrown error.
   private toHistoryPayload(
     alignment: PoolFundingAlignmentDetail | null,
   ): Record<string, unknown> | null {
@@ -1543,9 +1558,14 @@ export class BilateralService {
       return null;
     }
 
+    const primarySp = (alignment.sp_roles ?? []).find(
+      (sp) => sp.sp_role === 'PRIMARY',
+    );
+
     return {
       has_contribution: alignment.has_contribution,
       lever_codes: alignment.selected_levers.map((lever) => lever.lever_code),
+      primary_sp_code: primarySp?.sp_code ?? null,
     };
   }
 

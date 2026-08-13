@@ -1243,6 +1243,258 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
     });
   });
 
+  // A dedicated `scopedManager` again (T-06's convention) rather than the
+  // shared `fakeManager` — it echoes back the SAME mock repo for every
+  // entity, which would make `historySave` indistinguishable from the SP
+  // and alignment saves. The disqualifier requires reading `historySave`'s
+  // OWN call arguments to tell the three cases apart, not merely their
+  // presence.
+  //
+  // T-06's ADVISORY 3 (`transaction.mockReset()`) applies here too — this
+  // describe also assigns `transaction.mockImplementation` to a scoped
+  // manager that throws on any unrecognized entity. The file's OUTER
+  // `beforeEach` (`transaction.mockImplementation(async (cb) =>
+  // cb(fakeManager))`, line ~107) already reassigns it before EVERY test in
+  // the file regardless of describe nesting, so the leak T-06 guards
+  // against cannot actually reach a later describe — verified by running
+  // `listIndicators`/`upsertContribution`/`deleteContribution` (which all
+  // rely on `fakeManager`) green after this describe. The local
+  // `mockReset()` below is kept anyway, matching T-06's stated reasoning:
+  // explicit is safer than relying on hook ordering.
+  //
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-10 / design.md §5.4
+  describe('updateAlignment — audit payload records the Primary before/after (T-10)', () => {
+    const alignmentSpSave = jest.fn().mockResolvedValue([]);
+    const alignmentSpUpdate = jest.fn();
+    const alignmentSave = jest.fn().mockResolvedValue({ id: 501 });
+    const alignmentUpdate = jest.fn();
+    const historySave = jest.fn().mockResolvedValue({ id: 1 });
+
+    const scopedManager = {
+      getRepository: (entity: unknown) => {
+        if (entity === ResultPoolFundingAlignmentSp) {
+          return { save: alignmentSpSave, update: alignmentSpUpdate };
+        }
+        if (entity === ResultPoolFundingAlignment) {
+          return { save: alignmentSave, update: alignmentUpdate };
+        }
+        if (entity === ResultReviewHistory) {
+          return { save: historySave };
+        }
+        throw new Error(
+          `T-10 scopedManager: unexpected getRepository(${String(entity)})`,
+        );
+      },
+    } as unknown as EntityManager;
+
+    const eligibleContext = () => ({
+      result_id: 19792,
+      result_official_code: 19792,
+      is_pool_funding_contributor: true,
+      is_synced_to_prms: false,
+      platform_code: 'STAR',
+      report_year_id: 2026,
+    });
+
+    const legacyPreviousAlignment = () => ({
+      id: 77,
+      result_id: 19792,
+      has_contribution: true,
+      selected_levers: [
+        { lever_code: 'SP06', lever_name: 'SP06' },
+        { lever_code: 'SP09', lever_name: 'SP09' },
+      ],
+      sp_roles: [
+        { sp_code: 'SP06', sp_role: null },
+        { sp_code: 'SP09', sp_role: null },
+      ],
+    });
+
+    const primaryPreviousAlignment = (primary: 'SP06' | 'SP09') => ({
+      id: 77,
+      result_id: 19792,
+      has_contribution: true,
+      selected_levers: [
+        { lever_code: 'SP06', lever_name: 'SP06' },
+        { lever_code: 'SP09', lever_name: 'SP09' },
+      ],
+      sp_roles: [
+        {
+          sp_code: 'SP06',
+          sp_role: primary === 'SP06' ? 'PRIMARY' : 'CONTRIBUTING',
+        },
+        {
+          sp_code: 'SP09',
+          sp_role: primary === 'SP09' ? 'PRIMARY' : 'CONTRIBUTING',
+        },
+      ],
+    });
+
+    beforeEach(() => {
+      transaction.mockImplementation(async (cb) => cb(scopedManager));
+      jest.spyOn(service, 'getAlignment').mockResolvedValue({} as never);
+      jest.spyOn(service, 'getScienceProgramsForResult').mockResolvedValue({
+        result_code: '19792',
+        mapping_status: 'mapped',
+        clarisa_project: { id: 1, short_name: 'p' },
+        science_programs: ['SP06', 'SP09'].map((code) => ({
+          code,
+          name: `name-of-${code}`,
+          category: null,
+          color: null,
+          icon_key: null,
+          allocation: 50,
+        })),
+      });
+    });
+
+    afterEach(() => {
+      transaction.mockReset();
+    });
+
+    it('payload_after.primary_sp_code is populated with the resolved Primary', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      await service.updateAlignment(
+        19792,
+        '19792',
+        {
+          has_contribution: true,
+          sp_codes: ['SP06', 'SP09'],
+          primary_sp_code: 'SP06',
+        },
+        user,
+      );
+
+      expect(historySave).toHaveBeenCalledTimes(1);
+      const [payload] = historySave.mock.calls[0];
+      expect(payload.payload_after).toEqual(
+        expect.objectContaining({ primary_sp_code: 'SP06' }),
+      );
+    });
+
+    it('case 1 — previous alignment had a Primary ⇒ payload_before.primary_sp_code reports that sp_code (a real before/after diff)', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(
+        primaryPreviousAlignment('SP06'),
+      );
+
+      await service.updateAlignment(
+        19792,
+        '19792',
+        {
+          has_contribution: true,
+          sp_codes: ['SP06', 'SP09'],
+          primary_sp_code: 'SP09', // Primary changes SP06 -> SP09
+        },
+        user,
+      );
+
+      const [payload] = historySave.mock.calls[0];
+      expect(payload.payload_before).toEqual(
+        expect.objectContaining({ primary_sp_code: 'SP06' }),
+      );
+      expect(payload.payload_after).toEqual(
+        expect.objectContaining({ primary_sp_code: 'SP09' }),
+      );
+    });
+
+    it('case 2 — legacy previous alignment (sp_role = NULL on every row) ⇒ payload_before is an OBJECT whose primary_sp_code is null', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(legacyPreviousAlignment());
+
+      await service.updateAlignment(
+        19792,
+        '19792',
+        {
+          has_contribution: true,
+          sp_codes: ['SP06', 'SP09'],
+          primary_sp_code: 'SP06',
+        },
+        user,
+      );
+
+      const [payload] = historySave.mock.calls[0];
+      // SHAPE assertion — the disqualifier: a legacy previous alignment
+      // (case 2) is an OBJECT with a null field, never `null` itself. Case
+      // 3 below asserts the opposite shape with the identical VALUE
+      // (`null`), which is exactly why asserting only `=== null` here would
+      // pass under both cases and prove neither.
+      expect(payload.payload_before).not.toBeNull();
+      expect(typeof payload.payload_before).toBe('object');
+      expect(payload.payload_before.primary_sp_code).toBeNull();
+    });
+
+    it('case 3 — no previous alignment at all ⇒ payload_before stays null ENTIRELY, not an object', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+
+      await service.updateAlignment(
+        19792,
+        '19792',
+        {
+          has_contribution: true,
+          sp_codes: ['SP06', 'SP09'],
+          primary_sp_code: 'SP06',
+        },
+        user,
+      );
+
+      const [payload] = historySave.mock.calls[0];
+      // The shape case 2 must NOT collapse into: `payload_before` itself is
+      // `null`, not an object carrying a null field.
+      expect(payload.payload_before).toBeNull();
+    });
+
+    it('two-save test — a Primary CHANGE is distinguishable from a first-set, which the three cases above cannot show alone', async () => {
+      // Save 1: no previous alignment at all -> first-set of SP06 as Primary.
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+      await service.updateAlignment(
+        19792,
+        '19792',
+        {
+          has_contribution: true,
+          sp_codes: ['SP06', 'SP09'],
+          primary_sp_code: 'SP06',
+        },
+        user,
+      );
+      const [firstSavePayload] = historySave.mock.calls[0];
+
+      // Save 2: the alignment now on file has SP06 as Primary; this PATCH
+      // changes it to SP09 -> a genuine Primary CHANGE.
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(
+        primaryPreviousAlignment('SP06'),
+      );
+      await service.updateAlignment(
+        19792,
+        '19792',
+        {
+          has_contribution: true,
+          sp_codes: ['SP06', 'SP09'],
+          primary_sp_code: 'SP09',
+        },
+        user,
+      );
+      const [secondSavePayload] = historySave.mock.calls[1];
+
+      // Both saves report `payload_after.primary_sp_code` as truthy — a
+      // presence-assertion on `payload_after` alone cannot tell "first-set"
+      // apart from "change". Only `payload_before` can, and only across
+      // this before/after PAIR:
+      expect(firstSavePayload.payload_before).toBeNull(); // first-set
+      expect(secondSavePayload.payload_before).toEqual(
+        expect.objectContaining({ primary_sp_code: 'SP06' }),
+      ); // change — a real previous Primary existed
+      expect(firstSavePayload.payload_before).not.toEqual(
+        secondSavePayload.payload_before,
+      );
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // listIndicators
   // ---------------------------------------------------------------------------

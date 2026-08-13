@@ -459,7 +459,7 @@ graph TD
 - **Estimated LOC:** ~70
 - **Effort:** S
 - **Skills:** `nestjs-expert`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-10). Ran **in parallel with T-12**. Cases 2 and 3 proven **non-conflated** — the collapse sabotage reddens **case 2 only**. **⚠ The `?? []` guard masks a STALE T-06 FIXTURE**, not a production gap (`sp_roles` is required and always built) — **T-11 fixes the fixture; the guard's removal is a production change and is NOT T-11's.**
 
 ---
 

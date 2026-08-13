@@ -2599,3 +2599,105 @@ four names above.
 ✅ Sabotage reddens **all four** isolation tests; the original ordering reddens only two — **blind spot reproduced and closed**
 
 ---
+
+### T-10 — Audit payload records the Primary before and after
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **1** (of 3) · **Reviewer verdicts** 1 × `PASS` · **rework consumed 0** |
+| **Requirements covered** | `design.md` §5.4 · supports R-BIL-120, R-BIL-123 |
+| **Dependencies** | T-06 ✅ · T-08 ✅ |
+| **Estimated / actual LOC** | ~70 / **272 insertions, 0 deletions** |
+| **Ran** | **in parallel with T-12** (disjoint files) |
+
+`toHistoryPayload` widened to read T-08's `sp_roles` carrier; `payload_after` gains
+`primary_sp_code`. Without the widening **every** history entry would report `primary_sp_code: null`
+as its *before* value, making a Primary **change** indistinguishable from a Primary being **set for
+the first time** — the precise distinction an audit trail exists to capture.
+
+#### The three cases are genuinely distinguishable — verified by sabotage, not by claim
+
+| Case | `payload_before` |
+| --- | --- |
+| 1. Had a Primary | `{ …, primary_sp_code: 'SP06' }` |
+| 2. Legacy, no role | `{ …, primary_sp_code: null }` — an **OBJECT** |
+| 3. No previous alignment | **`null` itself** |
+
+The disqualifier warns cases 2 and 3 are *"trivially conflated"*. **Sabotage 3** (`if (!primarySp)
+return null;`, collapsing 2 into 3) reddens **case 2 ONLY** — case 3 reaches the `!alignment` early
+return before the sabotage. Sabotages 1 and 2 each hit their claimed target and nothing else. **Not
+conflated.**
+
+The **two-save test** does more than assert inequality: it asserts **both concrete shapes** (save 1
+`payload_before` `toBeNull()`; save 2 `objectContaining({ primary_sp_code: 'SP06' })`) *and* their
+difference. Both sabotages 1 and 2 redden it, confirming it is load-bearing.
+
+#### 🔴 The `?? []` guard — reading (b), MASKING, but of a test fixture
+
+The Leader asked the Reviewer to decide between two readings. **Answer: (b), and mechanically proven.**
+
+`PoolFundingAlignmentDetail.sp_roles` is a **required** field
+(`result-pool-funding-alignment.repository.ts:39`), and its sole producer
+`findActiveAlignmentByResultId` **always** builds it (possibly `[]`). `previousAlignment` has no other
+source. **So the guard defends a shape unreachable at runtime.**
+
+What it actually holds up: removing it moves the folder 41 → **42** red, and the single new failure is
+**`R-BIL-126 AC.4`** (`bilateral.service.spec.ts:~1206`) with
+`TypeError: Cannot read properties of undefined (reading 'find')` — **a stale T-06 fixture that omits
+`sp_roles` entirely**, predating T-08's carrier.
+
+**Reviewer's ruling: the guard should NOT stay long-term, but it should stay for T-10.** Its behaviour
+is correct (a missing carrier and an empty carrier both yield case 2's `null`), and removing it today
+requires editing a fixture inside **T-11's explicit 13-block re-base census**.
+
+#### ✅ Both inherited advisories resolved in the Implementer's favour — verified, not accepted
+
+- **`SpRole`:** the Reviewer compiled a deliberate typo — `sp.sp_role === 'PRIMARYX'` →
+  **`error TS2367: This comparison appears to be unintentional because the types 'SpRole' and
+  '"PRIMARYX"' have no overlap`**. The literal **is** type-checked against the exported union via
+  `PoolFundingAlignmentSpRole.sp_role: SpRole | null`. No import needed. T-08's request is satisfied
+  **by type**, which is what it asked for.
+- **`transaction.mockReset()` — T-06/T-08's advisory was OVER-CAUTIOUS.** The file-level `beforeEach`
+  reassigns `transaction.mockImplementation` and Jest runs **outer-before-inner for every test**, so a
+  stale inner implementation **structurally cannot** reach a later describe. **Recorded so it is not
+  re-issued a third time.** (Keeping the local reset is harmless.)
+
+#### Socket payload unchanged
+`emitPoolFundingAlignmentChanged({ result_code, by_user_id, at })` at `:872-876` — **zero diff hunks
+in that region.** `design.md` §5.3 satisfied.
+
+#### ⚠ A data-loss alarm that was a false positive — resolved
+`rev-T10-2` observed `result-pool-funding-toc-alignment.repository.spec.ts` change from **modified** to
+**clean** mid-run and correctly escalated *"please confirm T-12's +268/−1 still exists before anyone
+commits."* **Verified: it is safe in commit `49602c29`** — the file reads clean *because it was
+committed between the Reviewer's two observations*, not because it was reverted. All 10
+`R-BIL-118 AC` markers present at `HEAD`. **Correct instinct on a shared tree; benign cause.**
+
+#### ADVISORY (4R) — recorded
+1. **READABILITY.** The production comment at `bilateral.service.ts:1551-1553` justifies a **production
+   guard** by citing *"a pre-T-08 fixture shape"* — **production code should not document itself by
+   reference to a test fixture.** When the fixture is fixed, both the guard and this comment go.
+2. **RELIABILITY.** The two-save test **hand-writes** save 2's "previous alignment" rather than deriving
+   it from what save 1 actually wrote; deriving it from `alignmentSpSave.mock.calls[0]` would make the
+   fixture unable to drift from the real write. Polish — the round trip is covered by T-08/T-09.
+3. **RELIABILITY.** `has_contribution: false` yields `payload_after.primary_sp_code: null` — honest and
+   correct, but **untested**. One assertion would pin it.
+
+#### Forward pointers → T-11
+
+| Item | Detail |
+| --- | --- |
+| **Fix the stale fixture** | `R-BIL-126 AC.4` (`bilateral.service.spec.ts:~1206`) omits `sp_roles` entirely while its own comment claims it represents *"`sp_role = NULL` rows"*. Give it the two `sp_role: null` rows it describes. **This file is already in your 13-block census.** |
+| **⚠ Do NOT delete the `?? []` guard** | That is a **production** change and T-11's scope boundary is **test files only, zero production files in the diff.** Fix the fixture, then **record that the guard has become removable** — its removal belongs to a follow-up or `/akili-archive`, not here. |
+| **Delete T-08's superseded describe** | `ResultPoolFundingAlignmentRepository — sp_roles LEFT JOIN null-sp_code guard (T-08 / RA-08)` at `bilateral.service.spec.ts:~1524-1615` — **T-09's file is a strict superset** (T-09's forward pointer). |
+| **Cite T-12's four ASCII-safe test names** | Listed in T-12's entry above, for any ledger row reading *"relocated to the ToC repository spec"*. |
+| **Execute T-12's un-dischargeable criterion** | *"Every T-11 ledger row pointing here resolves to an existing test"* — T-12 could not run this (no ledger existed). **It is yours.** |
+
+#### Final verification
+✅ suite **byte-identical to baseline** — 41 failed / 176 passed / 217; `bilateral.service.spec.ts` carries exactly 2 red, **both proven pre-existing** by swapping HEAD copies of both T-10 files back in
+✅ `npx tsc -p tsconfig.json --noEmit` — clean · `npx eslint` both files — clean (**K-001**)
+✅ Working tree restored and checksum-verified after **every** sabotage
+
+---
