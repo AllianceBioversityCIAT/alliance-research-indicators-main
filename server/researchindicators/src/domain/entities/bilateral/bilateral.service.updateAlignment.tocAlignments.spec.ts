@@ -1535,4 +1535,272 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       });
     });
   });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-07 / R-BIL-124, R-BIL-125
+  //
+  // The ToC restriction: a selected SP that is not the resolved Primary is
+  // rejected with `toc_alignment_not_primary_sp`, positioned AFTER
+  // `sp_not_selected` and BEFORE the `aligns_with_toc` short-circuit
+  // (design.md §5.2), collected — not thrown eagerly — alongside any other
+  // per-alignment error (AC.4). R-BIL-125 pins that demoting/promoting the
+  // Primary role deactivates nothing — the only cascade trigger stays "the
+  // SP left sp_codes" (design.md §5.3). T-01's cascade pins above (lines
+  // 454-480) are intentionally left untouched here — they are T-11's to
+  // re-base, not this task's.
+  describe('R-BIL-124 / R-BIL-125 — ToC restriction to the Primary SP only (T-07)', () => {
+    beforeEach(() => {
+      findContext.mockResolvedValue(baseContext());
+      findActiveAlignment.mockResolvedValue(null);
+      getTocResults.mockResolvedValue(sp01OutputCatalog);
+    });
+
+    it('AC.1 — a selected Contributing SP’s entry ⇒ 400 { sp_code, error: "toc_alignment_not_primary_sp" }; the Primary’s own valid entry is absent from the errors', async () => {
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01', 'SP03'],
+        primary_sp_code: 'SP01',
+        toc_alignments: [
+          {
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: 5972,
+            quantitative_contribution: 3,
+          },
+          {
+            sp_code: 'SP03',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+          },
+        ],
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: {
+          toc_alignments: { sp_code: string; field: string; error: string }[];
+        };
+      };
+      // Presence-assertion caveat: assert the exact { sp_code, error } pair
+      // AND that the Primary's own (valid) entry is absent — not merely
+      // that the new code string shows up somewhere in the response.
+      expect(response.message.toc_alignments).toEqual([
+        {
+          sp_code: 'SP03',
+          field: 'sp_code',
+          error: 'toc_alignment_not_primary_sp',
+        },
+      ]);
+      expect(
+        response.message.toc_alignments.some((e) => e.sp_code === 'SP01'),
+      ).toBe(false);
+      expect(transaction).not.toHaveBeenCalled();
+      expect(upsertForSp).not.toHaveBeenCalled();
+    });
+
+    it('AC.2 — an unselected SP still ⇒ sp_not_selected, not the new code (proves position after sp_not_selected)', async () => {
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01'],
+        primary_sp_code: 'SP01',
+        toc_alignments: [{ sp_code: 'SP99', aligns_with_toc: false }],
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: {
+          toc_alignments: { sp_code: string; field: string; error: string }[];
+        };
+      };
+      expect(response.message.toc_alignments).toEqual([
+        { sp_code: 'SP99', field: 'sp_code', error: 'sp_not_selected' },
+      ]);
+    });
+
+    it('AC.3 — the Primary’s own entry validates exactly as under C1 (level_not_allowed still fires, untouched by the new rule)', async () => {
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01'],
+        primary_sp_code: 'SP01',
+        toc_alignments: [
+          {
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            // OUTCOME is not in capacity_sharing's allowed_levels (['OUTPUT']).
+            level: 'OUTCOME',
+            toc_result_id: 5187,
+          },
+        ],
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: {
+          toc_alignments: { sp_code: string; field: string; error: string }[];
+        };
+      };
+      expect(response.message.toc_alignments).toEqual([
+        { sp_code: 'SP01', field: 'level', error: 'level_not_allowed' },
+      ]);
+    });
+
+    it('AC.4 — ≥2 simultaneous per-alignment errors are returned together; nothing persisted (asserted by call counts)', async () => {
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01', 'SP03'],
+        primary_sp_code: 'SP01',
+        toc_alignments: [
+          // Unselected SP → sp_not_selected.
+          { sp_code: 'SP99', aligns_with_toc: false },
+          // Selected Contributing SP → toc_alignment_not_primary_sp.
+          {
+            sp_code: 'SP03',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+          },
+        ],
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: {
+          toc_alignments: { sp_code: string; field: string; error: string }[];
+        };
+      };
+      expect(response.message.toc_alignments).toEqual(
+        expect.arrayContaining([
+          { sp_code: 'SP99', field: 'sp_code', error: 'sp_not_selected' },
+          {
+            sp_code: 'SP03',
+            field: 'sp_code',
+            error: 'toc_alignment_not_primary_sp',
+          },
+        ]),
+      );
+      expect(response.message.toc_alignments).toHaveLength(2);
+      // Atomicity proven by CALL COUNTS (not merely the status code) —
+      // a single-bad-entry test cannot distinguish collection from eager
+      // throw; this one carries two simultaneous errors (D-V2-8).
+      expect(transaction).toHaveBeenCalledTimes(0);
+      expect(upsertForSp).toHaveBeenCalledTimes(0);
+      expect(deactivateForSps).toHaveBeenCalledTimes(0);
+    });
+
+    it('AC.5 — a request whose only toc_alignments entry is the Primary’s succeeds unchanged', async () => {
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01', 'SP03'],
+        primary_sp_code: 'SP01',
+        toc_alignments: [
+          {
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 5187,
+            indicator_id: 5972,
+            quantitative_contribution: 3,
+          },
+        ],
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, user),
+      ).resolves.toBeDefined();
+
+      expect(upsertForSp).toHaveBeenCalledTimes(1);
+      expect(upsertForSp).toHaveBeenCalledWith(
+        expect.objectContaining({ sp_code: 'SP01', aligns_with_toc: true }),
+        42,
+        fakeManager,
+      );
+      expect(transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('an explicit aligns_with_toc: false for a Contributing SP is REJECTED, not silently accepted as a valid "No" (design §5.2 — placement before the short-circuit)', async () => {
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01', 'SP03'],
+        primary_sp_code: 'SP01',
+        toc_alignments: [{ sp_code: 'SP03', aligns_with_toc: false }],
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: {
+          toc_alignments: { sp_code: string; field: string; error: string }[];
+        };
+      };
+      expect(response.message.toc_alignments).toEqual([
+        {
+          sp_code: 'SP03',
+          field: 'sp_code',
+          error: 'toc_alignment_not_primary_sp',
+        },
+      ]);
+      expect(upsertForSp).not.toHaveBeenCalled();
+    });
+
+    it('R-BIL-125 AC.1 — changing primary_sp_code with both SPs still selected leaves both ToC rows active (no new cascade)', async () => {
+      findActiveTocRows.mockResolvedValue([
+        { id: 10, sp_code: 'SP01' },
+        { id: 11, sp_code: 'SP03' },
+      ]);
+
+      // Demotes SP01 (previously Primary), promotes SP03 — both stay
+      // selected, no toc_alignments submitted on this PATCH.
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01', 'SP03'],
+        primary_sp_code: 'SP03',
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, user),
+      ).resolves.toBeDefined();
+
+      // Role change alone triggers NO cascade — the only trigger remains
+      // "the SP left sp_codes" (design.md §5.3, R-BIL-125). Both rows
+      // (SP01's and SP03's) stay active because neither left sp_codes.
+      expect(deactivateForSps).not.toHaveBeenCalled();
+      expect(upsertForSp).not.toHaveBeenCalled();
+    });
+  });
 });

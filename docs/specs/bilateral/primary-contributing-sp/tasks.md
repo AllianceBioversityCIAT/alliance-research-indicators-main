@@ -341,7 +341,7 @@ graph TD
 - **Estimated LOC:** ~110
 - **Effort:** M
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-07). Pure append to `tocAlignments.spec.ts` (**268/0**) — **none of T-11's 37 red blocks touched**; `bilateral.service.spec.ts` diff **empty**. "No new red" **proven structurally**: every failing block throws at `resolvePrimarySpCode` *before* `validateTocAlignments` runs, so the new rule cannot be on their failure path. **⚠ SECOND PIVOT OPEN — R-BIL-125 AC.2 is mis-assigned here and belongs to T-08** (`getAlignment` is mocked in this file and the read-back filter is out of T-07's scope). Awaiting approval; see `execution.md` → *Pivot Record: T-08*.
 
 ---
 

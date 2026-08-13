@@ -89,6 +89,8 @@ interface TocAlignmentValidationError {
   error:
     | 'duplicate_sp_code'
     | 'sp_not_selected'
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-07 / R-BIL-124
+    | 'toc_alignment_not_primary_sp'
     | 'missing_required_fields'
     | 'level_not_allowed'
     | 'unknown_toc_result_id'
@@ -695,8 +697,8 @@ export class BilateralService {
     // transaction opens too, so a rejection here observes no partial write
     // (R-BIL-121's atomicity clause) — same reasoning as the version gate
     // above. Positioned after it (R-BIL-130) and before
-    // `validateTocAlignments`, which needs the resolved Primary for the
-    // T-07 restriction (not wired through yet — that is T-07's scope).
+    // `validateTocAlignments`, which is passed the resolved Primary below
+    // for the T-07 restriction (R-BIL-124).
     const primarySpCode = this.resolvePrimarySpCode(
       dto,
       leverCodes,
@@ -717,6 +719,7 @@ export class BilateralService {
           leverCodes,
           context,
           resultId,
+          primarySpCode,
         )
       : null;
 
@@ -894,8 +897,8 @@ export class BilateralService {
    * the T-04 version gate), so a rejection here observes no partial write
    * (R-BIL-121's atomicity clause) — same reasoning as the version gate.
    * Positioned after it (R-BIL-130: the shipped 409 keeps winning) and
-   * before `validateTocAlignments`, which will need the resolved Primary for
-   * the T-07 restriction — wiring it through is T-07's job, not this one's.
+   * before `validateTocAlignments`, which is handed the resolved Primary as
+   * a parameter for the T-07 restriction (R-BIL-124).
    *
    *   1. `has_contribution === false` → `null`. No SP rows are written and
    *      `primary_sp_code` is ignored (R-BIL-014). Returns BEFORE touching
@@ -987,9 +990,14 @@ export class BilateralService {
    * runs — see design.md §4 step 2 and R-BIL-130.
    *
    *   a. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
-   *      `missing_required_fields` — collected per alignment. The required
-   *      floor for `aligns_with_toc: true` is `level` + `toc_result_id`
-   *      only (R-BIL-111 §5.1, D-C1-3); `indicator_id` is optional.
+   *      `toc_alignment_not_primary_sp` (T-07 / R-BIL-124: a selected SP
+   *      that is not the resolved Primary — checked immediately after
+   *      `sp_not_selected` and before the `aligns_with_toc` short-circuit,
+   *      so an explicit "No" for a Contributing SP is rejected too, design
+   *      §5.2), `missing_required_fields` — collected per alignment. The
+   *      required floor for `aligns_with_toc: true` is `level` +
+   *      `toc_result_id` only (R-BIL-111 §5.1, D-C1-3); `indicator_id` is
+   *      optional.
    *   b. Catalog validation per "Yes" entry — `level_not_allowed`, then
    *      `toc_result_id` existence in the cached (sp, level) catalog →
    *      `unknown_toc_result_id`. `indicator_id` is resolved against that
@@ -1016,6 +1024,12 @@ export class BilateralService {
     effectiveSpCodes: string[],
     context: { report_year_id?: number | string; indicator_id?: number },
     resultId: number,
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-07 / R-BIL-124
+    // The resolved Primary (T-06's `resolvePrimarySpCode`), threaded through
+    // so a selected-but-non-Primary entry can be rejected below. `null` only
+    // when `has_contribution` is false, in which case `effectiveSpCodes` is
+    // already empty and every entry is caught by `sp_not_selected` first.
+    primarySpCode: string | null,
   ): Promise<TocAlignmentUpsertInput[]> {
     const errors: TocAlignmentValidationError[] = [];
     const effective = new Set(effectiveSpCodes);
@@ -1044,6 +1058,24 @@ export class BilateralService {
           sp_code: entry.sp_code,
           field: 'sp_code',
           error: 'sp_not_selected',
+        });
+        continue;
+      }
+
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-07 / R-BIL-124, D-1, D-7
+      //
+      // A selected SP that is not the resolved Primary cannot be ToC-mapped
+      // from STAR (design.md §5.2). Positioned AFTER `sp_not_selected` above
+      // (an unselected SP keeps the older, more specific code — AC.2) and
+      // BEFORE the `aligns_with_toc` short-circuit below — deliberately: an
+      // explicit `aligns_with_toc: false` for a Contributing SP is also a
+      // write against a retained row, and must be rejected here rather than
+      // silently accepted as a valid "No".
+      if (entry.sp_code !== primarySpCode) {
+        errors.push({
+          sp_code: entry.sp_code,
+          field: 'sp_code',
+          error: 'toc_alignment_not_primary_sp',
         });
         continue;
       }

@@ -1906,3 +1906,177 @@ line itself, which contains the phrase as part of its *new* text.
 > list did not.
 
 ---
+
+### T-07 — ToC alignments accepted for the Primary SP only
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **1** (of 3 permitted) |
+| **Reviewer verdicts** | 1 × `PASS` |
+| **Rework attempts consumed** | 0 |
+| **Requirements covered** | **R-BIL-124** AC.1–AC.5 · **R-BIL-125** AC.1 fully, **AC.3 structurally** (per the approved amendment), **AC.2 write-half only — see the §C adjudication below** · defect classes **D-1**, **D-7** |
+| **Dependencies** | T-06 ✅ |
+| **Estimated / actual LOC** | ~110 / **307 insertions, 7 deletions** (39/7 production, 268/0 test) |
+
+#### The change
+
+One rule at `bilateral.service.ts:1074-1081`, inside `validateTocAlignments`'s per-alignment loop:
+push `{ sp_code, field: 'sp_code', error: 'toc_alignment_not_primary_sp' }` and `continue` — **after**
+`sp_not_selected`, **before** the `aligns_with_toc` short-circuit. Union member added at `:92`;
+`validateTocAlignments` gains `primarySpCode: string | null` (`:1024-1029`); call site `:722` threads
+the value T-06 resolves at `:702`.
+
+**The `continue` is normative, not incidental** — `design.md` §5.2 says the entry *"yields
+`toc_alignment_not_primary_sp` **and skips the rest of that entry's checks**"*. It mirrors
+`sp_not_selected` exactly. Running further checks would also be wrong on the merits: emitting
+`level_not_allowed` for an entry the caller may not write at all tells the contributor to fix the
+wrong thing.
+
+#### The restraint test — passed
+
+T-07 edited the file holding **37 of T-11's 41 red blocks**, each one `primary_sp_code` line from
+green, with its own full-suite run coming back red.
+
+- **`tocAlignments.spec.ts`: 268 insertions, 0 deletions** — a pure append after the file's final
+  test (hunk header `@@ -1535,4 +1535,272 @@`). **No existing fixture, assertion or `it()` title altered.**
+- **`bilateral.service.spec.ts`: EMPTY diff** — T-01's two pins untouched.
+- The **only 7 deletions** are doc-comment text (every `-` line begins `//` or ` *`); **zero removed code**.
+
+#### 🔬 "No new red" — PROVEN structurally, not counted
+
+Counts: 41 failed / 147 passed / 188 → **41 failed / 154 passed / 195** (+7 = exactly the new tests).
+But the Reviewer went past the count and established **set-identity by cause**:
+
+- Distribution `37 · 2 · 1 · 1 = 41` matches the amendment's census exactly.
+- **Zero** failures inside T-07's describe (checked against jest's JSON `fullName`s).
+- **Decisive:** every failing block's DTO **lacks `primary_sp_code`** — in `tocAlignments.spec.ts`
+  every `primary_sp_code:` line is at **≥1561**, i.e. entirely inside T-07's appended block. Such a
+  request throws at `resolvePrimarySpCode:939` **before `validateTocAlignments` is ever invoked**, so
+  **the new rule is structurally incapable of causing any of the 41.**
+
+> That is stronger evidence than a name-by-name diff of two runs: it shows not merely that the same
+> tests fail, but that the new code **cannot be on their failure path**.
+
+#### `primarySpCode: string | null` — unreachability verified, and it fails CLOSED
+
+The Reviewer proved the `null` branch unreachable for a sharper reason than the Implementer gave:
+`normalizeLeverCodes:1484` and `resolvePrimarySpCode:933` guard on the **same expression against the
+same object** (`!dto.has_contribution`), so `primarySpCode === null` ⟺ `codes === []`. `leverCodes` is
+never reassigned between them (all seven references are reads), so `effective` is empty and every
+entry is caught by `sp_not_selected` first. In the non-null case, step 5 guarantees the Primary is a
+member of `effective`.
+
+**Failure direction matters:** if a future change ever produced `null` on another path, **every ToC
+write would be rejected** rather than silently accepted — the safe direction for a restriction rule.
+
+#### Falsification — four sabotages, each RED on target then reverted
+
+| Sabotage | Red test |
+| --- | --- |
+| Rule **before** `sp_not_selected` | AC.2 — `SP99` got the new code instead of `sp_not_selected` |
+| **Throw eagerly** instead of collecting | AC.4 — only 1 of 2 errors surfaced |
+| **Add a role-change cascade** | R-BIL-125 AC.1 — `deactivateForSps` called once with `['SP01']` |
+| Rule **after** the `aligns_with_toc` short-circuit | the dedicated test — `thrown` was `undefined`, request silently succeeded |
+
+**On sabotage 3 the Reviewer went further than the brief asked:** the new R-BIL-125 AC.1 test is *not
+merely a substitute* for T-01's pins — **it is a sharper instrument.** T-01's pins carry no
+`primary_sp_code` and therefore **never exercise a role change at all**; the new test PATCHes a real
+demotion (`primary_sp_code` flips `SP01`→`SP03`, both still selected) and asserts `deactivateForSps`
+was not called. That is R-BIL-125's exact claim, tested directly.
+
+#### §5.3 invariants — byte-identical, verified mechanically
+
+`git diff -U0` filtered for `deactivateForSps|effectiveSpCodes|is_read_only|assertPrmsSourceWritable|POOL_FUNDING_ALIGNMENT_CHANGED|getAlignment|toc_alignments\[`
+returns **exactly one** changed line — and it is a **comment**. The cascade call site, the
+`effectiveSpCodes` filter, `is_read_only`/`assertPrmsSourceWritable`, the **role-blind read-back ToC
+filter** (`:581-584`) and the socket payload are all unchanged. This independently re-confirms the
+amended R-BIL-125 AC.3 structural criterion.
+
+#### Other confirmations
+- **AC.1 satisfies the Presence-assertion caveat** — `toEqual([...])` is exact array equality, which
+  already proves the Primary's absence; an explicit `.some(...) === false` is added as belt-and-braces.
+- **AC.4's ≥2-error test kills the spec's named mutant** — with `[SP99, SP03]`, eager throwing loses
+  SP03's error and `toHaveLength(2)` goes red. Call counts asserted as literal
+  `toHaveBeenCalledTimes(0)`.
+- **Fixture substitution is sound:** the file's catalog fixtures are `SP01`/`SP03`; the spec's
+  `SP06`/`SP09` are illustrative. Nothing in the rule, error shape or catalog checks depends on the
+  literal codes.
+- **K-001** honoured; **`:216` SHA still `94573605…`**; **scope boundary clean** (no `sp_roles`,
+  `toSelectedSciencePrograms`, `toHistoryPayload` or `payload_after`).
+
+#### ADVISORY (4R) — recorded, non-gating
+
+1. **RELIABILITY — one narrow AC.4 mutant survives.** With entries ordered `[SP99, SP03]`, an "eager
+   throw **at the new rule only**, carrying the accumulated `errors` array" still returns both errors
+   and passes. Putting the new-rule entry **first** (`[SP03, SP99]`), or using a same-code pair (two
+   Contributing SPs), kills it. **The spec's *named* mutant is already killed** — this is hardening,
+   not a gap.
+2. **READABILITY/TRACEABILITY — AC.3's behavioural coverage is one negative case.** The new test
+   proves `level_not_allowed`; AC.5 proves the success chain. The rest of C1's chain (HLO floor,
+   `contribution_without_indicator`, conditional catalog checks) rests on the 37 blocks red until
+   T-11. The code proof is strong (control flow below the insertion byte-identical), but **T-11's
+   assertion ledger is where AC.3's full behavioural evidence actually lands** — name it in T-11's
+   brief so it reads as evidence, not bookkeeping.
+3. **RISK — a positive finding, preserve it.** The `primarySpCode === null` invariant is guarded only
+   by the comment at `:1024-1029`. **Leave it that way.** The comment is load-bearing documentation of
+   a real coupling, and the code fails **closed**. Do **not** "harden" it with `primarySpCode !== null &&`
+   — that would convert a loud total rejection into **silent acceptance** of Contributing-SP ToC writes.
+4. **TRACEABILITY — fixture substitution recorded** (above), so a future reader grepping `SP09` and
+   finding nothing does not conclude AC.1 is uncovered.
+
+---
+
+## Pivot Record: T-08 — R-BIL-125 AC.2 is mis-assigned to T-07 (second amendment, awaiting approval)
+
+**Trigger.** Reviewer adjudication during T-07's audit, in response to a question the Leader raised.
+**Not an implementation defect** — T-07 passed, and the Implementer reported the limit honestly
+rather than dressing it up. **`tasks.md` is NOT amended; the exact text is below.**
+
+### The problem
+
+T-07's done-criteria include *"R-BIL-125 AC.2: the demoted SP's row still appears in
+`toc_alignments[]` on read-back."* **T-07 cannot discharge it, and the spec forbids it twice over:**
+
+1. `getAlignment` is mocked to `{}` for **every** test in `tocAlignments.spec.ts` (`:178`). The
+   read-back returns nothing to assert on.
+2. **T-07's own scope boundary** (`tasks.md:319`) says *"Do not touch … **the read-back's ToC
+   filter**"*. The only code that can make AC.2 true or false is `bilateral.service.ts:581-584` —
+   `toc_alignments: (eligible ? tocAlignmentRows : []).map(...)`, filtered by eligibility and nothing
+   else. **T-07 is forbidden from touching it and correctly did not.**
+
+> The criterion asks T-07 to prove a property of code it may not touch, through a carrier it has
+> mocked out. **Unsatisfiable — the same species as AC.3, for a different reason:** AC.3 demanded a
+> suite **state** only T-11 can create; **AC.2 demands a read-path behaviour whose owner is T-08.**
+
+### Is the structural discharge sufficient? No — and the Reviewer said so plainly
+
+*"It is sound as a **regression** claim … But AC.2 as written — 'toc_alignments[] on the read-back
+**still returns** the demoted SP's row' — is an assertion about **output**, and **no test anywhere in
+the repo currently asserts that an active ToC row belonging to a non-Primary SP appears in
+`toc_alignments[]`**. The read filter is never exercised against a role-differentiated fixture. The
+residual risk is genuinely low … but low risk is not discharge, and 'we didn't change the code' is
+exactly the argument that certified the inert clamp."*
+
+### Proposed amendment — two edits, plus a mandatory sweep. No rework, no re-dispatch.
+
+1. **Reassign R-BIL-125 AC.2 to T-08.** T-08 owns `getAlignment` and the read-back carrier; its spec
+   file is `bilateral.service.spec.ts`, where `getAlignment` runs **unmocked**; and its fixtures are
+   already role-differentiated (`sp_roles`, `role: "PRIMARY"` vs `"CONTRIBUTING"`). One test — *an
+   eligible alignment with an active ToC row for a **Contributing** SP still returns that row in
+   `toc_alignments[]`, alongside the Primary's* — is **cheap there and impossible here**.
+   **T-11 is the wrong home:** it is a re-base task with an assertion ledger, not a behaviour owner.
+2. **Reword T-07's criterion to the half it owns and has proven:**
+   > *"R-BIL-125 AC.2 (**write half**) — a role change never deactivates the demoted SP's ToC row
+   > (`deactivateForSps` not called; R-BIL-125 AC.1 test), and the read-back's ToC filter
+   > (`bilateral.service.ts:581-584`) is byte-identical. **The read-back assertion is discharged at
+   > T-08.**"*
+   Both halves are **already evidenced in T-07's diff**, so this is bookkeeping, not re-work.
+3. **⚠ Run the two-direction sweep — the Reviewer flags this as K-003's FIFTH occurrence waiting to
+   happen.** Known stale-on-amendment sites: **`tasks.md:349`** (T-08's *"Requirements covered"* does
+   **not** currently list R-BIL-125 AC.2), **`requirements.md:575`** and **`tasks.md:728`** (both were
+   *just* corrected for AC.3 and go stale again for AC.2 the moment this lands).
+   **The amendment's own citation list will not be the scope — it never has been in this spec.**
+
+---
