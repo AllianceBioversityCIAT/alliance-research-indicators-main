@@ -217,7 +217,7 @@ graph TD
 - **Estimated LOC:** ~50
 - **Effort:** S
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-04). **⚠ AC.4 carried to T-06 as an `it.todo`, and R-BIL-130's ordering claim is asserted-but-unfalsified until T-06 re-runs the "gate left in place" sabotage — see the FORWARD OBLIGATION block in `execution.md`.**
 
 ---
 

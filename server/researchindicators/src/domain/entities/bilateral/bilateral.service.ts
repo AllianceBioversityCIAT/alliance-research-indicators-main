@@ -675,6 +675,17 @@ export class BilateralService {
       resultCode,
     );
 
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
+    //
+    // Version gate extracted from `validateTocAlignments` (design.md §4 step
+    // 2) so it keeps firing before Primary validation (T-06 step 3) is
+    // inserted below. Trigger condition is unchanged from the original
+    // inline check: fires ONLY when `toc_alignments` is present, so legacy
+    // bodies still bypass it entirely (R-BIL-097 AC.3).
+    if (dto.toc_alignments) {
+      this.assertTocMappingVersionUnlocked(context);
+    }
+
     // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092..094, R-BIL-097
     //
     // ToC alignment gate + validation run BEFORE the transaction so nothing
@@ -824,20 +835,52 @@ export class BilateralService {
   }
 
   /**
-   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094, R-BIL-095, R-BIL-097
+   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
    *
-   * Pre-transaction gate + validation for `toc_alignments[]` (design §6.3
-   * steps 2a–2d). Returns the per-SP upsert inputs with snapshots already
+   * Version gate: live version (`report_year_id`, literal year per D-V2-7)
+   * ≠ `MAPPABLE_LIVE_VERSION` (2026) → 409 `toc_mapping_version_locked`
+   * (R-BIL-097). Extracted from `validateTocAlignments` — where it used to
+   * be the first statement — so it keeps firing BEFORE Primary validation
+   * (T-06), which the call site inserts after this check. Left inside
+   * `validateTocAlignments`, a new `400 primary_sp_required` would move in
+   * front of this shipped `409`, displacing a tested contract (R-BIL-097
+   * AC.2). The trigger condition (only when `toc_alignments` is present,
+   * R-BIL-097 AC.3) lives at the call site, not here, so it stays visible
+   * next to the other pre-transaction steps instead of being duplicated.
+   */
+  private assertTocMappingVersionUnlocked(context: {
+    report_year_id?: number | string;
+  }): void {
+    if (Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION) {
+      // GlobalExceptions surfaces `exception.response.message` into the
+      // envelope's `errors` field — same packing as the unknown_sp_codes 400.
+      throw new ConflictException({
+        message: {
+          description: `ToC mapping is locked to live version ${MAPPABLE_LIVE_VERSION}`,
+          code: 'toc_mapping_version_locked',
+        },
+      });
+    }
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094, R-BIL-095, R-BIL-097
+   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
+   *
+   * Pre-transaction validation for `toc_alignments[]` (design §6.3 steps
+   * 2b–2d). Returns the per-SP upsert inputs with snapshots already
    * resolved from the validated catalog entries, so the transaction only
    * persists — it never re-reads upstream.
    *
-   *   a. Version gate: live version (`report_year_id`, literal year per
-   *      D-V2-7) ≠ 2026 → 409 `toc_mapping_version_locked` (R-BIL-097).
-   *   b. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
+   * The version gate (former step "a" here) has been EXTRACTED to the call
+   * site as `assertTocMappingVersionUnlocked`, invoked before this method
+   * runs — see design.md §4 step 2 and R-BIL-130.
+   *
+   *   a. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
    *      `missing_required_fields` — collected per alignment. The required
    *      floor for `aligns_with_toc: true` is `level` + `toc_result_id`
    *      only (R-BIL-111 §5.1, D-C1-3); `indicator_id` is optional.
-   *   c. Catalog validation per "Yes" entry — `level_not_allowed`, then
+   *   b. Catalog validation per "Yes" entry — `level_not_allowed`, then
    *      `toc_result_id` existence in the cached (sp, level) catalog →
    *      `unknown_toc_result_id`. `indicator_id` is resolved against that
    *      ToC result's indicators ONLY when supplied → `unknown_indicator_id`
@@ -848,7 +891,7 @@ export class BilateralService {
    *      fetched ONLY for the (sp, level) combos actually referenced; a
    *      cold-cache upstream failure propagates as 503 with nothing
    *      persisted (R-BIL-094, NFR-BIL-110).
-   *   d. ANY collected error → single 400 carrying ALL per-alignment errors
+   *   c. ANY collected error → single 400 carrying ALL per-alignment errors
    *      as `errors.toc_alignments` (atomic — D-V2-8). The legacy
    *      `errors.unknown_sp_codes` contract is untouched (it fires earlier,
    *      from `normalizeLeverCodes`).
@@ -864,17 +907,6 @@ export class BilateralService {
     context: { report_year_id?: number | string; indicator_id?: number },
     resultId: number,
   ): Promise<TocAlignmentUpsertInput[]> {
-    if (Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION) {
-      // GlobalExceptions surfaces `exception.response.message` into the
-      // envelope's `errors` field — same packing as the unknown_sp_codes 400.
-      throw new ConflictException({
-        message: {
-          description: `ToC mapping is locked to live version ${MAPPABLE_LIVE_VERSION}`,
-          code: 'toc_mapping_version_locked',
-        },
-      });
-    }
-
     const errors: TocAlignmentValidationError[] = [];
     const effective = new Set(effectiveSpCodes);
     const allowedLevels = new Set(

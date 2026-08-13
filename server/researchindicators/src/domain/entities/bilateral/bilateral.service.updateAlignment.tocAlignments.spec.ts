@@ -1013,6 +1013,76 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     });
 
     // -----------------------------------------------------------------------
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04
+    // R-BIL-130 — the shipped 409 version gate keeps firing before Primary
+    // validation (T-06, not yet landed). The gate now lives at the call
+    // site (`assertTocMappingVersionUnlocked`, ahead of `validateTocAlignments`)
+    // instead of inside it — see design.md §4 step 2.
+    // -----------------------------------------------------------------------
+    describe('R-BIL-130 — version gate vs Primary validation ordering (T-04)', () => {
+      it('AC.1 — has_contribution:true + toc_alignments present + non-2026 live version + no primary_sp_code → 409 toc_mapping_version_locked, NOT 400 (report_year_id: 2025)', async () => {
+        findContext.mockResolvedValue(baseContext({ report_year_id: 2025 }));
+
+        let thrown: HttpException | undefined;
+        try {
+          await service.updateAlignment(
+            19792,
+            '19792',
+            patchDto([sp01Yes()]),
+            user,
+          );
+        } catch (err) {
+          thrown = err as HttpException;
+        }
+
+        expect(thrown).toBeInstanceOf(ConflictException);
+        // Assert the actual error code, not merely the HTTP status — a
+        // reordering defect could still surface as a 409 with a different
+        // code (or with a different exception type entirely).
+        const response = thrown!.getResponse() as {
+          message: { code: string };
+        };
+        expect(response.message.code).toBe('toc_mapping_version_locked');
+        // Nothing persisted: the gate fires before the transaction opens and
+        // before any catalog lookup Primary validation would trigger.
+        expect(transaction).not.toHaveBeenCalled();
+        expect(upsertForSp).not.toHaveBeenCalled();
+        expect(deactivateForSps).not.toHaveBeenCalled();
+        expect(getTocResults).not.toHaveBeenCalled();
+      });
+
+      it('AC.3 — legacy body (no toc_alignments) on a non-2026 live version bypasses the gate entirely and validates normally (report_year_id: 2025)', async () => {
+        // Falsification target for the "extracted unconditionally" wrong
+        // implementation: if the call site dropped the `dto.toc_alignments`
+        // guard, this legacy body would newly trip the gate and this test
+        // would go red with a ConflictException instead of resolving.
+        findContext.mockResolvedValue(baseContext({ report_year_id: 2025 }));
+
+        const dto: UpdatePoolFundingAlignmentDto = {
+          has_contribution: true,
+          sp_codes: ['SP01', 'SP03'],
+        };
+
+        await expect(
+          service.updateAlignment(19792, '19792', dto, user),
+        ).resolves.toBeDefined();
+
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(getTocResults).not.toHaveBeenCalled();
+        expect(upsertForSp).not.toHaveBeenCalled();
+        expect(deactivateForSps).not.toHaveBeenCalled();
+      });
+
+      // AC.4 depends on `resolvePrimarySpCode` (T-06), which has not landed
+      // yet in this branch. T-06 must PROMOTE this to a real assertion on a
+      // 2026 result asserting `primary_sp_required` still fires — not
+      // invent new behaviour here, and not leave it silently skipped.
+      it.todo(
+        'AC.4 — on a 2026 result, primary_sp_required still fires (the gate does not mask Primary validation where it does not apply) — promote from todo in T-06',
+      );
+    });
+
+    // -----------------------------------------------------------------------
     // NFR-BIL-090 — validation-path cold-cache 503
     // -----------------------------------------------------------------------
     describe('NFR-BIL-090 — validation-path 503', () => {
