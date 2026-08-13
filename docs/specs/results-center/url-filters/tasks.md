@@ -241,7 +241,7 @@ graph TD
 
 ---
 
-### T-09 [~] — Home link producers
+### T-09 [x] — Home link producers
 
 - **Requirements covered:** R-RCU-007 AC.1, **AC.1b**, AC.3
 - **Files touched:** `…/home/components/data-overview/data-overview.component.html` + `.ts` + `.spec.ts`, `…/home/components/main-actions/main-actions.component.html`

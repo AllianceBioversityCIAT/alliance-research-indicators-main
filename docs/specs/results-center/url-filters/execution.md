@@ -405,6 +405,57 @@ The re-review closed the one gap the remedy did not cover on its own: `loadMyRes
 
 ---
 
+### T-09 — Home link producers
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS on attempt 1** |
+| Date | 2026-08-12 |
+| Implementer attempts | 1 |
+| Requirements covered | R-RCU-007 AC.1, **AC.1b**, AC.3; R-RCU-001 AC.2 (no numeric id emitted); R-RCU-006 AC.3 (producer half) |
+| Wave | Ran concurrently with T-04 (client, disjoint folders) |
+
+**Files changed:** `…/home/components/data-overview/data-overview.component.{ts,html,spec.ts}` (+137/−10). `…/main-actions/main-actions.component.html` was in the Files-touched list and **deliberately not modified** — line 22 already emits `[queryParams]="{ tab: 'my' }"` with no legacy parameter. The Reviewer confirmed this is *satisfied work, not skipped work*: `tab` is canonical by R-RCU-001, and R-RCU-006 states outright "**`tab` is not legacy** … it keeps its current spelling and its current producer."
+
+Both cards now emit frozen-vocabulary **slugs** resolved from `STATUS_ID_TO_SLUG` / `INDICATOR_ID_TO_SLUG` plus a mandatory `tab: 'my'`. The old code emitted `{ indicatorTab: <number> }` — a numeric database id, which R-RCU-001 AC.2 forbids.
+
+**Verification** (from `client/research-indicators`): `tsc` clean but for the 2 known pre-existing errors · `npm test -- --silent --testPathPattern="data-overview|main-actions"` → 27/27 · lint clean.
+
+> **Reviewer PASS summary:** Both producers emit only frozen-vocabulary slugs plus a mandatory `tab=my` (R-RCU-007 AC.1/AC.1b), no numeric id or legacy key reaches any URL (R-RCU-001 AC.2, AC.3 verified by a word-boundary sweep of both packages), and the drift fallback matches a degradation the spec already ruled acceptable for the same id class on the write side. `main-actions.component.html` was correctly left alone — `tab` is canonical, not legacy.
+
+#### Ruling on the drift fallback — the Leader's concern was overruled, correctly
+
+The Implementer flagged an unspecified judgment call: an id with no slug emits `{ tab: 'my' }` alone. **The Leader argued this was possibly a FAIL** — the card says "12 results in status X", the user clicks, lands on all their results unfiltered with no notice, because no invalid token reaches the read path and R-RCU-005's toast never fires. The Leader proposed emitting the invalid token instead, so the designed drop-and-toast degradation would run.
+
+**The Reviewer ruled (a) correct as implemented, and the reasoning defeats the Leader's on three counts:**
+
+1. **R-RCU-005 governs *inbound* links the platform did not author** — "mistyped, stale or truncated". Its AC.2 toast is an error-reporting channel for foreign input, **not a notification bus the platform may self-trigger**. "Manufacturing a bad link so a downstream handler will apologize for it is a design inversion."
+2. Emitting a knowingly-invalid token would make **a producer emit a non-canonical token** — exactly what R-RCU-007's own title forbids ("Every link producer emits the canonical scheme") and what freezing the map exists to prevent.
+3. **The spec had already ruled on this id class** on the write side (§5.2 above: `serialize` silently omits an unmapped id, ruled a gap and not a FAIL because it is "the least-bad option the spec leaves available"). Ruling differently for the producers would contradict an accepted ruling.
+
+The Leader's third option — omit the link entirely — was also rejected: it destroys a working `tab=my` affordance and makes a clickable count non-clickable, for a branch **unreachable in current data** (the frozen maps cover all 25 live `allResultStatus` rows and all 6 `QueryIndicatorsEnum` values, and both cards source ids from those same server vocabularies). The branch fires only on a genuine server-side addition — NFR-RCU-002's explicitly accepted residual risk, whose designated surfacing mechanism is **layer 2, now owned by T-06**.
+
+Recorded because it is the second case in this run where the independent audit corrected the Leader's own analysis, and the first where the Leader was arguing *for* extra work.
+
+#### Ruling on the cross-feature import
+
+`data-overview.component.ts` importing `@platform/pages/results-center/url/results-center-url.vocabulary` is **acceptable as-is; do not move it, and moving is out of scope for T-09.** Design §2.1 places the vocabulary there *and*, in the same table, assigns `home/components/*` the job of emitting canonical parameters — the cross-feature dependency is deliberate. The `@platform/*` alias exists to make such an import legal without `../../..`, and there is repo precedent in the stricter direction (`shared/components/section-header` and `shared/components/alliance-navbar` both import from `@platform/pages/whats-new/…`). A move would touch T-01's file plus the two codec files T-02/T-03 import, and would require amending design §2.1.
+
+#### Bookkeeping consequence — §5.2's open decision now spans three sites
+
+§5.2's pending human decision **(ii)** — "whether the write side should surface an unmapped id at all" — now covers **three** producers, not one: `serialize` plus both `data-overview` cards. Recorded here so that whenever that decision is taken it does not amend `serialize` and silently leave the two home producers behind.
+
+#### ADVISORY (recorded only; none may become a task or widen one)
+
+1. **⚠️ Reliability — the highest-value advisory of the run so far.** `indicator_id` is **not coerced** before the map lookup. `getIndicatorData()` assigns `response.data` (typed `any`) straight into `indicatorList`, whereas the status path *does* coerce (`Number(item.result_status_id)`). If the indicators endpoint ever returns `"1"` as a string, `INDICATOR_ID_TO_SLUG.get("1")` misses a `Map<number, string>` and the card silently takes the drift branch — **and the Reviewer notes this is *not* the accepted NFR-RCU-002 risk**, it is a distinct latent defect producing exactly the silent-unfiltered-link the Leader was worried about, by a different route. One-token fix: `INDICATOR_ID_TO_SLUG.get(Number(indicator.indicator_id))`. **Surfaced to the user** — an advisory may not become a task, so this is theirs to decide.
+2. *Readability.* The status fixture pairs `result_status_id: 7` with `label: 'Submitted'`, while the frozen map has 7 → `not-approved` and 2 → `submitted`. Harmless (the label no longer reaches the URL) and inherited from the old fixture, but it reads as a bug; either align it or cite requirements §9 R5 in a comment.
+3. *Risk (sequencing).* T-06 is still `[ ]`, so today's read path recognizes only `indicatorTab`/`statusTab` — **both cards' filters are inert in the working tree right now** and only `tab=my` takes effect. That is the expected intermediate state, and T-09's Disqualifies clause assigns the end-to-end My-scope proof to T-06. **Leader must not treat that assertion as closed by T-09's unit tests.**
+4. *Pre-existing, not this diff.* `data-overview.component.ts:77` hard-codes the fallback colour `'#1689CA'`, violating root `CLAUDE.md` §4.2's no-hex-literals rule. Untouched here; a separate cleanup.
+
+**Final verification result:** 27/27 tests, `tsc` clean, lint clean, Reviewer `PASS` on attempt 1.
+
+---
+
 ### Wave note — two client tasks run concurrently (deliberate exception)
 
 `.agents/leader.md` warns that two tasks in one package are not safely parallel because they share `node_modules`, build output and ports. T-03 and T-05 were run concurrently anyway, **at the user's explicit request**, with four mitigations the Leader put in place instead of refusing: (1) disjoint file sets, verified before launch; (2) repo-wide git commands (`stash`/`checkout`/`restore`/`clean`/`reset`) **forbidden in both briefs**, with the reason and the path-scoped substitute given — a direct response to the T-02 incident; (3) disjoint, narrowed `--testPathPattern` runs, with the full-suite run reserved to the Leader on a quiet tree; (4) a cross-worker rule — an error in a file outside your own list is the other worker's transient state, do not fix it, re-run once, report. **Outcome: no interference.** Both workers reported clean `git status` bleed-checks, and neither ever saw the other's transient state.
