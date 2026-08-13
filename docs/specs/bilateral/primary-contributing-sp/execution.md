@@ -2475,3 +2475,127 @@ re-basing that file. Costs it nothing; avoids a second trip into a PASSed file.
 ✅ **Production untouched** — `git diff --stat` on the repository is empty
 
 ---
+
+### T-12 — Relocate the per-SP isolation evidence into the ToC repository spec
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** |
+| **Date** | 2026-08-13 |
+| **Implementer attempts** | **1** (of 3) · **Reviewer verdicts** 1 × `PASS` · **rework consumed 0** |
+| **Requirements covered** | C1's **R-BIL-118 AC.1/AC.3** (isolation, preserved) · **D-C2-11** · `design.md` §11 item 2 |
+| **Dependencies** | T-07 ✅ |
+| **Estimated / actual LOC** | ~150 / **268 insertions, 1 deletion** · **no production change** |
+| **Ran** | **in parallel with T-10** (disjoint files) |
+
+#### Why the relocation exists
+**T-07 made a C1 guarantee untestable.** R-BIL-118 AC.1/AC.3 — *one SP's ToC alignment must not
+overwrite another's* — can no longer be demonstrated through the service PATCH path, because that
+path now **refuses** to write two SPs' ToC entries (`toc_alignment_not_primary_sp`). The guarantee
+moves to the repository, where multi-SP state can be seeded directly.
+
+#### 🔴 THE FINDING — a pre-existing isolation test was passing by array-position coincidence
+
+Running the falsification properly exposed a **fixture-order blind spot**, and the Reviewer
+**independently reproduced it** rather than accept the report.
+
+Under the sabotage (`upsertForSp` dropping `sp_code` from its `findOne` WHERE),
+`Array.prototype.find` returns the **first** array match. With the **target** row listed first, the
+mock locates the correct row *by array position* even though the WHERE no longer scopes by `sp_code`
+— the update is then correctly scoped to `{ id: 1 }`, the sibling is genuinely untouched, and **all
+three assertions pass**, including the `toEqual` snapshot and the negative
+`not.toHaveBeenCalledWith`.
+
+| Fixture ordering | Result under the sabotage |
+| --- | --- |
+| `[target, other]` (original) | **2 of 4 isolation tests GREEN** — mutant invisible |
+| `[other, target]` (T-12's fix) | **4 of 4 RED** |
+
+> **The Reviewer's conclusion, confirmed by direct reproduction:** the **pre-existing R-BIL-118 AC.1
+> isolation test** (C1-era, predating this spec) *"was green under an implementation that ignores
+> `sp_code` entirely — i.e. under an implementation with **no per-SP isolation at all**. That test's
+> name and assertions were correct; its **fixture** silently neutralized them."* Its R-BIL-118 AC.1
+> evidence **should be treated as never having been discharged until this task.**
+
+**And it sharpens T-12's own disqualifier.** That disqualifier says *"a test that seeds ONE SP's row
+cannot demonstrate isolation between two."* This is the same defect **reappearing inside a genuine
+two-SP fixture that behaves like a one-SP fixture under the mutant**. → **Two seeded SPs is
+necessary but NOT sufficient; the victim must be positioned so the assertion cannot pass by
+coincidence.**
+
+**Was editing a pre-existing test's fixture in scope? The Reviewer says yes, and that leaving it
+would have been wrong:** it is inside T-12's one allowed file, name and all three assertions are
+byte-unchanged, and `design.md` §11 item 2 states *"under no circumstance may a re-based test be
+presented as evidence for an isolation property it no longer exercises."*
+
+#### The disqualifier — satisfied, and verified rather than asserted
+- **Two seeded SPs**, **both directions**, for **AC.1 and AC.3** (4 isolation tests).
+- Untouched row asserted `toEqual` a **genuinely pre-write** snapshot — taken immediately after the
+  fixture literal, **before** the `jest.spyOn` wiring and the `upsertForSp` call. Not tautological.
+- **All 14 columns** covered — cross-checked against the entity (13 own decorators + `is_active`
+  from `AuditableEntity`).
+- **Bonus rigor:** `toEqual` is structural, so it also catches **added** keys — a leak injecting
+  `updated_by: 555` into the sibling reddens it on its own.
+- **AC.3's partial-write variant is the maximal-null payload** (`aligns_with_toc: false` nulls all
+  ten of the writer's own ToC columns), so *"any smaller partial payload nulls a subset, and a leak
+  invisible to this test cannot exist."* `toMatchObject` on the writer's own row (which **must**
+  change) vs `toEqual` on the sibling (which must not) is the correct split.
+
+#### R-BIL-118 AC.2 — not re-opened, both table names spelled out
+The discharge is keyed to **`result_pool_funding_toc_alignment`** (its `active_result_sp` column and
+`idx_rpfta_active_result_sp` index); this spec's migration target is **`result_pool_funding_alignment_sp`**
+— a **different table**. AC.2 was neither re-tested nor described as tripped by T-02's migration.
+
+#### 🔴 Leader post-PASS action — applied an advisory, GOT IT WRONG, then fixed it
+
+**ADVISORY (READABILITY):** the two AC.3 test names contained **U+2019** (`SP02’s`), so a `jest -t`
+filter or a T-11 ledger citation typed with an ASCII `'` would **silently fail to match.** The
+advisory offered two remedies: *"prefer ASCII `'` or rephrase to avoid the possessive."*
+
+**The Leader took the first option and broke the file.** An ASCII apostrophe **terminates the
+single-quoted string** — `npx eslint` reported `453:71 Parsing error: ',' expected`. **That is
+precisely why U+2019 was there in the first place.**
+
+**Corrected by taking the second option** — rephrased to `does not null out the complete row for
+SP02`, removing the possessive entirely so **no apostrophe of either kind** appears. Re-verified:
+**20/20 green**, `npx eslint` **clean**, and a plain-ASCII `-t` filter now matches exactly one test.
+
+> **Recorded because it is the same class of error this spec keeps catching:** a remedy applied
+> without checking that it holds in context. The advisory was right about the *problem* and offered
+> the right *alternative*; the Leader picked the option that could not work here and only the lint
+> gate caught it.
+
+#### Test names for T-11's ledger to cite (post-rename — cite these, ASCII-safe)
+- `R-BIL-118 AC.1 — writing SP01 leaves SP02 row byte-identical` *(pre-existing; fixture strengthened, name/assertions unchanged)*
+- `R-BIL-118 AC.1 — writing SP02 leaves SP01 row byte-identical (reverse direction)`
+- `R-BIL-118 AC.3 — a partial row for SP01 does not null out the complete row for SP02`
+- `R-BIL-118 AC.3 — a partial row for SP02 does not null out the complete row for SP01 (reverse direction)`
+
+#### Carried-forward obligation → T-11
+T-12's Done criterion *"every T-11 ledger row pointing here resolves to an existing test"* **cannot be
+discharged by T-12** — T-11 has not run and no ledger exists. T-12's declared dependency is T-07 only,
+so **the spec itself sequences it this way**; the Implementer stated the situation plainly rather than
+claiming the criterion met. **This check must be executed as part of T-11's review**, against the
+four names above.
+
+#### ADVISORY (4R) — recorded
+1. **READABILITY** — U+2019 in test titles. **Applied** (see above, including the Leader's misfire).
+2. **RELIABILITY** — the victim-first ordering is commented on the two forward tests, but the two
+   reverse tests get it **incidentally** (SP01 naturally precedes SP02 when SP02 is the target). *"A
+   future edit that renumbers the SPs or normalizes fixture order would silently reintroduce the blind
+   spot there with no comment to warn against it."* A shared `seedStore(target, victim)` helper would
+   make the property **structural rather than conventional**. **Not applied** — that is a refactor.
+3. **RELIABILITY** — `toEqual` ignores `undefined`-valued keys; `toStrictEqual` does not. No current
+   mutant escapes (every column routes through `?? null`), but `toStrictEqual` is free hardening.
+4. **RISK** — the `matches` helper compares `row[key] === value` and **cannot express TypeORM
+   operators**. A mutant widening criteria to `In([...])` would match *nothing* and pass vacuously.
+   Out of scope for these ACs, **but `deactivateForSps` in the same file DOES use `In`** — worth
+   knowing before the helper is reused there.
+
+#### Final verification
+✅ `npx jest .../repositories` — **2 suites, 20/20 passed** (scoped; no conclusions drawn from a full-suite run while T-10 was in flight)
+✅ `npx tsc -p tsconfig.json --noEmit` — clean · `npx eslint` — clean (**K-001**)
+✅ **Production untouched** — repository `.ts` SHA-256 `3d6bd534…d338` identical before and after the Reviewer's sabotage
+✅ Sabotage reddens **all four** isolation tests; the original ordering reddens only two — **blind spot reproduced and closed**
+
+---

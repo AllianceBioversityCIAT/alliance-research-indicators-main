@@ -534,7 +534,7 @@ graph TD
 - **Estimated LOC:** ~150
 - **Effort:** M
 - **Skills:** `nestjs-expert`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 1; see [`./execution.md`](./execution.md) → T-12). Ran **in parallel with T-10**. **🔴 Finding: a pre-existing R-BIL-118 AC.1 isolation test was passing by ARRAY-POSITION COINCIDENCE** — green under an implementation with **no per-SP isolation at all**. Reproduced independently by the Reviewer; fixture reordered so all 4 isolation tests now redden under sabotage. **Two seeded SPs is necessary but NOT sufficient — the victim must be positioned so the assertion cannot pass by coincidence.** **→ T-11 must cite the four ASCII-safe test names listed in `execution.md`.**
 
 ---
 
