@@ -220,6 +220,36 @@ LOC by task: T-01 441 · T-02 747 · T-10 ~80.
 
 Realistic projection: **~3000–3500 LOC** for the full spec, roughly 3× the recorded budget.
 
-Per `/akili-execute`'s Budget Tripwire rule the run **stops here** rather than continuing on the assumption that finishing is what was wanted. Options put to the user: re-baseline §13 and continue · continue without re-baselining (tripwire noted once, not re-raised) · descope · pause. Decision to be recorded here.
+Per `/akili-execute`'s Budget Tripwire rule the run **stopped here** rather than continuing on the assumption that finishing is what was wanted. Options put to the user: re-baseline §13 and continue · continue without re-baselining · descope · pause.
+
+**USER DECISION (2026-08-12): re-baseline §13 and continue.** No descope; task count unchanged at 12.
+
+### Root cause found by the correction sweep — a review finding closed by an edit that did not fix it
+
+The two-direction sweep required before amending a spec value turned up the origin, which is worse than a bad estimate:
+
+- `judgment.md:104` — **JD-14, confirmed by both judges**: *"Meeting §10 is a rewrite of a ~1,000-line spec that §13's budget does not carry."* The defect was correctly identified during review.
+- `judgment.md:161` — its disposition: **"Fixed — §10.2 states the spec rewrite; budget raised to 11 tasks / ~950 LOC / 3 rounds."**
+
+**The raise (~630 → ~950, i.e. +320) was smaller than the single item it was raised to accommodate (~1000).** JD-14 was marked `Fixed` on the strength of the *narrative* half of the remedy (§10.2 now documents the rewrite) while the *numeric* half silently failed. Round 2 then moved the total to ~1000 for unrelated reasons (counter plumbing), so the contradiction survived three review rounds, a two-judge lineage, and the specify-phase HITL gate, and only surfaced when execution measured real lines.
+
+This is a distinct failure mode from anything in the Kaizen Active Lessons and is a **Kaizen candidate** for `/akili-archive`: *a finding whose remedy has both a prose half and a numeric half can be closed by the prose half alone — the disposition recorded "budget raised" without checking the raise against the item that forced it. Verify a corrected number against the thing that caused the correction, not merely that a change was made.*
+
+### Sites corrected (two-direction sweep, per `/akili-specify` Correction Closure)
+
+| Direction | Site | Action |
+| --- | --- | --- |
+| Forward (superseded value) | `design.md:424` §13 table | Re-baselined column added: LOC **~3200**; tasks and review rounds unchanged |
+| Forward | `tasks.md:10` Budget line | Updated to ~3200 with a pointer to the re-baseline record |
+| Forward | `tasks.md:356` PR strategy | Updated to ~3200 |
+| Backward (references *to* the corrected section) | `design.md:366` §10.2 | Read — already states the ~1,000-line rewrite correctly; it was the *source* of the true figure, not a casualty. No edit needed |
+| Backward | `tasks.md:281` T-11 notes | Read — already states "~1,000-line spec … the single largest item in the budget". Consistent with the new total; no edit needed |
+| Deliberately **not** edited | `judgment.md:104`, `:161` | A point-in-time record of the review lineage. Editing it would erase the evidence of how the error survived. Cited above instead |
+
+### Second correction made during the same sweep — PR strategy vs. the single-branch decision
+
+The sweep surfaced an unrelated live contradiction: `tasks.md` §5 prescribes a three-PR split, but all work is landing on one shared branch per the user's branch decision, and **T-10 (PR 3) has already landed before T-03 (PR 1).** The split is therefore not being produced by the branch structure. A warning note was added at `tasks.md:356` recording that the split must now be cut deliberately from the commit range if still wanted, and that design §11's client-before-server ordering has become a deploy-time obligation only. Flagged because a stale PR plan reads as a plan that is being followed.
+
+**Tripwire status: resolved. It will not be re-raised unless actuals exceed ~3200 LOC**, at which point it is a genuine overrun rather than a bad estimate.
 
 

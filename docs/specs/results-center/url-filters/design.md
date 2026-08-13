@@ -418,13 +418,23 @@ A green command that does **not** count as evidence:
 
 ## 13. Budget *(Step 2.4 — revised after Judgment Day)*
 
-| Metric | Draft 1 | Round 1 | **Round 2** | Why it moved |
-| --- | --- | --- | --- | --- |
-| Tasks | 8 | 11 | **12** | The user-intent counter touches five service mutators and needs its own task with per-mutator assertions (D-URL-15) |
-| LOC | ~630 | ~950 | **~1000** | Counter plumbing + null-emission serializer cases |
-| Review rounds | 2 | 3 | **3** | Unchanged — round 2 removed reactivity rather than adding surface |
+| Metric | Draft 1 | Round 1 | Round 2 | **Re-baselined (execution)** | Why it moved |
+| --- | --- | --- | --- | --- | --- |
+| Tasks | 8 | 11 | 12 | **12** | Unchanged — the decomposition was right; only the LOC estimate was wrong |
+| LOC | ~630 | ~950 | ~1000 | **~3200** | See the arithmetic error below. The pre-execution figures never carried §10.2's own ~1,000-line spec rewrite, and undercounted the falsifiable-assertion cost this spec's Disqualifies clauses mandate |
+| Review rounds | 2 | 3 | 3 | **3** | Unchanged — and holding: T-01, T-02 and T-10 each passed on the first attempt with zero rework |
 
-Depth re-checked: **Standard still holds**, now firmly at its ceiling. Not `Full` — no migration, no auth surface, no data model change, no rollback beyond a code revert. If execution exceeds these numbers, `/akili-execute` stops and escalates rather than continuing.
+Depth re-checked: **Standard still holds.** Not `Full` — no migration, no auth surface, no data model change, no rollback beyond a code revert. The LOC volume is test mass, not architectural surface. If execution exceeds these numbers, `/akili-execute` stops and escalates rather than continuing.
+
+### Re-baseline record — 2026-08-12, during `/akili-execute` after T-02
+
+**The pre-execution budget was arithmetically impossible, and the review lineage recorded the defect as fixed without fixing it.** `judgment.md:104` (JD-14, confirmed by both judges) states plainly: *"Meeting §10 is a rewrite of a ~1,000-line spec that §13's budget does not carry."* Its disposition at `judgment.md:161` records **"Fixed — budget raised to 11 tasks / ~950 LOC / 3 rounds."** But ~950 **total** cannot contain a ~1,000-line rewrite plus ten other tasks — the raise was smaller than the single item it was raised to accommodate. Round 2 then moved the total to ~1000 for unrelated reasons (counter plumbing), leaving the contradiction intact through three review rounds and into execution.
+
+Measured after 3 of 12 tasks (T-01 441 · T-02 747 · T-10 ~80 = **~1268 LOC**, already +27% over the whole-spec figure), with the three heaviest tasks (T-06, T-08, T-11) still ahead.
+
+Basis for ~3200: ~1268 actual for 3 tasks · T-11 ~1000 by its own §10.2 estimate · the remaining eight tasks at roughly the observed per-task average, weighted for T-06/T-08 being the largest wiring tasks.
+
+**Why this is a re-baseline and not a scope change:** zero rework has been consumed, no task grew beyond its stated scope, and the Reviewer judged the test volume *necessary* rather than gold-plated — this spec's Disqualifies clauses require assertions that can actually fail, which costs lines that a presence assertion would not. The LOC figure was wrong; the work is not. Decision recorded by the user at the tripwire escalation; full detail in `execution.md` §3.
 
 ---
 

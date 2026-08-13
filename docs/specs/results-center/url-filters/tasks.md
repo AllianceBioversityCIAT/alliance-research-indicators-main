@@ -2,12 +2,12 @@
 
 - **Module:** results-center (client) + results (server, link producer only)
 - **Spec id:** 2026-08-url-filters
-- **Status:** not-started
+- **Status:** in progress — T-01, T-02, T-10 done (`/akili-execute`, 2026-08-12); see `execution.md`
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
 - **Linked judgment:** ./judgment.md — **read §Round 3 before starting.** Four findings (R3-1 … R3-4) are open and are folded into T-01, T-03, T-05 and T-08 below
-- **Budget (design §13):** 12 tasks · ~1000 LOC · 3 review rounds
+- **Budget (design §13):** 12 tasks · **~3200 LOC** · 3 review rounds — *re-baselined 2026-08-12 during execution; the pre-execution ~1000 never carried §10.2's own ~1,000-line spec rewrite (see `design.md` §13 → Re-baseline record)*
 - **Last updated:** 2026-08-12
 
 ---
@@ -353,7 +353,9 @@ Closure is at **scenario and clause** granularity, not requirement ID.
 
 ## 5. PR strategy
 
-~1000 LOC across two packages — **split into three PRs**:
+**~3200 LOC** across two packages (re-baselined — see `design.md` §13) — **split into three PRs**:
+
+> ⚠️ **Execution note, 2026-08-12.** All work is landing on a single branch (`AC-1607-…`, user decision recorded in `execution.md` Document Control), so this three-way split is **not** being enforced by the commit history — commits from this spec interleave with the archived CapDev spec's. T-10 (PR 3) has already landed *before* T-03 (PR 1). If the split is still wanted, it has to be cut deliberately from the commit range rather than falling out of the branch structure. **Design §11's client-before-server deployment order is now a deploy-time obligation only.**
 
 | PR | Tasks | Rationale |
 | --- | --- | --- |
