@@ -51,7 +51,7 @@ graph TD
 
 ## 2. Task list
 
-### T-01 [ ] — Frozen vocabulary, bounds, and the folded recognized-key list
+### T-01 [x] — Frozen vocabulary, bounds, and the folded recognized-key list
 
 - **Requirements covered:** R-RCU-001 (all ACs), R-RCU-005 AC.4, NFR-RCU-002 (layer 1)
 - **Files touched:** `…/results-center/url/results-center-url.vocabulary.ts` (new), `…/results-center-url.vocabulary.spec.ts` (new)
