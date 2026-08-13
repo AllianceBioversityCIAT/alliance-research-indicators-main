@@ -1057,8 +1057,12 @@ export class BilateralService {
         indicator_id: indicator ? entry.indicator_id : null,
         quantitative_contribution: entry.quantitative_contribution ?? null,
         toc_result_title: tocResult.title,
-        indicator_description: indicator ? indicator.indicator_description : null,
-        unit_messurament: indicator ? (indicator.unit_messurament ?? null) : null,
+        indicator_description: indicator
+          ? indicator.indicator_description
+          : null,
+        unit_messurament: indicator
+          ? (indicator.unit_messurament ?? null)
+          : null,
         target_value: indicator ? this.resolveLiveTargetValue(indicator) : null,
         target_year: indicator ? MAPPABLE_LIVE_VERSION : null,
       };
