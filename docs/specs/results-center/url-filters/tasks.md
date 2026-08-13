@@ -117,10 +117,11 @@ graph TD
 
 ---
 
-### T-04 [~] — `seedFromUrl()` on `ResultsCenterService`
+### T-04 [x] — `seedFromUrl()` on `ResultsCenterService`
 
 - **Requirements covered:** R-RCU-002 AC.3/AC.5/AC.6/AC.7, R-RCU-006 AC.3
-- **Files touched:** `…/results-center/results-center.service.ts`, `…/results-center.service.spec.ts`
+- **Files touched:** `…/results-center/results-center.service.ts`, `…/results-center.service.spec.ts`, **`…/results-center/class/table.filters.class.ts`** *(third file authorized by the user 2026-08-12 during execution — see below)*
+- **Why the third file is required.** D-URL-10 mandates seeding **only** the option-value key (`{ result_status_id }`, no `name`), because `MultiselectComponent` backfills labels only for items *missing* the label key. But `TableFilters` declares `statusCodes: { result_status_id: number; name: string }[]` with `name` **required**, and `years`/`sources` as full `GetYear[]` / `PlatformSourceFilter[]`. **The design's mandated shape is therefore unrepresentable in the current types** — attempt 1 produced three real `TS2322` errors at `results-center.service.ts:817/818/820`. The fix widens the seed targets so the "seeded but not yet backfilled" state is legal (`name?: string`, `Array<{ report_year: number } & Partial<GetYear>>`, `Array<{ platform_code: string } & Partial<PlatformSourceFilter>>`) — **not** a cast, which would re-hide the very drift D-URL-10 depends on. Blast radius is small and already defensive: `applyFilters` reads only the value keys, and `getActiveFilters` already renders `s.name ?? ''` / `c.display_label || c.agreement_id` behind casts that can then be dropped.
 - **Description:** One method that writes all seeded state atomically, replacing the hand-duplicated multi-signal writes that make state desync (D3) the recurring defect class here.
 - **Implementation notes:**
   - **Call `invalidateResultsFetchDedupe()` first.** `lastSuccessfulResultsFetchKey` survives across component instances on the root singleton; without this, `main()` early-returns and the user sees "filter applied, table unchanged" (JD-21).

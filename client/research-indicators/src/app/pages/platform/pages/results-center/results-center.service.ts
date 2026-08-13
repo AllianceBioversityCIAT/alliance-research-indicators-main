@@ -17,6 +17,7 @@ import { GetAllIndicators } from '../../../../shared/interfaces/get-all-indicato
 import { Table, TableLazyLoadEvent } from 'primeng/table';
 import { ApiService } from '../../../../shared/services/api.service';
 import { MultiselectComponent } from '../../../../shared/components/custom-fields/multiselect/multiselect.component';
+import type { ResultsCenterUrlState } from './url/results-center-url.codec';
 
 interface ResultsCenterPersistedState {
   myResultsFilterItemId: string;
@@ -298,28 +299,28 @@ export class ResultsCenterService {
     }
 
     if ((active['status-codes'] ?? []).length > 0) {
-      const selected = this.tableFilters().statusCodes as { result_status_id: number; name: string }[];
+      const selected = this.tableFilters().statusCodes;
       selected.forEach(s => {
         if (s) filters.push({ label: 'STATUS', value: s.name ?? '', id: s.result_status_id });
       });
     }
 
     if ((active['platform-code'] ?? []).length > 0) {
-      const selected = (this.tableFilters().sources ?? []) as { platform_code: string; name: string }[];
+      const selected = this.tableFilters().sources ?? [];
       selected.forEach(s => {
         if (s) filters.push({ label: 'SOURCE', value: s.name ?? '', id: s.platform_code });
       });
     }
 
     if ((active['contract-codes'] ?? []).length > 0) {
-      const selected = this.tableFilters().contracts as { agreement_id: string; display_label?: string }[];
+      const selected = this.tableFilters().contracts;
       selected.forEach(c => {
         if (c) filters.push({ label: 'PROJECT', value: c.display_label || c.agreement_id, id: c.agreement_id });
       });
     }
 
     if ((active['lever-codes'] ?? []).length > 0) {
-      const selected = this.tableFilters().levers as { id: number; name?: string; short_name?: string }[];
+      const selected = this.tableFilters().levers;
       selected.forEach(l => {
         if (l) filters.push({ label: 'LEVER', value: l.short_name || l.name || '', id: l.id });
       });
@@ -757,21 +758,135 @@ export class ResultsCenterService {
     }
   }
 
-  applyStatusFilterFromHomeLink(statusId: number, statusName?: string, options?: { skipMain?: boolean }) {
+  /**
+   * D-URL: `seedFromUrl()` — one method, all state (design.md §7.1). Writes
+   * `tableFilters`, `resultsFilter`, `appliedFilters` and the my/all scope
+   * ATOMICALLY from one already-resolved `{ filters, scope }` pair (the
+   * codec's own shape — `parse(paramMap)` from `results-center-url.codec.ts`,
+   * with `scope` already defaulted by the caller per design §6.1 step 3).
+   * Replaces the hand-duplicated multi-signal writes that make state desync
+   * (design.md §8 D3) the recurring defect class here — `applyFilters`
+   * hand-writes this same seven-key `ResultFilter` object twice into two
+   * signals (design §7.1); this method builds it once and uses it for both.
+   *
+   * Order matters and mirrors every existing mutator (`applyFilters:692`,
+   * `onSelectFilterTab:726`, `clearAllFilters:838`):
+   *
+   * 1. `invalidateResultsFetchDedupe()` FIRST, before any signal is
+   *    written. `lastSuccessfulResultsFetchKey` survives across component
+   *    instances on this root singleton; skipping this makes `main()`
+   *    early-return and the user sees "filter applied, table unchanged"
+   *    with no error anywhere (JD-21).
+   * 2. `tableFilters` — option-**value**-only objects (D-URL-10):
+   *    `{ result_status_id }`, `{ platform_code }`, `{ agreement_id }`,
+   *    `{ report_year } `. Seeding the option's `optionLabel` key (`name` /
+   *    `select_label`) would stop `MultiselectComponent`'s label backfill
+   *    from ever running (it only backfills items *missing* the label key —
+   *    `multiselect.component.ts:187-192`), freezing the seeded string as
+   *    the chip label forever — the exact bug `applyStatusFilterFromHomeLink`
+   *    has today (renders the literal `'Status'`).
+   *    `tableFilters.indicators` is deliberately never written here —
+   *    `indicator` seeds `indicator-codes-tabs` only, below (design §7.2's
+   *    "indicator is deliberately absent from this table" blockquote): the
+   *    indicator multiselect is `@if`-hidden whenever a tab is set
+   *    (`table-filters-sidebar.component.html:2`), so a seeded entry would
+   *    render no chip while still inflating `countTableFiltersSelected`.
+   * 3. `resultsFilter` + `appliedFilters` — the wire keys, built as a single
+   *    object and used for BOTH signals.
+   * 4. `myResultsFilterItem` + `create-user-codes` — from the resolved
+   *    my/all scope (never a `sec_user_id`-bearing token from the URL
+   *    itself — NFR-RCU-003 — the scope is expressed purely as `'my' |
+   *    'all'` and the id is resolved here, client-side, from the cache).
+   *
+   * MUST NOT call `noteUserFilterMutation()` (T-05): this is the read path,
+   * not a user-facing mutation — bumping the counter here would fire the
+   * write effect (design §6.2) immediately after load.
+   *
+   * A **presence** assertion here (the signals hold the right ids) cannot
+   * prove the sidebar chip renders — the transient blank-label window
+   * before the control list resolves is documented and expected (design
+   * §7.2); the rendered proof belongs to T-11, taken after that resolution.
+   */
+  seedFromUrl(url: ResultsCenterUrlState): void {
     this.invalidateResultsFetchDedupe();
+
+    const { filters, scope } = url;
+
+    this.tableFilters.update(prev => ({
+      ...prev,
+      statusCodes: (filters.status ?? []).map(result_status_id => ({ result_status_id })),
+      sources: (filters.source ?? []).map(platform_code => ({ platform_code })),
+      contracts: (filters.contract ?? []).map(agreement_id => ({ agreement_id })),
+      years: (filters.year ?? []).map(report_year => ({ report_year }))
+      // `indicators` intentionally absent — see the doc comment above.
+    }));
+
+    const isMyScope = scope === 'my';
+    const createUserCodes = isMyScope ? [this.cache.dataCache().user.sec_user_id.toString()] : [];
+
+    // Built once, used for BOTH signals (design §7.1 — the fix for
+    // `applyFilters`'s same-object-twice hazard).
+    const seededFilter: ResultFilter = {
+      'indicator-codes': [],
+      'lever-codes': [],
+      'indicator-codes-filter': [],
+      'indicator-codes-tabs': filters.indicator !== undefined ? [filters.indicator] : [],
+      'status-codes': filters.status ?? [],
+      'contract-codes': filters.contract ?? [],
+      'platform-code': filters.source ?? [],
+      years: filters.year ?? [],
+      'create-user-codes': createUserCodes
+    };
+
+    this.resultsFilter.set(seededFilter);
+    this.appliedFilters.set(seededFilter);
+
+    this.myResultsFilterItem.set(isMyScope ? this.myResultsFilterItems[1] : this.myResultsFilterItems[0]);
+  }
+
+  /**
+   * Legacy Home-link seeding for `?statusTab=<id>&statusLabel=<text>`
+   * (R-RCU-006). **Folded into `seedFromUrl` (T-04) rather than duplicating
+   * its state-writing logic** — the only thing unique to this call site is
+   * the label write below, which `seedFromUrl` deliberately never does
+   * (D-URL-10). This method survives only until T-06 rewires
+   * `ResultsCenterComponent.initializeState()` onto the codec's own
+   * `status` slug resolution (which already recognizes legacy `statusTab`,
+   * `results-center-url.codec.ts:resolveLegacyStatusTab`) plus a single
+   * `seedFromUrl` call carrying every filter at once; at that point this
+   * method has no caller left and can be deleted (out of this task's file
+   * scope — `results-center.component.ts` is T-06's).
+   *
+   * The current caller (`results-center.component.ts:110`) always invokes
+   * this immediately after `loadMyResults(true)` has already reset
+   * `resultsFilter`/`appliedFilters` to a blank baseline (and, when
+   * `?indicatorTab=` was also present, after `onSelectFilterTab` has just
+   * written `indicator-codes-tabs`) — so re-establishing the full seeded
+   * state here, while preserving whatever indicator id a sibling legacy call
+   * just set, matches today's observable behavior; this is not intended as
+   * a general-purpose partial-merge method.
+   */
+  applyStatusFilterFromHomeLink(statusId: number, statusName?: string, options?: { skipMain?: boolean }) {
     const displayName = statusName?.trim() ? statusName.trim() : 'Status';
+    const preservedIndicatorId = this.resultsFilter()['indicator-codes-tabs']?.[0];
+    const scope: 'my' | 'all' = this.myResultsFilterItem()?.id === 'my' ? 'my' : 'all';
+
+    this.seedFromUrl({
+      filters: {
+        ...(preservedIndicatorId !== undefined ? { indicator: preservedIndicatorId } : {}),
+        status: [statusId]
+      },
+      scope
+    });
+
+    // The one piece `seedFromUrl` deliberately never writes (D-URL-10): this
+    // legacy call site keeps its display label until T-06 removes it. Do
+    // not copy this pattern into any new caller.
     this.tableFilters.update(prev => ({
       ...prev,
       statusCodes: [{ result_status_id: statusId, name: displayName }]
     }));
-    this.resultsFilter.update(prev => ({
-      ...prev,
-      'status-codes': [statusId]
-    }));
-    this.appliedFilters.update(prev => ({
-      ...prev,
-      'status-codes': [statusId]
-    }));
+
     this.resetResultsTablePaginatorToFirstPage();
     if (!options?.skipMain) {
       void this.main();

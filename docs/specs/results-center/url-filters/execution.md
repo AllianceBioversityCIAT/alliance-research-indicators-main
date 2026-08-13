@@ -456,6 +456,105 @@ Recorded because it is the second case in this run where the independent audit c
 
 ---
 
+### T-04 — `seedFromUrl()` on `ResultsCenterService`
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS on attempt 2** (1 rework round consumed) |
+| Date | 2026-08-12 |
+| Implementer attempts | 2 |
+| Requirements covered | R-RCU-002 AC.3/AC.5/AC.6/AC.7, R-RCU-006 AC.3 |
+| Scope change | **Third file authorized by the user** — `…/results-center/class/table.filters.class.ts` |
+
+**Files changed:** `results-center.service.ts`, `results-center.service.spec.ts`, and (attempt 2) `class/table.filters.class.ts`.
+
+One method writes `tableFilters`, `resultsFilter`, `appliedFilters` and the my/all scope atomically from the codec's own `{ filters, scope }` shape — the fix for the D3 state-desync class. `invalidateResultsFetchDedupe()` is the first statement (JD-21). Seeds carry **only** option-value keys (D-URL-10); `tableFilters.indicators` is never written (§7.2). `applyStatusFilterFromHomeLink` became a thin delegate retaining only its legacy label write, dated for deletion by T-06.
+
+#### Attempt 1 → Reviewer `STATUS: FAIL` — a defect the reported verification structurally could not see
+
+> **Discovered Issue:** The production seed block does not type-check. … `statusCodes` → target `{ result_status_id: number; name: string }[]` (`name` **required**) … `sources` → `PlatformSourceFilter[]` … `years` → `GetYear[]`. `contracts` is the only one that is legal, because `display_label` is optional. The reported evidence cannot see this: `jest.config.ts:50` sets `isolatedModules: true`, so the Angular Jest transform is transpile-only — the 203/203 and 6436/6436 green runs are consistent with a broken type and do not refute it.
+> **Violated Rule:** `.agents/reviewer.md` §2 *Stability & Integrity* and §5; root `CLAUDE.md` §4.2 (an AOT type error fails the build outright). The seeded shapes are correct per D-URL-10; **it is the untyped landing site that is wrong.**
+> **Remediation:** Do **not** paper over it with `as any` — that re-hides exactly the drift D-URL-10 depends on. Widen the seed targets in `class/table.filters.class.ts`.
+
+The Reviewer is read-only and could not run `tsc`. It reached this **statically**, from the declared types, stated it as falsifiable ("if `tsc` truly prints only the 2 known errors, this issue closes on that output alone"), and predicted that `contracts` alone would *not* error. **The Leader ran it. All four predictions were exact** — and settling it uncovered the `tsc`-masking process finding below.
+
+#### The scope decision
+
+D-URL-10's value-key-only seed is **unrepresentable** in the declared types: the design mandates a shape the data model forbids. T-04's Files-touched list excluded `table.filters.class.ts`, which is precisely why the Implementer — correctly staying in scope — produced a type error rather than a scope violation. **User authorized the third file (2026-08-12)**, explicitly rejecting the `as any` alternative on the Reviewer's reasoning. Recorded in `tasks.md` T-04 as a "Why the third file is required" note.
+
+#### Attempt 2 (effort `xhigh`) → Reviewer `STATUS: PASS`
+
+Three seed targets widened into strict supertypes: `statusCodes.name` → optional; `years` → `({ report_year: number } & Partial<GetYear>)[]`; `sources` → `({ platform_code: string } & Partial<PlatformSourceFilter>)[]`. Four now-redundant casts dropped from `getActiveFilters`.
+
+> **Reviewer PASS summary:** The attempt-1 FAIL is closed correctly — the three seed targets were widened into strict supertypes so D-URL-10's value-key-only shape is legal **by construction rather than cast into silence** — and I verified by hand that every reader on all four routes either never touches a now-optional key or already coalesced it (`s.name ?? ''`), that the export path reads `resultsFilter` and cannot see a partial object, and that the `Partial<GetYear>` intersection keeps `report_year` required.
+
+**The key insight, better than the Leader's framing:** the widening is *"a narrowing of the lie"*. The old type claimed `name: string` while the seed path produced no `name` at runtime — `getActiveFilters` already rendered `s.name ?? ''` **before** this change. The widening exposes design §7.2's documented transient rather than creating it, and makes the persisted-state JSON round-trip honest. Because each type is a strict supertype, no write site can break and the program-wide error count could only fall — it went **1359 → 1354**, resolving five pre-existing errors in other readers.
+
+Every reader on all four routes was checked individually: `getActiveFilters`, `applyFilters`, `onFiltersConfirm` (linked-results modal), `countTableFiltersSelected`, `project-detail`, `results-center-table`, `project-platform-filters`, the sidebar template (no type coupling — `@Input() signal: WritableSignal<any>`), and the persisted round-trip. `getExportResultFilter` reads `resultsFilter`, never `tableFilters`, so export cannot break.
+
+**Verification (Leader-run independently, not accepted on report):** probe `tsc` → **zero** errors in any of T-04's three files · full client suite → **309 suites / 6436 tests passing**, coverage 99.28/98.13/99.17/99.51 · lint clean. Attempt 2 changes zero runtime behavior (a type widening plus four no-op cast deletions).
+
+#### Rulings
+
+| # | Question | Ruling |
+| --- | --- | --- |
+| 1 | `.set()` on the wire signals vs `.update()` on `tableFilters` | **Correct.** Wholesale replacement is what R-RCU-004's "never partially merged" demands. `'result-codes'` omission harmless — only `create-result-form` uses it, on its own local object |
+| 2 | `applyStatusFilterFromHomeLink`'s semantic broadening | **Verified no-op.** `loadMyResults(true)` at `component.ts:102` blanks those same fields immediately before `:110`, and sets `myResultsFilterItem` to `my`, which the delegate reads back. **The `?indicatorTab=1&statusTab=2` case is safe in the only order that exists** — `onSelectFilterTab` writes `indicator-codes-tabs` at `:107`, before `:110`, and `preservedIndicatorId` reads that signal; `indicatorTab=0` degrades correctly |
+| 3 | Thin delegate vs deleting the method | **Faithful to "fold in".** Deleting now would break a caller in T-06's file, and the retained label write is legacy behavior §7.2 forbids moving into `seedFromUrl`. **T-06 must delete it outright, not merely stop calling it** |
+| 4 | Scope write vs AC.5/AC.6/AC.7 + NFR-RCU-003 | **Satisfied.** `create-user-codes` resolved client-side from the cache; `ResultsCenterUrlState` carries no identifier. AC.7 holds **by construction** — scope and filters are one object plus one signal write, so no window exists in which seeding can overwrite scope |
+| 5 | Widening too loose? | **No** — strict supertypes, no reader regresses (table above) |
+| 6 | Two extra cast removals (`contracts`, `levers`) | **In scope, do not revert.** `tasks.md:124` names `c.display_label \|\| c.agreement_id` explicitly; `:323` is in the same computed, in an authorized file, and is a pure no-op deletion |
+| 7 | `spec.ts:747` type error | **Genuinely pre-existing** (`years: [2024]`, a bare number array, never assignable to `GetYear` either). Only its reported target type changed — not a previously-legal line made illegal. Correctly left alone |
+
+#### ADVISORY (recorded only; none may become a task or widen one)
+
+1. **⚠️ Risk — carry into the T-11 brief.** `exactOptionalPropertyTypes` is **off**, so `name?: string` now legally admits an explicit `{ result_status_id: 5, name: undefined }`. `Object.hasOwn(item, 'name')` returns **`true`** for that object, which would silently defeat the very backfill D-URL-10 depends on (`multiselect.component.ts:188-190`). No current writer does this and the new comments warn against it — **but if T-11's rendered-chip proof ever goes red for a non-transient reason, this is the first thing to check.**
+2. *Reliability (test gap).* Nothing pins "seeding never fetches". `expect(fetchPaginated).not.toHaveBeenCalled()` after a bare `seedFromUrl` would secure it — R-RCU-002 AC.4's single-request guarantee in T-06 rests on this property of T-04.
+3. *Reliability (residual desync, unspecified by the design).* `seedFromUrl` writes `'lever-codes': []` but leaves `tableFilters.levers` untouched, so a lever selected on `/project-detail` would still render a `LEVER` chip while the fetch ignores it. `indicators` has the same asymmetry but is *mandated* untouched by T-04's done-check, so it is conformant. **A T-06/T-08 decision, not a change here.**
+4. *Resilience (T-06 hand-off).* Unlike `applyFilters`, `seedFromUrl` does not call `resetResultsTablePaginatorToFirstPage()`; the delegate still does. `resultsTablePaginatorFirst` lives on the singleton, so a deep link arriving after paging elsewhere could fetch page N of a new filter. Not among §7.1's five writes — **flagged for T-06's `main()` step.**
+5. *Risk (aliasing — spec-mandated, so not an issue).* One `seededFilter` object is shared by both signals per §7.1. Safe today, but a future in-place mutator would desync both at once — the mirror image of the D3 defect this method prevents. `Object.freeze` or a comment would make it explicit.
+6. *Readability.* `results-center.service.ts:295`'s `as { indicator_id: number; name: string }[]` is now the only surviving cast in `getActiveFilters`, redundant against the untouched `indicators` declaration. Correctly left alone (outside the authorized lines); worth sweeping when `indicators` is next edited.
+
+**Final verification result:** 456/456 targeted, **6436/6436 full suite**, probe `tsc` zero errors in this spec's files, lint clean, Reviewer `PASS` on attempt 2.
+
+---
+
+### 🚨 PROCESS FINDING — `npx tsc --noEmit` was reporting nothing for five tasks, and that was not evidence
+
+**Discovered 2026-08-12 while adjudicating T-04's FAIL. This invalidates a verification command this run had been trusting since T-02.**
+
+`client/research-indicators` contains **two pre-existing files with syntax errors**: `indicators-tab-filter.component.spec.ts(181,1) TS1005` and `oicr-form-fields.component.spec.ts(103) TS1005`. Every Implementer from T-02 onward was told to run `npx tsc -p tsconfig.json --noEmit` and to ignore exactly those two. Each did, each reported "only the 2 pre-existing errors", and the Leader accepted it five times.
+
+**A syntax error aborts TypeScript's semantic pass for the whole program.** The Leader proved it by re-running `tsc` against a probe config identical to `tsconfig.json` except that it excludes those two files:
+
+| Run | Result |
+| --- | --- |
+| `tsc -p tsconfig.json --noEmit` (as briefed) | 3 error lines, all `TS1005`, **exit 0** |
+| Same, with the two broken spec files excluded | **1359 error lines** |
+
+So "tsc clean" meant "tsc never got as far as type checking". The command was theatre.
+
+**What it cost, and what it did not.** Scoped to this spec's files, the probe found **three real type errors, all in T-04** (`results-center.service.ts:817/818/820`) and **zero** in T-01, T-02, T-03, T-05 or T-09 (`results-center-url.vocabulary.ts`, `results-center-url.codec.ts`, `results-center.component.ts`, `data-overview.component.ts` are genuinely clean). The masking hid one task's defect, not five. But that is luck, not process: for five tasks the Leader was recording an assertion that could not fail — the exact defect class this spec's own Disqualifies clauses exist to forbid, committed by the Leader rather than by an Implementer.
+
+**Corrected verification recipe, effective from T-04's rework onward.** `npx tsc -p tsconfig.json --noEmit` is not to be used or trusted in this package while those two files are broken. Instead, write a probe config that excludes them and grep the output for your own files:
+
+```
+cat > ./tsconfig.probe.json <<'EOF'
+{ "extends": "./tsconfig.json",
+  "exclude": ["src/app/pages/platform/pages/results-center/components/indicators-tab-filter/indicators-tab-filter.component.spec.ts",
+              "src/app/shared/components/custom-fields/oicr-form-fields/oicr-form-fields.component.spec.ts"] }
+EOF
+npx tsc -p tsconfig.probe.json --noEmit 2>&1 | grep -E "<your files>"
+rm -f ./tsconfig.probe.json
+```
+A grep is required because 1359 pre-existing errors would otherwise bury the signal. Fixing the two syntax errors would be the real repair, but both files are outside every task in this spec.
+
+**Kaizen candidate — this is a new lesson, not a variant of KZ-001/KZ-004.** Those two are about a *test* that cannot fail. This is about a **verification command whose success is indistinguishable from its not having run.** A green exit code was accepted five times as proof of a check that was silently skipped. The lesson: *for any verification command, know what its failure looks like before trusting its success — and prefer a command whose output proves it did the work (a count, a file list) over one whose only signal is silence.*
+
+**Credit where due:** the Reviewer is read-only and could not run `tsc`. It reached the correct conclusion **statically**, from the declared types, and explicitly told the Leader the issue would close on real `tsc` output alone — a falsifiable claim rather than an assertion. It also predicted which of the four seeded fields would *not* error (`contracts`, because `display_label` is optional). All four predictions were exactly right.
+
+---
+
 ### Wave note — two client tasks run concurrently (deliberate exception)
 
 `.agents/leader.md` warns that two tasks in one package are not safely parallel because they share `node_modules`, build output and ports. T-03 and T-05 were run concurrently anyway, **at the user's explicit request**, with four mitigations the Leader put in place instead of refusing: (1) disjoint file sets, verified before launch; (2) repo-wide git commands (`stash`/`checkout`/`restore`/`clean`/`reset`) **forbidden in both briefs**, with the reason and the path-scoped substitute given — a direct response to the T-02 incident; (3) disjoint, narrowed `--testPathPattern` runs, with the full-suite run reserved to the Leader on a quiet tree; (4) a cross-worker rule — an error in a file outside your own list is the other worker's transient state, do not fix it, re-run once, report. **Outcome: no interference.** Both workers reported clean `git status` bleed-checks, and neither ever saw the other's transient state.
