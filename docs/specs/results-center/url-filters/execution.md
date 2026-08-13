@@ -132,3 +132,94 @@ Design §11 requires **client first, then server**. This branch now carries the 
 
 **Final verification result:** 89/89 tests pass, lint clean, Reviewer `PASS` on attempt 1. **D6 manual gate outstanding.**
 
+---
+
+### T-02 — Codec: `parse`
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** |
+| Date | 2026-08-12 |
+| Implementer attempts | 1 |
+| Requirements covered | R-RCU-001 AC.3, R-RCU-002 (both scenarios + AC.1/AC.2), R-RCU-005 (both scenarios + AC.1–AC.4), R-RCU-006 (both scenarios + AC.1/AC.2/AC.3) |
+| Wave | Ran concurrently with T-10 (server) |
+
+**Files changed**
+
+- `client/…/results-center/url/results-center-url.codec.ts` (new, 442 lines) — pure `parse(paramMap) → { filters, scope, dropped, hadRecognizedParam }`; also exports `ResultsCenterUrlFilters`, `DroppedUrlToken`, `ResultsCenterUrlState`, `ParsedResultsCenterUrl`
+- `client/…/results-center/url/results-center-url.codec.spec.ts` (new, 305 lines) — 34 cases, all driving real `convertToParamMap`
+
+**Attempt 1 — Implementer (T2 `sonnet`, effort `high`)**
+
+Verification, from `client/research-indicators`:
+
+- `npx tsc -p tsconfig.json --noEmit` → 2 errors, both pre-existing in unrelated spec files (`indicators-tab-filter.component.spec.ts`, `oicr-form-fields.component.spec.ts`). Reviewer confirmed neither is imported by this diff. **This step was newly added to the recipe after T-01's advisory 5** and is the reason the type surface is now covered at all
+- `npm test -- --silent --testPathPattern=results-center-url` → `Test Suites: 2 passed, 2 total`, `Tests: 65 passed, 65 total`
+- `npm run lint -- --quiet` → `All files pass linting.` No `--fix` mutations
+
+**⚠️ Concurrency incident — `git stash` used while a parallel worker was writing**
+
+The Implementer isolated the two pre-existing `tsc` errors by running `git stash` / `git stash pop`, **while T-10 was concurrently editing server files.** `git stash` is repo-wide, not agent-scoped: it stashed and restored T-10's in-flight edits too. The Leader verified afterwards that the tree was intact (T-10's four changed lines present, its spec block intact, `CAPDEV_INDICATOR_TAB_QUERY` still removed, 18 stash entries all pre-existing from other branches with no residue from this run). **No damage occurred — but only because of timing.** Had T-10 been mid-write inside that window, its edits would have been stashed out from under it and it would have reported success against a reverted tree, with the failure surfacing later as an inexplicable missing change.
+
+**Standing correction, applied from the next parallel wave onward:** every Implementer brief in a concurrent wave must forbid repo-wide git operations (`stash`, `checkout`, `restore`, `clean`, `reset`) outright, and offer the safe substitute for the "is this error pre-existing?" question — check the error's file path against the task's own touched-files list, or run `git stash push -- <only-my-paths>`. **Kaizen candidate** for `/akili-archive`: the constitution's concurrency rule warns the *Leader* not to measure beside a worker, but says nothing to the *worker* about repo-wide git commands, which is the same hazard from the other direction.
+
+**Attempt 1 — Reviewer verdict (T3 `opus`, lens-checklist mode): `STATUS: PASS`**
+
+> `parse` conforms to R-RCU-001 AC.3, R-RCU-002, R-RCU-005 and R-RCU-006 AC.1/AC.2/AC.3 and to design §5.4/§5.5/§6.1 steps 1-2, and all eight T-02 done-checks are covered by falsifiable tests that drive the real `ParamsAsMap` — verified at the Angular source, which also confirms the case-sensitivity that motivates the folding and confirms the D6 object literal is byte-faithful to the query string it stands for. All four flagged judgment calls resolve in the Implementer's favor; the two Disqualifies clauses are both satisfied.
+
+**Rulings on the four flagged judgment calls**
+
+| # | Question | Ruling |
+| --- | --- | --- |
+| 1 | `.trim()` on split tokens, and blank segments skipped **silently** (no `dropped` entry) | **Both accepted.** A blank segment from `?contract=A100,,S192` carries no sender intent, so nothing the link promised is missing and a toast would be a false positive. Trim is affirmatively supported by R-RCU-001's "hand-edit the link" motivation and cannot cause a wrong resolution (resolvers still validate after). Order is safe: trim precedes the 64-char bound, so whitespace cannot smuggle an over-long token through. Recorded consequence, non-gating: the 50-value bound counts *post-skip* tokens |
+| 2 | `dropped` as typed `{ param, value, reason }` objects rather than `string[]` | **Accepted.** Design §2.1 constrains `dropped`'s presence, not its element type; the server exemplar is cited for *purity*, not for a shared shape. The richer type is what makes T-02's own Disqualifies clause satisfiable at all |
+| 3 | `tab` given `indicator`'s reject-on-repeated-key rule, admittedly under-tested | **In scope; the gap is advisory, not FAIL.** Design §5.4 types `tab` as `my \| all` with "exact match", so it is single-valued by definition and `?tab=my&tab=all` is genuinely ambiguous. R-RCU-005 AC.4 forbids *silently* taking the first occurrence — rejecting-and-reporting is the opposite of silent, and the resulting `scope: undefined` lands on design §6.1 step 3's documented no-`tab` path, composing correctly with R-RCU-002 AC.6. No done-check requires the untested branches |
+| 4 | D6 literal asserted via `convertToParamMap({...})` rather than a URL string — **is this KZ-001?** | **Satisfies design §8. Explicitly NOT KZ-001.** Verified at framework source: `convertToParamMap` returns `new ParamsAsMap(params)` (`router.mjs:60-62`) — the **same class** backing `route.snapshot.queryParamMap`, so the test's double *is* the production type, not a stand-in. Case-sensitivity is genuinely present (`hasOwnProperty` / `Object.keys`), so the folding is really exercised. And `UrlParser.parseQueryParam` (`:687-711`) does **no comma handling**, so the object literals are byte-faithful to what Angular's parser would hand the codec. The only unexercised thing is Angular's own `&`/`=` splitting, which this codec neither owns nor can break — its input type is `ParamMap`, not a URL string |
+
+**Other verifications performed**
+
+- **Falsifiability:** both order tests use inputs whose sorted order differs from input order (`'S192,A100'` → `['S192','A100']`; `'oicr-published,editing'` → `[14, 1]`, sorted-by-id would be `[1, 14]`). `dropped` assertions name the token via `toContainEqual({ param, value, reason })` in 8 of 9 places
+- **KZ-001 sweep:** all 34 `parse(...)` call sites use `convertToParamMap`; no hand-rolled `ParamMap` literal anywhere
+- **Test count corrected:** **34**, not the 33 the Implementer reported — it miscounted its own contribution; the run total of 65 is right (31 vocabulary + 34 codec). No test missing
+- **`statusLabel`:** claim verified against code. `rawValuesFor` is called for exactly eight groups, `statuslabel` not among them, so its value cannot reach `filters` *or* `dropped`. Only effect is `hadRecognizedParam` via set membership — presence, not content
+- **Case policy §5.4:** `contract` uppercase-then-validate (so `a100`→`A100` passes); `status`/`source`/`indicator`/`tab` all lower-folded; `year` numeric. `contract` shape-validated only (`/^[A-Za-z0-9._-]{1,32}$/`), no control-list lookup — D-URL-7 affirmatively tested with `ZZZ999`
+- **Bounds §5.5:** 51 values → whole param dropped `too-many-values` before any token inspected; 65-char → `too-long` (checked before pattern validation, so the reason is specific); repeated key via `getAll()` per folded key, concatenated
+- **Legacy precedence** by key presence, never order; no `dropped` entry for a legacy value that merely lost to its canonical counterpart (correct — overridden ≠ unrecognized)
+- **Purity D-URL-1:** `import type { ParamMap }` is type-only, so zero runtime dependency on `@angular/router`. No DI, router, signals, `console` or toast
+- **Extensibility for T-03:** confirmed. `ResultsCenterUrlState` already exported and documented as `serialize`'s input; the vocabulary already exports the three inverse maps `serialize` needs; nothing blocks nulling the legacy keys per R3-2
+
+**ADVISORY (recorded only; never gated, and none may become a task or widen one)**
+
+1. *Reliability.* Done-check 7 says `statusLabel`'s value never appears in "the **returned object**", but the three tests fence only `filters`. Behavior over `dropped`/`scope` is correct by construction. Widening one assertion to `JSON.stringify(parse(...))` would close it as literally worded.
+2. *Reliability.* `resolveScope`'s repeated-key branch (`:348-351`) and invalid-value branch (`:359`) are untested — the gap the Implementer admitted. **Worth covering before T-03/T-06 build on `scope`.**
+3. *Reliability.* Vocabulary-token case-insensitivity is implemented for all four token classes but directly tested for none — `{ CONTRACT: 'a100' }` covers only `contract`.
+4. *Reliability.* Legacy precedence gates on **raw** presence for `indicator` but **post-split token count** for `status`, so `?status=&statusTab=2` consults the fallback while `?indicator=&indicatorTab=1` does not. Deterministic either way, so no requirement is contradicted, but the asymmetry reads as accidental.
+5. *Readability.* `YEAR_PATTERN` is reused as the numeric-id test in both legacy resolvers, where years are not involved — a false semantic link.
+6. **Risk / hand-off to T-06.** `DroppedUrlToken.value` carries the raw unescaped token. Right shape for testing, but it makes T-06's done-check "a token containing markup cannot alter the toast's rendering" a live hazard rather than a structural impossibility. Design §7.4's guarantee is *non-interpolation*, so **T-06 must read only `dropped.length`, never `dropped[i].value`. Leader action: carry verbatim into the T-06 brief.**
+7. *Readability.* `DroppedUrlToken.param` is typed `string` though every producer passes a `CanonicalParamName` or a folded legacy name; a union would let T-06 group by parameter without a cast.
+8. *Resilience.* `splitMultiValue` calls `.split(',')`/`.trim()` on values Angular types `any`. Production values are always strings, so not a production risk, but a future test passing `{ year: 2025 }` as a number would throw rather than drop.
+9. *Risk (process, D6 / RB-3).* A strictly stronger twin form exists — hoist the literal to one exported const and derive the paramMap from it via `new URL(...).searchParams` — buying grep-comparability for humans rather than behavioral coverage. Optional; the manual HITL check stays mandatory regardless.
+
+**Final verification result:** 65/65 tests pass (31 vocabulary + 34 codec), `tsc` clean for this diff, lint clean, Reviewer `PASS` on attempt 1.
+
+---
+
+## 3. Budget Tripwire — BREACHED, escalated to the user
+
+**Raised 2026-08-12, after T-02 (3 of 12 tasks complete).**
+
+| Metric | `design.md` §13 budget | Actual after 3 tasks | Delta |
+| --- | --- | --- | --- |
+| Tasks | 12 | 3 done (T-01, T-02, T-10) | on track |
+| **LOC** | **~1000 total** | **~1268** | **+27% over the whole-spec budget, with 9 tasks left** |
+| Review rounds | 3 | 3 used, 3 PASS on first attempt, 0 rework | on track — every task passed first time |
+
+LOC by task: T-01 441 · T-02 747 · T-10 ~80.
+
+**Cause — the estimate is internally inconsistent, not the execution overrunning.** The overrun is not sloppy implementation: all three tasks passed review on the first attempt with zero rework, and the Reviewer judged the test volume *necessary* (the Disqualifies clauses in this spec demand falsifiable assertions, which cost lines). The real problem is that **`design.md` §13's ~1000 LOC cannot be right on its own terms**: `tasks.md` T-11 describes itself as "a rewrite of a ~1,000-line spec … the single largest item in the budget." T-11 alone therefore approaches the entire spec's LOC budget, before the nine other remaining tasks. The three heaviest tasks (T-06, T-08, T-11) are all still ahead.
+
+Realistic projection: **~3000–3500 LOC** for the full spec, roughly 3× the recorded budget.
+
+Per `/akili-execute`'s Budget Tripwire rule the run **stops here** rather than continuing on the assumption that finishing is what was wanted. Options put to the user: re-baseline §13 and continue · continue without re-baselining (tripwire noted once, not re-raised) · descope · pause. Decision to be recorded here.
+
+
