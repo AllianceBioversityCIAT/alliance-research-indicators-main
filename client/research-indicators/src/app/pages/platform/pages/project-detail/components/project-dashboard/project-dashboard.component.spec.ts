@@ -1,6 +1,6 @@
 import { Component, DebugElement, EventEmitter, Input, Output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { ApiService } from '@shared/services/api.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
@@ -1854,21 +1854,12 @@ describe('ProjectDashboardComponent', () => {
         .overrideComponent(ProjectDashboardComponent, {
           remove: {
             imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent],
-            providers: [
-              GetTopContributorsContractsService,
-              GetTopMainContactPersonsService,
-              GetTopPartnersService,
-              GetTopPrimaryLeversService,
-              GetGeoScopeService
-            ]
+            providers: [GetFullContractReportsService, GetGeoScopeService]
           },
           add: {
             imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
             providers: [
-              { provide: GetTopContributorsContractsService, useValue: createRankedServiceMock() },
-              { provide: GetTopMainContactPersonsService, useValue: createRankedServiceMock() },
-              { provide: GetTopPartnersService, useValue: createRankedServiceMock() },
-              { provide: GetTopPrimaryLeversService, useValue: createRankedServiceMock() },
+              { provide: GetFullContractReportsService, useValue: createReportsMock() },
               { provide: GetGeoScopeService, useValue: { main: jest.fn() } }
             ]
           }
