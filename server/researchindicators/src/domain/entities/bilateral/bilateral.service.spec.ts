@@ -59,6 +59,9 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
   // R-BIL-117 AC.3 — named so the gate-bypass test can assert it is never
   // reached when the read-only gate rejects the write first.
   const tocUpsertForSp = jest.fn();
+  // T-01 (R-BIL-125 AC.4) — named so the cascade-pin tests below can assert
+  // deactivation calls; behavior is unchanged (still a bare jest.fn()).
+  const deactivateForSps = jest.fn();
 
   // Mimic TypeORM's actual save: echo back the payload (merged with an id)
   // so `savedMapping` carries the lever_code / indicator_code / indicator_type
@@ -127,7 +130,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           useValue: {
             findActiveByResultId: findActiveTocRows,
             upsertForSp: tocUpsertForSp,
-            deactivateForSps: jest.fn(),
+            deactivateForSps,
           },
         },
         {
@@ -558,6 +561,94 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
 
       expect(tocUpsertForSp).not.toHaveBeenCalled();
       expect(transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // updateAlignment — SP-deselection ToC cascade pin (T-01 / R-BIL-125 AC.4)
+  //
+  // Characterisation tests recording TODAY's behavior BEFORE the Primary/
+  // Contributing role change lands (design.md §5.3 "What deliberately does
+  // not change"): a ToC row is deactivated ONLY when its sp_code leaves
+  // sp_codes. Asserted in both directions so a later regression — e.g. a
+  // role-change cascade, which R-BIL-125 explicitly forbids — is
+  // attributable rather than merely visible.
+  //
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-01 / R-BIL-125
+  // ---------------------------------------------------------------------------
+  describe('updateAlignment — SP-deselection ToC cascade pin (T-01 / R-BIL-125 AC.4)', () => {
+    const eligibleContext = () => ({
+      result_id: 19792,
+      result_official_code: 19792,
+      is_pool_funding_contributor: true,
+      is_synced_to_prms: false,
+      platform_code: 'STAR',
+      report_year_id: 2026,
+    });
+
+    beforeEach(() => {
+      // Short-circuit the read-back and the SP-catalog fan-out — both are
+      // covered elsewhere; this describe pins only the cascade decision.
+      jest.spyOn(service, 'getAlignment').mockResolvedValue({} as never);
+      jest.spyOn(service, 'getScienceProgramsForResult').mockResolvedValue({
+        result_code: '19792',
+        mapping_status: 'mapped',
+        clarisa_project: { id: 1, short_name: 'p' },
+        science_programs: ['SP01', 'SP03'].map((code) => ({
+          code,
+          name: `name-of-${code}`,
+          category: null,
+          color: null,
+          icon_key: null,
+          allocation: 50,
+        })),
+      });
+    });
+
+    it('deactivates a ToC row when its SP leaves sp_codes', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+      findActiveTocRows.mockResolvedValueOnce([
+        { id: 10, sp_code: 'SP01' },
+        { id: 11, sp_code: 'SP03' },
+      ]);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01'], // SP03 leaves sp_codes
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, user),
+      ).resolves.toBeDefined();
+
+      expect(deactivateForSps).toHaveBeenCalledTimes(1);
+      expect(deactivateForSps).toHaveBeenCalledWith(
+        19792,
+        ['SP03'],
+        42,
+        fakeManager,
+      );
+    });
+
+    it('does NOT deactivate a ToC row when its SP stays in sp_codes', async () => {
+      findContext.mockResolvedValueOnce(eligibleContext());
+      findActiveAlignment.mockResolvedValueOnce(null);
+      findActiveTocRows.mockResolvedValueOnce([
+        { id: 10, sp_code: 'SP01' },
+        { id: 11, sp_code: 'SP03' },
+      ]);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01', 'SP03'], // both stay selected
+      };
+
+      await expect(
+        service.updateAlignment(19792, '19792', dto, user),
+      ).resolves.toBeDefined();
+
+      expect(deactivateForSps).not.toHaveBeenCalled();
     });
   });
 

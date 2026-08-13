@@ -451,6 +451,34 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     expect(upsertForSp).not.toHaveBeenCalled();
   });
 
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-01 / R-BIL-125 AC.4
+  //
+  // Characterisation pin, added BEFORE the Primary/Contributing role change
+  // lands (design.md §5.3 "What deliberately does not change"): the
+  // SP-deselection cascade is keyed ONLY off an SP leaving `sp_codes`. This
+  // is the "stays ⇒ untouched" half — the "leaves ⇒ deactivated" half is
+  // the test immediately above.
+  it('does NOT deactivate a ToC row when its SP stays in sp_codes (R-BIL-125 AC.4 — T-01 cascade pin)', async () => {
+    findContext.mockResolvedValue(baseContext());
+    findActiveAlignment.mockResolvedValue(null);
+    findActiveTocRows.mockResolvedValue([
+      { id: 10, sp_code: 'SP01' },
+      { id: 11, sp_code: 'SP03' },
+    ]);
+
+    const dto: UpdatePoolFundingAlignmentDto = {
+      has_contribution: true,
+      sp_codes: ['SP01', 'SP03'], // both stay selected; no toc_alignments
+    };
+
+    await expect(
+      service.updateAlignment(19792, '19792', dto, user),
+    ).resolves.toBeDefined();
+
+    expect(deactivateForSps).not.toHaveBeenCalled();
+    expect(upsertForSp).not.toHaveBeenCalled();
+  });
+
   // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-08 / R-BIL-092..097, NFR-BIL-090
   //
   // Exhaustive write matrix on top of the T-06 smoke tests above (tasks.md
