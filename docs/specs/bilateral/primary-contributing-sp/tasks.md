@@ -302,9 +302,9 @@ graph TD
 
 ### T-07 — ToC alignments accepted for the Primary SP only
 
-> **⚠ PIVOT RECORD OPEN — read [`./execution.md`](./execution.md) → *Pivot Record: T-07* before starting.** Two spec defects were found pre-emptively during T-06's review: (1) this task's done-criterion *"T-01's pins green"* is **unsatisfiable**, because T-11 re-bases those pins and runs *after* this task; (2) **37 of the 41 currently-red blocks are in this task's own file** and are **T-11's to re-base, not yours** — touching them bypasses T-11's mandatory assertion ledger (the D-9 defect). **The amendment is drafted and awaiting user approval; `tasks.md` is unchanged below.**
+> **✅ AMENDED 2026-08-13 — user-approved. See [`./execution.md`](./execution.md) → *Pivot Record: T-07*.** Two spec defects were found pre-emptively during T-06's review and are now corrected in place below: (1) the done-criterion *"T-01's pins green"* was **unsatisfiable** — T-11 re-bases those pins and runs *after* this task — and is replaced by a **structural** no-cascade-trigger proof; (2) **37 of the ~41 currently-red blocks are in this task's own file** and are **T-11's to re-base, not yours** — an explicit scope boundary now says so. No requirement or design change; no task added or removed.
 
-- **Requirements covered:** **R-BIL-124** (AC.1–AC.5) · **R-BIL-125** AC.1/AC.2/AC.3 · defect classes **D-1**, **D-7**
+- **Requirements covered:** **R-BIL-124** (AC.1–AC.5) · **R-BIL-125** AC.1/AC.2 fully, **AC.3 structurally only** (finally discharged at **T-11** — amended 2026-08-13, Pivot Record: T-07) · defect classes **D-1**, **D-7**
 - **Files touched (intended):**
   - `.../bilateral/bilateral.service.ts`
   - `.../bilateral/bilateral.service.updateAlignment.tocAlignments.spec.ts`
@@ -316,10 +316,12 @@ graph TD
   - **Add no new cascade.** Demotion and promotion deactivate nothing (R-BIL-125). The only cascade trigger stays "the SP left `sp_codes`".
   - C1's chain for the Primary's own entry is untouched: Level + HLO floor, `level_not_allowed`, `contribution_without_indicator`, conditional catalog checks.
 - **Scope boundary:** one rule plus its tests. Do not touch the cascade, the read-back's ToC filter, or `is_read_only`.
+  - **⛔ 37 of the ~41 currently-red blocks are in `tocAlignments.spec.ts` — THIS TASK'S OWN FILE — and they are T-11's to re-base, NOT yours** *(added 2026-08-13, Pivot Record: T-07 §2)*. Each is one `primary_sp_code` line from green and they will sit in front of you while you work. **Do not add `primary_sp_code` to any block you did not author.** Re-basing them here bypasses **T-11's mandatory per-file assertion ledger** — the **D-9** defect T-11 exists to prevent, and the reason a green suite is *not* evidence of success in that task. It would arrive looking like helpfulness and would destroy the audit trail. If your change makes a **new** block red beyond the known ~41, that one **is** yours — report it.
 - **Tests:** `bilateral.service.updateAlignment.tocAlignments.spec.ts` — AC.1–AC.5, plus R-BIL-125 AC.1/AC.2/AC.3 including the demotion case.
 - **Verification:**
   - `cd server/researchindicators && npx jest src/domain/entities/bilateral --coverage=false`
-  - **T-01's cascade pins must still pass unmodified** — `git diff` shows no deletions in the pinned blocks.
+  - **T-01's cascade pins: prove NO CASCADE TRIGGER WAS ADDED, structurally** *(amended 2026-08-13 — see `execution.md` → Pivot Record: T-07; the original "must still pass unmodified" was unsatisfiable)*. Two checks: `git diff` shows **no deletions** inside T-01's two pinned blocks (`bilateral.service.spec.ts:610`, `:637`), **and** the cascade production logic — the `deactivateForSps` call site and the `effectiveSpCodes` filter — is **byte-identical**. The pins' green re-base is **T-11's**.
+  - **Filtered runs are the convention here.** The suite is **~41 red before you start** (T-06, proven by mutation to contain no regression), **37 of them in this task's own file**. Demonstrate your own tests with `npx jest …tocAlignments.spec.ts -t "R-BIL-124"`. **Report the full-suite count before and after** so any *new* red is visible.
   - `npx eslint src/domain/entities/bilateral/bilateral.service.ts`
 - **What would make this check FAIL:** placing the new rule *before* `sp_not_selected` makes AC.2 red (an unselected SP would get the new code). Throwing eagerly instead of collecting makes AC.4 red. Adding a role-change cascade makes T-01's pin and R-BIL-125 AC.1 red. Placing the rule *after* the `aligns_with_toc` short-circuit makes an `aligns_with_toc: false` entry for a Contributing SP silently accepted — so include exactly that input as a test.
 - **What DISQUALIFIES the evidence:** an AC.4 atomicity test that submits **one** bad entry cannot show that errors are *collected* — it passes identically under eager throwing. AC.4 requires a request with **two or more** simultaneous per-alignment errors, asserting all of them come back in one response. And "nothing persisted" must be asserted against repository call counts; a green test that only checks the status code is not evidence of atomicity.
@@ -333,7 +335,7 @@ graph TD
   - [ ] `aligns_with_toc: false` for a Contributing SP is **rejected**, not silently accepted.
   - [ ] R-BIL-125 AC.1: changing `primary_sp_code` with both SPs still selected leaves both ToC rows active.
   - [ ] R-BIL-125 AC.2: the demoted SP's row still appears in `toc_alignments[]` on read-back.
-  - [ ] R-BIL-125 AC.3: removing an SP from `sp_codes` still deactivates its ToC row — T-01's pins green.
+  - [ ] **R-BIL-125 AC.3 — T-07 adds no cascade trigger** *(amended 2026-08-13, Pivot Record: T-07)*. Proven **structurally**: no deletions inside T-01's two pinned blocks, and the `deactivateForSps` call site byte-identical. **R-BIL-125 AC.3 is finally discharged at T-11** (pins green), **not here** — T-11 re-bases them and runs after this task, so a green-pins criterion cannot be met at T-07, for the identical reason T-06 was excused from it.
   - [ ] `npx eslint` clean.
 - **Dependencies:** T-06
 - **Estimated LOC:** ~110
@@ -723,7 +725,7 @@ Requirement-ID presence is **not** closure. Every scenario and every `BUT it mus
 | **R-BIL-122** | A Primary outside the selection is rejected | report it as `unknown_sp_codes` → **T-06** (two distinct payloads, AC.4) | leave the stored alignment untouched → **T-06** | T-05, T-06 |
 | **R-BIL-123** | Role survives a round-trip | add, remove, or retype any pre-existing field → **T-08** (field-by-field), **T-09** | preserve `sp_code`-ascending ordering → **T-08** | T-08, T-09, T-13 |
 | **R-BIL-124** | A Contributing SP cannot be ToC-mapped | deactivate or delete an existing ToC row for that SP → **T-07** | report atomically alongside other per-alignment errors → **T-07** (≥ 2 errors) | T-07 |
-| **R-BIL-125** | Demotion preserves the demoted SP's ToC row | deactivate, delete, or blank it as a side effect → **T-01** (pin), **T-07** | remain excluded from STAR's writable surface → **T-07** | T-01, T-07 |
+| **R-BIL-125** | Demotion preserves the demoted SP's ToC row | deactivate, delete, or blank it as a side effect → **T-01** (pin), **T-07** (structural: no cascade trigger added) | remain excluded from STAR's writable surface → **T-07** | T-01, T-07, **T-11** (AC.3 finally discharged — pins green; amended 2026-08-13, Pivot Record: T-07) |
 | **R-BIL-126** | PRMS-locked legacy alignment left alone | be blocked, error, or prompt for an unsaveable Primary → **T-14** (read-only control) | no row rewritten by the migration → **T-02** (checksum) | T-02, T-06, T-08, T-13, T-14 |
 | **R-BIL-127** | Choosing a new Primary demotes the old one | leave two SPs Primary at any point, **including mid-interaction** → **T-16** | convey the distinction without colour alone → **T-14** (build), **T-16** (recorded as not dischargeable by test) | T-14, T-16 |
 | **R-BIL-128** | Only the Primary gets a ToC block | render a block, question, or cascade for a Contributing SP → **T-15**, **T-16** | still enforce C1's Level + HLO floor on the Primary → **T-15**, **T-16** | T-15, T-16 |

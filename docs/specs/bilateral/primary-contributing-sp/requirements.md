@@ -572,7 +572,7 @@ The classes of defect this spec can actually produce, and the command that catch
 | R-BIL-122 | Primary must be selected | server | 1 | T-05, **T-06** |
 | R-BIL-123 | Read-back exposes role | server | 1 | **T-08**, T-09, T-13 |
 | R-BIL-124 | ToC accepted for Primary only | server | 1 | **T-07** |
-| R-BIL-125 | Contributing ToC rows retained | server | 1 | **T-01** (AC.4 pin-first), **T-07** |
+| R-BIL-125 | Contributing ToC rows retained | server | 1 | **T-01** (AC.4 pin-first), **T-07** (AC.1/AC.2; AC.3 structurally), **T-11** (AC.3 discharged — pins green) |
 | R-BIL-126 | Legacy alignments survive | server + db | 1 | **T-02**, T-06, T-08, T-13, T-14 |
 | R-BIL-127 | Selector distinguishes roles | client | 1 | **T-14**, T-16 |
 | R-BIL-128 | ToC block for Primary only | client | 1 | **T-15**, T-16 |

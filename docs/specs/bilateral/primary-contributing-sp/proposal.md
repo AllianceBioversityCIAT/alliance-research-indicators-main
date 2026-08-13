@@ -154,6 +154,14 @@ In the bilateral mapping section a contributor:
 
 ## 9. Risks, Dependencies, And Open Questions
 
+> **⚠ Amended 2026-08-13 by `/akili-specify` — R-4 and OQ-2 below rest on a premise that is false.**
+>
+> The R-4 row states *"Post-migration every legacy result violates 'exactly one Primary'"*. **Production holds no mapped SP data** (stated by the product owner, 2026-08-13) — the mapped data is fake DEV test data. There are no legacy production rows to violate the invariant.
+>
+> **OQ-2 is closed**, on two independent grounds: auto-promoting the highest-allocation SP is *not implementable in a SQL migration* (allocations live in CLARISA, fetched per-result at request time, never persisted), and there is nothing in production to promote. Resolution: nullable `sp_role`, no backfill, invariant enforced on write only.
+>
+> Rows below are **left unedited as a point-in-time record** of what was believed at proposal time. The authoritative statements are [`requirements.md` §1.1](./requirements.md) and [`design.md` D-C2-3](./design.md).
+
 | # | Risk | Why it bites | Mitigation |
 | --- | --- | --- | --- |
 | **R-4** | **Backfill.** Existing results carry N role-less SPs. | Post-migration every legacy result violates "exactly one Primary". | **OQ-2.** Whichever way it goes, the migration must not retro-break `is_read_only` results — those are locked and cannot be repaired by a user. |

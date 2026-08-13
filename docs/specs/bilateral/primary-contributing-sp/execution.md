@@ -247,7 +247,7 @@ Per `/akili-execute` §2.4 these never trigger rework, never consume attempts, a
 | --- | --- |
 | **T-04** | Compare against block hash **`94573605dbbe22b943339c80e2601ae492ade7022614d161aa5d63d932ceed57`**, located by **content** (the `it('version gate — …(R-BIL-097 AC.2)')` block), not by lines 216–250. Do **not** use the whole-file hash `e2b05b60…` — T-01 has already invalidated it. |
 | **T-11** | Same block hash and the same content-anchored rule; `:216` is off-limits. Preserve the T-01 cross-reference comments in both cascade-pin blocks when re-basing (ADVISORY 3). |
-| **T-07** | T-01's cascade pins must still pass **unmodified** — `git diff` must show no deletions in the pinned blocks. The pins live in **both** `bilateral.service.spec.ts` (new describe) and `...tocAlignments.spec.ts` (`:453+`). |
+| **T-07** | ~~T-01's cascade pins must still pass **unmodified**~~ — **SUPERSEDED 2026-08-13 by *Pivot Record: T-07* (user-approved).** The pins are red from T-06 and only **T-11** can make them green, so T-07 proves the same claim **structurally**: no deletions inside the pinned blocks **and** the `deactivateForSps` call site byte-identical. The pins live in **both** `bilateral.service.spec.ts` (`:610`, `:637`) and `...tocAlignments.spec.ts` (`:453+`). **R-BIL-125 AC.3 is discharged at T-11, not T-07.** |
 | **T-09 / T-13** | ADVISORY 2 — these unit pins prove the repository **seam**, not persistence. Persistence of `is_active: false` is evidenced only in `result-pool-funding-toc-alignment.repository.spec.ts`. Do not cite T-01 as persistence evidence. |
 
 #### Issues encountered
@@ -1857,5 +1857,52 @@ No requirement changes. No design decision is reversed. No task is added or remo
 where the file layout actively invites crossing it. T-07 can still prove its real claim without a
 green suite: structurally (cascade call site untouched) and behaviourally on its own fixtures —
 `tocAlignments.spec.ts` already carries a cascade test T-07 owns and will supply a Primary to.
+
+---
+
+### ✅ Pivot Record: T-07 — AMENDMENT APPROVED AND APPLIED (2026-08-13)
+
+User approved. All three edits applied to `tasks.md`. **No requirement changed, no design decision
+reversed, no task added or removed.**
+
+| # | Edit | Location |
+| --- | --- | --- |
+| 1 | Verification: *"T-01's cascade pins must still pass unmodified"* → **structural** proof (no deletions inside the pinned blocks **and** `deactivateForSps` call site + `effectiveSpCodes` filter byte-identical), plus a filtered-run convention and a before/after full-suite count | `tasks.md:323` |
+| 2 | Done-criterion: *"R-BIL-125 AC.3 … T-01's pins green"* → **T-07 adds no cascade trigger**, proven structurally; **AC.3 finally discharged at T-11** | `tasks.md:338` |
+| 3 | Scope boundary: explicit ⛔ that **37 of the ~41 red blocks are in T-07's own file and are T-11's**, with the D-9 rationale spelled out | `tasks.md:319` |
+
+The header banner at `tasks.md:305` was flipped from *"awaiting user approval"* to **AMENDED — user-approved**.
+
+#### 🔁 Correction Closure — the two-direction sweep found FOUR survivors the amendment never named
+
+Per `/akili-specify` → *Correction Closure* and Kaizen **K-003**: grep the **literal superseded
+string** forward, and grep references **to** the corrected sections backward. Both directions ran.
+
+**Forward** (`"pins green"`, `"pass unmodified"`, `"pins must still pass"`):
+
+| Site | Verdict |
+| --- | --- |
+| **`execution.md:250`** — T-01's forward-pointer table, *"T-01's cascade pins must still pass **unmodified**"* | **🔴 STALE AND ACTIVELY WRONG** — the pre-amendment instruction, aimed at T-07, in the very table T-07's brief is built from. **Nobody named this site.** Corrected with a `SUPERSEDED` marker + the structural replacement. |
+| `tasks.md:479` — *"must pass unmodified"* for `:216` | ✅ **Different claim, correctly left.** That is the OFF-LIMITS R-BIL-097 AC.2 block, which genuinely must pass unmodified. |
+| `execution.md:1805-1843` | ✅ History — the Pivot Record quoting the superseded text. Correct as-is. |
+| `tasks.md:305/323/338` | ✅ The amendment itself. |
+
+**Backward** (references *to* R-BIL-125 AC.3's discharge point) — **three incomplete indices, none named by the amendment:**
+
+| Site | Fix |
+| --- | --- |
+| `requirements.md:575` — requirement index credited only *"T-01, T-07"* | Added **T-11 (AC.3 discharged — pins green)** and marked T-07's AC.3 as structural |
+| `tasks.md:728` — §4 coverage matrix, same omission | Same correction; **T-11 added to the owning-task column** |
+| `tasks.md:307` — T-07's *"Requirements covered: R-BIL-125 AC.1/AC.2/AC.3"* | Now reads **AC.1/AC.2 fully, AC.3 structurally only**, discharged at T-11 |
+
+**Re-grepped to confirm closure.** The only surviving match is the corrected `requirements.md:575`
+line itself, which contains the phrase as part of its *new* text.
+
+> **This is K-003's fourth occurrence in this spec** (twice inside T-02's rework, once on the
+> Leader's own supersession note, now once more) and the pattern is identical every time: **a
+> finding's cited-site list is a starting point, never the scope.** Here the most dangerous survivor
+> was in `execution.md` — the audit trail itself — where a superseded instruction would have been
+> read straight into the next task's brief. The sweep is what caught it; the amendment's own citation
+> list did not.
 
 ---
