@@ -20,6 +20,21 @@ global.setImmediate = setImmediatePolyfill as unknown as typeof setImmediate;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 global.clearImmediate = ((id: any) => clearTimeout(id)) as typeof clearImmediate;
 
+// jsdom's Performance implements only now(); libraries that call performance.mark/measure (e.g. mapbox-gl)
+// otherwise throw "performance.mark is not a function" under jsdom. Provide no-op stubs so those calls succeed.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const jsdomPerformance = globalThis.performance as any;
+if (jsdomPerformance && typeof jsdomPerformance.mark !== 'function') {
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  jsdomPerformance.mark = () => {};
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  jsdomPerformance.measure = () => {};
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  jsdomPerformance.clearMarks = () => {};
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  jsdomPerformance.clearMeasures = () => {};
+}
+
 // Mock window.alert
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 window.alert = () => {};

@@ -5,10 +5,10 @@ import { MapboxGeocodingService } from '@shared/services/mapbox-geocoding.servic
 import { environment } from '../../../../../../../environments/environment';
 import { GeoScopeMapComponent } from './geo-scope-map.component';
 
-const mockMapInstances: Array<Record<string, any>> = [];
-const mockPopupInstances: Array<Record<string, any>> = [];
-
 jest.mock('mapbox-gl', () => {
+  const mockMapInstances: Array<Record<string, any>> = [];
+  const mockPopupInstances: Array<Record<string, any>> = [];
+
   class MockMap {
     readonly addControl = jest.fn();
     readonly addSource = jest.fn((_id: string, source: unknown) => {
@@ -75,9 +75,18 @@ jest.mock('mapbox-gl', () => {
     },
     Map: MockMap,
     Popup: MockPopup,
-    LngLatBounds: MockLngLatBounds
+    LngLatBounds: MockLngLatBounds,
+    mockMapInstances,
+    mockPopupInstances
   };
 });
+
+const mapboxMock = jest.requireMock('mapbox-gl') as {
+  mockMapInstances: Array<Record<string, any>>;
+  mockPopupInstances: Array<Record<string, any>>;
+};
+const mockMapInstances = mapboxMock.mockMapInstances;
+const mockPopupInstances = mapboxMock.mockPopupInstances;
 
 describe('GeoScopeMapComponent', () => {
   let fixture: ComponentFixture<GeoScopeMapComponent>;
