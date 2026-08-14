@@ -122,7 +122,7 @@ The controller still holds a **pre-existing inline copy** of the `Confirmed` / e
 
 ---
 
-### T-05 — `app_config` seed migration · *review pending*
+### T-05 — `app_config` seed migration · **PASS**
 
 | Field | Value |
 | --- | --- |
@@ -145,6 +145,14 @@ MIGRATION RUNNABLE: yes
 The SQL uses `?` placeholders **with** parameter arrays (the exemplar's safe form) and contains no SQL comments, so the named-placeholders rewrite has parameters to bind. Scratch schema dropped afterwards.
 
 > This is the gate that migration `1784500000000` never had: it shipped unrunnable and passed lint, typecheck, build and human review on the way (**K-006**).
+
+**Reviewer verdict — `STATUS: PASS`** on all seven audit checkpoints: insert-only (no DDL), placeholder-safe with bound parameter arrays, keyed off the `AppConfigKey` enum member rather than a hardcoded string, correct values per design §5, `down()` deletes only its own row, timestamp append-only, scope confined to one file.
+
+#### ADVISORY (recorded, non-gating)
+
+`ON DUPLICATE KEY UPDATE` would **overwrite an administrator's edited `simple_value`** if the migration were ever reverted and re-applied. Theoretical — TypeORM tracks applied migrations and does not re-run them — and the spec does not prohibit the mechanism.
+
+*The Leader raised this to the Reviewer deliberately, because the Leader's own green execution could not surface it: the run inserted into an empty table, so the overwrite path was never exercised. A passing measurement that structurally cannot reach the risky branch is not evidence about that branch.*
 
 ---
 

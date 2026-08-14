@@ -206,7 +206,7 @@ Boolean parsing uses **`QueryParseBool`** from `shared/pipes/query-parse-boolean
 
 | | |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 | **Size** | S |
 | **Depends on** | T-02 (uses the `AppConfigKey` member) |
 | **Requirements** | R-BAS-005 (exactly one migration, insert-only), R-BAS-007 scenario 3 |
