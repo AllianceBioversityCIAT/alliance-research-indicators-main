@@ -8,7 +8,16 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "husky"
+    "prepare": "husky",
+    "local:up": "docker compose up --build -d && npm run local:ps",
+    "local:down": "docker compose down",
+    "local:restart": "docker compose restart",
+    "local:rebuild": "docker compose build --no-cache && docker compose up -d",
+    "local:ps": "docker compose ps",
+    "local:logs": "docker compose logs -f",
+    "local:logs:server": "docker compose logs -f server",
+    "local:logs:client": "docker compose logs -f client",
+    "local:health": "curl -sf http://localhost:3000/api/configuration/version >/dev/null && echo 'server :3000 OK' || echo 'server :3000 DOWN'; curl -sf http://localhost:4200 >/dev/null && echo 'client :4200 OK' || echo 'client :4200 DOWN'"
   },
   "keywords": [],
   "author": "",
