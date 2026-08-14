@@ -8,9 +8,12 @@ import {
 import { Roles } from '../../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { RolesGuard } from '../../../shared/guards/roles.guard';
+import { QueryParseBool } from '../../../shared/pipes/query-parse-boolean.pipe';
 import { ResponseUtils } from '../../../shared/utils/response.utils';
 import { ClarisaProjectsService } from './clarisa-projects.service';
+import { ClarisaProject } from './dto/clarisa-project.types';
 
+// @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-04 / R-BAS-003, R-BAS-004, R-BAS-006
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.15 / R-BIL-080 (UI)
 //
 // Thin admin-only picker endpoint for the bilateral_project_mapping form.
@@ -38,8 +41,30 @@ export class ClarisaProjectsController {
     description:
       'Optional case-insensitive substring match on `short_name`. Filtered in memory after the upstream cache.',
   })
-  async listBilateral(@Query('search') search?: string) {
-    const all = await this.projectsService.listBilateralProjects();
+  @ApiQuery({
+    name: 'phase',
+    required: false,
+    type: Number,
+    description:
+      'Optional explicit reporting phase filter (tier 1). Non-numeric value results in HTTP 400.',
+  })
+  @ApiQuery({
+    name: 'only-with-science-programs',
+    required: false,
+    type: Boolean,
+    description:
+      'Optional filter to return only projects with at least one Confirmed Science Program mapping. Defaults to false.',
+  })
+  async listBilateral(
+    @Query('search') search?: string,
+    @Query('phase') phase?: number,
+    @Query('only-with-science-programs', QueryParseBool)
+    onlyWithSciencePrograms?: boolean,
+  ) {
+    const all = await this.projectsService.listBilateralProjects({
+      phase,
+      onlyWithSciencePrograms,
+    });
     const needle = search?.trim().toLowerCase();
     const filtered = needle
       ? all.filter((p) => p.short_name?.toLowerCase().includes(needle))
@@ -51,23 +76,34 @@ export class ClarisaProjectsController {
       // Trim the heavy `project_mappings_array` down to what the picker
       // needs — the FE still sees the SP allocation preview for the
       // active portfolio without paying for the full upstream payload.
-      data: filtered.map((p) => ({
-        id: p.id,
-        short_name: p.short_name,
-        source_of_funding: p.source_of_funding,
-        science_programs: (p.project_mappings_array ?? [])
-          .filter(
-            (m) =>
-              m.status === 'Confirmed' &&
-              m.global_unit_object?.cgiar_entity_type_object?.code === 22,
-          )
-          .map((m) => ({
-            code: m.global_unit_object?.smo_code,
-            name: m.global_unit_object?.name,
-            portfolio: m.global_unit_object?.portfolio_object?.acronym,
-            allocation: m.allocation,
-          })),
-      })),
+      data: filtered.map((p) => {
+        const hasSciencePrograms =
+          (p as any).has_science_programs ??
+          this.projectsService.hasSciencePrograms(p);
+
+        return {
+          id: p.id,
+          short_name: p.short_name,
+          source_of_funding: p.source_of_funding,
+          phase: p.phase,
+          source_center_acronym: p.source_center_acronym,
+          has_science_programs: hasSciencePrograms,
+          science_programs: !hasSciencePrograms
+            ? []
+            : (p.project_mappings_array ?? [])
+                .filter((m) =>
+                  this.projectsService.hasSciencePrograms({
+                    project_mappings_array: [m],
+                  } as ClarisaProject),
+                )
+                .map((m) => ({
+                  code: m.global_unit_object?.smo_code,
+                  name: m.global_unit_object?.name,
+                  portfolio: m.global_unit_object?.portfolio_object?.acronym,
+                  allocation: m.allocation,
+                })),
+        };
+      }),
     });
   }
 }

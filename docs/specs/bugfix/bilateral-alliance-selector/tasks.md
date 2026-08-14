@@ -171,7 +171,7 @@ Add a test that drives **`listBilateralProjects` itself** over a production-shap
 
 | | |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 | **Size** | S |
 | **Depends on** | T-03 |
 | **Requirements** | R-BAS-003 (400 scenario, explicit phase), R-BAS-004, R-BAS-006 (response shape unchanged) |

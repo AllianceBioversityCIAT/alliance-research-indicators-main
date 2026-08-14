@@ -156,6 +156,30 @@ The SQL uses `?` placeholders **with** parameter arrays (the exemplar's safe for
 
 ---
 
+### T-04 — Controller parameters and response fields · **PASS**
+
+| Field | Value |
+| --- | --- |
+| **Date** | 2026-08-14 |
+| **Implementer attempts** | 1 |
+| **Dispatch** | `ctx_d343ae69219f` |
+| **Files** | `clarisa-projects.controller.ts`, `clarisa-projects.controller.spec.ts` |
+| **Requirements** | R-BAS-003 (explicit phase + 400), R-BAS-004, R-BAS-006 |
+
+**Leader verification:** 38 tests passed · `npx eslint` clean · claims confirmed by inspection — `QueryParseBool` is the imported name, `phase` is forwarded unmodified, and the inline `Confirmed`/code-22 filter is gone (the sole remaining occurrence of the word is inside an `@ApiQuery` description).
+
+**Reviewer verdict — `STATUS: PASS`** on all eight axes. The two that mattered:
+
+- **The carried-forward obligation was discharged.** The controller now calls the service's `hasSciencePrograms` helper for both the flag and the per-mapping filter — one expression, not two. This is the pointer T-03's Reviewer filed and this Leader copied into the brief; without that copy it would have died in the log.
+- **Test-double fidelity (KZ-001) verified at the byte level.** The Reviewer compared the mock's predicate against the service's method and found them identical, confirmed `has_science_programs` is present in every fixture, and noted the spec uses strict `toEqual` — so a missing field fails rather than passes. This was flagged in the brief as the most likely way the task could be green and wrong; it was checked rather than assumed.
+- **Falsifiability:** flipping the default to `true` reddens the pipe assertion; swallowing the error reddens the 400 test; hard-coding the phase reddens the forwarding test. No surviving tautology found.
+
+#### ADVISORY (recorded, non-gating)
+
+The controller reads the service-computed flag via `(p as any).has_science_programs` because `ClarisaProject` does not declare it, with a defensive `?? hasSciencePrograms(p)` fallback. Functional and correct; a `ListBilateralProjectsResult` type extending `ClarisaProject` would remove the cast. **Craft suggestion for a follow-up — not a spec violation, and per `/akili-execute` §2.4 it may not mint a task or widen one.**
+
+---
+
 ## Budget
 
 | | Estimate | Actual after T-01…T-03 |
