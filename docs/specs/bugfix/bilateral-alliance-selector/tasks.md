@@ -27,7 +27,7 @@ T-01 and T-02 are **independent and parallel-safe** — different files, no shar
 
 | | |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 | **Size** | M |
 | **Depends on** | none |
 | **Requirements** | R-BAS-001 (all clauses), R-BAS-002 (all clauses), R-BAS-003 phase-tolerance clauses, NFR-BAS-003 |
@@ -62,7 +62,7 @@ Assert the **counts**, not merely "some rows returned": a production-shaped fixt
 - [ ] `'BILATERAL- RESTRICTED'` (no space) is accepted — the single-row case a naive `split(' ')` drops
 - [ ] `source_center_acronym: 'IITA'` is **not** Alliance even when the legacy acronym would have matched
 - [ ] Absent / null / blank `phase` ⇒ **not excluded**
-- [ ] **Red before green:** the suite is committed against the current code and observed failing first
+- [x] ~~**Red before green**~~ — **moved to T-03 during execution (2026-08-14, user-approved).** This criterion is *unsatisfiable here*: T-01 creates a **new** util, so its tests are green the moment the util exists and could never have been red. Bug-Mode evidence can only live where the bug lives — in `listBilateralProjects`. What T-01 owes instead, and delivers, is a suite **proven able to redden** (K-004), demonstrated by mutation: making the funding predicate accept everything fails 11 assertions
 
 ### Verification
 
@@ -78,7 +78,7 @@ Assert the **counts**, not merely "some rows returned": a production-shaped fixt
 
 | | |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 | **Size** | M |
 | **Depends on** | none |
 | **Requirements** | R-BAS-003 (precedence, asymmetry, cache isolation), R-BAS-007 scenarios 1–2, NFR-BAS-002 |
@@ -141,8 +141,15 @@ Cache **only** the tier 2–4 ambient resolution, TTL 5 min, with a `resetCacheF
 - Observability: `warn` naming the CLARISA host when zero projects are eligible; `debug` with per-branch counts on cache refresh. Branch counts never go to `warn`.
 - **Move** S1's env-precedence and `BadRequestException` tests (`clarisa-projects.service.spec.ts:468`) into the resolver suite **still asserting the throw**. Move, do not weaken, do not delete.
 
+### ⚠️ T-03 owns the Bug-Mode regression evidence (moved here from T-01)
+
+Add a test that drives **`listBilateralProjects` itself** over a production-shaped fixture — the eleven measured funding spellings on Alliance-led projects — and asserts it returns **25**.
+
+**It must be written and observed FAILING against the current implementation first** (today's code returns **1**), then pass after the rewrite. This is the only place the red-before-green evidence can exist: T-01 built a *new* util, whose tests are green from the moment it compiles. The bug lives here.
+
 ### Done criteria
 
+- [ ] The `listBilateralProjects` regression test was observed **red (returns 1)** before the rewrite and **green (returns 25)** after — report both observations, not just the green one
 - [ ] `findProjectById` byte-for-byte unchanged
 - [ ] TTL, stale-cache-on-error, and cold-cache `503` unchanged
 - [ ] `listProjectsForCoverage` returns the same `{ all, slice, phaseUsed }` shape

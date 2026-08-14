@@ -266,10 +266,23 @@ A green run over fixtures that do not contain the real production spellings prov
 | Metric | Estimate |
 | --- | --- |
 | **Tasks** | **6** |
-| **LOC** | **≈ 450** (≈ 195 implementation, ≈ 255 tests) — raised from 420 after judgment added the `phase` parameter, the module registration and the cache-isolation split |
+| **LOC** | **≈ 1950** (≈ 260 implementation, ≈ 1690 tests) — **re-baselined during execution, 2026-08-14, with user approval.** See below |
 | **Review rounds** | **2** |
 
 Sizing note: this exceeds `Lite` decisively, which is why Phase 1 recorded the raise to **Standard**. It sits comfortably inside Standard — no split into a spec family is warranted.
+
+### Budget re-baseline — 2026-08-14, after T-01 and T-02
+
+The tripwire fired at the first measurement point and the estimate, not the work, was wrong:
+
+| | Original estimate (whole spec) | Actual after 2 of 6 tasks |
+| --- | --- | --- |
+| Implementation | 195 | **232** — accurate |
+| Tests | 255 | **1117** — **4.4× low** |
+
+**The implementation estimate held; the test estimate did not, and the cause is this spec's own requirements.** §11 demands fixtures carrying all eleven measured funding spellings, both Alliance encodings, present/absent/blank phase, and **asserted counts** rather than "some rows returned". That is what makes the suite evidence instead of decoration — and it does not compress without giving back the gate. A mutation test confirmed the value: breaking the funding predicate reddens 11 assertions.
+
+Re-baselined to **≈1950** with the user's approval rather than trimming coverage. **The estimating lesson is the artifact worth keeping:** an exhaustive-fixture requirement multiplies test volume in a way a per-task LOC guess does not anticipate, and this is the second consecutive spec whose budget was wrong in the same direction.
 
 `/akili-execute` trips on these. Exceeding them is information, not failure — but the Leader stops and escalates rather than continuing silently.
 
