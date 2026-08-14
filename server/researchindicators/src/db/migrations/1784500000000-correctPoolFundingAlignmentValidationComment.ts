@@ -8,22 +8,22 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * edited in place. This migration recreates the function with the exact
  * same logic — only the comment above the SP-loop is corrected.
  *
- * ⚠ NEVER write `:word` inside a SQL COMMENT in a migration.
- * `orm.config.ts:59` sets `extra.namedPlaceholders: true`, so mysql2 rewrites
- * the query through `named-placeholders` before sending it. That tokenizer
- * DOES skip quoted string literals — which is why the 2024 indicator
- * migrations survive `text-align:justify` inside their HTML — but it does NOT
- * skip `--` or block comments. A colon there is consumed as a bind parameter
- * and the query dies with "Named query contains placeholders, but parameters
- * object is undefined" before MySQL ever parses it. (`: ` with a space is
- * safe; only `:` immediately followed by identifier characters binds.)
+ * ⚠ This query passes NO parameters, so nothing in its SQL may look like a
+ * placeholder — not even inside a SQL comment. `orm.config.ts:59` sets
+ * `extra.namedPlaceholders: true`; `named-placeholders/index.js:6` matches
+ * `/(?:\?)|(?::(\d+|[a-zA-Z][a-zA-Z0-9_]*))/`, so a bare `?` counts as much as
+ * `:name`. It skips quoted strings — which is why the 2024 indicator
+ * migrations survive `text-align:justify` inside their HTML — but it has no
+ * notion of comments, and the call then dies with "Named query contains
+ * placeholders, but parameters object is undefined" before MySQL ever parses
+ * it. (`: ` with a space is safe.)
  *
  * This migration carried `[SPEC:bilateral/...]` in the comment below and was
  * therefore UNRUNNABLE from the day it was written. It had never executed in
  * any environment — that, and nothing else, is why editing it here is safe.
  * Spec tags inside SQL bodies drop the colon: `[SPEC bilateral/...]`. The
  * TSDoc above is TypeScript, never sent to the driver, so it keeps the normal
- * form. `npm run migration:scan` is the guard.
+ * form. The gate is running the migration.
  *
  * The function has always tested row *presence*
  * (`toc.aligns_with_toc is not null`) rather than field completeness. Its

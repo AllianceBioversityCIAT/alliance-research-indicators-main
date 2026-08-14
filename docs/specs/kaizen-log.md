@@ -9,7 +9,7 @@ Continuous-improvement record across AKILI specs. Newest entry first.
 | ID | Lesson | Severity | Target | Recurrence | Status |
 | --- | --- | --- | --- | --- | --- |
 | **K-004** | **A gate must be proven able to FAIL before it is trusted.** Three mandated gates in this repo could not go red for the reason they were mandated | **High** | Methodology | **4 gates** | Proposed (upstream) |
-| **K-006** | **An artifact no gate executes is an artifact nobody has verified.** A migration shipped syntactically valid, lint-clean, type-clean and **unrunnable** — no gate ever ran a migration | **High** | Product | 1 | **Institutionalized** (server `CLAUDE.md` §7 + `npm run migration:scan`) |
+| **K-006** | **An artifact no gate executes is an artifact nobody has verified** — and a static substitute for a dynamic gate is a third artifact nobody has verified | **High** | Product | 1 | **Institutionalized** (server `CLAUDE.md` §7) |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | Product | 2 (same edit) | Proposed |
 | **K-001** | A lint script that auto-fixes cannot serve as a verification gate — it makes the thing it checks true as a side effect of checking it | **High** | Product | 1 | **Institutionalized** (server `CLAUDE.md` §11) — now a member of K-004's family |
 | **K-002** | A tier can be certified "green" while being type-checked by nothing at all; test-runner green ≠ compiles | **High** | Product | 1 | **Institutionalized** (client `CLAUDE.md`) — **needs a factual correction, see 2026-08-13 C2 entry** |
@@ -23,12 +23,16 @@ Continuous-improvement record across AKILI specs. Newest entry first.
 
 Two defects found in local verification **after** the spec was archived. Both were reachable from the archived spec's own stated gaps; neither was caught by any gate.
 
-**K-006 — an artifact no gate executes is an artifact nobody has verified.** Migration `1784500000000` (from C1, `toc-optional-mapping`) shipped with `[SPEC:bilateral/…]` inside a **SQL comment**. `orm.config.ts:59` sets `extra.namedPlaceholders: true`, so mysql2 rewrites queries through `named-placeholders`, which skips quoted strings but **not** SQL comments — the colon is consumed as a bind parameter and the query throws before MySQL parses it. The migration was **unrunnable from the day it was written** and passed every gate the repo has: it is valid TypeScript, lint-clean, type-clean, and committed. The merge to `dev` would have failed in CI/CD. It surfaced only when the migration was finally executed.
+**K-006 — an artifact no gate executes is an artifact nobody has verified.** Migration `1784500000000` (from C1, `toc-optional-mapping`) shipped with `[SPEC:bilateral/…]` inside a **SQL comment**. `orm.config.ts:59` sets `extra.namedPlaceholders: true`, so mysql2 rewrites queries through `named-placeholders`, which skips quoted strings but has **no notion of SQL comments** — the colon is consumed as a bind parameter and, with no params argument, the call throws before MySQL parses it. The migration was **unrunnable from the day it was written** and passed every gate the repo has: valid TypeScript, lint-clean, type-clean, reviewed, committed. The merge to `dev` would have failed in CI/CD. It surfaced only when the migration was finally executed.
 
 *Root cause:* every gate in the repo inspects migrations as **text**; none executes one. The one property that matters — does it run — was unmeasured.
-*Evidence:* `migration:dev:execute` failure, 2026-08-13; probe against the installed `named-placeholders` (quoted `text-align:justify` safe, `--` and block comments hazardous, `: ` with a space safe).
-*Standardized:* `npm run migration:scan` + server `CLAUDE.md` §7. Gate verified able to FAIL against a deliberately broken fixture before being trusted (K-004), including its three negative discriminations.
-*Target:* **Product**. **K-004 recurrence → 4.**
+*Evidence:* two `migration:dev:execute` failures, 2026-08-13; `named-placeholders/index.js:6`.
+
+**The corollary, learned the expensive way.** A static scanner was written to substitute for the missing dynamic gate, and it was wrong **three times**: it first assumed quoted strings were the hazard (they are the safe place); then it reimplemented the tokenizer and missed that a bare **`?`** binds too — passing the very migration that then failed for real, *after* being "verified able to fail" against a fixture built from the same wrong model; then, corrected to call the real tokenizer, it flagged **230** hazards in migrations proven to run, because it never inspected whether the call site passes a params array (`1781879906673-AddNewEnvCl.ts` uses `?` legitimately). Withdrawn.
+
+*Lesson:* a K-004 failure demo only proves the gate catches **what its author already modeled**. When a gate's correctness depends on reimplementing a dependency's parser *and* its call-site contract, the honest gate is to run the thing. **K-004 recurrence → 4.**
+*Standardized:* server `CLAUDE.md` §7 — the rule, plus the statement that running migrations is its only sound gate.
+*Target:* **Product.**
 
 **D-6 materialized — the cross-tier gap the spec declared and left open.** `requirements.md` listed *"D-6 (cross-tier drift — partial)"* among items "uncovered by construction". R-BIL-128 AC.1 narrowed the client to one ToC block (the Primary's), but `pool_funding_alignment_validation` still demanded a ToC row for **every** active SP — so with 2+ SPs the green check was unreachable, since the UI offers no way to answer for a Contributing SP. The function is named in **none** of the spec's seven documents.
 

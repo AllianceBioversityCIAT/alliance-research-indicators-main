@@ -51,15 +51,17 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * for a body), and `down()` restores 1784500000000's logic — its SQL comments
  * are trimmed, which is immaterial to behavior.
  *
- * ⚠ NEVER write `:word` inside a SQL COMMENT below. `orm.config.ts:59` sets
- * `extra.namedPlaceholders: true`, so mysql2 rewrites the query through
- * `named-placeholders` first. That tokenizer skips quoted string literals but
- * NOT `--` or block comments, so a colon there is consumed as a bind parameter
- * and the query dies with "Named query contains placeholders, but parameters
- * object is undefined" before MySQL parses it. That is exactly how
- * 1784500000000 shipped unrunnable. Hence `[SPEC bilateral/...]` inside the
- * bodies; this TSDoc is TypeScript and keeps the normal `[SPEC:...]` form.
- * `npm run migration:scan` is the guard.
+ * ⚠ These queries pass NO parameters, so nothing in their SQL may look like a
+ * placeholder — not even inside a SQL comment. `orm.config.ts:59` sets
+ * `extra.namedPlaceholders: true`; `named-placeholders/index.js:6` matches
+ * `/(?:\?)|(?::(\d+|[a-zA-Z][a-zA-Z0-9_]*))/`, so a bare `?` counts as much as
+ * `:name`. It skips quoted strings but has no notion of comments, and the call
+ * then dies with "Named query contains placeholders, but parameters object is
+ * undefined" before MySQL parses it. That is exactly how 1784500000000 shipped
+ * unrunnable, and this migration hit it twice: `[SPEC:bilateral/...]` in a
+ * comment, and a comment that ended in a question mark. Hence
+ * `[SPEC bilateral/...]` and no question marks below; this TSDoc is TypeScript
+ * and keeps the normal form. The gate is running the migration.
  */
 export class ScopePoolFundingValidationToPrimarySp1786679227000
   implements MigrationInterface
@@ -124,7 +126,7 @@ begin
             end if;
 
             -- [SPEC bilateral/primary-contributing-sp] R-BIL-128 AC.1.
-            -- Does this alignment designate a Primary SP at all? Legacy rows
+            -- Whether this alignment designates a Primary SP at all. Legacy rows
             -- predate sp_role and carry NULL on every row (T-02 does no
             -- backfill, R-BIL-126 AC.1), so this is false for them and the
             -- scope below falls back to the original all-SPs rule. Without
