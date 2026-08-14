@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -26,6 +27,8 @@ import { ClarisaProject } from './dto/clarisa-project.types';
 // offers Alliance-led bilateral projects; other centers' projects stay
 // resolvable by id (findProjectById) so existing mappings keep rendering.
 const ALLIANCE_LEAD_ACRONYM = 'ABC';
+const ALLIANCE_CENTERS = new Set(['CIAT', 'BIOVERSITY']);
+const DEFAULT_PHASE = 2026;
 
 @Injectable()
 export class ClarisaProjectsService {
@@ -52,6 +55,60 @@ export class ClarisaProjectsService {
     if (!Number.isFinite(id)) return null;
     const all = await this.getCachedAll();
     return all.find((p) => p.id === id) ?? null;
+  }
+
+  // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-02 / R-CPA-002
+  async listProjectsForCoverage(phase?: number | string): Promise<{
+    all: ClarisaProject[];
+    slice: ClarisaProject[];
+    phaseUsed: number;
+  }> {
+    const targetPhase = this.resolvePhase(phase);
+    const all = await this.getCachedAll();
+
+    const slice = all.filter((p) => {
+      if (
+        !p.source_center_acronym ||
+        p.phase === undefined ||
+        p.phase === null
+      ) {
+        return false;
+      }
+      const normalizedCenter = p.source_center_acronym.trim().toUpperCase();
+      const numericPhase = Number(p.phase);
+      return (
+        ALLIANCE_CENTERS.has(normalizedCenter) &&
+        !Number.isNaN(numericPhase) &&
+        numericPhase === targetPhase
+      );
+    });
+
+    return { all, slice, phaseUsed: targetPhase };
+  }
+
+  private resolvePhase(phase?: number | string): number {
+    if (phase !== undefined && phase !== null && String(phase).trim() !== '') {
+      const parsed = Number(phase);
+      if (Number.isNaN(parsed)) {
+        throw new BadRequestException(
+          `Invalid phase "${phase}": must be a numeric value.`,
+        );
+      }
+      return parsed;
+    }
+
+    const envPhase = process.env.ARI_CLARISA_PROJECTS_PHASE;
+    if (envPhase !== undefined && envPhase.trim() !== '') {
+      const parsed = Number(envPhase);
+      if (Number.isNaN(parsed)) {
+        throw new BadRequestException(
+          `Invalid ARI_CLARISA_PROJECTS_PHASE "${envPhase}": must be a numeric value.`,
+        );
+      }
+      return parsed;
+    }
+
+    return DEFAULT_PHASE;
   }
 
   /**

@@ -76,4 +76,8 @@ export interface ClarisaProject {
   lead_institution_object?: ClarisaInstitutionRef | null;
   funder_institution_object?: ClarisaInstitutionRef | null;
   project_mappings_array?: ClarisaProjectMapping[];
+  // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-01 / R-CPA-001
+  external_code?: string | null;
+  phase?: string | number | null;
+  source_center_acronym?: string | null;
 }

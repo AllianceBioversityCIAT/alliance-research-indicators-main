@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
-import { ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ClarisaProjectsService } from './clarisa-projects.service';
 import { ClarisaProject } from './dto/clarisa-project.types';
 
@@ -160,6 +163,407 @@ describe('ClarisaProjectsService', () => {
       await expect(service.listBilateralProjects()).rejects.toBeInstanceOf(
         ServiceUnavailableException,
       );
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-01 / R-CPA-001
+  describe('upstream fields contract (R-CPA-001)', () => {
+    it('deserializes fields-absent payload and existing consumers return pre-change results (AC.1)', async () => {
+      // Fields-absent fixture: objects literally omit external_code, phase, and source_center_acronym.
+      const fieldsAbsentFixture: ClarisaProject[] = [
+        {
+          id: 101,
+          short_name: 'P-LEGACY-01',
+          source_of_funding: 'Bilateral',
+          project_mappings_array: [],
+          lead_institution_object: {
+            id: 49,
+            name: 'Alliance of Bioversity and CIAT',
+            acronym: 'ABC',
+          },
+        },
+        {
+          id: 102,
+          short_name: 'P-LEGACY-02',
+          source_of_funding: 'Window 3',
+          project_mappings_array: [],
+          lead_institution_object: {
+            id: 49,
+            name: 'Alliance of Bioversity and CIAT',
+            acronym: 'ABC',
+          },
+        },
+        {
+          id: 103,
+          short_name: 'P-LEGACY-03',
+          source_of_funding: 'Bilateral',
+          project_mappings_array: [],
+          lead_institution_object: {
+            id: 50,
+            name: 'International Potato Center',
+            acronym: 'CIP',
+          },
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fieldsAbsentFixture);
+
+      // Verify listBilateralProjects consumer
+      const bilateral = await service.listBilateralProjects();
+      expect(bilateral.map((p) => p.id)).toEqual([101]);
+      expect(bilateral[0].short_name).toBe('P-LEGACY-01');
+      expect(bilateral[0].external_code).toBeUndefined();
+      expect(bilateral[0].phase).toBeUndefined();
+      expect(bilateral[0].source_center_acronym).toBeUndefined();
+
+      // Verify findProjectById consumer (from cached data)
+      const found = await service.findProjectById(103);
+      expect(found).not.toBeNull();
+      expect(found?.id).toBe(103);
+      expect(found?.short_name).toBe('P-LEGACY-03');
+      expect(found?.external_code).toBeUndefined();
+      expect(found?.phase).toBeUndefined();
+      expect(found?.source_center_acronym).toBeUndefined();
+    });
+
+    it('exposes external_code, phase, and source_center_acronym when present upstream (AC.2)', async () => {
+      const fieldsPresentFixture: ClarisaProject[] = [
+        {
+          id: 201,
+          short_name: 'P-UPSTREAM-01',
+          source_of_funding: 'Bilateral',
+          external_code: 'B-1001',
+          phase: 2026,
+          source_center_acronym: 'CIAT',
+          project_mappings_array: [],
+          lead_institution_object: {
+            id: 49,
+            name: 'Alliance of Bioversity and CIAT',
+            acronym: 'ABC',
+          },
+        },
+        {
+          id: 202,
+          short_name: 'P-UPSTREAM-02',
+          source_of_funding: 'Bilateral',
+          external_code: null,
+          phase: '2026',
+          source_center_acronym: 'BIOVERSITY',
+          project_mappings_array: [],
+          lead_institution_object: {
+            id: 49,
+            name: 'Alliance of Bioversity and CIAT',
+            acronym: 'ABC',
+          },
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fieldsPresentFixture);
+
+      const bilateral = await service.listBilateralProjects();
+      expect(bilateral.map((p) => p.id)).toEqual([201, 202]);
+      expect(bilateral[0].external_code).toBe('B-1001');
+      expect(bilateral[0].phase).toBe(2026);
+      expect(bilateral[0].source_center_acronym).toBe('CIAT');
+      expect(bilateral[1].external_code).toBeNull();
+      expect(bilateral[1].phase).toBe('2026');
+      expect(bilateral[1].source_center_acronym).toBe('BIOVERSITY');
+    });
+
+    it('regression: listBilateralProjects returns an identical pinned id set before and after change (AC.3)', async () => {
+      const regressionFixture: ClarisaProject[] = [
+        bilateralProject(501, 'P-ABC-1', 'ABC'),
+        bilateralProject(502, 'P-CIP-1', 'CIP'),
+        window3Project(503, 'P-W3-1'),
+        bilateralProject(504, 'P-NO-LEAD', null),
+        bilateralProject(505, 'P-ABC-2', 'ABC'),
+      ];
+
+      connectionGet.mockResolvedValueOnce(regressionFixture);
+
+      const out = await service.listBilateralProjects();
+
+      // Pins the exact expected project ids to go red if filtering logic changes
+      expect(out.map((p) => p.id)).toEqual([501, 505]);
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-02 / R-CPA-002
+  describe('listProjectsForCoverage (R-CPA-002)', () => {
+    it('includes mixed-case and whitespace-padded Alliance centres (ciat, Bioversity, CIAT ) (AC.1)', async () => {
+      const mixedCaseFixture: ClarisaProject[] = [
+        {
+          id: 1,
+          short_name: 'P-CIAT-LOWER',
+          source_center_acronym: 'ciat',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 2,
+          short_name: 'P-BIO-TITLE',
+          source_center_acronym: 'Bioversity',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 3,
+          short_name: 'P-CIAT-SPACE',
+          source_center_acronym: 'CIAT ',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(mixedCaseFixture);
+
+      const { all, slice, phaseUsed } = await service.listProjectsForCoverage();
+
+      expect(all).toHaveLength(3);
+      expect(slice.map((p) => p.id)).toEqual([1, 2, 3]);
+      expect(phaseUsed).toBe(2026);
+    });
+
+    it('matches phase numerically across number and string representations and excludes wrong phase (AC.2)', async () => {
+      const phaseFixture: ClarisaProject[] = [
+        {
+          id: 10,
+          short_name: 'P-NUM-2026',
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 20,
+          short_name: 'P-STR-2026',
+          source_center_acronym: 'BIOVERSITY',
+          phase: '2026',
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 30,
+          short_name: 'P-NUM-2025',
+          source_center_acronym: 'CIAT',
+          phase: 2025,
+          source_of_funding: 'Bilateral',
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(phaseFixture);
+
+      const { all, slice, phaseUsed } =
+        await service.listProjectsForCoverage(2026);
+
+      expect(all).toHaveLength(3);
+      expect(slice.map((p) => p.id)).toEqual([10, 20]);
+      expect(phaseUsed).toBe(2026);
+    });
+
+    it('excludes projects from non-Alliance centres regardless of matching phase (AC.3)', async () => {
+      const nonAllianceFixture: ClarisaProject[] = [
+        {
+          id: 40,
+          short_name: 'P-CIP-2026',
+          source_center_acronym: 'CIP',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 41,
+          short_name: 'P-IFPRI-2026',
+          source_center_acronym: 'IFPRI',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 42,
+          short_name: 'P-ALLIANCE-2026',
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(nonAllianceFixture);
+
+      const { slice, phaseUsed } = await service.listProjectsForCoverage();
+
+      expect(slice.map((p) => p.id)).toEqual([42]);
+      expect(phaseUsed).toBe(2026);
+    });
+
+    it('resolves phase via ARI_CLARISA_PROJECTS_PHASE env var when caller phase is omitted (AC.4)', async () => {
+      const multiPhaseFixture: ClarisaProject[] = [
+        {
+          id: 50,
+          short_name: 'P-2025',
+          source_center_acronym: 'CIAT',
+          phase: 2025,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 51,
+          short_name: 'P-2026',
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+      ];
+
+      const originalEnv = process.env.ARI_CLARISA_PROJECTS_PHASE;
+      try {
+        process.env.ARI_CLARISA_PROJECTS_PHASE = '2025';
+        connectionGet.mockResolvedValueOnce(multiPhaseFixture);
+
+        const { slice, phaseUsed } = await service.listProjectsForCoverage();
+
+        expect(slice.map((p) => p.id)).toEqual([50]);
+        expect(phaseUsed).toBe(2025);
+      } finally {
+        if (originalEnv !== undefined) {
+          process.env.ARI_CLARISA_PROJECTS_PHASE = originalEnv;
+        } else {
+          delete process.env.ARI_CLARISA_PROJECTS_PHASE;
+        }
+      }
+    });
+
+    it('allows caller argument to override ARI_CLARISA_PROJECTS_PHASE env var', async () => {
+      const multiPhaseFixture: ClarisaProject[] = [
+        {
+          id: 60,
+          short_name: 'P-2025',
+          source_center_acronym: 'CIAT',
+          phase: 2025,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 61,
+          short_name: 'P-2026',
+          source_center_acronym: 'BIOVERSITY',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+      ];
+
+      const originalEnv = process.env.ARI_CLARISA_PROJECTS_PHASE;
+      try {
+        process.env.ARI_CLARISA_PROJECTS_PHASE = '2025';
+        connectionGet.mockResolvedValueOnce(multiPhaseFixture);
+
+        const { slice, phaseUsed } =
+          await service.listProjectsForCoverage(2026);
+
+        expect(slice.map((p) => p.id)).toEqual([61]);
+        expect(phaseUsed).toBe(2026);
+      } finally {
+        if (originalEnv !== undefined) {
+          process.env.ARI_CLARISA_PROJECTS_PHASE = originalEnv;
+        } else {
+          delete process.env.ARI_CLARISA_PROJECTS_PHASE;
+        }
+      }
+    });
+
+    it('rejects with BadRequestException when ARI_CLARISA_PROJECTS_PHASE env var is non-numeric', async () => {
+      const originalEnv = process.env.ARI_CLARISA_PROJECTS_PHASE;
+      try {
+        process.env.ARI_CLARISA_PROJECTS_PHASE = 'invalid-phase';
+
+        await expect(service.listProjectsForCoverage()).rejects.toThrow(
+          BadRequestException,
+        );
+        await expect(service.listProjectsForCoverage()).rejects.toThrow(
+          'Invalid ARI_CLARISA_PROJECTS_PHASE "invalid-phase": must be a numeric value.',
+        );
+      } finally {
+        if (originalEnv !== undefined) {
+          process.env.ARI_CLARISA_PROJECTS_PHASE = originalEnv;
+        } else {
+          delete process.env.ARI_CLARISA_PROJECTS_PHASE;
+        }
+      }
+    });
+
+    it('rejects with BadRequestException when caller passes non-numeric phase argument', async () => {
+      await expect(service.listProjectsForCoverage('abc')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.listProjectsForCoverage('abc')).rejects.toThrow(
+        'Invalid phase "abc": must be a numeric value.',
+      );
+    });
+
+    it('does NOT filter by source_of_funding or project_mappings_array, retaining window3 and empty mappings (DD-2)', async () => {
+      const fundingFixture: ClarisaProject[] = [
+        {
+          id: 70,
+          short_name: 'P-BILATERAL',
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+          project_mappings_array: [],
+        },
+        {
+          id: 71,
+          short_name: 'P-WINDOW3',
+          source_center_acronym: 'BIOVERSITY',
+          phase: 2026,
+          source_of_funding: 'Window 3',
+          project_mappings_array: undefined,
+        },
+        {
+          id: 72,
+          short_name: 'P-OTHER-FUNDING',
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          project_mappings_array: [],
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fundingFixture);
+
+      const { slice, phaseUsed } = await service.listProjectsForCoverage();
+
+      expect(slice.map((p) => p.id)).toEqual([70, 71, 72]);
+      expect(phaseUsed).toBe(2026);
+    });
+
+    it('returns unfiltered all payload, filtered slice, and resolved phaseUsed (DD-14)', async () => {
+      const fullFixture: ClarisaProject[] = [
+        {
+          id: 80,
+          short_name: 'P-ALLIANCE-2026',
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 81,
+          short_name: 'P-CIP-2026',
+          source_center_acronym: 'CIP',
+          phase: 2026,
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 82,
+          short_name: 'P-ALLIANCE-2025',
+          source_center_acronym: 'BIOVERSITY',
+          phase: 2025,
+          source_of_funding: 'Bilateral',
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fullFixture);
+
+      const result = await service.listProjectsForCoverage(2026);
+
+      expect(result.all).toHaveLength(3);
+      expect(result.all.map((p) => p.id)).toEqual([80, 81, 82]);
+      expect(result.slice).toHaveLength(1);
+      expect(result.slice.map((p) => p.id)).toEqual([80]);
+      expect(result.phaseUsed).toBe(2026);
     });
   });
 });
