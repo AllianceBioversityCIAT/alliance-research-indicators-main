@@ -246,7 +246,7 @@ No `?` and no `:word` anywhere in the SQL **including comments**, unless a param
 
 | | |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 | **Size** | S |
 | **Depends on** | T-04, T-05 |
 | **Requirements** | R-BAS-005 (blast radius), R-BAS-007 scenario 1 (TTL propagation), NFR-BAS-004 |
@@ -264,7 +264,9 @@ Per **KZ-003**, `ClarisaProjectsService` is consumed beyond this module, so a ta
 
 - [ ] **Full** server suite green — not only the touched files
 - [ ] Coverage ≥ 60% (NFR-BAS-004)
-- [ ] `evidence/probe-selector.py` re-run against both CLARISA hosts; the picker's live count matches the predicted **25** (prod) and **380** (test)
+- [x] The **shipped predicates** run against both live CLARISA feeds — measuring with the instrument that was built, not a reimplementation. Result: **prod 25 ✅**, **test 342 ✅**
+
+> **The `380` originally written here was wrong, and execution caught it.** 380 is the *coverage-report* slice — centre + phase, with **no funding filter**. The picker additionally excludes Window-3 per **OQ-A**, and the D8 reading already recorded that split as **342 bilateral / 38 window3**. So 342 is the correct expectation for the picker and 380 never was. The criterion, not the code, was mis-stated.
 - [ ] The 4 existing `bilateral_project_mapping` rows are unchanged
 - [ ] `git diff --stat` shows exactly one migration file
 - [ ] Admin edit of the `app_config` row is observed taking effect within the TTL

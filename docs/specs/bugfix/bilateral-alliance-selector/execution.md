@@ -180,12 +180,49 @@ The controller reads the service-computed flag via `(p as any).has_science_progr
 
 ---
 
+### T-06 — Integration verification and the measured re-reading · **PASS (with one declared gap)**
+
+| Field | Value |
+| --- | --- |
+| **Date** | 2026-08-14 |
+| **Performed by** | the Leader. T-06 writes no files — it is measurement, which is Leader work, not Implementer work |
+| **Requirements** | R-BAS-005 (blast radius), R-BAS-007 scenario 1, NFR-BAS-004 |
+
+| Check | Result |
+| --- | --- |
+| Full server suite | **326 suites · 2251 tests · all green** |
+| Coverage (threshold 60%) | statements **83.5%** · branches **75.9%** · functions **84.2%** |
+| **Live feed, prod** | **25 eligible — MATCH** |
+| **Live feed, test** | **342 eligible — MATCH** (see correction below) |
+| Migrations added | **exactly 1** |
+| `bilateral_project_mapping` | **4 active + 5 soft-deleted, all `MANUAL`, 0 created today**, last created 2026-07-02 — the table was not written to |
+
+**The live check ran the shipped predicates against the live CLARISA feeds**, not a reimplementation of them — the same instrument-vs-reimplementation discipline S1 established, because measuring with a different instrument than the one built is the failure this whole line of work exists to avoid.
+
+#### Correction found by execution — the criterion was wrong, not the code
+
+T-06 originally required the test feed to yield **380**. It yields **342**, and 342 is correct: **380 is the *coverage-report* slice** (centre + phase, no funding filter), while the picker additionally excludes Window-3 per **OQ-A**. The D8 reading had already recorded that split as *342 bilateral / 38 window3*. `tasks.md` was corrected.
+
+#### Leader error — recorded
+
+The first coverage run reported **3 failures** in `ExcelWorkbookBuilder`, a module untouched by this spec. Cause: the Leader ran that measurement **concurrently** with a `ts-node` live check and an HTTP probe — a violation of the same §4.3 concurrency rule the Leader enforced on every worker in this run. Re-measured in isolation: **2251/2251 green**. *A measurement under contention is not slow, it is wrong* — and this run produced its own proof of that.
+
+#### ⚠️ Declared gap — not silently closed
+
+**R-BAS-007 scenario 1's end-to-end propagation** ("an admin edits the row and the picker follows within the TTL") was **not observed end to end.** It requires a running stack **and a write to the shared Dev `app_config` table**, and per root `CLAUDE.md` the Dev database is remote, shared, and not disposable — writes to it are a human decision, not an agent's.
+
+What *is* proven: the TTL cache and its reset seam are unit-tested (T-02), the tier-2 read is unit-tested against a `DataSource` double, and the migration was executed against a disposable schema. What is *not* proven is the composition of those three against a live server.
+
+**How the user closes it:** start the stack locally, edit the `ARI_CLARISA_PROJECTS_PHASE` row on the Environment-variables screen, and confirm the picker follows within 5 minutes.
+
+---
+
 ## Budget
 
 | | Estimate | Actual after T-01…T-03 |
 | --- | --- | --- |
-| Tasks | 6 | 3 complete |
-| LOC | ≈450 → **re-baselined ≈1950** | ≈1600 |
-| Review rounds | 2 | 1 rework (lint) |
+| Tasks | 6 | **6 complete** |
+| LOC | ≈450 → **re-baselined ≈1950** | ≈1900 |
+| Review rounds | 2 | **1 rework** (lint), 4 Reviewer passes, 0 FAIL verdicts |
 
 **Tripwire fired after T-02** at 1349 lines against a ≈450 estimate. Escalated to the user per the guardrail — which stops for the user regardless of `pre-approved` mode. Cause: the implementation estimate was accurate (232 vs 195); the **test estimate was 4.4× low**, driven by this spec's own requirement for exhaustive fixtures over eleven measured funding spellings with asserted counts. User approved re-baselining to ≈1950 rather than trimming coverage, on the ground that the fixtures are what make the suite evidence.
