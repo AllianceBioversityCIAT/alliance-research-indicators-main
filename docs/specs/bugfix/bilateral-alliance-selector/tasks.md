@@ -124,7 +124,7 @@ Cache **only** the tier 2–4 ambient resolution, TTL 5 min, with a `resetCacheF
 
 | | |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 | **Size** | L |
 | **Depends on** | T-01, T-02 |
 | **Requirements** | R-BAS-001, R-BAS-002 (incl. branch logging), R-BAS-003 (single resolver), R-BAS-004 (flag computation), R-BAS-005, R-BAS-006, NFR-BAS-001 |

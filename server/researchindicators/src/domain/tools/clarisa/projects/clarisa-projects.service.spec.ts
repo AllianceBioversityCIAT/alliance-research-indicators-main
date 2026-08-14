@@ -2,19 +2,20 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import {
   BadRequestException,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { ClarisaProjectsModule } from './clarisa-projects.module';
 import { ClarisaProjectsService } from './clarisa-projects.service';
+import { MappingPhaseResolver } from './mapping-phase.resolver';
 import { ClarisaProject } from './dto/clarisa-project.types';
 
-// @sdd-spec docs/specs/bilateral-module/pending-items — T-15.10 / NFR-BIL-073
+// @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
 //
-// Covers: bilateral filter, cache hit, warm-cache-on-error, cold-503.
-// The underlying Clarisa connection is a tiny class instantiated inside
-// the service constructor with `new Clarisa(http)`. We stub the connection
-// instance directly via the service's private field rather than mocking
-// the whole HttpService — keeps the test focused on caching + resilience
-// rather than HTTP wire details.
+// Tests ClarisaProjectsService through the REAL compiled ClarisaProjectsModule (DD-5, J-F-2).
+// Covers: bilateral selection predicates composition, phase resolver delegation,
+// single science-programs computation, resilience, cache TTL, and observability.
 
 const bilateralProject = (
   id: number,
@@ -44,29 +45,183 @@ const window3Project = (id: number, shortName: string): ClarisaProject => ({
 
 describe('ClarisaProjectsService', () => {
   let service: ClarisaProjectsService;
+  let phaseResolver: MappingPhaseResolver;
   let connectionGet: jest.Mock;
+  let mockRepository: {
+    findOne: jest.Mock;
+  };
+  let mockDataSource: {
+    getRepository: jest.Mock;
+  };
 
   beforeEach(async () => {
+    mockRepository = {
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+
+    mockDataSource = {
+      getRepository: jest.fn().mockReturnValue(mockRepository),
+    };
+
+    // Build the REAL ClarisaProjectsModule to prove all module providers (including MappingPhaseResolver)
+    // are properly registered in the module (Design §11 F-2 gate).
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ClarisaProjectsService,
-        { provide: HttpService, useValue: { get: jest.fn(), post: jest.fn() } },
+      imports: [
+        ClarisaProjectsModule,
+        {
+          module: class MockDbModule {},
+          providers: [{ provide: DataSource, useValue: mockDataSource }],
+          exports: [DataSource],
+          global: true,
+        },
       ],
-    }).compile();
+    })
+      .overrideProvider(HttpService)
+      .useValue({ get: jest.fn(), post: jest.fn() })
+      .compile();
 
     service = module.get(ClarisaProjectsService);
+    phaseResolver = module.get(MappingPhaseResolver);
 
-    // Replace the inner Clarisa connection with a stub. The service holds
-    // `private readonly connection: Clarisa`; we intercept the .get path
-    // since that's the only method exercised here.
+    // Replace the inner Clarisa connection with a stub.
     connectionGet = jest.fn();
     (service as unknown as { connection: { get: jest.Mock } }).connection = {
       get: connectionGet,
     };
     service.resetCacheForTests();
+    phaseResolver.resetCacheForTests();
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  describe('Module Compilation & DI Architecture (NFR-BAS-001, DD-5)', () => {
+    it('compiles the real ClarisaProjectsModule with MappingPhaseResolver in providers', () => {
+      expect(service).toBeDefined();
+      expect(phaseResolver).toBeDefined();
+    });
+  });
+
+  describe('hasSciencePrograms (R-BAS-004, §7.3 Item 2)', () => {
+    it('returns true when project has at least one Confirmed Science Program mapping (code 22)', () => {
+      const project: ClarisaProject = {
+        id: 1,
+        short_name: 'P-WITH-SP',
+        source_of_funding: 'Bilateral',
+        project_mappings_array: [
+          {
+            id: 10,
+            project_id: 1,
+            program_id: 20,
+            allocation: 50,
+            status: 'Confirmed',
+            global_unit_object: {
+              id: 20,
+              name: 'Plant Health',
+              smo_code: 'SP01',
+              cgiar_entity_type_object: {
+                code: 22,
+                name: 'Science programs',
+              },
+            },
+          },
+        ],
+      };
+
+      expect(service.hasSciencePrograms(project)).toBe(true);
+    });
+
+    it('returns false when mapping is Pending or Draft even if entity code is 22', () => {
+      const project: ClarisaProject = {
+        id: 2,
+        short_name: 'P-PENDING-SP',
+        source_of_funding: 'Bilateral',
+        project_mappings_array: [
+          {
+            id: 11,
+            project_id: 2,
+            program_id: 20,
+            allocation: 50,
+            status: 'Pending',
+            global_unit_object: {
+              id: 20,
+              name: 'Plant Health',
+              smo_code: 'SP01',
+              cgiar_entity_type_object: {
+                code: 22,
+                name: 'Science programs',
+              },
+            },
+          },
+          {
+            id: 12,
+            project_id: 2,
+            program_id: 21,
+            allocation: 50,
+            status: 'Draft',
+            global_unit_object: {
+              id: 21,
+              name: 'Crops',
+              smo_code: 'SP02',
+              cgiar_entity_type_object: {
+                code: 22,
+                name: 'Science programs',
+              },
+            },
+          },
+        ],
+      };
+
+      expect(service.hasSciencePrograms(project)).toBe(false);
+    });
+
+    it('returns false when mapping is Confirmed but cgiar_entity_type_object code is not 22 (e.g. 26 for AOW)', () => {
+      const project: ClarisaProject = {
+        id: 3,
+        short_name: 'P-AOW-MAPPING',
+        source_of_funding: 'Bilateral',
+        project_mappings_array: [
+          {
+            id: 13,
+            project_id: 3,
+            program_id: 30,
+            allocation: 100,
+            status: 'Confirmed',
+            global_unit_object: {
+              id: 30,
+              name: 'Area of Work 1',
+              smo_code: 'AOW01',
+              cgiar_entity_type_object: {
+                code: 26,
+                name: 'Key Area of Work',
+              },
+            },
+          },
+        ],
+      };
+
+      expect(service.hasSciencePrograms(project)).toBe(false);
+    });
+
+    it('returns false when project_mappings_array is null, undefined, or empty', () => {
+      expect(
+        service.hasSciencePrograms({
+          id: 4,
+          short_name: 'P-EMPTY-1',
+          source_of_funding: 'Bilateral',
+          project_mappings_array: [],
+        }),
+      ).toBe(false);
+
+      expect(
+        service.hasSciencePrograms({
+          id: 5,
+          short_name: 'P-EMPTY-2',
+          source_of_funding: 'Bilateral',
+          project_mappings_array: undefined,
+        }),
+      ).toBe(false);
+    });
+  });
 
   describe('listBilateralProjects', () => {
     it('filters to source_of_funding === "Bilateral" led by the Alliance (ABC)', async () => {
@@ -114,6 +269,342 @@ describe('ClarisaProjectsService', () => {
       await service.findProjectById(1);
 
       expect(connectionGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('bug-mode regression: returns all 25 eligible production-shaped projects across all 11 observed funding spellings without phase or source_center_acronym', async () => {
+      const allianceInstitution = {
+        id: 49,
+        name: 'Alliance of Bioversity and CIAT',
+        acronym: 'ABC',
+      };
+      const allianceInstitutionLongAcronym = {
+        id: 49,
+        name: 'Alliance of Bioversity and CIAT',
+        acronym: 'ABC - Bioversity (Alliance)',
+      };
+
+      const productionFixture: ClarisaProject[] = [
+        // 1. One project with 'Bilateral' (the only 1 matched by pre-fix code)
+        {
+          id: 101,
+          short_name: 'PROD-01',
+          source_of_funding: 'Bilateral',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+        // 2..11. Ten projects with 'BILATERAL - RESTRICTED'
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: 200 + i,
+          short_name: `PROD-BILATERAL-RESTRICTED-${i + 1}`,
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        })),
+        // 12..24. Thirteen projects with 'Bilateral - Restricted' (mix of ABC and ABC - Bioversity (Alliance))
+        ...Array.from({ length: 13 }, (_, i) => ({
+          id: 300 + i,
+          short_name: `PROD-Bilateral-Restricted-${i + 1}`,
+          source_of_funding: 'Bilateral - Restricted',
+          lead_institution_object:
+            i % 2 === 0 ? allianceInstitution : allianceInstitutionLongAcronym,
+          project_mappings_array: [],
+        })),
+        // 25. One project with 'BILATERAL- RESTRICTED' (no space before dash)
+        {
+          id: 401,
+          short_name: 'PROD-BILATERAL-NO-SPACE',
+          source_of_funding: 'BILATERAL- RESTRICTED',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+
+        // --- NEGATIVE ROWS (Must be excluded) ---
+        // Window 3 spellings (all 6 observed spellings)
+        {
+          id: 501,
+          short_name: 'PROD-W3-1',
+          source_of_funding: 'Window 3',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+        {
+          id: 502,
+          short_name: 'PROD-W3-2',
+          source_of_funding: 'Window 3 - Restricted',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+        {
+          id: 503,
+          short_name: 'PROD-W3-3',
+          source_of_funding: 'WINDOW 3 - RESTRICTED',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+        {
+          id: 504,
+          short_name: 'PROD-W3-4',
+          source_of_funding: 'Windows 3',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+        {
+          id: 505,
+          short_name: 'PROD-W3-5',
+          source_of_funding: 'W3',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+        {
+          id: 506,
+          short_name: 'PROD-SRV',
+          source_of_funding: 'SRV',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+
+        // Null / whitespace funding (1 observed in production)
+        {
+          id: 601,
+          short_name: 'PROD-NULL-FUNDING',
+          source_of_funding: null as unknown as string,
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+        {
+          id: 602,
+          short_name: 'PROD-BLANK-FUNDING',
+          source_of_funding: '   ',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+
+        // Non-Alliance lead institutions
+        {
+          id: 701,
+          short_name: 'PROD-IFPRI',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          lead_institution_object: {
+            id: 2,
+            name: 'International Food Policy Research Institute',
+            acronym: 'IFPRI',
+          },
+          project_mappings_array: [],
+        },
+        {
+          id: 702,
+          short_name: 'PROD-ICARDA',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          lead_institution_object: {
+            id: 3,
+            name: 'International Center for Agricultural Research in the Dry Areas',
+            acronym: 'ICARDA',
+          },
+          project_mappings_array: [],
+        },
+        {
+          id: 703,
+          short_name: 'PROD-IITA',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          lead_institution_object: {
+            id: 4,
+            name: 'International Institute of Tropical Agriculture',
+            acronym: 'IITA',
+          },
+          project_mappings_array: [],
+        },
+        {
+          id: 704,
+          short_name: 'PROD-CIMMYT',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          lead_institution_object: {
+            id: 5,
+            name: 'International Maize and Wheat Improvement Center',
+            acronym: 'CIMMYT',
+          },
+          project_mappings_array: [],
+        },
+        {
+          id: 705,
+          short_name: 'PROD-EMPTY-LEAD',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          lead_institution_object: {
+            id: 6,
+            name: 'Unknown Organization',
+            acronym: '',
+          },
+          project_mappings_array: [],
+        },
+        {
+          id: 706,
+          short_name: 'PROD-NULL-LEAD',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          lead_institution_object: null,
+          project_mappings_array: [],
+        },
+
+        // Non-Alliance source_center_acronym (even with lead ABC)
+        {
+          id: 801,
+          short_name: 'PROD-IITA-CENTER',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          source_center_acronym: 'IITA',
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+
+        // Different phase (2025 excluded when target is 2026)
+        {
+          id: 901,
+          short_name: 'PROD-PHASE-2025',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          phase: 2025,
+          lead_institution_object: allianceInstitution,
+          project_mappings_array: [],
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(productionFixture);
+
+      const out = await service.listBilateralProjects();
+
+      expect(out).toHaveLength(25);
+    });
+
+    it('attaches has_science_programs boolean to each returned project (R-BAS-004)', async () => {
+      const fixture: ClarisaProject[] = [
+        {
+          id: 1,
+          short_name: 'P-WITH-SP',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          project_mappings_array: [
+            {
+              id: 10,
+              project_id: 1,
+              program_id: 20,
+              allocation: 50,
+              status: 'Confirmed',
+              global_unit_object: {
+                id: 20,
+                name: 'Plant Health',
+                smo_code: 'SP01',
+                cgiar_entity_type_object: {
+                  code: 22,
+                  name: 'Science programs',
+                },
+              },
+            },
+          ],
+        },
+        {
+          id: 2,
+          short_name: 'P-WITHOUT-SP',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          project_mappings_array: [],
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fixture);
+
+      const out = (await service.listBilateralProjects()) as Array<
+        ClarisaProject & { has_science_programs: boolean }
+      >;
+
+      expect(out).toHaveLength(2);
+      expect(out.find((p) => p.id === 1)?.has_science_programs).toBe(true);
+      expect(out.find((p) => p.id === 2)?.has_science_programs).toBe(false);
+    });
+
+    it('filters to only projects with science programs when onlyWithSciencePrograms is true (R-BAS-004)', async () => {
+      const fixture: ClarisaProject[] = [
+        {
+          id: 1,
+          short_name: 'P-WITH-SP',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          project_mappings_array: [
+            {
+              id: 10,
+              project_id: 1,
+              program_id: 20,
+              allocation: 50,
+              status: 'Confirmed',
+              global_unit_object: {
+                id: 20,
+                name: 'Plant Health',
+                smo_code: 'SP01',
+                cgiar_entity_type_object: {
+                  code: 22,
+                  name: 'Science programs',
+                },
+              },
+            },
+          ],
+        },
+        {
+          id: 2,
+          short_name: 'P-WITHOUT-SP',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          project_mappings_array: [],
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fixture);
+
+      const out = await service.listBilateralProjects({
+        onlyWithSciencePrograms: true,
+      });
+
+      expect(out).toHaveLength(1);
+      expect(out[0].id).toBe(1);
+    });
+
+    it('filters by explicit phase option when passed in options (R-BAS-003)', async () => {
+      const fixture: ClarisaProject[] = [
+        {
+          id: 1,
+          short_name: 'P-2025',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          phase: 2025,
+        },
+        {
+          id: 2,
+          short_name: 'P-2026',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fixture);
+
+      const out2025 = await service.listBilateralProjects({ phase: 2025 });
+      expect(out2025.map((p) => p.id)).toEqual([1]);
+    });
+
+    it('logs a warning naming CLARISA host when zero projects are eligible (R-BAS-006)', async () => {
+      const warnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => {});
+
+      connectionGet.mockResolvedValueOnce([
+        window3Project(2, 'N-303008'), // non-bilateral
+      ]);
+
+      const out = await service.listBilateralProjects();
+
+      expect(out).toHaveLength(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Zero eligible bilateral projects found from CLARISA host',
+        ),
+      );
+
+      warnSpy.mockRestore();
     });
   });
 
@@ -465,26 +956,6 @@ describe('ClarisaProjectsService', () => {
       }
     });
 
-    it('rejects with BadRequestException when ARI_CLARISA_PROJECTS_PHASE env var is non-numeric', async () => {
-      const originalEnv = process.env.ARI_CLARISA_PROJECTS_PHASE;
-      try {
-        process.env.ARI_CLARISA_PROJECTS_PHASE = 'invalid-phase';
-
-        await expect(service.listProjectsForCoverage()).rejects.toThrow(
-          BadRequestException,
-        );
-        await expect(service.listProjectsForCoverage()).rejects.toThrow(
-          'Invalid ARI_CLARISA_PROJECTS_PHASE "invalid-phase": must be a numeric value.',
-        );
-      } finally {
-        if (originalEnv !== undefined) {
-          process.env.ARI_CLARISA_PROJECTS_PHASE = originalEnv;
-        } else {
-          delete process.env.ARI_CLARISA_PROJECTS_PHASE;
-        }
-      }
-    });
-
     it('rejects with BadRequestException when caller passes non-numeric phase argument', async () => {
       await expect(service.listProjectsForCoverage('abc')).rejects.toThrow(
         BadRequestException,
@@ -564,6 +1035,46 @@ describe('ClarisaProjectsService', () => {
       expect(result.slice).toHaveLength(1);
       expect(result.slice.map((p) => p.id)).toEqual([80]);
       expect(result.phaseUsed).toBe(2026);
+    });
+  });
+
+  describe('Observability & Branch Logging (R-BAS-006, §7.3)', () => {
+    it('logs debug with branch counts on cache refresh', async () => {
+      const debugSpy = jest
+        .spyOn(Logger.prototype, 'debug')
+        .mockImplementation(() => {});
+
+      const fixture: ClarisaProject[] = [
+        {
+          id: 1,
+          short_name: 'P-1',
+          source_center_acronym: 'CIAT',
+          source_of_funding: 'Bilateral',
+        },
+        {
+          id: 2,
+          short_name: 'P-2',
+          source_center_acronym: null,
+          lead_institution_object: {
+            id: 49,
+            name: 'Alliance',
+            acronym: 'ABC',
+          },
+          source_of_funding: 'Bilateral',
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fixture);
+
+      await service.listBilateralProjects();
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'cache refreshed (2 projects: 1 via source_center_acronym, 1 via legacy lead acronym)',
+        ),
+      );
+
+      debugSpy.mockRestore();
     });
   });
 });

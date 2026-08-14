@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -7,13 +6,21 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { Clarisa } from '../clarisa.connection';
 import { ClarisaProject } from './dto/clarisa-project.types';
+import { MappingPhaseResolver } from './mapping-phase.resolver';
+import {
+  ALLIANCE_CENTRE_SET,
+  isAllianceProject,
+  isBilateralFunding,
+  matchesPhase,
+  normalizeToken,
+} from './utils/project-selector.util';
 
-// @sdd-spec docs/specs/bilateral-module/pending-items — T-15.10 / R-BIL-076
+// @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
 //
 // SINGLETON-SCOPED BY DESIGN — see parent design.md §3.4 Constraint A.
-// Do NOT inject CurrentUserUtil, ResultsUtil, or any other REQUEST-scoped
-// provider. The picker hot path goes through this service; cascading
-// REQUEST scope here would re-introduce the empty-shell DI cycle.
+// Do NOT inject CurrentUserUtil, ResultsUtil, AppConfigService, or any other
+// REQUEST-scoped provider. The picker hot path goes through this service; cascading
+// REQUEST scope here would re-introduce the empty-shell DI cycle (NFR-BAS-001).
 //
 // Cache strategy (per design D-PI-12): TTL only, in-memory, no event
 // invalidation. Project↔SP changes are rare. If staleness becomes a
@@ -23,12 +30,11 @@ import { ClarisaProject } from './dto/clarisa-project.types';
 // the cached payload + log a warn line. On COLD cache, throw
 // ServiceUnavailableException so the response envelope is a clean 503
 // instead of leaking an upstream stack trace.
-// CLARISA acronym for the Alliance of Bioversity and CIAT. The picker only
-// offers Alliance-led bilateral projects; other centers' projects stay
-// resolvable by id (findProjectById) so existing mappings keep rendering.
-const ALLIANCE_LEAD_ACRONYM = 'ABC';
-const ALLIANCE_CENTERS = new Set(['CIAT', 'BIOVERSITY']);
-const DEFAULT_PHASE = 2026;
+
+export interface ListBilateralProjectsOptions {
+  phase?: number | string;
+  onlyWithSciencePrograms?: boolean;
+}
 
 @Injectable()
 export class ClarisaProjectsService {
@@ -38,17 +44,57 @@ export class ClarisaProjectsService {
 
   private cache: { data: ClarisaProject[]; fetchedAt: number } | null = null;
 
-  constructor(http: HttpService) {
+  constructor(
+    http: HttpService,
+    private readonly phaseResolver: MappingPhaseResolver,
+  ) {
     this.connection = new Clarisa(http);
   }
 
-  async listBilateralProjects(): Promise<ClarisaProject[]> {
-    const all = await this.getCachedAll();
-    return all.filter(
-      (p) =>
-        p.source_of_funding === 'Bilateral' &&
-        p.lead_institution_object?.acronym === ALLIANCE_LEAD_ACRONYM,
+  /**
+   * Checks whether a project carries at least one Confirmed Science Program mapping (R-BAS-004).
+   * Computed once here and used by both the opt-in filter and the controller DTO mapping.
+   */
+  hasSciencePrograms(project: ClarisaProject): boolean {
+    return (
+      project.project_mappings_array?.some(
+        (m) =>
+          m.status === 'Confirmed' &&
+          m.global_unit_object?.cgiar_entity_type_object?.code === 22,
+      ) ?? false
     );
+  }
+
+  async listBilateralProjects(
+    options?: ListBilateralProjectsOptions,
+  ): Promise<ClarisaProject[]> {
+    const targetPhase = await this.phaseResolver.resolvePhase(options?.phase);
+    const all = await this.getCachedAll();
+
+    const eligible = all.filter(
+      (p) =>
+        isBilateralFunding(p.source_of_funding) &&
+        isAllianceProject(p) &&
+        matchesPhase(p.phase, targetPhase),
+    );
+
+    if (eligible.length === 0) {
+      const host = process.env.ARI_CLARISA_HOST || 'unknown host';
+      this.logger.warn(
+        `[ClarisaProjectsService] Zero eligible bilateral projects found from CLARISA host "${host}" (targetPhase=${targetPhase})`,
+      );
+    }
+
+    const withFlag = eligible.map((p) => ({
+      ...p,
+      has_science_programs: this.hasSciencePrograms(p),
+    }));
+
+    if (options?.onlyWithSciencePrograms) {
+      return withFlag.filter((p) => p.has_science_programs);
+    }
+
+    return withFlag;
   }
 
   async findProjectById(id: number): Promise<ClarisaProject | null> {
@@ -63,7 +109,7 @@ export class ClarisaProjectsService {
     slice: ClarisaProject[];
     phaseUsed: number;
   }> {
-    const targetPhase = this.resolvePhase(phase);
+    const targetPhase = await this.phaseResolver.resolvePhase(phase);
     const all = await this.getCachedAll();
 
     const slice = all.filter((p) => {
@@ -77,38 +123,13 @@ export class ClarisaProjectsService {
       const normalizedCenter = p.source_center_acronym.trim().toUpperCase();
       const numericPhase = Number(p.phase);
       return (
-        ALLIANCE_CENTERS.has(normalizedCenter) &&
+        ALLIANCE_CENTRE_SET.has(normalizedCenter) &&
         !Number.isNaN(numericPhase) &&
         numericPhase === targetPhase
       );
     });
 
     return { all, slice, phaseUsed: targetPhase };
-  }
-
-  private resolvePhase(phase?: number | string): number {
-    if (phase !== undefined && phase !== null && String(phase).trim() !== '') {
-      const parsed = Number(phase);
-      if (Number.isNaN(parsed)) {
-        throw new BadRequestException(
-          `Invalid phase "${phase}": must be a numeric value.`,
-        );
-      }
-      return parsed;
-    }
-
-    const envPhase = process.env.ARI_CLARISA_PROJECTS_PHASE;
-    if (envPhase !== undefined && envPhase.trim() !== '') {
-      const parsed = Number(envPhase);
-      if (Number.isNaN(parsed)) {
-        throw new BadRequestException(
-          `Invalid ARI_CLARISA_PROJECTS_PHASE "${envPhase}": must be a numeric value.`,
-        );
-      }
-      return parsed;
-    }
-
-    return DEFAULT_PHASE;
   }
 
   /**
@@ -129,9 +150,20 @@ export class ClarisaProjectsService {
     try {
       const data = await this.connection.get<ClarisaProject[]>('api/projects');
       this.cache = { data, fetchedAt: now };
+
+      let sourceCenterCount = 0;
+      let legacyLeadCount = 0;
+      for (const p of data) {
+        if (normalizeToken(p.source_center_acronym) !== '') {
+          sourceCenterCount++;
+        } else {
+          legacyLeadCount++;
+        }
+      }
       this.logger.debug(
-        `[ClarisaProjectsService] cache refreshed (${data.length} projects)`,
+        `[ClarisaProjectsService] cache refreshed (${data.length} projects: ${sourceCenterCount} via source_center_acronym, ${legacyLeadCount} via legacy lead acronym)`,
       );
+
       return data;
     } catch (err) {
       if (this.cache) {

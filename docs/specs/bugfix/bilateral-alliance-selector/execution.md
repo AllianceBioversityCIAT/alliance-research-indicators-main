@@ -92,7 +92,7 @@ Per `/akili-execute` §2.4, advisories are recorded and die there — they may n
 
 ---
 
-### T-03 — Service wiring, module registration, Bug-Mode evidence · *review pending*
+### T-03 — Service wiring, module registration, Bug-Mode evidence · **PASS**
 
 | Field | Value |
 | --- | --- |
@@ -105,7 +105,46 @@ Per `/akili-execute` §2.4, advisories are recorded and die there — they may n
 
 **Leader verification:** 98 tests passed across 4 suites · `npx eslint` clean · module `providers: [ClarisaProjectsService, MappingPhaseResolver]` confirmed by inspection · the private `resolvePhase` is gone from the service and delegated · constructor is `(http: HttpService, phaseResolver: MappingPhaseResolver)` — both singleton.
 
-Reviewer verdict pending.
+**Reviewer verdict — `STATUS: PASS`**, all nine audit criteria satisfied and **all four Implementer claims independently verified against the diff** rather than accepted:
+
+- **Bug-Mode evidence is genuine.** The Reviewer reconstructed the red observation from the fixtures themselves: against the pre-fix predicate (`source_of_funding === 'Bilateral' && acronym === 'ABC'`) only one of the 25 Alliance rows matches, so the `toHaveLength(25)` assertion would have returned 1. Red-before-green confirmed by analysis, not by trusting the report
+- **K-005 satisfied:** the private `resolvePhase` is deleted; grep confirms a single resolution path
+- **Module registration + real-module compilation** both confirmed — the spec uses `Test.createTestingModule({ imports: [ClarisaProjectsModule, …] })`, so a missing provider would fail the compile
+- **S1's env test moved intact**, still asserting both the `BadRequestException` *and* its exact message string
+- **Blast radius clean:** `findProjectById`, the TTL, the stale-serve path and the cold-cache `503` are byte-for-byte unchanged
+- **D6 named substitute discharged:** constructor is `(http: HttpService, phaseResolver: MappingPhaseResolver)` — both singleton, no `Scope.REQUEST` in the graph
+
+#### ADVISORY → carried forward as a T-04 obligation
+
+The controller still holds a **pre-existing inline copy** of the `Confirmed` / entity-type-22 expression (`clarisa-projects.controller.ts:58-62`) that will drift from the service's `hasSciencePrograms()` helper. Design §7.3 item 2 assigns its replacement to **T-04**.
+
+*Recorded here **and copied verbatim into T-04's brief**. A forward pointer is not carried by having been filed — the brief carries it or nobody does.*
+
+---
+
+### T-05 — `app_config` seed migration · *review pending*
+
+| Field | Value |
+| --- | --- |
+| **Date** | 2026-08-14 |
+| **Implementer attempts** | 1 |
+| **Dispatch** | `ctx_5d45f2b069ba` |
+| **Files** | `src/db/migrations/1786738949211-seedClarisaMappingPhase.ts` (new) |
+| **Requirements** | R-BAS-005 (one insert-only migration), R-BAS-007 scenario 3 |
+
+**Leader verification — the K-006 gate, which only execution can provide.** The migration was run through the **same driver stack the application uses** (`mysql2` with `extra.namedPlaceholders: true` — the setting that makes the placeholder trap fire), against a **disposable local schema** in the `ari-t13-mysql` container. The shared Dev database was never touched: it is remote, shared, and not disposable.
+
+```
+after up() #1 : [{"key":"ARI_CLARISA_PROJECTS_PHASE","simple_value":"2026",
+                  "category":"API","subcategory":"CLARISA"}]
+after up() #2 : [{"n":"1"}]   <- idempotent, no duplicate row
+after down()  : [{"n":"0"}]   <- reverts cleanly
+MIGRATION RUNNABLE: yes
+```
+
+The SQL uses `?` placeholders **with** parameter arrays (the exemplar's safe form) and contains no SQL comments, so the named-placeholders rewrite has parameters to bind. Scratch schema dropped afterwards.
+
+> This is the gate that migration `1784500000000` never had: it shipped unrunnable and passed lint, typecheck, build and human review on the way (**K-006**).
 
 ---
 
