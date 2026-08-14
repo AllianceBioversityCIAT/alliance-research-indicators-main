@@ -105,7 +105,7 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (migration + regres
 
 - **Requirements covered:** **R-SPV-001 (AC.1–AC.5)**; DC-A, DC-B, DC-C, DC-D
 - **Design references:** §2 (the repaired shape), §3 (migration), DD-2, DD-3
-- **Size:** M · **Dependencies:** T-01, **T-01b** · **Status:** todo
+- **Size:** M · **Dependencies:** T-01, **T-01b** · **Status:** **`[x]` done** — Reviewer PASS 2026-08-14, parallel-lens mode (spec conformance + risk + reliability, all PASS). See [`./execution.md`](./execution.md) → *T-02*
 - **Skills:** `nestjs-expert`, `systematic-debugging`, `tdd`
 
 **Scope** — migration `repairSpVersioningObjectiveBlocks` (`DROP` + `CREATE` of `SP_versioning`, two blocks changed) plus the regression fixture under `test/fixtures/`.
@@ -124,11 +124,13 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (migration + regres
 - **Disqualifier:** "the migration applied cleanly" proves the SQL parses, **not** that the procedure runs — parsing is exactly what already succeeded on the broken body. This task may not be reported green on a clean apply alone. If the disposable MySQL is unavailable, report **inconclusive**.
 
 **Done**
-- [ ] Red run captured verbatim (error 1054) **before** the migration
-- [ ] Green run after: AC.1, AC.2, AC.3 all satisfied
-- [ ] Full-body diff shows exactly two blocks changed (AC.4)
-- [ ] `down()` restores the prior body byte-for-byte (AC.5), verified by diff
-- [ ] Fixture observed red again with the defect reintroduced
+- [x] Red run captured verbatim (error 1054) **before** the migration — the migration file was held outside `src/db/migrations/` so the red could not be contaminated
+- [x] Green run after: AC.1, AC.2, AC.3 all satisfied — asserted on **both** tables against the seeded `role_id`, with `id` asserted unequal to the source PK
+- [x] Full-body diff shows exactly two blocks changed (AC.4) — Leader-extracted mechanically: four hunks, all removals, no other change
+- [x] `down()` restores the prior body byte-for-byte (AC.5), verified by diff — `cmp` byte-identical, **and** re-proven live by revert→RED→execute→GREEN
+- [x] Fixture observed red again with the defect reintroduced — via the real `migration:test:revert`, which exercises `down()` live rather than by hand-editing one block
+
+> **Rollout hold — advisory B-1 (`execution.md`).** The repair *activates* a latent FK failure: after this migration, `SP_versioning` writes snapshot rows into two tables that `SP_delete_result_version` never deletes and that hold RESTRICT FKs to `results`, so the next **re-version** of a result with objective rows raises MySQL 1451 — on the `green-checks` path with partial, committed deletion. Not a T-02 defect (DD-4 forbids touching the delete routine) and not rework. **Escalated to the user; T-03 is held pending the ruling.**
 
 ---
 

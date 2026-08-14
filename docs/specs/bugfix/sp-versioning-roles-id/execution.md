@@ -358,3 +358,111 @@ The Reviewer also checked a clause that *looked* like a violation and cleared it
 | R-SPV-001 | Gate precondition satisfied. The ACs themselves remain T-02's |
 
 ---
+
+### T-02 — The migration and its regression fixture (red → green): **PASS**
+
+- **Date:** 2026-08-14
+- **Implementer attempts:** 1 (no rework)
+- **Review mode:** **parallel lens** (4R) — the task touches a migration, which the mode table routes to 2–4 lens-scoped Reviewers. Three ran concurrently: **spec conformance** (the gate), **risk**, **reliability**. All three returned `STATUS: PASS`
+- **Requirements covered:** R-SPV-001 AC.1–AC.5; DC-A, DC-B, DC-C, DC-D
+
+#### Files changed
+
+| File | What |
+| --- | --- |
+| `src/db/migrations/1784300000000-RepairSpVersioningObjectiveBlocks.ts` | New migration, 1,991 lines. `up()` = the `1783029013035` body with `roles_id` and `id` dropped from the `result_impact_outcomes` and `result_strategic_objectives` column **and** `SELECT` lists (9/9 each). `down()` = that body verbatim, defects included (DD-3) |
+| `test/fixtures/sp-versioning-objective-blocks.fixture-spec.ts` | New regression fixture, 214 lines. Seeds its own FK chain, calls the **real** `SP_versioning` over the TEST datasource, asserts AC.1–AC.3 on both tables, cleans up in `afterAll` |
+
+`git status --short` shows only these two untracked files. No harness file, no merged migration, and no table DDL was touched.
+
+#### Verification evidence
+
+| Gate | Evidence |
+| --- | --- |
+| **RED, before the migration existed** | `QueryFailedError: Unknown column 'roles_id' in 'field list'` (MySQL 1054), with `SHOW CREATE PROCEDURE` showing `roles_id` count = 2 beforehand. The migration file was held outside `src/db/migrations/` so the red could not be contaminated |
+| **GREEN, after `migration:test:execute`** | `PASS test/fixtures/sp-versioning-objective-blocks.fixture-spec.ts ✓ copies result_impact_outcomes and result_strategic_objectives into the new snapshot with role_id preserved and a fresh id (11 ms)`; `roles_id` count = 0 |
+| **RE-RED, via `migration:test:revert`** | Same 1054; `roles_id` count back to 2. Then re-executed → GREEN again. **Stronger than the criterion asked for** — tasks.md suggested reinstating `roles_id` in one block by hand; running the real `down()` exercises AC.5 live instead of by inspection |
+| **AC.4 — body diff** (Leader-extracted mechanically from both files, not taken from the Implementer report) | `up()` vs the prior body: **four hunks, all removals**, confined to the two named blocks — `id,` and `roles_id,` out of each column list, `rio.id,` / `rso.id,` out of each `SELECT`. No additions anywhere, no other hunk |
+| **AC.5 — `down()` fidelity** | `cmp` → **byte-identical** to the prior body. `roles_id` counts: prior 2, `up()` 0, `down()` 2 |
+| Lint | `npm run lint -- --quiet` clean. It reformatted the fixture (Prettier wrapping) only; `git status` re-checked afterwards, nothing else mutated |
+
+All runs executed against the disposable scratch container (`127.0.0.1:3307`, `ari_scratch_test`). **No statement of any kind was issued against `ARI_MYSQL_*`.**
+
+#### `Not Done / Assumptions` (carried verbatim from the Implementer report)
+
+- The baseline schema has zero rows in **every** lookup table involved (`reporting_platforms`, `report_years`, `portfolios`, `impact_outcomes`, `strategic_objectives`, both role tables) — not merely "no business data" as the task prose implied. The fixture therefore seeds the full FK chain itself, idempotently for shared lookups (insert-if-absent, delete-only-if-this-run-inserted).
+- `results.result_status_id` has a non-NULL DEFAULT (`'4'`) plus an FK to the empty `result_status` table; the fixture sets it to `NULL` to avoid an incidental FK failure unrelated to the bug under test.
+- Scratch schema left in the migrated (GREEN) state as the handoff for T-03.
+- Full suite, `test:cov`, and harness files deliberately untouched — T-03's scope.
+
+**Leader adjudication:** none of these is unfinished T-02 scope. The reliability Reviewer independently cleared the `result_status_id = NULL` item with control-flow evidence: `SP_versioning` branches only on `is_active`, `is_snapshot`, `result_official_code`, `platform_code`, and `report_year_id`; no branch reads `result_status_id`, so NULLing it cannot steer the routine down an unrepresentative path. The column's copy is exercised trivially (NULL→NULL) and is covered by the AC.4 body diff.
+
+#### What the Reviewers verified independently (not accepted on report)
+
+- **Spec-conformance lens** re-derived the line arithmetic: prior body `1783029013035:8–988` (981 lines) vs new `up():30–1004` (975 lines) — exactly the 6 removed lines, with the offset confirmed at three anchors (`+22` before the blocks, `+16` after, and the terminal `END`). It read the fixture's assertions rather than its test name.
+- **Reliability lens** closed a tautology trap the assertions could have hidden: `id` and `role_id` are both `bigint`, so a driver returning strings would make `not.toBe(<number>)` pass vacuously. The `role_id` `toBe(<number>)` assertion passing **on the same row** is the type-witness that both arrive as JS numbers. It also established that all three §2.3 defect classes discriminate **independently** — 1054 and 1136 raise at statement *prepare* (so a partial repair still goes red on the column-count mismatch), and seeding exactly one source row per table makes defect 3 collide on 1062.
+- **Risk lens** confirmed zero table DDL (four `queryRunner.query` calls, all `DROP`/`CREATE PROCEDURE`), and cleared the timestamp: `1784300000000` sorts after the newest existing migration and *behind* the real clock, so anything `migration:generate` produces from now on — including Innovation Use M6 — still sorts after it, preserving design §6's ordering requirement. Hand-rounded stamps have 12 prior precedents in this folder.
+
+#### Requirements outcome
+
+| Item | Status |
+| --- | --- |
+| AC.1 | Closed — `CALL` completes; a 1054 would reject the awaited call |
+| AC.2 | Closed — `role_id` compared to the **seeded** FK on both tables, on rows selected by the new `result_id` |
+| AC.3 | Closed — `id` asserted unequal to the source PK on both tables |
+| AC.4 | Closed — four removal hunks, two blocks, nothing else |
+| AC.5 | Closed — `down()` byte-identical, and re-proven live by the revert→RED→execute→GREEN cycle |
+| DC-A / DC-B / DC-C / DC-D | Closed by the red-before-green cycle, the body diff, the `cmp`, and the fixture's dual assertions respectively |
+
+---
+
+## ADVISORY findings — T-02 (recorded; these never gate and never become tasks in this spec)
+
+| # | Lens | Finding |
+| --- | --- | --- |
+| **B-1** ⚠️ | **risk — HIGH, escalated** | **The repair activates a latent FK failure in the re-versioning path.** See the dedicated section below |
+| B-2 | risk / reliability (**flagged independently by two lenses**) | The fixture is an **unguarded write path**. `scripts/load-baseline.js:64` refuses to run when `ARI_TEST_MYSQL_HOST` resolves to `ARI_MYSQL_HOST` (RB-1c); the fixture carries no such check yet `INSERT`s, `DELETE`s, and `CALL`s. On a machine misconfigured exactly the way finding F-01 documents, it would write to the shared dev DB. Cheapest fix is porting the guard into `orm.test.config.ts`, which covers every fixture path at once |
+| B-3 | reliability | `test/jest-fixtures.json` sets no `maxWorkers`, so fixtures run in parallel workers against one scratch schema. This fixture seeds **shared** lookups (`reporting_platforms.STAR`, `report_years.2094`) with a racy insert-if-absent / delete-if-I-inserted protocol. Harmless today (the smoke fixture seeds nothing) but `innovation-use/data-model-and-catalog` is queued to add fixtures on this same schema — `"maxWorkers": 1` before the second seeding fixture lands |
+| B-4 | reliability | A partial `beforeAll` failure leaves `undefined` ids bound into `afterAll`'s deletes, masking the original seeding error (and, per the risk lens, potentially skipping `destroy()` and hanging Jest on an open handle). Guard each delete on its id; move `destroy()` into a `finally` |
+| B-5 | reliability | `beforeAll` has no timeout override — `initialize()` plus nine sequential inserts under Jest's default 5s. Against a cold container that is a plausible flake whose failure mode reads like the bug. The `it` already carries 30000 |
+| B-6 | reliability | Two cheap assertions would widen coverage: seed a second row per table with `is_active = 0` (the blocks' `WHERE is_active = TRUE` is asserted by nobody today, though AC.2 says "**active** rows"), and assert the copied row count is exactly 1 rather than destructuring `[0]` |
+| B-7 | risk (medium) | The scratch container under-predicts dev on `DEFINER`: dev's routines carry ``DEFINER=`AllianceRepUser`@`%` `` (40 stripped for the baseline load) and this `CREATE PROCEDURE` has none, so on dev the routine is recreated as `CURRENT_USER`. Confirm the shared-DB run executes as `AllianceRepUser`. `1783029013035` has the identical property, so this is pre-existing, not introduced. Separately: `--log-bin-trust-function-creators=1` masks nothing here — MySQL 1418 applies to stored *functions*, and this migration creates only a PROCEDURE |
+| B-8 | risk (low) | `DROP`/`CREATE` leaves a brief window where `CALL SP_versioning` raises 1305, and the `DROP` takes an exclusive metadata lock that waits on in-flight invocations. Unavoidable in MySQL, identical to every prior routine migration — fold "low-traffic window" into the §6 DevOps note |
+| B-9 | risk (low) | `design.md` §6 describes backout as "a procedure swap". Accurate but under-stated: a rollback re-breaks versioning for all six indicators **and** leaves the newly created objective rows in place. Worth one sentence for an on-call engineer reverting at 2am |
+| B-10 | readability | The fixture's docblock names only "the scratch MySQL schema". The real prerequisite chain is `compose:test:up` → `migration:test:bootstrap` → `migration:test:execute` → `test:fixtures`, and a bare 1054 means "migration not applied", not "harness broken" |
+| B-11 | readability | RB-3's mitigation claims "the fixture proves the other blocks still copy". It does not — the seeded result has no children outside the two objective tables, so the other 27 blocks copy zero rows. What the green `CALL` **does** prove is that every block's column list is nameable and count-matched (1054/1136 raise at prepare regardless of row count). DC-B is carried by the body diff, as designed; the risk-table sentence credits the wrong gate |
+
+Per the methodology none of these may become a task in this spec, and none was minted. **B-1 is rollout-blocking and was escalated to the user rather than filed and forgotten.**
+
+### B-1 — the repair activates a latent FK failure in the re-versioning path
+
+**Status: escalated to the user, 2026-08-14. Not actioned. T-03 is held pending the ruling.**
+
+The risk lens surfaced this; the Leader then verified every load-bearing link directly against the live scratch schema rather than adjudicating on the report:
+
+| Link | Leader verification |
+| --- | --- |
+| Both objective tables hold **RESTRICT** FKs to `results` | `information_schema.REFERENTIAL_CONSTRAINTS` → `DELETE_RULE = NO ACTION` for `FK_f1a19f2f5d9556dee00b4c54d31` (`result_impact_outcomes`) and `FK_f533df2b0cbca7d2d9cdc8d4308` (`result_strategic_objectives`) |
+| `SP_delete_result_version` never deletes those two tables | `ROUTINE_DEFINITION LIKE '%result_impact_outcomes%'` → **0**; same for `result_strategic_objectives` |
+| `full_delete_result_version` **does** delete both | → **1** for both. This is the transcript §4.1 divergence, confirmed live |
+| The delete routine ends by removing the parent | Routine tail: `DELETE FROM results WHERE result_id = temp_result_id` |
+| Both call sites delete the previous snapshot **before** re-versioning | `green-checks.repository.ts:294 → :307`; `result-status-workflow.repository.ts:152 → :172` |
+
+**The consequence.** Today the defect is inert: `SP_versioning` aborts at block 3 with 1054, so those two tables never receive snapshot rows and the delete routine never trips over them. **After this migration they will.** The next re-version of any result carrying objective rows — mainstream for Portfolio-2 alignment — hits **MySQL 1451** on the final `DELETE FROM results`.
+
+The two call paths fail differently, and the worse one is unprotected:
+
+- `green-checks.repository.ts` calls through `this.dataSource.query(...)` with **no transaction**, and the routine itself has no `START TRANSACTION` and no handler → autocommit. The ~32 preceding table deletes **commit**, then the parent delete fails: the snapshot's children are destroyed while the snapshot row survives. Not recoverable through the application.
+- `result-status-workflow.repository.ts` runs inside an `EntityManager` transaction, so it rolls back — but its `.catch()` at `:167-169` rewrites the error to a bare `'Error deleting snapshot'`, making the 1451 diagnostically invisible.
+
+That second point also **answers RB-4's open question** ("whether callers swallow the error") — one of them does, and the answer should be carried into `requirements.md`.
+
+**Why this is recorded as an advisory and not a FAIL.** DD-4 explicitly forbids touching the delete routine, and the Implementer complied. T-02 is correct as specified; the gap is in the spec's own risk analysis, which sized this as OQ-2 "worth its own ticket". Transcript §4.1 predicted *orphaned rows*; with a RESTRICT FK the real outcome is a hard block plus partial, committed deletion. The advisory route out of a spec is escalation, never a self-minted task.
+
+**Options put to the user:**
+
+1. **Companion migration** (Reviewer's suggestion) — add the two `DELETE` statements to `SP_delete_result_version`, mirroring `full_delete_result_version`, in **its own migration** shipped with or ahead of this one. Honours DD-4 (no harmonization hidden inside a versioning bugfix) while closing the activated defect.
+2. **Measure it** — extend the fixture to version → re-version and record the failure explicitly, so the gap is proven rather than assumed, then decide.
+3. **Accept and defer** — merge as-is, record B-1 against OQ-2, and hold the shared-DB run until a separate ticket lands. Note that `down()` does **not** undo the exposure: rows created while the fix is live persist and keep blocking the delete.
+
+---
