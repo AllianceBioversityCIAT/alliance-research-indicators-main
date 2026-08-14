@@ -54,8 +54,10 @@ Your sole responsibility is to coordinate execution of an approved spec by orche
    * On every Reviewer `PASS`, finalize the task.
    * After 3 consecutive `FAIL` results, **HALT**, mark the task `[~]`, record the full audit trail in `execution.md`, apply Automatic Rollback per `/akili-execute`, and present the blocker to the user for guidance.
    * **Advisory findings never gate.** A Reviewer `ADVISORY` block is recorded in `execution.md` and never counts toward the rework ceiling.
+   * **Evidence before checkbox.** On a `PASS`, append `execution.md` first, then flip `tasks.md`, then commit. The writes are not atomic: evidence-without-checkbox is recoverable, checkbox-without-evidence is an unfalsifiable completion.
 
 5. **Spec Drift / Pivot Protocol:**
+   * **ARI pivot triggers.** Treat as spec-is-wrong evidence, not implementation error: a contradiction of the `ServerResponseDto` envelope, the `@Roles`/`RolesGuard` model, the append-only migration rule, or the URI-versioned `/api` routing.
    * If the Implementer or Reviewer surfaces evidence that the spec itself is wrong or unviable, do not loop. Mark the task `[~]`, record a `## Pivot Record: <Task ID>` block in `execution.md`, and escalate to the user before continuing.
    * ARI tripwires that mean *pivot, not rework* — the spec contradicts a constitutional invariant:
      * **Server:** the `ServerResponseDto` envelope, the `@Roles`/`RolesGuard` authorization model, `ResultStatusGuard` on Results mutations, the append-only migration rule, or the URI-versioned `/api` routing.
@@ -89,6 +91,26 @@ This table is the methodology's single source of truth for when an orchestrating
 **Disjoint source files are necessary but not sufficient.** Two workers editing entirely different files still collide through everything the checkout shares: build output, a dev server and its port, `node_modules` and the lockfile, generated types, test fixtures, caches. That contention does not surface as a merge conflict — it surfaces as **nonsense errors in the wrong worker**: `dist/ does not exist`, a web server that "exited early", a module that cannot be found although it is plainly there. The worker reporting the error is usually not the one that caused it, which is what makes this expensive to diagnose. So the real test is: *different files **and** no shared build output, dev server, port, or dependency tree.* Fail the second half and it is a genuine conflict — isolate, or serialize.
 
 > **ARI-specific:** the two packages have **separate** `node_modules`, build outputs, and ports (`server` API + `/admin` on the Nest port; `client` on 4200). A server task and a client task are therefore genuinely parallelizable. Two client tasks that both trigger an Angular build are **not** — they share `client/research-indicators` build output and the dev-server port.
+
+### ⛔ Deferring a check (test the assumption first)
+
+Before recording any verification as blocked — "needs the stack", "needs a login", "needs seed data",
+"needs the environment" — spend **one bounded probe** falsifying that assumption. The field case that
+earned this rule: a visual check sat parked for a day as "blocked on an authenticated admin session"
+when the component under test took plain props and rendered in a throwaway harness page with no
+stack, no database, and no login — and the probe, once run, surfaced two real shipped defects within
+the hour, one of which had already survived an escalated gate.
+
+1. **State the assumption the deferral rests on**, in one line: *"this cannot run because X."*
+2. **Probe it cheaply.** A component taking plain props renders in a throwaway harness; a handler
+   taking a request object runs under the unit runner; a script runs against a fixture. Minutes,
+   not sessions.
+3. **Only a probe-confirmed blocker defers the check.** Record the probe and its result next to the
+   deferral in `execution.md`. A deferral without a tested assumption is a guess wearing a status —
+   and the cost of the wrong guess is every defect the deferred check would have caught, aging
+   silently while the gate reads as merely "blocked".
+
+---
 
 ### 🚧 Delegation Ceiling (when *not* to delegate)
 

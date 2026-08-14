@@ -2,8 +2,18 @@
 
 Continuous-improvement record for this project, updated automatically by
 `/akili-archive` (Kaizen Retrospective, powered by the `kaizen` skill).
-Other AKILI commands read only the `## Active Lessons` table below —
-keep it at 10 rows or fewer.
+Other AKILI commands read only the `## Active Lessons` table below.
+
+> **Two ID series, and one collision that was resolved by renumbering.** `K-00n` and `KZ-00n` were
+> assigned independently on parallel branches. They are kept side by side and **not** cross-renumbered,
+> so every citation already in the guides, specs and commit messages resolves as written. The one real
+> clash was `KZ-004`: `dev` and `staging` had each assigned it to a *different* lesson. `dev`'s is
+> **Applied** in `general-setup/task.md` and keeps the ID; `staging`'s became **`KZ-010`**.
+> *(`dev` cites that lesson as §3 in the table and §5 in its entry — unresolved there, not restated here.)*
+>
+> ⚠️ **This table now exceeds the 10-row cap** (16 rows) because merging two branches' logs is not the
+> moment to decide which lessons retire. Prune at the next `/akili-archive`: `K-001`, `K-002` and
+> `K-006` are already **Institutionalized** and are the first candidates.
 
 ---
 
@@ -20,10 +30,182 @@ keep it at 10 rows or fewer.
 | KZ-007 | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it — with the same rigour as the work it corrects. | **High** | 1          | Product | proposed                                    |
 | KZ-008 | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified.                                                                                                                      | **High** | 1          | Product | proposed                                    |
 | KZ-009 | Before trusting any measured ratio or margin, **measure the instrument's noise floor**. A rigorous harness — interleaved, warmed up, n≥25 — can still measure the wrong quantity.                                                                                | **High** | 1          | Product | proposed                                    |
+| **K-004** | **A gate must be proven able to FAIL before it is trusted.** Three mandated gates in this repo could not go red for the reason they were mandated | **High** | **4 gates** | Methodology | Proposed (upstream) |
+| **K-006** | **An artifact no gate executes is an artifact nobody has verified** — and a static substitute for a dynamic gate is a third artifact nobody has verified | **High** | 1 | Product | **Institutionalized** (server `CLAUDE.md` §7) |
+| **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
+| **K-001** | A lint script that auto-fixes cannot serve as a verification gate — it makes the thing it checks true as a side effect of checking it | **High** | 1 | Product | **Institutionalized** (server `CLAUDE.md` §11) — now a member of K-004's family |
+| **K-002** | A tier can be certified "green" while being type-checked by nothing at all; test-runner green ≠ compiles | **High** | 1 | Product | **Institutionalized** (client `CLAUDE.md`) |
+| **K-003** | Correction-closure sweeps must grep the **literal superseded string**, then re-grep to confirm — semantic greps miss their own target | **High** | **6** (3 in C1, 3 in C2) | Methodology | Proposed (upstream) |
+| **KZ-010** | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands | Medium | 1 | Product + Methodology | Proposed — *was `KZ-004` on `staging`; renumbered on merge to `dev`* |
+
+> **`K-001` and `KZ-001` are the same failure seen from two tiers** — a verification artifact that cannot
+> report the thing it stands for. `K-004` and `KZ-003` likewise both say a green result only covers what
+> its author modeled. Worth collapsing when the table is pruned.
 
 ---
 
 ## Entries
+
+### 2026-08-13 — post-archive findings, `bilateral/primary-contributing-sp`
+
+Two defects found in local verification **after** the spec was archived. Both were reachable from the archived spec's own stated gaps; neither was caught by any gate.
+
+**K-006 — an artifact no gate executes is an artifact nobody has verified.** Migration `1784500000000` (from C1, `toc-optional-mapping`) shipped with `[SPEC:bilateral/…]` inside a **SQL comment**. `orm.config.ts:59` sets `extra.namedPlaceholders: true`, so mysql2 rewrites queries through `named-placeholders`, which skips quoted strings but has **no notion of SQL comments** — the colon is consumed as a bind parameter and, with no params argument, the call throws before MySQL parses it. The migration was **unrunnable from the day it was written** and passed every gate the repo has: valid TypeScript, lint-clean, type-clean, reviewed, committed. The merge to `dev` would have failed in CI/CD. It surfaced only when the migration was finally executed.
+
+*Root cause:* every gate in the repo inspects migrations as **text**; none executes one. The one property that matters — does it run — was unmeasured.
+*Evidence:* two `migration:dev:execute` failures, 2026-08-13; `named-placeholders/index.js:6`.
+
+**The corollary, learned the expensive way.** A static scanner was written to substitute for the missing dynamic gate, and it was wrong **three times**: it first assumed quoted strings were the hazard (they are the safe place); then it reimplemented the tokenizer and missed that a bare **`?`** binds too — passing the very migration that then failed for real, *after* being "verified able to fail" against a fixture built from the same wrong model; then, corrected to call the real tokenizer, it flagged **230** hazards in migrations proven to run, because it never inspected whether the call site passes a params array (`1781879906673-AddNewEnvCl.ts` uses `?` legitimately). Withdrawn.
+
+*Lesson:* a K-004 failure demo only proves the gate catches **what its author already modeled**. When a gate's correctness depends on reimplementing a dependency's parser *and* its call-site contract, the honest gate is to run the thing. **K-004 recurrence → 4.**
+*Standardized:* server `CLAUDE.md` §7 — the rule, plus the statement that running migrations is its only sound gate.
+*Target:* **Product.**
+
+**D-6 materialized — the cross-tier gap the spec declared and left open.** `requirements.md` listed *"D-6 (cross-tier drift — partial)"* among items "uncovered by construction". R-BIL-128 AC.1 narrowed the client to one ToC block (the Primary's), but `pool_funding_alignment_validation` still demanded a ToC row for **every** active SP — so with 2+ SPs the green check was unreachable, since the UI offers no way to answer for a Contributing SP. The function is named in **none** of the spec's seven documents.
+
+*Lesson, folded into K-003's family rather than numbered separately:* a spec that renames or re-scopes a concept must grep for that concept **outside its own tier** — here, one grep for the validating function would have found it.
+*Fixed:* `1786679227000`, with a legacy fallback (no backfill per R-BIL-126). Blast radius measured against the live function over all 23 Dev alignments answered "Yes": recomputed-current reproduces `live_fn` on 23/23, proposed differs on exactly 1 — the intended flip.
+
+---
+
+### 2026-08-13 — `bilateral/primary-contributing-sp` (C2)
+
+**Outcome:** 16 tasks, 7 commits, all requirements delivered. **0 HALTs.** `/akili-test` and `/akili-validate` **not run** — absence explicitly accepted at the archive gate. T-02 archived `[~]` with one item dischargeable only by a deploy.
+
+#### Measure
+
+| Signal | Value |
+| --- | --- |
+| Reviewer FAIL verdicts | **3** (T-08, T-13, T-16) |
+| Rework attempts consumed | **2 of a possible 48** — T-08 ×1, T-16 ×2 |
+| HALTs / FATAL_FAILs | **0** |
+| Pivot Records | **2**, both user-approved, both for defects in the *approved spec* |
+| Budget breaches | **2** — T-13 894 vs ~180 (4.75×); T-16 739 vs ~400. **Both escalated and accepted, neither absorbed silently** |
+| Validation verdict | **not run** (accepted risk) |
+| Leader errors caught by review or by the user | **6** |
+
+**Notable:** the rework rate collapsed versus C1 (2 attempts across 16 tasks, vs C1's 6 FAILs across 10). The controls that produced that are named under *What went right*.
+
+#### Learn
+
+**K-004 — a gate must be proven able to FAIL before it is trusted.** This spec found that **three** mandated gates in this repo could not go red for the reason they were mandated:
+
+| Gate | Why it could not fail |
+| --- | --- |
+| `npm run lint` | it is `eslint --fix` — it makes the thing it checks true (**this is K-001**) |
+| `npm run build`, for spec files | `tsconfig.build.json` excludes `**/*spec.ts` — it type-checks **zero** of them |
+| `npx tsc -p tsconfig.spec.json --noEmit` | two pre-existing `TS1005` **syntax** errors aborted the parse, suppressing semantic diagnostics across ~1300 files: it reported **3** errors where **945** existed |
+
+*Root cause:* gates are adopted **by name**, and nobody runs the one experiment that would expose a hollow one — break the thing on purpose and confirm the gate goes red.
+*Evidence:* `archive-summary.md` → "Three mandated gates"; T-08 and T-14 review findings. Gate 3 repaired by T-16.
+*Target:* **Methodology** — K-001 is one member of this family, not the family itself. Recommend upstreaming as a rule: *a verification command may not be cited as evidence until it has been observed failing.*
+
+**K-005 — configuration values that act as discriminators must not be collapsed.** Rewriting the client's local `environment.ts`, the Leader set `mainApiUrl`, `textMiningUrl`, `documentOverviewUrl`, `fileManagerUrl` and `saveErrorsUrl` all to `http://localhost:3000/api/` "to simplify local". The code does not treat them as destinations — it **branches on them**:
+
+- `jwt.interceptor.ts:52` does `req.body as FormData` + `.set()` for any URL matching `textMiningUrl`. On a GET, `body` is `null` → **every API call threw before leaving the browser**. 33 console errors, zero requests reaching the server, an empty screen.
+- `api.service.ts:989` POSTs every client error to `saveErrorsUrl` as its base → each error POSTed to `/api/`, 404'd, and surfaced as a toast **which then reported itself**.
+
+*Root cause:* values read as "just URLs" were in fact branch selectors; in production they are genuinely different hosts, which is what kept the branches disjoint.
+*Evidence:* `client/.../environment.ts` comments; `jwt.interceptor.ts:52`; `api.service.ts:989`.
+*Target:* **Product**.
+
+**K-003 recurrence raised to 6.** Three more confident negatives asserted without the grep that would settle them: T-08's Seam 1 premise (`user` "feeds eligibility" — the parameter is `_user`, never read), T-13's *"no migration in this repository creates `results`"* (one grep disproves it), and a T-16 comment declaring a gap open **in the same diff that closed it**. Every one caught by an independent reader, never by the author.
+
+#### Standardize
+
+| Lesson | Proposed minimal edit | Status |
+| --- | --- | --- |
+| K-004 | Root `CLAUDE.md` §4.3 — a verification command may not be cited as evidence until it has been observed **failing** | *(see Step 4.3 menu)* |
+| K-005 | `client/research-indicators/src/CLAUDE.md` — record that several `environment` URLs are branch selectors, not just destinations | *(see Step 4.3 menu)* |
+| K-002 | **Factual correction:** the client CLAUDE.md block is now stale on three counts — the test count (6,239 → 6,267), *"`npm run build` is the only client type gate"* (false since T-16 repaired `tsc -p tsconfig.spec.json`, baseline **945**), and *"gitignored with no committed template"* (false — `environment.example.ts` is committed) | *(see Step 4.3 menu)* |
+| K-003 | No local edit — Methodology, for upstreaming | Recorded |
+
+#### What went right, worth preserving
+
+- **Executed sabotage replaced claimed verification, and it paid immediately.** Where a report said *"verified by inspection"*, the next Reviewer executed it — and twice the inspection had been optimistic. The decisive catch of the run came from **deleting a line and watching 108/108 stay green**: `isDirty()`'s Primary clause, whose absence makes a Primary-only edit unsaveable. It would have shipped under a fully green suite.
+- **Falsifying a premise beats satisfying it.** T-13's brief was written against a `TEST` datasource that turned out to be unreachable; the pre-check caught it *before* the Implementer spawned, and the task ran against an isolated container of the **same engine version** instead.
+- **The trap gate was not the obvious test.** "Second active `PRIMARY` rejected" stays green under the `CONCAT` trap; the real gate is "N active `CONTRIBUTING` accepted". Assumed gates and proven gates are different things — the same lesson as K-004, from the other end.
+- **Budget breaches were escalated, not absorbed.** Both times the estimate was ruled the defective artifact, with reasoning, on the record.
+
+---
+
+### 2026-08-13 — `bilateral/toc-optional-mapping`
+
+**Outcome:** 10 tasks, 13 commits, all requirements covered. `/akili-test` PASS. `/akili-validate` **FAIL** (evidence trail, not code). Not archived clean — gaps explicitly accepted.
+
+#### Measure
+
+| Signal | Value |
+| --- | --- |
+| Reviewer FAIL verdicts | 6 |
+| Pivot Records | **2** — both for defects in the *approved spec*, not the implementation |
+| HALTs / FATAL_FAILs | 0 |
+| Rework attempts consumed | 0 of 3 on 8 tasks; 1 of 3 on T-06 and T-10 |
+| Validation verdict | FAIL — 8 must-close items |
+| **Budget breach** | **1,719 insertions vs ~530 estimated (3.2×)**; review rounds ≥14 vs 10. **`design.md` §9 required escalation; none was raised** |
+| Leader errors caught by the panel | **3** (D8 false strike; two failed closure sweeps) |
+
+**Notable:** the two Pivots and all three Leader errors were caught by *independent review*, not by the Leader. The review panel was the load-bearing control in this run.
+
+#### Learn
+
+**K-001 — `npm run lint` is `eslint --fix`, so it cannot verify.** Every "lint clean" report across ~10 tasks was an artifact: the command rewrote the working tree and exited 0, while the **committed branch failed Prettier** from T-04 onward. Undetected for the entire run; found only by independent validation feeding `HEAD` content through `eslint --stdin`.
+*Root cause:* a verification gate whose action mutates the artifact it checks.
+*Evidence:* `validation-report.md` F-2; remediation commit `2de57099`.
+*Target:* **Product**.
+
+**K-002 — the client tier was certified green without any type-check.** Client Jest runs `isolatedModules: true` (no type-checking) and the flat ESLint config ignores `*.spec.ts`. So **6,239 passing tests coexisted with a client build that fails `TS2345`**. The spec *recorded both facts itself* (T-07 advisory A-1; T-10's lint caveat) and stopped one inference short of the conclusion they force. `build` appears in no verification matrix.
+*Root cause:* suite-green treated as compile-green; no gate distinguished them.
+*Evidence:* `validation-report.md` FAIL-2.
+*Target:* **Product**.
+
+**K-003 — correction-closure sweeps failed three times in one spec.** After each Pivot the sweep reported *"every surviving instance corrected"*; each time instances survived (six after the first, three after the second, one after the third). One survivor, `execution.md:352`, **directly contradicted the corrected record 75 lines below it in the same file**.
+*Root cause:* semantic/pattern greps miss the literal target — one reviewer's own filter excluded lines containing "false", which is the word inside *"returning `false`"*. Compounded by reporting closure without re-grepping.
+*Evidence:* T-06 audit findings; `validation-report.md` F-1.
+*Target:* **Methodology** — AKILI's *Correction Closure* rule says grep the superseded **value**; the lesson is grep the **literal string** and **re-grep to confirm**. Recommend upstreaming.
+
+#### Standardize
+
+| Lesson | Proposed minimal edit | Status |
+| --- | --- | --- |
+| K-001 | `server/researchindicators/src/CLAUDE.md` §11 — note `npm run lint` is `eslint --fix` and **cannot** verify; use `npx eslint` (no `--fix`) as the gate | **Awaiting approval** |
+| K-002 | `client/research-indicators/src/CLAUDE.md` — record that tests are neither linted nor type-checked (`isolatedModules: true`, ESLint ignores `*.spec.ts`), so `npm run build` is the only client type gate | **Awaiting approval** |
+| K-003 | No local edit — Methodology lesson for upstreaming to the AKILI repo | Recorded |
+
+#### What went right, worth preserving
+
+- **`author ≠ auditor` was the load-bearing control.** Every substantive defect — two undischargeable ACs, duplicate-coverage-as-new-proof, and all three Leader errors — was found by an independent reviewer.
+- **The two structural discharges are a reusable pattern:** unchanged-artifact argument + falsifiable lapse condition + a binding prohibition on naming tests as though they proved the discharged half. Independently re-derived and upheld at validation.
+- **Pivots cost zero rework attempts**, as designed. Both spec defects were caught before burning the 3-attempt ceiling.
+
+---
+
+### 2026-08-13 — `bugfix/oicr-lever-dropdowns`
+
+**Outcome:** delivered, tester-validated (user-confirmed). Bug Mode red-before observation waived under explicit user mandate — repo had no `node_modules` during execution; functional tester validated afterward.
+
+#### Measure
+
+| Signal | Count | Source |
+| --- | --- | --- |
+| Tasks executed | 1 (T-01) | tasks.md |
+| Reviewer FAIL / rework cycles | 0 (in-session) | n/a — informal execute | 
+| HALTs / FATAL_FAILs | 0 | n/a |
+| Pivot records | 0 | n/a |
+| PRODUCT_BUGs | 0 | n/a |
+| Judgment Day severe findings | 0 | n/a |
+| Verification-gate waivers | 1 (red-before skipped — no node_modules) | tasks.md Execution Note |
+| Validation FAIL / WARN | 0 / 2 (absent formal reports, user-validated) | archive-summary.md W-1/W-2 |
+
+#### Lessons
+
+- **KZ-004 — Bug Mode ran without the stack's verification prerequisites installed.** (Product + Methodology, Medium)
+  - Root cause: the worktree had no `node_modules` when `/akili-execute` ran, so the mandatory Bug-Mode red-before observation and the full-suite green-after gate could not be run. The fix was applied blind under explicit user mandate; the red-before evidence is non-recoverable post-fix.
+  - Evidence: `tasks.md` Execution Note (waiver under user mandate 2026-08-13); `archive-summary.md` W-1.
+  - Standardization (Product): add one line to `AGENTS.md` Working Conventions — *"Before any verification gate (`npm test` / `npm run lint`), confirm `node_modules` is installed in the target package; a worktree without deps forces a Bug-Mode red-before/green-after waiver."* → **Deferred (Medium severity, no High — apply on next spec or on user approval).**
+  - Standardization (Methodology): propose upstream that `/akili-execute` (and `/akili-specify`'s testing strategy) pre-flight-check the verification command's prerequisites and surface the gap **before** the fix lands, so the red observation is never skipped post-hoc. → **Recorded for upstreaming to the AKILI methodology repository.**
+
+---
 
 ### 2026-08-03 — `project-dashboard/indicator-metadata-charts`
 
