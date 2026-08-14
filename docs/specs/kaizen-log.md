@@ -8,7 +8,8 @@ Continuous-improvement record across AKILI specs. Newest entry first.
 
 | ID | Lesson | Severity | Target | Recurrence | Status |
 | --- | --- | --- | --- | --- | --- |
-| **K-004** | **A gate must be proven able to FAIL before it is trusted.** Three mandated gates in this repo could not go red for the reason they were mandated | **High** | Methodology | **3 gates** | Proposed (upstream) |
+| **K-004** | **A gate must be proven able to FAIL before it is trusted.** Three mandated gates in this repo could not go red for the reason they were mandated | **High** | Methodology | **4 gates** | Proposed (upstream) |
+| **K-006** | **An artifact no gate executes is an artifact nobody has verified.** A migration shipped syntactically valid, lint-clean, type-clean and **unrunnable** — no gate ever ran a migration | **High** | Product | 1 | **Institutionalized** (server `CLAUDE.md` §7 + `npm run migration:scan`) |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | Product | 2 (same edit) | Proposed |
 | **K-001** | A lint script that auto-fixes cannot serve as a verification gate — it makes the thing it checks true as a side effect of checking it | **High** | Product | 1 | **Institutionalized** (server `CLAUDE.md` §11) — now a member of K-004's family |
 | **K-002** | A tier can be certified "green" while being type-checked by nothing at all; test-runner green ≠ compiles | **High** | Product | 1 | **Institutionalized** (client `CLAUDE.md`) — **needs a factual correction, see 2026-08-13 C2 entry** |
@@ -17,6 +18,24 @@ Continuous-improvement record across AKILI specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-13 — post-archive findings, `bilateral/primary-contributing-sp`
+
+Two defects found in local verification **after** the spec was archived. Both were reachable from the archived spec's own stated gaps; neither was caught by any gate.
+
+**K-006 — an artifact no gate executes is an artifact nobody has verified.** Migration `1784500000000` (from C1, `toc-optional-mapping`) shipped with `[SPEC:bilateral/…]` inside a **SQL comment**. `orm.config.ts:59` sets `extra.namedPlaceholders: true`, so mysql2 rewrites queries through `named-placeholders`, which skips quoted strings but **not** SQL comments — the colon is consumed as a bind parameter and the query throws before MySQL parses it. The migration was **unrunnable from the day it was written** and passed every gate the repo has: it is valid TypeScript, lint-clean, type-clean, and committed. The merge to `dev` would have failed in CI/CD. It surfaced only when the migration was finally executed.
+
+*Root cause:* every gate in the repo inspects migrations as **text**; none executes one. The one property that matters — does it run — was unmeasured.
+*Evidence:* `migration:dev:execute` failure, 2026-08-13; probe against the installed `named-placeholders` (quoted `text-align:justify` safe, `--` and block comments hazardous, `: ` with a space safe).
+*Standardized:* `npm run migration:scan` + server `CLAUDE.md` §7. Gate verified able to FAIL against a deliberately broken fixture before being trusted (K-004), including its three negative discriminations.
+*Target:* **Product**. **K-004 recurrence → 4.**
+
+**D-6 materialized — the cross-tier gap the spec declared and left open.** `requirements.md` listed *"D-6 (cross-tier drift — partial)"* among items "uncovered by construction". R-BIL-128 AC.1 narrowed the client to one ToC block (the Primary's), but `pool_funding_alignment_validation` still demanded a ToC row for **every** active SP — so with 2+ SPs the green check was unreachable, since the UI offers no way to answer for a Contributing SP. The function is named in **none** of the spec's seven documents.
+
+*Lesson, folded into K-003's family rather than numbered separately:* a spec that renames or re-scopes a concept must grep for that concept **outside its own tier** — here, one grep for the validating function would have found it.
+*Fixed:* `1786679227000`, with a legacy fallback (no backfill per R-BIL-126). Blast radius measured against the live function over all 23 Dev alignments answered "Yes": recomputed-current reproduces `live_fn` on 23/23, proposed differs on exactly 1 — the intended flip.
+
+---
 
 ### 2026-08-13 — `bilateral/primary-contributing-sp` (C2)
 
