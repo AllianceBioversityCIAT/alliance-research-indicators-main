@@ -19,14 +19,15 @@ export interface AlignmentScienceProgram {
   color?: string | null;
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127, R-BIL-126
   // Always present on the wire (backend `SelectedScienceProgramResponse.role`,
-  // required-but-nullable — `null` only on legacy rows, R-BIL-126). Declared
-  // OPTIONAL here (not required) even though the backend always sends it:
-  // required would force every existing fixture across the 81KB client spec
-  // corpus that constructs `{ code, name }` literals to add `role`, which is
-  // T-16's job, not T-14's (scope boundary, tasks.md). Optional is
-  // behaviorally identical for every read site in this component —
-  // `sp.role === 'PRIMARY'` treats a missing role exactly like an absent one.
-  role?: SpRole | null;
+  // required-but-nullable — `null` only on legacy rows, R-BIL-126). Flipped
+  // from optional to required in T-16 (carried-forward obligation 5a):
+  // T-14 declared it optional purely to keep the client spec corpus's
+  // existing `{ code, name }` fixture literals out of its scope; left
+  // optional permanently, the client type would misrepresent design.md §4's
+  // wire contract and D-6 (cross-tier role drift) would lose the
+  // compile-time check nothing else replaces. `sp.role === 'PRIMARY'` still
+  // treats an explicit `null` exactly like the old missing-property case.
+  role: SpRole | null;
 }
 
 export interface AlignmentResponse {

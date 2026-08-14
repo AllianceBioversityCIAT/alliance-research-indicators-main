@@ -153,7 +153,13 @@ export default class PoolFundingAlignmentComponent {
   // Read-only orphan tag (display-only) — reuses the stale tag's `.pf-stale-tag`
   // visual treatment verbatim (D-C2-10); only the copy differs.
   readonly ORPHANED_TOC_TAG = 'Not the current Primary — read-only';
-  readonly NO_TOC_ALIGNMENT_MESSAGE = 'No Theory of Change alignment recorded.';
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16, applying T-15's
+  // Reviewer finding (design.md §12.2, superseded-string record kept there). The
+  // row this labels holds an explicit saved "No" answer — data that IS stored —
+  // so copy reading "recorded" as an absence worked against R-BIL-129 (stored
+  // data must not vanish from the screen on a role change) and was
+  // indistinguishable from a genuinely unanswered row.
+  readonly NO_TOC_ALIGNMENT_MESSAGE = 'Not aligned with the Theory of Change.';
   // REQ-BIL-TM2-10 / D-6a — destructive SP-deselect confirmation copy (OQ-5 default).
   readonly DESELECT_CONFIRM_SUMMARY = 'Remove Science Program?';
   readonly DESELECT_CONFIRM_DETAIL =

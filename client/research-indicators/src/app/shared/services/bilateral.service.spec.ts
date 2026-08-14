@@ -903,4 +903,101 @@ describe('BilateralService', () => {
       });
     });
   });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 flagged, T-16 covers.
+  // extractFieldErrors (line ~319) keeps only `typeof v === 'string'` entries, so the
+  // server's `errors.primary_sp: { code, description }` OBJECT is silently dropped
+  // there and a genuine 400 would fall through to a generic global toast unless a
+  // dedicated extractor picks it up. These tests exercise `extractPrimarySpError`
+  // (private — reached only via the public `patchAlignment` contract, matching every
+  // other extractor's test style above).
+  describe('extractPrimarySpError via patchAlignment (T-14 / T-16, R-BIL-127)', () => {
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 attempt 3, Leader ADVISORY (promoted)
+    // `as unknown as MainResponse<AlignmentResponse>`, not the bare `as` used by
+    // the six pre-existing instances of this same helper pattern elsewhere in
+    // this file (:406, :444, :468, :485, :510, :819) — this cast is new in this
+    // task, and a bare `as` here raises the tsc baseline this task exists to
+    // repair from 945 to 946. The six pre-existing ones are left untouched.
+    const fail400 = (errors: unknown): MainResponse<AlignmentResponse> =>
+      ({
+        data: undefined,
+        status: 400,
+        description: 'error',
+        timestamp: '',
+        path: '',
+        successfulRequest: false,
+        errorDetail: { errors: errors as string, detail: '', description: 'Validation failed' }
+      }) as unknown as MainResponse<AlignmentResponse>;
+
+    it('400 with primary_sp as STRINGIFIED-JSON errors → primarySpError populated (the object extractFieldErrors silently drops)', async () => {
+      const errorsJson = JSON.stringify({ primary_sp: { code: 'SP01', description: 'SP01 is no longer part of the alignment' } });
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(fail400(errorsJson));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(result).toEqual({
+        ok: false,
+        status: 400,
+        description: 'Validation failed',
+        primarySpError: 'SP01 is no longer part of the alignment'
+      });
+      // The object form never surfaces through the string-valued fieldErrors path —
+      // proving the failure mode T-14's review flagged is actually closed here.
+      expect((result as { fieldErrors?: unknown }).fieldErrors).toBeUndefined();
+    });
+
+    it('400 with primary_sp on an already-parsed OBJECT errors envelope → primarySpError populated (tolerant of object shape)', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(
+        fail400({ primary_sp: { code: 'SP03', description: 'SP03 was deselected mid-edit' } })
+      );
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect((result as { primarySpError?: unknown }).primarySpError).toBe('SP03 was deselected mid-edit');
+    });
+
+    it('400 with malformed/non-JSON errors payloads → no crash, no primarySpError key', async () => {
+      const malformed = ['{not-json', 'plain text', JSON.stringify({ primary_sp: 'not-an-object' }), JSON.stringify({ primary_sp: ['array'] })];
+      for (const errors of malformed) {
+        mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(fail400(errors));
+
+        const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+        expect((result as { primarySpError?: unknown }).primarySpError).toBeUndefined();
+      }
+    });
+
+    it('400 whose primary_sp.description is empty or whitespace-only → primarySpError undefined', async () => {
+      const blank = [
+        JSON.stringify({ primary_sp: { code: 'SP01', description: '' } }),
+        JSON.stringify({ primary_sp: { code: 'SP01', description: '   ' } }),
+        JSON.stringify({ primary_sp: { code: 'SP01' } })
+      ];
+      for (const errors of blank) {
+        mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(fail400(errors));
+
+        const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+        expect((result as { primarySpError?: unknown }).primarySpError).toBeUndefined();
+      }
+    });
+
+    it('400 carrying BOTH string-valued field errors and primary_sp → both surfaced side by side (no regression)', async () => {
+      const errorsJson = JSON.stringify({
+        has_contribution: 'must be true or false',
+        primary_sp: { code: 'SP01', description: 'SP01 is no longer part of the alignment' }
+      });
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(fail400(errorsJson));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(result).toEqual({
+        ok: false,
+        status: 400,
+        description: 'Validation failed',
+        fieldErrors: { has_contribution: 'must be true or false' },
+        primarySpError: 'SP01 is no longer part of the alignment'
+      });
+    });
+  });
 });

@@ -710,7 +710,7 @@ graph TD
 - **Estimated LOC:** ~400
 - **Effort:** L
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd`
-- **Status:** todo
+- **Status:** **done** (2026-08-13 — PASS on attempt 3 of 3; see [`./execution.md`](./execution.md) → T-16). **739 insertions vs the ~400 ceiling — BREACHED and ACCEPTED**, the estimate ruled the defective artifact: it was written before T-14/T-15 existed, so it could not contain 31 red-test repairs, 13 fixture literals, or four obligations assigned by later reviews. 🔴 **Attempt 2 FAILED on two defects this task's own tests could not see.** The graver one: deleting `isDirty()`'s Primary clause (`pool-funding-alignment.component.ts:360`) left the suite at **108/108 GREEN** — without it, changing ONLY the Primary leaves Save disabled and the change unsaveable, a user-visible defect shipping under a fully green suite. **The single highest-value catch of the run.** The other: AC.4's "re-blocks save" was a tautology (`canSave()` was already `false` before the deselect). Both now sabotage-proven red by the Reviewer independently. ✅ **`npx tsc -p tsconfig.spec.json --noEmit` REPAIRED** — two `TS1005` syntax errors were suppressing semantic diagnostics across ~1300 spec files; baseline is now **945** and the gate functions for every future task in this repo. Branches on the component: **82.68% → 58.59% → 83.26%** (pre-T-14 → pre-T-16 → now) — the ratchet holds against both baselines, **but 38 uncovered vs 31 before: the percentage rose because the denominator grew faster than the gap.** ⚠️ AC.6 remains **NOT discharged** — no test here can prove the two roles read as visually distinct, and the canonical mockups do not exist.
 
 ---
 

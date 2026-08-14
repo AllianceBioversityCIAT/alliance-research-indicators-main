@@ -3554,3 +3554,144 @@ from" note). No dead helper, no dead computed, no comment still describing N blo
    **but the orphan tag is now a second load-bearing non-colour cue on that unfixed surface.**
 
 ---
+
+## T-16 — Client spec corpus updates + the UX/UI decision entry
+
+**Attempts:** 3 (the ceiling) · **Verdict:** `STATUS: PASS` on attempt 3 (Reviewer `opus`, ≠ Implementer
+`sonnet`) · **Diff:** 7 files, **739 insertions / 61 deletions** — the ~400 ceiling **breached and accepted**.
+
+### Why the breach was accepted
+
+The ~400 estimate was written **before T-14 and T-15 existed** and scoped only "targeted additions". The
+actual work contained three things it could not have: repairing **31 red tests created by the two tasks
+that came after it**, adding `role` to **13 fixture literals**, and discharging **four obligations assigned
+by T-14's and T-15's reviews** — i.e. after `tasks.md` was authored. **The estimate is the defective
+artifact, not the deliverable** — the same ruling T-13's review reached on its own 4.75× overrun. Both
+Reviewers checked for speculative gold-plating and found none.
+
+### Attempt 1 → BLOCKED (budget escalation, correctly handled)
+
+The Implementer finished, verified, **then** escalated with the artifact attached rather than discarding it
+or quietly absorbing the overrun. That is the behaviour the tripwire exists to produce.
+
+They also flagged a coverage-baseline discrepancy and drew the **wrong conclusion** from a **right
+observation** — see below.
+
+### Attempt 2 → the coverage correction, and the number it revealed
+
+The Implementer reported *"the brief's table appears stale relative to `HEAD`"*. **It was not stale — it was
+a different, correctly-labeled baseline**, and the Leader verified this before answering:
+
+| | Their measurement | The Leader's table |
+| --- | --- | --- |
+| Taken at | `885e6f48` (post-T-15) — "pre-**T-16**" | `ada24ca0` (pre-T-14) — "pre-**any client task**" |
+
+Denominators differ because **T-14 and T-15 grew the files**: `pool-funding-alignment.component.ts` `+106/−1`
+then `+111/−8` (287→336 lines, 179→227 branches); `bilateral.service.ts` `+34/−1` (103→119 branches).
+`sp-toc-alignment-block.component.ts` matched **exactly** because zero commits touched it — **their
+consistency check was the right instinct and it worked; only the inference from it was wrong.**
+
+**And it surfaced the most important measurement in the task:**
+
+| Point | Branches on `pool-funding-alignment.component.ts` |
+| --- | --- |
+| pre-T-14 | **82.68%** — 148/179, **31 uncovered** |
+| pre-T-16 | **58.59%** — 133/227, **94 uncovered** |
+| post-T-16 | **83.26%** — 189/227, **38 uncovered** |
+
+T-14 and T-15 dropped it **24 points**; T-16 recovered it to above the original. **The ratchet holds against
+both baselines** — a far stronger statement than the "floors met" `tasks.md` asked for, which the client
+clears roughly five times over and which would have hidden the entire 24-point excursion.
+
+**But the percentage hides something the Reviewer refused to let pass: 38 uncovered branches now vs 31
+before — seven MORE in absolute terms, on the file this whole spec is about.** The percentage rose only
+because the denominator grew faster than the gap. The Reviewer enumerated all 38 and found **five sitting
+squarely in the Primary logic this spec added**. Two of them became the FAIL.
+
+### Attempt 2 → FAIL — two defects the task's own tests could not see
+
+**1 — AC.4's "re-blocks save" was a tautology.** The Reviewer inserted a probe asserting `canSave()`
+**before** the deselect: it was **already `false`**, because the Primary's draft was unanswered so
+`isDraftSaveable` failed. **Deleting all of AC.4's clearing logic would have left the assertion green.**
+The surrounding comment also made two false claims — that `canSave()` was "proven true beforehand" (no such
+assertion existed) and that the destructive-confirm path was "already covered separately" (that describe
+never sets `primary_sp_code`; `BRDA:598,63,0` was `taken 0`).
+
+**2 — `isDirty()`'s Primary clause was completely uncovered, and deleting it ships a user-visible defect
+under a fully green suite.** The Reviewer deleted `pool-funding-alignment.component.ts:360` —
+`if (server.primary_sp_code !== form.primary_sp_code) return true;` — and ran the suite: **108/108 passed.**
+
+> Without that clause, a contributor who opens a saved alignment and changes **only** the Primary finds Save
+> disabled and the change unsaveable. Every existing payload test set `primary_sp_code` alongside another
+> dirtying edit, so **the clause was never the sole cause of dirtiness in any fixture.**
+
+**This is the single highest-value catch of the entire run.** It is R-BIL-127 AC.2's own scenario — *"the
+save payload carries `primary_sp_code`"* — which cannot happen if the form is never dirty.
+
+Plus two record defects, the **sixth** instance in this spec of *a confident statement true when written and
+false when shipped*: a comment declaring 5c's second half "a real gap" **in the same diff that closed it with
+91 lines**, and a pointer to a §12.2 record **that was never written**.
+
+### Attempt 3 → PASS, with both sabotages executed by the Reviewer independently
+
+| Sabotage | Result |
+| --- | --- |
+| delete `:328` (the AC.4 Primary clause) | **RED** — and critically, the *pre*-deselect `expect(canSave()).toBe(true)` **still passed under sabotage**, proving `canSave()` is authentically true beforehand. **The tautology was eliminated, not moved.** |
+| delete `:360` (the `isDirty()` clause) | **RED** on exactly one dedicated test — the 108/108-green defect is now caught. Restored → **110/110**. |
+| delete `:598`'s clearing (Reviewer's own addition) | **RED** — the decisive proof of *mechanism*: had the test taken the direct `syncDraftsToSelection()` path, `:557` would have cleared the Primary and it would have stayed green. It routes through `confirmDestructiveRemoval` as claimed. |
+
+**The Implementer departed from the suggested remediation on Half A** — instead of answering the Primary's
+draft via `onDraftChange`, they removed the `tocCatalog`/`mappingStatus` setup so `showTocBlocks()` is
+structurally false. The Reviewer judged the substitution **"sound and strictly better-targeted"** than the
+suggestion: with the ToC gate structurally inactive, the post-deselect `false` provably originates from the
+Primary clause and nothing else.
+
+### Leader error, corrected by the Reviewer
+
+I briefed the Reviewer that the six pre-existing `TS2352` cast line numbers had **shifted** between rounds
+(`398/436/…` → `406/444/…`). **No shift occurred.** Those are the same six errors: `tsc` reports the
+literal's *expression-start* line, the Implementer's comment cites the *cast-text* line ~8 below. Since the
+new `describe` was appended at end-of-file, nothing could shift above `:811`. **The mismatch cost the review a
+reconciliation step because of my briefing.** → ADVISORY 1.
+
+### Gates — all independently re-run by the Reviewer
+
+✅ `npm test` — **307/307 suites, 6267/6267 tests** (baseline 6242) · `npm run build` exit 0 · `npx eslint`
+on the three production paths exit 0 · `npx tsc -p tsconfig.spec.json --noEmit` → **945, baseline restored**
+(the +1 was removed via `as unknown as`; **exactly six** pre-existing bare casts remain, none silently fixed,
+no seventh introduced) · `BRDA:360,37,0,1` and both `BRDA:598,63,{0,1},1` verified from a **regenerated**
+`lcov.info` · K-003 re-grep on all three superseded phrases → **zero** · tree integrity: `git diff | md5`
+identical before and after every experiment.
+
+### The `tsc` gate was repaired — this task's quietest win
+
+Two `TS1005` **syntax** errors were aborting the parse and suppressing semantic diagnostics across ~1300
+spec files. Repaired minimally (`+1` line; `} as any;` → `};`), revealing the **945**-error baseline. Both
+repaired suites stay green (43/43). **The gate now functions for every future task in this repo**, and
+`role?` → `role` restored D-6's compile-time check — verified by removing `role` from a fixture and observing
+`TS2741`.
+
+### ADVISORY (4R) — recorded
+
+1. **READABILITY — the cast-line convention.** `bilateral.service.spec.ts:916-921` cites the six pre-existing
+   casts by *cast-text* line while `tsc` reports *expression-start*. Both correct; the mismatch cost a
+   reconciliation step. A parenthetical would prevent the next auditor repeating it.
+2. **RISK — the version-lock stranding exits this spec UNASSIGNED.** §12.2 records it as an OPEN BEHAVIOR
+   with only a *suggested* banner-copy mitigation and **no owner**. It is a requirements-level contradiction
+   between R-BIL-127 AC.4 and AC.5, correctly out of T-16's scope — **but it will not resurface on its own.**
+   → needs a tracked follow-up, not a documentation-only resting place.
+3. **RISK — three Primary-path branches remain uncovered:** `:497` (`onPrimaryChange` clearing a prior inline
+   error), `:283` (`primarySelectedSp()`'s `?? null` when `primary_sp_code` names an SP no longer selected —
+   the transient state AC.4 exists to prevent), `:318` (empty-selection guard). Deliberately not chased —
+   the task was already past its accepted budget.
+4. **RISK — the dark-mode contrast gap is now recorded but still unowned.** §12.2 documents `bg-[#fcfcfc]` at
+   ~1.6:1 against a 4.5:1 floor, correctly framed as pre-existing and **now load-bearing for AC.6**. Nothing
+   in this spec can fix it and nothing schedules it.
+5. **READABILITY — the "never two Primaries" test can never fail** (~9 lines asserting the type system back
+   at itself). Honestly labelled as documented-not-discharged, which is the correct treatment of a
+   structurally-unrepresentable requirement, but a comment would carry the same record at zero runtime cost.
+
+**AC.6 remains NOT discharged, in both places** — the spec comment and §12.2 each say so explicitly, and
+nothing in the diff describes the visual treatment as approved. jsdom cannot measure contrast or layout.
+
+---
