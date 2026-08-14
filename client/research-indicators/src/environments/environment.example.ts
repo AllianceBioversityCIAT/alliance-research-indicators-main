@@ -76,5 +76,17 @@ export const environment = {
 
   // --- Numbers, not strings. See trap 1 above. -----------------------------
   hotjarId: 0,
-  hotjarVersion: 0
+  hotjarVersion: 0,
+
+  // --- Local auth bypass ---------------------------------------------------
+  // Client-side counterpart to the server's ARI_LOCAL_AUTH_BYPASS. The two are
+  // INDEPENDENT: the server flag only skips JWT validation on requests, while
+  // rolesGuard gates navigation on cache.isLoggedIn(). With the server flag on
+  // and this off, the app still redirects to /login and dies at Cognito.
+  //
+  // Set to `true` in your local environment.ts when running the Docker stack
+  // without real Cognito credentials. MUST remain `false` in environment.dev.ts
+  // and in any file feeding a deployed build. Guarded at the use site by
+  // `environment.production === false` — see shared/auth/local-auth-bypass.ts.
+  localAuthBypass: false
 };
