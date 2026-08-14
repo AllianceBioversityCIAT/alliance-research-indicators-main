@@ -3,6 +3,8 @@
 > **Headline:** AC-1676 is not one change. It is **eleven adjustments** spanning copy, validation, schema, and two new PRMS integrations. **Three are already implemented** in the working module, **two are one-file changes**, and **two are new integrations blocked on a PRMS API contract that does not exist in this repo yet.**
 >
 > **Status — 2026-08-12:** the split was **approved**. The PRMS round-trip (C3, C4) is **descoped from AC-1676 by agreement with the Product Manager** and will be carried by a separate user story. **This spec area now delivers C1 and C2 only.**
+>
+> **Status — 2026-08-13:** **C1 delivered and archived.** C2 specified at Full depth (`R-BIL-120`–`129`), with **A7 deferred** — OQ-1 has no answer in the repository. This file is a **splitter and should never be specified directly**; see §13. Two amendments below correct premises that are now false — §9.1 (R-4/OQ-2 backfill) and §9.3 (kaizen log).
 
 ---
 
@@ -158,6 +160,8 @@ The eleven adjustments, grouped by the chunk that will own them (§10):
 
 ### 9.1 Regression risks — the module works today
 
+> **⚠ Amended 2026-08-13 by `/akili-specify` (C2).** The **R-4** row below states that post-migration *"existing results have no Primary → the new 'exactly one' invariant is violated by legacy data."* **Production holds no mapped SP data** (product owner, 2026-08-13); the mapped data is fake DEV test data. **OQ-2 is closed** — see [`../primary-contributing-sp/requirements.md` §1.1](../primary-contributing-sp/requirements.md) and [`design.md` D-C2-3](../primary-contributing-sp/design.md). Rows left unedited as a point-in-time record.
+
 Ordered by blast radius. The user's explicit constraint is that current behavior must survive.
 
 | # | Risk | Why it bites | Mitigation |
@@ -191,7 +195,7 @@ Ordered by blast radius. The user's explicit constraint is that current behavior
 | ~~OQ-6~~ | ~~New socket event for PRMS review updates?~~ | **Moved** to the descoped PRMS story |
 | **OQ-7** | Carried over and still open: **OQ-V2-2/3/5/6** (indicator-type filter, one-alignment-per-SP cardinality, level rules for other result types, target year). OQ-V2-3 in particular interacts with the Primary-only rule. | C2 |
 
-*(No `docs/specs/kaizen-log.md` exists in this repo, so no Active Lessons apply.)*
+*(~~No `docs/specs/kaizen-log.md` exists in this repo, so no Active Lessons apply.~~ — **Corrected 2026-08-13:** the kaizen log now exists and carries three Active Lessons produced by the C1 run: **K-001** `npm run lint` is `eslint --fix` and cannot serve as a verification gate; **K-002** the client tier can be certified green while type-checked by nothing (`isolatedModules: true`, ESLint ignores `*.spec.ts`); **K-003** correction-closure sweeps must grep the **literal** superseded string and re-grep to confirm. All three bind C2 — see [`../primary-contributing-sp/design.md` §9 and §13](../primary-contributing-sp/design.md).)*
 
 ---
 
@@ -272,23 +276,25 @@ C2 is the substantive engineering chunk and should carry the migration, the back
 
 ## 13. Next Step
 
-**Split approved 2026-08-12; C3/C4 descoped by PM agreement.** Two chunk folders are created:
+**Split approved 2026-08-12; C3/C4 descoped by PM agreement.** Status as of **2026-08-13**:
 
-| Chunk | Proposal |
-| --- | --- |
-| C1 | [`docs/specs/bilateral/toc-optional-mapping/proposal.md`](../toc-optional-mapping/proposal.md) |
-| C2 | [`docs/specs/bilateral/primary-contributing-sp/proposal.md`](../primary-contributing-sp/proposal.md) |
+| Chunk | Status | Where |
+| --- | --- | --- |
+| **C1** `toc-optional-mapping` | ✅ **DELIVERED & ARCHIVED** 2026-08-13 — 16 commits, `/akili-test` PASS, `/akili-validate` FAIL on the evidence trail (not the code), gaps reviewed and accepted by the user | [`docs/specs/archive/2026-08-13-bilateral--toc-optional-mapping/`](../archive/2026-08-13-bilateral--toc-optional-mapping/) |
+| **C2** `primary-contributing-sp` | 🔨 **SPECIFIED** 2026-08-13 — Full depth, `R-BIL-120`–`129` + 3 NFRs. **A7 deferred** (OQ-1 unanswerable from the repo) | [`../primary-contributing-sp/`](../primary-contributing-sp/) |
 
-Specify C1 first:
+**This umbrella proposal is a splitter, not a specifiable target.** It has no `requirements.md` / `design.md` / `tasks.md` and should not acquire any — specifying it would re-specify shipped C1 work and duplicate C2. Work on the chunk folders.
+
+Next step — execute C2:
 
 ```text
-/akili-specify docs/specs/bilateral/toc-optional-mapping
+/akili-execute docs/specs/bilateral/primary-contributing-sp
 ```
 
-Before that runs, two inputs should land:
+**Still outstanding for C2** (none block execution of R-BIL-120–129):
 
-1. **The 3 Jira attachments + Miro flow** into `docs/specs/bilateral/mapping-adjustments/mockup/` (§7) — canonical UX per the 2026-05-24 decision.
-2. **BA answers to OQ-1 and OQ-3** — OQ-3 decides C2's data model; OQ-1 blocks A7 entirely. Neither blocks C1.
+1. **The 3 Jira attachments + Miro flow** into a `mockup/` folder (§7) — canonical UX per the 2026-05-24 decision. **Never ingested.** Their absence is recorded as an accepted risk in `requirements.md` §8 (defect class D-5: the Primary/Contributing visual distinction has neither an automated gate nor its intended human reference).
+2. **BA answers to OQ-3 and OQ-5.** Working assumptions are documented and implementable; OQ-2 is now closed on both technical and empirical grounds.
 
 ---
 
