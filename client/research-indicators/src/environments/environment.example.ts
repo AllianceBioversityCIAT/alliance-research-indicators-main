@@ -26,6 +26,18 @@
 //     gitignored and separately absent on a clean checkout, so a stack that
 //     builds via `npm run build` can still fail via `npm run build-dev`.
 //
+//  3. ⚠ THIS TEMPLATE IS NOT A CONTRACT — code must never assume a key here
+//     exists at runtime or in the TYPE. Because `environment.ts` is gitignored,
+//     its shape varies per checkout, and CI builds the client image against a
+//     file provisioned from AWS Secrets Manager that does NOT match this file:
+//     it has keys this template lacks, and lacks keys this template has. Reading
+//     a key as a declared property therefore compiles locally and fails the CI
+//     build with `TS2339` — that broke the `dev` pipeline on 2026-08-14 over
+//     `localAuthBypass`, which is present below and absent in CI's file. For any
+//     key not guaranteed everywhere, read it structurally:
+//     `(environment as Record<string, unknown>)['someKey']` — see
+//     `shared/auth/local-auth-bypass.ts`.
+//
 // Values below are inert placeholders. Replace the ones your task actually
 // needs; the rest only have to be present and correctly typed for the build
 // and the Jest suite to resolve `environment`.
