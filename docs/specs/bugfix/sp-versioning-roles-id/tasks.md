@@ -15,15 +15,18 @@
 - **Migrations are append-only** (ADR-5). Re-check `git status` after `npm run lint -- --quiet` — the script carries `--fix` and mutates files.
 - **Re-verify line numbers** before editing. `1783029013035:116` and `:143` were true on 2026-08-14; the stable anchors are the block *names*, not the numbers.
 
-**Budget tripwire:** ~~3 tasks · ~2,050 LOC · 1–2 review rounds~~ → **4 tasks · ~2,050 LOC + baseline dump · 2–3 review rounds** (revised 2026-08-14 by the T-01 pivot). If the repair turns out to need more than the two blocks, **stop and escalate** — that is a different bug.
+**Budget tripwire:** ~~3 tasks · ~2,050 LOC · 1–2 review rounds~~ → ~~4 tasks · ~2,050 LOC + baseline dump · 2–3 review rounds~~ (T-01 pivot) → **5 tasks · ~2,750 LOC + baseline dump · 3–4 review rounds** (revised 2026-08-14 by the T-02 pivot: the companion delete-routine migration reproduces a second ~350-line body twice). If the repair turns out to need more than the two blocks, **stop and escalate** — that is a different bug.
 
 ---
 
 ## 1. Dependency graph
 
 ```
-T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (migration + regression fixture) → T-03 (regression + release)
+T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (SP_versioning repair + fixture)
+                                                       → T-02b (SP_delete_result_version companion) → T-03 (regression + release)
 ```
+
+**T-02b was added on 2026-08-14** by the T-02 Pivot: the `SP_versioning` repair activates a latent 1451 in the delete routine. See [`./execution.md`](./execution.md) → *Pivot Record: T-02*, `design.md` §3.1 / DD-6, and requirements R-SPV-002 / RB-5.
 
 **T-01b was added on 2026-08-14** by the T-01 pivot: the migration history presumes `sec_*` tables no migration creates, so an empty scratch schema cannot be migrated at all. See [`./execution.md`](./execution.md) → *Pivot Record: T-01* and `design.md` §4.1 / DD-5.
 
@@ -115,7 +118,7 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (migration + regres
 - `FROM` / `WHERE` clauses unchanged.
 - **`down()` restores the prior broken body verbatim** (DD-3). Do not "improve" it.
 - Change nothing else — the other 27 blocks are byte-identical.
-- **Do not** touch the delete-routine divergence over these same tables (DD-4, OQ-2).
+- **Do not** touch the delete-routine divergence over these same tables (DD-4, OQ-2). *(Correct for T-02, which complied. The divergence itself moved **in scope** on 2026-08-14 as **T-02b** / R-SPV-002 — DD-4 is amended by DD-6. Left as written: it is what T-02 was executed against.)*
 
 **Verification** — the fixture script from T-01.
 - **Red first (mandatory):** on current `main`, `CALL SP_versioning(<code>)` must fail with **MySQL 1054**. Capture the error verbatim.
@@ -130,7 +133,40 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (migration + regres
 - [x] `down()` restores the prior body byte-for-byte (AC.5), verified by diff — `cmp` byte-identical, **and** re-proven live by revert→RED→execute→GREEN
 - [x] Fixture observed red again with the defect reintroduced — via the real `migration:test:revert`, which exercises `down()` live rather than by hand-editing one block
 
-> **Rollout hold — advisory B-1 (`execution.md`).** The repair *activates* a latent FK failure: after this migration, `SP_versioning` writes snapshot rows into two tables that `SP_delete_result_version` never deletes and that hold RESTRICT FKs to `results`, so the next **re-version** of a result with objective rows raises MySQL 1451 — on the `green-checks` path with partial, committed deletion. Not a T-02 defect (DD-4 forbids touching the delete routine) and not rework. **Escalated to the user; T-03 is held pending the ruling.**
+> **Rollout hold — advisory B-1 (`execution.md`).** The repair *activates* a latent FK failure: after this migration, `SP_versioning` writes snapshot rows into two tables that `SP_delete_result_version` never deletes and that hold RESTRICT FKs to `results`, so the next **re-version** of a result with objective rows raises MySQL 1451 — on the `green-checks` path with partial, committed deletion. Not a T-02 defect (DD-4 forbids touching the delete routine) and not rework. **Ruled by the user 2026-08-14: companion migration → now T-02b / R-SPV-002.** T-02 must not merge to a shared environment without it (RB-5).
+
+---
+
+### T-02b — Companion migration: `SP_delete_result_version` deletes the objective tables
+
+- **Requirements covered:** **R-SPV-002 (AC.1–AC.5)**; DC-E; RB-5
+- **Design references:** §3.1, **DD-6** (amends DD-4), §6
+- **Size:** M · **Dependencies:** T-02 · **Status:** todo
+- **Skills:** `nestjs-expert`, `systematic-debugging`
+
+> **Added 2026-08-14 by the T-02 Pivot** — user ruling on advisory B-1. T-02's repair activates a latent MySQL 1451 in the re-versioning path; this closes it. **This is not optional cleanup:** merging T-02 without it converts "versioning never works" into "re-versioning destroys the previous snapshot's children on the untransacted path" (RB-5).
+
+**Scope** — migration `repairSpDeleteResultVersionObjectiveTables` (`DROP` + `CREATE` of `SP_delete_result_version`, two `DELETE` statements added) plus an extension of T-02's fixture to a full **version → delete-version → re-version** cycle.
+
+**Implementation notes**
+- The two statements mirror `full_delete_result_version` exactly and go **before** the final `DELETE FROM results` (design §3.1 has the verbatim SQL).
+- Derive the body mechanically from the routine's latest definition — `1778510205765`, **not** `1783029013035` (which does not contain this routine's name at all). Re-verify that before editing; guessing which migration owns a routine is the mistake family D-10 was written for.
+- **`down()` restores the prior body verbatim**, omission included — same reasoning as DD-3.
+- Change nothing else: 37 existing child deletes, the `temp_result_id` selection, the `SIGNAL` guard, and the `(resultCode BIGINT, reportYear INT)` signature all stay byte-identical.
+- **Do not** add a transaction or handler to the routine. It has neither today; adding one changes failure semantics for all six indicators and stays out of scope.
+
+**Verification** — the extended fixture, on the scratch container.
+- **Red first (mandatory):** with T-02's migration applied but this one absent, the version → delete-version → re-version cycle must fail with **MySQL 1451** on the delete. Capture it verbatim.
+- **Green after:** the full cycle completes; the first snapshot's objective rows are gone and the second snapshot carries its own.
+- **Falsifying input:** revert this migration and confirm the cycle returns to 1451.
+- **Disqualifier:** a fixture that versions only **once** structurally cannot see this defect — it needs a pre-existing snapshot. A green single-version run is not evidence for this task.
+
+**Done**
+- [ ] Red run captured verbatim (error 1451) before the migration
+- [ ] Green run after: AC.1, AC.2 satisfied on the full re-version cycle
+- [ ] Body diff shows exactly two statements added, placed before `DELETE FROM results` (AC.3, AC.4)
+- [ ] `down()` restores the prior body byte-for-byte (AC.5), verified by diff
+- [ ] Fixture observed red again with the migration reverted
 
 ---
 
@@ -148,6 +184,8 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (migration + regres
 > - `:97` — "Run the **full** migration suite against the scratch schema" carries the same false premise.
 > - `:486` — RB-B claims the scratch-schema gap is closed by its T-01 + T-02. It is not; the baseline piece is missing. Restate or add RB-B2.
 > - Its T-01/T-02 are now **superseded** by this spec's T-01 + T-01b — mark them as such rather than letting a second harness be built.
+>
+> **Added by the T-02 pivot's backward sweep (2026-08-14) — this one is an acceptance-criteria conflict, not prose drift.** Chunk 1 asserts the delete-routine divergence as a *fixture expectation*: `design.md:499` and `tasks.md:319` require M6's edit-set assertion to leave "**both divergences intact**" (R-IU-011 AC.8/AC.9), and `design.md:422` files harmonization as out of scope. **T-02b removes one of those two divergences.** M6's assertion must be restated against the post-T-02b body, or it fails for the right reason at the wrong place. Amending it is chunk 1's own gate — this task raises it, it does not silently edit it.
 
 **Implementation notes**
 - The suite must be **FULL**, never targeted (KZ-003) — a routine serving all six indicators changed.
@@ -171,7 +209,9 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (migration + regres
 | Requirement | ACs | Scenario clauses | Tasks |
 | --- | --- | --- | --- |
 | R-SPV-001 | AC.1–AC.3 → **T-02** · AC.4 → **T-02** (diff) + **T-03** (suite) · AC.5 → **T-02** | *versioning a result with objective rows* · BUT NOT reference `roles_id` → **T-02** · BUT NOT copy the source `id` → **T-02** (AC.3) · AND IT MUST NOT alter another block → **T-02** (AC.4) · AND IT MUST leave `down()` restoring the broken body → **T-02** (AC.5) | T-01, **T-01b**, T-02, T-03 |
+| **R-SPV-002** | AC.1–AC.5 → **T-02b** · AC.4 also → **T-03** (suite) | *re-versioning a result with objective rows* · BUT NOT raise 1451 → **T-02b** (AC.1) · BUT NOT leave children deleted with the parent surviving → **T-02b** (AC.1, proven by the full cycle) · AND IT MUST NOT alter another table's delete semantics → **T-02b** (AC.4) | **T-02b**, T-03 |
 | RB-1b (harness) | Gate precondition — the scratch schema must be buildable at all | — | **T-01b** |
+| RB-5 (activation) | The versioning repair must never merge without the delete repair | — | **T-02b** (fix) + **T-03** (release order) |
 
 Every AC and every negative clause is owned. **The mandatory Bug Mode regression test is T-02's fixture** — red on current `main` with MySQL 1054, green after the migration.
 
@@ -184,6 +224,7 @@ Every AC and every negative clause is owned. **The mandatory Bug Mode regression
 | PR 1 | T-01 | ~130 (skip entirely if chunk 1 already built it) |
 | PR 1b | T-01b | baseline dump (generated artifact) + ~20 of load wiring |
 | PR 2 | T-02 | **~1,960** — `up()` + `down()` each reproduce the 981-line body |
+| PR 2b | **T-02b** | **~700** — `up()` + `down()` each reproduce the ~350-line delete routine, plus the fixture extension. **Must merge with or before PR 2** (RB-5) |
 | PR 3 | T-03 | ~20 (doc updates only) |
 
 **Single PR is acceptable** if T-01 is already satisfied: the substantive diff is two blocks, and reviewers should be pointed at the **body diff**, not the file. Total ~2,110 LOC, ~99% of it unchanged body text.
@@ -192,8 +233,9 @@ Every AC and every negative clause is owned. **The mandatory Bug Mode regression
 
 ## 5. Done definition
 
-- [ ] T-01, **T-01b**, T-02, T-03 `done`
+- [ ] T-01, **T-01b**, T-02, **T-02b**, T-03 `done`
 - [ ] R-SPV-001's five ACs checked; every scenario clause satisfied
-- [ ] Regression fixture demonstrated **red before, green after**
+- [ ] **R-SPV-002's five ACs checked; the re-version cycle proven green**
+- [ ] Regression fixture demonstrated **red before, green after** — for both defects (1054 and 1451)
 - [ ] Full suite green, coverage not regressed
 - [ ] `innovation-use/data-model-and-catalog` unblocked and its dependency recorded

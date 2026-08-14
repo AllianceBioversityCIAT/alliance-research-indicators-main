@@ -466,3 +466,37 @@ That second point also **answers RB-4's open question** ("whether callers swallo
 3. **Accept and defer** — merge as-is, record B-1 against OQ-2, and hold the shared-DB run until a separate ticket lands. Note that `down()` does **not** undo the exposure: rows created while the fix is live persist and keep blocking the delete.
 
 ---
+
+## Pivot Record: T-02 — the repair activates a latent 1451 in the delete routine
+
+**Trigger:** advisory B-1, raised by the T-02 risk lens, verified independently by the Leader against the live scratch schema (table above). **User ruling, 2026-08-14: option 1 — companion migration.**
+
+**Why this is a Pivot and not rework.** T-02 itself is correct and passed all three lenses; nothing about its diff changes. What was wrong is the *spec's* analysis: `design.md` DD-4 called the delete-routine divergence an "unrelated pre-existing inconsistency" and `requirements.md` OQ-2 sized it as "worth its own ticket". Both premises are false — this spec's own repair is what makes the divergence reachable, and the failure mode is not the orphaned rows transcript §4.1 predicted but a hard MySQL 1451 plus partial committed deletion, because the FKs are RESTRICT. An advisory that cannot wait is a spec gap, and the route out of a spec is escalation, never a self-minted task.
+
+**Blocker.** Merging the `SP_versioning` repair alone converts "versioning never works for any indicator" into "re-versioning fails once a snapshot exists, destroying that snapshot's children on the untransacted `green-checks` path". That is a worse failure than the one being fixed, because it loses data instead of refusing to act.
+
+**Alternatives considered:** the three options put to the user (companion migration / measure-first / accept-and-defer), recorded verbatim under B-1 above. The user chose the companion migration.
+
+**Revised direction.** Two migrations ship together, the delete repair sorting first or in the same PR (RB-5). The delete routine gains exactly the two `DELETE` statements `full_delete_result_version` already has, placed before the final `DELETE FROM results`. No transaction, no handler, no other harmonization — DD-4's *intent* (nothing hidden inside another change's diff) survives; only its factual premise was replaced.
+
+### Amendments applied (Pivot Protocol step 3)
+
+| Document | Change |
+| --- | --- |
+| `requirements.md` | **R-SPV-002** added (5 ACs + re-version scenario) · **DC-E** added to §4.1 · **RB-5** added · RB-4 partly answered (a caller *does* swallow the error — `result-status-workflow.repository.ts:167-169`) · **OQ-2 struck and resolved** into R-SPV-002 |
+| `design.md` | **§3.1** added (the companion migration, with the verbatim SQL and the live-verified evidence chain) · **DD-6** added, **DD-4 struck and amended** · §6 Rollout re-written (order, backout, timing, `DEFINER` — absorbing advisories B-7, B-8, B-9) · Document Control budget and Pivot rows updated |
+| `tasks.md` | **T-02b** added · dependency graph, budget tripwire (4→5 tasks, ~2,050→~2,750 LOC, 2–3→3–4 rounds), coverage table, PR strategy, and Done definition all updated |
+
+### Correction closure — two-direction sweep
+
+**Forward** (`grep` for the superseded values across the whole spec folder): `OQ-2` and `DD-4` appear at `tasks.md:121` (T-02's implementation note) and `tasks.md:136` (the rollout hold). Both annotated rather than deleted — they were true when written and are part of T-02's record.
+
+**Backward** (documents citing the corrected sections) — **one real hit, in the neighbouring spec**:
+
+> `innovation-use/data-model-and-catalog` asserts the delete-routine divergence as a *fixture expectation*, not merely as prose:
+> - `design.md:422` — "Harmonize the two hard-delete routines … **Out of scope** — 'fixing' it changes delete behavior for every indicator"
+> - `design.md:499` and `tasks.md:319` — M6's edit-set assertion requires the post-M6 routine bodies to leave "**both divergences intact**" (R-IU-011 AC.8/AC.9)
+>
+> Once T-02b lands, one of those two divergences **no longer exists**, so M6's assertion checks a stale expectation and will fail for the right reason at the wrong place. This is carried into **T-03**, which already owns the chunk-1 reconciliation — see its carry-forward list. It is recorded, not silently edited: amending another spec's approved acceptance criteria is that spec's gate, not this one's.
+
+---

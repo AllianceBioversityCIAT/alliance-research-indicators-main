@@ -94,6 +94,30 @@ The procedure **SHALL** complete without error, and **SHALL** copy `result_impac
 
 ---
 
+### R-SPV-002 — `SP_delete_result_version` removes objective rows before deleting the parent
+
+> **Added 2026-08-14 by the T-02 Pivot** (user ruling on advisory B-1). Repairing `SP_versioning` *activates* a defect that was inert while the procedure could not execute: once snapshot rows exist in `result_impact_outcomes` and `result_strategic_objectives`, the delete routine — which never removes them, while both tables hold **RESTRICT** FKs to `results` — fails on its final `DELETE FROM results`.
+
+The procedure **SHALL** delete `result_impact_outcomes` and `result_strategic_objectives` rows for the version being removed, before deleting the parent `results` row.
+
+**Acceptance criteria:**
+- [ ] AC.1 — After versioning a result that carries objective rows, `CALL SP_delete_result_version(<code>, <year>)` completes without error.
+- [ ] AC.2 — Both tables' rows for that snapshot are gone afterwards.
+- [ ] AC.3 — The two new statements are placed **before** the final `DELETE FROM results`.
+- [ ] AC.4 — **No other statement of the routine changes.** The existing 37 child deletes are byte-identical.
+- [ ] AC.5 — `down()` restores the exact prior body, the omission included.
+
+#### Scenario: Re-versioning a result with objective rows
+
+- GIVEN a result that has already been versioned once, so a snapshot carrying `result_impact_outcomes` and `result_strategic_objectives` rows exists
+- WHEN the application re-versions it — deleting the previous snapshot, then calling `SP_versioning` again (`green-checks.repository.ts:294→307`, `result-status-workflow.repository.ts:152→172`)
+- THEN the delete completes and the new version is created
+- BUT it must NOT raise **MySQL 1451**, which is what the RESTRICT FK produces today once those rows exist
+- AND IT MUST NOT leave the snapshot's other children deleted while the parent survives — on the `green-checks` path there is no transaction, so every delete before the failure commits
+- AND IT MUST NOT alter the delete semantics of any other table — this closes one omission, it does not harmonize the routine
+
+---
+
 ## 4. Verification Strategy
 
 ### 4.1 Defect class → gate
@@ -104,6 +128,7 @@ The procedure **SHALL** complete without error, and **SHALL** copy `result_impac
 | DC-B | The repair silently changes another block | Full-body diff of `up()` against `1783029013035:8-988`, statement by statement | ✅ covered |
 | DC-C | `down()` does not restore the prior state | Diff `down()`'s body against the pre-fix body | ✅ covered |
 | DC-D | Copied rows collide or lose `role_id` | Fixture asserts fresh `id` **and** preserved `role_id` | ✅ covered |
+| **DC-E** | **The repair makes re-versioning fail** (R-SPV-002 / RB-5) — the delete routine trips over the rows `SP_versioning` now creates | **Fixture extended to a full version → delete-version → re-version cycle.** A fixture that only versions once structurally cannot see this: the defect needs a pre-existing snapshot | ✅ covered by T-02b |
 
 > **No existing automated gate covers any of these.** Jest does not instrument SQL, and the repository's green-check specs are presence-assertions on emitted strings. The fixture below is the only real coverage.
 
@@ -130,7 +155,8 @@ The procedure **SHALL** complete without error, and **SHALL** copy `result_impac
 | RB-1c | **A `TEST`-named env var is not evidence of a disposable target.** On a developer machine `ARI_TEST_MYSQL_*` was found pointing at the same remote RDS instance as an alternate `ARI_MYSQL_*` target (`execution.md` → F-01). The literal prohibition "never point at `ARI_MYSQL_*`" did not cover it, because the *name* differed while the *host* did not | **High** | Verify the resolved host/port values, never the variable name. The falsifying sentinel in T-01 is the standing check |
 | RB-2 | Migrations are append-only (ADR-5) against a shared, non-disposable DB | **High** | Additive/repair-only; no DDL on any table; human approval before the shared DB; verified `down()` |
 | RB-3 | Touching a procedure that serves **all six indicators** | **High** | Only two blocks change; full-body diff is a done criterion; fixture proves the other blocks still copy |
-| RB-4 | Unknown production exposure — how long versioning has been broken, and whether callers swallow the error | Medium | §6 OQ-1; confirm against the deployed environment before release comms |
+| RB-4 | Unknown production exposure — how long versioning has been broken, and whether callers swallow the error | Medium | §6 OQ-1; confirm against the deployed environment before release comms. **Partly answered 2026-08-14 (T-02 review):** one caller *does* swallow it — `result-status-workflow.repository.ts:167-169` rewrites any failure to a bare `'Error deleting snapshot'`, so a 1451 there is diagnostically invisible. The `green-checks` path does not swallow but has no transaction |
+| RB-5 | **The repair activates the R-SPV-002 defect.** Merging `SP_versioning`'s fix without the delete-routine fix moves the failure from "versioning never works" to "re-versioning fails after the first snapshot, destroying that snapshot's children on the untransacted path" | **High** | R-SPV-002 ships **with or ahead of** R-SPV-001 (design §6). Never merge the versioning repair alone. Discovered by the T-02 risk lens; ruled by the user 2026-08-14 |
 
 ---
 
@@ -139,7 +165,7 @@ The procedure **SHALL** complete without error, and **SHALL** copy `result_impac
 | # | Question | Blocks |
 | --- | --- | --- |
 | OQ-1 | Has `1783029013035` been applied to staging/production, and has anyone attempted a version/snapshot since? This sets the user-facing severity and whether a comms note is needed | release comms, not the fix |
-| OQ-2 | `SP_delete_result_version` does **not** delete these two tables while `full_delete_result_version` does (transcript §4.1) — a separate pre-existing divergence. Out of scope here; worth its own ticket? | nothing |
+| ~~OQ-2~~ | ~~`SP_delete_result_version` does **not** delete these two tables while `full_delete_result_version` does (transcript §4.1) — a separate pre-existing divergence. Out of scope here; worth its own ticket?~~ **RESOLVED 2026-08-14 → in scope, as R-SPV-002.** The question was mis-sized twice over: the transcript predicted *orphaned rows*, but the FKs are **RESTRICT** (`DELETE_RULE = NO ACTION`, verified live), so the real outcome is a hard 1451 plus partial committed deletion — and it is not "separate" at all, because this spec's own repair is what activates it. User ruling on advisory B-1 | — |
 | OQ-3 | **The migration history cannot be replayed from an empty database** (RB-1d). Two independent blockers in the first 139 of 303; the rest unexercised. This means no environment can be stood up from source, and CI can never gain a from-scratch schema gate. Needs its own ticket and a TRD note — should the history be squashed to a baseline migration, or should a maintained snapshot become the official bootstrap? | nothing in this spec; a real constraint on every future environment |
 
 ---
