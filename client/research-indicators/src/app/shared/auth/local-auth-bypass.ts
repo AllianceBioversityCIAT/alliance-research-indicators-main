@@ -30,7 +30,21 @@ import { environment } from '@envs/environment';
 const SYSTEM_ADMIN_ROLE_ID = 1;
 
 export function isLocalAuthBypassActive(): boolean {
-  return environment.production === false && environment.localAuthBypass === true;
+  // ⚠ Read `localAuthBypass` STRUCTURALLY, never as a declared property.
+  //
+  // `src/environments/environment.ts` is gitignored (`.gitignore:40-41`), so its
+  // TYPE is whatever the checkout happens to provide — there is no shared
+  // interface. The CI image builds against a file provisioned from AWS Secrets
+  // Manager (`dev/app/frontend/alliance/reportingtool`) that has no
+  // `localAuthBypass` key at all, so `environment.localAuthBypass` fails the
+  // Angular build with TS2339 *there* while compiling fine on any machine whose
+  // local file happens to declare it. That is exactly how this shipped and broke
+  // the `dev` pipeline on 2026-08-14 (build 27): the error was unreachable from
+  // the author's checkout.
+  //
+  // An absent key is simply not `true`, which is the safe default.
+  const flag = (environment as Record<string, unknown>)['localAuthBypass'];
+  return environment.production === false && flag === true;
 }
 
 export function applyLocalAuthBypass(cache: CacheService): void {
