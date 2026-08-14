@@ -15,15 +15,17 @@
 - **Migrations are append-only** (ADR-5). Re-check `git status` after `npm run lint -- --quiet` — the script carries `--fix` and mutates files.
 - **Re-verify line numbers** before editing. `1783029013035:116` and `:143` were true on 2026-08-14; the stable anchors are the block *names*, not the numbers.
 
-**Budget tripwire:** 3 tasks · ~2,050 LOC · 1–2 review rounds. If the repair turns out to need more than the two blocks, **stop and escalate** — that is a different bug.
+**Budget tripwire:** ~~3 tasks · ~2,050 LOC · 1–2 review rounds~~ → **4 tasks · ~2,050 LOC + baseline dump · 2–3 review rounds** (revised 2026-08-14 by the T-01 pivot). If the repair turns out to need more than the two blocks, **stop and escalate** — that is a different bug.
 
 ---
 
 ## 1. Dependency graph
 
 ```
-T-01 (scratch-schema harness) → T-02 (migration + regression fixture) → T-03 (regression + release)
+T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (migration + regression fixture) → T-03 (regression + release)
 ```
+
+**T-01b was added on 2026-08-14** by the T-01 pivot: the migration history presumes `sec_*` tables no migration creates, so an empty scratch schema cannot be migrated at all. See [`./execution.md`](./execution.md) → *Pivot Record: T-01* and `design.md` §4.1 / DD-5.
 
 ---
 
@@ -33,7 +35,7 @@ T-01 (scratch-schema harness) → T-02 (migration + regression fixture) → T-03
 
 - **Requirements covered:** R-SPV-001 (precondition for its gate); RB-1
 - **Design references:** §4
-- **Size:** M · **Dependencies:** none · **Status:** todo
+- **Size:** M · **Dependencies:** none · **Status:** **`[x]` done** — Reviewer PASS 2026-08-14. Criterion #2 retired as never-achievable (RB-1d). See [`./execution.md`](./execution.md)
 - **Skills:** `nestjs-expert`
 
 > **Shared with `innovation-use/data-model-and-catalog` T-01/T-02.** If that chunk already landed them, verify and close this task as a no-op — do not build a second mechanism.
@@ -51,10 +53,51 @@ T-01 (scratch-schema harness) → T-02 (migration + regression fixture) → T-03
 - **Disqualifier:** compiling is not connecting. If the options cannot be printed and read, report **inconclusive**, not passed.
 
 **Done**
-- [ ] Module resolves to `dataSourceTarget.TEST`, demonstrated by the sentinel
-- [ ] Full migration suite applies **and reverts** on the scratch schema
-- [ ] A smoke fixture passes with the container up and **fails** with it down
-- [ ] `orm.config.ts` and `orm-connection-test.module.ts` unmodified
+- [x] Module resolves to `dataSourceTarget.TEST`, demonstrated by the sentinel
+- [x] ~~Full migration suite applies **and reverts** on the scratch schema~~ → **criterion retired 2026-08-14, it was never achievable.** The migration history is not replayable from empty (RB-1d): two independent blockers in the first 139 of 303, 164 unexercised. Replaced by T-01b's snapshot criterion. Revert is separately proven TEST-routed
+- [x] A smoke fixture passes with the container up and **fails** with it down
+- [x] `orm.config.ts` and `orm-connection-test.module.ts` unmodified
+
+---
+
+### T-01b — Baseline schema artifact for the scratch container
+
+- **Requirements covered:** R-SPV-001 (precondition for its gate); **RB-1b**
+- **Design references:** §4.1, DD-5
+- **Size:** S–M · **Dependencies:** T-01 · **Status:** **`[x]` done** — Reviewer PASS 2026-08-14, snapshot model. See [`./execution.md`](./execution.md) → *T-01 + T-01b — final outcome*
+- **Skills:** `nestjs-expert`
+
+> **Added by the T-01 pivot, 2026-08-14.** Without this, DC-A cannot execute and neither T-02 nor `innovation-use/data-model-and-catalog` T-01/T-02 can be verified.
+
+**Scope (revised 2026-08-14 — snapshot, not replay)** — a committed **schema-only snapshot** under `src/db/baseline/`, plus a load step wired so the scratch container cannot be migrated before it is loaded, plus documentation of source environment and date.
+
+> **Why the scope changed.** The first shape of this task assumed the 303 migrations could be replayed on top of a minimal baseline. They cannot — RB-1d. Keep what already works: the loader, the RB-1c same-host guard, and the derivation method. Replace the artifact's contents.
+
+**Implementation notes**
+- The snapshot is **all base tables and views + `--routines` + the `migrations` table with its rows**, so TypeORM records all 303 as applied and only genuinely new migrations run.
+- **`--routines` is essential:** it is what delivers `SP_versioning` present and broken, which is what makes T-02's red real.
+- **No business data.** The single deliberate exception is the `migrations` table's own rows — bookkeeping, not domain data. State the exception explicitly in the README.
+- Generated, never hand-written (DD-5).
+- Producing it reads the **shared, non-disposable** database. Read-only only; any write, schema change, or `migration:revert` against it is a human decision, never an agent's (root guide §4.3).
+- Never point the load step at `ARI_MYSQL_*`. Verify the resolved **host**, not the variable name (RB-1c) — already enforced in `scripts/load-baseline.js`.
+- Do **not** try to fix `CreateStaffGroups1759786024597` or any other unreplayable migration. That is OQ-3, deliberately out of scope.
+
+**Verification**
+- From a freshly created empty container: load the snapshot → `npm run migration:test:execute` reports **no pending migrations** (all 303 recorded as applied).
+- **`SP_versioning` exists in the scratch schema and is the broken version** — `SHOW CREATE PROCEDURE SP_versioning` contains `roles_id`. This is the handoff T-02 depends on; without it T-02 has no red to observe.
+- **Falsifying input:** on a fresh container, skip the snapshot load — `migration:test:execute` must fail immediately (no schema). A run that succeeds without the snapshot means the container was not empty; **stop and re-check**.
+- **Disqualifier:** a snapshot that loads is not a snapshot that is sufficient. The evidence is *TypeORM reporting zero pending migrations* **and** *`SP_versioning` present with `roles_id` in its body*. Anything less is INCONCLUSIVE.
+
+**Done**
+- [x] **Snapshot** artifact committed under `src/db/baseline/` — 196 tables + 17 views + 23 routines + `migrations` rows; 1 `INSERT`, targeting `migrations`; source environment and date recorded
+- [x] On a fresh container: snapshot loads and `migration:test:execute` reports **zero pending migrations** (`No migrations are pending`)
+- [x] `SHOW CREATE PROCEDURE SP_versioning` in the scratch schema contains `roles_id` — Reviewer confirmed structurally: body spans `baseline.sql:6935`–`:7917`, both occurrences inside it at `:7054` and `:7081`, all three §2.3 defects intact
+- [x] Falsifying input: without the snapshot, `migration:test:execute` fails immediately on a fresh container (MySQL 1146)
+- [x] README states the `migrations`-rows exception explicitly and records the derivation
+- [x] Load step ordered ahead of the migration script and documented (`migration:test:bootstrap` chains load → execute)
+- [x] RB-1c enforced in code: `load-baseline.js` refuses to run when `ARI_TEST_MYSQL_HOST` resolves to the same host as `ARI_MYSQL_HOST`
+- [x] Live table enumeration performed (196 base tables + 17 views); source-only derivation proven 95% incomplete and the lesson recorded
+- [x] Only read-only statements executed against the shared database
 
 ---
 
@@ -62,7 +105,7 @@ T-01 (scratch-schema harness) → T-02 (migration + regression fixture) → T-03
 
 - **Requirements covered:** **R-SPV-001 (AC.1–AC.5)**; DC-A, DC-B, DC-C, DC-D
 - **Design references:** §2 (the repaired shape), §3 (migration), DD-2, DD-3
-- **Size:** M · **Dependencies:** T-01 · **Status:** todo
+- **Size:** M · **Dependencies:** T-01, **T-01b** · **Status:** todo
 - **Skills:** `nestjs-expert`, `systematic-debugging`, `tdd`
 
 **Scope** — migration `repairSpVersioningObjectiveBlocks` (`DROP` + `CREATE` of `SP_versioning`, two blocks changed) plus the regression fixture under `test/fixtures/`.
@@ -98,6 +141,12 @@ T-01 (scratch-schema harness) → T-02 (migration + regression fixture) → T-03
 
 **Scope** — full server suite, lint, coverage; confirm OQ-1 against the deployed environment; DevOps note; then update `innovation-use/data-model-and-catalog` (drop T-03, add `Depends on`) and `family.md` FR-6.
 
+> **Carried forward from the T-01 pivot's backward sweep (2026-08-14) — do not drop this.** The correction to this spec made statements in a *neighbouring* spec false. `innovation-use/data-model-and-catalog/tasks.md` must be updated in this task:
+> - `:111` — Done criterion "Full migration suite applies **and reverts** cleanly on the scratch schema" is **unachievable as written** without the baseline artifact. Restate it against `design.md` §4.1 / DD-5.
+> - `:97` — "Run the **full** migration suite against the scratch schema" carries the same false premise.
+> - `:486` — RB-B claims the scratch-schema gap is closed by its T-01 + T-02. It is not; the baseline piece is missing. Restate or add RB-B2.
+> - Its T-01/T-02 are now **superseded** by this spec's T-01 + T-01b — mark them as such rather than letting a second harness be built.
+
 **Implementation notes**
 - The suite must be **FULL**, never targeted (KZ-003) — a routine serving all six indicators changed.
 - OQ-1: check whether `1783029013035` is applied in staging/production and whether any version/snapshot has been attempted since. This sets user-facing severity and whether comms are needed; it does **not** gate the fix.
@@ -119,7 +168,8 @@ T-01 (scratch-schema harness) → T-02 (migration + regression fixture) → T-03
 
 | Requirement | ACs | Scenario clauses | Tasks |
 | --- | --- | --- | --- |
-| R-SPV-001 | AC.1–AC.3 → **T-02** · AC.4 → **T-02** (diff) + **T-03** (suite) · AC.5 → **T-02** | *versioning a result with objective rows* · BUT NOT reference `roles_id` → **T-02** · BUT NOT copy the source `id` → **T-02** (AC.3) · AND IT MUST NOT alter another block → **T-02** (AC.4) · AND IT MUST leave `down()` restoring the broken body → **T-02** (AC.5) | T-01, T-02, T-03 |
+| R-SPV-001 | AC.1–AC.3 → **T-02** · AC.4 → **T-02** (diff) + **T-03** (suite) · AC.5 → **T-02** | *versioning a result with objective rows* · BUT NOT reference `roles_id` → **T-02** · BUT NOT copy the source `id` → **T-02** (AC.3) · AND IT MUST NOT alter another block → **T-02** (AC.4) · AND IT MUST leave `down()` restoring the broken body → **T-02** (AC.5) | T-01, **T-01b**, T-02, T-03 |
+| RB-1b (harness) | Gate precondition — the scratch schema must be buildable at all | — | **T-01b** |
 
 Every AC and every negative clause is owned. **The mandatory Bug Mode regression test is T-02's fixture** — red on current `main` with MySQL 1054, green after the migration.
 
@@ -130,6 +180,7 @@ Every AC and every negative clause is owned. **The mandatory Bug Mode regression
 | PR | Tasks | ~LOC |
 | --- | --- | --- |
 | PR 1 | T-01 | ~130 (skip entirely if chunk 1 already built it) |
+| PR 1b | T-01b | baseline dump (generated artifact) + ~20 of load wiring |
 | PR 2 | T-02 | **~1,960** — `up()` + `down()` each reproduce the 981-line body |
 | PR 3 | T-03 | ~20 (doc updates only) |
 
@@ -139,7 +190,7 @@ Every AC and every negative clause is owned. **The mandatory Bug Mode regression
 
 ## 5. Done definition
 
-- [ ] T-01 … T-03 `done`
+- [ ] T-01, **T-01b**, T-02, T-03 `done`
 - [ ] R-SPV-001's five ACs checked; every scenario clause satisfied
 - [ ] Regression fixture demonstrated **red before, green after**
 - [ ] Full suite green, coverage not regressed

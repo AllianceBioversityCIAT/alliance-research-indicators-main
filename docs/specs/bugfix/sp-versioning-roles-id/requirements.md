@@ -112,9 +112,11 @@ The procedure **SHALL** complete without error, and **SHALL** copy `result_impac
 - **Red:** on the current `main`, `CALL SP_versioning(<code>)` **must fail with MySQL 1054**.
 - **Green:** after the migration, the same call must succeed and satisfy AC.2 and AC.3.
 - **Falsifying input:** if the fixture passes *before* the migration, the premise is wrong for that environment — **stop and escalate**; do not ship a migration for a defect that is not present.
-- **Disqualifier:** a green run never observed red is not evidence — it proves the fixture ran, not that it discriminates. If the disposable MySQL cannot be provisioned, report **inconclusive, not passed**.
+- **Disqualifier:** a green run never observed red is not evidence — it proves the fixture ran, not that it discriminates. If the disposable MySQL cannot be provisioned **or its schema cannot be built**, report **inconclusive, not passed**.
 
 **Harness dependency.** This fixture needs a scratch schema, and the repo has **no working mechanism** for one: `migration:dev:execute` / `migration:revert` hardcode the `orm.config.ts` export, which is bound to `CORE` — the shared, non-disposable database. See §5.
+
+> **Amended 2026-08-14 (T-01 pivot).** Provisioning the container is **not** the same as building the schema, and the original wording conflated them. The container provisions fine; the migration suite still cannot run on it, because the history presumes `sec_*` tables it never creates (RB-1b). Both conditions must hold before this gate means anything: a disposable MySQL **and** a baseline schema loaded ahead of the migrations (`design.md` §4.1). Reporting green without the baseline in place is the failure mode KZ-004 already names.
 
 ---
 
@@ -122,7 +124,10 @@ The procedure **SHALL** complete without error, and **SHALL** copy `result_impac
 
 | # | Risk | Severity | Mitigation |
 | --- | --- | --- | --- |
-| RB-1 | **No scratch-schema mechanism exists.** The TEST datasource target (`orm.config.ts:34-39`) is unreachable from any npm script; `ARI_TEST_MYSQL_PORT` does not exist; `orm-connection-test.module.ts` binds to `CORE` despite its name | **High** | This spec depends on the TEST datasource module and Docker MySQL scaffolding (chunk-1 tasks T-01/T-02, or built here if this ships first — see `design.md` §4) |
+| RB-1 | **No scratch-schema mechanism exists.** The TEST datasource target (`orm.config.ts:34-39`) is unreachable from any npm script; `ARI_TEST_MYSQL_PORT` does not exist; `orm-connection-test.module.ts` binds to `CORE` despite its name | **High** | This spec depends on the TEST datasource module and Docker MySQL scaffolding (chunk-1 tasks T-01/T-02, or built here if this ships first — see `design.md` §4). **Resolved by T-01 and verified by a falsifying sentinel** |
+| RB-1b | **The migration history is not self-sufficient — discovered during T-01, 2026-08-14.** 10 migrations write into `sec_template`; **none of the 303 creates it**. An empty scratch schema fails at `1751474908040-InsertTemplates.ts` with MySQL 1146. RB-1 understated the gap: the missing piece was never only datasource plumbing | **High** | A committed **schema-only baseline dump** loaded before migrations — `design.md` §4.1 / DD-5, task T-01b. Until it lands, DC-A cannot execute and this spec cannot be shipped on evidence |
+| RB-1d | **The migration history is not replayable from empty — discovered during T-01b, 2026-08-14.** It assumes a pre-existing environment in both schema *and* data. `CreateStaffGroups1759786024597` hardcodes five `carnet` values with an FK to `alliance_user_staff`, a table populated by a runtime staff-sync and never by a migration (MySQL 1452, at migration #139 of 303). **164 migrations remain unexercised** | **High** | Harness switched from replay to a **schema-only snapshot** (`design.md` §4.1 / DD-5, revised). The non-replayability itself is a repo-level defect, out of scope here — OQ-3 |
+| RB-1c | **A `TEST`-named env var is not evidence of a disposable target.** On a developer machine `ARI_TEST_MYSQL_*` was found pointing at the same remote RDS instance as an alternate `ARI_MYSQL_*` target (`execution.md` → F-01). The literal prohibition "never point at `ARI_MYSQL_*`" did not cover it, because the *name* differed while the *host* did not | **High** | Verify the resolved host/port values, never the variable name. The falsifying sentinel in T-01 is the standing check |
 | RB-2 | Migrations are append-only (ADR-5) against a shared, non-disposable DB | **High** | Additive/repair-only; no DDL on any table; human approval before the shared DB; verified `down()` |
 | RB-3 | Touching a procedure that serves **all six indicators** | **High** | Only two blocks change; full-body diff is a done criterion; fixture proves the other blocks still copy |
 | RB-4 | Unknown production exposure — how long versioning has been broken, and whether callers swallow the error | Medium | §6 OQ-1; confirm against the deployed environment before release comms |
@@ -135,6 +140,7 @@ The procedure **SHALL** complete without error, and **SHALL** copy `result_impac
 | --- | --- | --- |
 | OQ-1 | Has `1783029013035` been applied to staging/production, and has anyone attempted a version/snapshot since? This sets the user-facing severity and whether a comms note is needed | release comms, not the fix |
 | OQ-2 | `SP_delete_result_version` does **not** delete these two tables while `full_delete_result_version` does (transcript §4.1) — a separate pre-existing divergence. Out of scope here; worth its own ticket? | nothing |
+| OQ-3 | **The migration history cannot be replayed from an empty database** (RB-1d). Two independent blockers in the first 139 of 303; the rest unexercised. This means no environment can be stood up from source, and CI can never gain a from-scratch schema gate. Needs its own ticket and a TRD note — should the history be squashed to a baseline migration, or should a maintained snapshot become the official bootstrap? | nothing in this spec; a real constraint on every future environment |
 
 ---
 
