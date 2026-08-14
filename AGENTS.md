@@ -154,11 +154,11 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 
 ## Model Routing
 
-> Guidance mirror of [`docs/model-routing.md`](docs/model-routing.md). Enforced bindings live in `.claude/agents/akili-*.md`. **Criteria-first:** match the model to the dominant demand of the phase. ARCHITECT = BUILDER; **author ≠ auditor** (Reviewer/Tester must differ from the Implementer model); reserve deep reasoning for propose/design/verify; fast & cheap for orchestration/archive.
+> Guidance mirror of [`docs/model-routing.md`](docs/model-routing.md). Enforced bindings live in `.claude/agents/akili-*.md`. **Criteria-first:** match the model to the dominant demand of the phase. ARCHITECT = BUILDER; **author ≠ auditor** (Reviewer/Tester must differ from the Implementer model); reserve deep reasoning for propose/design/verify; fast & cheap for bookkeeping (resume, quick, archive) — but the `/akili-execute` and `/akili-test` Leader is T1, never cheap: orchestration there is reasoning, not dispatch.
 
 **Capability tiers:** T1 Architect (hard design/synthesis) · T2 Coder (implementation, test authoring) · T3 Auditor (independent review) · T4 Context-Ingest (large-context ingestion) · T5 Fast-Cheap (orchestration/bookkeeping) · T6 Multimodal (screenshots/diagrams).
 
-**Phase → tier:** constitution-ingest T4 · constitution-synthesis/propose/specify T1 · execute-Leader T5 · execute-Implementer T2 · execute-Reviewer T3 (**≠ Implementer**) · test-Leader T5 · test-Tester(s) T2 (**prefer ≠ Implementer**) · validate/audit T3 · quick/archive T5.
+**Phase → tier:** constitution-ingest T4 · constitution-synthesis/propose/specify T1 · execute-Leader T1 · execute-Implementer T2 · execute-Reviewer T3 (**≠ Implementer**) · test-Leader T1 · test-Tester(s) T2 (**prefer ≠ Implementer**) · validate/audit T3 · quick/archive T5.
 
 **Model registry** (alias-first; edit here + `docs/model-routing.md` to change). **Updated: 2026-07**
 
@@ -171,7 +171,7 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 | T5 Fast-Cheap | `haiku` | `opencode-go/deepseek-v4-flash` `<CONFIRM>` | `haiku` |
 | T6 Multimodal | `opus` | `<CONFIRM SLUG>` | `sonnet` |
 
-Enforced wrappers: `akili-leader`→`haiku` · `akili-implementer`→`sonnet` · `akili-reviewer`→`opus` (≠ implementer) · `akili-tester`→`sonnet`. To change models edit only the registry (never pin a dated name where an alias exists); never add `model:` to command frontmatter.
+Enforced wrappers: `akili-leader`→`opus` · `akili-implementer`→`sonnet` · `akili-reviewer`→`opus` (≠ implementer) · `akili-tester`→`sonnet`. To change models edit only the registry (never pin a dated name where an alias exists); never add `model:` to command frontmatter.
 
 ---
 

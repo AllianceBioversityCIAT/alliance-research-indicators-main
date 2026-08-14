@@ -35,10 +35,10 @@ Match the model to the **dominant demand of the phase**, not to a habit. Guiding
 | `/akili-constitution` (synthesis) | T1 | PRD/UX/TRD baseline. |
 | `/akili-propose` | T1 | Deep problem framing. |
 | `/akili-specify` | T1 | Requirements/design/tasks authoring. |
-| `/akili-execute` — Leader | T5 | Orchestration only, no production code. |
+| `/akili-execute` — Leader | T1 | Orchestration judgment — decomposition in flight, skill selection per Implementer, FAIL adjudication, pivots. Writes no code, but this is reasoning, not dispatch. |
 | `/akili-execute` — Implementer | T2 | Writes the code. |
 | `/akili-execute` — Reviewer | T3 | **Must differ from the Implementer model.** |
-| `/akili-test` — Leader | T5 | Suite fan-out orchestration. |
+| `/akili-test` — Leader | T1 | Orchestration judgment — partitions suites, selects each Tester’s skills, adjudicates results. Writes no tests. |
 | `/akili-test` — Tester(s) | T2 | Test authoring; **prefer ≠ Implementer** (author ≠ tester). |
 | `/akili-validate` | T3 | Requirement/design conformance. |
 | `/akili-audit` | T3/T4 | Drift detection across code + docs. |
