@@ -16,7 +16,9 @@ const compat = new FlatCompat({
 
 export default [
   {
-    ignores: ['**/.eslintrc.js'],
+    // `scripts/` holds plain Node CLI helpers that are outside tsconfig's
+    // project, so the TS-aware parser cannot resolve them and errors out.
+    ignores: ['**/.eslintrc.js', 'scripts/**'],
   },
   ...compat.extends(
     'plugin:@typescript-eslint/recommended',

@@ -31,6 +31,7 @@
     "migration:revert": "npm run typeorm migration:revert -- -d ./src/db/config/mysql/orm.config.ts",
     "migration:execute": "npm run typeorm migration:run -- -d ./dist/db/config/mysql/orm.config.js",
     "migration:dev:execute": "npm run typeorm migration:run -- -d ./src/db/config/mysql/orm.config.ts",
+    "migration:scan": "node ./scripts/scan-migration-placeholders.js",
     "update:dependencies": "npx npm-check-updates -u"
   },
   "dependencies": {

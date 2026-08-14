@@ -48,7 +48,18 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * applies here as it does to the generated column's IF condition.
  *
  * Append-only: the function is recreated whole (MySQL has no ALTER FUNCTION
- * for a body), and `down()` restores 1784500000000's definition exactly.
+ * for a body), and `down()` restores 1784500000000's logic — its SQL comments
+ * are trimmed, which is immaterial to behavior.
+ *
+ * ⚠ NEVER write `:word` inside a SQL COMMENT below. `orm.config.ts:59` sets
+ * `extra.namedPlaceholders: true`, so mysql2 rewrites the query through
+ * `named-placeholders` first. That tokenizer skips quoted string literals but
+ * NOT `--` or block comments, so a colon there is consumed as a bind parameter
+ * and the query dies with "Named query contains placeholders, but parameters
+ * object is undefined" before MySQL parses it. That is exactly how
+ * 1784500000000 shipped unrunnable. Hence `[SPEC bilateral/...]` inside the
+ * bodies; this TSDoc is TypeScript and keeps the normal `[SPEC:...]` form.
+ * `npm run migration:scan` is the guard.
  */
 export class ScopePoolFundingValidationToPrimarySp1786679227000
   implements MigrationInterface
@@ -112,7 +123,7 @@ begin
                 return true;
             end if;
 
-            -- [SPEC:bilateral/primary-contributing-sp] R-BIL-128 AC.1.
+            -- [SPEC bilateral/primary-contributing-sp] R-BIL-128 AC.1.
             -- Does this alignment designate a Primary SP at all? Legacy rows
             -- predate sp_role and carry NULL on every row (T-02 does no
             -- backfill, R-BIL-126 AC.1), so this is false for them and the
@@ -138,7 +149,7 @@ begin
             -- row (e.g. Level + High-Level Output only, no indicator) still
             -- satisfies it (unchanged from 1784500000000).
             --
-            -- [SPEC:bilateral/toc-optional-mapping] R-BIL-119:
+            -- [SPEC bilateral/toc-optional-mapping] R-BIL-119 --
             -- pool_funding_alignment is a VISUAL_ONLY_GREEN_CHECKS entry
             -- (green-checks/dto/find-green-checks.dto.ts) and is excluded
             -- from the server-side completeness computations in
