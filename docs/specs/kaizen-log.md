@@ -10,22 +10,71 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 | ID | Lesson | Severity | Target | Recurrence | Status |
 | --- | --- | --- | --- | --- | --- |
-| **K-004** | **A gate must be proven able to FAIL before it is trusted** — and the sharpest form is not "never run red" but **"no input in the suite CAN make it red."** A guard written correctly against `all` survived mutation to `slice` because every fixture set `all === slice`: correct code, decorative gate | **High** | Methodology | **5 gates** | Proposed (upstream) |
-| **K-007** | **A fixer is not a gate, and a delegated worker still needs the fixer.** Banning `npm run lint` as a gate (K-001) does not justify banning `prettier --write`: it produces a file and measures nothing, so it cannot contaminate evidence. Forbidding it while requiring formatted output removes the tool that solves the problem, then fails the worker for the problem | **High** | Product + Methodology | 1 (**3 failures in one run**) | **Institutionalized** (root `CLAUDE.md` §4.3) |
-| **K-008** | **Writing a coverage table does not make it exhaustive.** A clause-level traceability table authored specifically to stop requirement clauses shipping unowned still missed one, because the same pass authored both the requirements and the table — nothing independent checked that every clause appears | **Medium** | Methodology | 1 | Proposed (upstream) |
+| **K-004** | **A gate must be proven able to FAIL before it is trusted.** Newest facet: **a falsifier authored from the same frame as the design tends to name a mutation the design already excludes** — a spec cited K-004 and in the same table wrote a break that leaves the suite green. Citing a lesson is not applying it | **High** | Methodology | **6** | Proposed (upstream) |
+| **K-009** | **A delegated worker that does not deliver is not a worker that found nothing.** A silent judge/reviewer is indistinguishable from a clean one; three subagents idled without reporting while the same brief on another transport returned 6 severe defects. Record non-delivery as runtime failure and re-dispatch | **High** | Product + Methodology | 1 | **Institutionalized** (root `CLAUDE.md` §4.3) |
+| **K-010** | **Bug-Mode red-before-green evidence belongs to the task that changes the buggy code path**, never to one that creates new code — a new unit's tests are green from first compile and could never have been red | Medium | Methodology | 1 | **Institutionalized** (`general-setup/task.md` §5) |
+| **K-008** | **Writing a coverage table does not make it exhaustive** — the same pass authored the requirements and the table, so nothing independent checked that every clause appears | **Medium** | Methodology | 1 | Proposed (upstream) |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | Product | 2 (same edit) | Proposed |
-| **K-002** | A tier can be certified "green" while being type-checked by nothing at all; test-runner green ≠ compiles | **High** | Product | 1 | **Institutionalized** (client `CLAUDE.md`) — **needs a factual correction, see 2026-08-13 C2 entry** |
-| **K-003** | Correction-closure sweeps must grep the **literal superseded string**, then re-grep to confirm — semantic greps miss their own target | **High** | Methodology | **6** (3 in C1, 3 in C2) | Proposed (upstream) |
+| **K-003** | Correction-closure sweeps must grep the **literal superseded string**, then re-grep to confirm — semantic greps miss their own target | **High** | Methodology | **6** | Proposed (upstream) |
 | **KZ-001** | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion | **High** | Product | 4 | Proposed |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | Product | 3 | Proposed |
 | **KZ-003** | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean | Medium | Product | 1 | Proposed |
 | **KZ-004** | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands | Medium | Product + Methodology | 1 | Proposed |
+
+> **Retired this cycle (institutionalized and stable):** K-007 (fixer-is-not-a-gate, root `CLAUDE.md` §4.3) and K-002 (test-runner green ≠ compiles, client `CLAUDE.md`). Both remain in force; they no longer need a slot here.
+
 
 > **K-001 and KZ-001 are the same failure seen from two tiers** — a verification artifact that cannot report the thing it stands for. K-004 and KZ-003 likewise both say a green result only covers what its author modeled. Worth collapsing when either series is next revised; kept distinct here so no existing citation breaks.
 
 ---
 
 ## Entries
+
+### 2026-08-14 — `bugfix/bilateral-alliance-selector`
+
+**Outcome:** 6 of 6 tasks delivered, **zero Reviewer FAIL verdicts**, one rework (an unused import). The bilateral picker went from returning **1** eligible project in CLARISA production to **25**, verified by running the shipped predicates against the live feed. Orchestrated through Orca with `agy`/gemini-3.7-flash as Implementer and `agy`/claude-opus-4-6-thinking as Reviewer — `author ≠ auditor` across both model and provider.
+
+#### Measure
+
+| Signal | Value |
+| --- | --- |
+| Orca dispatches | 8 (all delivered) |
+| Reviewer FAIL verdicts | **0** |
+| Rework attempts | 1 (lint: unused import) |
+| HALTs / Pivots / FATAL_FAILs | **0** |
+| Severe judgment-day findings on the design | **6** (2 would have broken build or boot) |
+| Budget miss | **4.4× on test volume**; implementation estimate accurate |
+| Delegation transport failures | **3** (Claude subagents idled without delivering) |
+| Leader errors caught and recorded | 3 |
+
+#### Learn
+
+**K-009 — A delegated worker that does not deliver is not a worker that found nothing.** Three Claude subagents (two judgment-day judges, one Reviewer) were spawned, ran, went idle, and never delivered a report; a direct message did not wake one of them. The same brief on another transport returned **6 severe defects** on the same target. Counting the silence as a clean verdict would have discarded every one of them, invisibly. *Evidence: `execution.md` → Runtime incident; `judgment.md` → Judge independence.* **Target: Product + Methodology. Severity: High.**
+
+**K-010 — Bug-Mode red-before-green evidence belongs to the task that changes the buggy code path.** The decomposition assigned it to T-01, which *creates a new util* — whose tests are green from the moment it compiles and could never have been red. The Implementer then reported having observed the red, and the claim was false: `grep` showed its suite never referenced the service. Moving the criterion to T-03 produced the real observation (1 → 25). *Evidence: `execution.md` → T-01 scope correction.* **Target: Methodology. Severity: Medium.**
+
+**K-004 (+1, now 6 occurrences) — new facet: a falsifier authored from the same frame as the design tends to name a mutation the design already excludes.** `design.md` §11 cited K-004 — *a gate must be proven able to fail* — and in the same table wrote "swap `startsWith` for `includes` ⇒ Window-3 rows appear". No Window-3 value contains the substring `BILATERAL`, so that mutation leaves the suite green. Both judges caught it independently. **Citing a lesson is not applying it.** *Evidence: `judgment.md` → F-6.* **Target: Methodology. Severity: High.**
+
+#### Watch (not yet a lesson)
+
+**Budget missed in the same direction for the second consecutive spec.** Implementation was estimated at 195 LOC and came in at 232; tests were estimated at 255 and came in at 1117 — **4.4×**. Root cause is structural: a requirement for *exhaustive fixtures* (eleven measured funding spellings × both Alliance encodings × phase states, with asserted counts) multiplies test volume in a way a per-task LOC guess does not anticipate. A third occurrence promotes this to a lesson.
+
+#### Standardize
+
+| Lesson | Edit | Status |
+| --- | --- | --- |
+| K-009 | Root `CLAUDE.md` §4.3 — new bullet: a non-delivering worker is a runtime failure, never a clean result | **Applied** (user-approved) |
+| K-010 | `docs/specs/general-setup/task.md` §5 — where the Bug-Mode regression test belongs | **Applied** (user-approved) |
+| K-004 | No local edit (Methodology) — upstream to the AKILI repo | Proposed |
+| *(factual sweep)* | Root `CLAUDE.md` Model Routing — `agy --effort` accepts only `low\|medium\|high`; exact Claude slug; `worker-start --agent gemini` disabled on this install | **Applied** (user-approved) |
+
+#### Leader errors recorded rather than smoothed over
+
+1. `--effort xhigh` passed to agy for two tasks; agy accepts only up to `high`. The stated effort was never applied.
+2. A coverage run measured **concurrently** with two other jobs produced 3 phantom failures in an untouched module — the same §4.3 concurrency rule the Leader enforced on every worker in the run. Re-measured in isolation: 2251/2251 green.
+3. A T-06 criterion expected 380 from the test feed; 342 is correct, because 380 is the coverage slice while the picker also excludes Window-3 per OQ-A.
+
+---
 
 ### 2026-08-14 — `bilateral/clarisa-project-automapping` (S1)
 

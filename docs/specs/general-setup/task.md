@@ -104,6 +104,8 @@ Per task, declare:
 - Coverage target if differing from the global 60% threshold.
 - E2E test cases (happy path + at least one auth failure + at least one role/status denial when applicable).
 
+**Bug Mode — where the regression test belongs.** The red-before-green test MUST be owned by the task that **changes the buggy code path**, never by a task that creates new code. A test over a newly-created function is green from the moment it compiles and could never have been red, so assigning the evidence there closes Bug Mode without producing the one artifact Bug Mode exists for. A new unit still owes a gate **proven able to fail** — demonstrate it by mutation — but that is a different claim from reproducing the defect.
+
 A task is NOT done until:
 - `npm run lint` passes.
 - `npm test` passes locally.
