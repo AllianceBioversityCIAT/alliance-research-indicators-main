@@ -13,6 +13,7 @@ import {
 } from './dto/bilateral-hlos-indicators.response.dto';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ROLES_KEY, RolesGuard } from '../../shared/guards/roles.guard';
 import { ResultOwnerGuard } from '../../shared/guards/result-owner.guard';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
@@ -68,6 +69,7 @@ describe('BilateralController (T-15.6)', () => {
       providers: [
         { provide: BilateralService, useValue: bilateral },
         { provide: ResultsUtil, useValue: resultsUtil },
+        SetUpInterceptor,
         mockPortfolioUtilProvider,
       ],
     })

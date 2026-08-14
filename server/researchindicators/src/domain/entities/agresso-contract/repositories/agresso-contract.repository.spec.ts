@@ -1161,6 +1161,175 @@ describe('AgressoContractRepository', () => {
         100,
       ]);
     });
+
+    it('should omit LIMIT when fetchAll is true', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      const result = await repository.getTopPartnersReport(
+        'A100',
+        undefined,
+        true,
+      );
+
+      expect(result.limit).toBeNull();
+      expect((repository.query as jest.Mock).mock.calls[0][0]).not.toContain(
+        'LIMIT ?',
+      );
+      expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
+        'A100',
+        InstitutionRolesEnum.PARTNERS,
+      ]);
+    });
+  });
+
+  describe('getFullContractReports', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getFullContractReports('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should aggregate all report sections without top-N limits', async () => {
+      jest.spyOn(repository, 'getTopPrimaryLeversReport').mockResolvedValue({
+        contract_id: 'A100',
+        limit: null,
+        top_primary_levers: [
+          {
+            lever_id: 1,
+            short_name: 'L1',
+            full_name: 'Lever 1',
+            count: 2,
+          },
+        ],
+      });
+      jest.spyOn(repository, 'getTopContributorsReport').mockResolvedValue({
+        contract_id: 'A100',
+        limit: null,
+        top_contributors: [
+          {
+            contract_id: 'B200',
+            contract_description: 'Contributor',
+            count: 3,
+          },
+        ],
+      });
+      jest
+        .spyOn(repository, 'getTopMainContactPersonsReport')
+        .mockResolvedValue({
+          contract_id: 'A100',
+          limit: null,
+          top_main_contact_persons: [
+            {
+              user_id: 'U1',
+              first_name: 'Ada',
+              last_name: 'Lovelace',
+              count: 1,
+            },
+          ],
+        });
+      jest.spyOn(repository, 'getContractStaffReport').mockResolvedValue({
+        contract_id: 'A100',
+        staff: [{ name: 'Jane Doe', role: 'Project Lead' }],
+      });
+      jest.spyOn(repository, 'getTopPartnersReport').mockResolvedValue({
+        contract_id: 'A100',
+        limit: null,
+        top_partners: [
+          {
+            institution_id: 10,
+            institution_name: 'Partner',
+            count: 4,
+          },
+        ],
+      });
+      jest.spyOn(repository, 'getGeoScopeReport').mockResolvedValue({
+        contract_id: 'A100',
+        limit: null,
+        geo_scope_summary: {
+          global: 1,
+          regional: 0,
+          countries: 2,
+          sub_national: 0,
+          yet_to_be_determined: 0,
+        },
+        top_regions: [{ region_id: 1, region_name: 'Africa', count: 1 }],
+        top_countries: [],
+      });
+
+      const result = await repository.getFullContractReports('A100');
+
+      expect(repository.getTopPrimaryLeversReport).toHaveBeenCalledWith(
+        'A100',
+        undefined,
+        true,
+      );
+      expect(repository.getTopContributorsReport).toHaveBeenCalledWith(
+        'A100',
+        undefined,
+        true,
+      );
+      expect(repository.getTopMainContactPersonsReport).toHaveBeenCalledWith(
+        'A100',
+        undefined,
+        true,
+      );
+      expect(repository.getContractStaffReport).toHaveBeenCalledWith('A100');
+      expect(repository.getTopPartnersReport).toHaveBeenCalledWith(
+        'A100',
+        undefined,
+        true,
+      );
+      expect(repository.getGeoScopeReport).toHaveBeenCalledWith(
+        'A100',
+        undefined,
+        true,
+      );
+      expect(result).toEqual({
+        contract_id: 'A100',
+        top_primary_levers: [
+          {
+            lever_id: 1,
+            short_name: 'L1',
+            full_name: 'Lever 1',
+            count: 2,
+          },
+        ],
+        top_contributors: [
+          {
+            contract_id: 'B200',
+            contract_description: 'Contributor',
+            count: 3,
+          },
+        ],
+        top_main_contact_persons: [
+          {
+            user_id: 'U1',
+            first_name: 'Ada',
+            last_name: 'Lovelace',
+            count: 1,
+          },
+        ],
+        staff: [{ name: 'Jane Doe', role: 'Project Lead' }],
+        top_partners: [
+          {
+            institution_id: 10,
+            institution_name: 'Partner',
+            count: 4,
+          },
+        ],
+        geo_scope: {
+          geo_scope_summary: {
+            global: 1,
+            regional: 0,
+            countries: 2,
+            sub_national: 0,
+            yet_to_be_determined: 0,
+          },
+          top_regions: [{ region_id: 1, region_name: 'Africa', count: 1 }],
+          top_countries: [],
+        },
+      });
+    });
   });
 
   describe('getGeoScopeReport', () => {

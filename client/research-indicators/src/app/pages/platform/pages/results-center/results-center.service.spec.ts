@@ -1177,6 +1177,103 @@ describe('ResultsCenterService', () => {
     });
   });
 
+  describe('userFilterMutations counter (D-URL-15)', () => {
+    it('starts at 0', () => {
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('applyFilters advances it exactly once', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.applyFilters();
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('onSelectFilterTab advances it exactly once', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.onSelectFilterTab(1);
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('onSelectFilterTab does NOT advance it when skipBump is set (load-path callers)', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.onSelectFilterTab(1, { skipBump: true });
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('removeFilter (INDICATOR TAB branch, delegates to onSelectFilterTab) advances it exactly once', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.removeFilter('INDICATOR TAB');
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('removeFilter (normal label, delegates to applyFilters) advances it exactly once', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.tableFilters.set({
+        indicators: [],
+        statusCodes: [],
+        years: [],
+        contracts: [],
+        levers: [{ id: 1 }, { id: 2 }]
+      } as any);
+      service.removeFilter('LEVER', 1);
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('clearAllFilters advances it exactly once, not twice, despite delegating to onSelectFilterTab', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.clearAllFilters();
+      expect(service.userFilterMutations()).toBe(1);
+    });
+
+    it('clearAllFiltersWithPreserve does NOT advance it, even though it delegates to onSelectFilterTab', () => {
+      service.clearAllFiltersWithPreserve([1, 2]);
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('initializeProjectDashboardResultsTable does NOT advance it', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      service.initializeProjectDashboardResultsTable('D514');
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('restorePersistedState does NOT advance it', () => {
+      const getItemSpy = jest.spyOn(Storage.prototype, 'getItem').mockReturnValue(
+        JSON.stringify({
+          myResultsFilterItemId: 'all',
+          tableFilters: {},
+          resultsFilter: {},
+          appliedFilters: {},
+          searchInput: '',
+          primaryContractId: null,
+          resultsTablePaginatorFirst: 0,
+          resultsTablePaginatorRows: 10,
+          resultsTableSortField: 'result_official_code',
+          resultsTableSortOrder: -1
+        })
+      );
+
+      try {
+        expect(service.restorePersistedState('demo')).toBe(true);
+        expect(service.userFilterMutations()).toBe(0);
+      } finally {
+        getItemSpy.mockRestore();
+      }
+    });
+
+    it('main() does NOT advance it', async () => {
+      await service.main();
+      expect(service.userFilterMutations()).toBe(0);
+    });
+
+    it('seedFromUrl does NOT advance it (T-04 — completes design §6.2 must-not column)', () => {
+      service.seedFromUrl({
+        filters: { status: [2, 6], contract: ['A100'], year: [2025], source: ['STAR'] },
+        scope: 'my'
+      });
+      expect(service.userFilterMutations()).toBe(0);
+    });
+  });
+
   describe('initializeProjectDashboardResultsTable', () => {
     it('sets pending revision status, contract context, and loads all results', () => {
       const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
@@ -1196,41 +1293,155 @@ describe('ResultsCenterService', () => {
     });
   });
 
-  describe('applyStatusFilterFromHomeLink', () => {
-    it('sets status on tableFilters and results filters and calls main by default', () => {
-      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+  // `applyStatusFilterFromHomeLink` was deleted in T-06: its only caller
+  // (`results-center.component.ts:110`) is gone now that `initializeState()`
+  // resolves legacy `statusTab`/`statusLabel` through the codec's own
+  // `resolveLegacyStatusTab` plus a single `seedFromUrl` call (design §6.1).
+  // The coverage this describe block used to provide over "seed only the
+  // value key" and "preserve a sibling legacy indicator id" is superseded by
+  // `seedFromUrl`'s own tests below and by `results-center.component.spec.ts`.
 
-      service.applyStatusFilterFromHomeLink(5, 'Approved');
+  // T-04: seedFromUrl() — one method, all state (design.md §7.1).
+  describe('seedFromUrl', () => {
+    // KZ-004: every filter carries a discriminating value distinct from the
+    // others, and status carries two distinct ids — a fixture built from
+    // identical/uniform values cannot tell a correct per-field write from
+    // one that crossed two keys.
+    const mixedFilters = {
+      status: [2, 6],
+      contract: ['A100'],
+      year: [2025],
+      source: ['STAR']
+    };
 
-      expect(service.tableFilters().statusCodes).toEqual([{ result_status_id: 5, name: 'Approved' }]);
-      expect(service.resultsFilter()['status-codes']).toEqual([5]);
-      expect(service.appliedFilters()['status-codes']).toEqual([5]);
-      expect(mainSpy).toHaveBeenCalled();
+    it('writes tableFilters, resultsFilter, appliedFilters and the scope consistently in one call', () => {
+      service.seedFromUrl({ filters: { ...mixedFilters, indicator: 3 }, scope: 'all' });
+
+      expect(service.tableFilters().statusCodes).toEqual([{ result_status_id: 2 }, { result_status_id: 6 }]);
+      expect(service.tableFilters().sources).toEqual([{ platform_code: 'STAR' }]);
+      expect(service.tableFilters().contracts).toEqual([{ agreement_id: 'A100' }]);
+      expect(service.tableFilters().years).toEqual([{ report_year: 2025 }]);
+
+      expect(service.resultsFilter()['status-codes']).toEqual([2, 6]);
+      expect(service.resultsFilter()['platform-code']).toEqual(['STAR']);
+      expect(service.resultsFilter()['contract-codes']).toEqual(['A100']);
+      expect(service.resultsFilter().years).toEqual([2025]);
+      expect(service.resultsFilter()['indicator-codes-tabs']).toEqual([3]);
+
+      // resultsFilter and appliedFilters must be consistent with each other, not
+      // merely each internally consistent (R-RCU-002 AC.3 — state parity across
+      // all three signals).
+      expect(service.appliedFilters()).toEqual(service.resultsFilter());
     });
 
-    it('does not call main when skipMain is true', () => {
-      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
-
-      service.applyStatusFilterFromHomeLink(3, 'Draft', { skipMain: true });
-
-      expect(service.tableFilters().statusCodes[0]).toEqual({ result_status_id: 3, name: 'Draft' });
-      expect(mainSpy).not.toHaveBeenCalled();
+    it('is a presence assertion only — it cannot and does not claim to prove the sidebar chip renders (design §7.2, KZ-001)', () => {
+      // Rendered proof belongs to T-11, taken after the control lists resolve.
+      // This test asserts signal state only, per this task's own Disqualifies clause.
+      service.seedFromUrl({ filters: { status: [6] }, scope: 'all' });
+      expect(service.tableFilters().statusCodes).toEqual([{ result_status_id: 6 }]);
     });
 
-    it('uses display name Status when statusName is omitted', () => {
-      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+    it('seeds only the option-value key — no seeded object carries its control optionLabel key', () => {
+      service.seedFromUrl({ filters: mixedFilters, scope: 'all' });
 
-      service.applyStatusFilterFromHomeLink(9);
-
-      expect(service.tableFilters().statusCodes[0].name).toBe('Status');
+      // status control: optionValue result_status_id, optionLabel name
+      service.tableFilters().statusCodes.forEach(entry => {
+        expect(Object.hasOwn(entry, 'name')).toBe(false);
+      });
+      // source control: optionValue platform_code, optionLabel name
+      service.tableFilters().sources.forEach(entry => {
+        expect(Object.hasOwn(entry as object, 'name')).toBe(false);
+      });
+      // project control: optionValue agreement_id, optionLabel select_label
+      service.tableFilters().contracts.forEach(entry => {
+        expect(Object.hasOwn(entry, 'select_label')).toBe(false);
+        expect(Object.hasOwn(entry, 'display_label')).toBe(false);
+      });
     });
 
-    it('trims statusName', () => {
-      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+    // D-URL-18 revised this contract. It previously asserted `toBe(sentinel)`
+    // — that `seedFromUrl` left `tableFilters.indicators` byte-identical and
+    // untouched — and the COMPONENT cleared the slot afterwards. That split
+    // ownership is what let the sidebar multiselect fall outside the URL
+    // layer entirely. `seedFromUrl` now owns the slot in both directions:
+    // cleared when the URL names no `indicators`, seeded when it does.
+    //
+    // The tab half of the rule is unchanged and still asserted below: the
+    // singular `indicator` must NEVER land in `tableFilters.indicators`,
+    // because seeding it `@if`-destroys the multiselect (design §7.2).
+    it('clears a stale tableFilters.indicators when the tab `indicator` is seeded — the tab never lands there', () => {
+      const sentinel = [{ indicator_id: 99, name: 'stale sidebar selection' }];
+      service.tableFilters.update(prev => ({ ...prev, indicators: sentinel }));
 
-      service.applyStatusFilterFromHomeLink(2, '  Submitted  ');
+      service.seedFromUrl({ filters: { indicator: 1 }, scope: 'all' });
 
-      expect(service.tableFilters().statusCodes[0].name).toBe('Submitted');
+      // Not the sentinel, and NOT `[{ indicator_id: 1 }]` either — the tab
+      // goes to its own wire key and nowhere near the sidebar collection.
+      expect(service.tableFilters().indicators).toEqual([]);
+      expect(service.resultsFilter()['indicator-codes-tabs']).toEqual([1]);
+      expect(service.appliedFilters()['indicator-codes-tabs']).toEqual([1]);
+      expect(service.resultsFilter()['indicator-codes-filter']).toEqual([]);
+    });
+
+    it('seeds tableFilters.indicators and indicator-codes-filter from the plural `indicators` (D-URL-18)', () => {
+      service.seedFromUrl({ filters: { indicators: [1, 4] }, scope: 'all' });
+
+      expect(service.resultsFilter()['indicator-codes-filter']).toEqual([1, 4]);
+      expect(service.appliedFilters()['indicator-codes-filter']).toEqual([1, 4]);
+      // D-URL-10 — value key only, so the label backfill still runs.
+      expect(service.tableFilters().indicators).toEqual([{ indicator_id: 1 }, { indicator_id: 4 }]);
+      service.tableFilters().indicators.forEach(entry => {
+        expect(Object.hasOwn(entry as object, 'name')).toBe(false);
+      });
+      // The tab stays clear — the two are mutually exclusive.
+      expect(service.resultsFilter()['indicator-codes-tabs']).toEqual([]);
+    });
+
+    it('leaves indicator-codes-tabs empty when indicator is absent from the URL', () => {
+      service.seedFromUrl({ filters: { status: [2] }, scope: 'all' });
+      expect(service.resultsFilter()['indicator-codes-tabs']).toEqual([]);
+      expect(service.appliedFilters()['indicator-codes-tabs']).toEqual([]);
+    });
+
+    it('calls invalidateResultsFetchDedupe before any signal write — a stale fetch key does not survive it', async () => {
+      await service.main();
+      expect(mockGetResultsService.fetchPaginated).toHaveBeenCalledTimes(1);
+      await service.main();
+      expect(mockGetResultsService.fetchPaginated).toHaveBeenCalledTimes(1);
+
+      service.seedFromUrl({ filters: { status: [6] }, scope: 'all' });
+
+      await service.main();
+      expect(mockGetResultsService.fetchPaginated).toHaveBeenCalledTimes(2);
+    });
+
+    it('resolves the my scope to the my/all tab item and create-user-codes from the cache', () => {
+      service.seedFromUrl({ filters: {}, scope: 'my' });
+      expect(service.myResultsFilterItem()?.id).toBe('my');
+      expect(service.resultsFilter()['create-user-codes']).toEqual(['123']);
+      expect(service.appliedFilters()['create-user-codes']).toEqual(['123']);
+    });
+
+    it('resolves the all scope to the all tab item and empty create-user-codes', () => {
+      service.myResultsFilterItem.set({ id: 'my', label: 'My Results' });
+      service.seedFromUrl({ filters: {}, scope: 'all' });
+      expect(service.myResultsFilterItem()?.id).toBe('all');
+      expect(service.resultsFilter()['create-user-codes']).toEqual([]);
+      expect(service.appliedFilters()['create-user-codes']).toEqual([]);
+    });
+
+    it('clears every filter category absent from the URL rather than merging with stale state', () => {
+      service.seedFromUrl({ filters: mixedFilters, scope: 'all' });
+      service.seedFromUrl({ filters: {}, scope: 'all' });
+
+      expect(service.tableFilters().statusCodes).toEqual([]);
+      expect(service.tableFilters().sources).toEqual([]);
+      expect(service.tableFilters().contracts).toEqual([]);
+      expect(service.tableFilters().years).toEqual([]);
+      expect(service.resultsFilter()['status-codes']).toEqual([]);
+      expect(service.resultsFilter()['contract-codes']).toEqual([]);
+      expect(service.resultsFilter()['platform-code']).toEqual([]);
+      expect(service.resultsFilter().years).toEqual([]);
     });
   });
 

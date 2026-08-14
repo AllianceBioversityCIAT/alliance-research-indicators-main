@@ -6,7 +6,10 @@ import { PrmsOpenSearchService } from './prms.opensearch.service';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { ResultsService } from '../../../entities/results/results.service';
-import { QueryService } from '../../../shared/utils/query.service';
+import {
+  QueryService,
+  ResultDeleteStatus,
+} from '../../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { PooledFundingContractsService } from '../../../entities/pooled-funding-contracts/pooled-funding-contracts.service';
@@ -24,6 +27,17 @@ import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 import { PrmsRepository } from './repositories/prms.repository';
 import { SyncStagingRecordsEntity } from './entities/sync-staging-records.entity';
+import { ClarisaCountriesService } from '../../clarisa/entities/clarisa-countries/clarisa-countries.service';
+import { ClarisaRegionsService } from '../../clarisa/entities/clarisa-regions/clarisa-regions.service';
+import { ClarisaInstitutionsService } from '../../clarisa/entities/clarisa-institutions/clarisa-institutions.service';
+import { ClarisaInnovationCharacteristicsService } from '../../clarisa/entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.service';
+import { ClarisaInnovationTypesService } from '../../clarisa/entities/clarisa-innovation-types/clarisa-innovation-types.service';
+import { ClarisaInnovationReadinessLevelsService } from '../../clarisa/entities/clarisa-innovation-readiness-levels/clarisa-innovation-readiness-levels.service';
+import { ClarisaActorTypesService } from '../../clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
+import { ClarisaInstitutionTypesService } from '../../clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
+import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
+import { resolveIncomingPublicationIdentity } from '../../../shared/utils/publication-identity.util';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual('typeorm');
@@ -47,6 +61,14 @@ describe('PrmsOpenSearchService', () => {
   let syncProcessLogService: jest.Mocked<SyncProcessLogService>;
   let saveResultService: jest.Mocked<SaveResultService>;
   let prmsRepository: jest.Mocked<PrmsRepository>;
+  let clarisaCountriesService: jest.Mocked<ClarisaCountriesService>;
+  let clarisaRegionsService: jest.Mocked<ClarisaRegionsService>;
+  let clarisaInstitutionsService: jest.Mocked<ClarisaInstitutionsService>;
+  let clarisaInnovationCharacteristicsService: jest.Mocked<ClarisaInnovationCharacteristicsService>;
+  let clarisaInnovationTypesService: jest.Mocked<ClarisaInnovationTypesService>;
+  let clarisaInnovationReadinessLevelsService: jest.Mocked<ClarisaInnovationReadinessLevelsService>;
+  let clarisaActorTypesService: jest.Mocked<ClarisaActorTypesService>;
+  let clarisaInstitutionTypesService: jest.Mocked<ClarisaInstitutionTypesService>;
   let temporalRepoHandle: { save: jest.Mock };
 
   const buildResultMapper = (
@@ -78,8 +100,12 @@ describe('PrmsOpenSearchService', () => {
       ],
       contributing_partners: [],
       evidences: [],
+      knowledge_product_summary: undefined,
       primary_entity: { official_code: 'PFUND', name: 'Entity' },
       created_by: undefined,
+      policy_change_summary: null,
+      capacity_development_summary: null,
+      innovation_development_summary: null,
     };
     return Object.assign(base, overrides);
   };
@@ -219,6 +245,65 @@ describe('PrmsOpenSearchService', () => {
             deleteTemporalResults: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: ClarisaCountriesService,
+          useValue: {
+            findByIso2: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ClarisaRegionsService,
+          useValue: {
+            findByUm49Codes: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ClarisaInstitutionsService,
+          useValue: {
+            findByCodes: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ClarisaInnovationCharacteristicsService,
+          useValue: {
+            findByName: jest.fn().mockResolvedValue({ id: 1 }),
+            findOne: jest.fn().mockResolvedValue({ id: 1 }),
+          },
+        },
+        {
+          provide: ClarisaInnovationTypesService,
+          useValue: {
+            findByName: jest.fn().mockResolvedValue({ code: 13 }),
+            findOne: jest.fn().mockResolvedValue({ code: 13 }),
+          },
+        },
+        {
+          provide: ClarisaInnovationReadinessLevelsService,
+          useValue: {
+            findByValue: jest.fn().mockResolvedValue({ id: 14, level: 3 }),
+          },
+        },
+        {
+          provide: ClarisaActorTypesService,
+          useValue: {
+            findByName: jest.fn().mockImplementation(async (name: string) => {
+              if (name === 'Researchers') return { code: 10 };
+              if (name?.includes('Policy actors')) return { code: 11 };
+              return null;
+            }),
+          },
+        },
+        {
+          provide: ClarisaInstitutionTypesService,
+          useValue: {
+            findByName: jest.fn().mockImplementation(async (name: string) => {
+              if (name?.includes('NGO')) return { code: 20 };
+              if (name?.includes('Private company')) return { code: 21 };
+              if (name?.includes('Financial')) return { code: 22 };
+              return null;
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -232,6 +317,18 @@ describe('PrmsOpenSearchService', () => {
     syncProcessLogService = module.get(SyncProcessLogService);
     saveResultService = module.get(SaveResultService);
     prmsRepository = module.get(PrmsRepository);
+    clarisaCountriesService = module.get(ClarisaCountriesService);
+    clarisaRegionsService = module.get(ClarisaRegionsService);
+    clarisaInstitutionsService = module.get(ClarisaInstitutionsService);
+    clarisaInnovationCharacteristicsService = module.get(
+      ClarisaInnovationCharacteristicsService,
+    );
+    clarisaInnovationTypesService = module.get(ClarisaInnovationTypesService);
+    clarisaInnovationReadinessLevelsService = module.get(
+      ClarisaInnovationReadinessLevelsService,
+    );
+    clarisaActorTypesService = module.get(ClarisaActorTypesService);
+    clarisaInstitutionTypesService = module.get(ClarisaInstitutionTypesService);
   });
 
   afterEach(() => {
@@ -315,6 +412,86 @@ describe('PrmsOpenSearchService', () => {
         buildTemporalMapper({}, { is_version: true }),
       ]);
       expect(out[0].is_version_applied).toBe(true);
+    });
+
+    // @akili-spec results/cross-platform-duplicate-resolution — T-13
+    // (rev 4, 2026-08-05). AC.10 tests below exercise the REAL `processData`,
+    // not a hand-built DTO — a hand-built DTO proves the resolver, not the
+    // mapper, which is exactly the blind spot that let a fixture-fed field
+    // pass a green suite while being absent from the real wire (attempt 1,
+    // `result_knowledge_product_array`, 0 of 13,507 staged rows). AC.10 part
+    // 2 (the live-payload observation) is not a unit test — it is recorded
+    // in `execution.md` -> "Pivot Record: T-13 — RESOLVED BY OBSERVATION"
+    // (277/277 live KP items carry `knowledge_product_summary.handle`).
+    it('AC.10 part 1 — a real processData run over a KP item carrying knowledge_product_summary.handle yields that handle as the incoming identity', async () => {
+      const handle = 'https://hdl.handle.net/10568/181394';
+      const row = buildTemporalMapper({
+        knowledge_product_summary: { handle },
+      });
+
+      const out = await service.processData([row]);
+
+      expect(out).toHaveLength(1);
+      // Exercises the REAL resolver over the REAL mapper output — a
+      // hand-built dto.evidence would prove the resolver only.
+      const resolution = resolveIncomingPublicationIdentity({
+        platformCode: ReportingPlatformEnum.PRMS,
+        indicatorId: out[0].createResult.indicator_id,
+        publicLink: out[0].public_link,
+        evidence: out[0].evidence?.evidence,
+      });
+      expect(resolution).toEqual({ identity: handle, refused: false });
+      // public_link / external_link are untouched by the identity carrier.
+      expect(out[0].public_link).toBe('https://pdf.example');
+      expect(out[0].external_link).toBe('https://prms.example');
+    });
+
+    it('AC.10 inertness pin — dto.knowledgeProduct stays undefined on the PRMS KP path (RB-13)', async () => {
+      // The single assertion that distinguishes an inert change from
+      // `UPDATE result_knowledge_products` on 2,388 PRMS rows per sync.
+      // Attempt 1 had no such test, which is how that mutation passed both
+      // the suite and the first review.
+      const row = buildTemporalMapper({
+        knowledge_product_summary: {
+          handle: 'https://hdl.handle.net/10568/181394',
+        },
+      });
+
+      const out = await service.processData([row]);
+
+      expect(out[0].knowledgeProduct).toBeUndefined();
+    });
+
+    it('a non-KP item carrying a handle-format knowledge_product_summary.handle still yields no identity (AC.5 — the field is only populated for KP items)', async () => {
+      const row = buildTemporalMapper({
+        indicator_category: {
+          code: String(ResultTypeEnum.INNOVATION_DEVELOPMENT),
+          name: 'Innovation development',
+        },
+        knowledge_product_summary: {
+          handle: 'https://hdl.handle.net/10568/181394',
+        },
+      });
+
+      const out = await service.processData([row]);
+
+      expect(out).toHaveLength(1);
+      expect(out[0].evidence).toBeUndefined();
+      const resolution = resolveIncomingPublicationIdentity({
+        platformCode: ReportingPlatformEnum.PRMS,
+        indicatorId: out[0].createResult.indicator_id,
+        publicLink: out[0].public_link,
+        evidence: out[0].evidence?.evidence,
+      });
+      expect(resolution).toEqual({ identity: null, refused: false });
+    });
+
+    it('a KP item with no knowledge_product_summary carries no evidence and resolves no identity', async () => {
+      const row = buildTemporalMapper({ knowledge_product_summary: undefined });
+
+      const out = await service.processData([row]);
+
+      expect(out[0].evidence).toBeUndefined();
     });
 
     it('should map a valid row without created_by', async () => {
@@ -481,6 +658,508 @@ describe('PrmsOpenSearchService', () => {
       expect(out[0].alignments.contracts).toEqual([]);
       expect(out[0].createResult.contract_id).toBe('');
     });
+
+    it('should map an empty geoScope and partners when PRMS sends no geo or partner data', async () => {
+      const out = await service.processData([buildTemporalMapper()]);
+      expect(clarisaCountriesService.findByIso2).not.toHaveBeenCalled();
+      expect(clarisaRegionsService.findByUm49Codes).not.toHaveBeenCalled();
+      expect(clarisaInstitutionsService.findByCodes).not.toHaveBeenCalled();
+      expect(out[0].geoScope.countries).toEqual([]);
+      expect(out[0].geoScope.regions).toEqual([]);
+      expect(out[0].partners.institutions).toEqual([]);
+    });
+
+    it('should map geoScope from PRMS geographic_focus, regions and countries', async () => {
+      clarisaCountriesService.findByIso2.mockResolvedValueOnce([
+        { isoAlpha2: 'AX' } as any,
+        { isoAlpha2: 'AF' } as any,
+      ]);
+      clarisaRegionsService.findByUm49Codes.mockResolvedValueOnce([
+        { um49Code: 150 } as any,
+      ]);
+
+      const out = await service.processData([
+        buildTemporalMapper({
+          geographic_focus: { code: '3', description: 'Multi-national' },
+          regions: [{ code: '150', name: 'Europe' }],
+          countries: [
+            { code: 'AX', name: 'Aland Islands' },
+            { code: 'AF', name: 'Afghanistan' },
+          ],
+        }),
+      ]);
+
+      expect(clarisaCountriesService.findByIso2).toHaveBeenCalledWith([
+        'AX',
+        'AF',
+      ]);
+      expect(clarisaRegionsService.findByUm49Codes).toHaveBeenCalledWith([150]);
+      expect(out[0].geoScope.geo_scope_id).toBe(3);
+      expect(out[0].geoScope.countries).toEqual([
+        { isoAlpha2: 'AX' },
+        { isoAlpha2: 'AF' },
+      ]);
+      expect(out[0].geoScope.regions).toEqual([{ region_id: 150 }]);
+    });
+
+    it('should map partners from PRMS contributing_partners via Clarisa institution codes', async () => {
+      clarisaInstitutionsService.findByCodes.mockResolvedValueOnce([
+        { code: 1 } as any,
+        { code: 70 } as any,
+      ]);
+
+      const out = await service.processData([
+        buildTemporalMapper({
+          contributing_partners: [
+            { code: '1', name: 'WUR', acronym: 'WUR' },
+            { code: '70', name: 'ULBS', acronym: 'ULBS' },
+          ],
+        }),
+      ]);
+
+      expect(clarisaInstitutionsService.findByCodes).toHaveBeenCalledWith([
+        1, 70,
+      ]);
+      expect(out[0].partners.institutions).toEqual([
+        { institution_id: 1 },
+        { institution_id: 70 },
+      ]);
+    });
+
+    it('should map an empty evidence list when PRMS sends no evidences', async () => {
+      const out = await service.processData([buildTemporalMapper()]);
+      expect(out[0].evidence.evidence).toEqual([]);
+    });
+
+    it('should map evidence from PRMS evidences', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          evidences: [{ link: 'link.com', description: 'gender 1' }],
+        }),
+      ]);
+
+      expect(out[0].evidence.evidence).toEqual([
+        { evidence_url: 'link.com', evidence_description: 'gender 1' },
+      ]);
+    });
+
+    it('should skip evidences without a link', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          evidences: [{ link: '', description: 'no link' }],
+        }),
+      ]);
+
+      expect(out[0].evidence.evidence).toEqual([]);
+    });
+
+    it('should map policy_change_summary for POLICY_CHANGE indicators', async () => {
+      clarisaInstitutionsService.findByCodes.mockResolvedValueOnce([
+        { code: 8064 } as any,
+        { code: 2714 } as any,
+      ]);
+
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.POLICY_CHANGE),
+            name: 'Policy Change',
+          },
+          policy_change_summary: {
+            amount: 500000,
+            amount_status_label: 'Estimated',
+            policy_type: {
+              id: 1,
+              name: 'Program, budget or investment',
+              definition: 'def',
+            },
+            policy_stage: {
+              id: 6,
+              name: 'Stage 1',
+              definition: 'def',
+            },
+            linked_innovation_dev: false,
+            linked_innovation_use: false,
+            result_related_to: [],
+            policy_implementing_organizations: [
+              {
+                id: 8064,
+                name: 'Papalotla - Grupo Nandi',
+                acronym: null,
+                institution_type_name: 'Private company',
+              },
+              {
+                id: 2714,
+                name: 'Semillas Papalotla SA de DV',
+                acronym: 'Papalotla',
+                institution_type_name: 'Private company',
+              },
+            ],
+          },
+        }),
+      ]);
+
+      expect(clarisaInstitutionsService.findByCodes).toHaveBeenCalledWith([
+        8064, 2714,
+      ]);
+      // PRMS policy_type 1 (Program…) → STAR policy_type_id 3
+      // PRMS policy_stage 6 (Stage 1) → STAR policy_stage_id 1
+      expect(out[0].policyChange).toEqual({
+        policy_type_id: 3,
+        policy_stage_id: 1,
+        evidence_stage: undefined,
+        implementing_organization: [
+          { institution_id: 8064 },
+          { institution_id: 2714 },
+        ],
+        innovation_development: undefined,
+        innovation_use: undefined,
+      });
+    });
+
+    it('should homologate PRMS policy_type ids to STAR policy_type_id', async () => {
+      const cases = [
+        { prmsId: 1, starId: 3 },
+        { prmsId: 2, starId: 2 },
+        { prmsId: 3, starId: 1 },
+      ];
+
+      for (const { prmsId, starId } of cases) {
+        const out = await service.processData([
+          buildTemporalMapper({
+            indicator_category: {
+              code: String(ResultTypeEnum.POLICY_CHANGE),
+              name: 'Policy Change',
+            },
+            policy_change_summary: {
+              amount: 0,
+              amount_status_label: '',
+              policy_type: { id: prmsId, name: '', definition: '' },
+              policy_stage: { id: 6, name: '', definition: '' },
+              linked_innovation_dev: false,
+              linked_innovation_use: false,
+              result_related_to: [],
+              policy_implementing_organizations: [],
+            },
+          }),
+        ]);
+
+        expect(out[0].policyChange.policy_type_id).toBe(starId);
+      }
+    });
+
+    it('should homologate PRMS policy_stage ids to STAR policy_stage_id', async () => {
+      const cases = [
+        { prmsId: 6, starId: 1 },
+        { prmsId: 7, starId: 2 },
+        { prmsId: 8, starId: 3 },
+      ];
+
+      for (const { prmsId, starId } of cases) {
+        const out = await service.processData([
+          buildTemporalMapper({
+            indicator_category: {
+              code: String(ResultTypeEnum.POLICY_CHANGE),
+              name: 'Policy Change',
+            },
+            policy_change_summary: {
+              amount: 0,
+              amount_status_label: '',
+              policy_type: { id: 2, name: '', definition: '' },
+              policy_stage: { id: prmsId, name: '', definition: '' },
+              linked_innovation_dev: false,
+              linked_innovation_use: false,
+              result_related_to: [],
+              policy_implementing_organizations: [],
+            },
+          }),
+        ]);
+
+        expect(out[0].policyChange.policy_stage_id).toBe(starId);
+      }
+    });
+
+    it('should leave policyChange undefined when policy_change_summary is null', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.POLICY_CHANGE),
+            name: 'Policy Change',
+          },
+          policy_change_summary: null,
+        }),
+      ]);
+
+      expect(out[0].policyChange).toBeUndefined();
+      expect(clarisaInstitutionsService.findByCodes).not.toHaveBeenCalled();
+    });
+
+    it('should not map policyChange for non policy-change indicators', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          policy_change_summary: {
+            amount: 1,
+            amount_status_label: 'Estimated',
+            policy_type: { id: 1, name: 't', definition: 'd' },
+            policy_stage: { id: 6, name: 's', definition: 'd' },
+            linked_innovation_dev: false,
+            linked_innovation_use: false,
+            result_related_to: [],
+            policy_implementing_organizations: [
+              { id: 1, name: 'a', acronym: null, institution_type_name: 'x' },
+            ],
+          },
+        }),
+      ]);
+
+      expect(out[0].policyChange).toBeUndefined();
+    });
+
+    it('should map capacity_development_summary for CAPACITY_SHARING indicators', async () => {
+      clarisaInstitutionsService.findByCodes.mockResolvedValueOnce([
+        { code: 21 } as any,
+        { code: 9486 } as any,
+      ]);
+
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.CAPACITY_SHARING_FOR_DEVELOPMENT),
+            name: 'Capacity Sharing',
+          },
+          capacity_development_summary: {
+            male_using: 59,
+            female_using: 16,
+            non_binary_using: 0,
+            has_unkown_using: 0,
+            is_attending_for_organization: true,
+            delivery_method: {
+              name: 'In person',
+              description: null,
+            },
+            training_length: {
+              name: 'Short-term',
+              term: 'Short-term',
+              description: '3 months or less',
+            },
+            on_behalf_organizations: [
+              {
+                id: 21,
+                name: 'MAGA',
+                acronym: 'MAGA',
+                institution_type_name: 'Government (National)',
+              },
+              {
+                id: 9486,
+                name: 'ADIPAZ',
+                acronym: 'ADIPAZ',
+                institution_type_name: 'NGO Local (General)',
+              },
+            ],
+          },
+        }),
+      ]);
+
+      expect(clarisaInstitutionsService.findByCodes).toHaveBeenCalledWith([
+        21, 9486,
+      ]);
+      expect(out[0].capacitySharing).toEqual(
+        expect.objectContaining({
+          session_format_id: 2,
+          delivery_modality_id: 3,
+          session_length_id: 1,
+          group: expect.objectContaining({
+            session_participants_male: 59,
+            session_participants_female: 16,
+            session_participants_non_binary: 0,
+            session_participants_total: 75,
+            is_attending_organization: true,
+            trainee_organization_representative: [
+              { institution_id: 21 },
+              { institution_id: 9486 },
+            ],
+          }),
+        }),
+      );
+      expect(out[0].capacitySharing.degree_id).toBeUndefined();
+    });
+
+    it('should map long-term training_length.name to degree_id', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.CAPACITY_SHARING_FOR_DEVELOPMENT),
+            name: 'Capacity Sharing',
+          },
+          capacity_development_summary: {
+            male_using: 1,
+            female_using: 0,
+            non_binary_using: 0,
+            has_unkown_using: 0,
+            is_attending_for_organization: false,
+            delivery_method: { name: 'Virtual / Online', description: null },
+            training_length: {
+              name: 'Master',
+              term: 'Long-term',
+              description: '',
+            },
+            on_behalf_organizations: [],
+          },
+        }),
+      ]);
+
+      expect(out[0].capacitySharing.session_length_id).toBe(2);
+      expect(out[0].capacitySharing.degree_id).toBe(2); // Master → MSc
+      expect(out[0].capacitySharing.delivery_modality_id).toBe(1);
+    });
+
+    it('should leave capacitySharing undefined when capacity_development_summary is null', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.CAPACITY_SHARING_FOR_DEVELOPMENT),
+            name: 'Capacity Sharing',
+          },
+          capacity_development_summary: null,
+        }),
+      ]);
+
+      expect(out[0].capacitySharing).toBeUndefined();
+    });
+
+    it('should map innovation_development_summary for INNOVATION_DEV indicators', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          indicator_category: {
+            code: String(ResultTypeEnum.INNOVATION_DEVELOPMENT),
+            name: 'Innovation Development',
+          },
+          innovation_development_summary: {
+            short_name: 'Holistic framework for valuing ecosystem services',
+            characterization: {
+              id: 1,
+              name: 'Incremental innovation',
+              definition: 'def',
+            },
+            typology: {
+              id: 13,
+              code: 13,
+              name: 'Capacity development innovation',
+              definition: 'def',
+            },
+            innovation_user_to_be_determined: false,
+            innovation_developers: 'dev',
+            innovation_collaborators: 'collab',
+            innovation_readiness_level: {
+              id: 14,
+              level: 3,
+              name: 'Proof of Concept',
+              definition: 'def',
+            },
+            evidences_justification: 'We chose readiness level 3',
+            has_scaling_studies: false,
+            anticipated_user_demand: {
+              actors: [
+                {
+                  actor_type_name: 'Researchers',
+                  sex_and_age_disaggregation: true,
+                  addressing_demands: 'The framework is providing methods',
+                },
+                {
+                  actor_type_name: 'Policy actors (public or private)',
+                  sex_and_age_disaggregation: true,
+                  addressing_demands: 'The framework is providing methods',
+                },
+              ],
+              organizations: [
+                {
+                  institution_type_name: 'NGO International (General)',
+                  addressing_demands: 'The framework is providing methods',
+                },
+              ],
+              measures: [],
+            },
+            initiative_budget: [],
+            bilateral_project_budget: [],
+            partner_budget: [],
+            reference_materials: [],
+            evidence_of_user_need_user_demand: [],
+            scaling_study_urls: [],
+            innovation_development_questionnaire: {
+              responsible_innovation_and_scaling: [],
+              intellectual_property_rights: [
+                {
+                  question: 'private sector engagement',
+                  question_id: 101,
+                  answer: { text: 'Not sure' },
+                },
+                {
+                  question: 'formal IPR',
+                  question_id: 102,
+                  answer: { text: 'No' },
+                },
+                {
+                  question: 'IP expert',
+                  question_id: 103,
+                  answer: { text: 'No, not now.' },
+                },
+                {
+                  question: 'already involved',
+                  question_id: 138,
+                  answer: { text: 'Not sure' },
+                },
+              ],
+              innovation_team_diversity: [],
+              megatrends: [],
+            },
+          },
+        }),
+      ]);
+
+      expect(out[0].createResult.indicator_id).toBe(
+        IndicatorsEnum.INNOVATION_DEV,
+      );
+      expect(
+        clarisaInnovationCharacteristicsService.findByName,
+      ).toHaveBeenCalledWith('Incremental innovation');
+      expect(clarisaInnovationTypesService.findByName).toHaveBeenCalledWith(
+        'Capacity development innovation',
+      );
+      expect(
+        clarisaInnovationReadinessLevelsService.findByValue,
+      ).toHaveBeenCalledWith(3);
+      expect(out[0].innovationDev).toEqual(
+        expect.objectContaining({
+          short_title: 'Holistic framework for valuing ecosystem services',
+          innovation_nature_id: 1,
+          innovation_type_id: 13,
+          innovation_readiness_id: 14,
+          innovation_readiness_explanation: 'We chose readiness level 3',
+          anticipated_users_id: 2,
+          no_sex_age_disaggregation: false,
+        }),
+      );
+      // `addressing_demands` is intentionally NOT mapped: the PRMS text does not
+      // satisfy STAR's display rules for these fields, so they stay empty until
+      // the rules are revisited.
+      expect(out[0].innovationDev.expected_outcome).toBeUndefined();
+      expect(
+        out[0].innovationDev.intended_beneficiaries_description,
+      ).toBeUndefined();
+      expect(out[0].innovationDev.actors).toHaveLength(2);
+      expect(out[0].innovationDev.institution_types).toEqual([
+        expect.objectContaining({
+          institution_type_id: 20,
+          is_organization_known: false,
+        }),
+      ]);
+      expect(out[0].ipRights).toEqual({
+        private_sector_engagement_id: 3,
+        formal_ip_rights_application_id: 2,
+      });
+      expect(clarisaActorTypesService.findByName).toHaveBeenCalled();
+      expect(clarisaInstitutionTypesService.findByName).toHaveBeenCalled();
+    });
   });
 
   describe('processKnowledgeProduct (private)', () => {
@@ -517,6 +1196,32 @@ describe('PrmsOpenSearchService', () => {
       (service as any).processKnowledgeProduct(kpList, body);
 
       expect(body.evidence.evidence.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('does not duplicate an evidence entry whose url already exists', () => {
+      const body = new ExternalMappersDto();
+      body.evidence = {
+        evidence: [
+          { evidence_url: 'http://handle', evidence_description: 'gender 1' },
+        ] as any,
+      } as any;
+      const kp = {
+        knowledge_product_type: 'JOURNAL',
+        handle: 'http://handle',
+        doi: '10.1000/xyz',
+      } as PrmsKnowledgeProductDto;
+
+      (service as any).processKnowledgeProduct(kp, body);
+
+      expect(body.evidence.evidence).toHaveLength(2);
+      expect(
+        body.evidence.evidence.filter(
+          (el) => el.evidence_url === 'http://handle',
+        ),
+      ).toHaveLength(1);
+      expect(
+        body.evidence.evidence.find((el) => el.evidence_url === '10.1000/xyz'),
+      ).toBeDefined();
     });
   });
 
@@ -594,6 +1299,32 @@ describe('PrmsOpenSearchService', () => {
       await service.mapToExternalCreateResultDto([basePayload()]);
 
       expect(queryService.deleteFullResultById).toHaveBeenCalledWith(888);
+    });
+
+    it('should warn, not throw, when the sync rollback delete is REFUSED', async () => {
+      // T-07 pivot per-caller verdict: `deleteFullResultById` resolves
+      // (never rejects) on a REFUSED outcome, so this catch block would
+      // otherwise proceed silently, leaving a live row on an ambiguous
+      // identity for the duplicate matcher to see again on the next run.
+      resultRepoHandle.findOne.mockResolvedValueOnce(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 889,
+        result_official_code: 56,
+      } as any);
+      resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('boom'));
+      queryService.deleteFullResultById.mockResolvedValueOnce([
+        { resultId: 889, status: ResultDeleteStatus.REFUSED },
+      ]);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.mapToExternalCreateResultDto([basePayload()]);
+
+      expect(queryService.deleteFullResultById).toHaveBeenCalledWith(889);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('889'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('manual handling'),
+      );
+      warnSpy.mockRestore();
     });
 
     it('should log and skip rollback when update fails without new result', async () => {

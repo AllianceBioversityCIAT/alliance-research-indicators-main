@@ -33,8 +33,8 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  *
  * Requires MySQL views: report_general_information, report_alliance_alignment,
  * report_partners, report_geo_location, report_evidences, report_ip_rights,
- * report_capacity_sharing_development, report_policy_change, report_oicr,
- * report_link_result.
+ * report_capacity_sharing_development, report_policy_change, report_innovation_dev,
+ * report_oicr, report_link_result.
  */
 @Injectable()
 export class StarResultsExportRepository {
@@ -126,6 +126,33 @@ export class StarResultsExportRepository {
         pc.policy_stage AS policy_stage,
         pc.evidence_stage AS evidence_stage,
         pc.implementing_organizations AS implementing_organizations,
+        idv.short_title AS short_title,
+        idv.innovation_nature AS innovation_nature,
+        idv.innovation_type AS innovation_type,
+        idv.innovation_readiness_level AS innovation_readiness_level,
+        idv.innovation_readiness_explanation AS innovation_readiness_explanation,
+        idv.actors AS actors,
+        idv.innovation_partners AS innovation_partners,
+        idv.intended_beneficiaries_description AS intended_beneficiaries_description,
+        idv.expected_outcome AS expected_outcome,
+        idv.expansion_adaptation_details AS expansion_adaptation_details,
+        idv.dissemination_qualification AS dissemination_qualification,
+        idv.tool_useful_context AS tool_useful_context,
+        idv.results_achieved_expected AS results_achieved_expected,
+        idv.tool_functions AS tool_functions,
+        idv.is_used_beyond_original_context AS is_used_beyond_original_context,
+        idv.adoption_adaptation_context AS adoption_adaptation_context,
+        idv.link_to_results AS tools_often_used_together,
+        idv.other_tools AS other_tools,
+        idv.other_tools_integration AS other_tools_integration,
+        idv.is_cheaper_than_alternatives AS is_cheaper_than_alternatives,
+        idv.is_simpler_to_use AS is_simpler_to_use,
+        idv.does_perform_better AS does_perform_better,
+        idv.is_desirable_to_users AS is_desirable_to_users,
+        idv.has_commercial_viability AS has_commercial_viability,
+        idv.has_suitable_enabling_environment AS has_suitable_enabling_environment,
+        idv.has_evidence_of_uptake AS has_evidence_of_uptake,
+        idv.expansion_potential AS expansion_potential,
         oc.impact_area AS impact_area,
         oc.mel_regional_expert AS mel_regional_expert,
         oc.sharepoint_link AS sharepoint_link,
@@ -150,6 +177,7 @@ export class StarResultsExportRepository {
       LEFT JOIN report_ip_rights ip ON ip.result_id = gi.result_id
       LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id
       LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id
+      LEFT JOIN report_innovation_dev idv ON idv.result_id = gi.result_id
       LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id
       LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id`;
 

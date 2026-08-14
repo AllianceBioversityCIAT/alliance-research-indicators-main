@@ -55,7 +55,13 @@ export const STAR_RAW_COLUMN_GROUP_FALLBACK: Array<{
   },
   {
     fromCol: 61,
-    toCol: 74,
+    toCol: 87,
+    label: 'INNOVATION DETAILS',
+    fillArgb: 'FF00897B',
+  },
+  {
+    fromCol: 88,
+    toCol: 101,
     label: 'OICR DETAILS',
     fillArgb: 'FFD9A041',
   },
@@ -71,7 +77,7 @@ export const STAR_RAW_SHEET_PREAMBLE_BASE: Omit<
   bannerTitleFillArgb: STAR_RAW_BANNER_TITLE_FILL_ARGB,
   bannerTitleFontArgb: STAR_RAW_BANNER_TITLE_FONT_ARGB,
   bannerTitleMergeFromCol: 3,
-  bannerTitleMergeToCol: 74,
+  bannerTitleMergeToCol: 101,
   logoMergeFromCol: 1,
   logoMergeToCol: 2,
   /** Row 1 only so row 2 subtitle merge does not overlap the logo merge. */

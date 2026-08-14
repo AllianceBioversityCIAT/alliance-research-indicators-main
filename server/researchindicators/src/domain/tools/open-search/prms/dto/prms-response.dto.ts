@@ -139,6 +139,30 @@ export class EvidencesMapper {
   public description: string;
 }
 
+/**
+ * The KP result's OWN publication handle (R-RES-010, rev 4).
+ *
+ * Measured live on the PRMS searcher payload, 2026-08-05: present and
+ * handle-format on 277/277 Knowledge Product items
+ * (`indicator_category.code = 6`, `ResultTypeEnum.KNOWLEDGE_PRODUCT`), one
+ * handle per item, and identical to the single handle in that item's
+ * `evidences[]` on 277/277. Unlike `evidences[]` — which 41/123 live non-KP
+ * items also carry, for a handle the result merely CITES (DC-10) —
+ * this field exists only for the result's own publication, which is what
+ * makes the KP-only identity scope a property of the field rather than a
+ * filter that must be remembered. See
+ * `docs/specs/results/cross-platform-duplicate-resolution/execution.md` ->
+ * "Pivot Record: T-13 — RESOLVED BY OBSERVATION".
+ *
+ * NOT the same field as `result_knowledge_product_array` (declared above on
+ * `PrmsResponseDto`, a different, unrelated payload shape) — that field is
+ * absent from every real PRMS payload measured (0 of 13,507 staged rows) and
+ * must not be read for identity.
+ */
+export class KnowledgeProductSummaryMapper {
+  public handle: string;
+}
+
 export class PrimaryEntityMapper {
   public official_code: string;
   public name: string;
@@ -201,8 +225,153 @@ export class ResultResponseMapper {
   public contributing_centers: ContributingCenterMapper[];
   public contributing_partners: ContributingPartnerMapper[];
   public evidences: EvidencesMapper[];
+  public knowledge_product_summary: KnowledgeProductSummaryMapper;
   public primary_entity: PrimaryEntityMapper;
   public created_by: CreatedByMapper;
+  public policy_change_summary: PolicyChangeSummaryMapper;
+  public capacity_development_summary: CapacityDevelopmentSummaryMapper;
+  public innovation_development_summary: InnovationDevelopmentSummaryMapper;
+}
+
+export class PolicyChangeSummaryMapper {
+  public amount: number;
+  public amount_status_label: string;
+  public policy_type: PolicyTypeMapper;
+  public policy_stage: PolicyStageMapper;
+  public linked_innovation_dev: boolean;
+  public linked_innovation_use: boolean;
+  public result_related_to: ResultRelatedToMapper[];
+  public policy_implementing_organizations: PolicyImplementingOrganizationsMapper[];
+}
+
+export class CapacityDevelopmentSummaryMapper {
+  public male_using: number;
+  public female_using: number;
+  public non_binary_using: number;
+  public has_unkown_using: number;
+  public is_attending_for_organization: boolean;
+  public delivery_method: DeliveryMethodMapper;
+  public training_length: TrainingLengthMapper;
+  public on_behalf_organizations: OnBehalfOrganizationMapper[];
+}
+
+export class InnovationDevelopmentSummaryMapper {
+  public short_name: string;
+  public characterization: InnovationCharacterizationMapper;
+  public typology: InnovationTypologyMapper;
+  public innovation_user_to_be_determined: boolean;
+  public innovation_developers: string;
+  public innovation_collaborators: string;
+  public innovation_readiness_level: InnovationReadinessLevelMapper;
+  public evidences_justification: string;
+  public has_scaling_studies: boolean;
+  public anticipated_user_demand: AnticipatedUserDemandMapper;
+  public initiative_budget: unknown[];
+  public bilateral_project_budget: unknown[];
+  public partner_budget: unknown[];
+  public reference_materials: unknown[];
+  public evidence_of_user_need_user_demand: unknown[];
+  public scaling_study_urls: unknown[];
+  public innovation_development_questionnaire: InnovationDevelopmentQuestionnaireMapper;
+}
+
+export class InnovationCharacterizationMapper {
+  public id: number;
+  public name: string;
+  public definition: string;
+}
+
+export class InnovationTypologyMapper {
+  public id: number;
+  public code: number;
+  public name: string;
+  public definition: string;
+}
+
+export class InnovationReadinessLevelMapper {
+  public id: number;
+  public level: number;
+  public name: string;
+  public definition: string;
+}
+
+export class AnticipatedUserDemandMapper {
+  public actors: AnticipatedUserActorMapper[];
+  public organizations: AnticipatedUserOrganizationMapper[];
+  public measures: unknown[];
+}
+
+export class AnticipatedUserActorMapper {
+  public actor_type_name: string;
+  public sex_and_age_disaggregation: boolean;
+  public addressing_demands: string;
+}
+
+export class AnticipatedUserOrganizationMapper {
+  public institution_type_name: string;
+  public addressing_demands: string;
+}
+
+export class InnovationDevelopmentQuestionnaireMapper {
+  public responsible_innovation_and_scaling: InnovationQuestionnaireItemMapper[];
+  public intellectual_property_rights: InnovationQuestionnaireItemMapper[];
+  public innovation_team_diversity: InnovationQuestionnaireItemMapper[];
+  public megatrends: InnovationQuestionnaireItemMapper[];
+}
+
+export class InnovationQuestionnaireItemMapper {
+  public question: string;
+  public question_id: number;
+  public answer: InnovationQuestionnaireAnswerMapper;
+  public selected_sub_options?: InnovationQuestionnaireItemMapper[];
+}
+
+export class InnovationQuestionnaireAnswerMapper {
+  public text?: string;
+  public boolean?: boolean;
+  public selections?: string[];
+}
+
+export class DeliveryMethodMapper {
+  public name: string;
+  public description: string;
+}
+
+export class TrainingLengthMapper {
+  public name: string;
+  public term: string;
+  public description: string;
+}
+
+export class OnBehalfOrganizationMapper {
+  public id: number;
+  public name: string;
+  public acronym: string;
+  public institution_type_name: string;
+}
+
+export class ResultRelatedToMapper {
+  public parent_question: string;
+  public option_text: string;
+}
+
+export class PolicyImplementingOrganizationsMapper {
+  public id: number;
+  public name: string;
+  public acronym: string;
+  public institution_type_name: string;
+}
+
+export class PolicyTypeMapper {
+  public id: number;
+  public name: string;
+  public definition: string;
+}
+
+export class PolicyStageMapper {
+  public id: number;
+  public name: string;
+  public definition: string;
 }
 
 export class PrmsTemporalResponseMapper {

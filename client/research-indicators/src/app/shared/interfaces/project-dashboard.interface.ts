@@ -19,6 +19,7 @@ export interface GeoScopeSummary {
 }
 
 export interface ProjectDashboardRankedItem {
+  user_id?: string;
   agreement_id?: string;
   contract_id?: string;
   contract_code?: string;

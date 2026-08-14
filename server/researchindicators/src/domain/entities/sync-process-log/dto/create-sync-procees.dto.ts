@@ -15,6 +15,7 @@ export class CreateSyncProcessDto {
   totalRecords: number;
   successRecords: number;
   errorRecords: number;
+  omittedDuplicateRecords?: number;
   processStatus: SyncProcessStatusEnum;
 
   static fromEntity(
@@ -54,6 +55,10 @@ export class CreateSyncProcessDto {
       error_records: incrementCounter(
         syncProcessLog.error_records,
         entity?.errorRecords,
+      ),
+      omitted_duplicate_records: incrementCounter(
+        syncProcessLog.omitted_duplicate_records,
+        entity?.omittedDuplicateRecords,
       ),
       total_records: incrementCounter(
         syncProcessLog.total_records,

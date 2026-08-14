@@ -376,7 +376,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
    * A missing or non-object intermediate segment is created as a plain
    * object; an existing intermediate segment keeps its other keys. Mirrors
    * `UtilsService.setNestedPropertyWithReduce`'s `acc[key] ??= {}` convention
-   * without its in-place mutation (see design.md D-OLD-1).
+   * without its in-place mutation (see design.md DD-1).
    */
   private writeAtPath(current: any, path: string, value: any): any {
     const [key, ...rest] = path.split('.');

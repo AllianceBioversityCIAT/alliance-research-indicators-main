@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mockup — Chunk B: Indicator-metadata charts (Project Dashboard)</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ------------------------------------------------------------------
+     Self-contained mockup for docs/specs/project-dashboard/indicator-metadata-charts
+     Tokens copied verbatim from the live client so the mockup is measurable
+     against the real dashboard:
+       navy      #112F5C   (headings, counts)
+       slate     #4c5158   (item labels)
+       grey      #777C83   (descriptions)
+       border    #e8ebed
+       chip bg   #E8F0F7 / chip fg #345B8F
+       accent    #1689CA
+     Bar colours mirror projectDashboardBarColor():
+       1st #358540 · 2nd #7CB580 · 3rd #1689CA · middle #345b8f · last #112F5C
+       (single-item charts render #112f5c)
+     Font: Barlow, matching font-['Barlow'] throughout the component tree.
+     ------------------------------------------------------------------ */
+  :root{
+    --navy:#112F5C; --slate:#4c5158; --grey:#777C83; --line:#e8ebed;
+    --chip-bg:#E8F0F7; --chip-fg:#345B8F; --accent:#1689CA;
+    --c1:#358540; --c2:#7CB580; --c3:#1689CA; --cm:#345b8f; --cl:#112F5C;
+    --page:#f4f6f8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--page);font-family:'Barlow',system-ui,sans-serif;color:var(--slate);}
+  .wrap{max-width:1320px;margin:0 auto;padding:28px 24px 80px;}
+
+  /* --- mockup chrome (not part of the product) --- */
+  .banner{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);
+    border-radius:12px;padding:18px 20px;margin-bottom:26px;}
+  .banner h1{margin:0 0 6px;font-size:17px;font-weight:600;color:var(--navy);}
+  .banner p{margin:0 0 4px;font-size:13.5px;line-height:1.6;color:var(--grey);}
+  .banner code{background:var(--chip-bg);color:var(--chip-fg);padding:1px 5px;border-radius:4px;font-size:12px;}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .legend span{font-size:11.5px;background:var(--chip-bg);color:var(--chip-fg);
+    border-radius:999px;padding:3px 10px;font-weight:600;}
+  .note{position:relative;}
+  .note::after{content:attr(data-note);position:absolute;top:-9px;right:10px;background:#FFF4E5;
+    color:#8A5A00;border:1px solid #F5D9A8;border-radius:999px;padding:2px 9px;
+    font-size:10.5px;font-weight:600;letter-spacing:.02em;white-space:nowrap;z-index:3;}
+
+  /* --- section headers --- */
+  .sec-head{display:flex;align-items:center;gap:10px;margin:34px 0 14px;}
+  .sec-head .ico{font-size:17px;color:var(--navy);}
+  .sec-head h2{margin:0;font-size:16px;font-weight:600;color:var(--navy);line-height:1.2;}
+  .sec-head .sub{margin-left:auto;font-size:12.5px;color:var(--grey);}
+
+  /* --- indicator band (the layout answer to B-R1) --- */
+  .band{background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:0;margin-bottom:18px;overflow:hidden;box-shadow:0 1px 2px rgba(17,47,92,.04);}
+  .band-head{display:flex;align-items:center;gap:10px;padding:14px 18px;
+    background:linear-gradient(0deg,#fbfcfd,#fff);border-bottom:1px solid var(--line);}
+  .band-head .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .band-head h3{margin:0;font-size:14px;font-weight:600;color:var(--navy);letter-spacing:.01em;}
+  .band-head .count{font-size:11.5px;font-weight:600;color:var(--chip-fg);
+    background:var(--chip-bg);border-radius:999px;padding:3px 10px;}
+  .band-head .caret{margin-left:auto;color:var(--grey);font-size:12px;user-select:none;}
+  /* auto-FILL, not auto-fit: keeps empty tracks so a band with one card
+     (e.g. OICR) renders a normal-width card instead of a 1200px-wide one. */
+  .band-body{display:grid;gap:18px;padding:18px;align-items:start;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));}
+  /* 4-card band → 2x2 instead of a 3+1 orphan row (M-3) */
+  .band-body.two{grid-template-columns:repeat(auto-fill,minmax(400px,1fr));}
+
+  /* --- card (mirrors app-project-dashboard-card variant="card") --- */
+  .card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:16px 16px 14px;
+    display:flex;flex-direction:column;gap:12px;}
+  .card > header{display:flex;flex-direction:column;gap:3px;}
+  .card .t{display:flex;align-items:center;gap:8px;}
+  .card .t i{font-size:12px;color:var(--accent);}
+  .card .t span{font-size:14px;font-weight:600;color:var(--navy);line-height:1.15;}
+  .card .d{font-size:11.5px;line-height:1.45;color:var(--grey);}
+
+  /* layout: columns (vertical bars) — for <=5 categories */
+  ul.cols{list-style:none;margin:auto 0 0;padding:4px 0 0;display:grid;gap:10px;align-items:end;}
+  ul.cols li{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;}
+  ul.cols .n{font-size:12px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums;line-height:1;}
+  ul.cols .track{position:relative;width:100%;max-width:4.2rem;height:6rem;overflow:hidden;}
+  ul.cols .fill{position:absolute;left:0;right:0;bottom:0;min-height:4px;border-radius:8px 8px 0 0;}
+  ul.cols .lb{font-size:10px;line-height:1.2;text-align:center;color:var(--slate);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+  /* layout: rows (horizontal bar + count) — for >5 categories or long labels */
+  ul.rows{list-style:none;margin:auto 0 0;padding:4px 0 0;display:flex;flex-direction:column;gap:10px;}
+  ul.rows li{display:grid;grid-template-columns:minmax(0,1fr) minmax(64px,1.6fr) auto;
+    align-items:center;gap:10px;}
+  ul.rows .lb{font-size:12px;color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  ul.rows .track{height:10px;border-radius:999px;background:var(--line);overflow:hidden;}
+  ul.rows .fill{height:100%;border-radius:inherit;min-width:4px;}
+  ul.rows .n{font-size:13px;font-weight:700;color:var(--navy);
+    font-variant-numeric:tabular-nums;text-align:right;min-width:28px;}
+
+  /* source footnote on the Gender card (B-R3 mitigation) */
+  .src{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);
+    font-size:10.5px;line-height:1.5;color:var(--grey);display:flex;gap:6px;align-items:flex-start;}
+  .src i{color:var(--accent);font-size:11px;margin-top:1px;}
+
+  /* filter pill on the Degree card */
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;
+    background:var(--chip-bg);color:var(--chip-fg);border-radius:999px;padding:3px 9px;align-self:flex-start;}
+
+  /* empty-field state (B-OQ3 answer) */
+  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:7px;text-align:center;padding:14px 8px;color:var(--grey);}
+  .empty .g{width:34px;height:34px;border-radius:50%;background:var(--chip-bg);
+    display:flex;align-items:center;justify-content:center;color:var(--chip-fg);font-size:14px;}
+  .empty p{margin:0;font-size:11.5px;line-height:1.5;max-width:220px;}
+
+  /* hidden-indicator explainer (D-7) */
+  .hidden-band{border:1px dashed #cbd5e1;background:#fbfcfd;border-radius:14px;
+    padding:16px 18px;display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .hidden-band .g{width:30px;height:30px;border-radius:8px;background:#eef1f4;color:#94a3b8;
+    display:flex;align-items:center;justify-content:center;font-size:13px;flex:none;}
+  .hidden-band p{margin:0;font-size:12px;line-height:1.55;color:var(--grey);}
+  .hidden-band strong{color:var(--slate);font-weight:600;}
+
+  /* existing-section stub */
+  .stub{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;}
+  .stub div{border:1px dashed var(--line);border-radius:9px;padding:14px 12px;text-align:center;
+    font-size:11.5px;color:var(--grey);background:#fcfdfe;}
+  .stub b{display:block;color:var(--slate);font-weight:600;font-size:12px;margin-bottom:3px;}
+
+  @media (max-width:720px){
+    /* `.two` is two classes, so it must be named here or it outspecifies this rule */
+    .band-body, .band-body.two{grid-template-columns:1fr;}
+    .wrap{padding:18px 14px 60px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="banner">
+    <h1>Project Dashboard — Indicator-metadata charts (Chunk B mockup)</h1>
+    <p>Resolves the proposal's blocking layout question <strong>B-R1 / B-10</strong>: how the dashboard absorbs
+       <strong>10 new cards</strong> on top of the 7 that exist today, without turning the page into an undifferentiated grid.</p>
+    <p><strong>The answer:</strong> the new cards do <em>not</em> join the existing <code>Result analytics</code> grid.
+       They live in a new <code>Indicator metadata</code> section, split into one <strong>collapsible band per indicator</strong>.
+       A band is the unit of visibility (D-7), so a project with no OICR results simply has no OICR band —
+       and the user never scrolls past empty cards to reach populated ones.</p>
+    <div class="legend">
+      <span>10 new cards</span><span>4 indicator bands</span><span>Chunk A card + expansion reused</span>
+      <span>No new chart component</span><span>Server: 10 aggregations on reports/full</span>
+    </div>
+  </div>
+
+  <!-- ============ EXISTING SECTION (unchanged, shown for context) ============ -->
+  <div class="sec-head">
+    <span class="ico">&#128202;</span>
+    <h2>Result analytics</h2>
+    <span class="sub">unchanged by this spec</span>
+  </div>
+  <div class="stub">
+    <div><b>Results Partners</b>Chunk A — show more</div>
+    <div><b>Primary Levers</b>Chunk A — show more</div>
+    <div><b>Main contact person</b>Chunk A — show more</div>
+    <div><b>Contributing projects</b>Chunk A — show more</div>
+    <div><b>Results by indicator</b>existing</div>
+    <div><b>Results by status</b>existing — deferred, stays client-side</div>
+    <div><b>Geographic scope</b>Chunk A2 owns this</div>
+  </div>
+
+  <!-- ============ NEW SECTION ============ -->
+  <div class="sec-head">
+    <span class="ico">&#129513;</span>
+    <h2>Indicator metadata</h2>
+    <span class="sub">new — one band per indicator, ordered by result volume</span>
+  </div>
+
+  <!-- ---------- Innovation Development ---------- -->
+  <section class="band">
+    <div class="band-head">
+      <span class="dot" style="background:var(--c1)"></span>
+      <h3>Innovation Development</h3>
+      <span class="count">24 results</span>
+      <span class="caret">&#9662; collapse</span>
+    </div>
+    <div class="band-body">
+
+      <article class="card">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Innovation Nature</span></div>
+          <div class="d">Nature of the innovations reported under this project.</div>
+        </header>
+        <ul class="cols" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+          <li><span class="n">11</span><div class="track"><div class="fill" style="height:100%;background:var(--c1)"></div></div><span class="lb">Technological</span></li>
+          <li><span class="n">7</span><div class="track"><div class="fill" style="height:64%;background:var(--c2)"></div></div><span class="lb">Capacity development</span></li>
+          <li><span class="n">4</span><div class="track"><div class="fill" style="height:36%;background:var(--c3)"></div></div><span class="lb">Policy / organisational</span></li>
+          <li><span class="n">2</span><div class="track"><div class="fill" style="height:18%;background:var(--cl)"></div></div><span class="lb">Other</span></li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Innovation Type</span></div>
+          <div class="d">Type recorded on each innovation-development result.</div>
+        </header>
+        <ul class="rows">
+          <li><span class="lb">Product / technology</span><div class="track"><div class="fill" style="width:100%;background:var(--c1)"></div></div><span class="n">10</span></li>
+          <li><span class="lb">Service</span><div class="track"><div class="fill" style="width:60%;background:var(--c2)"></div></div><span class="n">6</span></li>
+          <li><span class="lb">Method / approach</span><div class="track"><div class="fill" style="width:50%;background:var(--c3)"></div></div><span class="n">5</span></li>
+          <li><span class="lb">Policy / institutional</span><div class="track"><div class="fill" style="width:20%;background:var(--cm)"></div></div><span class="n">2</span></li>
+          <li><span class="lb">Other</span><div class="track"><div class="fill" style="width:10%;background:var(--cl)"></div></div><span class="n">1</span></li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Current Readiness</span></div>
+          <div class="d">Innovation readiness level currently reported.</div>
+        </header>
+        <ul class="rows">
+          <li><span class="lb">Level 3 — proof of concept</span><div class="track"><div class="fill" style="width:100%;background:var(--c1)"></div></div><span class="n">9</span></li>
+          <li><span class="lb">Level 5 — pilot</span><div class="track"><div class="fill" style="width:78%;background:var(--c2)"></div></div><span class="n">7</span></li>
+          <li><span class="lb">Level 2 — formulation</span><div class="track"><div class="fill" style="width:56%;background:var(--c3)"></div></div><span class="n">5</span></li>
+          <li><span class="lb">Level 7 — uncontrolled testing</span><div class="track"><div class="fill" style="width:22%;background:var(--cm)"></div></div><span class="n">2</span></li>
+          <li><span class="lb">Level 0 — idea</span><div class="track"><div class="fill" style="width:11%;background:var(--cl)"></div></div><span class="n">1</span></li>
+        </ul>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ---------- Capacity Sharing ---------- -->
+  <section class="band">
+    <div class="band-head">
+      <span class="dot" style="background:var(--c3)"></span>
+      <h3>Capacity Sharing for Development</h3>
+      <span class="count">36 results</span>
+      <span class="caret">&#9662; collapse</span>
+    </div>
+    <div class="band-body two">
+
+      <article class="card">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Training or engagement to report</span></div>
+          <div class="d">Session format recorded on each capacity-sharing result.</div>
+        </header>
+        <ul class="cols" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <li><span class="n">21</span><div class="track"><div class="fill" style="height:100%;background:var(--c1)"></div></div><span class="lb">Individual training</span></li>
+          <li><span class="n">15</span><div class="track"><div class="fill" style="height:71%;background:var(--c2)"></div></div><span class="lb">Group training</span></li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Training vs. Engagement</span></div>
+          <div class="d">Session type recorded on each capacity-sharing result.</div>
+        </header>
+        <ul class="cols" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <li><span class="n">28</span><div class="track"><div class="fill" style="height:100%;background:var(--c1)"></div></div><span class="lb">Training</span></li>
+          <li><span class="n">8</span><div class="track"><div class="fill" style="height:29%;background:var(--c2)"></div></div><span class="lb">Engagement</span></li>
+        </ul>
+      </article>
+
+      <article class="card note" data-note="B-R3 — mixed units, labelled">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Gender</span></div>
+          <div class="d">Total distribution by gender across both training types.</div>
+        </header>
+        <ul class="cols" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <li><span class="n">312</span><div class="track"><div class="fill" style="height:100%;background:var(--c1)"></div></div><span class="lb">Male</span></li>
+          <li><span class="n">287</span><div class="track"><div class="fill" style="height:92%;background:var(--c2)"></div></div><span class="lb">Female</span></li>
+          <li><span class="n">14</span><div class="track"><div class="fill" style="height:5%;background:var(--c3)"></div></div><span class="lb">Non-binary</span></li>
+        </ul>
+        <div class="src">
+          <i>&#9432;</i>
+          <span>Combines <strong>individual</strong> trainings (one participant each, from the participant's
+          gender field) with <strong>group</strong> trainings (total male / female / non-binary recorded on the form).</span>
+        </div>
+      </article>
+
+      <article class="card note" data-note="B-R4 — two-condition filter">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Degree</span></div>
+          <div class="d">Degree pursued in long-term trainings.</div>
+        </header>
+        <span class="pill">&#9873; Training &middot; Long-term (3 months and more)</span>
+        <ul class="cols" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+          <li><span class="n">6</span><div class="track"><div class="fill" style="height:100%;background:var(--c1)"></div></div><span class="lb">MSc</span></li>
+          <li><span class="n">4</span><div class="track"><div class="fill" style="height:67%;background:var(--c2)"></div></div><span class="lb">PhD</span></li>
+          <li><span class="n">3</span><div class="track"><div class="fill" style="height:50%;background:var(--c3)"></div></div><span class="lb">BSc</span></li>
+          <li><span class="n">1</span><div class="track"><div class="fill" style="height:17%;background:var(--cl)"></div></div><span class="lb">Other</span></li>
+        </ul>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ---------- Policy Change ---------- -->
+  <section class="band">
+    <div class="band-head">
+      <span class="dot" style="background:var(--cm)"></span>
+      <h3>Policy Change</h3>
+      <span class="count">11 results</span>
+      <span class="caret">&#9662; collapse</span>
+    </div>
+    <div class="band-body">
+
+      <article class="card">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Policy Type</span></div>
+          <div class="d">Type of policy reported on each policy-change result.</div>
+        </header>
+        <ul class="cols" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <li><span class="n">6</span><div class="track"><div class="fill" style="height:100%;background:var(--c1)"></div></div><span class="lb">Policy or strategy</span></li>
+          <li><span class="n">3</span><div class="track"><div class="fill" style="height:50%;background:var(--c2)"></div></div><span class="lb">Legal instrument</span></li>
+          <li><span class="n">2</span><div class="track"><div class="fill" style="height:33%;background:var(--c3)"></div></div><span class="lb">Budgetary / investment</span></li>
+        </ul>
+      </article>
+
+      <article class="card note" data-note="B-OQ3 — field unanswered">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Stage in Policy Process</span></div>
+          <div class="d">Stage reached by each reported policy change.</div>
+        </header>
+        <div class="empty">
+          <span class="g">&#9711;</span>
+          <p>The 11 Policy Change results on this project have no stage recorded yet.</p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ---------- OICR ---------- -->
+  <section class="band">
+    <div class="band-head">
+      <span class="dot" style="background:var(--cl)"></span>
+      <h3>OICR</h3>
+      <span class="count">8 results</span>
+      <span class="caret">&#9662; collapse</span>
+    </div>
+    <div class="band-body">
+      <article class="card">
+        <header>
+          <div class="t"><i>&#9679;</i><span>Maturity of change reported</span></div>
+          <div class="d">Maturity level recorded on each OICR result.</div>
+        </header>
+        <ul class="cols" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <li><span class="n">4</span><div class="track"><div class="fill" style="height:100%;background:var(--c1)"></div></div><span class="lb">Level 1 — established</span></li>
+          <li><span class="n">3</span><div class="track"><div class="fill" style="height:75%;background:var(--c2)"></div></div><span class="lb">Level 2 — emerging</span></li>
+          <li><span class="n">1</span><div class="track"><div class="fill" style="height:25%;background:var(--c3)"></div></div><span class="lb">Level 3 — mature</span></li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- ---------- D-7 explainer ---------- -->
+  <div class="hidden-band">
+    <span class="g">&#128065;</span>
+    <p><strong>Not rendered on this project (D-7):</strong> Innovation Use, Knowledge Product, Other Outcome&nbsp;—
+       any indicator with <strong>zero</strong> results on the project contributes
+       <strong>no band and no cards</strong> to the DOM. This is distinct from the
+       <em>Stage in Policy Process</em> card above, where the indicator <em>has</em> results but the field is
+       unanswered on all of them&nbsp;— that card renders with an explanatory empty state so the user can tell
+       "nobody filled this in" apart from "this doesn't apply here".</p>
+  </div>
+
+  <div class="banner" style="margin-top:26px;border-left-color:var(--c1)">
+    <h1 style="font-size:15px">Decisions this mockup locks in</h1>
+    <p><strong>M-1 — Bands, not one flat grid.</strong> Ten cards appended to the existing grid would produce
+       17 undifferentiated tiles. One band per indicator keeps each chart next to the indicator it describes,
+       and gives D-7 a natural unit to hide.</p>
+    <p><strong>M-2 — Band order follows result volume</strong> (descending), so the project's dominant indicator
+       is first. Card order <em>within</em> a band follows the acceptance criteria's order.</p>
+    <p><strong>M-3 — Chart layout by cardinality.</strong> <code>columns</code> (vertical bars) for &le;&nbsp;4
+       categories, <code>rows</code> (horizontal bars) for 5+ or long labels. Both are existing
+       <code>layout()</code> variants&nbsp;— no new chart component (B-7).</p>
+    <p><strong>M-4 — Bands are collapsible</strong>, defaulting to open. With four bands open the section is long
+       but scannable; collapsing is the escape hatch for projects reporting on every indicator.</p>
+    <p><strong>M-5 — Gender card carries a provenance footnote</strong> stating that individual and group
+       trainings are both included (mitigates B-R3's mixed-unit concern while satisfying the AC literally).</p>
+    <p><strong>M-6 — Degree card carries a filter pill</strong> making the two-condition scope
+       (Training + Long-term) visible on the card, so a reader never mistakes it for all degrees (B-R4).</p>
+    <p style="margin-top:8px;color:var(--slate)"><strong>Still open for /akili-specify:</strong> whether band
+       collapse state persists across navigation; exact copy for each card description; whether the band header
+       count is "results" or "results with this indicator".</p>
+  </div>
+
+</div>
+</body>
+</html>

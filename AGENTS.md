@@ -122,7 +122,7 @@ Both packages are independent deployables. See the child guides for per-package 
 Inherited from the TRD. Top-of-mind for every agent touching the server:
 
 - **HTTP envelope:** every response is `ServerResponseDto` (`{ data, status, description, errors, timestamp, path }`). Wrapping happens in `ResponseInterceptor`. Errors go through `GlobalExceptions` and use the same shape.
-- **Routing:** global `/api` prefix; URI versioning (`/api/v1`, `/api/v2`).
+- **Routing:** global `/api` prefix. URI versioning is **enabled** (`VersioningType.URI`) but **no `defaultVersion` is set** (`main.ts:53-56`), so a handler gets a version segment **only if it declares `@Version(...)`** — every other handler mounts unversioned. The reachable path for most endpoints is `/api/<resource>/...`, **not** `/api/v1/<resource>/...`, and `/api/v1/...` returns `404` unless that specific handler is decorated. Check the decorator (or boot the app and dump the route table) before writing a client, test, or doc against a path; assuming `/v1` has already put a non-existent endpoint into three documents of one spec — see `docs/specs/results/capdev-bulk-upload-notification/design.md` §5 → **D-T11-b**.
 - **Auth:** `JwtMiddleware` accepts ROAR JWT or base64(`{client_id, client_secret}`) machine tokens. `/admin*`, `/admin/public*`, `/.well-known*`, `GET /api/configuration/:key`, `GET /`, `/favicon.ico` are excluded.
 - **Authorization:** `@Roles(...)` + `RolesGuard`. `SYSTEM_ADMIN` bypasses role checks. Results mutations also pass through `ResultStatusGuard`.
 - **Audit:** every domain entity extends `AuditableEntity`; mutations populate audit fields from `request.user`.

@@ -1,0 +1,19 @@
+### TRUNCATED EXTRACT — server-coverage.log
+### Original: 330 KB, 1621 lines. Full log NOT archived (repo size).
+### Kept verbatim: the invoked command, the 'All files' coverage row,
+### the coverage summary block and the suite totals. Nothing else.
+
+--- command ---
+
+> researchindicators@0.0.1 test:cov
+> jest --coverage
+
+--- All files ---
+All files                                                                              |   84.16 |    74.62 |   84.67 |   84.22 |                                                                                                                                                         
+
+--- summary / totals ---
+Test Suites: 324 passed, 324 total
+Tests:       2069 passed, 2069 total
+Snapshots:   1 passed, 1 total
+Time:        30.183 s
+Ran all test suites.

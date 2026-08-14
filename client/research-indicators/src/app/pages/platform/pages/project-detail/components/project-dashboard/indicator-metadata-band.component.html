@@ -1,0 +1,17 @@
+<section class="imb">
+  <header class="imb-header">
+    <span class="imb-dot" [style.background-color]="color() || null" aria-hidden="true"></span>
+    <h3 class="imb-title">{{ indicator() }}</h3>
+    <span class="imb-chip">{{ resultCountLabel() }}</span>
+    <button type="button" class="imb-toggle" [attr.aria-expanded]="!collapsed()"
+      [attr.aria-label]="toggleAriaLabel()" (click)="onToggleClick()">
+      <i class="pi pi-chevron-down imb-toggle-icon" [class.imb-toggle-icon-collapsed]="collapsed()"
+        aria-hidden="true"></i>
+    </button>
+  </header>
+  @if (!collapsed()) {
+  <div class="imb-grid" [class.imb-grid-wide]="isWideGrid()">
+    <ng-content></ng-content>
+  </div>
+  }
+</section>

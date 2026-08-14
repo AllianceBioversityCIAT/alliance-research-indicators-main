@@ -22,6 +22,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { RolesGuard } from '../../shared/guards/roles.guard';
+import { ProtectedConfigKeysGuard } from '../../shared/guards/protected-config-keys.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { UpdateAppConfigDto } from './dtos/update-app-config.dto';
@@ -144,6 +145,9 @@ export class AppConfigController {
   }
 
   @Patch(':key')
+  // duplicate_resolution.* keys are SYSTEM_ADMIN-only: hard_delete_enabled arms
+  // irreversible deletion on the sync path, which has no dry run, digest or TTL.
+  @UseGuards(ProtectedConfigKeysGuard)
   @ApiBody({
     type: UpdateAppConfigDto,
     description: 'Configuration data to update',
