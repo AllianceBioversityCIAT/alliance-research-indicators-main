@@ -3,10 +3,14 @@ import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { MappingSourceEnum } from '../enum/mapping-source.enum';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.13 / R-BIL-079
+// [SPEC bilateral/clarisa-project-automapping] — DD-8 (supersedes D-PI-8)
 //
 // Owns the join between an AGRESSO bilateral contract and a CLARISA bilateral project.
-// Admin-maintained (see /admin/bilateral-project-mappings, T-15.15) — no upstream
-// join field exists per D-PI-8. Soft-delete via `is_active` from AuditableEntity.
+// Admin-maintained (see /admin/bilateral-project-mappings, T-15.15). Upstream join
+// field `external_code` is now published by CLARISA (see DD-8 in
+// docs/specs/bilateral/clarisa-project-automapping superseding archived D-PI-8,
+// which is preserved as a point-in-time record). Soft-delete via `is_active`
+// from AuditableEntity.
 //
 // Partial-uniqueness "(agresso_agreement_id) WHERE is_active = true" is enforced
 // by a MySQL generated column + unique index defined in the matching migration
