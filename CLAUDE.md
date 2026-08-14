@@ -161,6 +161,8 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
   | Lint (server) | `npx eslint <path>` | ⚠️ `npm run lint` carries `--fix`, so it **mutates files** and cannot verify (K-001) — use bare `npx eslint` as the gate |
   | Lint (client) | `npm run lint -- --quiet` | `ng lint` |
 
+- **Fixers are not gates — and a delegated worker still needs the fixer.** K-001 bans `npm run lint` as a *gate* because it carries `--fix`. It does **not** follow that a worker should be denied every formatting command: `npx prettier --write` **produces a formatted file and measures nothing**, so it cannot contaminate evidence and does not fall under the concurrency rule below. Forbidding it while still requiring formatted output removes the tool that resolves the problem and then fails the worker for the unresolved problem — **three failures in one 2026-08-14 run came from exactly this**. The line is: *worker may fix, Leader verifies, and no single command may do both.*
+
 - **Concurrency (binds every session, including ones that load no persona).** One AKILI session per checkout; additional sessions use `git worktree`. Two Leaders in one tree interleave commits and overwrite each other's `tasks.md` and `execution.md`. **Never run a measurement command — build, benchmark, Lighthouse, E2E — while a delegated agent is active:** it competes for `node_modules`, ports, lockfiles, and build output, and the result is not a slow measurement but a **wrong** one. Measure in the window after a worker reports. Cross-package parallelism (one server task + one client task) is safe; two tasks in the same package are not.
 
 ---
@@ -178,7 +180,7 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 | Tier | Claude Code | OpenCode | Antigravity | Fallback |
 | --- | --- | --- | --- | --- |
 | T1 Architect | `opus` | `<CONFIRM SLUG>` | `pro` | `sonnet` |
-| T2 Coder | `sonnet` | `opencode-go/glm-5.1` `<CONFIRM>` | `flash` | `sonnet` |
+| T2 Coder | `sonnet` | `opencode-go/glm-5.2` | `flash` | `sonnet` |
 | T3 Auditor | `opus` | `opencode-go/deepseek-v4-pro` `<CONFIRM>` | `pro` | `opus` |
 | T4 Context-Ingest | `sonnet` | `<CONFIRM SLUG>` | `flash` | `haiku` |
 | T5 Fast-Cheap | `haiku` | `opencode-go/deepseek-v4-flash` `<CONFIRM>` | `flash` | `haiku` |
@@ -189,8 +191,8 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 | Host | Command | Status |
 | --- | --- | --- |
 | Claude Code | `claude` | Confirmed (this session) |
-| OpenCode | `opencode` `<CONFIRM>` | Unconfirmed — ask before dispatching |
-| Antigravity | `agy` (**not** `antigravity`) | Documented name; **not installed on this machine** as of 2026-08-03 |
+| OpenCode | `opencode` | **Installed and confirmed** (v1.18.18, 2026-08-14) — but **unusable on this account: `Insufficient balance`.** A billing state, not a config one; re-check before planning around it |
+| Antigravity | `agy` (**not** `antigravity`) | **Installed and confirmed working** at `~/.local/bin/agy` (2026-08-14) — this line previously said "not installed", which would have ruled the host out unexamined. Headless needs `--dangerously-skip-permissions` (even a file read is auto-denied without it), and `--model`/`--effort` are session flags. `agy models` lists gemini-3.7/3.6/3.5-flash, gemini-3.1-pro, claude-sonnet-4-6, claude-opus-4-6 |
 
 **Cross-host dispatch:** T6 Multimodal → **Antigravity** (Gemini vision) when a phase genuinely needs image/diagram reading that the session host cannot do. The rule: *reach across hosts before degrading within one, but only for a real capability gap* — a cross-host spawn costs a fresh context, which a one-tier difference does not repay. This is the third option at every command's model checkpoint, alongside switch-model and continue-as-is. Whether an orchestrator is installed to perform the dispatch is a property of the machine, not of this project.
 

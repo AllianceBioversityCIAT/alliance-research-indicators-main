@@ -10,10 +10,10 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 | ID | Lesson | Severity | Target | Recurrence | Status |
 | --- | --- | --- | --- | --- | --- |
-| **K-004** | **A gate must be proven able to FAIL before it is trusted.** Three mandated gates in this repo could not go red for the reason they were mandated | **High** | Methodology | **4 gates** | Proposed (upstream) |
-| **K-006** | **An artifact no gate executes is an artifact nobody has verified** — and a static substitute for a dynamic gate is a third artifact nobody has verified | **High** | Product | 1 | **Institutionalized** (server `CLAUDE.md` §7) |
+| **K-004** | **A gate must be proven able to FAIL before it is trusted** — and the sharpest form is not "never run red" but **"no input in the suite CAN make it red."** A guard written correctly against `all` survived mutation to `slice` because every fixture set `all === slice`: correct code, decorative gate | **High** | Methodology | **5 gates** | Proposed (upstream) |
+| **K-007** | **A fixer is not a gate, and a delegated worker still needs the fixer.** Banning `npm run lint` as a gate (K-001) does not justify banning `prettier --write`: it produces a file and measures nothing, so it cannot contaminate evidence. Forbidding it while requiring formatted output removes the tool that solves the problem, then fails the worker for the problem | **High** | Product + Methodology | 1 (**3 failures in one run**) | **Institutionalized** (root `CLAUDE.md` §4.3) |
+| **K-008** | **Writing a coverage table does not make it exhaustive.** A clause-level traceability table authored specifically to stop requirement clauses shipping unowned still missed one, because the same pass authored both the requirements and the table — nothing independent checked that every clause appears | **Medium** | Methodology | 1 | Proposed (upstream) |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | Product | 2 (same edit) | Proposed |
-| **K-001** | A lint script that auto-fixes cannot serve as a verification gate — it makes the thing it checks true as a side effect of checking it | **High** | Product | 1 | **Institutionalized** (server `CLAUDE.md` §11) — now a member of K-004's family |
 | **K-002** | A tier can be certified "green" while being type-checked by nothing at all; test-runner green ≠ compiles | **High** | Product | 1 | **Institutionalized** (client `CLAUDE.md`) — **needs a factual correction, see 2026-08-13 C2 entry** |
 | **K-003** | Correction-closure sweeps must grep the **literal superseded string**, then re-grep to confirm — semantic greps miss their own target | **High** | Methodology | **6** (3 in C1, 3 in C2) | Proposed (upstream) |
 | **KZ-001** | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion | **High** | Product | 4 | Proposed |
@@ -26,6 +26,47 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-14 — `bilateral/clarisa-project-automapping` (S1)
+
+**Outcome:** 6 of 7 tasks delivered with independent Reviewer PASS; T-06 HALTed after 6 attempts. 2173 tests passing. The D8 reading — the stage's actual deliverable — was taken against DEV over VPN. Orchestrated through Orca with `agy`/gemini-3.7-flash-high as Implementer and Claude Opus as Reviewer, giving an `author ≠ auditor` split that crosses **providers**, not just tiers.
+
+#### Measure
+
+| Signal | Value |
+| --- | --- |
+| Orca dispatches | 18 |
+| Task-attempts failing first pass | **7 of 11** |
+| Reviewer FAIL verdicts | 4 |
+| HALTs | 1 (T-06) · Pivots 0 · PRODUCT_BUGs 0 |
+| Budget tripwire | **1 — fired, escalated, user ruled the estimate wrong** (~680 → ~3000 LOC) |
+| Judgment-day severe findings | 5 (all applied) |
+| Leader errors recorded | 3 |
+
+#### Learn
+
+**K-004 → recurrence 5, with its sharpest form yet.** T-04's availability guard was written *correctly* against the full feed. No reviewer reading the code would have objected. But every fixture set `all === slice`, so mutating the guard to the slice left **all 11 tests green** — the gate protecting this spec's headline behavior (R-CPA-005) could not fail for the reason it existed. The distinction worth institutionalizing: "was this gate ever seen red?" is weaker than **"can any input in this suite make it red?"** The finding came from mutation, not from reading.
+
+**K-007 — the fixer/gate conflation (NEW, and self-inflicted).** The Leader's briefs banned all measurement commands to honor the concurrency rule, sweeping `prettier --write` in with `npm test`. But a formatter *produces a file*; it measures nothing and cannot contaminate parallel evidence. The result: workers were denied the tool that fixes formatting and then rejected for unfixed formatting — **three of this run's failures**. K-001's real content is *fixing and verifying must be separate acts*, and it was applied one notch too broadly.
+
+**K-008 — a coverage table is not self-exhaustive (NEW).** `tasks.md` §3 carried a clause-level table written specifically so that no requirement clause could ship unowned. It still missed R-CPA-005's `description` sentence, which reached the working tree uncovered until T-04's Reviewer flagged it as a cross-task carry-forward. Root cause: the same authoring pass produced the requirements *and* the table, so nothing independent verified that every clause appeared in it.
+
+#### Standardize
+
+| Lesson | Action |
+| --- | --- |
+| K-007 | **Applied** — root `CLAUDE.md` §4.3 now states *worker may fix, Leader verifies, no single command may do both* |
+| K-004 | Upstream to AKILI (Methodology) — recurrence raised to 5 |
+| K-008 | Upstream to AKILI (Methodology) — no local edit |
+| — | **Factual sweep applied:** three registry claims in root `CLAUDE.md` were false. `agy` **is** installed (the line said it was not, which would have ruled the host out unexamined); `glm-5.2` exists (registry said 5.1); OpenCode is installed but blocked by **account balance**, not configuration |
+
+**A false correction avoided.** The CodeGraph line was suspected stale too — `.codegraph/` holds only `config.json`. It was **tested rather than corrected**: `codegraph_explore` resolved 48 symbols including the service created that same day, with blast radius. The claim is accurate. Correcting it would have introduced the very defect this sweep exists to remove.
+
+#### Record — what the run proved about the method
+
+The three most valuable findings all came from review asking *"what would make this red?"* rather than from any test: a decorative gate, an unauthorized third query parameter published by Swagger, and a documented DTO field the endpoint could never return. All three were **contract- or evidence-level defects sitting on top of correct code** — precisely the class a passing suite cannot surface.
+
+
 
 ### 2026-08-13 — post-archive findings, `bilateral/primary-contributing-sp`
 
