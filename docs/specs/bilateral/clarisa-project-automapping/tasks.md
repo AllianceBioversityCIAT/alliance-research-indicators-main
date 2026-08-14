@@ -307,5 +307,5 @@ Single-PR is acceptable if the team prefers it — the seam is a convenience, no
 - [ ] Swagger documents the endpoint
 - [ ] **No file under `src/db/migrations/` in the diff**
 - [ ] The three break-it-on-purpose demonstrations for T-06 are recorded (K-004)
-- [ ] **The D8 reading has been taken with the user** — the report run against a real environment, its numbers read aloud. *S1 is not complete when the code merges; it is complete when the measurement exists.*
-- [ ] OQ-2, OQ-5, OQ-7 answered or explicitly carried into S2
+- [x] **The D8 reading has been taken with the user** — 2026-08-14, over VPN against DEV, using the real service. Both environments read. *S1 is not complete when the code merges; it is complete when the measurement exists — and it now does.* See [`./evidence/D8-reading-2026-08-14.md`](./evidence/D8-reading-2026-08-14.md)
+- [x] OQ-2 answered (**no** — 5/380 makes "has SPs" the wrong filter) · OQ-5 population measured (342/38) · **OQ-7 still open and now more urgent** — the two Alliance selectors proved *disjoint*, so the legacy picker is selecting a different population, not merely a case-folded subset

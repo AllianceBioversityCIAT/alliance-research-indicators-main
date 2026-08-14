@@ -170,6 +170,30 @@ Test Suites: 2 passed, Tests: 15 passed
 
 ---
 
+## D8 reading taken — 2026-08-14. **S1 is complete.**
+
+The spec held throughout that the report is the *instrument* and the reading is the *deliverable*. The user connected over VPN, DEV became reachable, and the reading was taken with the **real service** — not a reimplementation, because measuring with a different instrument than the one built is the exact failure this spec exists to avoid.
+
+Full analysis: [`./evidence/D8-reading-2026-08-14.md`](./evidence/D8-reading-2026-08-14.md). Both payloads committed.
+
+**Production run — R-CPA-005 validated against reality rather than a fixture.** 299 projects, none carrying `external_code`; `upstream_contract_available: false`; `resolution`/`agresso`/`normalization`/`samples` all `null`; the `clarisa` block still emitted; a `warn` naming the host. **Production does not report a measured zero.** The behavior that consumed the most design effort — DD-3, judgment-day finding B-7 — does what it was built to do, in the environment it was built for. No test could have established this.
+
+**Test run — OQ-1 answered.** 336 of 1543 bilateral contracts resolve (21.8 %), which is **88.4 % of the reachable ceiling** — only 380 Alliance-2026 projects exist to match against, so the ceiling is 24.6 %. Quoting the raw "78 % unresolved" without that ceiling would misstate the instrument's performance fourfold.
+
+Three findings that only measurement could produce:
+
+| Finding | Consequence for S2 |
+| --- | --- |
+| **Normalization did 9.5× the work of exact matching** (304 vs 32) | The proposal's §4.3 inference is now fact. DD-4's closed-set strip is what actually produces coverage; exact matching alone would have yielded 2 % |
+| **`FULL_NAME` resolved ZERO** | The proposal positioned it as "a fallback for the residue". It contributed nothing. Dead weight as implemented — and unpredictable from the design |
+| **The two Alliance selectors are DISJOINT** (0 in both; 380 spec-only in test; 32 legacy-only in prod) | Corroborates **OQ-7** from a second direction: the legacy picker is not dropping lower-case rows, it is selecting a *different population*. S2 must choose deliberately |
+
+`AMBIGUOUS = 0` and `collision_count = 0` on live data — the injectivity claim, closed in August on a static probe, now holds against the real join.
+
+**What the reading does not establish, stated rather than implied:** these numbers describe `clarisatest-back`, not production. When CLARISA promotes the contract, the reading must be re-run before any release decision — which is precisely why the report carries its host in every payload.
+
+---
+
 ## Final state — 2026-08-14
 
 | Task | Attempts | Tests | Reviewer | Status |

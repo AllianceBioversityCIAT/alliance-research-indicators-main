@@ -388,13 +388,17 @@ Per the `/akili-specify` gate rule: name the defects first, then the command. A 
 
 ## 10. Open questions
 
-| ID | Question | Owner | Resolution path |
+**Status 2026-08-14: the D8 reading was taken over VPN against DEV.** See [`./evidence/D8-reading-2026-08-14.md`](./evidence/D8-reading-2026-08-14.md) and the two committed payloads. Four of six questions are now answered by measurement.
+
+| ID | Question | Owner | Status |
 | --- | --- | --- | --- |
-| **OQ-1** | What fraction of STAR bilateral contracts resolve by normalized `external_code`? | Squad | **This spec's deliverable.** Answered by running R-CPA-006 against DEV (D8 human check). |
-| **OQ-2** | Is "has SPs" the right population filter, given 5/380? | Product + squad | Answered from the report's has-mappings split; **not** decided in S1. |
-| **OQ-4** | What wins when an automatic proposal contradicts a `MANUAL` mapping? | Product | **Deferred to S2.** S1 writes nothing, so it cannot arise. |
-| **OQ-5** | Are the 38 `window3` projects in scope? | Product | Answered from the report's funding-source split; **not** decided in S1. |
-| **OQ-6** | Does the `description` display feature (19% populated) survive the reading? | Product | Report includes the fill rate; decision deferred to S2. |
+| **OQ-1** | What fraction of STAR bilateral contracts resolve by normalized `external_code`? | Squad | ✅ **ANSWERED.** **336 / 1543 contracts (21.8 %)** — which is **88.4 % of the reachable ceiling**, since only 380 CLARISA Alliance-2026 projects exist to match against. Normalization did 9.5× the work of exact matching (304 vs 32). **`FULL_NAME` resolved zero** |
+| **OQ-2** | Is "has SPs" the right population filter, given 5/380? | Product + squad | ✅ **ANSWERED — no.** `has_project_mappings` = **5 of 380**. Filtering on it would target 5 projects and discard 375 that match fine. DD-2's report-don't-filter decision is vindicated |
+| **OQ-4** | What wins when an automatic proposal contradicts a `MANUAL` mapping? | Product | Open — **deferred to S2.** S1 writes nothing, so it cannot arise |
+| **OQ-5** | Are the 38 `window3` projects in scope? | Product | Population **confirmed by measurement**: 342 `bilateral` / 38 `window3`. Still a product decision, but now made against a number rather than a guess |
+| **OQ-6** | Does the `description` display feature survive the reading? | Product | ✅ **Fill rate measured: 74 / 380 = 19.5 %.** A UI built around it renders empty for 4 of every 5 projects. Display decision stays S2's |
+| **OQ-7** | Should DD-9's picker defect be fixed before S2? | **User** | **Open — and the reading made it more urgent.** The two Alliance selectors are **disjoint**: 380 in this spec's selector only, 0 in both, 0 in legacy-only (test); 32 in legacy-only (prod). The legacy picker is not dropping lower-case rows — it is selecting a different population entirely |
+| **R-1** | Has CLARISA promoted the upstream contract to production? | CLARISA team | ❌ **No.** The production reading confirms it: 299 projects, none carrying `external_code`. **S2 cannot release until this changes** |
 
 ---
 
