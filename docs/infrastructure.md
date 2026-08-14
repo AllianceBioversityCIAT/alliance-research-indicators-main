@@ -1,82 +1,242 @@
 # Infrastructure — Alliance Research Indicators (ARI)
 
-> Deployment & hosting blueprint for the ARI monorepo (server + client). The infrastructure shape derives from the TRD's robust-vs-lite tier decision — see [`docs/trd/trd.md`](./trd/trd.md) §2. Entries marked **⚠ confirm** are inferred from repo evidence and need ops sign-off.
+> Deployment & hosting blueprint for the ARI monorepo (server + client). The infrastructure shape derives from the TRD's robust-vs-lite tier decision — see [`docs/trd/trd.md`](./trd/trd.md) §2.
 
-**Tier decision (from TRD §2): Robust.** ARI is a federated system of record with multiple external integrations (CLARISA, AGRESSO, ROAR/Cognito, OpenSearch, TIP), a real-time channel, and a governed audit trail — it warrants managed, horizontally-scalable cloud components rather than a single-node lite deployment.
-
----
-
-## 1. Target Environment
-
-| Concern | Choice | Notes |
-| --- | --- | --- |
-| Cloud | **AWS** | Primary target for both packages. |
-| Server runtime | AWS **Elastic Beanstalk** (Node ≥ 20.11.1) ⚠ confirm | NestJS HTTP + RabbitMQ microservice bootstrap (`main.ts`). |
-| Client hosting | **Docker + Nginx** container ⚠ confirm | Angular SPA built to static assets, served by `nginx.conf`. |
-| Region / residency | ⚠ confirm | See PRD open question on data residency / PII. |
+**Tier decision (from TRD §2): Robust.** ARI is a federated system of record with multiple external integrations (CLARISA, AGRESSO, ROAR/Cognito, OpenSearch, TIP), a real-time channel, and a governed audit trail — it warrants managed, horizontally-scalable cloud components for production and a dedicated on-premise staging/dev tier rather than a single-node lite deployment.
 
 ---
 
-## 2. Core Cloud Components
+## 1. Target Environments
 
-| Component | Service | Used by | Purpose |
+The ARI platform operates across two remote deployed environments, mapped strictly to Git branches:
+
+| Environment | Hosting Target | Git Branch | Access & Deployment Mechanism | Purpose |
+| --- | --- | --- | --- | --- |
+| **Development (Dev)** | **On-premise infrastructure** | `dev` | **100% Automated CI/CD** (triggered on push/merge to `dev`) | Integration testing, active feature validation, QA, shared dev database. |
+| **Production (Prod)** | **AWS Cloud infrastructure** | `main` | **100% Automated CI/CD** (triggered on push/merge to `main`) | Live platform for end users, partner systems, and donor reporting. |
+
+### Environment Topology Overview
+
+```
+ [ Local Dev / Agent ]
+   │
+   ├─► Local Docker Stack (Frontend :4200 + Backend :3000) ──► Points directly to Dev MySQL (On-Premise)
+   │
+   ├─► Git Push / PR Merge: 'dev' branch  ──► Automated CI/CD ──► Deploys to On-Premise (Dev)
+   │
+   └─► Git Push / PR Merge: 'main' branch ──► Automated CI/CD ──► Deploys to AWS Cloud (Prod)
+```
+
+---
+
+## 2. Core Cloud & On-Prem Components
+
+| Component | Service / Location | Used by | Purpose |
 | --- | --- | --- | --- |
-| Relational DB | **AWS RDS — MySQL** (utf8mb4) | server | System of record (TypeORM). |
-| Document / feedback store | **AWS DynamoDB** | server | External feedback store. |
-| Search | **OpenSearch** cluster | server | Results / Alliance Staff / PRMS indexes. |
-| Message broker | **RabbitMQ** (`amqps://`, `ARI_QUEUE`) | server | Cross-system events (microservice). |
-| Identity | **ROAR Management** (server JWT) + **AWS Cognito** (client JWT) | both | Human + machine auth. |
-| Object storage | **AWS S3** ⚠ confirm | server | Evidence / static assets (to confirm in TRD). |
-| Real-time | **Socket.IO / WebSocket gateway** | both | Live result updates, presence, notifications. |
-| CDN / static | Nginx (client) + `/admin/public` (server SSR assets) | both | Static delivery. |
+| **Relational DB (Dev)** | **MySQL Server (On-premise)** | server | Primary dev system of record (TypeORM). Shared by dev deployment and local docker testing. |
+| **Relational DB (Prod)**| **AWS RDS — MySQL** (utf8mb4) | server | Production system of record (TypeORM). |
+| **Document / Feedback store** | **AWS DynamoDB** | server | External feedback storage. |
+| **Search cluster** | **OpenSearch** | server | Results / Alliance Staff / PRMS indexes. |
+| **Message broker** | **RabbitMQ** (`amqps://`, `ARI_QUEUE`) | server | Cross-system events (microservice bootstrap). |
+| **Identity & Auth** | **ROAR Management** (server JWT) + **AWS Cognito** (client JWT) | both | Dual human and machine authentication. |
+| **Object storage** | **AWS S3** | server | Evidence attachments and static exports. |
+| **Real-time Gateway** | **Socket.IO / WebSocket** | both | Live result editing presence, locking, and notifications. |
+| **Web / Reverse Proxy** | **Nginx (Container)** | client | Serves Angular static SPA bundle with HTML5 client-side routing fallback. |
 
 ---
 
-## 3. Deployment Strategy
+## 3. Deployment Strategy & Access Governance
+
+### 3.1 CI/CD Automation Pipeline
 
 | Aspect | Approach |
 | --- | --- |
-| CI | **GitHub Actions** — `unit-tests.yml`, `sonarcloud-analysis.yml`, `jenkins-trigger.yml` (SonarCloud analysis on JDK 21). |
-| CD | Jenkins-triggered pipeline ⚠ confirm → Elastic Beanstalk (server) / container registry + Nginx (client). |
-| Build (server) | `npm run build` → Nest dist + Vite admin SSR bundle. |
-| Build (client) | `ng build` (prod) → static assets; `Dockerfile` + `docker-compose.yml` package the Nginx image. |
-| Quality gates | SonarCloud; per-package Jest coverage floors (server 60%; client statements 40 / branches 20 / lines 45 / functions 30). |
-| Migrations | TypeORM **append-only** migrations under `server/.../src/db/migrations`; never edit merged migrations. Run as a release step. |
-| IaC | ⚠ confirm (Terraform / CDK / manual) — not tracked in this repo. |
+| **Continuous Integration (CI)** | **GitHub Actions** (`unit-tests.yml`, `sonarcloud-analysis.yml`, `jenkins-trigger.yml`). Automates linting, test suites, SonarCloud quality gates (JDK 21). |
+| **Continuous Delivery (CD)** | Automated Jenkins/GitHub Actions pipelines triggered by branch updates: <br>• Changes on `dev` branch ➔ Automatically builds and deploys to **On-premise Dev**.<br>• Changes on `main` branch ➔ Automatically builds and deploys to **AWS Cloud Production**. |
+| **Server Build** | `npm run build` ➔ Compiles NestJS backend dist and Vite admin SSR bundle. |
+| **Client Build** | `ng build` (prod configuration) ➔ Compiles Angular SPA static bundle packaged in Nginx container. |
+| **Quality Gates** | SonarCloud clean status; Jest coverage floors (Server ≥ 60%; Client statements ≥ 40 / branches ≥ 20 / lines ≥ 45 / functions ≥ 30). |
+| **Database Migrations** | TypeORM **append-only** migrations under `server/.../src/db/migrations`. Executed automatically as a release step during deployment. |
+
+### 3.2 Strict Access & Deployment Governance (Non-Negotiable)
+
+> [!IMPORTANT]
+> **No Manual Remote Deployments:**
+> 1. Developers, contributors, and AI agents **DO NOT** perform manual deployments to remote environments (neither On-premise Dev nor AWS Prod).
+> 2. Developers and AI agents **DO NOT** hold AWS Production account credentials or direct write access to the On-premise deployment hosts.
+> 3. All remote deployments are strictly managed and executed by the automated CI/CD pipeline upon merging code into `dev` or `main`.
+> 4. Local testing is conducted exclusively via local Docker containers or native local dev processes pointing to the shared Dev MySQL database.
 
 ---
 
 ## 4. Network & Security Architecture
 
-- **Auth boundary (server):** `JwtMiddleware` validates ROAR JWT or base64(`{client_id, client_secret}`) machine tokens; anonymous access is an explicit allowlist (`/admin*`, `/.well-known*`, `GET /api/configuration/:key`, `GET /`, `/favicon.ico`).
-- **Auth boundary (client):** AWS Cognito JWT with proactive refresh; `rolesGuard` / `centerAdminGuard` mirror backend authorization.
-- **Machine-token hardening:** `client_id/client_secret` validated against `app_secrets` + host allowlist (`app_secret_host_list`). Rotation policy ⚠ confirm.
-- **`/admin` exposure:** currently excluded from `JwtMiddleware` — **must gain an explicit admin guard before any production exposure** (tracked open gap in UX/UI §Open Gaps and TRD §Security).
-- **Transport:** HTTPS everywhere; RabbitMQ over `amqps://`. Helmet CSP configured (prod + Vite dev `http://localhost:5173`).
-- **Body limits:** 50 MB JSON / URL-encoded (evidence uploads).
-- **Rate limiting:** `express-rate-limit` installed; global policy ⚠ confirm.
+- **Auth boundary (server):** `JwtMiddleware` validates ROAR JWT or base64(`{client_id, client_secret}`) machine tokens. Anonymous endpoints are strictly allowlisted (`/admin*`, `/.well-known*`, `GET /api/configuration/:key`, `GET /`, `/favicon.ico`).
+- **Auth boundary (client):** AWS Cognito JWT with proactive refresh; Angular guards (`rolesGuard`, `centerAdminGuard`) mirror backend authorization.
+- **Machine-token hardening:** `client_id/client_secret` validated against `app_secrets` + host allowlist (`app_secret_host_list`).
+- **`/admin` SSR panel:** Internal administration surface. Must enforce authentication/admin guards before exposing to public networks.
+- **Transport:** HTTPS/TLS enforced; RabbitMQ over secure AMQPS (`amqps://`). Helmet CSP configured for production and local Vite dev origins.
+- **Body limits:** 50 MB JSON / URL-encoded payload limit (supports rich evidence uploads and data matrices).
+- **Rate limiting:** `express-rate-limit` middleware active.
 
 ---
 
 ## 5. Infrastructure Rules & Constraints
 
-1. **Append-only migrations.** Schema changes ship only via new TypeORM migrations; a merged migration is immutable.
-2. **Two deployables, one repo.** Server and client build and deploy independently from the monorepo; no shared runtime.
-3. **Secrets never in git.** App secrets, DB creds, Cognito/ROAR config, broker URLs, and both clients' `environment.ts` live outside the repo (env/secret manager). `environment.ts` / `environment.dev.ts` are gitignored.
-4. **Managed data services.** RDS, DynamoDB, OpenSearch, RabbitMQ are managed/hosted — no self-run stateful nodes on the app tier.
-5. **Reproducible search.** OpenSearch indexes are rebuildable from TypeORM entities (`@OpenSearchProperty`); an index rebuild is a supported operational action.
-6. **CodeGraph is machine-local.** `.codegraph/` is never committed (gitignored).
+1. **Append-only migrations.** Schema changes ship only via new TypeORM migrations. Merged migrations are strictly immutable.
+2. **Two deployables, one monorepo.** Server and Client build and deploy independently; neither imports runtime code from the other.
+3. **Secrets never in git.** Database credentials, broker connection strings, Cognito/ROAR secrets, and `environment.ts` remain outside git tracking.
+4. **Governed CI/CD releases.** Zero manual cloud/on-premise deployments by developers or agents.
+5. **Reproducible search.** OpenSearch indexes are completely rebuildable from TypeORM entities decorated with `@OpenSearchProperty`.
+6. **CodeGraph is machine-local.** The index lives at `server/researchindicators/.codegraph/` and is strictly gitignored.
 
 ---
 
-## Open Items (need ops sign-off)
+## 6. Local Environment Contract
 
-- OI-1. Confirm server hosting: Elastic Beanstalk vs ECS/Fargate vs other.
-- OI-2. Confirm IaC ownership and tool (Terraform / CDK / manual).
-- OI-3. Confirm S3 usage for evidence storage and its lifecycle policy.
-- OI-4. Define the admin-panel production auth guard before exposing `/admin`.
-- OI-5. Document rate-limit and machine-token rotation policies.
-- OI-6. Confirm region / data-residency constraints (PRD open question on PII / GDPR).
+The local environment is designed for fast developer feedback, local feature testing, and end-to-end verification without touching production.
+
+### 6.1 Architecture of the Local Stack
+
+The local stack runs both packages containerized with Docker, configured so that the backend connects directly to the remote **Dev MySQL database** (on-premise):
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   LOCAL DOCKER STACK                   │
+│                                                        │
+│   ┌───────────────────────────┐                        │
+│   │ Client Container (Angular)│                        │
+│   │ Port: 4200 (Nginx/SPA)    │                        │
+│   └─────────────┬─────────────┘                        │
+│                 │ Calls http://localhost:3000/api       │
+│                 ▼                                      │
+│   ┌───────────────────────────┐                        │
+│   │ Server Container (NestJS) │                        │
+│   │ Port: 3000 (HTTP/Socket)  │                        │
+│   └─────────────┬─────────────┘                        │
+└─────────────────┼──────────────────────────────────────┘
+                  │ Connects over network
+                  ▼
+   ┌─────────────────────────────┐
+   │ Dev MySQL Database (On-Prem)│
+   └─────────────────────────────┘
+```
+
+### 6.2 Service Contract & Ports
+
+| Service | Container Name | Local Port | Target URL / Health Check | Target Database |
+| --- | --- | --- | --- | --- |
+| **Backend API** | `ari_server_local` | `3000` | `http://localhost:3000/api`<br>`http://localhost:3000/swagger` | **Dev MySQL (On-premise)** |
+| **Frontend UI** | `ari_client_local` | `4200` | `http://localhost:4200` | N/A (calls Backend API) |
+
+### 6.3 Running the Local Stack
+
+#### Primary Route: Docker Compose (Recommended)
+
+```bash
+# 1. Pre-check: Ensure Docker daemon is running
+docker info
+
+# 2. Configure Backend environment
+# Ensure server/researchindicators/.env is populated with the Dev MySQL credentials:
+# ARI_MYSQL_HOST=<dev-mysql-host>
+# ARI_MYSQL_USER_NAME=<dev-mysql-user>
+# ARI_MYSQL_USER_PASS=<dev-mysql-pass>
+# ARI_MYSQL_NAME=<dev-mysql-db>
+# ARI_PORT=3000
+
+# 3. Configure Client environment — REQUIRED on a clean checkout
+# src/environments/environment.ts and environment.dev.ts are gitignored
+# (.gitignore:40-41) and have NEVER been committed; only .gitkeep is tracked.
+# `ng build` reads environment.ts directly, so the client image cannot build
+# without it — and the error names a missing module, not a missing config.
+cp client/research-indicators/src/environments/environment.example.ts \
+   client/research-indicators/src/environments/environment.ts
+cp client/research-indicators/src/environments/environment.example.ts \
+   client/research-indicators/src/environments/environment.dev.ts   # for `npm run build-dev`
+# then fill in the values your task needs — see the two typed traps in the template
+
+# 4. Build and launch all local containers from the monorepo root
+docker compose up --build -d
+
+# 4. View container logs
+docker compose logs -f
+
+# 5. Stop the local stack
+docker compose down
+```
+
+#### Fallback Route: Native Development (No Docker)
+
+```bash
+# 1. Start Server locally (Node >= 20)
+cd server/researchindicators
+npm install
+npm run start:dev   # Runs NestJS on http://localhost:3000 pointing to Dev MySQL
+
+# 2. In a separate terminal, start Client locally
+cd client/research-indicators
+npm install
+npm start           # Runs Angular dev server on http://localhost:4200
+```
+
+### 6.4 Order of operations — schema reaches Dev by CI/CD, never by the local stack
+
+**The local stack runs branch code against the Dev schema.** Those two move on different clocks, and
+nothing in the stack reconciles them. A migration that exists on your branch **does not exist in the Dev
+database** until the branch is merged to `dev` and the pipeline applies it (§3.1) — and §3.2 forbids
+applying it by hand, correctly, since a hand-applied migration would diverge Dev from what CI/CD believes
+it deployed.
+
+So when a branch adds a migration **and** code that reads the new column, the local stack is broken for
+that feature until the migration lands. **The failure does not look like a missing migration** — it looks
+like a broken endpoint:
+
+```
+ER_BAD_FIELD_ERROR: Unknown column 'rpfas.sp_role' in 'field list'
+```
+
+That is a real example, reproduced against Dev on 2026-08-13 while
+`bilateral/primary-contributing-sp` was in flight: the repository selected a column its own migration had
+not yet delivered to Dev, so the whole `GET` 500'd. **Nothing in the code was wrong.** An engineer who
+reads that trace as a code defect can lose an afternoon.
+
+**The order, therefore:**
+
+| # | Step | Where |
+| --- | --- | --- |
+| 1 | Merge the branch carrying the migration to `dev` | PR |
+| 2 | CI/CD applies it to the Dev database | pipeline, §3.1 |
+| 3 | Confirm the column landed before blaming the code | `information_schema.columns` |
+| 4 | Run the local stack against Dev | §6.3 |
+
+**Before debugging any "broken endpoint" in the local stack, check step 3 first:**
+
+```sql
+SELECT column_name FROM information_schema.columns
+ WHERE table_schema = '<dev-db>' AND table_name = '<table>';
+```
+
+**Corollary for feature work that cannot wait for the merge:** point the server at a disposable local
+MySQL of the **same engine version as Dev** and run the migration against it there. That is a local
+environment, so §6.4's disposability rule applies and no governance rule is bent. `server/researchindicators`
+ships `npm run test:integration` (see `test/jest-integration.json`), which does exactly this and requires
+`T13_MYSQL_PASSWORD` to be set rather than defaulting — deliberately, so a misconfigured run fails loudly
+instead of silently connecting somewhere unintended.
+
+### 6.5 Boundary & Disposability Rule
+
+- **Local environment is disposable:** Developers and agents may freely start, restart, rebuild, and re-test local containers.
+- **Remote environments are governed:** Deployed Dev (on-premise) and Prod (AWS) environments are managed strictly through CI/CD pipelines.
+
+---
+
+## 7. Open Items (need ops sign-off)
+
+- OI-1. Document exact host allowlists (`app_secret_host_list`) for machine-token clients in Dev vs Prod.
+- OI-2. Confirm S3 evidence lifecycle policy and bucket encryption settings.
+- OI-3. Formalize the automated release tagging convention between `dev` and `main`.
+- OI-4. Ensure production admin guard is locked down prior to public routing of `/admin`.
 
 ---
 

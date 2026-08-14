@@ -17,7 +17,7 @@ These documents form the project's constitutional baseline. Always consult them 
 | `docs/trd/trd.md` | Technical Requirements Document (implementation blueprint): architecture + ADRs, NFR scenarios, module layout, data model, API contracts, backend/frontend architecture, integrations, security, observability, testing, constraints — both tiers. | Whenever a change touches code, schema, integrations, or infra-adjacent settings. |
 | `docs/infrastructure.md` | Deployment & hosting blueprint (AWS target, cloud components, CI/CD, network & security, infra rules). Derives from the TRD robust-vs-lite tier decision. | Whenever a change touches deployment, hosting, secrets, or environment topology. |
 | `docs/model-routing.md` | Canonical model-selection registry (tiers, phase→tier mapping, editable model table). Mirrored into the `## Model Routing` section below. | When choosing which model to run an AKILI phase or agent on. |
-| `docs/specs/general-setup/{requirements,design,task}.md` | Methodology templates that every module-level spec MUST follow. | Whenever you create a new spec under `docs/specs/<module>/<feature>/`. |
+| `docs/specs/general-setup/{requirements,design,task,family}.md` | Methodology templates that every module-level spec MUST follow (including `family.md` for spec families). | Whenever you create a new spec under `docs/specs/<module>/<feature>/`. |
 
 If you have to choose between the PRD and a piece of source code, **the source code is the truth of today** and the PRD is the truth of intent. Reconcile by updating the doc that is wrong, not by silently changing behavior.
 
@@ -148,7 +148,9 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 ### 4.3 Shared
 - **Lint/format:** `npm run lint` in each package (eslint + prettier). Don't bypass `husky` hooks.
 - **Commits / PRs:** match existing style — `<type>(<module>): <subject>` (e.g. `fix(results.service): ...`). Never `--no-verify` without an explicit human approval.
-- **CodeGraph:** `.codegraph/` is initialized (machine-local, gitignored). Prefer `codegraph_*` tools for symbol lookup, callers/callees, and impact analysis before broad file scanning.
+- **Local Environment & Testing:** Docker Compose (`docker compose up --build -d` at root) orchestrates both frontend (:4200) and backend (:3000) pointing directly to the on-premise Dev MySQL database. Native fallback commands are documented in [`docs/infrastructure.md`](docs/infrastructure.md) §6.
+- **Deployment & Access Governance:** Zero manual deployments by developers/agents. Remote releases are 100% automated via CI/CD pipelines (pushes/merges to `dev` deploy to On-Premise Dev; pushes/merges to `main` deploy to AWS Production).
+- **CodeGraph:** the index lives at **`server/researchindicators/.codegraph/`** (machine-local, gitignored) — **not** at the repo root, so pass that path as `projectPath` when querying. *(Location corrected 2026-08-13 by the `/akili-archive` factual-claims sweep: this line previously read "`.codegraph/` is initialized", which sent agents looking at the repo root, finding nothing, and concluding CodeGraph was unavailable.)* The client package has **no** index — use Read/Grep/Glob there. Prefer `codegraph_*` tools for symbol lookup, callers/callees and impact analysis before broad file scanning, and note the index reflects the last re-index, not the working tree.
 
 ---
 

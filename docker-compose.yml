@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  server:
+    container_name: ari_server_local
+    build:
+      context: ./server/researchindicators
+      target: development
+      dockerfile: ./Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./server/researchindicators/.env
+    volumes:
+      - ./server/researchindicators:/usr/src/app
+      - /usr/src/app/node_modules
+    restart: unless-stopped
+
+  client:
+    container_name: ari_client_local
+    build:
+      context: ./client/research-indicators
+      dockerfile: ./Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      - server
+    restart: unless-stopped
