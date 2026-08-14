@@ -224,10 +224,28 @@ ships `npm run test:integration` (see `test/jest-integration.json`), which does 
 `T13_MYSQL_PASSWORD` to be set rather than defaulting — deliberately, so a misconfigured run fails loudly
 instead of silently connecting somewhere unintended.
 
-### 6.5 Boundary & Disposability Rule
+### 6.5 Migration commands
+
+Run from `server/researchindicators/`. Ordering and governance are §6.4 — these are only the commands.
+
+| Action | Command |
+| --- | --- |
+| Apply pending migrations (from TS sources) | `npm run migration:dev:execute` |
+| Apply pending migrations (against built output) | `npm run migration:execute` |
+| Roll back the last migration | `npm run migration:revert` |
+| Generate a new migration | `npm run migration:generate -- ./src/db/migrations/<name>` |
+
+**`migration:revert` against the shared Dev database affects every other developer** — it is a coordinated action, never a unilateral one. Migrations are append-only (§6.4).
+
+**A migration is only verified once it has been executed.** It can be valid TypeScript, lint-clean, type-clean and reviewed while still being unrunnable — this happened on 2026-08-13 and is recorded as Kaizen K-006. Run it against a disposable local MySQL of the same engine version before the PR.
+
+### 6.6 Boundary & Disposability Rule
 
 - **Local environment is disposable:** Developers and agents may freely start, restart, rebuild, and re-test local containers.
 - **Remote environments are governed:** Deployed Dev (on-premise) and Prod (AWS) environments are managed strictly through CI/CD pipelines.
+- **The Dev database is the exception to disposability.** It is remote and shared, so the usual "reset it and re-seed" licence does **not** apply; destructive schema or data operations against it are a human decision, never an agent's.
+
+**Concurrency (agents).** The two packages have separate `node_modules`, build outputs and ports, so a server task and a client task can run in parallel safely. Two tasks inside the *same* package cannot — they contend for that package's build output and dev-server port. This is the concrete form of the concurrency protocol in `.agents/leader.md`.
 
 ---
 

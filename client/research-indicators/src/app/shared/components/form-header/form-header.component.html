@@ -6,3 +6,28 @@
 <app-version-selector></app-version-selector>
 <br />
 }
+@if (cache.isExternalResult()) {
+<div class="flex flex-wrap items-center gap-4 mb-2">
+  @if (syncedDate()) {
+  <span class="fs-[12] atc-grey-600">Last synced: {{ syncedDate() | formatDate: dateFormatConfig.config() }}</span>
+  }
+  @if (publicLink()) {
+  <button
+    type="button"
+    (click)="openPublicLink()"
+    class="fs-[13] atc-light-blue-400 font-semibold underline cursor-pointer bg-transparent border-0 p-0"
+  >
+    Open public link
+  </button>
+  }
+  @if (externalLink()) {
+  <button
+    type="button"
+    (click)="openExternalLink()"
+    class="fs-[13] atc-light-blue-400 font-semibold underline cursor-pointer bg-transparent border-0 p-0"
+  >
+    {{ externalLinkLabel() }}
+  </button>
+  }
+</div>
+}

@@ -4,6 +4,7 @@ import { BilateralService } from './bilateral.service';
 import { ApiService } from './api.service';
 import { RolesService } from './cache/roles.service';
 import { CurrentResultService } from './cache/current-result.service';
+import { CacheService } from './cache/cache.service';
 import { FindContracts, FindContractsResponse } from '@shared/interfaces/find-contracts.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { PoolFundingTagPatchResponse } from '@interfaces/bilateral/agresso-contract.interface';
@@ -27,6 +28,7 @@ describe('BilateralService', () => {
   };
   let canAccessCenterAdminSignal: ReturnType<typeof signal<boolean>>;
   let isCurrentUserOwnerSignal: ReturnType<typeof signal<boolean>>;
+  let isExternalResultSignal: ReturnType<typeof signal<boolean>>;
 
   beforeEach(() => {
     mockApi = {
@@ -39,12 +41,14 @@ describe('BilateralService', () => {
     };
     canAccessCenterAdminSignal = signal<boolean>(false);
     isCurrentUserOwnerSignal = signal<boolean>(false);
+    isExternalResultSignal = signal<boolean>(false);
     TestBed.configureTestingModule({
       providers: [
         BilateralService,
         { provide: ApiService, useValue: mockApi },
         { provide: RolesService, useValue: { canAccessCenterAdmin: canAccessCenterAdminSignal } },
-        { provide: CurrentResultService, useValue: { isCurrentUserOwner: isCurrentUserOwnerSignal } }
+        { provide: CurrentResultService, useValue: { isCurrentUserOwner: isCurrentUserOwnerSignal } },
+        { provide: CacheService, useValue: { isExternalResult: isExternalResultSignal } }
       ]
     });
     service = TestBed.inject(BilateralService);
@@ -594,6 +598,36 @@ describe('BilateralService', () => {
       isCurrentUserOwnerSignal.set(false);
 
       expect(service.editable()).toBe(false);
+    });
+
+    // R-RC-005 — external (TIP/AICCRA/PRMS) results are always read-only on this
+    // tab, regardless of is_read_only/ownership/admin (AC.1). STAR-result behavior
+    // must remain unchanged (AC.2), already covered by the cases above.
+    it('false for an external result even when admin, owner, and is_read_only=false (AC.1)', () => {
+      service.currentAlignment.set(readOnlyFalse);
+      canAccessCenterAdminSignal.set(true);
+      isCurrentUserOwnerSignal.set(true);
+      isExternalResultSignal.set(true);
+
+      expect(service.editable()).toBe(false);
+    });
+
+    it('false for an external result regardless of is_read_only value', () => {
+      service.currentAlignment.set({ ...readOnlyFalse, is_read_only: true });
+      canAccessCenterAdminSignal.set(true);
+      isCurrentUserOwnerSignal.set(true);
+      isExternalResultSignal.set(true);
+
+      expect(service.editable()).toBe(false);
+    });
+
+    it('unchanged (true) for a STAR result — admin/owner not read-only (AC.2)', () => {
+      service.currentAlignment.set(readOnlyFalse);
+      canAccessCenterAdminSignal.set(true);
+      isCurrentUserOwnerSignal.set(false);
+      isExternalResultSignal.set(false);
+
+      expect(service.editable()).toBe(true);
     });
   });
 

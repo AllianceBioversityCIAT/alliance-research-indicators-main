@@ -14,6 +14,7 @@ import {
 } from '@interfaces/bilateral/pool-funding-alignment.interface';
 import { RolesService } from './cache/roles.service';
 import { CurrentResultService } from './cache/current-result.service';
+import { CacheService } from './cache/cache.service';
 import { ErrorResponse } from '@shared/interfaces/responses.interface';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
 
@@ -59,6 +60,7 @@ export class BilateralService {
   private readonly api = inject(ApiService);
   private readonly rolesService = inject(RolesService);
   private readonly currentResultService = inject(CurrentResultService);
+  private readonly cache = inject(CacheService);
 
   readonly currentContract = signal<AgressoContractRow | null>(null);
   readonly loadingContract = signal(false);
@@ -77,7 +79,14 @@ export class BilateralService {
   private scienceProgramsInflight = new Map<string, Promise<PoolFundingScienceProgram[]>>();
   private scienceProgramsRequestSeq = 0;
 
+  // R-RC-005 — external (TIP/AICCRA/PRMS) results are always read-only on this tab,
+  // regardless of `is_read_only`/ownership/admin. Must short-circuit BEFORE those
+  // checks: a Center Admin or the result's own "owner" would otherwise still be able
+  // to edit a TIP/AICCRA result (which is never PRMS-synced, so `is_read_only` is
+  // false). Server-side companion gate: bilateral.service.ts (server)
+  // `assertNonPrmsExternalSourceWritable()` / existing `assertPrmsSourceWritable()`.
   readonly editable = computed(() => {
+    if (this.cache.isExternalResult()) return false;
     const alignment = this.currentAlignment();
     if (!alignment) return false;
     if (alignment.is_read_only) return false;

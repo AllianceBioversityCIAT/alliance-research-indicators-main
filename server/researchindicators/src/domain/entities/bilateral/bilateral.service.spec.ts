@@ -1767,6 +1767,65 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       expect(transaction).not.toHaveBeenCalled();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // updateAlignment — R-RC-005 TIP/AICCRA read-only gate
+  // (docs/specs/results-center/external-results-readonly-view)
+  //
+  // Sibling coverage to the PRMS-only R-BIL-071 gate exercised in
+  // `bilateral.service.sourceReadOnlyGate.spec.ts` (left untouched by this
+  // task). Asserts the NEW assertNonPrmsExternalSourceWritable gate rejects
+  // TIP/AICCRA-sourced writes with its OWN distinct 409 wording — never the
+  // locked PRMS string the client string-matches on.
+  // ---------------------------------------------------------------------------
+  describe('updateAlignment — TIP/AICCRA source gate (R-RC-005)', () => {
+    const baseContext = (platform_code: string) => ({
+      result_id: 19792,
+      result_official_code: 19792,
+      result_status_id: 1,
+      version_id: 1,
+      is_pool_funding_contributor: true,
+      is_synced_to_prms: false,
+      agresso_agreement_id: 'D527',
+      platform_code,
+    });
+
+    const dto: UpdatePoolFundingAlignmentDto = {
+      has_contribution: true,
+      sp_codes: ['SP01'],
+    };
+
+    it.each(['TIP', 'AICCRA'])(
+      'rejects a %s-sourced result with a distinct 409, not the locked PRMS wording',
+      async (platformCode) => {
+        findContext.mockResolvedValueOnce(baseContext(platformCode));
+        findActiveAlignment.mockResolvedValueOnce(null);
+
+        let thrown: HttpException | undefined;
+        try {
+          await service.updateAlignment(19792, '19792', dto, user);
+        } catch (err) {
+          thrown = err as HttpException;
+        }
+
+        expect(thrown).toBeInstanceOf(ConflictException);
+        expect(thrown!.message).not.toBe(
+          'Result is PRMS-sourced; bilateral alignment is read-only in STAR',
+        );
+        expect(thrown!.message).toBe(
+          'Result is sourced from an external reporting platform (TIP/AICCRA), not STAR; bilateral alignment is read-only',
+        );
+        expect(transaction).not.toHaveBeenCalled();
+      },
+    );
+
+    // The STAR (non-external) regression path for updateAlignment — that a
+    // non-synced, STAR-sourced write still passes both source gates and
+    // reaches the transaction — is already covered end-to-end by
+    // `bilateral.service.sourceReadOnlyGate.spec.ts` ("R-BIL-071 scenario
+    // 4"), which this task leaves untouched. Not duplicated here to avoid
+    // re-wiring that suite's dedicated getScienceProgramsForResult stub.
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import {
 import { DataSource } from 'typeorm';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { ResultRepository } from '../results/repositories/result.repository';
+import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import {
   AlignmentResponse,
   SelectedScienceProgramResponse,
@@ -673,6 +674,11 @@ export class BilateralService {
     // domain-eligibility check fires (avoids leaking "not a contributor"
     // when the real reason is "we don't own this result").
     this.assertPrmsSourceWritable(context.platform_code);
+    // R-RC-005 (docs/specs/results-center/external-results-readonly-view) —
+    // sibling gate for TIP/AICCRA-sourced results. Independent of the PRMS
+    // check above (platform codes are mutually exclusive) and uses its own,
+    // distinctly-worded rejection — see assertNonPrmsExternalSourceWritable.
+    this.assertNonPrmsExternalSourceWritable(context.platform_code);
 
     if (!this.toBoolean(context.is_pool_funding_contributor)) {
       throw new BadRequestException(
@@ -1610,6 +1616,34 @@ export class BilateralService {
     if (this.isPrmsSourced(platformCode)) {
       throw new ConflictException(
         'Result is PRMS-sourced; bilateral alignment is read-only in STAR',
+      );
+    }
+  }
+
+  // @sdd-spec docs/specs/results-center/external-results-readonly-view — R-RC-005
+  //
+  // Sibling architectural gate to isPrmsSourced/assertPrmsSourceWritable above:
+  // TIP and AICCRA are the other two federated origins that never write bilateral
+  // alignment data from STAR. Kept as a SEPARATE method (not merged into the PRMS
+  // check) so the two gates can carry distinct, independently-worded rejections —
+  // the PRMS 409 description is a locked contract the client string-matches on
+  // (pool-funding-alignment.component.ts's PRMS_SOURCED_409_DESCRIPTION), so this
+  // gate must never reuse or resemble it.
+  private isNonPrmsExternalSourced(
+    platformCode: string | null | undefined,
+  ): boolean {
+    return (
+      platformCode === ReportingPlatformEnum.TIP ||
+      platformCode === ReportingPlatformEnum.AICCRA
+    );
+  }
+
+  private assertNonPrmsExternalSourceWritable(
+    platformCode: string | null | undefined,
+  ): void {
+    if (this.isNonPrmsExternalSourced(platformCode)) {
+      throw new ConflictException(
+        'Result is sourced from an external reporting platform (TIP/AICCRA), not STAR; bilateral alignment is read-only',
       );
     }
   }

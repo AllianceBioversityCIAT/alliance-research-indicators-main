@@ -15,9 +15,8 @@
   <div class="card-container">
     @for (result of latestResultList(); track result.result_id + '-' + result.platform_code) {
     <a class="card cursor-pointer"
-      [attr.href]="opensResultInformationModal(result) ? '#' : null"
-      [routerLink]="opensResultInformationModal(result) ? null : getStarResultRouterLink(result)"
-      [queryParams]="opensResultInformationModal(result) ? null : getStarResultQueryParams(result)"
+      [routerLink]="getStarResultRouterLink(result)"
+      [queryParams]="getStarResultQueryParams(result)"
       (click)="onResultCardClick(result, $event)">
       <div class="card-content">
         <div class="project-indicators">
@@ -28,7 +27,7 @@
               }
             </div>
             <label class="indicator-type" for="username">{{ result.indicators?.name ?? '' }}</label>
-            <div class="more-vert">
+            <div class="more-vert" (click)="$event.stopPropagation(); $event.preventDefault()">
               <span class="material-symbols-rounded more-vert__icon">more_vert</span>
             </div>
           </div>

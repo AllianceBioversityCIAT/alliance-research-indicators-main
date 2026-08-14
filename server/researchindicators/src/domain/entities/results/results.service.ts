@@ -782,6 +782,10 @@ export class ResultsService {
           editable_roles: true,
         },
         created_by: true,
+        platform_code: true,
+        public_link: true,
+        external_link: true,
+        updated_at: true,
       },
       where: { result_id, is_active: true },
       relations: {
@@ -821,6 +825,10 @@ export class ResultsService {
       report_year: result?.report_year_id,
       is_principal_investigator: is_principal == 1,
       result_status: result?.result_status,
+      platform_code: result?.platform_code,
+      public_link: result?.public_link,
+      external_link: result?.external_link,
+      updated_at: result?.updated_at,
       portfolio: portfolio
         ? {
             id: portfolio.id,

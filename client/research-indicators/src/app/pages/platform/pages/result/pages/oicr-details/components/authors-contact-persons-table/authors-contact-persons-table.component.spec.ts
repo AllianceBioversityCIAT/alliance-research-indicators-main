@@ -25,6 +25,10 @@ describe('AuthorsContactPersonsTableComponent', () => {
       expect(component.rows).toEqual([]);
     });
 
+    it('should default disabled to false', () => {
+      expect(component.disabled).toBe(false);
+    });
+
     it('should accept rows input', () => {
       const mockRows: ContactPersonRow[] = [
         {
@@ -191,6 +195,89 @@ describe('AuthorsContactPersonsTableComponent', () => {
       expect(cells[3].textContent.trim()).toBe('-');
       expect(cells[4].textContent.trim()).toBe('-');
       expect(cells[5].textContent.trim()).toBe('-');
+    });
+  });
+
+  describe('disabled input (T-07 / R-RC-003)', () => {
+    const mockRow: ContactPersonRow = {
+      id: 1,
+      name: 'John Doe',
+      position: 'Researcher',
+      affiliation: 'University',
+      email: 'john@example.com',
+      role: 'Author'
+    };
+
+    it('should render the Add button as disabled and not emit addClicked on click when disabled=true', () => {
+      component.disabled = true;
+      fixture.detectChanges();
+
+      jest.spyOn(component.addClicked, 'emit');
+
+      const addButton = fixture.nativeElement.querySelector('p-button') as HTMLElement;
+      expect(addButton.getAttribute('ng-reflect-disabled')).not.toBeNull();
+      addButton.click();
+
+      expect(component.addClicked.emit).not.toHaveBeenCalled();
+    });
+
+    it('should render the delete/trash button as disabled and not emit deleteClicked on click when disabled=true', () => {
+      component.rows = [mockRow];
+      component.disabled = true;
+      fixture.detectChanges();
+
+      jest.spyOn(component.deleteClicked, 'emit');
+
+      const deleteButton = fixture.nativeElement.querySelector('tbody button[type="button"]') as HTMLButtonElement;
+      expect(deleteButton.disabled).toBe(true);
+      deleteButton.click();
+
+      expect(component.deleteClicked.emit).not.toHaveBeenCalled();
+    });
+
+    it('should not emit addClicked on Enter keydown when disabled=true', () => {
+      component.disabled = true;
+      fixture.detectChanges();
+
+      jest.spyOn(component.addClicked, 'emit');
+
+      const addButton = fixture.nativeElement.querySelector('p-button') as HTMLElement;
+      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
+      addButton.dispatchEvent(enterEvent);
+
+      expect(component.addClicked.emit).not.toHaveBeenCalled();
+    });
+
+    it('should not emit deleteClicked on Enter keydown when disabled=true', () => {
+      component.rows = [mockRow];
+      component.disabled = true;
+      fixture.detectChanges();
+
+      jest.spyOn(component.deleteClicked, 'emit');
+
+      const deleteButton = fixture.nativeElement.querySelector('tbody button[type="button"]') as HTMLButtonElement;
+      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
+      deleteButton.dispatchEvent(enterEvent);
+
+      expect(component.deleteClicked.emit).not.toHaveBeenCalled();
+    });
+
+    it('should still emit addClicked/deleteClicked when disabled=false (unchanged STAR-editable behavior)', () => {
+      component.rows = [mockRow];
+      component.disabled = false;
+      fixture.detectChanges();
+
+      jest.spyOn(component.addClicked, 'emit');
+      jest.spyOn(component.deleteClicked, 'emit');
+
+      const addButton = fixture.nativeElement.querySelector('p-button') as HTMLElement;
+      addButton.click();
+      expect(component.addClicked.emit).toHaveBeenCalled();
+
+      const deleteButton = fixture.nativeElement.querySelector('tbody button[type="button"]') as HTMLButtonElement;
+      expect(deleteButton.disabled).toBe(false);
+      deleteButton.click();
+      expect(component.deleteClicked.emit).toHaveBeenCalledWith(mockRow);
     });
   });
 });

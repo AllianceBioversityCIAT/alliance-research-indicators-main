@@ -216,7 +216,7 @@ export class BilateralController {
   @ApiResponse({
     status: HttpStatus.CONFLICT,
     description:
-      'Result is PRMS-sourced or already synced to PRMS (unchanged contracts); or errors.code = toc_mapping_version_locked when toc_alignments is present and the result’s live version ≠ 2026 (R-BIL-097)',
+      'Result is PRMS-sourced, TIP/AICCRA-sourced, or already synced to PRMS (unchanged contracts); or errors.code = toc_mapping_version_locked when toc_alignments is present and the result’s live version ≠ 2026 (R-BIL-097)',
   })
   @ApiResponse({
     status: HttpStatus.SERVICE_UNAVAILABLE,

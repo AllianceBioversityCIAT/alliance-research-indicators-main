@@ -18,11 +18,11 @@ Match the model to the **dominant demand of the phase**, not to a habit. Guiding
 
 | Tier | Name | One-line definition |
 | --- | --- | --- |
-| **T1** | Architect | Hardest design/synthesis: constitution, TRD, multi-module design. |
+| **T1** | Architect | Hardest design/synthesis: constitution, TRD, multi-module design, **`tasks.md` decomposition**, and **live orchestration judgment** (skill selection, FAIL adjudication, pivot). |
 | **T2** | Coder | High-throughput implementation and test authoring. |
 | **T3** | Auditor | Independent, skeptical review; spec-conformance gatekeeping. |
 | **T4** | Context-Ingest | Large-context repository ingestion and summarization. |
-| **T5** | Fast-Cheap | Orchestration, task tracking, status transitions, archive. |
+| **T5** | Fast-Cheap | Task tracking, status transitions, archive/bookkeeping. (Orchestration moved to T1 — it is judgment, not dispatch.) |
 | **T6** | Multimodal | Screenshots, diagrams, design-image reasoning. |
 
 ---
@@ -51,16 +51,16 @@ Match the model to the **dominant demand of the phase**, not to a habit. Guiding
 
 > **Alias-first rule:** the Claude Code column uses floating aliases (`opus`, `sonnet`, `haiku`) — they always resolve to the latest generation, so this registry survives model churn with zero edits. Pin a dated model ID only when deliberately freezing a version, and record why. OpenCode slugs are concrete (no alias mechanism); confirm them against your roster.
 
-**Updated: 2026-07**
+**Updated: 2026-08**
 
-| Tier | Claude Code | OpenCode | Fallback |
-| --- | --- | --- | --- |
-| T1 Architect | `opus` | `<CONFIRM SLUG>` | `sonnet` |
-| T2 Coder | `sonnet` | `opencode-go/glm-5.1` `<CONFIRM>` | `sonnet` |
-| T3 Auditor | `opus` | `opencode-go/deepseek-v4-pro` `<CONFIRM>` | `opus` |
-| T4 Context-Ingest | `sonnet` | `<CONFIRM SLUG>` | `haiku` |
-| T5 Fast-Cheap | `haiku` | `opencode-go/deepseek-v4-flash` `<CONFIRM>` | `haiku` |
-| T6 Multimodal | `opus` | `<CONFIRM SLUG>` | `sonnet` |
+| Tier | Claude Code | OpenCode | Antigravity | Fallback |
+| --- | --- | --- | --- | --- |
+| T1 Architect | `opus` | `<CONFIRM SLUG>` | `pro` | `sonnet` |
+| T2 Coder | `sonnet` | `opencode-go/glm-5.1` `<CONFIRM>` | `flash` | `sonnet` |
+| T3 Auditor | `opus` | `opencode-go/deepseek-v4-pro` `<CONFIRM>` | `pro` | `opus` |
+| T4 Context-Ingest | `sonnet` | `<CONFIRM SLUG>` | `flash` | `haiku` |
+| T5 Fast-Cheap | `haiku` | `opencode-go/deepseek-v4-flash` `<CONFIRM>` | `flash` | `haiku` |
+| T6 Multimodal | `opus` | `<CONFIRM SLUG>` | `pro` | `sonnet` |
 
 ### Enforced bindings (`/akili-execute`, `/akili-test`)
 

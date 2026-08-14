@@ -54,7 +54,8 @@ describe('ResultSidebarComponent', () => {
       } as GreenChecks),
       allGreenChecksAreTrue: signal(true),
       projectResultsSearchValue: signal(''),
-      isSidebarCollapsed: jest.fn().mockReturnValue(false)
+      isSidebarCollapsed: jest.fn().mockReturnValue(false),
+      isExternalResult: signal(false)
     };
 
     actionsService = {
@@ -154,6 +155,106 @@ describe('ResultSidebarComponent', () => {
     it('should be false for non-OICR indicators', () => {
       cacheService.currentMetadata.set({ indicator_id: 1, status_id: 4 });
       expect(component.showOicrStatusDropdown()).toBe(false);
+    });
+
+    it('regression — remains true for a STAR (non-external) OICR result for admin when status is not Published', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(false);
+      cacheService.currentMetadata.set({ indicator_id: 5, status_id: 13 });
+      expect(component.showOicrStatusDropdown()).toBe(true);
+    });
+
+    it('should be false for an external OICR result even when admin/status conditions are otherwise met', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+      cacheService.currentMetadata.set({ indicator_id: 5, status_id: 13 });
+      expect(component.showOicrStatusDropdown()).toBe(false);
+    });
+
+    it('falls back to the plain status tag (app-custom-tag) instead of app-status-dropdown for an external OICR result', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+      cacheService.currentMetadata.set({ indicator_id: 5, status_id: 13, status_name: 'Draft' });
+      fixture.detectChanges();
+
+      const host: HTMLElement = fixture.nativeElement;
+      expect(host.querySelector('app-status-dropdown')).toBeNull();
+      expect(host.querySelector('app-custom-tag')).not.toBeNull();
+    });
+  });
+
+  describe('External result readonly gating — Review/Submit-Unsubmit/Approve buttons (T-06)', () => {
+    function getButtonTexts(): string[] {
+      const host: HTMLElement = fixture.nativeElement;
+      return Array.from(host.querySelectorAll('button')).map(btn => (btn.textContent ?? '').trim());
+    }
+
+    it('renders Review Result and Submit Result for a STAR (non-external) result viewed by an admin (regression)', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(false);
+      cacheService.currentMetadata.set({
+        indicator_id: 1,
+        status_id: 1,
+        is_principal_investigator: false,
+        result_title: 'Test Result Title'
+      });
+      fixture.detectChanges();
+
+      const texts = getButtonTexts().join(' | ');
+      expect(texts).toContain('Review Result');
+      expect(texts).toContain('Submit Result');
+    });
+
+    it('hides Review Result and Submit/Unsubmit Result for an admin viewing an external result', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+      cacheService.currentMetadata.set({
+        indicator_id: 1,
+        status_id: 1,
+        is_principal_investigator: false,
+        result_title: 'Test Result Title'
+      });
+      fixture.detectChanges();
+
+      const texts = getButtonTexts().join(' | ');
+      expect(texts).not.toContain('Review Result');
+      expect(texts).not.toContain('Submit Result');
+      expect(texts).not.toContain('Unsubmit Result');
+    });
+
+    it('renders Approve Result for a STAR (non-external) result owned by the principal investigator (regression)', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(false);
+      cacheService.currentMetadata.set({
+        indicator_id: 1,
+        status_id: 1,
+        is_principal_investigator: true,
+        result_title: 'Test Result Title'
+      });
+      fixture.detectChanges();
+
+      expect(getButtonTexts().join(' | ')).toContain('Approve Result');
+    });
+
+    it('hides Approve Result for an external result owned by the principal investigator', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+      cacheService.currentMetadata.set({
+        indicator_id: 1,
+        status_id: 1,
+        is_principal_investigator: true,
+        result_title: 'Test Result Title'
+      });
+      fixture.detectChanges();
+
+      expect(getButtonTexts().join(' | ')).not.toContain('Approve Result');
+    });
+
+    it('leaves the "X/Y sections completed" progress counter visible for an external result (Design Decision D-5)', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+      cacheService.currentMetadata.set({
+        indicator_id: 1,
+        status_id: 1,
+        is_principal_investigator: false,
+        result_title: 'Test Result Title'
+      });
+      fixture.detectChanges();
+
+      const host: HTMLElement = fixture.nativeElement;
+      expect(host.textContent).toContain('sections completed');
     });
   });
 
@@ -437,6 +538,14 @@ describe('ResultSidebarComponent', () => {
   });
 
   describe('submmitConfirm', () => {
+    it('should no-op for an external result (defense-in-depth method guard, T-15)', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+
+      component.submmitConfirm();
+
+      expect(actionsService.showGlobalAlert).not.toHaveBeenCalled();
+    });
+
     it('should show submission alert when result is not submitted', () => {
       (submissionService.currentResultIsSubmitted as any).mockReturnValue(false);
 
@@ -732,6 +841,14 @@ describe('ResultSidebarComponent', () => {
   });
 
   describe('approveResult', () => {
+    it('should no-op for an external result (defense-in-depth method guard, T-15)', async () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+
+      await component.approveResult();
+
+      expect(apiService.PATCH_SubmitResult).not.toHaveBeenCalled();
+    });
+
     it('should call PATCH_SubmitResult and on success update metadata and show toast', async () => {
       (apiService.PATCH_SubmitResult as jest.Mock).mockResolvedValue({ successfulRequest: true });
       (metadataService.update as jest.Mock).mockResolvedValue(undefined);
@@ -1096,6 +1213,14 @@ describe('ResultSidebarComponent', () => {
   });
 
   describe('onStatusChange', () => {
+    it('should no-op for an external result (defense-in-depth method guard, T-15)', async () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+
+      await component.onStatusChange(11);
+
+      expect(actionsService.showGlobalAlert).not.toHaveBeenCalled();
+    });
+
     it('should show special alert for status 11 (postpone)', async () => {
       cacheService.currentMetadata?.set({
         indicator_id: 1,
