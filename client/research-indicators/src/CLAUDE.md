@@ -188,10 +188,22 @@ Two independent gaps mean **a green test suite does not mean the code compiles**
 - Jest runs **`isolatedModules: true`** under `jest-preset-angular`, so `ts-jest` performs **no type-checking** at all.
 
 A spec once shipped **6,239 passing tests over a tree that failed `npm run build` with `TS2345`**.
-**`npm run build` is the only client type gate — run it before claiming a change is verified.**
-Note `ng build` uses `tsconfig.app.json` (`files: [src/main.ts]`), so a green build still does not
-type-check the specs; `npx tsc -p tsconfig.spec.json --noEmit` is a separate gate.
+*(Suite size at 2026-08-13: **6,267**. The lesson is unaffected; the number is dated on purpose.)*
 
-Related: `src/environments/environment.ts` is **gitignored with no committed template**, so a clean
-checkout cannot build or test until it is created — and a wrongly-typed hand-written stub breaks the
-build while leaving every test green.
+**Two gates, and you need both:**
+
+- **`npm run build`** — the gate for **app** code. `ng build` uses `tsconfig.app.json` (`files: [src/main.ts]`), and with `strictTemplates` on it type-checks templates too. It does **not** see `*.spec.ts`.
+- **`npx tsc -p tsconfig.spec.json --noEmit`** — the gate for **spec** code. **Repaired 2026-08-13 (K-004).** Until then two pre-existing `TS1005` *syntax* errors aborted the parse and suppressed semantic diagnostics across the whole spec project: it reported **3** errors where **945** existed. **Gate against the 945 baseline — it will not be "clean", and expecting clean makes it useless again.**
+
+## ⚠ Gates must be proven able to fail (Kaizen K-004)
+
+Three mandated gates in this repo could not go red for the reason they were mandated: `npm run lint` (it is `eslint --fix`), `npm run build` for spec files (excluded by `tsconfig.build.json`), and the spec type-check above. **A verification command may not be cited as evidence until it has been observed failing** — break the thing on purpose once, confirm the gate reddens, then trust it.
+
+## ⚠ Several `environment` URLs are branch selectors, not just destinations (Kaizen K-005)
+
+`jwt.interceptor.ts` branches on whether a request URL matches `textMiningUrl` / `documentOverviewUrl` / `fileManagerUrl`, and mutates `req.body as FormData` when it does — which is `null` on a GET. `api.service.ts:989` uses `saveErrorsUrl` as a POST **base**. In production these are genuinely different hosts, which is what keeps the branches disjoint. **Collapsing them onto `mainApiUrl` "to simplify local" makes every API GET throw inside the interceptor before it leaves the browser, and turns error reporting into a self-reporting 404 loop.** Keep them distinct.
+
+Related: `src/environments/environment.ts` and `environment.dev.ts` are **gitignored**; a clean checkout
+cannot build or test until they exist. Copy the committed template **`src/environments/environment.example.ts`**
+(added 2026-08-13) — it documents the typed traps, including `hotjarId`/`hotjarVersion` which must be
+**numbers**, since a wrongly-typed hand-written stub breaks the build while leaving every test green.

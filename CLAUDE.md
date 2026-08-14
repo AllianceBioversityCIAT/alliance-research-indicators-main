@@ -146,6 +146,7 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 - **Budgets:** respect `angular.json` (initial ≤ 3 MB error / 2 MB warning; component styles ≤ 8 kB / 4 kB).
 
 ### 4.3 Shared
+- **A verification command may not be cited as evidence until it has been observed FAILING** (Kaizen **K-004**). Three mandated gates in this repo could not go red for the reason they were mandated: `npm run lint` (it is `eslint --fix`), `npm run build` for spec files (`tsconfig.build.json` excludes `**/*spec.ts`), and the client's `tsc -p tsconfig.spec.json` (a syntax error aborted the parse, hiding 945 type errors behind a report of 3). Break the thing on purpose once, confirm the gate reddens, then trust it.
 - **Lint/format:** `npm run lint` in each package (eslint + prettier). Don't bypass `husky` hooks.
 - **Local Environment & Testing:** Docker Compose (`docker compose up --build -d` at root) orchestrates both frontend (:4200) and backend (:3000) pointing directly to the on-premise Dev MySQL database. Native fallback commands are documented in [`docs/infrastructure.md`](docs/infrastructure.md) §6.
 - **Deployment & Access Governance:** Zero manual deployments by developers/agents. Remote releases are 100% automated via CI/CD pipelines (pushes/merges to `dev` deploy to On-Premise Dev; pushes/merges to `main` deploy to AWS Production).

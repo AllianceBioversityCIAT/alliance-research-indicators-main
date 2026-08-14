@@ -2,7 +2,7 @@
 
 - **Module:** bilateral
 - **Spec id:** 2026-08-primary-contributing-sp
-- **Status:** in-progress (T-01 done, 2026-08-13)
+- **Status:** **DELIVERED & ARCHIVED 2026-08-13** — 16 of 16 tasks executed, T-02 remaining `[~]` with one item owed post-deploy (see its entry). 7 commits, 2 rework attempts consumed across the whole run. `/akili-test` and `/akili-validate` were **not run**; their absence is an explicitly accepted risk recorded in `archive-summary.md`.
 - **Owner:** Juan Carlos Cadavid
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -143,7 +143,7 @@ graph TD
 - **Estimated LOC:** ~70
 - **Effort:** M
 - **Skills:** `nestjs-expert`, `systematic-debugging` (if the DDL misbehaves)
-- **Status:** **`[~]` in-progress** (2026-08-13) — **migration authored, reviewed PASS, committed `77f7e4f8`; probe package audited after 3 review rounds. The DB invariant is UNVERIFIED — no probe has been run.** See [`./execution.md`](./execution.md) → T-02. **⚠ The manual probes must run BEFORE T-06 reaches DEV** (T-06 writes `sp_role`, invalidating four `must_be_zero` assertions), or be re-scoped. Durable alternative: **T-13** automates all three probes against the `TEST` datasource. **Unowned gap:** forward+revert+forward (done-criterion 1) has no vehicle — CI/CD owns migrations.
+- **Status:** **`[~]` — migration DELIVERED, invariant VERIFIED, one item owed post-deploy** (2026-08-13). Migration authored, Reviewer PASS, committed `77f7e4f8`. ⚠️ **Two claims in the previous version of this line were falsified during the run and are corrected here by the `/akili-archive` factual-claims sweep:** (1) *"The DB invariant is UNVERIFIED — no probe has been run"* — it was verified twice: four Leader probes against **MySQL 8.0.45** (the DEV engine version) proving `ER_DUP_ENTRY` on a second active `PRIMARY`, N active `CONTRIBUTING` accepted, deactivate-then-reinsert accepted, and cross-alignment independence; then **T-13 automated all of it**, with its matchers mutation-proven to redden under `design.md` §3.1's `CONCAT` trap. **The trap gate is the N-active-`CONTRIBUTING` assertion, NOT the second-`PRIMARY` one — the latter stays green under the trap.** (2) *"T-13 automates all three probes against the `TEST` datasource"* — **the `TEST` host is an AWS RDS unreachable from the dev VPN**; T-13 ran against an isolated MySQL 8.0.45 container. See `execution.md` → "Environment resolution". **STILL OWED, and only a deploy can discharge it:** NFR-BIL-120 (row count + checksum preserved over seeded data), and the `is_read_only` half of R-BIL-126 AC.3, whose test re-reads a **mocked** context and structurally cannot fail for any DB reason. Post-deploy verification query recorded in `archive-summary.md`.
 
 ---
 
