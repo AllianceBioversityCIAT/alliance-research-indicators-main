@@ -1,17 +1,20 @@
 import { dataSource } from '../../src/db/config/mysql/orm.test.config';
 
 /**
- * Regression fixture for T-02, `docs/specs/bugfix/sp-versioning-roles-id`.
+ * Regression fixture for T-02 / T-02b, `docs/specs/bugfix/sp-versioning-roles-id`.
  *
- * Calls the REAL `SP_versioning` stored procedure against the scratch
- * MySQL schema — never asserts on emitted SQL strings (KZ-001). The
- * baseline snapshot carries no business data (design.md §4.1), so this
- * fixture seeds its own minimal, self-contained chain: a reporting
- * platform + report year, a portfolio with one impact outcome / one
- * strategic objective and their role lookups, an active non-snapshot
- * `results` row, and one row each in `result_impact_outcomes` /
- * `result_strategic_objectives`. Every seeded row is removed in
- * `afterAll` so reruns leave the scratch schema exactly as they found it.
+ * Calls the REAL `SP_versioning` and `SP_delete_result_version` stored
+ * procedures against the scratch MySQL schema — never asserts on emitted
+ * SQL strings (KZ-001). The baseline snapshot carries no business data
+ * (design.md §4.1), so this fixture seeds its own minimal, self-contained
+ * chains: a reporting platform + report year (shared), and — per test —
+ * a portfolio with one impact outcome / one strategic objective and their
+ * role lookups, an active non-snapshot `results` row, and one row each in
+ * `result_impact_outcomes` / `result_strategic_objectives`. Every seeded
+ * row is removed in `afterAll` so reruns leave the scratch schema exactly
+ * as they found it.
+ *
+ * ## T-02 — single version (`it('copies result_impact_outcomes...')`)
  *
  * RED (current `main`, migration `repairSpVersioningObjectiveBlocks` not
  * yet applied): `CALL SP_versioning(...)` fails with MySQL 1054, Unknown
@@ -22,12 +25,38 @@ import { dataSource } from '../../src/db/config/mysql/orm.test.config';
  * copied onto the new snapshot's `result_id`, `role_id` is preserved, and
  * each copied row receives a fresh `id` (the source row's id is not
  * reused) — R-SPV-001 AC.1–AC.3.
+ *
+ * ## T-02b — version → delete-version → re-version (`it('re-versions...')`)
+ *
+ * A fixture that versions only once structurally cannot see the T-02b
+ * defect — it needs a *pre-existing snapshot* for the delete routine to
+ * trip over (tasks.md T-02b disqualifier). This case therefore versions
+ * its own seeded source twice, with a `CALL SP_delete_result_version`
+ * in between, exactly mirroring the application's re-version sequence
+ * (`green-checks.repository.ts:294→307`).
+ *
+ * RED (migration `repairSpDeleteResultVersionObjectiveTables` not yet
+ * applied, `repairSpVersioningObjectiveBlocks` applied): the first
+ * `CALL SP_versioning(...)` succeeds and creates a snapshot carrying its
+ * own `result_impact_outcomes` / `result_strategic_objectives` rows.
+ * `CALL SP_delete_result_version(...)` then fails with MySQL 1451 —
+ * `SP_delete_result_version` never deletes those two tables, and both
+ * hold RESTRICT FKs to `results`, so its final `DELETE FROM results`
+ * cannot proceed.
+ *
+ * GREEN (after the migration): the delete completes, that snapshot's
+ * objective rows and its `results` row are gone, and the second
+ * `CALL SP_versioning(...)` produces a new snapshot carrying its own,
+ * distinct objective rows — R-SPV-002 AC.1–AC.2.
  */
 describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
   const uniqueSuffix = Date.now();
   // Comfortably inside JS safe-integer range; astronomically unlikely to
   // collide with anything else that might exist in the schema.
   const resultOfficialCode = 900_000_000_000_000 + uniqueSuffix;
+  // T-02b's own official code, distinct from T-02's, so the two `it`s
+  // never contend over the same `results` rows.
+  const cycleResultOfficialCode = 900_000_000_000_001 + uniqueSuffix;
   // The baseline carries no `report_years` rows; this fixed, far-future
   // year is reserved for this fixture and cleaned up when seeded by it.
   const reportYear = 2094;
@@ -42,6 +71,11 @@ describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
   let sourceResultId: number;
   let sourceRioId: number;
   let sourceRsoId: number;
+  // T-02b's own source `results` row — reuses the portfolio / impact
+  // outcome / strategic objective / role lookups seeded above (plain
+  // reference data), but is a distinct row so its version → delete →
+  // re-version cycle cannot collide with T-02's single-version case.
+  let cycleSourceResultId: number;
 
   beforeAll(async () => {
     await dataSource.initialize();
@@ -127,6 +161,25 @@ describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
       [sourceResultId, strategicObjectiveId, strategicObjectiveRoleId],
     );
     sourceRsoId = result.insertId;
+
+    result = await dataSource.query(
+      `INSERT INTO results (is_active, result_official_code, platform_code, report_year_id, is_snapshot, result_status_id)
+       VALUES (1, ?, 'STAR', ?, 0, NULL)`,
+      [cycleResultOfficialCode, reportYear],
+    );
+    cycleSourceResultId = result.insertId;
+
+    await dataSource.query(
+      `INSERT INTO result_impact_outcomes (is_active, result_id, impact_outcome_id, role_id)
+       VALUES (1, ?, ?, ?)`,
+      [cycleSourceResultId, impactOutcomeId, impactOutcomeRoleId],
+    );
+
+    await dataSource.query(
+      `INSERT INTO result_strategic_objectives (is_active, result_id, strategic_objective_id, role_id)
+       VALUES (1, ?, ?, ?)`,
+      [cycleSourceResultId, strategicObjectiveId, strategicObjectiveRoleId],
+    );
   });
 
   afterAll(async () => {
@@ -134,22 +187,24 @@ describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
       return;
     }
 
-    const resultRows: { result_id: number }[] = await dataSource.query(
-      `SELECT result_id FROM results WHERE result_official_code = ?`,
-      [resultOfficialCode],
-    );
-    const resultIds = resultRows.map((r) => r.result_id);
-    if (resultIds.length) {
-      await dataSource.query(
-        `DELETE FROM result_impact_outcomes WHERE result_id IN (${resultIds.join(',')})`,
+    for (const officialCode of [resultOfficialCode, cycleResultOfficialCode]) {
+      const resultRows: { result_id: number }[] = await dataSource.query(
+        `SELECT result_id FROM results WHERE result_official_code = ?`,
+        [officialCode],
       );
-      await dataSource.query(
-        `DELETE FROM result_strategic_objectives WHERE result_id IN (${resultIds.join(',')})`,
-      );
-      await dataSource.query(
-        `DELETE FROM results WHERE result_official_code = ?`,
-        [resultOfficialCode],
-      );
+      const resultIds = resultRows.map((r) => r.result_id);
+      if (resultIds.length) {
+        await dataSource.query(
+          `DELETE FROM result_impact_outcomes WHERE result_id IN (${resultIds.join(',')})`,
+        );
+        await dataSource.query(
+          `DELETE FROM result_strategic_objectives WHERE result_id IN (${resultIds.join(',')})`,
+        );
+        await dataSource.query(
+          `DELETE FROM results WHERE result_official_code = ?`,
+          [officialCode],
+        );
+      }
     }
 
     await dataSource.query(`DELETE FROM impact_outcomes WHERE id = ?`, [
@@ -210,5 +265,90 @@ describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
     expect(copiedRso).toBeDefined();
     expect(copiedRso.role_id).toBe(strategicObjectiveRoleId);
     expect(copiedRso.id).not.toBe(sourceRsoId);
+  }, 30000);
+
+  it('re-versions a result whose existing snapshot carries objective rows, without losing the new snapshot to a foreign-key failure (T-02b)', async () => {
+    // First version: creates snapshot1, which owns its own copies of the
+    // two objective-table rows (this is the "pre-existing snapshot" the
+    // T-02b disqualifier requires — a fixture that versions only once
+    // cannot see the defect).
+    await dataSource.query(`CALL SP_versioning(?)`, [cycleResultOfficialCode]);
+
+    const [snapshot1] = await dataSource.query(
+      `SELECT result_id FROM results WHERE result_official_code = ? AND is_snapshot = TRUE`,
+      [cycleResultOfficialCode],
+    );
+    expect(snapshot1).toBeDefined();
+    const snapshot1Id = snapshot1.result_id;
+    expect(snapshot1Id).not.toBe(cycleSourceResultId);
+
+    const [snapshot1Rio] = await dataSource.query(
+      `SELECT id FROM result_impact_outcomes WHERE result_id = ?`,
+      [snapshot1Id],
+    );
+    expect(snapshot1Rio).toBeDefined();
+    const [snapshot1Rso] = await dataSource.query(
+      `SELECT id FROM result_strategic_objectives WHERE result_id = ?`,
+      [snapshot1Id],
+    );
+    expect(snapshot1Rso).toBeDefined();
+
+    // The application's re-version sequence: delete the existing
+    // snapshot, then version again (green-checks.repository.ts:294→307).
+    // Before `repairSpDeleteResultVersionObjectiveTables`, this call
+    // raises MySQL 1451 — snapshot1's own objective rows are never
+    // deleted by `SP_delete_result_version`, and both tables hold
+    // RESTRICT FKs to `results`, so its final `DELETE FROM results`
+    // cannot proceed.
+    await dataSource.query(`CALL SP_delete_result_version(?, ?)`, [
+      cycleResultOfficialCode,
+      reportYear,
+    ]);
+
+    const remainingSnapshot1Rows = await dataSource.query(
+      `SELECT result_id FROM results WHERE result_id = ?`,
+      [snapshot1Id],
+    );
+    expect(remainingSnapshot1Rows).toHaveLength(0);
+
+    const remainingSnapshot1Rio = await dataSource.query(
+      `SELECT id FROM result_impact_outcomes WHERE result_id = ?`,
+      [snapshot1Id],
+    );
+    expect(remainingSnapshot1Rio).toHaveLength(0);
+
+    const remainingSnapshot1Rso = await dataSource.query(
+      `SELECT id FROM result_strategic_objectives WHERE result_id = ?`,
+      [snapshot1Id],
+    );
+    expect(remainingSnapshot1Rso).toHaveLength(0);
+
+    // Second version: the source row (untouched by either the versioning
+    // or the delete routine) produces a fresh snapshot carrying its own,
+    // distinct objective rows.
+    await dataSource.query(`CALL SP_versioning(?)`, [cycleResultOfficialCode]);
+
+    const [snapshot2] = await dataSource.query(
+      `SELECT result_id FROM results WHERE result_official_code = ? AND is_snapshot = TRUE`,
+      [cycleResultOfficialCode],
+    );
+    expect(snapshot2).toBeDefined();
+    const snapshot2Id = snapshot2.result_id;
+    expect(snapshot2Id).not.toBe(snapshot1Id);
+    expect(snapshot2Id).not.toBe(cycleSourceResultId);
+
+    const [snapshot2Rio] = await dataSource.query(
+      `SELECT id, role_id FROM result_impact_outcomes WHERE result_id = ?`,
+      [snapshot2Id],
+    );
+    expect(snapshot2Rio).toBeDefined();
+    expect(snapshot2Rio.role_id).toBe(impactOutcomeRoleId);
+
+    const [snapshot2Rso] = await dataSource.query(
+      `SELECT id, role_id FROM result_strategic_objectives WHERE result_id = ?`,
+      [snapshot2Id],
+    );
+    expect(snapshot2Rso).toBeDefined();
+    expect(snapshot2Rso.role_id).toBe(strategicObjectiveRoleId);
   }, 30000);
 });

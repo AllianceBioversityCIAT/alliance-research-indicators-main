@@ -104,7 +104,7 @@ The procedure **SHALL** delete `result_impact_outcomes` and `result_strategic_ob
 - [ ] AC.1 — After versioning a result that carries objective rows, `CALL SP_delete_result_version(<code>, <year>)` completes without error.
 - [ ] AC.2 — Both tables' rows for that snapshot are gone afterwards.
 - [ ] AC.3 — The two new statements are placed **before** the final `DELETE FROM results`.
-- [ ] AC.4 — **No other statement of the routine changes.** The existing 37 child deletes are byte-identical.
+- [ ] AC.4 — **No other statement of the routine changes.** The existing **32 child deletes** (33 statements including the final parent delete) are byte-identical. *(Corrected 2026-08-14 from "37", a Leader miscount at pivot time — advisory B-12.)*
 - [ ] AC.5 — `down()` restores the exact prior body, the omission included.
 
 #### Scenario: Re-versioning a result with objective rows

@@ -80,14 +80,14 @@ The other **27** copy blocks, the guard clauses, the `SIGNAL` handlers, the `new
 | Link | Evidence |
 | --- | --- |
 | Both objective tables hold **RESTRICT** FKs to `results` | `information_schema.REFERENTIAL_CONSTRAINTS` → `DELETE_RULE = NO ACTION` for `FK_f1a19f2f5d9556dee00b4c54d31` and `FK_f533df2b0cbca7d2d9cdc8d4308` |
-| `SP_delete_result_version` deletes **37** child tables, and neither of these is among them | `ROUTINE_DEFINITION LIKE '%result_impact_outcomes%'` → 0; same for `result_strategic_objectives` |
+| `SP_delete_result_version` deletes **32** child tables, and neither of these is among them | `ROUTINE_DEFINITION LIKE '%result_impact_outcomes%'` → 0; same for `result_strategic_objectives` |
 | `full_delete_result_version` deletes both | → 1 for both. The transcript §4.1 divergence, confirmed |
 | It ends by removing the parent | Routine tail: `DELETE FROM results WHERE result_id = temp_result_id` |
 | The app deletes the old snapshot **before** re-versioning | `green-checks.repository.ts:294 → :307`; `result-status-workflow.repository.ts:152 → :172` |
 
 Inert today (the procedure aborts at block 3 with 1054, so the rows never exist); live the moment the repair lands.
 
-**The `green-checks` path is the damaging one.** It calls `this.dataSource.query(...)` with no transaction, and the routine itself has no `START TRANSACTION` and no handler — so under autocommit the 37 preceding deletes **commit** and the parent delete then fails with 1451. Result: the snapshot's children destroyed, the snapshot row surviving, unrecoverable through the application. The workflow path is transactional and rolls back, but its `.catch()` at `:167-169` rewrites the error to a bare `'Error deleting snapshot'`.
+**The `green-checks` path is the damaging one.** It calls `this.dataSource.query(...)` with no transaction, and the routine itself has no `START TRANSACTION` and no handler — so under autocommit the 32 preceding child deletes **commit** and the parent delete then fails with 1451. Result: the snapshot's children destroyed, the snapshot row surviving, unrecoverable through the application. The workflow path is transactional and rolls back, but its `.catch()` at `:167-169` rewrites the error to a bare `'Error deleting snapshot'`.
 
 ### The change
 
@@ -113,7 +113,7 @@ DELETE
 
 ### What does not change
 
-The 37 existing child deletes, the `temp_result_id` selection, the `SIGNAL` guard, and the parameter list. The routine still has no transaction and no handler — **adding one is out of scope** and would change failure semantics for every indicator, which is precisely what DD-4 exists to prevent.
+The 32 existing child deletes, the `temp_result_id` selection, the `SIGNAL` guard, and the parameter list. The routine still has no transaction and no handler — **adding one is out of scope** and would change failure semantics for every indicator, which is precisely what DD-4 exists to prevent.
 
 ---
 

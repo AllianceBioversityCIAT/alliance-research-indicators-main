@@ -141,7 +141,7 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (SP_versioning repa
 
 - **Requirements covered:** **R-SPV-002 (AC.1–AC.5)**; DC-E; RB-5
 - **Design references:** §3.1, **DD-6** (amends DD-4), §6
-- **Size:** M · **Dependencies:** T-02 · **Status:** todo
+- **Size:** M · **Dependencies:** T-02 · **Status:** **`[x]` done** — Reviewer PASS 2026-08-14, parallel-lens mode (conformance + risk, both PASS). See [`./execution.md`](./execution.md) → *T-02b*
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 > **Added 2026-08-14 by the T-02 Pivot** — user ruling on advisory B-1. T-02's repair activates a latent MySQL 1451 in the re-versioning path; this closes it. **This is not optional cleanup:** merging T-02 without it converts "versioning never works" into "re-versioning destroys the previous snapshot's children on the untransacted path" (RB-5).
@@ -162,11 +162,11 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (SP_versioning repa
 - **Disqualifier:** a fixture that versions only **once** structurally cannot see this defect — it needs a pre-existing snapshot. A green single-version run is not evidence for this task.
 
 **Done**
-- [ ] Red run captured verbatim (error 1451) before the migration
-- [ ] Green run after: AC.1, AC.2 satisfied on the full re-version cycle
-- [ ] Body diff shows exactly two statements added, placed before `DELETE FROM results` (AC.3, AC.4)
-- [ ] `down()` restores the prior body byte-for-byte (AC.5), verified by diff
-- [ ] Fixture observed red again with the migration reverted
+- [x] Red run captured verbatim (error 1451) before the migration — the migration file was held outside `src/db/migrations/`; T-02's test kept passing throughout (1 failed, 1 passed)
+- [x] Green run after: AC.1, AC.2 satisfied on the full re-version cycle — snapshot 1's objective rows gone, snapshot 2 carrying its own
+- [x] Body diff shows exactly two statements added, placed before `DELETE FROM results` (AC.3, AC.4) — one hunk, +8 lines; `DELETE` count 33 → 35
+- [x] `down()` restores the prior body byte-for-byte (AC.5), verified by diff — `cmp` byte-identical
+- [x] Fixture observed red again with the migration reverted — revert log confirmed it removed exactly `1784250000000`
 
 ---
 

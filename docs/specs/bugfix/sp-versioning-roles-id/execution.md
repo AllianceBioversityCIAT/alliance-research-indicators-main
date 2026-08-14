@@ -452,7 +452,7 @@ The risk lens surfaced this; the Leader then verified every load-bearing link di
 
 The two call paths fail differently, and the worse one is unprotected:
 
-- `green-checks.repository.ts` calls through `this.dataSource.query(...)` with **no transaction**, and the routine itself has no `START TRANSACTION` and no handler → autocommit. The ~32 preceding table deletes **commit**, then the parent delete fails: the snapshot's children are destroyed while the snapshot row survives. Not recoverable through the application.
+- `green-checks.repository.ts` calls through `this.dataSource.query(...)` with **no transaction**, and the routine itself has no `START TRANSACTION` and no handler → autocommit. The 32 preceding child deletes **commit**, then the parent delete fails: the snapshot's children are destroyed while the snapshot row survives. Not recoverable through the application.
 - `result-status-workflow.repository.ts` runs inside an `EntityManager` transaction, so it rolls back — but its `.catch()` at `:167-169` rewrites the error to a bare `'Error deleting snapshot'`, making the 1451 diagnostically invisible.
 
 That second point also **answers RB-4's open question** ("whether callers swallow the error") — one of them does, and the answer should be carried into `requirements.md`.
@@ -498,5 +498,79 @@ That second point also **answers RB-4's open question** ("whether callers swallo
 > - `design.md:499` and `tasks.md:319` — M6's edit-set assertion requires the post-M6 routine bodies to leave "**both divergences intact**" (R-IU-011 AC.8/AC.9)
 >
 > Once T-02b lands, one of those two divergences **no longer exists**, so M6's assertion checks a stale expectation and will fail for the right reason at the wrong place. This is carried into **T-03**, which already owns the chunk-1 reconciliation — see its carry-forward list. It is recorded, not silently edited: amending another spec's approved acceptance criteria is that spec's gate, not this one's.
+
+---
+
+### T-02b — Companion migration: `SP_delete_result_version` deletes the objective tables: **PASS**
+
+- **Date:** 2026-08-14
+- **Implementer attempts:** 1 (no rework)
+- **Review mode:** **parallel lens** (4R) — two lenses, **spec conformance + evidence discrimination** (the gate) and **risk**. Both `STATUS: PASS`. Narrower than T-02's three because the change is eight lines over a body whose structural questions T-02's review had already settled
+- **Requirements covered:** R-SPV-002 AC.1–AC.5; DC-E; RB-5
+
+#### Files changed
+
+| File | What |
+| --- | --- |
+| `src/db/migrations/1784250000000-RepairSpDeleteResultVersionObjectiveTables.ts` | New, 381 lines. `up()` adds the two `DELETE` statements before the final `DELETE FROM results`; `down()` restores the prior body verbatim, omission included |
+| `test/fixtures/sp-versioning-objective-blocks.fixture-spec.ts` | +165/−25. A second `it` exercising version → delete-version → re-version on its own `cycleResultOfficialCode`. The 25 deletions are the existing `afterAll` cleanup wrapped in a loop over both codes — **not** removed assertions; T-02's test and every one of its assertions are unchanged (Leader-verified against `git diff`) |
+
+#### Verification evidence
+
+| Gate | Evidence |
+| --- | --- |
+| **RED, migration absent** (T-02 applied, so `SP_versioning` works — the precondition this red needs) | `QueryFailedError: Cannot delete or update a parent row: a foreign key constraint fails (`ari_scratch_test`.`result_impact_outcomes`, CONSTRAINT `FK_f1a19f2f5d9556dee00b4c54d31` FOREIGN KEY (`result_id`) REFERENCES `results` (`result_id`))` — 1 failed, 1 passed, T-02's test unaffected |
+| **GREEN** after `migration:test:execute` | 2/2 pass |
+| **RE-RED** via `migration:test:revert` | Revert log confirmed it removed exactly timestamp `1784250000000`; fixture returned to the identical 1451; re-execute → 2/2 green |
+| **AC.3/AC.4 — body diff** (Leader-extracted mechanically) | **One hunk, +8 lines**, positioned immediately before the final `DELETE FROM results`. `DELETE` counts: prior 33, `up()` 35, `down()` 33 |
+| **AC.5 — `down()` fidelity** | `cmp` → **byte-identical** to the prior body |
+| Ordering | Live `migrations` table: `1784211738931 < 1784250000000 < 1784300000000` |
+| Lint | `npm run lint -- --quiet` clean; `git status` unchanged before/after |
+
+#### Ownership determination (family decision D-10 — never guess which migration owns a routine)
+
+The Implementer grepped rather than trusting the spec's filename: `SP_delete_result_version` appears in 10–11 migration files; highest prior timestamp is `1778510205765-updatefulldelete.ts`, and `1783029013035` — the newest *lifecycle* migration — contains **zero** occurrences of the routine name. Its objective-table deletes at `:1046–:1052` belong to `full_delete_result_version`, which is what the new statements were mirrored from. Both Reviewers re-derived this independently and confirmed it.
+
+#### What the Reviewers verified independently (not accepted on report)
+
+- **Zero routine drift on the shared DB** — a check neither the Leader nor the brief asked for. Both lenses compared the migration's base body against **dev's live routine** as captured in `baseline.sql:6706–6867` and found it identical to `1778510205765:173–334`. So `up()` overwrites nothing that exists only on dev — the failure mode where a migration reproduces a stale body and silently reverts a hand-edit made directly on the shared database is ruled out, not assumed away.
+- **Deletion scope — the load-bearing risk question**, confirmed safe on three independent grounds: `temp_result_id` is selected under `is_snapshot = TRUE` and `results.result_id` is the PK, so snapshot and live rows are distinct; both new `DELETE`s key on `result_id`, an FK to `results(result_id)` (`baseline.sql:3158`/`:4002`) rather than on `result_official_code`; and the statements introduce **no new selection semantics at all** — `WHERE result_id = temp_result_id` is the identical predicate the 30 sibling deletes already use. A live result's objective rows are unreachable by this predicate.
+- **Both target tables are FK leaves** — a full-file grep of `baseline.sql` finds no `REFERENCES` pointing at either — so deleting them before `DELETE FROM results` can neither block nor orphan anything.
+- **Discrimination** — the fixture asserts `snapshot1Rio`/`snapshot1Rso` are *defined* (`:285–294`) **before** the delete runs, so a silent zero-row copy by `SP_versioning` would fail there rather than producing a trivially-successful delete and a false green. And it versions **twice** (`:275`, `:329`) with the delete at `:303`, clearing the T-02b disqualifier.
+- **Body preservation checked by offset arithmetic**, not by trust: a constant 131-line offset holds from prior `:173`↔`up():42` through `:328`↔`:197`, resuming cleanly after the eight inserted lines (`:329`↔`:206`).
+- **Two risk-positive choices recorded**, because a plausible alternative to each would have re-opened the bug: the new deletes are **unconditional on `is_active`** (matching all 30 siblings — an `is_active = TRUE` filter would strand soft-deleted rows and re-raise 1451), and the fixture's `afterAll` removes objective rows *before* `DELETE FROM results`, so cleanup stays FK-safe even when the fixture is left RED.
+- **The other divergence is correctly left alone** — `up():87-90` keeps `link_results … WHERE result_id = temp_result_id OR other_result_id = temp_result_id`, where `full_delete_result_version` has only `result_id`. One omission closed, nothing harmonized (AC.4).
+
+#### `Not Done / Assumptions` (carried verbatim from the Implementer report)
+
+- The spec's own statement counts ("~37 child deletes", "~32 preceding deletes") disagree with the file: the routine has **32 child deletes + 1 parent = 33 statements**. Implementation unaffected — exactly 2 added, all 33 originals byte-identical.
+- Scope fences honoured: no transaction/handler, no harmonization of the `SIGNAL` vs `RETURN FALSE` divergence, no merged migration edited, no harness file touched, full suite not run (T-03's).
+- Scratch MySQL left GREEN with both migrations applied.
+
+**Leader adjudication:** no unfinished scope. The count discrepancy is **my error, introduced when I wrote §3.1 during the T-02 Pivot**, and both Reviewers flagged it independently. Corrected in `requirements.md` R-SPV-002 AC.4 and `design.md` §3.1 in the same turn rather than deferred to T-03's sweep — leaving it would send a T-03 verifier hunting for five statements that do not exist.
+
+#### Requirements outcome
+
+| Item | Status |
+| --- | --- |
+| AC.1 | Closed — the delete completes; the full re-version cycle runs |
+| AC.2 | Closed — snapshot 1's objective rows and its `results` row are gone; snapshot 2 carries its own |
+| AC.3 | Closed — placement immediately before the final `DELETE FROM results` |
+| AC.4 | Closed — 33 prior statements, the `temp_result_id` SELECT, the `SIGNAL` guard and the signature all byte-identical |
+| AC.5 | Closed — `down()` byte-identical, omission intact |
+| DC-E | Closed — the cycle fixture is the gate; a single-version fixture structurally cannot see this defect |
+| RB-5 | Mitigated in structure, not only in prose — see B-13 |
+
+## ADVISORY findings — T-02b (recorded; never gate, never become tasks in this spec)
+
+| # | Lens | Finding |
+| --- | --- | --- |
+| **B-12** ✅ | conformance / risk (**both lenses**) | **The spec said 37 child deletes; the routine has 32 + 1 parent.** A Leader error from the T-02 Pivot. **FIXED this turn** in `requirements.md` AC.4 and `design.md` §3.1 |
+| **B-13** ✅ | risk — *favourable* | Because `1784250000000` sorts **before** `1784300000000`, TypeORM's newest-first revert undoes the versioning repair before the delete repair automatically. Advisory B-9's "revert the delete repair last" is now **structurally guaranteed by the timestamp**, not merely documented |
+| B-14 | risk | §6's backout rule is stated in migration-identity terms, not operator terms. Concretely: `npm run migration:revert` reverts exactly **one** migration, and with both applied that is `1784300000000` — **the default single revert is already the safe one**, and the hazard is specifically a *second consecutive* revert. §6 also offers no way to find the residual rows that make it dangerous; a locator (`SELECT r.result_id FROM results r JOIN result_impact_outcomes rio ON rio.result_id = r.result_id WHERE r.is_snapshot = TRUE`, and the same for the other table) would let an engineer decide rather than guess |
+| B-15 | risk — harness fidelity, inherited from T-01b | §6 says dev's routines carry ``DEFINER=`AllianceRepUser`@`%` ``, but the baseline snapshot emits `CREATE PROCEDURE` with **no DEFINER** (`baseline.sql:6706`), so the scratch container recreates as the scratch user and **structurally cannot exercise the DEFINER axis**. The green fixture is not evidence about privilege behaviour on dev. This migration introduces no new divergence (`1778510205765` declares none either) and §6 already requires human confirmation — recorded so the green run is not later misread as having covered it. Immaterial companion: dev's routine was created under `sql_mode = STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION` and will be recreated under the TypeORM session's mode; no effect on a DELETE-only body |
+| B-16 | risk — pre-existing data | For snapshots created before any of this landed — which by the spec's own premise carry no objective rows, since `SP_versioning` could never execute — the two new statements match zero rows and are a successful no-op. Dev behaviour unchanged |
+| B-17 | reliability — optional | The fixture proves the **live** result's rows survive the delete only *indirectly*, via snapshot 2 being non-empty (`:340-352`). Since "the delete did not touch the live result's rows" is the most consequential property of this change, one direct assertion after the delete (`result_impact_outcomes WHERE result_id = cycleSourceResultId` still returns a row) would make the guarantee explicit and fail loudly rather than as a confusing downstream `undefined` |
+| B-18 | risk — outside this task | T-03 must still restate chunk 1's R-IU-011 AC.8/AC.9 edit-set assertion. Already carried in `tasks.md` T-03; re-flagged by a Reviewer so it is not lost |
 
 ---
