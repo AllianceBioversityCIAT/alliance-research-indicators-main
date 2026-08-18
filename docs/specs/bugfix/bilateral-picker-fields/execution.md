@@ -431,3 +431,56 @@ The Implementer strengthened the assertion rather than deleting the test — the
 **⚠ Independence caveat, recorded rather than buried:** `claude-sonnet-4-6` hit its agy quota (`Resets in 2h54m`) mid-dispatch, so this review ran on **`gemini-3.1-pro-high`** against a `gemini-3.7-flash-medium` Implementer. `author ≠ auditor` holds — different model — but **same family, so the independence is weaker** than the cross-family separation T-01 and T-02 got. Noted so nobody later reads this PASS as equivalent to theirs.
 
 Raw output: `evidence/t05-RED.txt`, `evidence/t05-GREEN.txt`.
+
+---
+
+## T-06 — implementation complete, review in flight
+
+| | |
+| --- | --- |
+| **Implementer** | agy `gemini-3.7-flash-high`, `ctx_c0957ef9d82d` — **1 attempt, no rework** |
+| **Files** | interface (+1), `component.ts` (+8/−1), `component.html` (+1/−1), spec (+141/−5) |
+| **Requirements** | R-BPF-003 (amended), R-BPF-004 (amended — both new scenarios) |
+
+**The label rule as shipped:**
+
+```
+code  = external_code?.trim() || short_name?.trim() || ''
+title = full_name?.trim() || ''
+!title            -> code
+!code             -> title
+code === title    -> title        (case-folded — THE FIX)
+else              -> `${code} — ${title}`
+```
+
+**K-004 evidence — Leader-captured independently, not taken on the Implementer's word:**
+
+| Run | Result |
+| --- | --- |
+| **RED** (production files at `HEAD`, new spec kept) | **`Tests: 7 failed, 70 passed, 77 total`** |
+| **GREEN** | **`Tests: 77 passed, 77 total`** · `npm run lint -- --quiet` → *All files pass linting* |
+
+**All seven failures are new tests — none passed on `HEAD`.** This is the third task in a row where the brief named the exact failing input in advance, and the first client task with zero weak-red tests. The failing set:
+
+- `returns the title once when short_name equals full_name (R-BPF-004 de-duplication)` ← **the user's reported defect, reproduced as a unit assertion**
+- `de-duplicates case-insensitively and ignores surrounding whitespace`
+- `de-duplicates when external_code equals full_name`
+- `prefers external_code over short_name as the code`
+- `falls back to short_name when external_code is whitespace-only or empty`
+- `renders external_code alone when full_name is absent or empty`
+- `survives client-side filtering when searching by full_name, short_name, and external_code (R-BPF-003 / D-2)`
+
+**Full client suite, run in isolation — and an honest finding:**
+
+```
+Test Suites: 1 failed, 307 passed, 308 total
+Tests:       3 failed, 6390 passed, 6393 total
+```
+
+The three failures are in `ToPromiseService` (`getEnv` / `getBlob` — which API URL is selected from `isAuth`). **They are PRE-EXISTING, not caused by T-06.** Verified by stashing every T-06 change and re-running that suite alone: the same three fail on a clean tree. Almost certainly local environment configuration — the reporter had `.env` and `environment.ts` open when they filed the picker defect.
+
+Recorded rather than left as an unexplained *"3 failed"*, and **out of scope for this spec** — it belongs to whoever owns the client environment config. Reporting a green suite here without this note would have been the lie; blaming T-06 for it would have been the other one.
+
+**DD-4 spot-check by the Leader** (composing the review brief, not a verdict): `optionLabel="short_name"` is still present on the CLARISA picker, and the AGRESSO picker's own `filterBy="agreement_id,description"` is undisturbed.
+
+Raw output: `evidence/t06-RED.txt`, `evidence/t06-GREEN.txt`.
