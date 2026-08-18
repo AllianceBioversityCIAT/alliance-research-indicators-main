@@ -354,3 +354,80 @@ The user's ask is *"código del proyecto y el título"* — the same shape the A
 **Leader recommendation: A + C together, B optional.** De-duplication is required under every option and is the actual defect. Preferring `external_code` is what makes the label a *code + title* the day PRMS lands, without a second change — and it aligns the picker with the field S2 will key on. The `id` prefix is a product call: it guarantees an identifier today at the cost of showing an internal number to users.
 
 **Status:** spec amendment pending user approval. No code changed.
+
+---
+
+## ✅ T-05 — PASS (1 rework)
+
+| | |
+| --- | --- |
+| **Implementer** | agy `gemini-3.7-flash-medium`, `ctx_e7b26d5f4b6e` — **1 attempt, no rework** |
+| **Files** | `clarisa-projects.controller.ts` (+8/−4), spec (+67/−1) |
+| **Requirements** | R-BPF-001 (amended), R-BPF-002 (amended), NFR-BPF-001, DD-9 |
+
+**K-004 evidence — Leader-captured with the safe primitive, not taken on the Implementer's word:**
+
+| Run | Controller | Result |
+| --- | --- | --- |
+| **RED** | reverted to `HEAD` (i.e. post-T-01), new spec kept | **`Tests: 3 failed, 14 passed, 17 total`** |
+| **GREEN** | fix applied | **`Tests: 17 passed, 17 total`** |
+
+The three failures, each naming its requirement:
+- `returns trimmed picker shape with additive fields including full_name, description, and external_code (R-BPF-001, NFR-BPF-001)`
+- `matches by external_code case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input / DD-9)`
+- `matches uppercase external_code term case-insensitively`
+
+**Improvement over T-01 worth recording: all three new tests failed in RED.** T-01 shipped three new tests that passed on `HEAD` and therefore never served as gates — the Reviewer caught that and it became an advisory. T-05 has no such tests. The pattern held because the brief named the exact failing input in advance (`external_code: 'B-A1080'` searched as `b-a1080`), which makes a non-falsifiable test obvious while it is being written rather than after.
+
+**Full server suite, re-measured in isolation with nothing else running:**
+
+```
+Test Suites: 326 passed, 326 total
+Tests:       2261 passed, 2261 total
+Time:        147 s
+```
+
+**This retroactively settles the T-01 concurrency question.** T-01 began chasing failures in `excel-workbook.builder.spec.ts` while T-02's client jest ran concurrently; the Leader told it over the dispatch channel to treat them as artifacts and verify its own scope only. The full suite is green — **the coordinator's call was right, and the failures were the concurrency artifact root `CLAUDE.md` §4.3 describes.**
+
+### Reviewer attempt 1 — `STATUS: FAIL`, and it was right
+
+Reviewer: agy `gemini-3.1-pro-high`, `ctx_7413d9e81166`.
+
+> **Q4 EVIDENCE INTEGRITY:** yes — a NEW test PASSED in the RED run: *"tolerates absent or null `external_code` without throwing and matches `short_name` or `full_name` (R-BPF-002)"*. **STATUS: FAIL**
+
+Everything else passed: scope, additivity, the predicate with optional chaining, no new upstream call, sort comparator untouched.
+
+**The defect:** that test passed against the unmodified controller because the old predicate never touched `external_code` at all, so an absent `external_code` could never throw. It proved the *old* code was safe, not that the new optional-chaining is — the exact weak-red pattern T-01 shipped three of.
+
+### Leader adjudication — the FAIL was upheld, not downgraded
+
+T-01's reviewer classified the identical defect class as a **non-gating advisory** and the task passed. Two arguments for doing the same here, and why neither won:
+
+1. *"The fix is correct anyway."* True, and irrelevant. Downgrading a FAIL because the remediation is inconvenient is precisely what erodes a gate until it stops catching anything.
+2. *"Precedent within this spec treats it as advisory."* Also true — but T-05's brief **named this exact pattern in advance**, citing T-01's three tests by name. The Implementer was on notice and produced one anyway.
+
+`requirements.md` §6 D-6 already defines the remedy: a test that passes on `HEAD` is **disqualified as evidence**. The correction cost one assertion. Reworked rather than waived.
+
+**Recorded inconsistency, for the Kaizen pass:** the same defect class drew an *advisory* in T-01 and a *FAIL* in T-05, from two different reviewers. Both readings are defensible under the current wording — which means **the wording is what needs fixing**, not either reviewer.
+
+### Rework — evidence re-captured independently by the Leader
+
+| Run | Result |
+| --- | --- |
+| **RED** (controller at `HEAD`, reworked spec) | **`Tests: 4 failed, 13 passed, 17 total`** — up from 3 |
+| **GREEN** | **`Tests: 17 passed, 17 total`** · `npx eslint` clean |
+
+The fourth failure is the previously-passing test, now genuinely red:
+`tolerates absent or null external_code without throwing and matches short_name or full_name (R-BPF-002)`
+
+The Implementer strengthened the assertion rather than deleting the test — the fixture now carries one project with a null `external_code` and one with a populated `external_code` matching the term, asserting **both** that nothing throws **and** that the populated row is returned. Against the old predicate that returns `[]`.
+
+### Reviewer attempt 2 — `STATUS: PASS`
+
+> Q1 previously-passing test now among the RED failures — **yes**
+> Q2 all four `external_code` tests now genuine gates, none passing on `HEAD` — **yes**
+> Q3 anything changed beyond that one test — **no**
+
+**⚠ Independence caveat, recorded rather than buried:** `claude-sonnet-4-6` hit its agy quota (`Resets in 2h54m`) mid-dispatch, so this review ran on **`gemini-3.1-pro-high`** against a `gemini-3.7-flash-medium` Implementer. `author ≠ auditor` holds — different model — but **same family, so the independence is weaker** than the cross-family separation T-01 and T-02 got. Noted so nobody later reads this PASS as equivalent to theirs.
+
+Raw output: `evidence/t05-RED.txt`, `evidence/t05-GREEN.txt`.

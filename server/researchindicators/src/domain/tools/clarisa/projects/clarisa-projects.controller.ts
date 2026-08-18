@@ -15,7 +15,7 @@ import { ClarisaProject } from './dto/clarisa-project.types';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-04 / R-BAS-003, R-BAS-004, R-BAS-006
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.15 / R-BIL-080 (UI)
-// @sdd-spec docs/specs/bugfix/bilateral-picker-fields — T-01 / R-BPF-001, R-BPF-002, R-BPF-006, NFR-BPF-001, NFR-BPF-003
+// @sdd-spec docs/specs/bugfix/bilateral-picker-fields — T-01, T-05 / R-BPF-001, R-BPF-002, R-BPF-006, NFR-BPF-001, NFR-BPF-003, DD-9
 //
 // Thin admin-only picker endpoint for the bilateral_project_mapping form.
 // Returns the cached CLARISA bilateral projects (5-min TTL via the
@@ -40,7 +40,7 @@ export class ClarisaProjectsController {
     required: false,
     type: String,
     description:
-      'Optional case-insensitive substring match on `short_name` or `full_name`. Filtered in memory after the upstream cache.',
+      'Optional case-insensitive substring match on `short_name`, `full_name`, or `external_code`. Filtered in memory after the upstream cache.',
   })
   @ApiQuery({
     name: 'phase',
@@ -71,7 +71,8 @@ export class ClarisaProjectsController {
       ? all.filter(
           (p) =>
             p.short_name?.toLowerCase().includes(needle) ||
-            p.full_name?.toLowerCase().includes(needle),
+            p.full_name?.toLowerCase().includes(needle) ||
+            p.external_code?.toLowerCase().includes(needle),
         )
       : all;
 
@@ -103,6 +104,7 @@ export class ClarisaProjectsController {
           short_name: p.short_name,
           full_name: p.full_name,
           description: p.description,
+          external_code: p.external_code,
           source_of_funding: p.source_of_funding,
           phase: p.phase,
           source_center_acronym: p.source_center_acronym,

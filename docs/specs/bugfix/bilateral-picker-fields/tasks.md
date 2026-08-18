@@ -186,7 +186,7 @@ T-05 (server: external_code) ──> T-06 (client: prefer code + de-duplicate) �
 - **The input that would make this check FAIL:** `{ short_name: 'Fertilize Right Colombia', external_code: 'B-A1080' }` searched as `b-a1080` — returns `[]` today.
 - **Disqualifier:** a test that only asserts the field appears in the response does not prove the predicate matches it. Both assertions are required.
 - **Skills:** `nestjs-expert`, `systematic-debugging` · **Effort:** `medium` · **Size:** S (~40 LOC)
-- **Status:** todo
+- **Status:** done
 
 ### T-06 — Client: prefer `external_code`, and stop rendering the name twice
 

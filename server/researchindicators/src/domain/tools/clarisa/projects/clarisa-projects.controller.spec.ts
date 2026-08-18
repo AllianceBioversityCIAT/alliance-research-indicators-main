@@ -62,7 +62,7 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
     ]);
   });
 
-  it('returns trimmed picker shape with additive fields including full_name and description (R-BPF-001, NFR-BPF-001)', async () => {
+  it('returns trimmed picker shape with additive fields including full_name, description, and external_code (R-BPF-001, NFR-BPF-001)', async () => {
     // KZ-001: faithful mock shape representing real listBilateralProjects output
     listBilateralProjects.mockResolvedValueOnce([
       {
@@ -70,6 +70,7 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
         short_name: 'A1806',
         full_name: 'WTO-Phase 1: MusaSentinel',
         description: 'MusaSentinel surveillance and diagnostics project',
+        external_code: 'B-A1080',
         source_of_funding: 'BILATERAL - RESTRICTED',
         phase: 2026,
         source_center_acronym: 'CIAT',
@@ -117,6 +118,7 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
       short_name: 'A1806',
       full_name: 'WTO-Phase 1: MusaSentinel',
       description: 'MusaSentinel surveillance and diagnostics project',
+      external_code: 'B-A1080',
       source_of_funding: 'BILATERAL - RESTRICTED',
       phase: 2026,
       source_center_acronym: 'CIAT',
@@ -132,7 +134,7 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
     });
   });
 
-  it('handles absent full_name and description without throwing (R-BPF-001)', async () => {
+  it('handles absent full_name, description, and external_code without throwing (R-BPF-001)', async () => {
     listBilateralProjects.mockResolvedValueOnce([
       {
         id: 2,
@@ -153,6 +155,7 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
       short_name: 'B-A1080',
       full_name: undefined,
       description: undefined,
+      external_code: undefined,
       source_of_funding: 'Bilateral',
       phase: 2026,
       source_center_acronym: 'BIOVERSITY',
@@ -312,6 +315,77 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
       listBilateralProjects.mockResolvedValueOnce(fixtureProjects);
 
       const response = await controller.listBilateral('B-A1080');
+      const data = (response as { data: { id: number }[] }).data;
+      expect(data.map((p) => p.id)).toEqual([2]);
+    });
+
+    it('matches by external_code case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input / DD-9)', async () => {
+      listBilateralProjects.mockResolvedValueOnce([
+        {
+          id: 1,
+          short_name: 'Fertilize Right Colombia',
+          full_name: 'Fertilize Right Colombia',
+          external_code: 'B-A1080',
+          source_of_funding: 'Bilateral',
+          phase: 2026,
+          source_center_acronym: 'CIAT',
+          has_science_programs: false,
+          project_mappings_array: [],
+        },
+      ]);
+
+      const response = await controller.listBilateral('b-a1080');
+      const data = (response as { data: { id: number }[] }).data;
+      expect(data.map((p) => p.id)).toEqual([1]);
+    });
+
+    it('matches uppercase external_code term case-insensitively', async () => {
+      listBilateralProjects.mockResolvedValueOnce([
+        {
+          id: 1,
+          short_name: 'Fertilize Right Colombia',
+          full_name: 'Fertilize Right Colombia',
+          external_code: 'B-A1080',
+          source_of_funding: 'Bilateral',
+          phase: 2026,
+          source_center_acronym: 'CIAT',
+          has_science_programs: false,
+          project_mappings_array: [],
+        },
+      ]);
+
+      const response = await controller.listBilateral('B-A1080');
+      const data = (response as { data: { id: number }[] }).data;
+      expect(data.map((p) => p.id)).toEqual([1]);
+    });
+
+    it('tolerates absent or null external_code without throwing and matches short_name or full_name (R-BPF-002)', async () => {
+      listBilateralProjects.mockResolvedValueOnce([
+        {
+          id: 1,
+          short_name: 'Semillas del Futuro - AGROSAVIA',
+          full_name: 'Semillas del Futuro - AGROSAVIA',
+          external_code: null,
+          source_of_funding: 'Bilateral',
+          phase: 2026,
+          source_center_acronym: 'CIAT',
+          has_science_programs: false,
+          project_mappings_array: [],
+        },
+        {
+          id: 2,
+          short_name: 'Fertilize Right Colombia',
+          full_name: 'Fertilize Right Colombia',
+          external_code: 'B-A1080',
+          source_of_funding: 'Bilateral',
+          phase: 2026,
+          source_center_acronym: 'CIAT',
+          has_science_programs: false,
+          project_mappings_array: [],
+        },
+      ]);
+
+      const response = await controller.listBilateral('b-a1080');
       const data = (response as { data: { id: number }[] }).data;
       expect(data.map((p) => p.id)).toEqual([2]);
     });
