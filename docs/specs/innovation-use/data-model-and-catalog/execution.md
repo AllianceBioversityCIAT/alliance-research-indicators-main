@@ -1380,3 +1380,23 @@ FP-1 … FP-34 status: **FP-2 remains fully discharged.** **FP-23, FP-24, FP-16,
 #### Constitution Impact: T-11
 
 No module created or reshaped. `GreenCheckRepository`'s public surface gained one method (`innovationUseValidation`), consistent with the eleven existing per-check helpers — **no module boundary moved, no child guide made stale.** Nothing owed beyond the two items already recorded at T-10. CodeGraph re-index pending.
+
+---
+
+## ⚠️ FP-23 RETIREMENT + a Leader read error, recorded — 2026-08-18, before T-12
+
+**FP-23 is RETIRED. It was already actioned, and T-12 was never blocked by it.**
+
+At the T-11 continue/pause gate the Leader reported to the user that FP-23 was an **open decision blocking T-12**. **That was wrong.** The 2026-08-18 correction pass (commit `b5738a11`, its item 3) had already amended `design.md` §6.5's F11 row, which now reads *"**At least one valid Innovation-Use actor row, PLUS** actor rows under the **Innovation Dev** role → the Innovation Dev rows are ignored → `1`"*, carrying its own inline amendment note.
+
+**Two-direction sweep, run 2026-08-18 to confirm closure:**
+- **Forward** (the superseded phrasing in every variant — `"Innovation Dev role only"`, `"Dev role only"`, `"role only"`): **zero live hits** across all spec files and `../family.md`. The only matches are in `execution.md` itself.
+- **Backward** (every `F11` reference): `design.md:326` carries the corrected row; `tasks.md:375` lists F11 in T-12's scope without describing its content; `tasks.md:464`'s traceability row says only *"BUT NOT change Innovation Dev counting → F11/F12"*, which is true of the corrected fixture. **No document asserts the superseded claim.**
+
+**Why the Leader got it wrong — the mechanism matters more than the instance.** `execution.md` is **append-only**, so FP-23's original text (`:1024`), its adoption row (`:1074`), and the budget-tripwire block's item-3 table (`:1128`) all still read as open — permanently, by design. The Leader quoted those historical records **without re-reading the document they pointed at**. This is the same root cause as the T-10 pre-flight finding (six residual merge-gate sites) and as this spec's three false-absence greps: **a stale artifact treated as current state.**
+
+**Standing rule this produces — for any future Leader on any spec:** an `execution.md` forward pointer states what was true **when it was filed**. Before reporting one as open, **re-read the target document.** The FP is a pointer to a question, never the answer's current status. `/akili-resume` is especially exposed: it reads `execution.md` to rebuild state, which is exactly where the append-only records look authoritative.
+
+**Net effect on T-12:** no user ruling was ever required. **FP-16** — the other item the Leader flagged as "must resolve before T-12" — is likewise **not** a decision: its own text (*"Seed both roles, or the fixture proves nothing"*) is direct, actionable implementation guidance, carried into T-12's brief. **T-12 proceeds.**
+
+**User authorization of record:** at the T-11 gate the user directed *"rule on F11 and continue with T-12."* The ruling required no change — F11 was already correct — so the authorization is discharged by this verification, and T-12 starts with the F11 row as it already stands. No spec document was edited by this note.
