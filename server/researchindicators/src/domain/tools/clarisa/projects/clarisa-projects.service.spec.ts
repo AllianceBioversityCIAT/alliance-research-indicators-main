@@ -608,6 +608,149 @@ describe('ClarisaProjectsService', () => {
     });
   });
 
+  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-02 / R-CPC-003, NFR-CPC-002
+  //
+  // KZ-013: fixtures below encode the 2026-08-18 measurement — CLARISA test
+  // served 299 projects, all `phase = 2025`; CLARISA production serves all
+  // `phase = null`. If the upstream feed's shape changes, these tests keep
+  // passing while reality diverges — see requirements.md K-013.
+  describe('getEligiblePhases (R-CPC-003, NFR-CPC-002)', () => {
+    it('offers only the phase actually present in the eligible cohort, not an ineligible year (R-CPC-003 scenario 1 — the trap)', async () => {
+      connectionGet.mockResolvedValueOnce([
+        // Eligible: Bilateral + Alliance, phase 2025 — the only phase that
+        // should ever appear in the response.
+        {
+          id: 1,
+          short_name: 'ELIGIBLE-2025-A',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          phase: 2025,
+          project_mappings_array: [],
+        },
+        {
+          id: 2,
+          short_name: 'ELIGIBLE-2025-B',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          source_center_acronym: 'BIOVERSITY',
+          phase: 2025,
+          project_mappings_array: [],
+        },
+        // Ineligible (Window 3) but carries phase 2026. If the derivation
+        // were circular (i.e. read from listBilateralProjects(), which
+        // already applies matchesPhase) or derived from the FULL payload
+        // instead of the eligible cohort, 2026 would leak into the result.
+        {
+          id: 3,
+          short_name: 'INELIGIBLE-2026',
+          source_of_funding: 'Window 3',
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+          project_mappings_array: [],
+        },
+      ]);
+
+      const result = await service.getEligiblePhases();
+
+      expect(result.phases).toEqual([{ phase: 2025, count: 2 }]);
+      expect(result.phases.some((p) => p.phase === 2026)).toBe(false);
+    });
+
+    it('omits a year whose projects exist but none are eligible (non-Alliance / non-bilateral)', async () => {
+      connectionGet.mockResolvedValueOnce([
+        // 2026 has projects, but none pass isBilateralFunding + isAllianceProject.
+        {
+          id: 10,
+          short_name: 'NON-ALLIANCE-2026',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'IITA', // not an Alliance centre
+          phase: 2026,
+          project_mappings_array: [],
+        },
+        {
+          id: 11,
+          short_name: 'NON-BILATERAL-2026',
+          source_of_funding: 'Window 3', // not bilateral funding
+          source_center_acronym: 'CIAT',
+          phase: 2026,
+          project_mappings_array: [],
+        },
+        // 2025 has one genuinely eligible project.
+        {
+          id: 12,
+          short_name: 'ELIGIBLE-2025',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          phase: 2025,
+          project_mappings_array: [],
+        },
+      ]);
+
+      const result = await service.getEligiblePhases();
+
+      expect(result.phases).toEqual([{ phase: 2025, count: 1 }]);
+      expect(result.phases.some((p) => p.phase === 2026)).toBe(false);
+    });
+
+    it('returns an empty year set AND a non-zero absent-phase count when every eligible project has phase: null (production today, K-013)', async () => {
+      connectionGet.mockResolvedValueOnce([
+        {
+          id: 20,
+          short_name: 'PROD-NULL-1',
+          source_of_funding: 'BILATERAL - RESTRICTED',
+          source_center_acronym: 'CIAT',
+          phase: null,
+          project_mappings_array: [],
+        },
+        {
+          id: 21,
+          short_name: 'PROD-NULL-2',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'BIOVERSITY',
+          phase: null,
+          project_mappings_array: [],
+        },
+        // Ineligible project also without a phase — must NOT be counted.
+        {
+          id: 22,
+          short_name: 'NON-ALLIANCE-NULL',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'IITA',
+          phase: null,
+          project_mappings_array: [],
+        },
+      ]);
+
+      const result = await service.getEligiblePhases();
+
+      expect(result.phases).toEqual([]);
+      expect(result.phaseAbsentCount).toBe(2);
+    });
+
+    it('does NOT trigger an additional CLARISA call when served from a warm cache (NFR-CPC-002)', async () => {
+      connectionGet.mockResolvedValueOnce([
+        {
+          id: 30,
+          short_name: 'WARM-CACHE-2025',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          phase: 2025,
+          project_mappings_array: [],
+        },
+      ]);
+
+      // Warm the cache via a different consumer of getCachedAll().
+      await service.listBilateralProjects();
+      expect(connectionGet).toHaveBeenCalledTimes(1);
+
+      // Phases request must be served from the same warm cache — no
+      // additional upstream call.
+      const result = await service.getEligiblePhases();
+
+      expect(connectionGet).toHaveBeenCalledTimes(1);
+      expect(result.phases).toEqual([{ phase: 2025, count: 1 }]);
+    });
+  });
+
   describe('findProjectById', () => {
     it('returns the project when found', async () => {
       connectionGet.mockResolvedValueOnce([

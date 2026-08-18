@@ -111,3 +111,56 @@ No code was written and no database was touched beyond a read-only `migration:sh
 Apply `SeedClarisaMappingPhase1786738949211` to the Dev database. Until then the variable will not appear on the Configuration Variables screen and `T-03`'s human visual check cannot complete end to end (`design.md` X-6).
 
 ---
+
+### T-02 — Phases endpoint derived from the eligible cohort
+
+- **Status:** ✅ **PASS** (first attempt, no rework)
+- **Date:** 2026-08-18
+- **Implementer attempts:** 1 · **Reviewer verdict:** `STATUS: PASS`
+- **Requirements covered:** `R-CPC-003` (both scenarios, server half), `NFR-CPC-002`, `NFR-CPC-003`
+
+**Files changed**
+
+| File | Change |
+| --- | --- |
+| `dto/clarisa-project-phase.types.ts` | **new** — `ClarisaProjectPhaseCount` / `ClarisaProjectPhasesResponse` |
+| `clarisa-projects.service.ts` | + `getEligiblePhases()` |
+| `clarisa-projects.controller.ts` | + `@Get('phases')` handler |
+| `clarisa-projects.service.spec.ts` | +4 tests |
+| `clarisa-projects.controller.spec.ts` | +6 tests |
+
+**Verification (Implementer, from `server/researchindicators`)**
+
+```
+npm test -- --silent   → 326 suites / 2271 tests passed
+npx eslint src/domain/tools/clarisa/projects → clean (no output)
+```
+
+Prettier ran as a fixer, the bare `npx eslint` as the gate — K-001-compliant.
+
+**Leader note — artifact validated before dispatch (K-011).** The new DTO file was **untracked**, so `git diff` excluded it; the Reviewer would have audited an incomplete artifact. Staged with `git add -N` before extracting the diff (313 insertions across 5 files, symbol under audit present 12×).
+
+**Reviewer summary.** All five clause-coverage rows have a passing, non-trivial test. `getEligiblePhases` derives from the pre-phase eligible cohort exactly as `DD-2`/`DD-5`/§6.1 require — no circular read, no additional CLARISA call. Controller handler is a thin `ResponseUtils.format` delegate with correct roles and inherited class-level Swagger decorators.
+
+The Reviewer independently corroborated the evidence rather than accepting it: `2271` is exactly `+10` over the `2261` baseline in root `CLAUDE.md` §4.3, and the diff adds exactly 10 tests.
+
+**Judgment call assessed and accepted.** The Implementer folded non-numeric phase strings into `phaseAbsentCount` — not enumerated in the spec's "null/undefined/blank". The Reviewer ruled it defensible and *disclosed* (the DTO comment states it), noting the alternatives are worse: emitting a non-numeric phase breaks the `phase: number` contract and the numeric sort, while dropping it silently loses the project.
+
+#### ADVISORY (4R lenses — recorded, never gating, never a new task)
+
+| Lens | Finding |
+| --- | --- |
+| Reliability | **An empty eligible cohort returns `{ phases: [], phaseAbsentCount: 0 }`, indistinguishable from "cohort exists, no phases parsed".** T-03's empty-state hint would say "CLARISA publishes no phase data" for a state that is really "no eligible projects at all" → **carried forward, see below** |
+| Reliability | Descending order is implemented but **unasserted** — every service fixture yields ≤1 year, so an inverted comparator would not redden |
+| Reliability | No observability on the zero-phase path; `listBilateralProjects` warns when its eligible set is empty, `getEligiblePhases` is silent |
+| Risk | `Number()` accepts `"2025.5"` and `"Infinity"`; `Number.isInteger` would exclude them. Implausible upstream today |
+| Readability | No e2e case for the new route. Sibling `bilateral` has none either, so local practice is consistent — recorded so the omission is a choice |
+| Readability | Tag typo: service spec comment writes `KZ-013` where every other reference uses `K-013` |
+
+#### Forward pointer → T-03 (must be copied into its brief)
+
+The first advisory is not merely advisory *for T-03*: `R-CPC-003` scenario 2 requires the client to **"make clear that no phase data is available upstream, rather than implying there are no projects."** With `phaseAbsentCount: 0` the client cannot tell the two apart.
+
+**T-03's brief MUST state that the empty-state hint branches on `phaseAbsentCount > 0`**, and must render a different message when both `phases` and `phaseAbsentCount` are empty. This is implementation of an existing requirement, not new scope.
+
+---

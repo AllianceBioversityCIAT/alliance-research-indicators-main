@@ -48,10 +48,10 @@ Full analysis: `execution.md` → *Pivot Record: T-01*.
 
 | Field | Value |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[x]` — PASS first attempt, 2026-08-18 (`execution.md` → T-02) |
 | **Size** | M |
 | **Package** | `server/researchindicators` |
-| **Depends on** | none (do not run concurrently with `T-01` — same package) |
+| **Depends on** | none (do not run concurrently with `T-04` — same package) |
 | **Requirements** | `R-CPC-003` scenario 1 + scenario 2 (server half), `NFR-CPC-002`, `NFR-CPC-003` |
 | **Design** | `design.md` §5, §6.1, §6.2, `DD-2`, `DD-5`, `DD-7` |
 | **Skills** | `nestjs-expert`, `api-design-principles` |
@@ -87,9 +87,9 @@ npx eslint src/domain/tools/clarisa/projects
 
 ### Done
 
-- [ ] All five clause-coverage rows have a passing test.
-- [ ] Swagger shows the endpoint with tag, bearer lock, and operation summary.
-- [ ] `npx eslint` clean.
+- [x] All five clause-coverage rows have a passing test.
+- [x] Swagger shows the endpoint with tag, bearer lock, and operation summary (class-level `@ApiTags`/`@ApiBearerAuth` inherited; `@ApiOperation` on the handler).
+- [x] `npx eslint` clean.
 
 ---
 
