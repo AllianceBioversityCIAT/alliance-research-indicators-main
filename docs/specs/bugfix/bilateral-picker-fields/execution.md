@@ -64,7 +64,7 @@ _(appended per task, on Reviewer PASS or HALT — evidence is always written bef
   ```
   And the ordering gate: expected `[2, 3, 1]`, received `[1, 2, 3]` — upstream order, unsorted.
 
-  The 9 that passed pre-fix are the **pre-existing T-04 tests** from the archived Alliance-selector bugfix. They are regression protection for *that* fix and are correctly green in both runs; none of them is offered as evidence for this one.
+  ~~The 9 that passed pre-fix are the pre-existing T-04 tests from the archived Alliance-selector bugfix.~~ **CORRECTED by the Reviewer (see the T-01 PASS entry below): that claim was false.** Only 5 of the 9 are pre-existing T-04 tests; **3 are NEW tests in this diff that happened to pass on `HEAD`** and therefore carry no red-gate value. The Leader asserted the wrong thing in this log and the audit caught it — which is precisely what an independent Reviewer is for.
 
   Raw output: `evidence/t01-RED.txt`, `evidence/t01-GREEN.txt`.
 
@@ -173,3 +173,50 @@ Leader adjudication: **not in scope for this task.** `short_name` is non-optiona
 - Scope confirmed by `git status`: exactly the two intended files
 
 **What T-01 does NOT have:** an independent audit of clause coverage, additivity, determinism, or fixture fidelity. **That is exactly what a Reviewer exists to provide, and it is missing.**
+
+---
+
+## ✅ T-01 — PASS (reviewer attempt 4)
+
+| | |
+| --- | --- |
+| **Status** | **PASS** — `tasks.md` T-01 → `done` |
+| **Date** | 2026-08-18 |
+| **Implementer** | agy `gemini-3.7-flash-medium`, `ctx_8156fc4b42b6` — **1 attempt, no rework** |
+| **Reviewer** | agy `claude-sonnet-4-6`, `ctx_fd4fba05c5f5` — **attempt 4 of 4** |
+| **Full report** | `evidence/t01-review.md` (224 lines, seven axes) |
+| **Requirements** | R-BPF-001, R-BPF-002, R-BPF-006, NFR-BPF-001, NFR-BPF-003 |
+
+**What finally made the reviewer work — the fix was in the brief, not the model.** Attempts 1–3 all froze at the same phase: after ingesting the material, at the moment of emitting one long verdict. Attempt 4 was told to **append each axis to a report file as it finished it** and then send a three-sentence `worker_done` pointing at the file. Seven small writes instead of one large emission. It completed all seven axes.
+
+Second-order benefit that decided the outcome: **the verdict became durable independent of the message.** `STATUS: PASS` was on disk in `evidence/t01-review.md` before any `worker_done` arrived — so the K-009 failure mode (a verdict that exists but never lands) stopped being able to lose the work.
+
+**Verdict — `STATUS: PASS`:**
+
+> All 13 T-01 clauses are satisfied across R-BPF-001, R-BPF-002 and R-BPF-006. The diff is additive (NFR-BPF-001), adds no upstream call (NFR-BPF-003), touches exactly the two specified files, sorts a copy with a total-order comparator, and uses fixtures pinned to measured evidence spellings (KZ-001). Five of five RED failures are genuine regression gates that went green with the fix.
+
+**Checks worth naming:**
+
+| Axis | Finding |
+| --- | --- |
+| 1 — clause coverage | All 13. The hard one — *"absent-name items sort by `short_name` in the same sequence, not clustered"* — is satisfied by keying on `full_name \|\| short_name`, so `B-A1080` sorts as `b-a1080` between `fertilize…` and `wto-…` rather than at an end |
+| 5 — fixture fidelity | The 255-char fixture is `'WTO-Phase 1: MusaSentinel - ' + 'X'.repeat(255 - 28)`. The reviewer counted the prefix character by character to confirm 28, making the length **provable from the source text** rather than asserted |
+| 7 — determinism | Sorts `[...filtered]` (no mutation); total order via `full_name` → `short_name` → `id`; `null` and `undefined` both fall through the `\|\|` chain |
+
+**ADVISORY 1 (non-gating) — three new tests passed in RED, so they never served as gates:**
+
+| Test | Why it was already green |
+| --- | --- |
+| `does NOT match on description` | `description` was never in the old predicate |
+| `tolerates absent full_name without throwing` | the old predicate never accessed `full_name` |
+| `produces stable and deterministic order` | an unsorted list is trivially stable across two calls |
+
+**This advisory corrected a false statement the Leader had written into this log** — that all 9 pre-fix passers were pre-existing T-04 tests. Only 5 were. Corrected above. The fix itself is unaffected: the five genuine red gates cover R-BPF-001, R-BPF-002 and R-BPF-006, and each went green.
+
+**ADVISORY 2 (non-gating) — `localeCompare` without an explicit locale.** Deterministic for the ASCII fixture strings, but could order non-ASCII names differently across Node versions or OS locales.
+
+Leader note: **this is more pointed than the reviewer could know.** The live-feed measurement behind this spec contains exactly such names — e.g. `FRANCE – FFEM Promover Oportunidades Sostenibles en la Cadena…`, carrying an en-dash and Spanish accents. So the condition is not hypothetical for this dataset.
+
+It is still **not** in scope for T-01: no requirement mandates a locale, and per the Advisory-Never-Becomes-A-Task rule an advisory is recorded and dies there — it may not mint a task or widen one. If it is to be fixed it needs a proposal, where it gets a requirement, a design decision and a budget line like any other work.
+
+**Verification (Leader-run, in isolation):** RED `5 failed, 9 passed, 14 total` → GREEN `14 passed, 14 total`.

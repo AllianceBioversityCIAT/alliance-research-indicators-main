@@ -65,7 +65,7 @@ T-01 ──> T-03 (admin SSR label) ──────────┘
 - **Skills:** `nestjs-expert`, `api-design-principles`, `systematic-debugging`
 - **Effort:** `medium`
 - **Estimated effort:** M · **~110 LOC** (~35 production, ~75 tests)
-- **Status:** todo
+- **Status:** done
 
 ---
 
