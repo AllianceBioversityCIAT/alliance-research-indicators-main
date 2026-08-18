@@ -395,3 +395,148 @@ Per `/akili-execute` §2.4, advisories are recorded and stop here. Two were **ad
 | **L1-iii** | reliability (positive) | The `toContain` row assertion depends on the migration's exact `', '` inter-column spacing — a Prettier reflow would break it. **Fails loudly, not open** — the correct direction for a gate | Recorded only; no action |
 
 **Budget after T-04:** 3 of 13 tasks · ~317 LOC of ~2,600 · 1 of 4–5 review rounds consumed (T-04 passed first attempt). Within tripwire.
+
+---
+
+### T-05 — M2: detail table `result_innovation_use` · **PASS (attempt 1 of 3)**
+
+- **Date:** 2026-08-18
+- **Status:** `[x]`
+- **Implementer attempts:** 1 · **Reviewers:** 2 parallel lens-scoped (both PASS) · **Rework attempts consumed:** 0
+- **Requirements covered:** R-IU-001 **AC.1, AC.4**; NFR-IU-002. *(AC.2 → T-08; AC.3 → T-12. Neither claimed here — Lens A verified the mapping is honest.)*
+- **Design references:** §3.1, §5 (M2), DD-3
+- **Effort:** `xhigh` · **Skills:** `nestjs-expert` + `tdd` (Leader addition)
+
+**Files changed (both new):**
+
+| Path | What |
+| --- | --- |
+| `src/db/migrations/1787068132517-createResultInnovationUse.ts` | M2 — `CREATE TABLE` + two `ALTER TABLE ADD CONSTRAINT`; `down()` drops both FKs then the table |
+| `src/db/migration-specs/1787068132517-createResultInnovationUse.spec.ts` | DDL spec, 10 tests, TDD red(10/10)→green(10/10). Placed per the `migration-specs/` rule established in T-04 |
+
+**Verification:**
+
+```
+npm run migration:empty --name=createResultInnovationUse  -> 1787068132517
+npx jest <spec>   (RED, empty stub)   -> 10 failed / 10
+npx jest <spec>   (GREEN)             -> 10 passed / 10
+npm test -- --silent                  -> 323 suites, 2071 tests passed (was 322/2061)
+compose:test:down && compose:test:up  -> fresh container (FP-1)
+migration:test:bootstrap              -> M2 applied on top of M1
+migration:test:revert                 -> M2 ONLY reverted (FK, FK, DROP TABLE)
+migration:test:execute                -> M2 re-applied
+npm run lint -- --quiet               -> reformatted the spec's line wrapping only; git status
+                                         re-checked, still only the two new files; spec 10/10
+compose:test:down                     -> container + network removed (docker ps -a empty)
+```
+
+**Timestamp — all three ceilings cleared** (FP-6 discharged, and *verified* rather than assumed):
+
+| Ceiling | Value |
+| --- | --- |
+| Highest pre-spec migration file | `1784300000000` |
+| Highest migration file on branch (T-04's M1) | `1787066437593` |
+| **Highest executed row in the baseline snapshot** (the binding one) | **`1786679227000`** (`baseline.sql:8269`) |
+| **M2** | **`1787068132517`** — a real-clock stamp ~28 min after M1 |
+
+**Done criteria:**
+
+1. **Table exists, `result_id` is PK, both FKs resolvable** — ✅. `SHOW CREATE TABLE` shows `PRIMARY KEY (result_id)`, `FK_result_innovation_use_result_id → results(result_id)`, `FK_result_innovation_use_innovation_use_level_id → clarisa_innovation_use_levels(id)`. Lens A confirmed the FK targets the catalog's **`id`**, not `level` (DD-3), and that M1 emits `id bigint NOT NULL` + `PRIMARY KEY(id)` so type and signedness match — the FK is *creatable*, not merely textually plausible.
+2. **Duplicate active row structurally impossible — demonstrated** — ✅:
+   ```
+   ERROR 1062 (23000) at line 2: Duplicate entry '33540' for key 'result_innovation_use.PRIMARY'
+   ```
+   **Lens A's forensic point, which is why this is proof and not decoration:** MySQL 8 renders the key as `table.index_name`, and `PRIMARY` is a **reserved** index name that only a primary key carries. A `UNIQUE KEY` on `result_id` would have reported its own index name (`IDX_…`/`UQ_…`). The error string therefore independently corroborates `PRIMARY KEY (result_id)` rather than a unique index — exactly the distinction T-05's Disqualifier targets.
+3. **`is_active` defaults to `1`, `deleted_at` to `NULL`** — ✅. Real row after a bare insert: `result_id=33540, innovation_use_level_id=NULL, innovation_use_level_explanation=NULL, is_active=1, deleted_at=NULL`.
+4. **`down()` reverts cleanly** — ✅. `migration:test:revert` reverted **M2 only** (DROP FK level → DROP FK result → DROP TABLE), M1 untouched per FP-7.
+
+**Second falsification — the FK is real** (R-IU-001's *"AND IT MUST reject an `innovation_use_level_id` absent from the catalog"*):
+```
+ERROR 1452 (23000) at line 2: Cannot add or update a child row: a foreign key constraint fails
+  ('ari_scratch_test'.'result_innovation_use',
+   CONSTRAINT 'FK_result_innovation_use_innovation_use_level_id'
+   FOREIGN KEY ('innovation_use_level_id') REFERENCES 'clarisa_innovation_use_levels' ('id'))
+```
+Constraint identifier, child table, child column, referenced table and referenced column all match the migration verbatim. Schema is **`ari_scratch_test`** — the disposable container, never `ARI_MYSQL_*`.
+
+**Fixture rows created and cleaned up** (recorded per Lens A's evidence-completeness note — error 1062 is only reachable if a first insert succeeded, which requires a parent `results` row, and `baseline.sql` is schema-only):
+
+| Table | Rows | Disposition |
+| --- | --- | --- |
+| `results` | `result_id=33540` (`result_official_code=999999901`), `result_id=33541` (`999999902`), both `result_status_id=NULL` | deleted; `SELECT COUNT(*)` returned `0` |
+| `result_innovation_use` | one row, `result_id=33540`, defaults | deleted; count `0` |
+
+The container was then destroyed entirely, so no residue survives regardless.
+
+#### The PK-vs-"active rows" question — adjudicated
+
+R-IU-001 says *"must NOT be possible to write two **active** rows"*; a PK forbids two rows **at all**. **Lens A ruled this faithful and stronger, not over-constraining**, and the reasoning is worth keeping:
+
+1. **Versioning (R-IU-011 AC.1)** — `SP_versioning` writes the copy against a **new** `results` row, hence a new `result_id`. No collision. Proven by precedent: `result_innovation_dev` has the identical PK-is-FK shape and is already copied by its dedicated block (`1783029013035:695-770`) without conflict.
+2. **Both hard deletes (AC.3, AC.4)** — the row is removed; nothing survives to collide.
+3. **Soft delete (AC.5)** — leaves exactly one row, `is_active = FALSE` + `deleted_at` set. A second row would only be needed if a soft-deleted result were re-reported *in place* — but `delete_result` deactivates the **result itself** (`results.is_active = FALSE`, `result_status_id = 8`), so re-reporting means a new `results` row and a new `result_id`. A restore reactivates the existing row by `UPDATE` on the same PK, which is what a PK permits.
+4. `design.md` **§3.7's "no index added" review basis depends on `result_id` being the PK** — a unique index would have satisfied the constraint while weakening that argument.
+
+#### Reviewer verdicts — 2 parallel lens-scoped reviewers, both PASS
+
+| Lens | Scope | Verdict |
+| --- | --- | --- |
+| **A** | Spec conformance · constraint correctness · gate fidelity · requirement-mapping honesty | **PASS** — DDL matches §3.1 column-for-column, all three traps clear, mapping honest, gate non-tautological with a reachable failing input behind every assertion (8 of 10 carry real weight) |
+| **B** | Migration safety · reversibility · precedent fidelity · forward-compatibility | **PASS** — append-only and correctly ordered above all three ceilings; `down()` fully and exclusively reverses `up()`; **all three cited precedents verified to genuinely establish every claimed pattern** |
+
+**Every apparent divergence from the shipped `result_innovation_dev` is mysqldump normalization or an InnoDB default, not a semantic difference** — Lens B proved each by comparing what the precedent *authored* against what the dump *renders*: `deleted_at timestamp NULL` ≡ `timestamp NULL DEFAULT NULL`; `is_active … DEFAULT 1` ≡ `DEFAULT '1'`; the absent `KEY` clauses are InnoDB auto-created (the precedent authors **zero** `KEY` clauses yet `baseline.sql:3231-3233` shows them, with index names identical to the constraint names); the absent `ON DELETE` resolves to the same rule.
+
+**Citation check passed this time** — notable because `design.md` §6.7's *"Why this section was wrong three times"* records three consecutive rounds citing the wrong migration for `SP_delete_result_version`. All three of M2's cited precedents (`1749603152180`, `1749763135881`, `1749957832239`) exist and establish exactly the claimed patterns.
+
+**`down()`'s explicit FK drops are redundant but correctly kept.** Lens B confirmed InnoDB drops a table's own outgoing FKs as part of `DROP TABLE` — the constraint that blocks a drop is one *referencing* the table, and `result_innovation_use` is the child in both FKs. Keeping them is harmless and marginally better: it matches the precedent's shape, makes the reversal self-documenting, and the only way they could error (1091) requires a half-applied `up()`, which per FP-9 leaves no `migrations` row so `down()` would never be called. The drop **order** between the two is arbitrary.
+
+---
+
+## Forward pointers — added after T-05
+
+| # | For | Pointer |
+| --- | --- | --- |
+| **FP-10** | **T-08** | **Pin the FK constraint names on the entity, or `migration:generate` will propose rename churn.** Lens B verified against the installed TypeORM **0.3.20**: `RdbmsSchemaBuilder.js:193-202` (`dropOldForeignKeys`) and `:764-768` (`createForeignKeys`) match existing constraints **by NAME only, never by structure**, and the metadata name is `"FK_" + sha1(table_sortedColumns).substr(0,27)` (`DefaultNamingStrategy.js:81-89`). M2's hand-named FKs therefore produce a **drop-then-re-add**, not duplicates. Fix: `@JoinColumn({ name: 'result_id', foreignKeyConstraintName: 'FK_result_innovation_use_result_id' })` and likewise `'FK_result_innovation_use_innovation_use_level_id'` — `foreignKeyConstraintName` is confirmed available on `JoinColumnOptions` in this version. **The precedent will mislead you:** `result-innovation-dev.entity.ts:214-266` pins **no** constraint names, and grep finds **zero** `foreignKeyConstraintName` and **zero** hand-named FKs across all 307 migrations. Two secondary traps: deleting the FK statements out of the generated migration makes the generator re-propose the same diff forever; and if such a churn migration ever lands, `DROP FOREIGN KEY` leaves the index behind, so you get an index named `FK_result_innovation_use_innovation_use_level_id` supporting a constraint named `FK_<sha1>`. **Exposure is broader than T-08 — it is anyone who runs `migration:generate` for any reason.** |
+| **FP-11** | **T-10 rollout · DevOps hand-off** | **M2's `down()` acquires a SECOND, SILENT order dependency once M5 lands.** `innovation_use_validation`'s body references `result_innovation_use`, and **MySQL does not schema-bind stored routines or views** — so dropping the table without first reverting M5 raises **nothing at DDL time** and instead fails at the function's next invocation (`ER_NO_SUCH_TABLE`). §13's reverse-order backout already covers it, but unlike FP-7's loud MySQL 1217/3730 **this variant leaves no trace if the order is broken.** Must be stated explicitly in the DevOps hand-off alongside FP-7. |
+| **FP-12** | **chunk 2** (`innovation-use/details-api`) | **The write path is load-bearing because the PK is the constraint.** Mirror `result-innovation-dev.service.ts`: `create()` once via `entityManager.save`, then `findOne({ result_id, is_active: true })` + `.update(resultId, …)`. **Never insert-on-save** — an `INSERT` against a soft-deleted row raises the very MySQL 1062 that T-05 relies on as proof of correctness. |
+
+FP-1 … FP-9 remain live. **FP-6 and FP-7 were both exercised in T-05 and both held.**
+
+---
+
+## Open doc conflict found in T-05 — R-IU-001 AC.3 is double-assigned
+
+**Found by Lens A; pre-existing, not caused by T-05.** `tasks.md` **T-08** lists *"Requirements covered: R-IU-001 (AC.2, AC.3)"*, while **§3's traceability row** and **T-12** both place the AC.3 detail-row round trip in **T-12** — consistent with `design.md` §10's *"Integration — Detail-row round trip (R-IU-001 AC.3) … §6.5 harness"*.
+
+Harmless for T-05, which claims neither AC. But **whichever of T-08 / T-12 lands first will report AC.3 closed**, and the other will either duplicate the work or skip it. **Needs a ruling before T-08 runs.** Raised, deliberately not silently edited — reassigning an AC is a spec correction requiring the two-direction sweep, not a task finalization step.
+
+---
+
+## Leader deviations & process notes — T-05
+
+| Item | Note |
+| --- | --- |
+| **Skills** | `nestjs-expert` + **`tdd`** (task lists only the former) — same reasoning as T-04; red 10/10 → green 10/10 |
+| **Effort** | `xhigh` — append-only migration adding an FK into `results`, the domain hub |
+| **Review mode** | **2** parallel lenses, not T-04's 3. No ten-row seed corpus to verify character-by-character, so gate-fidelity folded into the conformance lens. Fan-out capped to the surface |
+| **⚠️ Leader briefing asymmetry** | I gave the verbatim MySQL 1062/1452 evidence to **Lens A only**. Lens B therefore could not judge Done criterion 2 and raised a **CROSS-LENS FLAG** — *"if no duplicate-insert attempt was actually run, that checkbox is unearned"* — and correctly deferred rather than asserting. It worked, but the split was mine, not a reviewer failing. **Next time: give every lens the full evidence set and vary only the lens.** |
+
+---
+
+## ADVISORY findings — T-05 (recorded, never gating; 0 rework attempts consumed; no task minted)
+
+Adopted only where the item is mandatory record-accuracy or a forward pointer. Everything else is recorded and stops here — editing files or widening a task to absorb an advisory is forbidden.
+
+| # | Lens | Finding | Disposition |
+| --- | --- | --- | --- |
+| **A-1** | risk | Chunk 2's write path must not insert-on-save | **Adopted as FP-12** |
+| **A-2** | reliability | **No re-runnable gate for the constraint itself.** `design.md` §6.5's F1–F18 contains **no** duplicate-insert and **no** off-catalog-FK fixture, so Done criterion 2 rests on a one-time manual demonstration recorded in prose here. Two cheap fixtures in T-12's set would make the family's signature defects regression-proof rather than historically observed | **Recorded only** — adding fixtures to T-12 would widen a task from an advisory. **Surfaced to the user** |
+| **A-3** | readability | `not.toMatch(/ON DELETE/i)` / `/ON UPDATE/i` gate *text*, not behavior — InnoDB treats `NO ACTION` and `RESTRICT` identically, so a maintainer aligning the statement with the precedent's explicit clauses would fail a test having changed nothing | Recorded only |
+| **A-4** | gate fidelity (minor) | "Exactly one `CREATE TABLE`" lives in `beforeAll`, so a regression surfaces as a hook error rather than the named test; and test 6's `/utf8mb4/i` is subsumed by its `/utf8mb4_unicode_520_ci/i` and cannot fail independently | Recorded only |
+| **A-5** | evidence | Record the seed statements verbatim, since the container is gone | **Adopted** — the fixture table above |
+| **B-1** | risk / forward-compat | FK naming vs TypeORM's hash matching. **Direct answer to the Leader's question: NO, do not change the migration before merge** — no rule constrains FK names (checked TRD §2.4, §Indexes, child guide §7, `design.md` §3.1/§3.7, R-IU-009), matching TypeORM would require embedding two opaque sha1 prefixes obtainable only by writing T-08's entity first (inverting task order), and a verified two-token fix exists on the T-08 side that makes the hand-naming a net **improvement** — greppable and immune to hash churn | **Adopted as FP-10** |
+| **B-2** | risk / reversibility | The silent M5 order dependency | **Adopted as FP-11** |
+| **B-3** | readability | Header lines 27-29 say *"No `ON DELETE`/`ON UPDATE` clause … matching the `result_innovation_dev` precedent"* — **the precedent carries the clause explicitly** (`1749603152180:13`). The resulting schema is identical (InnoDB resolves `NO ACTION` to `RESTRICT`; mysqldump prints the clause only for non-default rules), so behavior matches and the omission is arguably cleaner — but the sentence reads as "the precedent has no clause", which is false | **Recorded only** — a factual imprecision in a comment; editing it would widen T-05. Consistent with how T-04's equivalent in-file note (L2-3) was handled |
+| **B-4** | readability (minor) | The `down()` spec pins the two FK drops in a relative order that is arbitrary in MySQL. Fails safe | Recorded only |
+
+**Budget after T-05:** 4 of 13 tasks · ~574 LOC of ~2,600 · 1 of 4–5 review rounds consumed (T-04 and T-05 both passed first attempt). Within tripwire.

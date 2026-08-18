@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, **T-04** `[x]` (2026-08-18); next eligible **T-05**
+- **Status:** in-progress — T-01, T-02, T-04, **T-05** `[x]` (2026-08-18); next eligible **T-06**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -168,8 +168,8 @@ graph TD
 
 - **Requirements covered:** R-IU-001 (AC.1, AC.4); NFR-IU-002
 - **Design references:** §3.1, §5 (M2)
-- **Size:** S · **Dependencies:** T-04 (FK target) · **Status:** todo
-- **Skills:** `nestjs-expert`
+- **Size:** S · **Dependencies:** T-04 (FK target) · **Status:** ~~todo~~ → **`[x]` DONE 2026-08-18** — PASS attempt 1; 2 parallel lens Reviewers both PASS. Evidence: [`./execution.md`](./execution.md) → *T-05*
+- **Skills:** `nestjs-expert` + **`tdd`** (Leader addition)
 
 **Scope** — table with `result_id` as **both PK and FK** to `results`, `innovation_use_level_id` (bigint, nullable, FK to the catalog), `innovation_use_level_explanation` (text, nullable), `AuditableEntity` columns.
 
@@ -180,10 +180,10 @@ graph TD
 - **Disqualifier:** verifying only that the table exists proves nothing about the constraint.
 
 **Done**
-- [ ] Table exists with `result_id` as PK; both FKs resolvable
-- [ ] Duplicate active row is **structurally impossible** (demonstrated)
-- [ ] `is_active` defaults to `1`, `deleted_at` to `NULL`
-- [ ] `down()` reverts cleanly
+- [x] Table exists with `result_id` as PK; both FKs resolvable
+- [x] Duplicate active row is **structurally impossible** (demonstrated)
+- [x] `is_active` defaults to `1`, `deleted_at` to `NULL`
+- [x] `down()` reverts cleanly
 
 ---
 
