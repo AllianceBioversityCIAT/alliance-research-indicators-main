@@ -52,22 +52,13 @@ const writeDtoFromDrafts = (drafts: SpAlignmentDraft[]): TocAlignmentWriteDto[] 
       continue;
     }
     if (draft.aligns_with_toc !== true) continue;
-    if (
-      draft.level === null ||
-      draft.toc_result_id === null ||
-      draft.indicator_id === null ||
-      draft.quantitative_contribution === null ||
-      draft.quantitative_contribution < 0
-    ) {
-      continue;
-    }
     dtos.push({
       sp_code: draft.sp_code,
       aligns_with_toc: true,
-      level: draft.level,
-      toc_result_id: draft.toc_result_id,
-      indicator_id: draft.indicator_id,
-      quantitative_contribution: draft.quantitative_contribution
+      ...(draft.level !== null ? { level: draft.level } : {}),
+      ...(draft.toc_result_id !== null ? { toc_result_id: draft.toc_result_id } : {}),
+      ...(draft.indicator_id !== null ? { indicator_id: draft.indicator_id } : {}),
+      ...(draft.quantitative_contribution !== null ? { quantitative_contribution: draft.quantitative_contribution } : {})
     });
   }
   return dtos;
@@ -319,6 +310,8 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(component.formData()).toEqual({
         has_contribution: null,
         selected_sps: [],
+        // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
+        primary_sp_code: null,
         toc_drafts: []
       });
     });
@@ -344,8 +337,8 @@ describe('PoolFundingAlignmentComponent', () => {
         ...baseAlignment,
         has_contribution: true,
         selected_science_programs: [
-          { code: 'SP01', name: 'Breeding for Tomorrow' },
-          { code: 'SP02', name: 'Sustainable Farming' }
+          { code: 'SP01', name: 'Breeding for Tomorrow', role: 'PRIMARY' },
+          { code: 'SP02', name: 'Sustainable Farming', role: 'CONTRIBUTING' }
         ]
       });
       component.seedFromServer(currentAlignment()!);
@@ -353,6 +346,9 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(component.formData().has_contribution).toBe(true);
       expect(codes(component.formData()).sort()).toEqual(['SP01', 'SP02']);
       expect(component.formData().selected_sps[0]).toMatchObject({ official_code: 'SP01', name: 'Breeding for Tomorrow' });
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-123 AC.1, R-BIL-127
+      // Primary derived solely from the wire's role: 'PRIMARY' entry, not position.
+      expect(component.formData().primary_sp_code).toBe('SP01');
     });
 
     it('falls back to selected_levers when selected_science_programs is absent (backend compat)', () => {
@@ -376,17 +372,21 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({
         ...baseAlignment,
         has_contribution: true,
-        selected_science_programs: [{ code: 'SP01', name: 'Breeding for Tomorrow' }]
+        selected_science_programs: [{ code: 'SP01', name: 'Breeding for Tomorrow', role: 'PRIMARY' }]
       });
       component.seedFromServer(currentAlignment()!);
     });
 
-    it('flip true → false clears selected_sps and toc_drafts', () => {
+    it('flip true → false clears selected_sps, toc_drafts AND primary_sp_code', () => {
       expect(codes(component.formData())).toEqual(['SP01']);
+      expect(component.formData().primary_sp_code).toBe('SP01');
       component.onContributionChange(false);
       expect(component.formData().has_contribution).toBe(false);
       expect(codes(component.formData())).toEqual([]);
       expect(component.formData().toc_drafts).toEqual([]);
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
+      // A stale Primary must not survive into a later "Yes" flip.
+      expect(component.formData().primary_sp_code).toBeNull();
     });
 
     it('flip false → true preserves selected_sps already in form state', () => {
@@ -414,51 +414,139 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(component.canSave()).toBe(false);
     });
 
-    it('true when has_contribution=true and ≥1 SP selected and form is dirty', () => {
+    it('true when has_contribution=true and ≥1 SP selected, a Primary chosen, and form is dirty', () => {
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [sp('SP01')],
+        primary_sp_code: 'SP01',
+        toc_drafts: [component['emptyDraft']('SP01')]
+      }));
+      expect(component.canSave()).toBe(true);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-127 AC.3
+    // has_contribution: true with ≥1 SP selected but NO Primary chosen must block
+    // save — the client-side clause canSave() gains (design.md §6.1), independent
+    // of the server 400. Sabotage check: reverting the `!form.primary_sp_code`
+    // clause in canSave() would flip this to true (the draft is otherwise complete
+    // and dirty), so this fixture can fail on a real regression.
+    it('R-BIL-127 AC.3 — false when has_contribution=true, ≥1 SP selected, but no Primary chosen', () => {
       component.onContributionChange(true);
       component.formData.update(f => ({
         ...f,
         selected_sps: [sp('SP01')],
         toc_drafts: [component['emptyDraft']('SP01')]
       }));
-      expect(component.canSave()).toBe(true);
-    });
-
-    it('false when not editable, even with valid dirty form', () => {
-      editable.set(false);
-      component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      expect(component.formData().primary_sp_code).toBeNull();
       expect(component.canSave()).toBe(false);
     });
 
-    it('false when alignment is read-only, even with valid dirty form', () => {
+    it('false when not editable, even with valid dirty form (Primary chosen)', () => {
+      editable.set(false);
+      component.onContributionChange(true);
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('false when alignment is read-only, even with valid dirty form (Primary chosen)', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false, is_read_only: true });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
       expect(component.canSave()).toBe(false);
     });
 
-    it('false while a rendered "Yes" draft is incomplete (D-9)', () => {
+    it('false while the Primary’s rendered "Yes" draft is below the Level + HLO floor (missing toc_result_id)', () => {
       tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
       component.onContributionChange(true);
       component.formData.update(f => ({
         ...f,
         selected_sps: [sp('SP01')],
-        toc_drafts: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null }]
+        primary_sp_code: 'SP01',
+        toc_drafts: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: null, indicator_id: null, quantitative_contribution: null }]
       }));
       expect(component.canSave()).toBe(false);
     });
 
-    it('true when the rendered "Yes" draft is complete', () => {
+    // R-BIL-112 AC.1/AC.2 — the defect being fixed: a "Yes" carrying Level + HLO
+    // but no indicator must NOT disable save (it used to, under the old
+    // completeness gate — D-C1-4 reverts that half).
+    it('true while the Primary’s rendered "Yes" draft has Level + HLO but no indicator (partial, at the floor)', () => {
       tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
       component.onContributionChange(true);
       component.formData.update(f => ({
         ...f,
         selected_sps: [sp('SP01')],
+        primary_sp_code: 'SP01',
+        toc_drafts: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null }]
+      }));
+      expect(component.canSave()).toBe(true);
+    });
+
+    it('false while the Primary’s rendered "Yes" draft supplies a negative quantitative_contribution', () => {
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [sp('SP01')],
+        primary_sp_code: 'SP01',
+        toc_drafts: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: -1 }]
+      }));
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('true when the Primary’s rendered "Yes" draft is complete', () => {
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [sp('SP01')],
+        primary_sp_code: 'SP01',
         toc_drafts: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 }]
       }));
       expect(component.canSave()).toBe(true);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.2
+    // Discriminating fixture (tasks.md §4): ≥2 selected SPs, a Primary chosen, and
+    // the NON-Primary SP's draft is unanswered (null). If canSave() still evaluated
+    // "every selected SP" (the pre-T-15 loop), this would be false; under the
+    // narrowed "Primary's draft only" loop it is true. Sabotage: reverting T-15's
+    // narrowing (evaluating every draft instead of only the Primary's) flips this
+    // fixture to false, proving the loop is actually narrowed and not merely
+    // untriggered by coincidence.
+    it('R-BIL-128 AC.2 — canSave() ignores a Contributing SP’s missing ToC answer', () => {
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [sp('SP01'), sp('SP03')],
+        primary_sp_code: 'SP01',
+        toc_drafts: [
+          { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 },
+          { sp_code: 'SP03', aligns_with_toc: null, level: null, toc_result_id: null, indicator_id: null, quantitative_contribution: null }
+        ]
+      }));
+      expect(component.canSave()).toBe(true);
+    });
+
+    // The other direction — guards against inverting R-BIL-128 AC.2 into a
+    // regression of the C1 R-BIL-112 floor: the PRIMARY's own unanswered draft
+    // must still block, even with a Contributing SP selected alongside it.
+    it('R-BIL-128 AC.2 (other direction) — the Primary’s own unanswered draft still blocks save', () => {
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [sp('SP01'), sp('SP03')],
+        primary_sp_code: 'SP01',
+        toc_drafts: [
+          { sp_code: 'SP01', aligns_with_toc: null, level: null, toc_result_id: null, indicator_id: null, quantitative_contribution: null },
+          { sp_code: 'SP03', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 905187, indicator_id: 905973, quantitative_contribution: 25 }
+        ]
+      }));
+      expect(component.canSave()).toBe(false);
     });
   });
 
@@ -595,21 +683,29 @@ describe('PoolFundingAlignmentComponent', () => {
     });
   });
 
-  describe('per-SP ToC blocks (AC-02.2, AC-03.1)', () => {
+  describe('per-SP ToC blocks (AC-02.2 → R-BIL-128 AC.1, AC-03.1 → R-BIL-128 AC.2/AC.3)', () => {
     // onSpSelectionChange now defers reconcileDrafts via queueMicrotask
     // (toc-mapping-save-gating-ux T-01), so the helper awaits the microtask flush.
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128
+    // SP01 defaults to Primary — the block-gating tests below exercise the
+    // now-Primary-only rendering rule (design.md §6.2); tests that need a
+    // different Primary call component.onPrimaryChange() after this helper.
     const showBlocks = async (catalog = TOC_CATALOG_TWO_SP_FIXTURE) => {
       tocCatalog.set(catalog);
       mappingStatus.set('mapped');
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01'), sp('SP03')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01'), sp('SP03')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       await Promise.resolve();
     };
 
-    it('AC-02.2 — N selected SPs render N blocks in selection order', async () => {
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.1
+    // Re-pointed (tasks.md §1): "N selected SPs render N blocks" is obsolete under
+    // R-BIL-128 — the ToC block renders for the Primary alone. Contributing SPs
+    // (SP03 here) render NO block, question, or cascade (R-BIL-128 rationale).
+    it('AC-02.2 → R-BIL-128 AC.1 — with N selected SPs, exactly ONE ToC block renders, for the Primary', async () => {
       await showBlocks();
       sciencePrograms.set([
         { code: 'SP01', name: 'A', category: null, color: null, icon_key: 'SP01', allocation: 50 },
@@ -618,7 +714,23 @@ describe('PoolFundingAlignmentComponent', () => {
       fixture.detectChanges();
       const root: HTMLElement = fixture.nativeElement;
       const blocks = root.querySelectorAll('app-sp-toc-alignment-block');
-      expect(blocks.length).toBe(2);
+      expect(blocks.length).toBe(1);
+      expect(root.querySelector('[data-testid="pf-alignment-block-SP01"]')).not.toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-block-SP03"]')).toBeNull();
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.4
+    it('R-BIL-128 AC.4 — changing the Primary moves the rendered block to the new Primary', async () => {
+      await showBlocks();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="pf-alignment-block-SP01"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="pf-alignment-block-SP03"]')).toBeNull();
+
+      component.onPrimaryChange('SP03');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="pf-alignment-block-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="pf-alignment-block-SP03"]')).not.toBeNull();
     });
 
     it('reconcileDrafts appends one empty draft per selected SP', async () => {
@@ -628,7 +740,7 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(drafts.every(d => d.aligns_with_toc === null)).toBe(true);
     });
 
-    it('AC-03.1 — editing SP01 draft leaves SP03 draft untouched in state AND in the PATCH body (10/25)', async () => {
+    it('AC-03.1 — editing SP01 (Primary) draft leaves SP03 (Contributing) draft untouched in state, and only the Primary’s entry reaches the PATCH body (10/25)', async () => {
       await showBlocks();
       // Configure both SP drafts: SP01 → 10, SP03 → 25.
       component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 10 });
@@ -640,17 +752,21 @@ describe('PoolFundingAlignmentComponent', () => {
       component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 11 });
 
       const sp03After = component.formData().toc_drafts.find(d => d.sp_code === 'SP03');
-      // SP03 reference + values unchanged (independence in state).
+      // SP03 reference + values unchanged (independence in state — unaffected by
+      // the Primary-only PATCH restriction below, which is a payload concern).
       expect(sp03After).toBe(sp03Before);
       expect(sp03After?.quantitative_contribution).toBe(25);
 
       patchAlignmentMock.mockResolvedValue({ ok: true, data: { ...baseAlignment, has_contribution: true } } as PatchAlignmentResult);
       await component.onSave();
 
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.3
+      // At most one toc_alignments entry, for the Primary (SP01) — SP03's edit
+      // must NOT leak into the payload even though it is independently tracked
+      // in state above.
       const [, body] = patchAlignmentMock.mock.calls[0];
       expect(body.toc_alignments).toEqual([
-        { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 11 },
-        { sp_code: 'SP03', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 905187, indicator_id: 905973, quantitative_contribution: 25 }
+        { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 11 }
       ]);
     });
 
@@ -670,14 +786,504 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(component.resultType()).toBe('capacity_sharing');
     });
 
-    it('T-BIL-ITG-03 — every rendered block receives the envelope resultType', async () => {
+    // Re-pointed alongside AC-02.2 (tasks.md §1) — only ONE block renders now
+    // (the Primary's), so "every rendered block" means the single block.
+    it('T-BIL-ITG-03 — the rendered (Primary’s) block receives the envelope resultType', async () => {
       await showBlocks(); // TWO_SP fixture: result_type 'capacity_sharing'
       fixture.detectChanges();
       const blocks = fixture.debugElement.queryAll(By.directive(SpTocAlignmentBlockComponent));
-      expect(blocks.length).toBe(2);
+      expect(blocks.length).toBe(1);
+      expect((blocks[0].componentInstance as SpTocAlignmentBlockComponent).sp().official_code).toBe('SP01');
       blocks.forEach(block =>
         expect((block.componentInstance as SpTocAlignmentBlockComponent).resultType()).toBe('capacity_sharing')
       );
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16
+  // R-BIL-127 (selector distinguishes Primary/Contributing) + R-BIL-129 (saved
+  // ToC for a non-Primary SP stays visible, read-only) + carried-forward
+  // obligations 5b/5c/5d (tasks.md T-16).
+  describe('Primary/Contributing role selector (R-BIL-127)', () => {
+    const selectTwo = () => {
+      currentAlignment.set({ ...baseAlignment, has_contribution: false });
+      component.seedFromServer(currentAlignment()!);
+      component.onContributionChange(true);
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01'), sp('SP03')] }));
+    };
+
+    it('R-BIL-127 AC.1 — selecting a Primary marks that SP as Primary and leaves the other Contributing', () => {
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      expect(component.isPrimary('SP01')).toBe(true);
+      expect(component.isPrimary('SP03')).toBe(false);
+      expect(component.formData().primary_sp_code).toBe('SP01');
+    });
+
+    it('R-BIL-127 AC.2 — choosing a different Primary demotes the previous one in the same interaction', () => {
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      expect(component.isPrimary('SP01')).toBe(true);
+
+      component.onPrimaryChange('SP03');
+
+      expect(component.isPrimary('SP03')).toBe(true);
+      expect(component.isPrimary('SP01')).toBe(false);
+      expect(component.formData().primary_sp_code).toBe('SP03');
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 attempt 3 / R-BIL-127 AC.2
+    // isDirty()'s dedicated Primary clause (component.ts:360,
+    // `if (server.primary_sp_code !== form.primary_sp_code) return true;`) is the
+    // ONLY thing that makes a Primary-ONLY change dirty, and therefore saveable
+    // at all (attempt-3 review finding 2 — `BRDA:360,37,0`, uncovered). Every
+    // other payload test in this corpus changes `primary_sp_code` alongside
+    // another dirtying edit (selection or draft), so the clause was never the
+    // SOLE cause of dirtiness anywhere — this fixture makes it so, and
+    // end-to-end discharges R-BIL-127 AC.2's scenario for the first time
+    // ("the save payload carries `primary_sp_code` with both codes still in
+    // `sp_codes`").
+    it('R-BIL-127 AC.2 — changing ONLY the Primary (no other edit) makes the form dirty, saveable, and the PATCH carries primary_sp_code with both codes in sp_codes', async () => {
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [
+          { code: 'SP01', name: 'A', role: 'PRIMARY' },
+          { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }
+        ]
+      });
+      component.seedFromServer(currentAlignment()!);
+      expect(component.isDirty()).toBe(false);
+
+      component.onPrimaryChange('SP03');
+
+      expect(component.isDirty()).toBe(true);
+      expect(component.canSave()).toBe(true);
+
+      patchAlignmentMock.mockResolvedValue({ ok: true, data: { ...baseAlignment, has_contribution: true } } as PatchAlignmentResult);
+      await component.onSave();
+
+      const [, body] = patchAlignmentMock.mock.calls[0];
+      expect(body.primary_sp_code).toBe('SP03');
+      expect(body.sp_codes).toEqual(expect.arrayContaining(['SP01', 'SP03']));
+      expect(body.sp_codes).toHaveLength(2);
+    });
+
+    // "Never two Primaries mid-interaction" (R-BIL-127 AC.1/AC.2, requirements.md
+    // scenario) is structurally unrepresentable, not merely untested: `primary_sp_code`
+    // is a single `string | null` field (design.md §6.1, mirroring D-C2-1's wire-shape
+    // reasoning). A runtime assertion "no two SPs are both Primary" would be
+    // tautological — it can only ever pass, because the type makes the violating
+    // state impossible to construct in the first place, not just difficult to reach.
+    it('R-BIL-127 AC.1/AC.2 — "never two Primaries" is enforced structurally, not by a runtime check (documented, not a discharge)', () => {
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      component.onPrimaryChange('SP03');
+      // The only assertion this fixture CAN make: one scalar field holds at most
+      // one value. A test claiming to "prove" no second Primary exists would be
+      // asserting the type system's guarantee back at itself.
+      expect(typeof component.formData().primary_sp_code === 'string' || component.formData().primary_sp_code === null).toBe(true);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 attempt 3 / R-BIL-127 AC.4
+    // Non-destructive path: no ToC catalog is loaded here, so `showTocBlocks()`
+    // is false and canSave()'s ToC-completeness gate (component.ts:344-347) is
+    // structurally inactive — isolating THIS test to the ONE clause AC.4 is
+    // actually about: `form.has_contribution === true && !form.primary_sp_code`
+    // (component.ts:328). SP01's draft is therefore also left UNTOUCHED (null),
+    // so deselecting it does not trigger the D-6a destructive-confirm dialog
+    // (hasMeaningfulAlignment is false) — reconcileDrafts() takes the direct
+    // syncDraftsToSelection() path, which is where primaryStillSelected() clears
+    // the Primary (component.ts:557). The companion test immediately below
+    // covers the OTHER path — confirming a destructive removal of the Primary,
+    // which clears it via applyDestructiveRemoval() (component.ts:598) instead.
+    // Discriminating fix (attempt-3 review, finding 1): canSave() is asserted
+    // TRUE immediately before the deselect, so the FALSE assertion after it
+    // cannot be a tautology over an already-blocked save.
+    it('R-BIL-127 AC.4 — deselecting the SP holding Primary clears primary_sp_code and re-blocks save', async () => {
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      component.onSpSelectionChange();
+      await Promise.resolve();
+
+      // Primary chosen, selection dirty relative to the server snapshot, and no
+      // ToC gate active — canSave() is genuinely true here.
+      expect(component.formData().primary_sp_code).toBe('SP01');
+      expect(component.canSave()).toBe(true);
+
+      // Deselect SP01 (the Primary, draft untouched — no destructive confirm).
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP03')] }));
+      component.onSpSelectionChange();
+      await Promise.resolve();
+
+      expect(showGlobalAlertMock).not.toHaveBeenCalled();
+      expect(component.formData().primary_sp_code).toBeNull();
+      expect(component.canSave()).toBe(false);
+      expect(component.primaryRequiredMessage()).toBe(component.PRIMARY_SP_REQUIRED_MESSAGE);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 attempt 3 / R-BIL-127 AC.4
+    // (destructive-confirm path, closes attempt-3 review finding 1's second half).
+    // T-14's record claims "deselecting the SP holding Primary clears the Primary"
+    // was implemented on BOTH removal paths — the direct one covered above, and
+    // this one, reached when the deselected SP's draft is "meaningful" (touched
+    // or server-saved), which routes through the house destructive-confirm
+    // dialog instead. Before this test, applyDestructiveRemoval's own
+    // primary-clearing branch (component.ts:598,
+    // `primary_sp_code: form.primary_sp_code === spCode ? null : form.primary_sp_code`)
+    // had never been exercised by anything in this corpus (`BRDA:598,63,0`).
+    it('R-BIL-127 AC.4 — confirming a destructive removal of the Primary also clears primary_sp_code', async () => {
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      // Give SP01 (the Primary) a touched draft so hasMeaningfulAlignment('SP01')
+      // is true and deselecting it routes through confirmDestructiveRemoval() /
+      // applyDestructiveRemoval(), not the direct syncDraftsToSelection() path.
+      component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: false, level: null, toc_result_id: null, indicator_id: null, quantitative_contribution: null });
+
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP03')] }));
+      component.onSpSelectionChange();
+      await Promise.resolve();
+
+      expect(showGlobalAlertMock).toHaveBeenCalledTimes(1);
+      const confirm = showGlobalAlertMock.mock.calls[0][0].confirmCallback.event;
+      confirm();
+
+      expect(component.formData().primary_sp_code).toBeNull();
+      expect(codes(component.formData())).toEqual(['SP03']);
+      expect(component.canSave()).toBe(false);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-127 AC.5
+    it('R-BIL-127 AC.5 — read-only and version-locked both disable the Primary control alongside the existing picker', () => {
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      expect(component.primaryControlDisabled()).toBe(false);
+
+      currentAlignment.set({ ...baseAlignment, has_contribution: true, is_read_only: true });
+      expect(component.primaryControlDisabled()).toBe(true);
+
+      currentAlignment.set({ ...baseAlignment, has_contribution: true, is_read_only: false });
+      tocCatalog.set(TOC_CATALOG_VERSION_LOCKED_FIXTURE);
+      expect(component.primaryControlDisabled()).toBe(true);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-127 AC.5 (DOM)
+    // ROOT-CAUSED (T-16 attempt 2, bounded investigation): this test deliberately
+    // renders the Primary radio row with `is_read_only` still FALSE on the first
+    // `detectChanges()`, THEN mutates `currentAlignment` and calls `detectChanges()`
+    // again — it does NOT collapse both state changes into one render pass.
+    // Empirically confirmed this is load-bearing, not stylistic: creating the
+    // `p-radioButton` row for the FIRST time (inside `@for`, `p-radioButton` is
+    // `ChangeDetectionStrategy.OnPush`) with `primaryControlDisabled()` already
+    // `true` at creation leaves `componentInstance.disabled` (and the native
+    // `<input disabled>` attribute) reading `false` even though the TS-level
+    // computed itself is correctly `true` both before and after that same
+    // `detectChanges()` call — and a SECOND no-op `detectChanges()` (no new
+    // signal write) does not self-correct it either. The binding only takes on
+    // an already-EXISTING p-radioButton instance's NEXT change-detection pass,
+    // triggered by a genuine signal write after creation — exactly the sequence
+    // this test uses. So: NOT a stale DebugElement/query problem (re-querying
+    // `de` isn't what fixes it — a fresh signal write on an already-created row
+    // is), and not a signal/computed bug (the TS value is right throughout) —
+    // it is a first-render input-propagation gap on this OnPush child inside
+    // `@for`, sidestepped by asserting the initial (false) state BEFORE the
+    // state that flips it to true. This assertion is not lower-confidence: its
+    // current two-step shape is the correct, deliberate way to observe the
+    // property, and the given root cause is testable by anyone who prefers to
+    // verify rather than take it on faith (create the row with disabled=true in
+    // one pass and watch componentInstance.disabled read false).
+    it('R-BIL-127 AC.5 — the rendered Primary radio reflects primaryControlDisabled in the DOM', () => {
+      mappingStatus.set('mapped');
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      fixture.detectChanges();
+      let de = fixture.debugElement.query(By.css('[data-testid="pf-alignment-primary-radio-SP01"]'));
+      expect(de).not.toBeNull();
+      expect((de.componentInstance as { disabled?: boolean }).disabled).toBeFalsy();
+
+      currentAlignment.set({ ...baseAlignment, has_contribution: true, is_read_only: true });
+      fixture.detectChanges();
+      de = fixture.debugElement.query(By.css('[data-testid="pf-alignment-primary-radio-SP01"]'));
+      expect((de.componentInstance as { disabled?: boolean }).disabled).toBe(true);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-127 AC.6
+    // Presence-assertion ONLY (tasks.md §7 / design.md D-5): proves the text-label
+    // + icon markup is IN the DOM for both roles, which is necessary for AC.6's
+    // non-colour-only cue but not sufficient — jsdom cannot measure rendered
+    // colour, contrast, or layout, and no assertion in this file can. AC.6 is
+    // NOT discharged by this or any other test here; see the design.md §12.2
+    // decision entry and tasks.md §7 for the explicit record.
+    it('R-BIL-127 AC.6 (presence-assertion only, NOT a visual discharge) — Primary and Contributing each carry a distinct text label; only Primary carries the star icon', () => {
+      mappingStatus.set('mapped');
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const primaryBadge = root.querySelector('[data-testid="pf-alignment-role-primary-SP01"]');
+      const contributingBadge = root.querySelector('[data-testid="pf-alignment-role-contributing-SP03"]');
+      expect(primaryBadge).not.toBeNull();
+      expect(contributingBadge).not.toBeNull();
+      expect(primaryBadge!.textContent?.trim()).toContain(component.PRIMARY_ROLE_LABEL);
+      expect(contributingBadge!.textContent?.trim()).toContain(component.CONTRIBUTING_ROLE_LABEL);
+      // Icon present on Primary only — the non-colour-only cue's second channel.
+      expect(primaryBadge!.querySelector('.pi-star-fill')).not.toBeNull();
+      expect(contributingBadge!.querySelector('.pi-star-fill')).toBeNull();
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.5
+    it('R-BIL-128 AC.5 — with no Primary chosen, no ToC block renders (save already blocked by R-BIL-127 AC.3)', () => {
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      mappingStatus.set('mapped');
+      selectTwo();
+      component.onSpSelectionChange();
+      fixture.detectChanges();
+
+      expect(component.primarySelectedSp()).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-sp-toc-alignment-block')).toBeNull();
+      expect(component.canSave()).toBe(false);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / carried-forward 5b
+    // `contributingSps` (design.md §6.1) has no template consumer as of T-14/T-15
+    // (every selected SP is shown once in the Primary selector, role read off
+    // `isPrimary`). Deleting it is a production change beyond T-16's single
+    // sanctioned one (the `role` type flip, 5a) — flipping a signal's ts-prune
+    // status is not that. Decision: ASSERT it here so the derivation is proven
+    // correct and the signal earns its place until a future task either wires
+    // it into the template or removes it deliberately.
+    it('5b — contributingSps derives the selected set minus the Primary', () => {
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      expect(component.contributingSps().map(s => s.official_code)).toEqual(['SP03']);
+
+      component.onPrimaryChange('SP03');
+      expect(component.contributingSps().map(s => s.official_code)).toEqual(['SP01']);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / carried-forward 5c
+    // Covers the component's consumption of an already-parsed
+    // `result.primarySpError` (pool-funding-alignment.component.ts:781-789) — the
+    // defensive path canSave() should make unreachable, exercised here via a
+    // race-condition-shaped 400. The OTHER half — `extractPrimarySpError` itself,
+    // the JSON-parsing logic in bilateral.service.ts that the T-14 review flagged
+    // as untested — is covered separately in
+    // `bilateral.service.spec.ts` → describe('extractPrimarySpError via
+    // patchAlignment (T-14 / T-16, R-BIL-127)'). Both halves of 5c are closed.
+    it('5c — a defensive primarySpError from the server surfaces as an inline error on primary_sp_code', async () => {
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      mappingStatus.set('mapped');
+      selectTwo();
+      component.onPrimaryChange('SP01');
+      component.onSpSelectionChange();
+      await Promise.resolve();
+      // canSave() must be true for onSave() to even reach the server — the
+      // whole point of this defensive path is that it fires despite canSave()
+      // having passed (a race the client cannot pre-validate away).
+      component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: false, level: null, toc_result_id: null, indicator_id: null, quantitative_contribution: null });
+      expect(component.canSave()).toBe(true);
+
+      patchAlignmentMock.mockResolvedValue({
+        ok: false,
+        status: 400,
+        description: 'Validation failed',
+        primarySpError: 'SP01 is no longer a valid Primary for this result.'
+      } as PatchAlignmentResult);
+
+      await component.onSave();
+
+      expect(component.inlineErrors()?.['primary_sp_code']).toBe('SP01 is no longer a valid Primary for this result.');
+      expect(showToastMock).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning' }));
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / carried-forward 5d
+    // Pins existing (confusing but real) rendering: with `role: null` on every row
+    // (a legacy alignment, R-BIL-126, before any Primary is ever chosen), the
+    // `@else` branch in the template renders an affirmative "Contributing" badge
+    // even though the true state is "no role chosen yet" — because
+    // `primarySpCode` derives from `role === 'PRIMARY'` (snapshotFromServer), and
+    // none of the rows carry that. Editable forms are mitigated by the concurrent
+    // `primaryRequiredMessage`; a READ-ONLY legacy alignment has no such message
+    // (suppressed by `isReadOnly()`), so the user sees a confident "Contributing"
+    // with nothing correcting it. Recorded per tasks.md 5d — behavior pinned, not
+    // endorsed; see design.md §12.2 for the decision record.
+    it('5d — a read-only legacy alignment (role: null on every row) renders "Contributing" on every SP, not a neutral state', () => {
+      mappingStatus.set('mapped');
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        is_read_only: true,
+        selected_science_programs: [
+          { code: 'SP01', name: 'A', role: null },
+          { code: 'SP03', name: 'B', role: null }
+        ]
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      expect(component.formData().primary_sp_code).toBeNull();
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('[data-testid="pf-alignment-role-contributing-SP01"]')).not.toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-role-contributing-SP03"]')).not.toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-role-primary-SP01"]')).toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-role-primary-SP03"]')).toBeNull();
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-129
+  describe('Non-Primary saved ToC stays visible, read-only (R-BIL-129)', () => {
+    const orphanedRow = (overrides: Partial<SavedTocAlignment> = {}): SavedTocAlignment => ({
+      sp_code: 'SP03',
+      aligns_with_toc: true,
+      level: 'OUTPUT',
+      toc_result_id: 5187,
+      indicator_id: 5973,
+      quantitative_contribution: 3,
+      toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+      indicator_description: 'An indicator',
+      unit_of_measurement: 'Number',
+      target_value: '10',
+      target_year: 2026,
+      ...overrides
+    });
+
+    it('R-BIL-129 AC.1/AC.2 — a saved ToC alignment for a non-Primary SP renders as a read-only summary identifying its SP, with no editable control', () => {
+      mappingStatus.set('mapped');
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }, { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }],
+        toc_alignments: [orphanedRow()]
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const summary = root.querySelector('[data-orphaned="true"]') as HTMLElement | null;
+      expect(summary).not.toBeNull();
+      expect(summary!.textContent).toContain('SP03');
+      // AC.2 — no editable control inside the summary (no input/select/button).
+      expect(summary!.querySelector('input, select, textarea, button, [contenteditable]')).toBeNull();
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-129 AC.3/AC.4
+    it('R-BIL-129 AC.3/AC.4 — the orphaned row is never in the PATCH payload and never dirties the form', async () => {
+      mappingStatus.set('mapped');
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }, { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }],
+        toc_alignments: [orphanedRow()]
+      });
+      component.seedFromServer(currentAlignment()!);
+
+      // AC.4 — orphaned SP03's saved row does not make the freshly-seeded form dirty.
+      expect(component.isDirty()).toBe(false);
+      expect(component.canSave()).toBe(false); // not dirty yet
+
+      // Dirty the form via an unrelated change (edit the Primary's own draft), save.
+      component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 905187, indicator_id: 905973, quantitative_contribution: 9 });
+      expect(component.isDirty()).toBe(true);
+
+      patchAlignmentMock.mockResolvedValue({ ok: true, data: { ...baseAlignment, has_contribution: true } } as PatchAlignmentResult);
+      await component.onSave();
+
+      const [, body] = patchAlignmentMock.mock.calls[0];
+      // AC.3 — SP03 (orphaned, Contributing) never appears in toc_alignments.
+      expect(body.toc_alignments).toEqual([
+        { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 905187, indicator_id: 905973, quantitative_contribution: 9 }
+      ]);
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-129 AC.5
+    // Discriminating fixture (tasks.md §4): SP03's row is genuinely BOTH (a)
+    // orphaned — sp_code ('SP03') ≠ primary_sp_code ('SP01') — AND (b) stale — its
+    // toc_result_id (999999) does not resolve in the live catalog for its level.
+    // A row that is only one of the two would render once even under a
+    // CONCATENATING (buggy) implementation, so it would NOT be evidence; this
+    // fixture is the one that can actually fail.
+    //
+    // ⚠ The trap (T-15 review): a row that is both renders under
+    // `data-testid="pf-alignment-stale-<sp>"`, NOT `"pf-alignment-orphaned-<sp>"`
+    // (component.html:291, ternary on row.isStale — deliberate, AC-08.4 backward
+    // compatibility). Querying `[data-testid="pf-alignment-orphaned-SP03"]` here
+    // would find nothing against a CORRECT implementation and misread as "renders
+    // zero times". Query `[data-orphaned]` / `[data-stale]` instead.
+    it('R-BIL-129 AC.5 — a row that is both orphaned AND stale renders exactly once, with both attributes on the single element', () => {
+      mappingStatus.set('mapped');
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE); // has SP01 results, but NOT toc_result_id 999999
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }, { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }],
+        toc_alignments: [orphanedRow({ toc_result_id: 999999 })] // orphaned (sp_code≠primary) AND stale (unresolvable)
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      expect(component.readOnlyTocSummaries().length).toBe(1);
+      const root: HTMLElement = fixture.nativeElement;
+      const matches = root.querySelectorAll('[data-orphaned="true"], [data-stale="true"]');
+      // Sabotage-provable: a concatenating (Array, not Map-keyed) implementation
+      // of readOnlyTocSummaries would render TWO elements for this sp_code.
+      expect(matches.length).toBe(1);
+      const el = matches[0] as HTMLElement;
+      expect(el.getAttribute('data-orphaned')).toBe('true');
+      expect(el.getAttribute('data-stale')).toBe('true');
+      // The trap: rendered under the STALE testid, not the orphaned one.
+      expect(el.getAttribute('data-testid')).toBe('pf-alignment-stale-SP03');
+      expect(root.querySelector('[data-testid="pf-alignment-orphaned-SP03"]')).toBeNull();
+    });
+  });
+
+  // R-BIL-115 — regression (already implemented): the selected-SP chip renders
+  // through the `#rows` ng-template of `app-multiselect` (pool-funding-alignment
+  // .component.html :151), driven by `findScienceProgram()` resolving the chip's
+  // allocation from the per-result `sciencePrograms` picker list.
+  describe('R-BIL-115 — SP selector display format (regression)', () => {
+    const spOption = (overrides: Partial<PoolFundingScienceProgram> = {}): PoolFundingScienceProgram => ({
+      code: 'SP06',
+      name: 'Climate Action',
+      category: null,
+      color: '#000000',
+      icon_key: 'SP06',
+      allocation: 10,
+      ...overrides
+    });
+
+    const renderSelectedChip = async (option: PoolFundingScienceProgram) => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set([option]);
+      currentAlignment.set({ ...baseAlignment, has_contribution: false });
+      component.seedFromServer(currentAlignment()!);
+      component.onContributionChange(true);
+      component.formData.update(f => ({
+        ...f,
+        selected_sps: [{ official_code: option.code, name: option.name, category: option.category ?? null, color: option.color ?? null }]
+      }));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('AC.1 — renders the selected SP as "<code> — <allocation>% - <name>"', async () => {
+      await renderSelectedChip(spOption());
+      const chip = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-chip-SP06"]') as HTMLElement | null;
+      expect(chip).not.toBeNull();
+      expect(chip!.textContent?.replace(/\s+/g, ' ').trim()).toBe('SP06 — 10% - Climate Action');
+    });
+
+    it('AC.2 — a null allocation renders the existing "—" placeholder, never the literal "null"', async () => {
+      // Runtime data can carry a null allocation even though the wire type is
+      // declared non-nullable (`?? '—'` in the template is the actual guard).
+      await renderSelectedChip(spOption({ allocation: null as unknown as number }));
+      const chip = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-chip-SP06"]') as HTMLElement | null;
+      expect(chip).not.toBeNull();
+      expect(chip!.textContent?.replace(/\s+/g, ' ').trim()).toBe('SP06 — —% - Climate Action');
+      expect(chip!.textContent).not.toMatch(/\bnull\b/);
     });
   });
 
@@ -760,7 +1366,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({
         ...baseAlignment,
         has_contribution: true,
-        selected_science_programs: [{ code: 'SP01', name: 'A' }],
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }],
         toc_alignments: [{ sp_code: 'SP01', aligns_with_toc: false }]
       });
       component.seedFromServer(currentAlignment()!);
@@ -777,7 +1383,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
     };
@@ -790,12 +1396,41 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(body).toEqual({
         has_contribution: true,
         sp_codes: ['SP01'],
+        primary_sp_code: 'SP01',
         toc_alignments: [{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 }]
       });
     });
 
+    // R-BIL-112 AC.1/AC.2/NFR-BIL-112 — the core fix: a "Yes" draft with
+    // Level + HLO but no indicator (1) does not disable save and (2) actually
+    // reaches the PATCH body instead of being silently dropped by the writer.
+    it('a Level + HLO draft with no indicator is PRESENT in the PATCH toc_alignments (partial draft reaches the server)', async () => {
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      currentAlignment.set({ ...baseAlignment, has_contribution: false });
+      component.seedFromServer(currentAlignment()!);
+      component.onContributionChange(true);
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
+      component.onSpSelectionChange();
+      component.onDraftChange({
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5187,
+        indicator_id: null,
+        quantitative_contribution: null
+      });
+
+      expect(component.canSave()).toBe(true);
+
+      patchAlignmentMock.mockResolvedValue({ ok: true, data: { ...baseAlignment, has_contribution: true } } as PatchAlignmentResult);
+      await component.onSave();
+
+      const [, body] = patchAlignmentMock.mock.calls[0];
+      expect(body.toc_alignments).toEqual([{ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187 }]);
+    });
+
     it('omits toc_alignments when has_contribution=false', async () => {
-      currentAlignment.set({ ...baseAlignment, has_contribution: true, selected_science_programs: [{ code: 'SP01', name: 'A' }] });
+      currentAlignment.set({ ...baseAlignment, has_contribution: true, selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }] });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(false);
       patchAlignmentMock.mockResolvedValue({ ok: true, data: { ...baseAlignment, has_contribution: false } } as PatchAlignmentResult);
@@ -820,7 +1455,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 7201, indicator_id: 7302, quantitative_contribution: 12 });
 
@@ -847,7 +1482,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({
         ...baseAlignment,
         has_contribution: true,
-        selected_science_programs: [{ code: 'SP01', name: 'A' }, { code: 'SP03', name: 'B' }],
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }, { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }],
         toc_alignments: SAVED_TOC_ALIGNMENTS_FIXTURE
       });
       component.seedFromServer(currentAlignment()!);
@@ -857,6 +1492,48 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(sp01).toMatchObject({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
       expect(sp03).toMatchObject({ sp_code: 'SP03', aligns_with_toc: false, level: null, toc_result_id: null });
     });
+
+    // R-BIL-114 — client scenario "Partial row renders without error". T-09.
+    // `SAVED_TOC_ALIGNMENTS_FIXTURE` above only exercises a COMPLETE "Yes"
+    // (SP01) and a "No" (SP03) — neither is a saved PARTIAL row. This pins the
+    // genuinely new reload case: a saved "Yes" carrying Level + HLO but no
+    // indicator round-trips through `draftsFromSaved`
+    // (bilateral.service.ts:347-356, unmodified by this task) with exactly the
+    // expected nulls — proving the RELOAD path, not the already-covered
+    // mid-entry cascade (R-BIL-116 AC.3 in the sibling block spec).
+    it('a saved partial row (Level + HLO, no indicator) reloads with indicator/contribution null and level/toc_result_id populated', () => {
+      const partialSaved: SavedTocAlignment = {
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5187,
+        indicator_id: null,
+        quantitative_contribution: null,
+        toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+        indicator_description: null,
+        unit_of_measurement: null,
+        target_value: null,
+        target_year: null
+      };
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }],
+        toc_alignments: [partialSaved]
+      });
+      component.seedFromServer(currentAlignment()!);
+
+      const sp01 = component.draftForSp('SP01');
+      expect(sp01).toEqual({
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5187,
+        indicator_id: null,
+        quantitative_contribution: null
+      });
+    });
   });
 
   describe('per-block 400 routing (AC-08.2)', () => {
@@ -865,7 +1542,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01'), sp('SP03')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01'), sp('SP03')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
       component.onDraftChange({ sp_code: 'SP03', aligns_with_toc: false, level: null, toc_result_id: null, indicator_id: null, quantitative_contribution: null });
@@ -927,7 +1604,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
 
@@ -959,7 +1636,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
 
@@ -987,7 +1664,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       fixture.detectChanges();
 
@@ -998,7 +1675,7 @@ describe('PoolFundingAlignmentComponent', () => {
 
       patchAlignmentMock.mockResolvedValue({ ok: true, data: { ...baseAlignment, has_contribution: true } } as PatchAlignmentResult);
       await component.onSave();
-      expect(patchAlignmentMock).toHaveBeenCalledWith('RES-001', { has_contribution: true, sp_codes: ['SP01'] });
+      expect(patchAlignmentMock).toHaveBeenCalledWith('RES-001', { has_contribution: true, sp_codes: ['SP01'], primary_sp_code: 'SP01' });
     });
   });
 
@@ -1011,7 +1688,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       await Promise.resolve();
       fixture.detectChanges();
@@ -1072,7 +1749,9 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({
         ...baseAlignment,
         has_contribution: true,
-        selected_science_programs: [{ code: 'SP01', name: 'A' }],
+        // SP01 IS the Primary here — stale-but-not-orphaned, isolating AC-08.4
+        // from R-BIL-129's orphan case (covered separately below).
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }],
         toc_alignments: [staleSaved]
       });
       component.seedFromServer(currentAlignment()!);
@@ -1082,7 +1761,10 @@ describe('PoolFundingAlignmentComponent', () => {
       const root: HTMLElement = fixture.nativeElement;
       const staleEl = root.querySelector('[data-testid="pf-alignment-stale-SP01"]') as HTMLElement | null;
       expect(staleEl).not.toBeNull();
+      expect(staleEl!.getAttribute('data-stale')).toBe('true');
+      expect(staleEl!.hasAttribute('data-orphaned')).toBe(false);
       expect(root.querySelector('[data-testid="pf-alignment-stale-tag-SP01"]')).not.toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-orphaned-tag-SP01"]')).toBeNull();
       // Flat read-back fields render directly off the row (D-10 — no snapshot wrapper).
       const staleText = staleEl!.textContent ?? '';
       expect(staleText).toContain('Retired HLO');
@@ -1151,7 +1833,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
 
       patchAlignmentMock.mockResolvedValue({
         ok: false,
@@ -1174,7 +1856,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
 
       patchAlignmentMock.mockResolvedValue({
         ok: false,
@@ -1195,7 +1877,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: spCodes.map(c => sp(c)) }));
+      component.formData.update(f => ({ ...f, selected_sps: spCodes.map(c => sp(c)), primary_sp_code: spCodes[0] ?? null }));
     };
 
     it('AC-03.1/AC-03.3 — 400 with unknownSpCodes → inline sp_codes error naming the codes, no toast', async () => {
@@ -1314,7 +1996,7 @@ describe('PoolFundingAlignmentComponent', () => {
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01'), sp('SP03')] }));
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01'), sp('SP03')], primary_sp_code: 'SP01' }));
       component.onSpSelectionChange();
       component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
       component.onDraftChange({ sp_code: 'SP03', aligns_with_toc: false, level: null, toc_result_id: null, indicator_id: null, quantitative_contribution: null });
@@ -1322,18 +2004,22 @@ describe('PoolFundingAlignmentComponent', () => {
       const returned: AlignmentResponse = {
         ...baseAlignment,
         has_contribution: true,
-        selected_science_programs: [{ code: 'SP01', name: 'A' }, { code: 'SP03', name: 'B' }]
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }, { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }]
       };
       patchAlignmentMock.mockResolvedValue({ ok: true, data: returned } as PatchAlignmentResult);
       trackEventMock.mockClear();
 
       await component.onSave();
 
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.3
+      // toc_alignment_count reflects the COMPOSED PATCH BODY (`body.toc_alignments`),
+      // which now carries at most one entry (the Primary's) — SP03's "No" draft is
+      // tracked in form state but never reaches the body, so the count is 1, not 2.
       expect(trackEventMock).toHaveBeenCalledWith('bilateral.alignment.saved', {
         result_code: 'RES-001',
         has_contribution: true,
         sp_count: 2,
-        toc_alignment_count: 2
+        toc_alignment_count: 1
       });
     });
 
@@ -1360,13 +2046,16 @@ describe('PoolFundingAlignmentComponent', () => {
   describe('save-gating-ux (REQ-BIL-SGU-*)', () => {
     // Bring the page to "has_contribution = Yes" with the given SPs selected and
     // the reconcile microtask flushed — mirrors the established showBlocks helper.
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-127
+    // The FIRST sp code defaults to Primary; a test needing a different Primary
+    // (or none at all) calls component.onPrimaryChange(...) after this resolves.
     const selectSps = async (spCodes: string[], catalog = TOC_CATALOG_TWO_SP_FIXTURE) => {
       tocCatalog.set(catalog);
       mappingStatus.set('mapped');
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
-      component.formData.update(f => ({ ...f, selected_sps: spCodes.map(c => sp(c)) }));
+      component.formData.update(f => ({ ...f, selected_sps: spCodes.map(c => sp(c)), primary_sp_code: spCodes[0] ?? null }));
       component.onSpSelectionChange();
       await Promise.resolve();
     };
@@ -1424,7 +2113,11 @@ describe('PoolFundingAlignmentComponent', () => {
     });
 
     describe('REQ-BIL-SGU-03 — single-pass select → map → save', () => {
-      it('one PATCH carries BOTH sp_codes and toc_alignments together', async () => {
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.3
+      // Re-pointed: sp_codes still carries BOTH selected SPs (unaffected by the
+      // Primary restriction), but toc_alignments now carries at MOST ONE entry —
+      // the Primary's (SP01) — never SP03's "No" draft.
+      it('one PATCH carries BOTH sp_codes together, but toc_alignments carries only the Primary’s entry', async () => {
         await selectSps(['SP01', 'SP03']);
         component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
         component.onDraftChange({ sp_code: 'SP03', aligns_with_toc: false, level: null, toc_result_id: null, indicator_id: null, quantitative_contribution: null });
@@ -1437,8 +2130,7 @@ describe('PoolFundingAlignmentComponent', () => {
         expect(resultCode).toBe('RES-001');
         expect(body.sp_codes).toEqual(['SP01', 'SP03']);
         expect(body.toc_alignments).toEqual([
-          { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 },
-          { sp_code: 'SP03', aligns_with_toc: false }
+          { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 }
         ]);
       });
 
@@ -1447,7 +2139,7 @@ describe('PoolFundingAlignmentComponent', () => {
         const saved: AlignmentResponse = {
           ...baseAlignment,
           has_contribution: true,
-          selected_science_programs: [{ code: 'SP01', name: 'A' }, { code: 'SP03', name: 'B' }],
+          selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }, { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }],
           toc_alignments: SAVED_TOC_ALIGNMENTS_FIXTURE
         };
         component.seedFromServer(saved);
@@ -1464,7 +2156,12 @@ describe('PoolFundingAlignmentComponent', () => {
     });
 
     describe('per-SP independence — editing one SP leaves the other untouched (10/25)', () => {
-      it('editing SP02 leaves SP06 unchanged in state AND in the composed PATCH toc_alignments', async () => {
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.2/AC.3
+      // Re-pointed: independence in FORM STATE still holds regardless of role
+      // (both SP02 and SP06 keep independent draft references). The composed
+      // PATCH body, however, now carries only the Primary's (SP02, first of the
+      // two per selectSps()) entry — SP06's edit must NOT leak into the payload.
+      it('editing SP02 (Primary) leaves SP06 (Contributing) unchanged in state; only SP02’s entry reaches the composed PATCH toc_alignments', async () => {
         // Two-SP scenario using SP02 + SP06; the catalog levels just need to be
         // non-empty so the blocks render — independence is a draft-array property.
         await selectSps(['SP02', 'SP06']);
@@ -1485,23 +2182,34 @@ describe('PoolFundingAlignmentComponent', () => {
 
         const [, body] = patchAlignmentMock.mock.calls[0];
         expect(body.toc_alignments).toEqual([
-          { sp_code: 'SP02', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 11 },
-          { sp_code: 'SP06', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 905187, indicator_id: 905973, quantitative_contribution: 25 }
+          { sp_code: 'SP02', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 11 }
         ]);
       });
     });
 
     describe('REQ-BIL-SGU-05 — Save gating (no global footer hint)', () => {
-      it('canSave is false for an incomplete "Yes" draft', async () => {
+      // R-BIL-112 AC.2 — a "Yes" at the Level + HLO floor (no indicator) no longer
+      // disables save; this is the reverted half of the old completeness gate
+      // (D-C1-4). The save-hint absence assertion is unaffected either way.
+      it('canSave is true for a "Yes" draft at the Level + HLO floor (no indicator)', async () => {
         await selectSps(['SP01'], TOC_CATALOG_CAPSHARING_FIXTURE);
         component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null });
 
-        expect(component.canSave()).toBe(false);
+        expect(component.canSave()).toBe(true);
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('[data-testid="pf-alignment-save-hint"]')).toBeNull();
       });
 
-      it('canSave is false when only quantitative contribution is missing', async () => {
+      it('canSave is false for a "Yes" draft below the Level + HLO floor (missing toc_result_id)', async () => {
+        await selectSps(['SP01'], TOC_CATALOG_CAPSHARING_FIXTURE);
+        component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: null, indicator_id: null, quantitative_contribution: null });
+
+        expect(component.canSave()).toBe(false);
+      });
+
+      // R-BIL-112 AC.3 — quantitative_contribution is no longer required for
+      // saveability once an indicator is chosen.
+      it('canSave is true when only quantitative contribution is missing (indicator chosen)', async () => {
         await selectSps(['SP01'], TOC_CATALOG_CAPSHARING_FIXTURE);
         component.onDraftChange({
           sp_code: 'SP01',
@@ -1512,7 +2220,7 @@ describe('PoolFundingAlignmentComponent', () => {
           quantitative_contribution: null
         });
 
-        expect(component.canSave()).toBe(false);
+        expect(component.canSave()).toBe(true);
       });
 
       it('canSave is true when the "Yes" draft is complete with contribution 0', async () => {

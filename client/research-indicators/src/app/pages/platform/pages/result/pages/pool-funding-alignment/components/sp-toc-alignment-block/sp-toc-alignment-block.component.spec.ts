@@ -984,6 +984,173 @@ describe('SpTocAlignmentBlockComponent', () => {
     });
   });
 
+  // R-BIL-116 — regression (already implemented): unit + target precede the
+  // contribution input, and — the partial-row case this spec relaxes into
+  // reachability — neither renders while no indicator is selected. Satisfied
+  // by construction via the `@if (selectedIndicator(); as indicator)` gate
+  // (:281), which also wraps unit/target/contribution as one unit.
+  describe('R-BIL-116 — unit and target precede the contribution input (regression)', () => {
+    function fullDraft(): SpAlignmentDraft {
+      return emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973 });
+    }
+
+    it('AC.1 — unit and target render when an indicator is selected', () => {
+      setup({ catalog: SP01_CAT, draft: fullDraft() });
+      fixture.detectChanges();
+      const unit = fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-SP01"]') as HTMLElement | null;
+      const target = fixture.nativeElement.querySelector('[data-testid="sp-toc-target-SP01"]') as HTMLElement | null;
+      expect(unit).not.toBeNull();
+      expect(target).not.toBeNull();
+      expect(unit!.textContent?.trim()).toBe('Number');
+      expect(target!.textContent?.trim()).toBe('5');
+    });
+
+    it('AC.2 — unit and target sit before the contribution input in DOM order, never after', () => {
+      setup({ catalog: SP01_CAT, draft: fullDraft() });
+      fixture.detectChanges();
+      const unit = fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-SP01"]') as HTMLElement;
+      const target = fixture.nativeElement.querySelector('[data-testid="sp-toc-target-SP01"]') as HTMLElement;
+      const input = fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-input-SP01"]') as HTMLElement;
+      expect(unit).not.toBeNull();
+      expect(target).not.toBeNull();
+      expect(input).not.toBeNull();
+      // DOCUMENT_POSITION_FOLLOWING on `input` relative to `unit`/`target` means
+      // unit/target come earlier in the document — i.e. before the input.
+      expect(unit.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(target.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('AC.3 — no indicator selected (partial row: Level + HLO only): neither unit nor target renders, and the contribution input never shows a stale unit', () => {
+      setup({ catalog: SP01_CAT, draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null }) });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-target-SP01"]')).toBeNull();
+      // The whole contribution panel — including the input — is gated by the same
+      // `selectedIndicator()` check, so no input renders to carry a stale unit.
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-input-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-SP01"]')).toBeNull();
+    });
+  });
+
+  // T-11 validation remediation — R-BIL-111 AC.1 / R-BIL-112 AC.3 made
+  // `indicator_id` and `quantitative_contribution` optional at the Level + HLO
+  // floor (isDraftSaveable, pool-funding-alignment.component.ts:688-696), but
+  // the template kept unconditionally rendering both fields as required. That
+  // mismatched a starred label and `aria-required="true"` against a field the
+  // save gate and server both accept empty. This suite pins the corrected,
+  // unconditional absence of the required affordance on both fields, and
+  // guards that Level/HLO — genuinely required by isDraftSaveable — keep theirs.
+  describe('required-marker drift (T-11) — indicator and contribution are optional', () => {
+    function floorDraft(): SpAlignmentDraft {
+      return emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null });
+    }
+
+    it('Indicator field: no required asterisk and no aria-required on the partial (Level + HLO only) draft', () => {
+      setup({ catalog: SP01_CAT, draft: floorDraft() });
+      fixture.detectChanges();
+      const label = fixture.nativeElement.querySelector('label[for="sp-toc-indicator-SP01"]') as HTMLElement | null;
+      const select = fixture.nativeElement.querySelector('[data-testid="sp-toc-indicator-SP01"]') as HTMLElement | null;
+      expect(label).not.toBeNull();
+      expect(select).not.toBeNull();
+      expect(label!.querySelector('.sp-toc-block__required')).toBeNull();
+      expect(select!.getAttribute('aria-required')).not.toBe('true');
+    });
+
+    it('Contribution field: no required asterisk and no aria-required once an indicator is selected', () => {
+      setup({ catalog: SP01_CAT, draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973 }) });
+      fixture.detectChanges();
+      const label = fixture.nativeElement.querySelector('label[for="sp-toc-contribution-input-SP01"]') as HTMLElement | null;
+      const input = fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-input-SP01"]') as HTMLElement | null;
+      expect(label).not.toBeNull();
+      expect(input).not.toBeNull();
+      expect(label!.querySelector('.sp-toc-block__required')).toBeNull();
+      expect(input!.getAttribute('aria-required')).not.toBe('true');
+    });
+
+    it('guard — Level and HLO fields still DO carry the required asterisk and aria-required', () => {
+      setup({ catalog: SP01_CAT, draft: floorDraft() });
+      fixture.detectChanges();
+      const levelLabel = fixture.nativeElement.querySelector('label[for="sp-toc-level-SP01"]') as HTMLElement | null;
+      const levelSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-level-SP01"]') as HTMLElement | null;
+      const hloLabel = fixture.nativeElement.querySelector('label[for="sp-toc-hlo-SP01"]') as HTMLElement | null;
+      const hloSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-hlo-SP01"]') as HTMLElement | null;
+
+      expect(levelLabel).not.toBeNull();
+      expect(levelSelect).not.toBeNull();
+      expect(hloLabel).not.toBeNull();
+      expect(hloSelect).not.toBeNull();
+
+      expect(levelLabel!.querySelector('.sp-toc-block__required')).not.toBeNull();
+      expect(levelSelect!.getAttribute('aria-required')).toBe('true');
+      expect(hloLabel!.querySelector('.sp-toc-block__required')).not.toBeNull();
+      expect(hloSelect!.getAttribute('aria-required')).toBe('true');
+    });
+  });
+
+  // R-BIL-114 — client scenario "Partial row renders without error". T-09.
+  // The draft below is exactly what `draftsFromSaved`
+  // (shared/services/bilateral.service.ts:347-356) produces when it reloads a
+  // SAVED partial alignment (Level + HLO, no indicator) — as opposed to the
+  // mid-entry partial state R-BIL-116 AC.3 already pins above. Since this pure
+  // block renders from `draft` alone (D-C1-6, no template change), the same
+  // shape proves the reload case too — this suite adds the assertions that
+  // AC.3 did not: Level/HLO actually render the saved values, the indicator
+  // select renders present-but-unselected (not a valid selection), and no
+  // literal null/undefined/NaN leaks into the rendered text anywhere in the
+  // block.
+  describe('R-BIL-114 — saved partial row reloads and renders without error', () => {
+    function reloadedPartialDraft(): SpAlignmentDraft {
+      return emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: null, quantitative_contribution: null });
+    }
+
+    it('Level and HLO render the saved values; the indicator select renders but nothing is selected', async () => {
+      setup({ catalog: SP01_CAT, draft: reloadedPartialDraft() });
+      fixture.detectChanges();
+      // NgModel's initial view→model write for `[ngModel]` runs inside a
+      // resolved-promise microtask (Angular forms internals), so the
+      // PrimeNG select's rendered label is not populated until a stable tick
+      // after the first `detectChanges()` — a second synchronous pass isn't
+      // enough. Confirmed by direct inspection of `Select`'s CVA state.
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const levelSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-level-SP01"]') as HTMLElement | null;
+      const hloSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-hlo-SP01"]') as HTMLElement | null;
+      const indicatorSelect = fixture.nativeElement.querySelector('[data-testid="sp-toc-indicator-SP01"]') as HTMLElement | null;
+
+      expect(levelSelect).not.toBeNull();
+      expect(hloSelect).not.toBeNull();
+      // The indicator field renders — gated only by `toc_result_id !== null`
+      // (:209) — even though nothing is selected yet (AC-06.2 by construction).
+      expect(indicatorSelect).not.toBeNull();
+
+      expect(levelSelect!.querySelector('.p-select-label')?.textContent?.trim()).toBe('High Level Output');
+      expect(hloSelect!.querySelector('.p-select-label')?.textContent?.trim()).toContain('HLO1.AOW1.IO1 Steer to impact');
+      // Placeholder text, not a stale/invalid selection — the empty indicator
+      // is not presented as a valid value.
+      expect(indicatorSelect!.querySelector('.p-select-label')?.textContent?.trim()).toBe('Select an indicator');
+      expect(component.selectedIndicator()).toBeNull();
+    });
+
+    it('unit, target, and the contribution panel do not render (gated behind selectedIndicator, R-BIL-116 AC.3)', () => {
+      setup({ catalog: SP01_CAT, draft: reloadedPartialDraft() });
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-target-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-SP01"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-input-SP01"]')).toBeNull();
+    });
+
+    it('no literal null, undefined, or NaN text renders anywhere in the block', () => {
+      setup({ catalog: SP01_CAT, draft: reloadedPartialDraft() });
+      fixture.detectChanges();
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).not.toMatch(/\bnull\b/i);
+      expect(text).not.toMatch(/\bundefined\b/i);
+      expect(text).not.toMatch(/\bNaN\b/i);
+    });
+  });
+
   // --- disabled / version-locked (AC-09.1 block parts) -----------------------
   describe('disabled / version-locked rendering', () => {
     it('renders the current draft values read-only when disabled', () => {
@@ -1059,5 +1226,30 @@ describe('SpTocAlignmentBlockComponent', () => {
     fixture.detectChanges();
     const err = fixture.nativeElement.querySelector('[data-testid="sp-toc-error-contribution-SP01"]') as HTMLElement;
     expect(err.textContent?.trim()).toBe('Contribution is required');
+  });
+
+  // R-BIL-110 — the per-SP question asks whether the contributor wants to
+  // map, not whether the result aligns. The stored field is unrenamed
+  // (D-C1-2); this only pins the constant's text and its `.label` binding.
+  describe('R-BIL-110 — reworded ToC intent question', () => {
+    it('AC.1 — ALIGN_QUESTION holds the exact required copy', () => {
+      setup();
+      expect(component.ALIGN_QUESTION).toBe('Would you like to complete the detailed Theory of Change mapping for this result?');
+    });
+
+    it('AC.1 — the rendered question text matches ALIGN_QUESTION exactly', () => {
+      setup();
+      fixture.detectChanges();
+      const question = fixture.nativeElement.querySelector('#sp-toc-aligns-q-SP01') as HTMLElement;
+      expect(question).not.toBeNull();
+      expect(question.textContent?.trim()).toBe(`${component.ALIGN_QUESTION}*`);
+    });
+
+    it('scenario clause — the question renders through the canonical .label class, not a Tailwind substitute', () => {
+      setup();
+      fixture.detectChanges();
+      const question = fixture.nativeElement.querySelector('#sp-toc-aligns-q-SP01') as HTMLElement;
+      expect(question.classList.contains('label')).toBe(true);
+    });
   });
 });

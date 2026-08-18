@@ -1,0 +1,120 @@
+ FAIL  src/domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts (8.916 s)
+  ClarisaProjectsController (T-04 / T-15.15 / T-01)
+    ✓ listBilateral is gated by CENTER_ADMIN + SYSTEM_ADMIN roles (20 ms)
+    ✕ returns trimmed picker shape with additive fields including full_name, description, and external_code (R-BPF-001, NFR-BPF-001) (11 ms)
+    ✓ handles absent full_name, description, and external_code without throwing (R-BPF-001) (4 ms)
+    ✓ supports full_name of exactly 255 characters (KZ-001 / R-BPF-005) (3 ms)
+    ✓ forwards phase parameter to the service (R-BAS-003) (2 ms)
+    ✓ lets non-numeric phase throw BadRequestException (R-BAS-003) (6 ms)
+    ✓ forwards onlyWithSciencePrograms parameter parsed by QueryParseBool (R-BAS-004) (3 ms)
+    search filtering (R-BPF-002)
+      ✓ matches by full_name case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input) (2 ms)
+      ✓ matches uppercase full_name term case-insensitively (1 ms)
+      ✓ still matches by short_name code term (1 ms)
+      ✓ does NOT match on description (DD-2 / OQ-1) (1 ms)
+      ✓ tolerates absent full_name without throwing and matches short_name (2 ms)
+      ✕ matches by external_code case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input / DD-9) (3 ms)
+      ✕ matches uppercase external_code term case-insensitively (2 ms)
+      ✕ tolerates absent or null external_code without throwing and matches short_name or full_name (R-BPF-002) (1 ms)
+    sorting (R-BPF-006 / DD-3)
+      ✓ orders case-insensitively by full_name with absent full_name falling back to short_name in sequence (2 ms)
+      ✓ produces stable and deterministic order across two identical invocations
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › returns trimmed picker shape with additive fields including full_name, description, and external_code (R-BPF-001, NFR-BPF-001)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 0
+
+    @@ -1,8 +1,7 @@
+      Object {
+        "description": "MusaSentinel surveillance and diagnostics project",
+    -   "external_code": "B-A1080",
+        "full_name": "WTO-Phase 1: MusaSentinel",
+        "has_science_programs": true,
+        "id": 1,
+        "phase": 2026,
+        "science_programs": Array [
+
+      114 |     const data = (response as { data: unknown[] }).data;
+      115 |     expect(data).toHaveLength(1);
+    > 116 |     expect(data[0]).toEqual({
+          |                     ^
+      117 |       id: 1,
+      118 |       short_name: 'A1806',
+      119 |       full_name: 'WTO-Phase 1: MusaSentinel',
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:116:21)
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › search filtering (R-BPF-002) › matches by external_code case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input / DD-9)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Array [
+    -   1,
+    - ]
+    + Array []
+
+      337 |       const response = await controller.listBilateral('b-a1080');
+      338 |       const data = (response as { data: { id: number }[] }).data;
+    > 339 |       expect(data.map((p) => p.id)).toEqual([1]);
+          |                                     ^
+      340 |     });
+      341 |
+      342 |     it('matches uppercase external_code term case-insensitively', async () => {
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:339:37)
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › search filtering (R-BPF-002) › matches uppercase external_code term case-insensitively
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Array [
+    -   1,
+    - ]
+    + Array []
+
+      357 |       const response = await controller.listBilateral('B-A1080');
+      358 |       const data = (response as { data: { id: number }[] }).data;
+    > 359 |       expect(data.map((p) => p.id)).toEqual([1]);
+          |                                     ^
+      360 |     });
+      361 |
+      362 |     it('tolerates absent or null external_code without throwing and matches short_name or full_name (R-BPF-002)', async () => {
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:359:37)
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › search filtering (R-BPF-002) › tolerates absent or null external_code without throwing and matches short_name or full_name (R-BPF-002)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Array [
+    -   2,
+    - ]
+    + Array []
+
+      388 |       const response = await controller.listBilateral('b-a1080');
+      389 |       const data = (response as { data: { id: number }[] }).data;
+    > 390 |       expect(data.map((p) => p.id)).toEqual([2]);
+          |                                     ^
+      391 |     });
+      392 |   });
+      393 |
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:390:37)
+
+Test Suites: 1 failed, 1 total
+Tests:       4 failed, 13 passed, 17 total
+Snapshots:   0 total
+Time:        9.006 s, estimated 13 s
+Ran all test suites matching /src\/domain\/tools\/clarisa\/projects\/clarisa-projects.controller.spec.ts/i.

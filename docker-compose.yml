@@ -1,0 +1,41 @@
+services:
+  server:
+    container_name: ari_server_local
+    build:
+      context: ./server/researchindicators
+      target: development
+      dockerfile: ./Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./server/researchindicators/.env
+    environment:
+      # Pin the IN-CONTAINER port, overriding whatever .env carries.
+      # main.ts:71 listens on ARI_PORT; the Dockerfile EXPOSEs 3000 and the
+      # mapping above targets 3000. The checked-in .env sets ARI_PORT=3001, so
+      # without this the app listens on 3001, nothing is on 3000, and the
+      # container reports "Up" and healthy while the port mapping reaches
+      # nothing — the failure gives no error, only silence on curl.
+      # The host port stays 3000 per docs/infrastructure.md §6.2.
+      ARI_PORT: 3000
+    volumes:
+      # WORKDIR in server/researchindicators/Dockerfile is /app, not /usr/src/app.
+      # Mounting to the wrong path leaves the bind mount inert: the container runs
+      # the code baked into the image and no source edit is ever picked up, with
+      # no error to say so.
+      - ./server/researchindicators:/app
+      # Anonymous volume shadows the bind mount so the Alpine/musl node_modules
+      # installed in the image survive — the host's are macOS-built.
+      - /app/node_modules
+    restart: unless-stopped
+
+  client:
+    container_name: ari_client_local
+    build:
+      context: ./client/research-indicators
+      dockerfile: ./Dockerfile
+    ports:
+      - "4200:80"
+    depends_on:
+      - server
+    restart: unless-stopped

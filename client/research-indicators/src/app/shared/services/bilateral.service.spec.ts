@@ -740,17 +740,56 @@ describe('BilateralService', () => {
       expect(service.draftsFromSaved(undefined)).toEqual([]);
     });
 
-    it('writeDtoFromDrafts — incomplete Yes draft is omitted entirely (defensive, canSave gates upstream)', () => {
-      const incomplete: SpAlignmentDraft = {
+    // R-BIL-112 AC.1 — the defect being fixed: a "Yes" draft with Level + HLO but
+    // no indicator (below the OLD completeness floor, at the NEW Level+HLO floor)
+    // must be EMITTED, not dropped. Asserting the emitted DTO array contents
+    // directly (not just that save is allowed) — that is precisely the gap the
+    // original bug exploited: the UI reported success while the body was empty.
+    it('writeDtoFromDrafts — Level + HLO "Yes" draft with no indicator is EMITTED, not omitted (R-BIL-112 AC.1)', () => {
+      const partial: SpAlignmentDraft = {
         sp_code: 'SP01',
         aligns_with_toc: true,
         level: 'OUTPUT',
         toc_result_id: 5187,
-        indicator_id: null, // missing cascade step
-        quantitative_contribution: 3
+        indicator_id: null, // never chosen
+        quantitative_contribution: null
       };
 
-      expect(service.writeDtoFromDrafts([incomplete])).toEqual([]);
+      expect(service.writeDtoFromDrafts([partial])).toEqual([
+        { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187 }
+      ]);
+    });
+
+    it('writeDtoFromDrafts — Level + HLO + indicator, no contribution is EMITTED with contribution omitted (R-BIL-112 AC.1)', () => {
+      const partial: SpAlignmentDraft = {
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 5187,
+        indicator_id: 5973,
+        quantitative_contribution: null
+      };
+
+      expect(service.writeDtoFromDrafts([partial])).toEqual([
+        { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973 }
+      ]);
+    });
+
+    // R-BIL-112 AC.5 / NFR-BIL-112 — even a "Yes" below the Level + HLO floor
+    // (which `isDraftSaveable` blocks at the UI gate) is never silently omitted
+    // by this writer if it somehow reaches it: it is emitted for the server to
+    // reject (`missing_required_fields`), never dropped without feedback.
+    it('writeDtoFromDrafts — bare "Yes" below the Level + HLO floor is EMITTED for the server to reject, never silently dropped (R-BIL-112 AC.5, NFR-BIL-112)', () => {
+      const bare: SpAlignmentDraft = {
+        sp_code: 'SP01',
+        aligns_with_toc: true,
+        level: null,
+        toc_result_id: null,
+        indicator_id: null,
+        quantitative_contribution: null
+      };
+
+      expect(service.writeDtoFromDrafts([bare])).toEqual([{ sp_code: 'SP01', aligns_with_toc: true }]);
     });
 
     it('writeDtoFromDrafts — unanswered draft (aligns_with_toc: null) is omitted', () => {
@@ -781,7 +820,11 @@ describe('BilateralService', () => {
       ]);
     });
 
-    it('writeDtoFromDrafts — negative contribution makes a Yes draft incomplete (omitted)', () => {
+    // Sign validation (`>= 0`) is `isDraftSaveable`'s job (component.ts), which
+    // blocks save before this writer ever runs — the writer itself no longer
+    // filters on value, only on presence, so it never becomes a second silent-drop
+    // path (NFR-BIL-112).
+    it('writeDtoFromDrafts — a negative contribution is still EMITTED as-is (the writer does not validate sign)', () => {
       const negative: SpAlignmentDraft = {
         sp_code: 'SP01',
         aligns_with_toc: true,
@@ -791,7 +834,9 @@ describe('BilateralService', () => {
         quantitative_contribution: -1
       };
 
-      expect(service.writeDtoFromDrafts([negative])).toEqual([]);
+      expect(service.writeDtoFromDrafts([negative])).toEqual([
+        { sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: -1 }
+      ]);
     });
   });
 
@@ -889,6 +934,103 @@ describe('BilateralService', () => {
         description: 'Validation failed',
         unknownSpCodes: ['SP04'],
         tocAlignmentErrors: [{ sp_code: 'SP01', message: 'invalid indicator' }]
+      });
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 flagged, T-16 covers.
+  // extractFieldErrors (line ~319) keeps only `typeof v === 'string'` entries, so the
+  // server's `errors.primary_sp: { code, description }` OBJECT is silently dropped
+  // there and a genuine 400 would fall through to a generic global toast unless a
+  // dedicated extractor picks it up. These tests exercise `extractPrimarySpError`
+  // (private — reached only via the public `patchAlignment` contract, matching every
+  // other extractor's test style above).
+  describe('extractPrimarySpError via patchAlignment (T-14 / T-16, R-BIL-127)', () => {
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 attempt 3, Leader ADVISORY (promoted)
+    // `as unknown as MainResponse<AlignmentResponse>`, not the bare `as` used by
+    // the six pre-existing instances of this same helper pattern elsewhere in
+    // this file (:406, :444, :468, :485, :510, :819) — this cast is new in this
+    // task, and a bare `as` here raises the tsc baseline this task exists to
+    // repair from 945 to 946. The six pre-existing ones are left untouched.
+    const fail400 = (errors: unknown): MainResponse<AlignmentResponse> =>
+      ({
+        data: undefined,
+        status: 400,
+        description: 'error',
+        timestamp: '',
+        path: '',
+        successfulRequest: false,
+        errorDetail: { errors: errors as string, detail: '', description: 'Validation failed' }
+      }) as unknown as MainResponse<AlignmentResponse>;
+
+    it('400 with primary_sp as STRINGIFIED-JSON errors → primarySpError populated (the object extractFieldErrors silently drops)', async () => {
+      const errorsJson = JSON.stringify({ primary_sp: { code: 'SP01', description: 'SP01 is no longer part of the alignment' } });
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(fail400(errorsJson));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(result).toEqual({
+        ok: false,
+        status: 400,
+        description: 'Validation failed',
+        primarySpError: 'SP01 is no longer part of the alignment'
+      });
+      // The object form never surfaces through the string-valued fieldErrors path —
+      // proving the failure mode T-14's review flagged is actually closed here.
+      expect((result as { fieldErrors?: unknown }).fieldErrors).toBeUndefined();
+    });
+
+    it('400 with primary_sp on an already-parsed OBJECT errors envelope → primarySpError populated (tolerant of object shape)', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(
+        fail400({ primary_sp: { code: 'SP03', description: 'SP03 was deselected mid-edit' } })
+      );
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect((result as { primarySpError?: unknown }).primarySpError).toBe('SP03 was deselected mid-edit');
+    });
+
+    it('400 with malformed/non-JSON errors payloads → no crash, no primarySpError key', async () => {
+      const malformed = ['{not-json', 'plain text', JSON.stringify({ primary_sp: 'not-an-object' }), JSON.stringify({ primary_sp: ['array'] })];
+      for (const errors of malformed) {
+        mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(fail400(errors));
+
+        const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+        expect((result as { primarySpError?: unknown }).primarySpError).toBeUndefined();
+      }
+    });
+
+    it('400 whose primary_sp.description is empty or whitespace-only → primarySpError undefined', async () => {
+      const blank = [
+        JSON.stringify({ primary_sp: { code: 'SP01', description: '' } }),
+        JSON.stringify({ primary_sp: { code: 'SP01', description: '   ' } }),
+        JSON.stringify({ primary_sp: { code: 'SP01' } })
+      ];
+      for (const errors of blank) {
+        mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(fail400(errors));
+
+        const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+        expect((result as { primarySpError?: unknown }).primarySpError).toBeUndefined();
+      }
+    });
+
+    it('400 carrying BOTH string-valued field errors and primary_sp → both surfaced side by side (no regression)', async () => {
+      const errorsJson = JSON.stringify({
+        has_contribution: 'must be true or false',
+        primary_sp: { code: 'SP01', description: 'SP01 is no longer part of the alignment' }
+      });
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(fail400(errorsJson));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(result).toEqual({
+        ok: false,
+        status: 400,
+        description: 'Validation failed',
+        fieldErrors: { has_contribution: 'must be true or false' },
+        primarySpError: 'SP01 is no longer part of the alignment'
       });
     });
   });

@@ -45,3 +45,44 @@
   border: 1px solid var(--ac-orange-1);
   color: var(--ac-orange-1);
 }
+
+// R-BIL-127 / design.md §6.3 — Primary designation control. Token-based only
+// (no hex literals).
+.pf-primary-row {
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+// AC.6 — non-colour-only cue: a text label is ALWAYS present ("Primary" /
+// "Contributing"); the star icon is an ADDITIONAL cue present only on the
+// Primary badge, so the two roles differ by more than colour alone.
+// Border-only (no filled background), mirroring .pf-stale-tag above — and
+// using the --ac-pool-funding-fg/-border pair (not the raw --ac-green-*
+// ramp) because that pair is the one green token in this file already
+// calibrated with distinct, legible light/dark values for FOREGROUND use;
+// the numbered --ac-green-* scale inverts direction between themes and is
+// tuned for background tints, not text/border foreground color.
+.pf-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  i {
+    font-size: 11px;
+  }
+
+  &--primary {
+    color: var(--ac-pool-funding-fg);
+    border: 1px solid var(--ac-pool-funding-border);
+  }
+
+  &--contributing {
+    color: var(--ac-grey-700);
+    border: 1px solid var(--ac-grey-400);
+  }
+}
