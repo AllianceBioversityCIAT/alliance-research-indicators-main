@@ -265,3 +265,34 @@ Production code came in at ~244 lines against an implied ~160 — within noise. 
 2. **T-03's HITL visual checklist** — four items, recorded in T-03's entry above, including advisory R2 (the editable field displays the option *label* `2025 (25)`, not the value).
 
 ---
+
+### T-03 — HITL visual check COMPLETED (2026-08-18)
+
+- **Status:** `[~]` → **`[x]`** — the human visual check owed since the code PASS is done
+- **Verified by:** Juan Carlos Cadavid
+- **Where:** local stack (`localhost:4200`) against the **shared Dev MySQL** and CLARISA `clarisatest-back`. Same client build as deployed dev; the deployed instance differs only in its `ARI_CLARISA_HOST`, which is not readable from the repo
+
+**Checklist results — all four**
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | Selector renders, years and counts readable | ✅ offered **`2025 (25)`** — which also proves T-02's endpoint returns `[{phase: 2025, count: 25}]` end to end |
+| 2 | Free entry works (`DD-3` `editable`) | ✅ control accepts typing |
+| 3 | Empty-state hint says "no phase data", not "no projects" | ✅ observed on the production-pointing run: *"CLARISA publishes no phase data for these projects"* — the `phaseAbsentCount > 0` branch, exactly as the T-02 forward pointer required |
+| 4 | **Advisory R2** — what the editable field displays after selecting | ✅ **checked, and R2 did NOT materialize.** The field shows the label `2025 (25)`, but the value written to the DB is `"2025"` — verified by direct query: numeric, 4 chars, `is_active = 1`. Selecting and saving is safe, as the Reviewer predicted |
+
+**End-to-end confirmation.** After the value was set to `2025`, the bilateral picker returned **25 projects** — matching the independently measured cohort (`clarisatest-back`: 299 total → 221 bilateral → 25 Alliance, all `phase 2025`; `matchesPhase(2025)` → 25, `matchesPhase(2026)` → 0).
+
+**The original defect is closed.** The picker was empty because no `app_config` row existed, so the resolver fell through to the literal `2026` while the feed carried only `2025`.
+
+#### New advisory — the 5-minute TTL is a UX trap
+
+The verification was blocked for several minutes by a false symptom worth recording. After saving `2025` the picker still returned nothing, and the reported symptom was *"no devuelve nada en ninguna phase"*.
+
+Cause: `MappingPhaseResolver` caches the ambient phase for `TTL_MS = 5 * 60 * 1000`. A value saved after the resolver last read is invisible for up to five minutes — **with no signal in the UI**. An admin who changes the value, tests, sees no change and changes it again **restarts the TTL and never escapes the loop**, concluding the feature is broken for every year they try.
+
+This is **spec-conformant** — `NFR-CPC-001` explicitly says "within the resolver's existing 5-minute TTL" — so it is not a FAIL. But the requirement described the latency without asking anything of the UI, and the first real user hit exactly the trap it creates. Resolved here by restarting the backend (fresh process → cold cache).
+
+Candidate for a follow-up spec: surface "may take up to 5 minutes to take effect" next to the control, or expose the resolver's currently-cached value. **Not minted as a task in this spec** — an advisory may not grow scope the user never approved.
+
+---
