@@ -14,7 +14,7 @@
 | Branch | `AC-1679-Create-the-innovation-use-section` |
 | Approval Mode | **gated** (inherited from `proposal.md` / `family.md`) — every continue/pause gate stops for the user |
 | Budget tripwire (`design.md` §12) | **13 tasks · ~2,600 LOC · 4–5 review rounds** |
-| Budget consumed so far | **2 tasks (both no-op verifications) · 0 LOC · 1 review round** — within tripwire |
+| Budget consumed so far | **5 tasks (T-01, T-02 no-op verifications; T-04, T-05, T-06 migrations) · ~936 LOC · 1 review round** — within tripwire |
 | Package | `server/researchindicators` (server-only; no client file touched) |
 | Model routing | Leader T1 `opus` · Implementer T2 `sonnet` · Reviewer T3 `opus` (**author ≠ auditor** satisfied on both axes: different model, read-only tools) |
 | Started | 2026-08-18 |
@@ -540,3 +540,127 @@ Adopted only where the item is mandatory record-accuracy or a forward pointer. E
 | **B-4** | readability (minor) | The `down()` spec pins the two FK drops in a relative order that is arbitrary in MySQL. Fails safe | Recorded only |
 
 **Budget after T-05:** 4 of 13 tasks · ~574 LOC of ~2,600 · 1 of 4–5 review rounds consumed (T-04 and T-05 both passed first attempt). Within tripwire.
+
+---
+
+### T-06 — M3: six additive count columns on the two shared tables · **PASS (first attempt)**
+
+- **Date:** 2026-08-18
+- **Status:** `[x]`
+- **Implementer attempts:** 1
+- **Review mode:** 2 parallel lenses (effort `xhigh`), **both given the full evidence set** — correcting the T-05 briefing asymmetry recorded in that task's process notes
+- **Requirements covered:** R-IU-003 (AC.1, AC.2), R-IU-004 (AC.1, AC.2), R-IU-009 (AC.2) — and R-IU-009 **AC.1** for M3, see the FP-2 retirement below
+
+**Files changed (2, both new, 362 insertions, nothing else touched):**
+
+| File | Note |
+| --- | --- |
+| `src/db/migrations/1787070034303-addInnovationUseCountsToSharedTables.ts` | M3. Six `ALTER TABLE … ADD \`col\` int NULL`; `down()` = six `DROP COLUMN` in exact reverse order |
+| `src/db/migration-specs/1787070034303-addInnovationUseCountsToSharedTables.spec.ts` | DDL spec, 21 tests, TDD red(15/21)→green(21/21). `migration-specs/` placement per child guide §9 |
+
+**The six columns** — `result_actors`: `women_youth_count`, `women_not_youth_count`, `men_youth_count`, `men_not_youth_count`, `actors_count`. `result_institution_types`: `organization_count`. All `int` (DD-6), all nullable, no default.
+
+**Verification:**
+
+```
+npm run migration:empty --name=addInnovationUseCountsToSharedTables -> 1787070034303
+npx jest <spec>  (RED, empty stub)    -> 15 failed / 21
+npx jest <spec>  (GREEN)              -> 21 passed / 21
+npm test -- --silent                  -> 324 suites, 2092 tests passed (was 323/2071)
+                                         every Innovation Dev spec passed UNMODIFIED
+compose:test:down && compose:test:up  -> fresh container (FP-1)
+migration:test:bootstrap              -> baseline + all migrations incl. M1, M2
+<seed rows in BOTH affected tables>   -> see the fixture table below
+migration:test:execute                -> M3 applied
+migration:test:revert                 -> M3 ONLY reverted (6 DROP COLUMN)
+migration:test:execute                -> M3 re-applied cleanly
+npm run lint -- --quiet               -> reformatted the spec's line wrapping only; git status
+                                         re-checked, still only the two new files; spec 21/21,
+                                         suite re-run 324/2092
+compose:test:down                     -> container + network removed (docker ps -a empty)
+```
+
+**Seed fixture — recorded verbatim because the container is disposable and the evidence must outlive it** (the practice adopted from T-05 advisory A-5). `baseline.sql` is schema-only, so `result_status`, `actor_roles` and `institution_type_roles` had no data rows despite the schema recording their migrations as applied; those had to be seeded to satisfy the FKs.
+
+```sql
+INSERT INTO `result_status` (`result_status_id`, `name`) VALUES (4, 'T-06 scratch status');
+INSERT INTO `results` (`result_official_code`) VALUES (999001);        -- got result_id=33541
+INSERT INTO `clarisa_actor_types` (`code`, `name`) VALUES (9999, 'T-06 scratch actor type');
+INSERT INTO `actor_roles` (`actor_role_id`, `name`) VALUES (1, 'innovation-development');
+INSERT INTO `institution_type_roles` (`institution_type_role_id`, `name`) VALUES (1, 'innovation-development');
+INSERT INTO `result_actors`
+  (`result_id`,`actor_type_id`,`actor_role_id`,`sex_age_disaggregation_not_apply`,
+   `women_youth`,`women_not_youth`,`men_youth`,`men_not_youth`)
+  VALUES (33541, 9999, 1, 0, 1, 0, 1, 0);
+INSERT INTO `result_institution_types`
+  (`result_id`,`institution_type_id`,`institution_type_role_id`) VALUES (33541, NULL, 1);
+```
+
+| Observation | Before M3 | After M3 | After revert |
+| --- | --- | --- | --- |
+| `result_actors` row count | 1 | 1 | 1 |
+| booleans on result_id 33541 | `0,1,0,1,0` | **identical** | **identical** |
+| the six new columns | absent | present, all `NULL`, `int DEFAULT NULL` | **gone** |
+| every pre-existing column | present | present | **present, unchanged** |
+
+`0` acceptance (R-IU-003 AC.1 / R-IU-004 AC.1) proved by explicit `UPDATE … = 0` on all six, not by inspection of the DDL.
+
+**Reviewer verdicts — both PASS, independently:**
+
+| Lens | Scope | Verdict |
+| --- | --- | --- |
+| **A** | Spec conformance · gate fidelity · requirement-mapping honesty | **PASS** — DDL matches §3.3/§3.4 column-for-column; the AC.4 trap judged in both directions; all 21 assertions independently transcribed and provably falsifiable; four Done criteria each earned |
+| **B** | Migration safety · reversibility · precedent fidelity · Innovation Dev non-regression · forward-compat | **PASS** — append-only verified against the folder and `baseline.sql:8269` rather than the Implementer's claim; `up()` destructive-DDL-free; `down()` exact and exclusive; cited precedent genuinely establishes the pattern |
+
+**Lens A reconstructed the RED count instead of accepting it.** It enumerated the suite independently (11 `up()` + 10 `down()` = 21), derived that every `for (const sql of calls)` loop passes vacuously against an empty stub, predicted exactly 15 fail / 6 pass — matching the reported run — and then **named the six**: the three `up()` and three `down()` absence assertions. All six are still meaningful against the real artifact, but their gating power is conditional on the two `expect(calls).toHaveLength(6)` cardinality assertions. That pairing is present, so the suite is not tautological.
+
+**The AC.4 trap, judged in both directions (Lens A).** `actors_count` does **not** violate R-IU-003 AC.4: the AC is a *per-row* property ("parts present in the same row"), and in aggregate mode the four disaggregated columns are `NULL` — the row has no parts. This is the requirement's own scenario text, not a post-hoc reading. Equally, nothing was over-corrected away: all five design columns are present and no `*total*` / `*_sum` column was added.
+
+**Innovation Dev non-regression — the mechanism, not just the green suite (Lens B).** `orm.config.ts:51` sets `synchronize: false`, the only occurrence in `src/`, hard-coded and not env-driven. `SP_versioning` copies both tables with **explicit column lists** (`routine-transcript.md` §2.1/§2.2), so there is no positional or column-count coupling to break. Views expand `*` at creation time. The six columns are therefore invisible to Innovation Dev at runtime.
+
+**Both lenses converged on the seed's sufficiency, from different directions.** One row per table clears the task's Disqualifier (an empty table cannot detect a destructive migration), and the seed carries both `1` and `0` booleans so a flip or a backfill-from-boolean would have surfaced. Lens B added the precise limit: a *conditional* destructive statement predicated on a value absent from the seed is the one class a single row cannot catch — closed here not by the seed but by the spec's cardinality assertions, which leave no room for a seventh statement. **Seed + cardinality together discharge the clause; the seed alone would not.**
+
+**FP-2 retirement for M3.** T-02's delegated "M1–M6 apply-and-revert" clause is discharged task by task against R-IU-009 **AC.1**. The apply → revert → re-apply run above is that discharge for **M3**. Recorded explicitly (Lens A advisory) so the delegated clause closes visibly per task rather than by inference. Remaining: M4, M5, M6.
+
+---
+
+## Forward pointers — added after T-06
+
+| # | For | Pointer |
+| --- | --- | --- |
+| **FP-13** | **T-08** (and anyone running `migration:generate` before it lands) | **M3's six columns are entity-less until T-08, and TypeORM will propose DROPPING them.** Verified against the installed TypeORM **0.3.20**: `RdbmsSchemaBuilder.js:526` — *"Drops all columns that exist in the table, but does not exist in the metadata"* — invoked unconditionally at `:168`. For as long as these six columns exist in a database with no entity counterpart, `migration:generate` emits six `ALTER TABLE … DROP COLUMN`. **This is a NEW variant, not FP-10.** FP-10 is the FK-*name* churn; M1/M2 added whole *tables*, which the schema builder never auto-drops. M3 adds *columns to already-mapped tables*, which it does. If you must run `migration:generate` in this window, discard the six `DROP COLUMN` statements — and note the two traps now compose: a generated migration in this window can carry both the FK rename churn (FP-10) and these drops. Closed by T-08. |
+
+FP-1 … FP-12 remain live. **FP-1, FP-2, FP-6 and FP-9 were all exercised in T-06 and all held.**
+
+---
+
+## Leader deviations & process notes — T-06
+
+| Item | Note |
+| --- | --- |
+| **Skills** | `nestjs-expert` + **`tdd`** (task lists only the former) — third consecutive task where the DDL spec is authored red-first; red 15/21 → green 21/21 |
+| **Effort** | `xhigh` — first migration in this chunk to touch **pre-existing shared tables** that Innovation Dev reads and writes today (FR-1) |
+| **Review mode** | **2** parallel lenses, matching T-05's width. **Both lenses received the full evidence set** — the T-05 entry's ⚠️ briefing-asymmetry note was a standing correction and it was applied; neither lens had to defer a Done criterion for want of evidence this time |
+| **Exemplar correction, by the Implementer** | The brief named `1779190000012-addIconKeyToScienceProgram.ts`. The Implementer declared a deviation to `1752542014680-addNewFieldsInnovationDev.ts` (nine one-column ALTERs, `down()` exact reverse) on the grounds that a single-column migration establishes no multi-column pattern. **Lens B verified the citation at `:18-44` / `:74-100` and confirmed it.** The declared judgment call was correct and the Leader's exemplar was the weaker one |
+| **Citation discipline held** | The migration header makes **no** style-precedent claim, so it does not repeat T-05's B-3 defect (a header sentence that misdescribed its precedent). Both lenses checked every factual claim in the 40-line JSDoc against its cited source; all accurate |
+
+---
+
+## ADVISORY findings — T-06 (recorded, never gating; 0 rework attempts consumed; no task minted)
+
+Adopted only where the item is mandatory record-accuracy or a forward pointer. Everything else is recorded and stops here — editing files or widening a task to absorb an advisory is forbidden.
+
+| # | Lens | Finding | Disposition |
+| --- | --- | --- | --- |
+| **B-1** | risk / forward-compat | The `migration:generate` DROP-COLUMN window on entity-less columns | **Adopted as FP-13** |
+| **A-1** | reliability | The six vacuously-passing absence assertions gate only in combination with the two `toHaveLength(6)` checks. If a refactor weakens those, six tests silently become decorative. A `expect(calls.length).toBeGreaterThan(0)` in each would make them independently non-vacuous | **Recorded only** — widening the spec to absorb an advisory is forbidden. **Surfaced to the user** |
+| **A-2 / B-2** | reliability / readability (**both lenses, independently**) | The spec's `*_PRE_EXISTING_COLUMNS` lists are transcribed from `1749957832239` only, so they omit the six `AuditableEntity` columns **and** `actor_type_custom_name` (`1750220319664:16`), `sub_institution_type_id` and `institution_type_custom_name` (`:10,13`). The test titled *"…or any other pre-existing column on either table"* promises more than it checks — a `down()` dropping `is_active` would be caught by cardinality, but **not** by the guard whose stated job that is | **Recorded only.** The actual hole is closed by the cardinality assertions; the defect is a title over-promising. **Surfaced to the user** |
+| **A-3** | reliability | The fake `QueryRunner` never parses SQL and the primary regexes are unanchored, so the unit spec would go green on syntactically invalid DDL. Fully covered by the real-MySQL scratch run — worth recording that Done criteria 1 and 2 rest on the **scratch run**, not on the DDL spec | Recorded only |
+| **A-4** | risk | The falsifying input used n=1 row per table — literally what T-06 prescribes, and it clears the Disqualifier. A second row would additionally catch a row-reordering or partial-loss defect one row cannot distinguish from success | Recorded only |
+| **B-3** | reliability | `down()`'s reverse ordering is **arbitrary** here — six independent, unconstrained columns drop in any order. Precedent aesthetics; fails safe. Explicitly no change wanted | Recorded only |
+| **B-4** | risk (minor) | Five separate instant `ADD COLUMN`s consume five of MySQL 8.0's 64 per-table instant row versions where one batched ALTER would consume one. Immaterial at 5/64; exhaustion degrades to a table rebuild, not an error. Recorded because precedent-vs-batching was the declared judgment call | Recorded only |
+| **B-5** | readability | No DB-level `COMMENT` on the six columns — spec-correct (RB-5 layer 1 puts the invariant on the entity, T-08), but a DBA reading `SHOW CREATE TABLE` sees six bare `int DEFAULT NULL` with no hint that two mutually exclusive modes exist. **Not free**: a column comment must be mirrored on the entity or it becomes its own `migration:generate` drift source | Recorded only |
+
+**Lens B's verification boundary, stated by the lens itself:** read-only and running no commands, it could not independently confirm the scratch-schema BEFORE/AFTER observations, `SHOW CREATE TABLE`, the RED/GREEN counts, or the suite run — those are transient worker output with no persisted artifact. Its verdict rests on static evidence, which it judged independently sufficient for every Lens B question except the empirical apply/revert. **Recorded rather than papered over:** the empirical half of this task's evidence is Implementer-attested and Leader-accepted, not independently reproduced.
+
+**Budget after T-06:** 5 of 13 tasks · ~936 LOC of ~2,600 · 1 of 4–5 review rounds consumed (T-04, T-05 and T-06 each passed first attempt). Within tripwire.

@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04, **T-05** `[x]` (2026-08-18); next eligible **T-06**
+- **Status:** in-progress — T-01, T-02, T-04, T-05, **T-06** `[x]` (2026-08-18); next eligible **T-07**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -191,7 +191,7 @@ graph TD
 
 - **Requirements covered:** R-IU-003 (AC.1, AC.2), R-IU-004 (AC.1, AC.2), R-IU-009 (AC.2)
 - **Design references:** §3.3, §3.4, §5 (M3), DD-6, DD-7
-- **Size:** S · **Dependencies:** none · **Status:** todo
+- **Size:** S · **Dependencies:** none · **Status:** done
 - **Skills:** `nestjs-expert`
 
 **Scope** — `result_actors`: `women_youth_count`, `women_not_youth_count`, `men_youth_count`, `men_not_youth_count`, `actors_count`. `result_institution_types`: `organization_count`. All `int`, **nullable**.
@@ -207,10 +207,10 @@ graph TD
 - **Disqualifier:** running against an empty table cannot detect a destructive migration — the check requires pre-existing rows to be meaningful.
 
 **Done**
-- [ ] Six columns exist, nullable, accepting `0`
-- [ ] Pre-existing rows unchanged: same count, same boolean values, new columns `NULL`
-- [ ] `down()` drops only the six new columns
-- [ ] No total column added for disaggregated mode (R-IU-003 AC.4)
+- [x] Six columns exist, nullable, accepting `0`
+- [x] Pre-existing rows unchanged: same count, same boolean values, new columns `NULL`
+- [x] `down()` drops only the six new columns
+- [x] No total column added for disaggregated mode (R-IU-003 AC.4)
 
 ---
 
