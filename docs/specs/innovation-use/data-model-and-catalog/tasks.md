@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04, T-05, **T-06** `[x]` (2026-08-18); next eligible **T-07**
+- **Status:** in-progress — T-01, T-02, T-04, T-05, T-06, **T-07** `[x]` (2026-08-18); next eligible **T-08**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -218,7 +218,7 @@ graph TD
 
 - **Requirements covered:** R-IU-005 (AC.1–AC.3)
 - **Design references:** §3.6, §5 (M4)
-- **Size:** S · **Dependencies:** none · **Status:** todo
+- **Size:** S · **Dependencies:** none · **Status:** done
 - **Skills:** `nestjs-expert`
 
 **Scope** — one `INNOVATION_USE` row each in `actor_roles`, `institution_type_roles`, `quantification_roles`, each taking the next free id. Plus the role-row assertion spec (`design.md` §10).
@@ -230,9 +230,9 @@ graph TD
 - **Disqualifier:** asserting only that three rows were added does not prove no existing id moved (AC.3).
 
 **Done**
-- [ ] Each catalog gains exactly one active row, with a previously unused id
-- [ ] No existing role id renumbered or reused
-- [ ] Spec asserts the added rows **and** the stability of existing ones
+- [x] Each catalog gains exactly one active row, with a previously unused id
+- [x] No existing role id renumbered or reused
+- [x] Spec asserts the added rows **and** the stability of existing ones
 
 ---
 

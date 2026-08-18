@@ -14,7 +14,7 @@
 | Branch | `AC-1679-Create-the-innovation-use-section` |
 | Approval Mode | **gated** (inherited from `proposal.md` / `family.md`) — every continue/pause gate stops for the user |
 | Budget tripwire (`design.md` §12) | **13 tasks · ~2,600 LOC · 4–5 review rounds** |
-| Budget consumed so far | **5 tasks (T-01, T-02 no-op verifications; T-04, T-05, T-06 migrations) · ~936 LOC · 1 review round** — within tripwire |
+| Budget consumed so far | **6 tasks (T-01, T-02 no-op verifications; T-04 … T-07 migrations) · ~1,270 LOC · 2 review rounds** — within tripwire; rework margin half spent |
 | Package | `server/researchindicators` (server-only; no client file touched) |
 | Model routing | Leader T1 `opus` · Implementer T2 `sonnet` · Reviewer T3 `opus` (**author ≠ auditor** satisfied on both axes: different model, read-only tools) |
 | Started | 2026-08-18 |
@@ -664,3 +664,145 @@ Adopted only where the item is mandatory record-accuracy or a forward pointer. E
 **Lens B's verification boundary, stated by the lens itself:** read-only and running no commands, it could not independently confirm the scratch-schema BEFORE/AFTER observations, `SHOW CREATE TABLE`, the RED/GREEN counts, or the suite run — those are transient worker output with no persisted artifact. Its verdict rests on static evidence, which it judged independently sufficient for every Lens B question except the empirical apply/revert. **Recorded rather than papered over:** the empirical half of this task's evidence is Implementer-attested and Leader-accepted, not independently reproduced.
 
 **Budget after T-06:** 5 of 13 tasks · ~936 LOC of ~2,600 · 1 of 4–5 review rounds consumed (T-04, T-05 and T-06 each passed first attempt). Within tripwire.
+
+---
+
+### T-07 — M4: three role-discriminator rows · **PASS (attempt 2 of 3; 1 rework round consumed)**
+
+- **Date:** 2026-08-18
+- **Status:** `[x]`
+- **Implementer attempts:** 2
+- **Review mode:** 2 parallel lenses per attempt (effort `xhigh`), full evidence set to both
+- **Requirements covered:** R-IU-005 **AC.2 + the row half of AC.3** (see the AC.1 ruling below — the task file's `AC.1–AC.3` is an over-claim), R-IU-009 (AC.1 for M4 via FP-2, AC.2)
+
+**Files changed (2, both new, 334 insertions):**
+
+| File | Note |
+| --- | --- |
+| `src/db/migrations/1787071463485-insertInnovationUseRoles.ts` | M4. Three `INSERT`, `down()` = three PK-targeted `DELETE` in reverse order. Pure DML — no DDL |
+| `src/db/migration-specs/1787071463485-insertInnovationUseRoles.spec.ts` | Role-row assertion spec (`design.md` §10, Unit layer), 16 tests |
+
+**The three rows:** `actor_roles` id **2** `'innovation-use'` · `institution_type_roles` id **2** `'innovation-use'` · `quantification_roles` id **3** `'innovation_use'`.
+
+---
+
+#### Attempt 1 — **FAIL** (both lenses, same root cause)
+
+Correct SQL, sound gate, false justifying prose. Both lenses independently found that the migration header's "Trap 2" asserted **zero** in-migration seed precedent for these three catalogs and drew a DD-2 / `clarisa_innovation_readiness_levels` parallel. Both statements are false. The precedent exists and is executed:
+
+```
+1749957832239-createEntitiesForInnovationDev.ts:45  -> actor_roles            'innovation-development'
+1749957832239-createEntitiesForInnovationDev.ts:48  -> institution_type_roles 'innovation-development'
+1760653582914-createQuantificationTables.ts:23      -> quantification_roles   'actual_count', 'extrapolate_estimates'
+```
+Both recorded executed in `baseline.sql:8269` (rows 96 and 178). So these catalogs **are** reconstructable from source — the opposite of what the header claimed.
+
+**Root cause: a false premise in the Leader's brief.** The attempt-1 brief stated as a verified trap that *"there is NO seed precedent … grep finds zero `INSERT INTO`"*. That grep used a raw-backtick pattern; the migrations write the SQL inside TypeScript template literals with **escaped** backticks (`` \` ``), so the pattern could not match. The Implementer inherited the claim, reported "no direct evidence found" for the `name` convention in good faith, and wrote the falsehood into the migration header as its stated justification.
+
+**This is the exact failure mode the family already has a rule against.** `family.md` **D-10** — *"Transcribe … before writing about them"* — and `routine-transcript.md:28`, *"A `grep`-derived list may not be labelled a transcription."* That rule was written because three earlier review rounds on this chunk got routine claims wrong the same way. A grep miss was written up as a positive finding of absence. **Kaizen candidate for `/akili-archive`: the D-10 rule currently reads as being about SQL routines; it is really about any negative claim, and it binds the Leader's own briefs, not only worker output.**
+
+Two consequences the false premise concealed, both flagged by both lenses:
+1. **`name` was `'Innovation Use'`** (display text) against established slugs in the same tables.
+2. **Literal-vs-enum id style** diverged from the precedent silently — never adjudicated because the header said no pattern existed.
+
+Lens B additionally found a second, independent overclaim: the **spec** header stated every expected value *including `name`* was transcribed from `design.md` §3.6 and the baseline snapshot. §3.6 holds enum notation only and `baseline.sql` is schema-only, so the guarantee was unearned for `name`.
+
+---
+
+#### Leader ruling for attempt 2
+
+| # | Ruling |
+| --- | --- |
+| 1 | **`name` flips to per-catalog slugs** — `'innovation-use'` / `'innovation-use'` / `'innovation_use'`. The third's separator differs **deliberately**: each catalog matches its own internal convention, because the inconsistency a reader actually sees is intra-table |
+| 2 | **Ids stay hard-coded literals**, not enum constants. The precedent interpolates the enum, but those members arrive in T-08 and the dependency edge runs T-07 → T-08; depending on them here would invert it. Divergence stated in the header rather than made silently |
+| 3 | Trap 2 rewritten to the true finding; DD-2 parallel dropped |
+| 4 | Spec header's independence claim narrowed to the values its cited sources actually contain |
+
+**Effort was deliberately NOT bumped** (`xhigh` held, against the standing rework rule). The rule assumes a failed fix means under-thinking; here the cause was identified as a false input from the Leader. More depth on a wrong premise produces a better-argued wrong answer. Recorded as a deviation, not an oversight.
+
+**Leader's own exhaustive re-check, run after the rework** — escaped-backtick-aware sweep for `INSERT INTO` / `UPDATE` / `DELETE FROM` against the three catalogs across all of `src/db/migrations/`: **only** the two precedent migrations plus M4. No third seed migration, **no `UPDATE` or `DELETE` anywhere**. `1749965559755` and `1749966409521` mention the catalogs but carry FK DDL only. This closes the completeness question the Implementer honestly flagged as unrun. Both attempt-2 lenses independently reproduced it.
+
+---
+
+#### Attempt 2 — **PASS** (both lenses)
+
+**Verification:**
+
+```
+spec, literals reverted to 'Innovation Use' (probe) -> 3 failed / 13 passed / 16
+spec, restored                                      -> 16 passed / 16
+npm test -- --silent (twice, before+after probes)   -> 325 suites, 2108 tests passed (unchanged baseline)
+compose:test:down && compose:test:up                -> fresh container (FP-1)
+migration:test:bootstrap                            -> M1..M4 applied
+<seed precedent rows, REAL names>                   -> (1,'innovation-development') x2,
+                                                       (1,'actual_count'), (2,'extrapolate_estimates')
+migration:test:execute                              -> "No migrations are pending" (no-op)
+migration:test:revert                               -> M4 ONLY: three DELETE ... WHERE <pk> = <id>
+migration:test:execute                              -> M4 re-applied INTO POPULATED TABLES
+compose:test:down                                   -> container gone
+falsification: ids 2->1 (two catalogs)              -> 4 failed / 12 passed / 16; reverted -> 16/16
+npm run lint -- --quiet                             -> no output; git status re-checked, 2 files
+```
+
+**⚠️ RECORDED NON-EVIDENCE — the BEFORE/AFTER leg is vacuous and must never be cited for AC.2/AC.3.** In this run `bootstrap` applied M4 **before** the manual seed, so the standalone `migration:test:execute` was a genuine no-op and "BEFORE == AFTER" proves only that a no-op changes nothing. Attempt 1's run had the correct ordering (seed → apply). Flagged by Lens B, concurred by Lens A. **Future scratch runs must seed precedent rows before the first apply.**
+
+**The property still holds, carried by the other two legs** (both lenses agreed independently): `down()` ran with the precedent rows genuinely present and POST-REVERT left them intact — the non-disturbance observation on the destructive half, where it matters — and the re-apply ran M4's `INSERT`s **into populated tables**, which is the production shape. Lens A added the strict-direction argument: the id-1 seeds succeeded alongside M4's ids, so had M4 used id 1 that seed would have raised 1062. FP-2 / R-IU-009 AC.1 is discharged for M4.
+
+**Reviewer verdicts — attempt 2:**
+
+| Lens | Scope | Verdict |
+| --- | --- | --- |
+| **A** | Spec conformance · gate fidelity · requirement-mapping · **factual accuracy of prose** | **PASS** — every header citation verified at source, *including the Trap-1 lines the Implementer declared unverified*; the defect class is closed, not patched at the one caught sentence |
+| **B** | Data/migration safety · reversibility · precedent fidelity · rollout · forward-compat | **PASS** — all citations verified; `down()` exact and exclusive; drift risk now closed from source |
+
+**Both lenses reconstructed the gate arithmetically rather than trusting it.** Lens A independently derived 10 `up()` + 6 `down()` = 16 tests and showed that *both* reported RED counts follow from the spec as shipped: the name probe touches exactly 3 assertions, the id-collision probe exactly 4 (the row-tuple regex plus the AC.3 collision guard, on two tables). **That the two probe numbers are arithmetically consistent with the shipped spec is itself corroboration the probes were actually run** rather than reported. The 9/16 → 3/16 change between attempts measures different mutations; the suite did not get weaker.
+
+**Lens B found a better justification for the separator split than the Leader gave.** The OICR wire contract uses the quantification role names **verbatim as DTO keys** — `actual_count` / `extrapolate_estimates` appear in `client/.../shared/interfaces/oicr-creation.interface.ts:108-109` and `server/.../result-oicr.service.ts:336,340`. Snake-cased `'innovation_use'` preserves that mirror for a chunk-2 DTO key; a uniform kebab slug would have broken it. The ruling was made on intra-table consistency and turns out to be load-bearing for a reason the Leader did not know.
+
+**`name` is confirmed inert at the data layer** (Lens A + B, independently): role selection is numeric everywhere (`result-actors.service.ts:111,135,150,160`; `result-quantifications.service.ts`; `result-oicr.service.ts:236-343`), `name` is never joined on, never a `findByName` target from any live caller, and carries no `@OpenSearchProperty`.
+
+**R-IU-005 AC.1 ruling.** Both lenses independently agree with the Leader's adjudication: **AC.1 is T-08's**. AC.1 reads *"Each **enum** gains exactly one member"*, T-08's Done criterion is its literal restatement, and `design.md` §10 maps the role-row assertion to **AC.2** specifically. T-07 owns AC.2 + the row half of AC.3 (supplied by the Scenario's *"must NOT renumber or reuse any existing role id"*). All three T-07 Done criteria are earnable without AC.1. The diff adds **no** enum member — verified by both lenses. **`tasks.md:219`'s `AC.1–AC.3` range is the defect; recorded for a user ruling, deliberately not edited** (reassigning an AC needs the two-direction sweep). This is the **second** open AC double-assignment, alongside R-IU-001 AC.3 (T-08 vs T-12) from T-05.
+
+---
+
+## Forward pointers — added after T-07
+
+| # | For | Pointer |
+| --- | --- | --- |
+| **FP-14** | **M4 rollout · DevOps hand-off** | **No pre-flight is recorded for M4 anywhere.** Before M4 runs against the shared dev DB, `SELECT` all three role catalogs and confirm ids **2 / 2 / 3** are unoccupied. Risk is now much smaller than first assessed — ids 1/1/1+2 are seeded by *executed* migrations and the counters read 2/2/3, so the target ids are corroborated free **from source**, not merely from a scratch schema the Implementer seeded itself. Residual path: a human inserting a row out-of-band. **Failure mode is loud and safe** — plain `INSERT` against a PK (never `REPLACE`, never `ON DUPLICATE KEY UPDATE`), so a collision raises MySQL 1062 and aborts; no path overwrites an existing row. A read-only `SELECT` is not a migration, so this does not engage R-IU-009 AC.4's approval gate. |
+| **FP-15** | **chunk 2 · any rollback plan** | **From chunk 2 onward M4's `down()` stops being freely revertible.** All three FKs (`result_actors.actor_role_id`, `result_institution_types.institution_type_role_id`, `result_quantifications.quantification_role_id`) are `ON DELETE NO ACTION`, so once child rows carry the Innovation Use roles a revert raises **MySQL 1451 and refuses** — correct and safe, never an orphan, but a rollback plan that assumes M4 is always revertible is wrong from the moment the write path ships. |
+| **FP-16** | **T-09 · T-12 (fixture authoring)** | **`baseline.sql` seeds none of the three role catalogs** (verified: zero `INSERT INTO` for them in the snapshot), so a fresh scratch schema has them EMPTY — which is why T-07 had to hand-seed. Consequence for fixtures: a test exercising the DD-4 **role filter** (`actor_role_id = INNOVATION_USE`) on an unseeded scratch schema has **no Innovation Dev row to exclude**, so the filter passes while being untested. Seed both roles, or the fixture proves nothing. |
+| **FP-17** | **chunk 2 · chunk 3** | **The per-catalog separator split means a role resolved by name needs two spellings** — `innovation-use` (actor/institution) vs `innovation_use` (quantification). No consumer exists today. Secondary: after this seed, `findByName('innovation')` on `actor_roles` matches **two** rows through `LIKE %name%` with no `order` clause, where it previously resolved uniquely. Carry alongside the existing `ControlListBaseService` warning in `family.md`. |
+
+FP-1 … FP-13 remain live. **FP-1, FP-2, FP-6 and FP-9 were exercised in T-07 and held** (FP-9 differently: M4 is pure DML, so the CREATE+INSERT implicit-commit hazard does not arise for it).
+
+---
+
+## Leader deviations & process notes — T-07
+
+| Item | Note |
+| --- | --- |
+| **Skills** | `nestjs-expert` + **`tdd`** (task lists only the former) — fourth consecutive task |
+| **Effort** | `xhigh` on both attempts. **Deliberate deviation from the rework rule** on attempt 2 — the standing rule bumps one level on retry because a failed fix usually means under-thinking, but here the cause was a false premise in the Leader's brief. Escalating depth on a wrong input yields a better-argued wrong answer. The tier↔effort rule also forbids `max` on a T2 Implementer |
+| **⚠️ Leader-caused FAIL** | The rework round was consumed by the Leader's own unverified negative claim, not by Implementer error. **The brief asserted a trap as verified fact when the search behind it was defective.** Attempt 2's brief was rewritten to instruct: *do not trust a negative claim in a brief — including the Leader's — without re-running the search in a form that would actually find the thing.* The Implementer complied and re-derived the corrected facts independently before editing |
+| **Implementer honesty improved between attempts** | Attempt 1's `Not Done / Assumptions` read "None" while carrying an inherited false premise. Attempt 2 declared two genuine gaps unprompted — that it had not re-verified Trap 1's citations, and had not run a repo-wide third-seed search. **Both were then closed by others** (the Leader ran the sweep; both lenses verified Trap 1). This is the field working as intended and is worth preserving in future briefs |
+| **Review mode** | 2 parallel lenses per attempt, 4 lens-reviews total. Both attempt-2 lenses were told to judge the artifact on its merits and *not* to assume a requested fix is a correct one |
+
+---
+
+## ADVISORY findings — T-07 (recorded, never gating; no task minted)
+
+| # | Lens / attempt | Finding | Disposition |
+| --- | --- | --- | --- |
+| **B-1** | B / a1 | M4 rollout pre-flight unrecorded | **Adopted as FP-14** |
+| **B-2** | B / a1 | `down()` hits 1451 from chunk 2 onward | **Adopted as FP-15** |
+| **B-3** | B / a2 | Empty role catalogs on scratch make a role-filter fixture vacuous | **Adopted as FP-16** |
+| **A-1 / B-4** | both / a2 | Cross-catalog name spelling split; `findByName('innovation')` now matches two rows | **Adopted as FP-17** |
+| **A-2** | A / a1+a2 | **The AC.3 collision guard derives the inserted PK positionally** (`tuple[1].split(',')[0]`), assuming id-first column order. The `actor_roles` precedent uses the *opposite* order (`(name, actor_role_id) VALUES ('…', 1)`); under that shape `Number("'innovation-use'")` is `NaN` and the guard passes **vacuously** — degrading silently rather than failing loudly. Live today only because M4 writes id-first. A `pkColumn`-anchored regex removes the coupling | **Recorded only** — widening the spec to absorb an advisory is forbidden. **Surfaced to the user; the strongest candidate if any advisory is ever promoted** |
+| **A-3** | A / a1 | Spec never asserts `is_active` is absent from the INSERT column list; a future edit adding `is_active = 0` would satisfy every current assertion while breaking the "active row" criterion | Recorded only |
+| **B-5** | B / a2 | `existingIds` has no stated source in the spec's provenance note (it is derivable from `design.md` §3.6, so nothing is false — naming it would complete the KZ-001 record) | Recorded only |
+| **A-4** | A / a2 | Both file headers tag `R-IU-005 AC.1-AC.3`, mirroring `tasks.md:219`. Inherited spec text, not a new claim. When the AC.1 ruling lands, narrow both headers to `AC.2` + the row half of AC.3 | Recorded only |
+| **A-5** | A / a2 | The AC.3 test nests a loop over `insertCalls` inside a loop over `calls`, re-deriving the same tuples each iteration; hoisting would halve it | Recorded only |
+| **B-6** | B / a1 | Autocommit nuance: with `migrationsTransactionMode` unset, M1–M3's DDL implicit-commits break the batch transaction, so M4's three INSERTs likely autocommit individually. A 1062 on statement 2 or 3 leaves earlier rows committed with no `migrations` row, and the retry then collides on statement 1. **Not fixable inside M4 and explicitly not to be restructured (FP-9).** Lens B could not execute anything to confirm the transaction semantics | Recorded only |
+
+**Budget after T-07:** 6 of 13 tasks · ~1,270 LOC of ~2,600 · **2 of 4–5 review rounds consumed** (T-07 consumed one rework round; T-04/T-05/T-06 each passed first attempt). Within tripwire, but the rework margin is now half spent.
