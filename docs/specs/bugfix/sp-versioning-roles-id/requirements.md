@@ -2,11 +2,11 @@
 
 - **Module:** results (lifecycle routines)
 - **Spec id:** 2026-08-sp-versioning-roles-id
-- **Status:** draft
+- **Status:** implemented
 - **Owner:** David Felipe Casañas Hernández
 - **Linked design:** [`./design.md`](./design.md) · **Linked tasks:** [`./tasks.md`](./tasks.md)
 - **Routine authority:** [`../../innovation-use/data-model-and-catalog/routine-transcript.md`](../../innovation-use/data-model-and-catalog/routine-transcript.md) §2.4
-- **Last updated:** 2026-08-14
+- **Last updated:** 2026-08-18 *(bumped from 2026-08-14 — the OQ-1 resolution was already merged into this file on 2026-08-18 per commit history, but the header was never bumped to match; corrected in the 2026-08-18 validation-remediation pass, W-1)*
 
 ---
 
@@ -15,7 +15,7 @@
 | Field | Value |
 | --- | --- |
 | Type | **Bug** |
-| Depth | **Lite** (Bug Mode) — one migration, one fixture, no design latitude |
+| Depth | **Lite** (Bug Mode) — two migrations, one fixture, no design latitude *(corrected 2026-08-18 — pre-pivot text said "one migration"; the T-02 Pivot added a mandatory second, RB-5)* |
 | Approval Mode | gated |
 | Severity | **High** — versioning/snapshot is non-functional for **all six indicators** |
 | Discovered by | `innovation-use/data-model-and-catalog`, while transcribing lifecycle routines for migration M6. **Not found by any test** — no test in this repository executes a stored routine |
@@ -30,7 +30,7 @@
 
 The defect is invisible to CI because **nothing in this repository executes a stored routine**; the only coverage of this layer is presence-assertions on emitted SQL strings.
 
-**Fix:** one append-only migration rewriting those two blocks. Nothing else in the 981-line body changes.
+**Fix:** two append-only migrations — the `SP_versioning` repair (two of its 29 copy blocks; nothing else in its 981-line body changes) and its mandatory `SP_delete_result_version` companion (R-SPV-002 / RB-5); never ship the first alone. *(Corrected 2026-08-18 — pre-pivot text said "one append-only migration".)*
 
 ---
 

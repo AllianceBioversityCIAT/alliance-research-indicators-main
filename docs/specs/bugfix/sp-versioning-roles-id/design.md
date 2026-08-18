@@ -2,7 +2,7 @@
 
 - **Module:** results (lifecycle routines)
 - **Spec id:** 2026-08-sp-versioning-roles-id
-- **Status:** draft
+- **Status:** implemented
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Routine authority:** [`../../innovation-use/data-model-and-catalog/routine-transcript.md`](../../innovation-use/data-model-and-catalog/routine-transcript.md)
 - **Last updated:** 2026-08-14
@@ -23,9 +23,9 @@
 
 ## 1. Executive Summary
 
-One append-only migration, `DROP` + `CREATE` of `SP_versioning`, changing **two of its 29 copy blocks** and nothing else. One regression fixture, red before green.
+Two append-only migrations. `DROP` + `CREATE` of `SP_versioning`, changing **two of its 29 copy blocks** and nothing else, plus its mandatory `DROP` + `CREATE` of `SP_delete_result_version`, adding two `DELETE` statements (§3.1). One regression fixture, red before green, extended to cover both defects. *(Corrected 2026-08-18 — this paragraph originally said "One append-only migration"; the T-02 Pivot added the second, and RB-5 forbids shipping the first alone.)*
 
-The whole 981-line body must be reproduced because the repo's established pattern for routine changes is drop-and-recreate — there is no `ALTER PROCEDURE` for a body edit in MySQL. That is why a two-block repair costs ~2,050 LOC.
+The whole 981-line body must be reproduced because the repo's established pattern for routine changes is drop-and-recreate — there is no `ALTER PROCEDURE` for a body edit in MySQL. That is why a two-block repair costs the LOC recorded in Document Control above.
 
 ---
 

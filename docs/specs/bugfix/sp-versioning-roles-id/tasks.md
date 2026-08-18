@@ -2,10 +2,10 @@
 
 - **Module:** results (lifecycle routines)
 - **Spec id:** 2026-08-sp-versioning-roles-id
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md)
-- **Last updated:** 2026-08-14
+- **Last updated:** 2026-08-18 (F-2 "37"→32 correction, budget-tripwire ~350→~165 corrections, LOC-total pointer fix — 2026-08-18 validation-remediation pass; four of five tasks `[x]`, T-03 `[~]`)
 
 ---
 
@@ -15,7 +15,7 @@
 - **Migrations are append-only** (ADR-5). Re-check `git status` after `npm run lint -- --quiet` — the script carries `--fix` and mutates files.
 - **Re-verify line numbers** before editing. `1783029013035:116` and `:143` were true on 2026-08-14; the stable anchors are the block *names*, not the numbers.
 
-**Budget tripwire:** ~~3 tasks · ~2,050 LOC · 1–2 review rounds~~ → ~~4 tasks · ~2,050 LOC + baseline dump · 2–3 review rounds~~ (T-01 pivot) → **5 tasks · ~2,750 LOC + baseline dump · 3–4 review rounds** (revised 2026-08-14 by the T-02 pivot: the companion delete-routine migration reproduces a second ~350-line body twice). If the repair turns out to need more than the two blocks, **stop and escalate** — that is a different bug.
+**Budget tripwire:** ~~3 tasks · ~2,050 LOC · 1–2 review rounds~~ → ~~4 tasks · ~2,050 LOC + baseline dump · 2–3 review rounds~~ (T-01 pivot) → **5 tasks · ~2,750 LOC + baseline dump · 3–4 review rounds** (revised 2026-08-14 by the T-02 pivot: the companion delete-routine migration reproduces a second ~165-line body twice *(corrected 2026-08-18 from "~350-line" — W-9; the routine is 162 lines)*). If the repair turns out to need more than the two blocks, **stop and escalate** — that is a different bug.
 
 ---
 
@@ -152,7 +152,7 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (SP_versioning repa
 - The two statements mirror `full_delete_result_version` exactly and go **before** the final `DELETE FROM results` (design §3.1 has the verbatim SQL).
 - Derive the body mechanically from the routine's latest definition — `1778510205765`, **not** `1783029013035` (which does not contain this routine's name at all). Re-verify that before editing; guessing which migration owns a routine is the mistake family D-10 was written for.
 - **`down()` restores the prior body verbatim**, omission included — same reasoning as DD-3.
-- Change nothing else: 37 existing child deletes, the `temp_result_id` selection, the `SIGNAL` guard, and the `(resultCode BIGINT, reportYear INT)` signature all stay byte-identical.
+- Change nothing else: **32** existing child deletes (33 statements including the final parent delete), the `temp_result_id` selection, the `SIGNAL` guard, and the `(resultCode BIGINT, reportYear INT)` signature all stay byte-identical. *(Corrected 2026-08-18 from "37" — the same Leader miscount already fixed in `requirements.md` AC.4 and `design.md` §3.1, advisory B-12; this was a third site the B-12 remediation missed, caught by the 2026-08-18 validation pass, F-2.)*
 - **Do not** add a transaction or handler to the routine. It has neither today; adding one changes failure semantics for all six indicators and stays out of scope.
 
 **Verification** — the extended fixture, on the scratch container.
@@ -224,10 +224,10 @@ Every AC and every negative clause is owned. **The mandatory Bug Mode regression
 | PR 1 | T-01 | ~130 (skip entirely if chunk 1 already built it) |
 | PR 1b | T-01b | baseline dump (generated artifact) + ~20 of load wiring |
 | PR 2 | T-02 | **~1,960** — `up()` + `down()` each reproduce the 981-line body |
-| PR 2b | **T-02b** | **~700** — `up()` + `down()` each reproduce the ~350-line delete routine, plus the fixture extension. **Must merge with or before PR 2** (RB-5) |
+| PR 2b | **T-02b** | **~700** — `up()` + `down()` each reproduce the ~165-line delete routine *(corrected 2026-08-18 from "~350-line" — W-9; the routine is 162 lines)*, plus the fixture extension. **Must merge with or before PR 2** (RB-5) |
 | PR 3 | T-03 | ~20 (doc updates only) |
 
-**Single PR is acceptable** if T-01 is already satisfied: the substantive diff is two blocks, and reviewers should be pointed at the **body diff**, not the file. Total ~2,110 LOC, ~99% of it unchanged body text.
+**Single PR is acceptable** if T-01 is already satisfied: the substantive diff is two blocks, and reviewers should be pointed at the **body diff**, not the file. Total LOC matches the Document Control budget above (~2,750), ~99% of it unchanged body text. *(Corrected 2026-08-18 — this line said "Total ~2,110 LOC", a figure that predates PR 2b/T-02b and was never updated after the T-02 Pivot added it; newly found during the 2026-08-18 validation-remediation sweep, same defect class as F-1.)*
 
 ---
 

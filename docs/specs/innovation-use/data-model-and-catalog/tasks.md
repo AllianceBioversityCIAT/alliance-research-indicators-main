@@ -23,7 +23,7 @@
 | **Line numbers drift.** | The transcript's absolute lines were true on 2026-08-14. Re-verify before editing; the stable anchors are *"after the `result_innovation_dev` block"*, not the numbers. |
 | **Migrations are append-only** (ADR-5). | Never edit a merged migration. `git status` after every `npm run lint` — the script carries `--fix` and mutates files. |
 
-**Budget tripwire** (`design.md` §12): **13 tasks · ~2,600 LOC · 4–5 review rounds** *(revised after M0 was extracted to [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/) — that spec carries the remaining ~2,050 LOC).* If actuals exceed this — especially if any routine needs *restructuring* rather than the six transcript §6 edits — **stop and escalate**; do not continue.
+**Budget tripwire** (`design.md` §12): **13 tasks · ~2,600 LOC · 4–5 review rounds** *(revised after M0 was extracted to [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/) — that spec carries the remaining ~2,750 LOC *(corrected 2026-08-18 — that spec's T-02 Pivot added a mandatory second migration after this figure was written, growing its own budget from ~2,050 to ~2,750; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*).* If actuals exceed this — especially if any routine needs *restructuring* rather than the six transcript §6 edits — **stop and escalate**; do not continue.
 
 ---
 
@@ -123,7 +123,7 @@ graph TD
 
 > **Removed from this spec on the user's ruling of 2026-08-14.** The `SP_versioning` repair is a pre-existing, cross-indicator production defect that this chunk merely discovered, so it ships on its own schedule rather than waiting on an Innovation Use feature spec.
 >
-> **It now lives at [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/)** — 3 tasks, ~2,050 LOC, red-before-green regression fixture (formerly F19).
+> **It now lives at [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/)** — **5** tasks, ~2,750 LOC *(corrected 2026-08-18 from "3 tasks, ~2,050 LOC" — that spec grew by two tasks and ~700 LOC across its T-01 and T-02 Pivots after this note was written; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*, red-before-green regression fixture (formerly F19).
 >
 > **This chunk `Depends on` it.** T-10 (M6) reproduces `SP_versioning`'s body and **must inherit the repaired one**; T-13's fixtures cannot run until it lands, since `CALL SP_versioning` raises MySQL 1054 today.
 >
@@ -481,7 +481,7 @@ graph TD
 | **PR 4** | T-10, T-13 | **~3,250** | **M6. Four routines, six indicators, append-only.** Never combine with anything else |
 | **PR 5** | T-14 | ~50 | Regression evidence + TRD filing |
 
-**Total ≈ 2,600 LOC** — for this chunk, plus ~2,110 in the extracted bugfix spec. PR 4 (M6) is ~3,250 of the combined figure — almost entirely `DROP`/`CREATE` body text, over half existing only because `down()` reproduces prior bodies.
+**Total ≈ 2,600 LOC** — for this chunk, plus ~2,750 in the extracted bugfix spec *(corrected 2026-08-18 from "~2,110"; that spec's T-02 Pivot grew its own budget after this figure was written; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*. PR 4 (M6) is ~3,250 of the combined figure — almost entirely `DROP`/`CREATE` body text, over half existing only because `down()` reproduces prior bodies.
 
 PR descriptions follow `cognitive-doc-design` review-empathy rules: state what to review first (for PR 4: the **body diffs**, not the file), what is out of scope (both pre-existing divergences), and link previous/next PR.
 
