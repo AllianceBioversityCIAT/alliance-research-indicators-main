@@ -20,7 +20,7 @@
 | --- | --- |
 | Type | Change |
 | Approval Mode | gated (inherited from `proposal.md`) |
-| Depends on | **[`bugfix/sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/)** — must merge before T-10 (M6). No other spec dependency; family root otherwise |
+| Depends on | **[`bugfix/sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/)** — **satisfied by construction, not a task gate** *(corrected 2026-08-18 — residual site of correction item 1, KZ-005; formerly "must merge before T-10 (M6)")*: both repair migrations are committed on this branch, ordered before every Innovation Use migration, so M6 inherits the repaired body. What survives is a **rollout** pre-flight against the target database. No other spec dependency; family root otherwise |
 | Blocks | `innovation-use/details-api`, then `innovation-use/details-page` |
 | Depth rationale | Creates two tables, alters two shared tables, adds a MySQL stored function, seeds a controlled vocabulary, **amends four lifecycle routines that serve all six indicators** (R-IU-011 — the chunk's largest item), and **depends on the extracted `sp-versioning-roles-id` bugfix** for a non-executable `SP_versioning` block it discovered. ADR-5 makes every migration immutable once merged. Full depth is mandatory, not stylistic. |
 | Judgment Day | 3 rounds, lineage **exhausted**, terminal `ESCALATED`. R1: 21 findings. R2: 17/21 closed, 11 new. R3: 12 new. R1–R2 applied in-lineage; **R3 applied by the 2026-08-14 fresh pass**. Ledger: [`./judgment.md`](./judgment.md). |
