@@ -8,7 +8,8 @@
 - **Linked design:** [`./design.md`](./design.md)
 - **Routine authority:** [`./routine-transcript.md`](./routine-transcript.md) revision 2 — **M6 is written from it, not from prose** (DD-12)
 - **Parent spec:** [`../family.md`](../family.md) — chunk 1 of 3
-- **Last updated:** 2026-08-14
+- **Depends on:** [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/) — **must be merged before T-10 starts.** Verify with `SHOW CREATE PROCEDURE SP_versioning` (no `roles_id`) before that task begins. Declared here 2026-08-18 by that spec's T-03 (`design.md` §6 "Coupling"); already carried in `../family.md`'s children table
+- **Last updated:** 2026-08-18 (T-01/T-02/T-10 superseded/corrected/notified, dependency declared — see notes inline; by `bugfix/sp-versioning-roles-id` T-03)
 
 ---
 
@@ -59,8 +60,10 @@ graph TD
 
 - **Requirements covered:** R-IU-009 (AC.4), and the precondition for DC-1/DC-2/DC-3/DC-10/DC-12
 - **Design references:** §6.5.1 pieces 1 and 3; RB-9
-- **Size:** S · **Dependencies:** none · **Status:** todo
+- **Size:** S · **Dependencies:** none · **Status:** ~~todo~~ → **superseded — verify only.** Filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03
 - **Skills:** `nestjs-expert`
+
+> **Superseded, 2026-08-18.** `bugfix/sp-versioning-roles-id`'s own T-01 (`src/db/config/mysql/orm.test.config.ts`, the `TEST`-bound npm scripts) is `[x]` **done** — Reviewer PASS 2026-08-14, falsifying sentinel demonstrated. Per T-03 below's own rule ("shared with `innovation-use/data-model-and-catalog` T-01/T-02 … whichever lands first builds them"), the external spec landed first. **Do not build a second TEST datasource module.** Verify the existing one resolves to `dataSourceTarget.TEST` and close this task as a no-op.
 
 **Scope**
 - New `src/db/config/mysql/orm.test.config.ts` exporting a `DataSource` built from `getDataSource(dataSourceTarget.TEST, true)`.
@@ -87,19 +90,21 @@ graph TD
 
 - **Requirements covered:** R-IU-009 (AC.1, AC.4); A-4
 - **Design references:** §6.5.1 pieces 2, 4, 5
-- **Size:** M · **Dependencies:** T-01 · **Status:** todo
+- **Size:** M · **Dependencies:** T-01 · **Status:** ~~todo~~ → **superseded — verify only.** Filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03
 - **Skills:** `nestjs-expert`
+
+> **Superseded, 2026-08-18.** `bugfix/sp-versioning-roles-id`'s own T-01 (`ARI_TEST_MYSQL_PORT`, Docker MySQL, the dedicated Jest config for the fixture directory) is `[x]` **done**, and its T-01b (the baseline snapshot this task's original scope below did not anticipate — see the corrected bullet immediately below) is also `[x]` **done**, both Reviewer PASS 2026-08-14. The external spec landed first — do not provision a second Docker/Jest harness. Verify the existing one and close this task as a no-op.
 
 **Scope**
 - Add `ARI_TEST_MYSQL_PORT` (read by T-01's module) and document it in `.env.example`.
 - Docker MySQL (utf8mb4 / `utf8mb4_unicode_520_ci`) for the scratch schema.
 - Dedicated Jest config covering `test/fixtures/innovation-use/`.
-- Run the **full** migration suite against the scratch schema and record the outcome.
+- ~~Run the **full** migration suite against the scratch schema and record the outcome.~~ → **Corrected 2026-08-18 (T-03 of `bugfix/sp-versioning-roles-id`).** The "run the full migration suite from empty" premise is false: RB-1d (that spec's `requirements.md`) proved the 303-migration history is **not replayable from empty** — two independent blockers surface in the first 139 of 303. The scratch schema is built instead by loading a committed **schema-only snapshot** (`bugfix/sp-versioning-roles-id` T-01b, `design.md` §4.1/DD-5) that already records all 303 migrations as applied; only migrations genuinely new since the snapshot's date — this chunk's own M1–M6 — actually run, and that is what this step verifies and records.
 
 **Implementation notes**
 - `orm.config.ts:46` uses `DB_PORT` for **both** targets — there is currently no way to address a MySQL on a non-default port (round 3, T8).
 - Fixtures sit outside Jest's `rootDir: "src"` / `testRegex` (`package.json:122-123`), so the default runner will not collect them.
-- The suite must be the **full** one: `innovation_use_validation` depends on `results`, `result_actors`, `clarisa_actor_types`, `valid_text()`; F12/F16 additionally need `result_innovation_dev`, `result_impact_outcomes`, `result_strategic_objectives`, `clarisa_innovation_readiness_levels`.
+- ~~The suite must be the **full** one~~ → **Corrected 2026-08-18 (T-03 of `bugfix/sp-versioning-roles-id`), same reasoning as the scope bullet above: the full-migration-suite premise is false (RB-1d).** These objects are real, unchanged dependencies, but they arrive via the T-01b snapshot, not a from-empty replay: `innovation_use_validation` depends on `results`, `result_actors`, `clarisa_actor_types`, `valid_text()`; F12/F16 additionally need `result_innovation_dev`, `result_impact_outcomes`, `result_strategic_objectives`, `clarisa_innovation_readiness_levels`.
 
 **Verification**
 - The new Jest config collects a trivial smoke fixture that opens a connection and runs `SELECT 1`.
@@ -108,7 +113,7 @@ graph TD
 
 **Done**
 - [ ] `ARI_TEST_MYSQL_PORT` is read by T-01's module and documented
-- [ ] Full migration suite applies **and reverts** cleanly on the scratch schema
+- [ ] ~~Full migration suite applies **and reverts** cleanly on the scratch schema~~ → **Corrected 2026-08-18 (T-03 of `bugfix/sp-versioning-roles-id`), same reasoning as the scope bullet above: unachievable as written** — restate as *the snapshot loads, `migration:test:execute` reports zero pending migrations, and only this chunk's own M1–M6 apply and revert cleanly on top of it* (`bugfix/sp-versioning-roles-id` `design.md` §4.1/DD-5; that spec's own T-01 retired the identical criterion as never-achievable, RB-1d)
 - [ ] The smoke fixture passes with the container up and **fails** with it down
 - [ ] Execution note records the outcome verbatim, including any inconclusive result
 
@@ -127,6 +132,8 @@ graph TD
 > `requirements.md` R-IU-012 and `design.md` DD-13 / M0 are retained as the **record of the discovery and the routing decision**; the work itself is no longer this spec's.
 >
 > The harness tasks **T-01 and T-02 are shared** with that spec. Whichever lands first builds them; the other verifies and moves on.
+
+> **Recorded 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03.** Both migrations that carry the former M0's work are `[x]` done on branch and Reviewer-passed: `repairSpVersioningObjectiveBlocks` (that spec's T-02) and its required companion `repairSpDeleteResultVersionObjectiveTables` (T-02b, R-SPV-002/RB-5). The harness tasks landed there too (T-01, T-01b) — see T-01/T-02 above, now marked superseded-verify-only. **This closes the routing/extraction record, not the merge gate two paragraphs above** — the migrations exist only on branch `AC-1679-Create-the-innovation-use-section` and have not run against the shared dev DB. The "before starting T-10, verify the bugfix is merged" instruction above still applies at that time.
 
 ---
 
@@ -321,6 +328,8 @@ graph TD
 - [ ] Applies and reverts cleanly on the scratch schema
 - [ ] Behavioral ACs deferred to T-13 — **not** claimed here
 
+> **Inbound notice — filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03. Not edited here; chunk 1 restates its own AC when it next runs T-10.** That spec's T-02b (`[x]` done, Reviewer PASS 2026-08-14) added two `DELETE` statements to `SP_delete_result_version` for `result_impact_outcomes` / `result_strategic_objectives`, closing the transcript §4.1 hard-delete table-enumeration divergence with `full_delete_result_version`. **One of the "two pre-existing divergences" this Done item and R-IU-011 AC.8 require to survive intact no longer exists pre-M6** — only the `SIGNAL` vs `RETURN FALSE` divergence (transcript §4.1) and `delete_result`'s six soft-delete gaps (transcript §5.1) remain. Amending AC.8/AC.9 against the post-T-02b routine bodies is chunk 1's own gate, to be done before this task runs — this notice raises it, it does not silently edit it.
+
 ---
 
 ### T-11 — Green-check assembly, `ip_rights` inclusion, and the DTO
@@ -483,7 +492,8 @@ PR descriptions follow `cognitive-doc-design` review-empathy rules: state what t
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
 | RB-A | 2026-08-14 | **`SP_versioning` non-executable in `main`** — blocks every versioning gate | **Extracted** to `bugfix/sp-versioning-roles-id` per the user ruling of 2026-08-14. This chunk `Depends on` it; verify merged before T-10 | — | routed — tracked in that spec |
-| RB-B | 2026-08-14 | No scratch-schema mechanism exists; two prior revisions asserted one that did not work | T-01 + T-02, verified by sentinel and by a smoke fixture that must fail when the DB is down | — | open |
+| RB-B | 2026-08-14 | No scratch-schema mechanism exists; two prior revisions asserted one that did not work | T-01 + T-02, verified by sentinel and by a smoke fixture that must fail when the DB is down. **Corrected 2026-08-18 (T-03 of `bugfix/sp-versioning-roles-id`): this mitigation covers only the datasource/port/Docker/Jest-config piece.** It does not close the gap RB-B2 records | — | mitigated (datasource/harness piece only — see RB-B2) |
+| **RB-B2** | 2026-08-18 | **The scratch schema still could not be *built*, even with T-01/T-02 fully done** — the migration history is not replayable from empty (RB-1d in `bugfix/sp-versioning-roles-id/requirements.md`): an empty container fails at migration #139 of 303. RB-B's own mitigation column never named this gap. Filed by `bugfix/sp-versioning-roles-id` T-03, whose own T-01 pivoted mid-execution to add a T-01b for exactly this reason | Closed **externally** by `bugfix/sp-versioning-roles-id` T-01b (`[x]` done, Reviewer PASS 2026-08-14) — a committed schema-only **snapshot** (`design.md` §4.1/DD-5), not a replay. This chunk inherits it as-is; no task here builds a second baseline artifact | — | closed (external) |
 | RB-C | 2026-08-14 | Routine set was wrong in three consecutive review rounds | Call-site enumeration re-run at T-10; transcript §0 records the method | — | mitigated |
 | RB-D | 2026-08-14 | If no disposable MySQL is reachable, DC-2/3/10/12/13 are all ungated | Report **inconclusive**, never pass; recorded as accepted blind spot (A-4) | — | open |
 

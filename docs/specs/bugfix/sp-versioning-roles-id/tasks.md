@@ -174,7 +174,7 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (SP_versioning repa
 
 - **Requirements covered:** R-SPV-001 (AC.4); RB-2, RB-3; OQ-1
 - **Design references:** §6
-- **Size:** S · **Dependencies:** T-02 · **Status:** todo
+- **Size:** S · **Dependencies:** T-02 · **Status:** ~~todo~~ → `[~]` **all delegable scope complete, Reviewer PASS on attempt 2 (2026-08-18).** Held open by ONE user-owned criterion: the DevOps note is drafted but not yet sent. See `execution.md` → *T-03 attempt 2 → PASS* and its `Not Done` section
 - **Skills:** `nestjs-expert`
 
 **Scope** — full server suite, lint, coverage; confirm OQ-1 against the deployed environment; DevOps note; then update `innovation-use/data-model-and-catalog` (drop T-03, add `Depends on`) and `family.md` FR-6.
@@ -196,11 +196,11 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (SP_versioning repa
 - **Disqualifier:** a targeted run is not evidence here; the blast radius is every indicator.
 
 **Done**
-- [ ] Full suite green; coverage ≥ 60%, not regressed
-- [ ] `npm run lint -- --quiet` clean and `git status` re-checked
-- [ ] OQ-1 answered and recorded; comms decision made
-- [ ] DevOps informed before the shared-DB run
-- [ ] Chunk 1 updated: T-03 removed, `Depends on` declared, `family.md` FR-6 closed
+- [x] Full suite green; coverage ≥ 60%, not regressed — 321 suites / 2042 tests; 83.57% stmts, 74.76% branches, 84.62% funcs, 83.56% lines
+- [x] `npm run lint -- --quiet` clean and `git status` re-checked — no `--fix` mutations
+- [x] OQ-1 answered and recorded; comms decision made — ruling carried verbatim with provenance in `execution.md`; comms: none needed
+- [ ] **DevOps informed before the shared-DB run** — ⚠️ **USER-OWNED, STILL OPEN.** [`devops-note.md`](./devops-note.md) is drafted and Reviewer-verified; **sending it is a human action the Leader cannot take** (user ruling 2026-08-18). Flip this by sending the note, then checking the DevOps box in `requirements.md` §7 Sign-off with approver and date
+- [x] Chunk 1 updated: T-03 removed, `Depends on` declared, `family.md` FR-6 closed (merge-conditionally, with the residual pre-flight named)
 
 ---
 

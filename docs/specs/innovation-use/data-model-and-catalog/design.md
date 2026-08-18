@@ -8,7 +8,7 @@
 - **Findings ledger:** [`./judgment.md`](./judgment.md)
 - **Linked TRD:** [`../../../trd/trd.md`](../../../trd/trd.md) §2.4 (ADR-5, ADR-6), §5.1, §5.2, §7.1, §12
 - **Parent spec:** [`../family.md`](../family.md) — chunk 1 of 3
-- **Last updated:** 2026-08-14
+- **Last updated:** 2026-08-18 (§6.5.1 piece 4 corrected, §6.7 and §10 inbound notices filed — by `bugfix/sp-versioning-roles-id` T-03; each correction carries its own dated provenance inline)
 
 ---
 
@@ -352,7 +352,7 @@ No test in this repository has ever executed a stored routine. The harness lives
    > **Trap (round 3, T10):** `orm-connection-test.module.ts` already exists and, despite the name, binds to **`CORE`** (`:10`). It is **not** this piece. An implementer who greps for a test module and assumes piece 1 is done will point the whole harness at the shared database.
 2. **A `ARI_TEST_MYSQL_PORT` env var, which does not exist yet** (round 3, T8). `orm.config.ts:46` reads `DB_PORT` for **both** targets, so a Docker MySQL published on any non-default port is unaddressable. Piece 1's module must read a TEST-specific port, and `.env.example` must gain it.
 3. **New npm scripts** passing `-d ./src/db/config/mysql/orm.test.config.ts` — never the CORE config.
-4. **A disposable MySQL** (Docker) with `ARI_TEST_MYSQL_*` pointed at it, running the **full** migration suite — not just M0–M6. The validation function depends on `results`, `result_actors`, `clarisa_actor_types`, and `valid_text()`, none of which M0–M6 create; F12/F16/F19 additionally need `result_innovation_dev`, `result_impact_outcomes`, `result_strategic_objectives`, and `clarisa_innovation_readiness_levels`.
+4. **A disposable MySQL** (Docker) with `ARI_TEST_MYSQL_*` pointed at it. ~~running the **full** migration suite — not just M0–M6~~ → **Corrected 2026-08-18 (T-03 of `bugfix/sp-versioning-roles-id`), same reasoning as §4.1 below: the 303-migration history is not replayable from empty (RB-1d in that spec's `requirements.md`).** The schema is built by loading a committed schema-only **snapshot** (that spec's T-01b, §4.1/DD-5 below) that already carries `results`, `result_actors`, `clarisa_actor_types`, `valid_text()`, and every other pre-existing table/routine as applied; only migrations genuinely new since the snapshot's date — M1–M6 here, plus the two migrations in the external bugfix spec — actually run. The validation function's real dependency on those tables is unchanged; what changes is *how* they arrive in the scratch schema (snapshot, not replay). F12/F16/F19 additionally need `result_innovation_dev`, `result_impact_outcomes`, `result_strategic_objectives`, and `clarisa_innovation_readiness_levels` — all present in the snapshot.
 5. **A dedicated Jest config.** The fixtures live under `test/fixtures/innovation-use/`, outside Jest's `rootDir: "src"` with `testRegex: ".*\\.spec\\.ts$"` (`package.json:122-123`), so the default runner will not pick them up.
 
 **Never point any of this at `ARI_MYSQL_*`.** The shared dev DB is not disposable (root `CLAUDE.md` §4.3), and R-IU-009 AC.4 makes any shared-DB migration a human decision. **Piece 1 is a hard prerequisite for every SQL gate in this spec** — until it exists, DC-1, DC-2, DC-3, DC-10, and DC-12 are all ungated.
@@ -422,6 +422,8 @@ Each routine is `DROP` + `CREATE` reproducing the full body, with `down()` resto
 | Harmonize the two hard-delete routines | Transcript §4.1 records a pre-existing divergence (`result_impact_outcomes`, `result_strategic_objectives`, and `SIGNAL` vs `RETURN FALSE`). **Out of scope** — "fixing" it changes delete behavior for every indicator |
 | Close `delete_result`'s six soft-delete gaps | Transcript §5.1. Same reasoning |
 | Fold in the M0 repair | M0 ships separately so the repair is reviewable on its own and can land without Innovation Use (§5, DD-13) |
+
+> **Inbound notice — filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03. This row is left as written above; it is what M6 must be executed against, and this task does not edit chunk 1's own scope.** That spec's T-02b (`[x]` done, Reviewer PASS 2026-08-14) already closed the table-enumeration half of the divergence in the row above — `SP_delete_result_version` now deletes `result_impact_outcomes` / `result_strategic_objectives`, mirroring `full_delete_result_version` — outside M6, in its own separate migration (`1784250000000`), pending merge of `bugfix/sp-versioning-roles-id`; verify with `SHOW CREATE PROCEDURE SP_delete_result_version` before T-10. Only the `SIGNAL` vs `RETURN FALSE` half of that divergence, and `delete_result`'s six soft-delete gaps, remain pre-existing as of M6's first run. See §10's M6 edit-set assertion row below for the acceptance-criteria consequence, which chunk 1 must restate, not this task.
 
 **This is additive within each routine** — no existing column, block, or statement is removed — so the reversion challenge is still not triggered.
 
@@ -500,6 +502,8 @@ Both are the observability half of §6.6's blind spot, and both strengthen ADR-1
 | Integration | **§6.5 harness, F1–F18** — the only gate for DC-2 / DC-3 / DC-10 / DC-12 *(DC-13 gated by the extracted bugfix spec)* | dedicated npm script on the `TEST` datasource (§6.5.1) |
 | Regression | **Full** suite; Innovation Dev specs unmodified (KZ-003) | `npm test -- --silent` |
 | Migration | Apply then revert on the **scratch** schema (DC-1) | **New** npm scripts passing `-d ./src/db/config/mysql/orm.test.config.ts` (§6.5.1 pieces 1–3). **The existing `migration:dev:execute` / `migration:revert` CANNOT be used** — both hardcode `-d ./src/db/config/mysql/orm.config.ts`, whose export is bound to **`CORE`** at module load (`orm.config.ts:71-73`), i.e. the shared database. And **there is no `migration:run` script** (`package.json:28-32`) |
+
+> **Inbound notice on the "M6 edit-set assertion" row above — filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03. Not edited here; chunk 1 restates it when T-10 next runs.** That row's "both divergences intact" expectation (R-IU-011 AC.8/AC.9) is **invalidated in part**: T-02b (`[x]` done, Reviewer PASS 2026-08-14) added the two missing `DELETE` statements to `SP_delete_result_version`, closing the hard-delete table-enumeration divergence with `full_delete_result_version` (transcript §4.1) — see the §6.7 notice above. The M6 edit-set assertion must be restated against the **post-T-02b** routine bodies before M6 runs, checking only the divergences that still exist (the `SIGNAL`/`RETURN FALSE` difference and `delete_result`'s soft-delete gaps). Amending R-IU-011 AC.8/AC.9 is chunk 1's own gate; this notice raises it, it does not silently edit it.
 
 Coverage target: repo default ≥ 60%, not regressed (NFR-IU-004). Unit specs keep mocking `DataSource` — appropriate for assembly logic, inadequate for SQL, which is why §6.5 exists.
 

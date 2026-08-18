@@ -12,7 +12,7 @@
 | --- | --- |
 | Approval Mode | **gated** — every continue/pause gate stops for the user |
 | Depth | Lite (Bug Mode) |
-| Budget (design §2.4) | ~~3 tasks · ~2,050 LOC · 1–2 review rounds~~ → **4 tasks · ~2,050 LOC + baseline dump · 2–3 review rounds** (revised 2026-08-14 by the T-01 pivot) |
+| Budget (design §2.4) | ~~3 tasks · ~2,050 LOC · 1–2 review rounds~~ → ~~4 tasks · ~2,050 LOC + baseline dump · 2–3 review rounds~~ → **5 tasks · ~2,750 LOC + baseline dump · 3–4 review rounds** (revised 2026-08-14 by the T-02 Pivot; this row had been left at the T-01 figure — corrected 2026-08-18 by the Leader during T-03 so the log and `design.md` §2.4 no longer state two different budgets) |
 | Leader model tier | T1 (session model: Opus 5 — matches registry) |
 | Log started | 2026-08-14 |
 
@@ -574,3 +574,230 @@ The Implementer grepped rather than trusting the spec's filename: `SP_delete_res
 | B-18 | risk — outside this task | T-03 must still restate chunk 1's R-IU-011 AC.8/AC.9 edit-set assertion. Already carried in `tasks.md` T-03; re-flagged by a Reviewer so it is not lost |
 
 ---
+
+### T-03 — Full-suite regression and release: **attempt 1 → FAIL (rework)**
+
+- **Date:** 2026-08-18 · **Attempts run:** 1 of 3 · **Status after this attempt:** `[~]` in flight
+- **Requirements covered (attempted):** R-SPV-001 AC.4 (suite); RB-2, RB-3; OQ-1
+- **Effort:** Implementer `high` · Reviewers `high` (conformance) / `xhigh` (risk)
+
+#### Leader decisions recorded before the spawn
+
+| Decision | Reason |
+| --- | --- |
+| **Skills deviated from the task list** — kept `nestjs-expert`, **added** `cognitive-doc-design` and `systematic-debugging` (the latter contingent on a red suite) | T-03's real output is cross-spec document surgery plus an operator-facing hand-off artifact, not Nest code. The task list named only `nestjs-expert` |
+| **Fixture suite (`test:fixtures`) excluded from the gate** | User ruling, 2026-08-18. T-03's Verification line names only `npm test`, `test:cov`, `lint` — none needing Docker. The fixture red→green is already recorded verbatim for both defects (1054, 1451) in the T-02 / T-02b entries. Docker daemon was down; pre-flight (KZ-004) confirmed the unit suite does not need it |
+| **DevOps comms → drafted, not sent** | User ruling, 2026-08-18. The Leader cannot perform an outward-facing action; the Implementer drafts `devops-note.md`, the user sends it |
+| **`caveman` compression not applied to the Implementer brief** | T-03's load-bearing instruction is a *negative* boundary ("raise it, do not edit it"). Compression is most dangerous exactly at a prohibition. Deviation taken deliberately and recorded rather than silently |
+| **Parallel lens Reviewers (2), not the single-Reviewer checklist** | The diff's `devops-note.md` is operator guidance on a **data-loss path against a shared, non-disposable database** — a data-loss surface under `/akili-execute` §2.3's mode table, independent of effort |
+| **Diff handed to Reviewers as a frozen scratchpad file, not inline** | The inline rule exists because a wrapper-restricted Reviewer has no `Bash` to regenerate the diff; a read-only file it can `Read` satisfies that reason, and inlining for two parallel Reviewers would have duplicated the identical payload. Deviation recorded |
+
+#### OQ-1 — answered and recorded (T-03 Done criterion)
+
+**Ruling, 2026-08-14, by the product owner** — carried here verbatim because the risk-lens Reviewer correctly noted that the answer existed only in `requirements.md` and had **no provenance in the audit trail**, while T-03's criterion is "OQ-1 answered **and recorded**":
+
+> Reporting has been **paused** in production for some time, so there are no updates and no version/snapshot attempts — the defect was never reachable by a real user. **Comms decision: none needed.**
+
+**Consequences:** RB-4's "unknown production exposure" is closed on the exposure side. The error-swallowing observation at `result-status-workflow.repository.ts:167-169` stands on its own as a code finding, unaffected. The paused-reporting window is also the low-traffic window advisory B-8 asks for. This ruling is the sole support for `devops-note.md`'s "User impact: none" section — recorded here so a future operator can audit its source.
+
+#### Files changed (attempt 1)
+
+| File | Change |
+| --- | --- |
+| `innovation-use/data-model-and-catalog/tasks.md` | `Depends on` declared; T-01/T-02 marked superseded-verify-only; false premise corrected at the T-02 scope bullet and Done criterion; T-03 extraction finalized; RB-B corrected + **RB-B2** added; inbound notice on T-10's AC.8/AC.9 Done item |
+| `innovation-use/data-model-and-catalog/design.md` | §6.5.1 piece 4 corrected; inbound notices after the §6.7 "What M6 must NOT do" table and the §10 testing-strategy table |
+| `innovation-use/data-model-and-catalog/requirements.md` | Sixth false-premise site (§4.3 DC-13 substitute-gate row) corrected — found by full-folder grep, named by neither the spec's cited list nor the Leader's forward sweep |
+| `innovation-use/family.md` | FR-6 marked closed |
+| `bugfix/sp-versioning-roles-id/requirements.md` | OQ-1 struck through and answered (pre-existing working-tree edit, carried as this task's evidence) |
+| `bugfix/sp-versioning-roles-id/devops-note.md` | **New** — operator-facing hand-off note |
+
+Diff: 6 files, doc-only, +25/−10 plus the new file. **Scope fences held** — no production code, no migration created or edited, no harness file, `design.md` §6 untouched (B-14 routed into the note rather than into the spec, which is correct).
+
+#### Verification (Implementer, from `server/researchindicators`, working tree quiet)
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **PASS** — `Test Suites: 321 passed, 321 total`; `Tests: 2042 passed, 2042 total` |
+| `npm run test:cov` | **PASS** — `All files: 83.57% stmts / 74.76% branches / 84.62% funcs / 83.56% lines`; no threshold failure (global floor 60%) |
+| `npm run lint -- --quiet` | Clean, no output. `git status` re-checked after — `--fix` mutated nothing |
+| Fixture suite | Deliberately not run (user ruling above); Docker down by design |
+
+#### Reviewer verdicts — attempt 1
+
+**Lens A (spec conformance) — `STATUS: FAIL`, 2 issues.**
+**Lens B (risk / reliability) — `STATUS: FAIL`, 2 issues.**
+
+**A-1 — the corrected chunk-1 task still contradicts itself.**
+*Discovered Issue:* `data-model-and-catalog/tasks.md:107` (T-02 **Implementation notes**) still reads "The suite must be the **full** one: …" — the identical false premise the task was mandated to remove, left inside the same task and now in direct contradiction with the corrected scope bullet three lines above it. An implementer reading T-02 top to bottom hits "snapshot, only M1–M6 run" and then "the suite must be the full one."
+*Violated Rule:* T-03's first carried blockquote — chunk 1's `tasks.md` "**must be updated in this task**", `:97` cited precisely because it "carries the same false premise". Root `CLAUDE.md` §5 ("Do NOT silently let docs and code drift").
+*Remediation:* Same strikethrough-plus-correction pattern at `:107`; keep the dependency list (true and unchanged), state those objects arrive via the T-01b snapshot.
+
+**A-2 — "already-merged migration" is false and defeats the merge gate this task just declared.**
+*Discovered Issue:* `data-model-and-catalog/design.md:426` asserts the T-02b work landed "outside M6, in its own **already-merged** migration." Both migrations exist only on branch `AC-1679-Create-the-innovation-use-section`; the shared-DB run has not happened — it is what this task's own `devops-note.md` requests. The claim contradicts two statements in the same diff: the new `Depends on` line ("**must be merged before T-10 starts**") and bugfix `design.md:176` Coupling ("**Once merged**, chunk 1 drops its T-03"). A chunk-1 implementer reading "already-merged" has a documented reason to skip the `SHOW CREATE PROCEDURE` check — the one guard between M6 and re-emitting a non-executable body.
+*Violated Rule:* bugfix `design.md` §6 Coupling + Shared-DB gate rows; `requirements.md` §7 (DevOps sign-off outstanding); root `CLAUDE.md` §5.
+*Remediation:* Merge-status-free statement of fact + "pending merge of `bugfix/sp-versioning-roles-id`; verify with `SHOW CREATE PROCEDURE SP_delete_result_version` before T-10."
+
+**B-1 — `devops-note.md` omits the Shared-DB gate entirely.**
+*Discovered Issue:* The note's five imperative steps read as a self-authorizing procedure against a non-disposable database. Step 1 is "Run these two migrations"; step 2 says "you don't need to schedule around anything else"; step 4 downgrades the last remaining check to "a check, not a change to how you already run migrations". Nowhere does it state that a shared-DB run requires **human approval first**. A DevOps engineer handed this document has a complete and self-authorizing procedure in front of them.
+*Violated Rule:* `design.md` §6 Rollout → **Shared-DB gate** ("Human approval required before running against the shared dev database"); `requirements.md` **RB-2**; `family.md` **FR-3**; root `CLAUDE.md` §4.3.
+*Remediation:* Make the gate **step 0** and blocking — "This note is the hand-off that *requests* the run; it is not the approval." Name who approves and where the approval is recorded.
+
+**B-2 — `family.md` FR-6 stamped "CLOSED 2026-08-18" while its own closure criterion is unmet.**
+*Discovered Issue:* The criterion sits in the same cell, left intact: "must not start T-10 until it **merges**." Nothing has merged, and T-03's own Done items (suite, DevOps informed, release) were unchecked at the time of the edit. The supporting evidence is narrower than the claim — "proven red-before-green **on the scratch schema**"; the shared dev DB still carries the broken routine. Chunk 1's `tasks.md:130` tells an implementer to run `SHOW CREATE PROCEDURE SP_versioning` before T-10 and **stop** if `roles_id` is present — which it still is. Marking the row closed converts a live guard into a green light.
+*Violated Rule:* `family.md` FR-6's own mitigation column; bugfix `design.md` §6 Coupling ("**Once merged**…").
+*Remediation:* Merge-conditional wording; keep the residual pre-flight condition explicit.
+
+#### Leader adjudication
+
+**All four findings accepted as in-scope; one lens conflict resolved.**
+
+The two lenses **disagreed on FR-6**: Lens A accepted it (T-03's Done item mandates closing the row, and there is no later task in which to do it — so "now" is the only compliant time), filing only advisory A1 on the wording. Lens B filed it as a FAIL (the row asserts a state that is not true and defeats a live guard).
+
+**Both are right about different things, and they converge on the same remedy.** The task genuinely mandates closing FR-6, so deleting or deferring the closure would violate T-03. What is defective is the *wording*, which asserts a completed merge. Adjudicated as an **in-scope FAIL whose remediation is merge-conditional phrasing, not removal of the closure** — satisfying the mandate and the risk finding at once.
+
+**Root cause is shared across three of the four findings.** A-2 and B-2 are the same defect at two sites, and B-1 is its operational twin: the attempt conflated *"task `[x]`, Reviewer PASS, committed on a branch"* with *"merged and applied to the shared database."* Attempt 2 is therefore briefed to sweep its **own diff** for merge-status over-claims rather than patching only the two cited sites — the two-direction sweep discipline this spec already applies to pivots.
+
+**Not a Pivot.** No evidence surfaced that the spec is wrong or unviable; the spec was right and the implementation over-claimed against it. Straight rework, effort bumped `high` → `xhigh`.
+
+**Boundary set for attempt 2** (to stop the fix from widening): sites **inside the blocks T-03 mandates** get corrected; identical premises **outside** those blocks get recorded as advisory and, where they are acceptance criteria, remain chunk 1's own gate to amend.
+
+## ADVISORY findings — T-03 attempt 1 (recorded; never gate, never become tasks in this spec)
+
+| # | Lens | Finding |
+| --- | --- | --- |
+| C-1 | risk | The note's failure-mode sentence drops the path qualifier both sources carry. `design.md` §3.1 restricts partial destruction to the **untransacted `green-checks` path** ("the workflow path is transactional and rolls back"); RB-5 agrees. Overstated in the safe direction, so not a gate — but naming the path would also tell the operator the failure can arrive *invisibly* on the other path, reported as a bare `'Error deleting snapshot'` |
+| C-2 | reliability | Note step 2 ("you don't need to schedule around anything else") contradicts its own Timing section ("the `DROP` takes an exclusive metadata lock…"). The reporting pause is a fact about **production**; the target here is the **shared dev** database, whose traffic that pause does not govern |
+| C-3 | reliability | Step 4 asks the operator to confirm the DEFINER but supplies neither a command nor a failure branch. A wrong definer breaks at `CALL` time, not migration time. A post-run verification section (`SHOW CREATE PROCEDURE` on both routines) would close it |
+| C-4 | readability | The note names only `migration:dev:execute`. `README.md:262-263` documents `migration:execute` as the dist/production path. Both resolve to `orm.config.ts` → `CORE` → `ARI_MYSQL_*`, so nothing is wrong; naming the **datasource** rather than one script removes the assumption that the operator runs from a TypeScript checkout |
+| C-5 | conformance — *favourable* | The "superseded" marking of chunk 1's T-01/T-02 was **verified sound**, not accepted on assertion: `test/jest-fixtures.json` sets `rootDir: "."` (resolved against `test/`) with `testRegex: ".fixture-spec.ts$"`, so it does collect `test/fixtures/innovation-use/**` recursively. Chunk 1's T-02 Jest-config deliverable is genuinely satisfied; **no work is stranded** by the supersede |
+| C-6 | reliability | The supersede notes say "verify the existing one and close as a no-op" — not falsifiable as written. The harness collects only `*.fixture-spec.ts`; a chunk-1 fixture named `*.spec.ts` under `test/` is collected by **neither** runner and yields exactly the silent zero-collected pass chunk 1's own disqualifier forbids. Naming the convention and `npm run test:fixtures` would make the verify step real |
+| C-7 | conformance | Three further "from empty" sites survive **outside** T-03's mandate: `tasks.md:163` (T-04 Done), `requirements.md:248` (R-IU-002 AC.4), `requirements.md:254`. Two are ACs — chunk 1's gate to amend. A raise-notice, not an edit, is the correct instrument |
+| C-8 | conformance | Two small imprecisions in audit prose: (a) RB-B2 says an empty container "fails at migration **#139**" — from empty the *first* blocker is `1751474908040-InsertTemplates.ts` (`sec_template`, MySQL 1146, RB-1b); #139 is the second, found after the first was worked around. (b) `tasks.md:328` says one of the two divergences "no longer exists" where `design.md:426` more accurately says the table-enumeration **half**; by the transcript's taxonomy nothing ceased to exist |
+| **C-9** | risk — **carry forward** | **Post-T-02b staleness now sits in chunk 1's declared M6 authority.** `routine-transcript.md:172-175` still records `SP_delete_result_version` as absent for both objective tables ("Table count 33"), `:177` still says AC.8 asserts the divergence survives M6 intact, and `requirements.md:511` still names `1778510205765` as that routine's latest definition. **DD-12 requires M6 to be written from the transcript, not from prose** — so this is the one place stale text can propagate into SQL. Correctly outside T-03's sweep (editing chunk 1's authority is chunk 1's gate), but stronger than B-18 and must not rest on B-18 alone |
+| C-10 | readability | The inbound notice at `tasks.md:328` was inserted **between** Done-checklist items, splitting one list into two so the following items render as a restarted list. Both `design.md` notices also say "the row above" when the referenced row is 2–3 rows up |
+| C-11 | conformance | T-03's Verification block specifies a falsifying input ("revert one lifecycle-adjacent spec's expectation — the full suite must fail"); the evidence supplied is the three commands only. The diff changes zero code, so this would test suite sensitivity rather than the change, and the Done checklist is satisfied — but every prior task in this spec demonstrated its falsifier, which makes the omission conspicuous |
+| C-12 | traceability | `devops-note.md` is linked from nowhere — not `requirements.md` §7, not `tasks.md` T-03, not `execution.md`. **Closed by this entry**, which is now its pointer |
+
+
+### T-03 — Full-suite regression and release: **attempt 2 → PASS**
+
+- **Date:** 2026-08-18 · **Attempts run:** 2 of 3 · **Effort:** Implementer `xhigh` (bumped from `high`) · Reviewer `high`
+- **Reviewer mode:** single Reviewer, scoped re-judgment. Changed from round 1's parallel lens pair because the data-loss surface's factual claims (migration identity/order, revert semantics, DEFINER, locator SQL) were exhaustively verified correct in round 1 — re-deriving them would violate *commit to the delegation*. The verified facts were passed forward in the brief so the pass was spent on closure and new-defect detection.
+
+#### Runtime failure (not a work FAIL, consumed no attempt)
+
+The first closure-Reviewer spawn terminated on **API Error 529 Overloaded** — an environment blocker. Per `/akili-execute`'s runtime-failure fallback it was retried once, with the identical brief and the same frozen diff; the retry completed. **The Reviewer-inline fallback was not used and was never considered available:** the Leader supervised this work, so auditing it would collapse `author ≠ auditor`, and an infrastructure failure does not suspend a correctness constraint.
+
+#### Root cause of attempt 1's FAIL (Leader analysis)
+
+Attempt 1 was not missing work — it delivered all five deliverables and the suite was green. It made **one systematic error at multiple sites**: it treated *"task `[x]`, Reviewer PASS, committed on a branch"* as equivalent to *"merged and applied to the shared database."* Three of the four findings were that single error, so attempt 2 was briefed to sweep its **own diff** for merge-status over-claims rather than patch the two cited sites — the two-direction sweep discipline this spec already applies to pivots.
+
+That sweep paid for itself: it found a **fifth** site neither lens cited by line — chunk 1's `tasks.md:136`, where attempt 1's own blockquote claimed "This extraction is complete; nothing further is pending here", sitting three blockquote paragraphs below its own "verify the bugfix is merged … If it does, stop" instruction. That is the site most likely to have talked a chunk-1 implementer past the guard.
+
+#### Attempt 2 changes (six edits, all documentation)
+
+| Finding | Site | Fix |
+| --- | --- | --- |
+| A-1 | `data-model-and-catalog/tasks.md:107` | Struck "The suite must be the **full** one"; dependency list retained verbatim and re-attributed to the T-01b snapshot |
+| A-2 | `data-model-and-catalog/design.md:426` | "already-merged migration" → merge-status-free fact + the `SHOW CREATE PROCEDURE SP_delete_result_version` pre-flight |
+| B-1 | `devops-note.md` | Blocking **step 0** ahead of everything: names the note as *requesting* the run, not authorizing it, and points at the real approval mechanism |
+| B-2 | `family.md` FR-6 | Closure **retained** per Leader adjudication; wording now "Closes on merge of this PR" + explicit residual (branch-only, shared DB still broken, `devops-note.md` and §7 Sign-off both open) |
+| C-10 | `data-model-and-catalog/tasks.md` T-10 | Inbound notice moved from *between* Done items to after the complete checklist — list renders as one again |
+| self-swept | `data-model-and-catalog/tasks.md:136` | "Verified and finalized" → "Recorded", plus an explicit line that this closes the routing record, **not** the merge gate |
+
+#### Leader adjudication of the round-1 lens conflict (recorded because it bound attempt 2)
+
+The two lenses **disagreed on FR-6**. Lens A accepted the closure — T-03's Done item mandates *"`family.md` FR-6 closed"* and there is no later task, so "now" is the only compliant time. Lens B filed it FAIL — the row asserted a state that was untrue and converted a live guard into a green light.
+
+**Both were right about different things, and they converged on one remedy.** Deleting or deferring the closure would have violated T-03; retaining "CLOSED" would have violated `design.md` §6 Coupling. Adjudicated as an **in-scope FAIL whose remediation is merge-conditional phrasing, not removal of the closure** — and the binding was stated explicitly in attempt 2's brief and in the closure-Reviewer's brief, so neither worker could re-open a settled question.
+
+#### Reviewer verdict — attempt 2: `STATUS: PASS`
+
+> All four round-1 findings and the list-splitting rendering defect are closed at the cited sites, with citations (`design.md` §6 Shared-DB gate, `requirements.md` §7 Sign-off, the migration filename) verified accurate against the tree; the fifth self-swept site was in-scope, the left-alone sites' code-artifact-vs-deployment-state distinction holds including RB-B2, and the scope fences (no code, no migration, bugfix `design.md` and R-IU-011 AC.8/AC.9 untouched) held. **No new defect entered.**
+
+**Independently verified by the Reviewer, not accepted on report:**
+
+- **Every citation attempt 2 introduced resolves.** `design.md` §6 *Rollout* at `:166` with the Shared-DB gate row at `:174`; `requirements.md` §7 Sign-off at `:173` carrying both the Engineering-lead (`:175`) and DevOps (`:176`) rows step 0 names; root `CLAUDE.md` §4.3 does make shared-DB schema operations a human decision. Step 0 points at a **real** approval mechanism, not a dangling reference.
+- **RB-B2's `closed (external)` survives scrutiny** — a claim round 1 never examined. The gap it records is *can the scratch schema be built at all*, closed by the committed `src/db/baseline/` snapshot, which is exercised only against the **disposable** container. No shared-DB deployment state is implied, so the code-artifact-vs-deployment-state distinction the Implementer drew is the correct one.
+- **The other left-alone judgments hold:** `tasks.md:11` is a forward-looking requirement, not a state claim; the T-01/T-02 supersede notices rest on committed on-branch artifacts and stay verification-conditional; `design.md:506` makes a routine-body claim that is unconditional regardless of merge.
+- **Markdown structure checked line by line** — strikethrough, bold-nested-italic, backtick and paren balance all sound; the note's `0.`-based ordered list renders as 0–5. (Attempt 2 caught and fixed one stray `)` of its own before reporting.)
+- **Fences confirmed against the tree:** bugfix `design.md` absent from the diff entirely (B-14 stayed routed into the note); chunk 1 `requirements.md` changed only at the §4.3 DC-13 row, R-IU-011 AC.8/AC.9 untouched; `tasks.md:163`, `requirements.md:248`, `requirements.md:254`, `routine-transcript.md:172-177` all unchanged.
+
+#### Final verification
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **PASS** — `Test Suites: 321 passed, 321 total`; `Tests: 2042 passed, 2042 total` |
+| `npm run test:cov` | **PASS** — 83.57% stmts / 74.76% branches / 84.62% funcs / 83.56% lines; global floor 60%, not regressed. Note `collectCoverageFrom` excludes `**/db/migrations/**`, so this spec's migrations cannot move the number either way |
+| `npm run lint -- --quiet` | Clean; `git status` re-checked, `--fix` mutated nothing |
+| Not re-run for attempt 2 | Documentation-only changes; Leader instruction. Fixture suite excluded from the gate by user ruling — its red→green stands recorded verbatim in the T-02 / T-02b entries for both defects (1054, 1451) |
+
+#### Requirements outcome
+
+| Item | Status |
+| --- | --- |
+| R-SPV-001 AC.4 (suite) | Closed — full suite green, never targeted (KZ-003) |
+| RB-2, RB-3 | Addressed — the shared-DB run stays a human gate, and `devops-note.md` now carries that gate as blocking step 0 rather than omitting it |
+| OQ-1 | **Answered and recorded** — ruling carried verbatim with provenance in the attempt-1 entry above, closing the risk lens's advisory that it existed only in `requirements.md` |
+| Chunk 1 updated | Closed — `Depends on` declared, T-01/T-02 superseded-verify-only, T-03 extraction record finalized, six false-premise sites corrected, RB-B corrected + RB-B2 added, three raise-notices filed without touching chunk 1's ACs |
+| `family.md` FR-6 | Closed **merge-conditionally**, with the residual pre-flight named |
+
+#### `Not Done` — one criterion, user-owned
+
+**"DevOps informed before the shared-DB run" is NOT closed.** The note is drafted and Reviewer-verified; **sending it is an outward-facing human action the Leader cannot take**, and the user explicitly took ownership of it (ruling, 2026-08-18: *"Draft the note, you send it"*).
+
+T-03 therefore stays `[~]`, not `[x]`. This is deliberate and follows the standard this very task enforced on FR-6: a reader who saw T-03 `[x]` would conclude DevOps had been informed, which is exactly the over-claim attempt 1 failed for. Marking it done while the note sits unsent would repeat that error in the audit trail itself.
+
+**One action flips it:** send `devops-note.md` to DevOps, then check `requirements.md` §7's DevOps box (recording approver and date) — at which point T-03's remaining criterion and the spec's release gate both close.
+
+## ADVISORY findings — T-03 attempt 2 (recorded; never gate, never become tasks in this spec)
+
+| # | Lens | Finding |
+| --- | --- | --- |
+| D-1 | readability | At `design.md:353` and `requirements.md:253` the retained lead-in ends in a period and the struck fragment then starts lowercase. The original was a subordinate clause; splitting the correction into its own sentence would read cleanly |
+| **D-2** | readability — **precision, the one worth acting on** | Three snapshot restatements disagree on what runs after the snapshot loads. `design.md:353` is accurate ("M1–M6 here, **plus the two migrations in the external bugfix spec**"); `requirements.md:253` and `tasks.md:102`/`:116` say "only this chunk's own M1–M6". On this branch the two bugfix migrations post-date the snapshot, so `tasks.md:116`'s restated criterion "`migration:test:execute` reports zero pending migrations" **will read 2 pending** once they are in the tree. Aligning the three on `design.md:353`'s phrasing removes a criterion that will read false to the next implementer |
+| D-3 | readability | Pointer imprecision: `tasks.md:136` says "two paragraphs above" (it is three); both `design.md` notices say "the row above" where the row is 2–3 up; `tasks.md:331` says "this Done item" now that it sits after the whole checklist. All cosmetic — each sentence self-disambiguates by quoting its referent |
+| D-4 | risk | `devops-note.md` step 0 names the approver as "whoever checks the 'DevOps' box" while the note is addressed **to** DevOps. The parenthetical gives both rows, but naming the **Engineering-lead** row as the non-operator approver would eliminate the residual self-approval reading |
+| D-5 | risk | RB-B2's `closed (external)` is sound but does not repeat the branch/merge caveat carried at `tasks.md:11`; one clause ("inherited on merge of that spec") would make the row self-contained for a reader landing on the register directly |
+| — | carried | Still open and still non-gating from round 1: **C-8** (RB-B2's "#139" first-blocker imprecision), **C-11** (T-03's falsifier not demonstrated), **C-9** (`routine-transcript.md` staleness — chunk 1's gate, and stronger than B-18) |
+
+
+#### Addendum — T-03 attempt 2 received a **second, independent Reviewer PASS**
+
+The closure-Reviewer spawn that was recorded above as terminated on **API Error 529** had in fact not died — it was still running and completed after the retry. Attempt 2 therefore carries **two independent PASS verdicts from two separately spawned Reviewers**, neither aware of the other. This is stronger evidence than the single verdict recorded above, and it is logged rather than discarded.
+
+**What the second Reviewer verified that the first did not:**
+
+- **Per-file `2026-08-18` occurrence counts reconcile exactly with the frozen diff** (design 3 · tasks 13 · requirements 1 · family 1) — proving there were **no undeclared working-tree edits** outside the reviewed diff. Neither the Implementer's report nor the first Reviewer established this.
+- **`RB-B2`'s `closed (external)` status was pushed on hardest**, and held: the gap it records is *"no mechanism to build a scratch schema"*, whose remedy is a **repo artifact, not a deployment**. It confirmed `src/db/baseline/baseline.sql` and its `README.md` exist and are **tracked** (no matching pattern in the package `.gitignore`), and that the target is a local Docker schema, so no shared-DB state is implicated. The Implementer's code-artifact-vs-deployment-state distinction is independently upheld.
+- **Repo-wide grep for `already[- ]merged|is merged|already applied|already landed` returns no residual over-claim** in any audited file — a direct falsification test of attempt 1's root cause, rather than a site-by-site check.
+- **`R-IU-011 AC.8/AC.9` untouched was confirmed as *mandated*, not merely permitted**, citing `tasks.md:188` ("this task raises it, it does not silently edit it").
+
+#### Leader response to the second Reviewer's process finding
+
+> *"`tasks.md:177` already records 'Reviewer PASS on attempt 2' and its Done items at `:199-203` are checked — written before this review concluded. My verdict happens to match, so no false record results, but pre-recording a Reviewer verdict is worth avoiding on principle."*
+
+**The principle is right and the finding does not apply here.** The record was written **after** a completed Reviewer PASS — from the retry spawn, whose verdict is transcribed in full above. The flagging Reviewer had no way to know a second Reviewer existed, because the 529 notification had reported its own spawn as dead. Nothing was pre-recorded and no verdict was anticipated.
+
+**The real artifact of the mix-up is the reverse, and it is worth naming:** this Reviewer audited a tree that **already contained** the attempt-2 PASS record and the flipped Done checkboxes. That is observation-order contamination in the confirming direction — a Reviewer that can see a recorded PASS has a mild pull toward agreeing with it. Recorded so the dual-PASS is not over-read: it reached PASS independently and pushed hardest on the one claim round 1 never examined (`RB-B2`), which is evidence against the bias having bitten — but the two verdicts are **not** equally blind, and the audit trail should say so rather than presenting them as symmetric.
+
+**Process correction adopted:** when a spawn reports a terminal API error, the retry's verdict is authoritative, but the Leader should not treat the failed spawn as reliably dead until the run ends — a 529 notification describes the transport, not the worker.
+
+#### Leader action taken on the second Reviewer's traceability finding
+
+`data-model-and-catalog/design.md:11` and `requirements.md:13` still read **"Last updated: 2026-08-14"** while carrying 2026-08-18 corrections; `tasks.md:12` had been bumped but its two siblings had not. **Corrected inline by the Leader.**
+
+This is deliberately *not* treated as an advisory absorbed into the task. It is a **false statement this task's own diff created** — a document asserting it was not edited on the day it was edited — and it is the same class as the split-checklist defect attempt 2 was told to fix: completing this task's edits correctly, not new scope. Two single-line header bumps, each naming what changed and pointing at the inline provenance. Recorded here as a Leader write, not Implementer work.
+
+#### New advisories from the second Reviewer (recorded; never gate, never become tasks)
+
+| # | Lens | Finding |
+| --- | --- | --- |
+| E-1 | traceability | ✅ **Closed this turn** — the two stale `Last updated` headers, above |
+| E-2 | risk | `family.md` FR-6's "**this PR**" is written in an innovation-use document about the *bugfix* spec's PR. Both live on branch `AC-1679-Create-the-innovation-use-section`, so it resolves to the same thing; naming the branch would remove the double-take |
+| E-3 | risk | Duplicate of D-5 — `RB-B2`'s mitigation cell lacks the on-branch qualifier the other five swept sites now carry. Authorizes no action and `baseline.sql` genuinely exists, so non-gating; "(on branch; inherited on merge)" would make the sweep uniform |
+| E-4 | risk | Duplicate of D-4 — `devops-note.md` step 0 defines the approver as "whoever checks the 'DevOps' box", plausibly the same engineer executing the note. Not self-authorizing (the parenthetical names both rows and §7's DevOps row *is* the spec's gate), but naming the **Engineering-lead row as approver** and the DevOps row as executor acknowledgement would close the last inch |
+| E-5 | readability | Duplicates D-1 and D-3 — the period-then-lowercase strikethrough surgery at `design.md` §6.5.1 piece 4 / `requirements.md:253`, and the "row above" / "two paragraphs above" pointer imprecision. All cosmetic; each sentence quotes its referent |
+
+**Both Reviewers independently carried forward the same non-gating set** — C-1 through C-4, C-6 through C-9, C-11 — with **C-9** (`routine-transcript.md` staleness inside chunk 1's DD-12 routine authority) named by both as the strongest. Two independent auditors converging on one carry-forward is the signal worth acting on; it must not rest on B-18 alone.
+
