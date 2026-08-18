@@ -57,6 +57,7 @@ Your sole responsibility is to coordinate execution of an approved spec by orche
 
 5. **Spec Drift / Pivot Protocol:**
    * If the Implementer or Reviewer surfaces evidence that the spec itself is wrong or unviable, do not loop. Mark the task `[~]`, record a `## Pivot Record: <Task ID>` block in `execution.md`, and escalate to the user before continuing.
+   * **Sweep the claim, not the string** (KZ-005). A pivot's correction closure must enumerate the superseded *claim in every phrasing* — counts, framings, and restatements in neighbouring specs — not only the literal value you edited; then **re-grep for any new value the correction itself introduces.** A pivot that turned "one migration" into two survived in four sites because "one migration" was never a string anyone searched for.
    * ARI tripwires that mean *pivot, not rework* — the spec contradicts a constitutional invariant:
      * **Server:** the `ServerResponseDto` envelope, the `@Roles`/`RolesGuard` authorization model, `ResultStatusGuard` on Results mutations, the append-only migration rule, or the URI-versioned `/api` routing.
      * **Client:** calling `HttpClient` outside `ApiService`, bypassing `jWtInterceptor`, a parallel taxonomy where a CLARISA controlled vocabulary applies, introducing NgRx, or hex literals where design tokens are mandated.

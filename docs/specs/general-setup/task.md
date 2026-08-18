@@ -105,6 +105,7 @@ Per task, declare:
 - E2E test cases (happy path + at least one auth failure + at least one role/status denial when applicable).
 
 A task is NOT done until:
+- **If the task delivers a harness, fixture, or any verification mechanism:** at least one criterion exercises the mechanism **end to end** (KZ-006). Per-piece checks can all pass while the mechanism cannot run at all.
 - `npm run lint` passes.
 - `npm test` passes locally.
 - New endpoints appear correctly in `/swagger`.
