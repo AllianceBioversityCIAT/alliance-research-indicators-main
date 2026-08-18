@@ -300,7 +300,8 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 - BUT it must NOT populate both modes on one row — `actors_count` is not a redundant total, it is the count for a row that has no parts
 - AND IT MUST be possible to switch a row between modes without a schema change
 
-> **Invariant with no constraint behind it.** The mutual exclusion above is enforced by the API edge (chunk 2) and by the validation function (R-IU-006), not by a database constraint. This is stated so it is designed for, not assumed. See RB-5.
+> **Invariant with no constraint behind it.** No database constraint enforces the mutual exclusion above.
+> **Corrected 2026-08-18 (T-09 Lens B).** This previously said the exclusion is enforced *"by the API edge (chunk 2) **and by the validation function** (R-IU-006)"*. The shipped function enforces mode **completeness**, not **exclusivity**: §6.4 step 4 and R-IU-006 AC.10 require the *populated* mode to be filled in, and a row with `sex_age_disaggregation_not_apply = TRUE`, `actors_count` set **and** all four disaggregated counts set returns `1`. **The both-populated case rests entirely on chunk 2's API edge (RB-5 layer 3).** The function is spec-conformant as written — it is this sentence that overstated it. See RB-5, and `result-actor.entity.ts`'s shipped column comment, whose "MUTUALLY EXCLUSIVE" heading carries the same overstatement and is corrected by this note rather than by an edit to already-merged code.
 
 **Out of scope:** rejecting negative values at the API edge (chunk 2 — this requirement only guarantees the columns can hold the values).
 
@@ -516,7 +517,8 @@ Indexing Innovation Use detail fields would make it the only indicator with sear
 
 - Verified consequences if unamended: the five new `result_actors` counts are not copied (`1783029013035:625`); `organization_count` is not copied (`:662`); `result_innovation_use` has **no copy block at all**, since `result_innovation_dev` is copied by its own dedicated block (`:695-770`); rows are orphaned on both hard deletes (`1778510205765:279`, `1783029013035:1106`); and **soft delete leaves `is_active = TRUE`** (`1764275660631:467`) — an *active* orphan visible to every `is_active = TRUE` query.
 - All four routines are amended by migration M6 via `DROP` + `CREATE` reproducing each body in full. **M6 depends on M0** (R-IU-012): it reproduces `SP_versioning`'s body and must inherit the repaired one.
-- **The pre-existing divergences must not be harmonized** — the two hard-delete routines (transcript §4.1) or `delete_result`'s six soft-delete gaps (§5.1). Either change would alter behavior for every indicator.
+- **The divergences that still exist pre-M6 must not be harmonized** — the `SIGNAL` vs `RETURN FALSE` difference between the two hard-delete routines (transcript §4.1) and `delete_result`'s six soft-delete gaps (§5.1). Either change would alter behavior for every indicator.
+  > **Amended 2026-08-18.** This previously read *"the two hard-delete routines (transcript §4.1)"* as a single intact divergence. **The extracted bugfix's T-02b closed half of it** — it added the two missing `DELETE` statements for `result_impact_outcomes` / `result_strategic_objectives` to `SP_delete_result_version`, harmonizing the table enumeration with `full_delete_result_version`. Only the `SIGNAL` vs `RETURN FALSE` difference survives from §4.1. **That closure must not be re-opened by M6.**
 
 **Acceptance criteria:**
 - [ ] AC.1 — Versioning a populated Innovation Use result reproduces the `result_innovation_use` row on the new version, with level id and explanation intact.
@@ -526,7 +528,7 @@ Indexing Innovation Use detail fields would make it the only indicator with sear
 - [ ] AC.5 — **`delete_result` sets `result_innovation_use.is_active = FALSE` and populates `deleted_at`** — no *active* orphan survives a soft delete.
 - [ ] AC.6 — Versioning **and all three delete paths** behave identically for an **Innovation Dev** result before and after M0+M6, compared column by column and row by row. *(Gated by fixture F16 — **not** by F12, which compares a stored function and executes no routine.)*
 - [ ] AC.7 — M6's `down()` restores all four prior bodies exactly. *(`SP_delete_result_version`'s historical `down()` is a bare `DROP` with no recreation — the neighbouring pattern must not be copied blindly.)*
-- [ ] AC.8 — M6 makes exactly the six edits in transcript §6 and no others. In particular it adds **no** `result_quantifications` copy block (already copied at `:297`), and both pre-existing divergences survive intact.
+- [ ] AC.8 — M6 makes exactly the six edits in transcript §6 and no others. In particular it adds **no** `result_quantifications` copy block (already copied at `:297`), and **the divergences that remain pre-M6 survive intact — the `SIGNAL` vs `RETURN FALSE` difference (transcript §4.1) and `delete_result`'s six soft-delete gaps (§5.1)**. *(Amended 2026-08-18: formerly "both pre-existing divergences". The §4.1 table-enumeration divergence was closed by the extracted bugfix's T-02b and is **not** to be restored — verifying against the pre-T-02b bodies would fail this AC for a false reason.)*
 - [ ] AC.9 — No routine amendment is applied to `result_actors` / `result_institution_types` on any delete path — both are already removed wholesale by row; only the versioning copy lists change.
 
 #### Scenario: A versioned result keeps its Innovation Use data

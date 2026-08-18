@@ -323,7 +323,7 @@ No test in this repository has ever executed a stored routine. The harness lives
 | F8 | Actor row, `actor_type_id = 5` (OTHER), null `actor_type_custom_name` | `0` | Actor resolution — **the only reachable failure** |
 | F9 | Actor row, aggregate mode, `actors_count` NULL | `0` | Mode consistency (RB-5 layer 2) |
 | F10 | Indicator-6 result, no `result_ip_rights` row | `ip_rights` = `0` | §6.2's submit-blocking consequence |
-| F11 | Actor rows under the **Innovation Dev** role only | ignored → `1` | DD-4 role filtering |
+| F11 | **At least one valid Innovation-Use actor row, PLUS** actor rows under the **Innovation Dev** role | the Innovation Dev rows are ignored → `1` | DD-4 role filtering. **Amended 2026-08-18 (T-09 Lens B):** formerly *"Innovation Dev role only"*, which is **unsatisfiable** — with no Innovation-Use actor row `tempFullActors = 0` and DD-11's unconditional guard correctly returns `0` (AC.11). A fixture without the Innovation-Use row tests nothing about role filtering and would be misread as a filter defect |
 | F12 | `innovation_dev_validation` over a fixed Innovation Dev fixture, before vs after M1–M6 | identical | R-IU-006 AC.9 — **stored function only; proves nothing about the routines** |
 | **F9b** | **Actor row, disaggregated mode (`sex_age_disaggregation_not_apply` FALSE), all four counts NULL** | **`0`** | **R-IU-006 AC.10's disaggregated half** — round 3 (T4) found the AC added without its gate |
 | **F13** | **`CALL SP_versioning` on an Innovation Use result with level, explanation, all five actor counts and an organization count** | **every field and count present on the new version** | **DC-12 / R-IU-011 AC.1, AC.2** |
@@ -498,11 +498,13 @@ Both are the observability half of §6.6's blind spot, and both strengthen ADR-1
 | Unit | Migration seed spec: the ten catalog rows equal R-IU-002's table **verbatim**; exactly ten rows; no duplicate `level`; **no ids 13–20** (D-7); **`clarisa_innovation_readiness_levels` row count and contents unchanged** (R-IU-002 AC.5) | same |
 | Unit | **Role-row assertion** (R-IU-005 AC.2, round 3 T12): each of `actor_roles`, `institution_type_roles`, `quantification_roles` gains exactly one row, with a previously unused id | same |
 | Integration | **Detail-row round trip** (R-IU-001 AC.3, round 3 T12): insert a `result_innovation_use` row, read it back, assert both columns and the populated audit columns | §6.5 harness |
-| Integration | **M6 edit-set assertion** (R-IU-011 AC.8/AC.9, round 3 T12): the post-M6 routine bodies differ from the pre-M6 bodies in exactly transcript §6's six edits — no `result_quantifications` block added, both divergences intact | §6.5 harness |
+| Integration | **M6 edit-set assertion** (R-IU-011 AC.8/AC.9, round 3 T12): the post-M6 routine bodies differ from the pre-M6 bodies in exactly transcript §6's six edits — no `result_quantifications` block added, and **the divergences remaining pre-M6** intact (`SIGNAL` vs `RETURN FALSE`, §4.1; `delete_result`'s six soft-delete gaps, §5.1) *(amended 2026-08-18 — see the resolved notice below)* | §6.5 harness |
 | Integration | **§6.5 harness, F1–F18** — the only gate for DC-2 / DC-3 / DC-10 / DC-12 *(DC-13 gated by the extracted bugfix spec)* | dedicated npm script on the `TEST` datasource (§6.5.1) |
 | Regression | **Full** suite; Innovation Dev specs unmodified (KZ-003) | `npm test -- --silent` |
 | Migration | Apply then revert on the **scratch** schema (DC-1) | **New** npm scripts passing `-d ./src/db/config/mysql/orm.test.config.ts` (§6.5.1 pieces 1–3). **The existing `migration:dev:execute` / `migration:revert` CANNOT be used** — both hardcode `-d ./src/db/config/mysql/orm.config.ts`, whose export is bound to **`CORE`** at module load (`orm.config.ts:71-73`), i.e. the shared database. And **there is no `migration:run` script** (`package.json:28-32`) |
 
+> **✅ RESOLVED 2026-08-18 — actioned by the spec-correction pass; AC.8/AC.9 and the row above are now restated. Original notice retained as the record.**
+>
 > **Inbound notice on the "M6 edit-set assertion" row above — filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03. Not edited here; chunk 1 restates it when T-10 next runs.** That row's "both divergences intact" expectation (R-IU-011 AC.8/AC.9) is **invalidated in part**: T-02b (`[x]` done, Reviewer PASS 2026-08-14) added the two missing `DELETE` statements to `SP_delete_result_version`, closing the hard-delete table-enumeration divergence with `full_delete_result_version` (transcript §4.1) — see the §6.7 notice above. The M6 edit-set assertion must be restated against the **post-T-02b** routine bodies before M6 runs, checking only the divergences that still exist (the `SIGNAL`/`RETURN FALSE` difference and `delete_result`'s soft-delete gaps). Amending R-IU-011 AC.8/AC.9 is chunk 1's own gate; this notice raises it, it does not silently edit it.
 
 Coverage target: repo default ≥ 60%, not regressed (NFR-IU-004). Unit specs keep mocking `DataSource` — appropriate for assembly logic, inadequate for SQL, which is why §6.5 exists.
@@ -576,6 +578,20 @@ Estimated from the finished design; a **tripwire** for `/akili-execute`, not a q
 
 **Tripwire:** the M6 figure assumes the four bodies are copied unchanged apart from transcript §6's six edits. If M6 requires *restructuring* any routine — including "harmonizing" the pre-existing delete divergence (transcript §4.1) or closing `delete_result`'s soft-delete gaps (§5.1) — that exceeds this budget and must **escalate rather than continue**.
 
+### ⚠️ Re-baseline — 2026-08-18, after T-09
+
+**The tripwire fired and the user ruled to continue (option A).** Recorded here so §12 stops stating a budget reality has already passed.
+
+| Signal | Budgeted | Actual at end of T-09 | Verdict |
+| --- | --- | --- | --- |
+| Tasks | 13 | 9 done, 4 remaining | on track |
+| LOC | ~2,600 | **~2,102** with T-12 and T-13 (both **L**, both fixture-heavy) still to come | **will be exceeded** — treat its arrival as expected, not as a new signal |
+| Review rounds | 4–5 | **4** | **at the ceiling** — one more FAIL reaches it, the next exceeds it |
+
+**Cause, stated honestly: two of the four rework rounds were caused by the Leader supplying false facts in briefs, not by task difficulty.** T-04, T-05, T-06 and T-08 each passed on the first attempt. All four false claims share one mechanical root — a grep pattern containing a backtick cannot match SQL held in a TypeScript template literal, where the bytes carry `\` before every backtick — and each was a *negative* claim asserted without a search that could have falsified it. This is the failure mode `family.md` **D-10** already forbids; the rule bound worker output but not the Leader's own briefs. Corrective method in force since T-09 attempt 3: **supply no facts to a worker**, require every claim reported as `claim | file:line | command`, and **prefer deleting a claim to correcting it**.
+
+**What this re-baseline does NOT do:** it does not raise the ceiling. The 4–5 review-round figure stands as written, because the estimate was sound for the work — it was the margin that was misspent. The next FAIL is still an escalation to the user, and `/akili-archive`'s Kaizen still measures actual against the original figures. See the top-level **BUDGET TRIPWIRE** block in `execution.md` for the decision record and the three foreseeable return points.
+
 ### ✅ Resolved escalation — DD-13's routing
 
 `SP_versioning` has been non-executable in `main` for an unknown period, for **all six indicators**. This spec discovered it; it is not caused by Innovation Use. Two defensible routings:
@@ -585,7 +601,7 @@ Estimated from the finished design; a **tripwire** for `/akili-execute`, not a q
 | **A — M0 inside this spec** *(specified here, and what `tasks.md` assumes)* | Repair ships with chunk 1. Simple, one review stream. But a cross-indicator production fix waits on an Innovation Use spec, and chunk 1's PR set grows by ~1,960 LOC |
 | **B — extract to `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id`** | The production fix ships **now**, independently and faster, with its own regression gate (F19). Chunk 1 then declares a `Depends on` and drops T0 — a ~2-line change to `tasks.md` and `family.md` |
 
-**Ruled 2026-08-14: option B.** The repair now lives at [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) (Lite depth, Bug Mode, **5** tasks *(corrected 2026-08-18 from "3 tasks" — that spec's T-01 and T-02 Pivots each added a task after this note was written; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*). This chunk **`Depends on` it** and T-10 must not start until it is merged — verify with `SHOW CREATE PROCEDURE SP_versioning`. R-IU-012, DD-13, and the M0 row above are retained as the record of the discovery and the ruling; the work itself has moved.
+**Ruled 2026-08-14: option B.** The repair now lives at [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) (Lite depth, Bug Mode, **5** tasks *(corrected 2026-08-18 from "3 tasks" — that spec's T-01 and T-02 Pivots each added a task after this note was written; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*). This chunk **`Depends on` it**. *(Corrected 2026-08-18: this previously read "T-10 must not start until it is merged". The repair migrations are committed on **this** branch and ordered before M6, so the dependency is satisfied by construction; the bugfix cannot merge separately. `SHOW CREATE PROCEDURE SP_versioning` survives as a **rollout** check against the target database.)* R-IU-012, DD-13, and the M0 row above are retained as the record of the discovery and the ruling; the work itself has moved.
 
 ---
 

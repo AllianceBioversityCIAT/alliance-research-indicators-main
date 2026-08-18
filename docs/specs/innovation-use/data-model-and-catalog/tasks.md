@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04 … **T-09** `[x]` (2026-08-18); next eligible **T-10** (⚠️ blocked: see FP-3 merge gate)
+- **Status:** in-progress — T-01, T-02, T-04 … **T-09** `[x]` (2026-08-18); next eligible **T-10**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -125,15 +125,17 @@ graph TD
 >
 > **It now lives at [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/)** — **5** tasks, ~2,750 LOC *(corrected 2026-08-18 from "3 tasks, ~2,050 LOC" — that spec grew by two tasks and ~700 LOC across its T-01 and T-02 Pivots after this note was written; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*, red-before-green regression fixture (formerly F19).
 >
-> **This chunk `Depends on` it.** T-10 (M6) reproduces `SP_versioning`'s body and **must inherit the repaired one**; T-13's fixtures cannot run until it lands, since `CALL SP_versioning` raises MySQL 1054 today.
+> **This chunk `Depends on` it.** T-10 (M6) reproduces `SP_versioning`'s body and **must inherit the repaired one**; T-13's fixtures need the repaired procedure present in the schema they run against.
 >
-> **Before starting T-10, verify the bugfix is merged** — `SHOW CREATE PROCEDURE SP_versioning` must contain no `roles_id`. If it does, stop: M6 would re-emit a non-executable body.
+> **Before starting T-10 — CORRECTED 2026-08-18.** The former instruction read *"verify the bugfix is merged"*. **That gate was mis-worded and is now satisfied by construction.** Both repair migrations are committed on this branch (`9392c010`, `4dd884f6`) at timestamps `1784250000000` / `1784300000000` — **ordered before every Innovation Use migration** — so any migration run applies the repair first and M6 inherits the repaired body automatically. The bugfix spec cannot be "merged" separately: it is part of this development, on this branch, and lands with it.
+>
+> **What survives, and is not about merging:** (a) T-10 must reproduce the **repaired** body — read `SP_versioning` from `1784300000000`, never from the older `1783029013035`; (b) at rollout, `SHOW CREATE PROCEDURE SP_versioning` against the target database must contain no `roles_id` — a DevOps verification that the database is where we believe, not a task gate.
 >
 > `requirements.md` R-IU-012 and `design.md` DD-13 / M0 are retained as the **record of the discovery and the routing decision**; the work itself is no longer this spec's.
 >
 > The harness tasks **T-01 and T-02 are shared** with that spec. Whichever lands first builds them; the other verifies and moves on.
 
-> **Recorded 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03.** Both migrations that carry the former M0's work are `[x]` done on branch and Reviewer-passed: `repairSpVersioningObjectiveBlocks` (that spec's T-02) and its required companion `repairSpDeleteResultVersionObjectiveTables` (T-02b, R-SPV-002/RB-5). The harness tasks landed there too (T-01, T-01b) — see T-01/T-02 above, now marked superseded-verify-only. **This closes the routing/extraction record, not the merge gate two paragraphs above** — the migrations exist only on branch `AC-1679-Create-the-innovation-use-section` and have not run against the shared dev DB. The "before starting T-10, verify the bugfix is merged" instruction above still applies at that time.
+> **Recorded 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03.** Both migrations that carry the former M0's work are `[x]` done on branch and Reviewer-passed: `repairSpVersioningObjectiveBlocks` (that spec's T-02) and its required companion `repairSpDeleteResultVersionObjectiveTables` (T-02b, R-SPV-002/RB-5). The harness tasks landed there too (T-01, T-01b) — see T-01/T-02 above, now marked superseded-verify-only. **This closes the routing/extraction record.** The migrations exist on branch `AC-1679-Create-the-innovation-use-section` and have not yet run against the shared dev DB — which is a **rollout** fact, not a blocker: see the corrected note two paragraphs above.
 
 ---
 
@@ -216,7 +218,8 @@ graph TD
 
 ### T-07 — M4: three role-discriminator rows
 
-- **Requirements covered:** R-IU-005 (AC.1–AC.3)
+- **Requirements covered:** R-IU-005 (**AC.2, and the row half of AC.3**)
+  > *Corrected 2026-08-18: formerly claimed the whole **AC.1–AC.3** range. AC.1 is enum-level ("each **enum** gains exactly one member") and no migration can satisfy it — **T-08** owns it, and did so. T-07 seeds the catalog rows (AC.2) and satisfies AC.3's row half, supplied by the Scenario's "must NOT renumber or reuse any existing role **id**". Confirmed independently by both T-07 review lenses; T-07 shipped without touching an enum.*
 - **Design references:** §3.6, §5 (M4)
 - **Size:** S · **Dependencies:** none · **Status:** done
 - **Skills:** `nestjs-expert`
@@ -238,7 +241,8 @@ graph TD
 
 ### T-08 — Entities, enums, and the `Result` inverse relation
 
-- **Requirements covered:** R-IU-001 (AC.2, AC.3), R-IU-003 (AC.1, mode invariant), R-IU-004, R-IU-005 (AC.1); NFR-IU-002; DC-7
+- **Requirements covered:** R-IU-001 (**AC.2 only**), R-IU-003 (AC.1, mode invariant), R-IU-004, R-IU-005 (AC.1); NFR-IU-002; DC-7
+  > *Corrected 2026-08-18: formerly claimed **AC.3** as well. AC.3 is the detail-row round trip — `design.md` §10 places it in the **Integration** layer on the §6.5 harness, the traceability matrix routes it to **T-12**, and a unit metadata spec cannot populate audit columns from an acting user. Confirmed independently by both T-08 review lenses.*
 - **Design references:** §2.1, §3.1–§3.4, §3.3's mode-invariant table
 - **Size:** M · **Dependencies:** T-05, T-06, T-07 · **Status:** done
 - **Skills:** `nestjs-expert`
@@ -300,7 +304,7 @@ graph TD
 
 - **Requirements covered:** **R-IU-011 (AC.1–AC.9)**; R-IU-009 (AC.1); DC-12
 - **Design references:** §6.7; **transcript §6** (the authoritative edit set); DD-9, DD-12
-- **Size:** L · **Dependencies:** **`bugfix/sp-versioning-roles-id` (external, must be merged)**, T-05, T-06 · **Status:** todo
+- **Size:** L · **Dependencies:** **the two `sp-versioning-roles-id` repair migrations present and ordered before M6 — SATISFIED BY CONSTRUCTION** (same branch; verified 2026-08-18), T-05, T-06 · **Status:** todo
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 > **The single highest-risk task in the chunk.** Four routines, all six indicators, on an append-only migration. **Ships as its own PR.**
@@ -309,7 +313,7 @@ graph TD
 
 **Implementation notes**
 - **Re-derive the routine set first** (transcript §0 step 1) and confirm it is still four. **Re-verify every line number** — they drift with any migration added above.
-- **Confirm the bugfix spec is merged first:** `SHOW CREATE PROCEDURE SP_versioning` must contain no `roles_id`. `SP_versioning` inherits the **repaired** body, not `main`'s.
+- **Inherit the repaired body, not `main`'s:** transcribe `SP_versioning` from `1784300000000-RepairSpVersioningObjectiveBlocks.ts`, **never** from the older `1783029013035`. `main`'s body still names `roles_id` and is non-executable; this branch's is repaired. (The former wording asked to "confirm the bugfix spec is merged" — corrected 2026-08-18, see the note under T-03.)
 - **`down()` must be written, not copied.** `SP_delete_result_version`'s historical `down()` is a bare `DROP` with no recreation (`1778510205765:337`) — following that pattern would leave the routine missing.
 - **Forbidden** (each already cost a review round):
   - a `result_quantifications` copy block — it is **already copied** (`:297`); adding one duplicates rows on every version bump for every indicator;
@@ -323,11 +327,13 @@ graph TD
 **Done**
 - [ ] Routine set re-derived by call site and confirmed as four
 - [ ] Exactly six edits applied; body diffs reviewed statement by statement
-- [ ] No `result_quantifications` block added; both divergences intact (AC.8, AC.9)
+- [ ] No `result_quantifications` block added; **the divergences that remain pre-M6** intact — `SIGNAL` vs `RETURN FALSE` (§4.1) and `delete_result`'s six soft-delete gaps (§5.1) (AC.8, AC.9) *(amended 2026-08-18: the §4.1 table-enumeration divergence was closed by the bugfix's T-02b and must NOT be restored)*
 - [ ] `down()` restores all four prior bodies exactly (AC.7)
 - [ ] Applies and reverts cleanly on the scratch schema
 - [ ] Behavioral ACs deferred to T-13 — **not** claimed here
 
+> **✅ RESOLVED 2026-08-18 — actioned by the spec-correction pass; AC.8/AC.9 and the row above are now restated. Original notice retained as the record.**
+>
 > **Inbound notice — filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03. Not edited here; chunk 1 restates its own AC when it next runs T-10.** That spec's T-02b (`[x]` done, Reviewer PASS 2026-08-14) added two `DELETE` statements to `SP_delete_result_version` for `result_impact_outcomes` / `result_strategic_objectives`, closing the transcript §4.1 hard-delete table-enumeration divergence with `full_delete_result_version`. **One of the "two pre-existing divergences" this Done item and R-IU-011 AC.8 require to survive intact no longer exists pre-M6** — only the `SIGNAL` vs `RETURN FALSE` divergence (transcript §4.1) and `delete_result`'s six soft-delete gaps (transcript §5.1) remain. Amending AC.8/AC.9 against the post-T-02b routine bodies is chunk 1's own gate, to be done before this task runs — this notice raises it, it does not silently edit it.
 
 ---
@@ -403,7 +409,7 @@ graph TD
 
 **Verification** — the dedicated fixture script from T-02.
 - **Falsifying input:** remove one of transcript §6's six edits and re-run. The corresponding fixture must go red. If every fixture still passes with an edit missing, the fixtures do not gate DC-12 and the task is not done.
-- **Disqualifier:** these fixtures cannot run before the `sp-versioning-roles-id` bugfix is merged — `CALL SP_versioning` raises 1054. An error is **not** a failure verdict on M6; distinguish the two in the execution note or the result is uninterpretable.
+- **Disqualifier:** these fixtures require the repair migrations **applied** to the schema under test — without them `CALL SP_versioning` raises MySQL 1054. On the scratch schema this is automatic (they are ordered first in the migration sequence); confirm it rather than assume it. An error is **not** a failure verdict on M6; distinguish the two in the execution note or the result is uninterpretable.
 
 **Done**
 - [ ] F13 asserts level id, explanation, four disaggregated counts, `actors_count`, `organization_count` on the new version
@@ -501,7 +507,7 @@ PR descriptions follow `cognitive-doc-design` review-empathy rules: state what t
 
 ## 6. Done definition
 
-- [ ] All T-01 … T-14 are `done` (T-03 extracted — verify `bugfix/sp-versioning-roles-id` is merged instead)
+- [ ] All T-01 … T-14 are `done` (T-03 extracted — verify instead that both `sp-versioning-roles-id` repair migrations are present and ordered before M6)
 - [ ] Every AC in R-IU-001 … R-IU-009 and **R-IU-011** is checked (**R-IU-012 is closed by the extracted bugfix spec**), and every scenario clause in §3 is owned and satisfied
 - [ ] Coverage ≥ 60%; full suite green with Innovation Dev specs unmodified
 - [ ] No endpoint added (chunk 1 exposes none) — Swagger unchanged **by design**
