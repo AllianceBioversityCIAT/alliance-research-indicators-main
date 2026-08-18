@@ -15,6 +15,7 @@
 | Budget (design §2.4) | ~~3 tasks · ~2,050 LOC · 1–2 review rounds~~ → ~~4 tasks · ~2,050 LOC + baseline dump · 2–3 review rounds~~ → **5 tasks · ~2,750 LOC + baseline dump · 3–4 review rounds** (revised 2026-08-14 by the T-02 Pivot; this row had been left at the T-01 figure — corrected 2026-08-18 by the Leader during T-03 so the log and `design.md` §2.4 no longer state two different budgets) |
 | Leader model tier | T1 (session model: Opus 5 — matches registry) |
 | Log started | 2026-08-14 |
+| **Reconciliation (2026-08-18, W-9)** | **Tasks:** 5/5, as budgeted. **LOC:** ≈3,065 authored vs ~2,750 budgeted (+11%). **Review rounds:** 5 vs 3–4 budgeted. **Overrun causes:** two pivots (T-01→T-01b, replay→snapshot; T-02's risk lens surfacing R-SPV-002 mid-task), +1 task added (T-02b), +2 review rounds on T-03 (attempt 1 FAIL plus a second, independently-spawned attempt-2 Reviewer). **Why the tripwire didn't fire:** `tasks.md` §0's budget tripwire names only a scope trigger ("if the repair needs more than the two blocks, stop and escalate") — it has no LOC or round-count trigger, so a budget overrun on either axis was never going to stop this spec by itself. No closing reconciliation had been recorded before this pass |
 
 ---
 
@@ -353,7 +354,7 @@ The Reviewer also checked a clause that *looked* like a violation and cleared it
 | --- | --- |
 | RB-1 | Closed — TEST datasource reachable, proven by sentinel |
 | RB-1b | Closed — the `sec_template` 1146 defect no longer occurs |
-| RB-1c | Closed as written, with A-1 recording where the guard does **not** reach |
+| RB-1c | **Restated 2026-08-18 (W-3) — over-read on first entry.** Closed for the **baseline-load path**: `load-baseline.js:64`'s guard covers `docker exec` against a hard-coded container name with no `-h` flag, which structurally cannot reach a remote host. **Open** for `migration:test:execute`/`:revert`, which connect over TCP through `orm.test.config.ts` with no such guard and run DDL, and for the fixture datasource, which writes through the same unguarded connection — see A-1/B-2. Closing those is a separate proposal, not this spec's scope |
 | RB-1d | Recorded, out of scope, tracked as OQ-3 |
 | R-SPV-001 | Gate precondition satisfied. The ACs themselves remain T-02's |
 
@@ -742,13 +743,15 @@ The two lenses **disagreed on FR-6**. Lens A accepted the closure — T-03's Don
 | Chunk 1 updated | Closed — `Depends on` declared, T-01/T-02 superseded-verify-only, T-03 extraction record finalized, six false-premise sites corrected, RB-B corrected + RB-B2 added, three raise-notices filed without touching chunk 1's ACs |
 | `family.md` FR-6 | Closed **merge-conditionally**, with the residual pre-flight named |
 
-#### `Not Done` — one criterion, user-owned
+#### `Not Done` — two criteria, both user-owned
 
-**"DevOps informed before the shared-DB run" is NOT closed.** The note is drafted and Reviewer-verified; **sending it is an outward-facing human action the Leader cannot take**, and the user explicitly took ownership of it (ruling, 2026-08-18: *"Draft the note, you send it"*).
+**Neither `requirements.md` §7 Sign-off row is closed: Engineering lead, and DevOps.** The note is drafted and Reviewer-verified; **sending it, and securing both sign-offs, are outward-facing human actions the Leader cannot take**, and the user explicitly took ownership of them (ruling, 2026-08-18: *"Draft the note, you send it"*). *(Restated 2026-08-18, W-8 — the audit trail here had named only the DevOps row, though `requirements.md` §7 always carried both open and `devops-note.md:8` already named both.)*
 
-T-03 therefore stays `[~]`, not `[x]`. This is deliberate and follows the standard this very task enforced on FR-6: a reader who saw T-03 `[x]` would conclude DevOps had been informed, which is exactly the over-claim attempt 1 failed for. Marking it done while the note sits unsent would repeat that error in the audit trail itself.
+`devops-note.md` step 0 now assigns the two rows distinct roles (D-4/E-4, adopted this pass): **Engineering lead approves** the shared-DB run; **DevOps is the executor acknowledgement**, confirming the run happened as specified. This removes the residual self-approval reading — the same engineer checking both boxes for themselves — without changing which actions are still outstanding.
 
-**One action flips it:** send `devops-note.md` to DevOps, then check `requirements.md` §7's DevOps box (recording approver and date) — at which point T-03's remaining criterion and the spec's release gate both close.
+T-03 therefore stays `[~]`, not `[x]`. This is deliberate and follows the standard this very task enforced on FR-6: a reader who saw T-03 `[x]` would conclude both sign-offs had happened, which is exactly the over-claim attempt 1 failed for. Marking it done while both boxes sit unchecked would repeat that error in the audit trail itself.
+
+**Two actions flip it:** send `devops-note.md`, then check **both** the Engineering lead and DevOps boxes in `requirements.md` §7 Sign-off (recording approver/acknowledger and date for each) — at which point T-03's remaining criterion and the spec's release gate both close.
 
 ## ADVISORY findings — T-03 attempt 2 (recorded; never gate, never become tasks in this spec)
 
@@ -757,7 +760,7 @@ T-03 therefore stays `[~]`, not `[x]`. This is deliberate and follows the standa
 | D-1 | readability | At `design.md:353` and `requirements.md:253` the retained lead-in ends in a period and the struck fragment then starts lowercase. The original was a subordinate clause; splitting the correction into its own sentence would read cleanly |
 | **D-2** | readability — **precision, the one worth acting on** | Three snapshot restatements disagree on what runs after the snapshot loads. `design.md:353` is accurate ("M1–M6 here, **plus the two migrations in the external bugfix spec**"); `requirements.md:253` and `tasks.md:102`/`:116` say "only this chunk's own M1–M6". On this branch the two bugfix migrations post-date the snapshot, so `tasks.md:116`'s restated criterion "`migration:test:execute` reports zero pending migrations" **will read 2 pending** once they are in the tree. Aligning the three on `design.md:353`'s phrasing removes a criterion that will read false to the next implementer |
 | D-3 | readability | Pointer imprecision: `tasks.md:136` says "two paragraphs above" (it is three); both `design.md` notices say "the row above" where the row is 2–3 up; `tasks.md:331` says "this Done item" now that it sits after the whole checklist. All cosmetic — each sentence self-disambiguates by quoting its referent |
-| D-4 | risk | `devops-note.md` step 0 names the approver as "whoever checks the 'DevOps' box" while the note is addressed **to** DevOps. The parenthetical gives both rows, but naming the **Engineering-lead** row as the non-operator approver would eliminate the residual self-approval reading |
+| D-4 ✅ | risk — **FIXED 2026-08-18 (W-8)** | `devops-note.md` step 0 names the approver as "whoever checks the 'DevOps' box" while the note is addressed **to** DevOps. The parenthetical gives both rows, but naming the **Engineering-lead** row as the non-operator approver would eliminate the residual self-approval reading. **Adopted:** step 0 now names Engineering lead as approver, DevOps as executor acknowledgement |
 | D-5 | risk | RB-B2's `closed (external)` is sound but does not repeat the branch/merge caveat carried at `tasks.md:11`; one clause ("inherited on merge of that spec") would make the row self-contained for a reader landing on the register directly |
 | — | carried | Still open and still non-gating from round 1: **C-8** (RB-B2's "#139" first-blocker imprecision), **C-11** (T-03's falsifier not demonstrated), **C-9** (`routine-transcript.md` staleness — chunk 1's gate, and stronger than B-18) |
 
@@ -796,7 +799,7 @@ This is deliberately *not* treated as an advisory absorbed into the task. It is 
 | E-1 | traceability | ✅ **Closed this turn** — the two stale `Last updated` headers, above |
 | E-2 | risk | `family.md` FR-6's "**this PR**" is written in an innovation-use document about the *bugfix* spec's PR. Both live on branch `AC-1679-Create-the-innovation-use-section`, so it resolves to the same thing; naming the branch would remove the double-take |
 | E-3 | risk | Duplicate of D-5 — `RB-B2`'s mitigation cell lacks the on-branch qualifier the other five swept sites now carry. Authorizes no action and `baseline.sql` genuinely exists, so non-gating; "(on branch; inherited on merge)" would make the sweep uniform |
-| E-4 | risk | Duplicate of D-4 — `devops-note.md` step 0 defines the approver as "whoever checks the 'DevOps' box", plausibly the same engineer executing the note. Not self-authorizing (the parenthetical names both rows and §7's DevOps row *is* the spec's gate), but naming the **Engineering-lead row as approver** and the DevOps row as executor acknowledgement would close the last inch |
+| E-4 ✅ | risk — **FIXED 2026-08-18 (W-8), same fix as D-4** | Duplicate of D-4 — `devops-note.md` step 0 defines the approver as "whoever checks the 'DevOps' box", plausibly the same engineer executing the note. Not self-authorizing (the parenthetical names both rows and §7's DevOps row *is* the spec's gate), but naming the **Engineering-lead row as approver** and the DevOps row as executor acknowledgement would close the last inch |
 | E-5 | readability | Duplicates D-1 and D-3 — the period-then-lowercase strikethrough surgery at `design.md` §6.5.1 piece 4 / `requirements.md:253`, and the "row above" / "two paragraphs above" pointer imprecision. All cosmetic; each sentence quotes its referent |
 
 **Both Reviewers independently carried forward the same non-gating set** — C-1 through C-4, C-6 through C-9, C-11 — with **C-9** (`routine-transcript.md` staleness inside chunk 1's DD-12 routine authority) named by both as the strongest. Two independent auditors converging on one carry-forward is the signal worth acting on; it must not rest on B-18 alone.

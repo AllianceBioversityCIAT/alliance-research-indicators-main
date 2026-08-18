@@ -5,7 +5,7 @@
 - **Status:** in-progress
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md)
-- **Last updated:** 2026-08-18 (F-2 "37"→32 correction, budget-tripwire ~350→~165 corrections, LOC-total pointer fix — 2026-08-18 validation-remediation pass; four of five tasks `[x]`, T-03 `[~]`)
+- **Last updated:** 2026-08-18 (F-2 "37"→32 correction, budget-tripwire ~350→~165 corrections, LOC-total pointer fix — 2026-08-18 validation-remediation pass; four of five tasks `[x]`, T-03 `[~]`. **Second remediation pass, same day:** T-01b zero-pending qualifier (W-7), both sign-off rows named in T-03 (W-8), FR-6 "closed"→"closes on merge" (W-10), Done-definition ticks (W-11))
 
 ---
 
@@ -86,14 +86,14 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (SP_versioning repa
 - Do **not** try to fix `CreateStaffGroups1759786024597` or any other unreplayable migration. That is OQ-3, deliberately out of scope.
 
 **Verification**
-- From a freshly created empty container: load the snapshot → `npm run migration:test:execute` reports **no pending migrations** (all 303 recorded as applied).
+- From a freshly created empty container: load the snapshot → `npm run migration:test:execute` reports **no pending migrations** (all 303 recorded as applied — **other than this spec's own two migrations, once they are committed to the tree** *(qualified 2026-08-18, W-7)*).
 - **`SP_versioning` exists in the scratch schema and is the broken version** — `SHOW CREATE PROCEDURE SP_versioning` contains `roles_id`. This is the handoff T-02 depends on; without it T-02 has no red to observe.
 - **Falsifying input:** on a fresh container, skip the snapshot load — `migration:test:execute` must fail immediately (no schema). A run that succeeds without the snapshot means the container was not empty; **stop and re-check**.
 - **Disqualifier:** a snapshot that loads is not a snapshot that is sufficient. The evidence is *TypeORM reporting zero pending migrations* **and** *`SP_versioning` present with `roles_id` in its body*. Anything less is INCONCLUSIVE.
 
 **Done**
 - [x] **Snapshot** artifact committed under `src/db/baseline/` — 196 tables + 17 views + 23 routines + `migrations` rows; 1 `INSERT`, targeting `migrations`; source environment and date recorded
-- [x] On a fresh container: snapshot loads and `migration:test:execute` reports **zero pending migrations** (`No migrations are pending`)
+- [x] On a fresh container: snapshot loads and `migration:test:execute` reports **zero pending migrations** (`No migrations are pending`) **other than this spec's own two migrations** *(qualified 2026-08-18, W-7 — true as run at T-01b's execution date; with `1784250000000`/`1784300000000` now committed to this tree, a fresh run reports 2 pending until they merge, same defect class as advisory D-2 against chunk 1)*
 - [x] `SHOW CREATE PROCEDURE SP_versioning` in the scratch schema contains `roles_id` — Reviewer confirmed structurally: body spans `baseline.sql:6935`–`:7917`, both occurrences inside it at `:7054` and `:7081`, all three §2.3 defects intact
 - [x] Falsifying input: without the snapshot, `migration:test:execute` fails immediately on a fresh container (MySQL 1146)
 - [x] README states the `migrations`-rows exception explicitly and records the derivation
@@ -199,8 +199,8 @@ T-01 (harness plumbing) → T-01b (baseline schema) → T-02 (SP_versioning repa
 - [x] Full suite green; coverage ≥ 60%, not regressed — 321 suites / 2042 tests; 83.57% stmts, 74.76% branches, 84.62% funcs, 83.56% lines
 - [x] `npm run lint -- --quiet` clean and `git status` re-checked — no `--fix` mutations
 - [x] OQ-1 answered and recorded; comms decision made — ruling carried verbatim with provenance in `execution.md`; comms: none needed
-- [ ] **DevOps informed before the shared-DB run** — ⚠️ **USER-OWNED, STILL OPEN.** [`devops-note.md`](./devops-note.md) is drafted and Reviewer-verified; **sending it is a human action the Leader cannot take** (user ruling 2026-08-18). Flip this by sending the note, then checking the DevOps box in `requirements.md` §7 Sign-off with approver and date
-- [x] Chunk 1 updated: T-03 removed, `Depends on` declared, `family.md` FR-6 closed (merge-conditionally, with the residual pre-flight named)
+- [ ] **Engineering lead and DevOps both informed / signed off before the shared-DB run** — ⚠️ **USER-OWNED, STILL OPEN, both rows.** [`devops-note.md`](./devops-note.md) is drafted and Reviewer-verified, and its step 0 now names **Engineering lead** as the approving party and **DevOps** as the executor acknowledgement (D-4/E-4, adopted 2026-08-18, W-8); **sending it and securing both sign-offs are human actions the Leader cannot take** (user ruling 2026-08-18). Flip this by sending the note, then checking **both** the Engineering lead and DevOps boxes in `requirements.md` §7 Sign-off, each with approver/acknowledger and date *(named as two rows, not one, 2026-08-18 — W-8; `requirements.md` §7 always had both open, but the audit trail had tracked only DevOps)*
+- [x] Chunk 1 updated: T-03 removed, `Depends on` declared, `family.md` FR-6 updated to close on merge, with the residual pre-flight named *(corrected 2026-08-18, W-10 — the delivered row says "closes on merge", not "closed")*
 
 ---
 
@@ -233,9 +233,11 @@ Every AC and every negative clause is owned. **The mandatory Bug Mode regression
 
 ## 5. Done definition
 
-- [ ] T-01, **T-01b**, T-02, **T-02b**, T-03 `done`
-- [ ] R-SPV-001's five ACs checked; every scenario clause satisfied
-- [ ] **R-SPV-002's five ACs checked; the re-version cycle proven green**
-- [ ] Regression fixture demonstrated **red before, green after** — for both defects (1054 and 1451)
-- [ ] Full suite green, coverage not regressed
-- [ ] `innovation-use/data-model-and-catalog` unblocked and its dependency recorded
+*(Ticked 2026-08-18, W-11 — each verified against `execution.md`'s recorded outcome before ticking. Two items stay open: both are DevOps/merge-dependent, which this pass does not tick regardless of how much delegable work behind them is finished.)*
+
+- [ ] T-01, **T-01b**, T-02, **T-02b**, T-03 `done` — **left open.** T-01/T-01b/T-02/T-02b are `[x]`, but T-03 itself is `[~]`, not `[x]` — held open by the same user-owned DevOps criterion as the last item below. Ticking this line would assert T-03 is "done" while its own task entry says otherwise
+- [x] R-SPV-001's five ACs checked; every scenario clause satisfied — `requirements.md` R-SPV-001 AC.1–AC.5, all ticked with `execution.md` T-02 evidence pointers; scenario clauses trace to the same ACs (§3 coverage table)
+- [x] **R-SPV-002's five ACs checked; the re-version cycle proven green** — `requirements.md` R-SPV-002 AC.1–AC.5, all ticked with `execution.md` T-02b evidence pointers; full version → delete-version → re-version cycle green per T-02b Done
+- [x] Regression fixture demonstrated **red before, green after** — for both defects (1054 and 1451) — T-02 Done (1054 red/green, `execution.md` T-02) and T-02b Done (1451 red/green, `execution.md` T-02b)
+- [x] Full suite green, coverage not regressed — T-03 Done item 1: 321 suites / 2042 tests, 83.57%/74.76%/84.62%/83.56% against a 60% floor
+- [ ] `innovation-use/data-model-and-catalog` unblocked and its dependency recorded — **left open, merge-dependent.** The dependency **is** recorded (chunk 1's `Depends on`, `family.md` FR-6 "closes on merge"), but chunk 1 stays blocked on T-10 until these two migrations actually run against the shared dev DB (`family.md` FR-6's named pre-flight) — that is the DevOps-owned step, not yet taken

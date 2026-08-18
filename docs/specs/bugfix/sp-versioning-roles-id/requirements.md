@@ -74,12 +74,12 @@ Defect 1 masks 2 and 3 — all three must be fixed for the block to execute.
 
 The procedure **SHALL** complete without error, and **SHALL** copy `result_impact_outcomes` and `result_strategic_objectives` rows to the new version.
 
-**Acceptance criteria:**
-- [ ] AC.1 — `CALL SP_versioning(<code>)` completes without error.
-- [ ] AC.2 — Both tables' active rows are copied to the new version with `role_id` preserved.
-- [ ] AC.3 — Each copied row receives a **fresh** `id`; the source row's `id` is not reused.
-- [ ] AC.4 — **No other block of the procedure changes.** The other 27 copy blocks are byte-identical.
-- [ ] AC.5 — `down()` restores the exact prior body, **defects included**.
+**Acceptance criteria:** *(ticked 2026-08-18, W-11 — each verified against `execution.md`'s T-02 "Requirements outcome" table before ticking)*
+- [x] AC.1 — `CALL SP_versioning(<code>)` completes without error. — `execution.md` → T-02 Requirements outcome, AC.1 Closed
+- [x] AC.2 — Both tables' active rows are copied to the new version with `role_id` preserved. — `execution.md` → T-02 Requirements outcome, AC.2 Closed
+- [x] AC.3 — Each copied row receives a **fresh** `id`; the source row's `id` is not reused. — `execution.md` → T-02 Requirements outcome, AC.3 Closed
+- [x] AC.4 — **No other block of the procedure changes.** The other 27 copy blocks are byte-identical. — `execution.md` → T-02 Requirements outcome, AC.4 Closed
+- [x] AC.5 — `down()` restores the exact prior body, **defects included**. — `execution.md` → T-02 Requirements outcome, AC.5 Closed
 
 #### Scenario: Versioning a result with objective rows
 
@@ -100,12 +100,12 @@ The procedure **SHALL** complete without error, and **SHALL** copy `result_impac
 
 The procedure **SHALL** delete `result_impact_outcomes` and `result_strategic_objectives` rows for the version being removed, before deleting the parent `results` row.
 
-**Acceptance criteria:**
-- [ ] AC.1 — After versioning a result that carries objective rows, `CALL SP_delete_result_version(<code>, <year>)` completes without error.
-- [ ] AC.2 — Both tables' rows for that snapshot are gone afterwards.
-- [ ] AC.3 — The two new statements are placed **before** the final `DELETE FROM results`.
-- [ ] AC.4 — **No other statement of the routine changes.** The existing **32 child deletes** (33 statements including the final parent delete) are byte-identical. *(Corrected 2026-08-14 from "37", a Leader miscount at pivot time — advisory B-12.)*
-- [ ] AC.5 — `down()` restores the exact prior body, the omission included.
+**Acceptance criteria:** *(ticked 2026-08-18, W-11 — each verified against `execution.md`'s T-02b "Requirements outcome" table before ticking)*
+- [x] AC.1 — After versioning a result that carries objective rows, `CALL SP_delete_result_version(<code>, <year>)` completes without error. — `execution.md` → T-02b Requirements outcome, AC.1 Closed
+- [x] AC.2 — Both tables' rows for that snapshot are gone afterwards. — `execution.md` → T-02b Requirements outcome, AC.2 Closed
+- [x] AC.3 — The two new statements are placed **before** the final `DELETE FROM results`. — `execution.md` → T-02b Requirements outcome, AC.3 Closed
+- [x] AC.4 — **No other statement of the routine changes.** The existing **32 child deletes** (33 statements including the final parent delete) are byte-identical. *(Corrected 2026-08-14 from "37", a Leader miscount at pivot time — advisory B-12.)* — `execution.md` → T-02b Requirements outcome, AC.4 Closed
+- [x] AC.5 — `down()` restores the exact prior body, the omission included. — `execution.md` → T-02b Requirements outcome, AC.5 Closed
 
 #### Scenario: Re-versioning a result with objective rows
 
@@ -152,7 +152,7 @@ The procedure **SHALL** delete `result_impact_outcomes` and `result_strategic_ob
 | RB-1 | **No scratch-schema mechanism exists.** The TEST datasource target (`orm.config.ts:34-39`) is unreachable from any npm script; `ARI_TEST_MYSQL_PORT` does not exist; `orm-connection-test.module.ts` binds to `CORE` despite its name | **High** | This spec depends on the TEST datasource module and Docker MySQL scaffolding (chunk-1 tasks T-01/T-02, or built here if this ships first — see `design.md` §4). **Resolved by T-01 and verified by a falsifying sentinel** |
 | RB-1b | **The migration history is not self-sufficient — discovered during T-01, 2026-08-14.** 10 migrations write into `sec_template`; **none of the 303 creates it**. An empty scratch schema fails at `1751474908040-InsertTemplates.ts` with MySQL 1146. RB-1 understated the gap: the missing piece was never only datasource plumbing | **High** | A committed **schema-only baseline dump** loaded before migrations — `design.md` §4.1 / DD-5, task T-01b. Until it lands, DC-A cannot execute and this spec cannot be shipped on evidence |
 | RB-1d | **The migration history is not replayable from empty — discovered during T-01b, 2026-08-14.** It assumes a pre-existing environment in both schema *and* data. `CreateStaffGroups1759786024597` hardcodes five `carnet` values with an FK to `alliance_user_staff`, a table populated by a runtime staff-sync and never by a migration (MySQL 1452, at migration #139 of 303). **164 migrations remain unexercised** | **High** | Harness switched from replay to a **schema-only snapshot** (`design.md` §4.1 / DD-5, revised). The non-replayability itself is a repo-level defect, out of scope here — OQ-3 |
-| RB-1c | **A `TEST`-named env var is not evidence of a disposable target.** On a developer machine `ARI_TEST_MYSQL_*` was found pointing at the same remote RDS instance as an alternate `ARI_MYSQL_*` target (`execution.md` → F-01). The literal prohibition "never point at `ARI_MYSQL_*`" did not cover it, because the *name* differed while the *host* did not | **High** | Verify the resolved host/port values, never the variable name. The falsifying sentinel in T-01 is the standing check |
+| RB-1c | **A `TEST`-named env var is not evidence of a disposable target.** On a developer machine `ARI_TEST_MYSQL_*` was found pointing at the same remote RDS instance as an alternate `ARI_MYSQL_*` target (`execution.md` → F-01). The literal prohibition "never point at `ARI_MYSQL_*`" did not cover it, because the *name* differed while the *host* did not | **High** | **Closed for the baseline-load path only; open for `migration:test:*` and the fixture datasource — see `execution.md` advisories A-1/B-2** *(restated 2026-08-18, W-3)*. Verify the resolved host/port values, never the variable name. The falsifying sentinel in T-01 is the standing check for the load path |
 | RB-2 | Migrations are append-only (ADR-5) against a shared, non-disposable DB | **High** | Additive/repair-only; no DDL on any table; human approval before the shared DB; verified `down()` |
 | RB-3 | Touching a procedure that serves **all six indicators** | **High** | Only two blocks change; full-body diff is a done criterion; fixture proves the other blocks still copy |
 | RB-4 | Unknown production exposure — how long versioning has been broken, and whether callers swallow the error | Medium | §6 OQ-1; confirm against the deployed environment before release comms. **Partly answered 2026-08-14 (T-02 review):** one caller *does* swallow it — `result-status-workflow.repository.ts:167-169` rewrites any failure to a bare `'Error deleting snapshot'`, so a 1451 there is diagnostically invisible. The `green-checks` path does not swallow but has no transaction |
@@ -172,6 +172,6 @@ The procedure **SHALL** delete `result_impact_outcomes` and `result_strategic_ob
 
 ## 7. Sign-off
 
-- [ ] Engineering lead
-- [ ] DevOps — required before the migration runs against the shared dev database
+- [ ] Engineering lead — **approves** the shared-DB run (see `devops-note.md` step 0, D-4/E-4)
+- [ ] DevOps — **executor acknowledgement**: confirms the run happened per `devops-note.md`, required before the migration runs against the shared dev database *(roles split 2026-08-18, W-8, so the two boxes are not the same person approving and executing)*
 - [ ] Security review — not required (no auth, secrets, or PII surface changed)

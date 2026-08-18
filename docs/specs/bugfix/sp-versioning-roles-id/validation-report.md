@@ -277,3 +277,27 @@ Then:
 ```text
 /akili-archive docs/specs/bugfix/sp-versioning-roles-id
 ```
+
+---
+
+## Remediation Status
+
+**Appended 2026-08-18 by a second remediation pass. Point-in-time record — the findings above are unchanged; this section only tracks what happened to each of them.**
+
+| ID | Status | Note |
+| --- | --- | --- |
+| F-1 | **Closed** | commit `8afd2ca9` (first pass) |
+| F-2 | **Closed** | commit `8afd2ca9` (first pass) |
+| W-1 | **Closed** | commit `8afd2ca9` (first pass) |
+| W-2 | **Closed** | commit `8afd2ca9` (first pass) |
+| W-3 | **Restated, not closed (this pass)** | RB-1c's closure narrowed in `requirements.md`, `design.md`'s referenced `execution.md` row, and `execution.md` itself, to *"closed for the baseline-load path; open for `migration:test:*` and the fixture datasource — see A-1/B-2."* The guard gap itself is untouched — actually closing it needs its own proposal |
+| W-4 | **Still open — needs an owner decision** | Not addressed beyond recording it here, as instructed: the only real gate for this defect class (the `*.fixture-spec.ts` suite) runs in no CI path and contributes to no coverage floor |
+| W-5 | **Closed (this pass)** | A non-editing inbound notice filed at `routine-transcript.md` (adjacent to §4.1, ~`:177`), matching the shape already used at `design.md:426`/`:506`. States the post-T-02b reality and points at R-IU-011 AC.8/AC.9 as chunk 1's own gate to amend. No stale fact and no acceptance criterion was edited |
+| W-6 | **Closed (this pass)** | `design.md`'s Pivot register (Document Control) now lists T-01b between T-01 and T-02, pointing at `execution.md` → *Pivot Record: T-01b* |
+| W-7 | **Closed (this pass)** | `tasks.md` T-01b's Done criterion and its Verification twin both qualified: zero pending migrations **other than this spec's own two**, once committed to the tree |
+| W-8 | **Partial (this pass) — the sign-offs themselves are user-owned** | `execution.md`'s T-03 `Not Done` and `tasks.md`'s T-03 Done item now name **both** the Engineering lead and DevOps rows, not DevOps alone. `devops-note.md` step 0 adopts D-4/E-4: Engineering lead is now the approving party, DevOps the executor acknowledgement. Neither box is checked — that remains a human action |
+| W-9 | **Closed (this pass)** | One reconciliation row added to `execution.md`'s Document Control: 5/5 tasks as budgeted; LOC ≈3,065 vs ~2,750 (+11%); 5 review rounds vs 3–4; overrun causes named (two pivots, +1 task, +2 T-03 rounds); records that the budget tripwire never had a LOC/round trigger, only a scope one, and that no reconciliation had been recorded before now |
+| W-10 | **Closed (this pass)** | `tasks.md` T-03's Done item reworded from `family.md` FR-6 "**closed**" to "**updated to close on merge**, with the residual pre-flight named" — matching the delivered row's actual wording |
+| W-11 | **Closed (this pass)** | `requirements.md`'s ten ACs (R-SPV-001 + R-SPV-002) ticked, each with an `execution.md` evidence pointer. `tasks.md`'s spec-level Done definition: 4 of 6 items ticked with evidence; the other 2 (task-status roll-up naming T-03 "done", and chunk 1 "unblocked") left open as DevOps/merge-dependent, since T-03 itself is still `[~]` |
+
+**Net effect:** every WARN with a documentation-only fix is closed or explicitly restated with its residual scope named. **Two items remain open by design, not by oversight:** W-4 (needs an owner decision on the fixture gate's CI coverage) and the sign-off boxes under W-8 (needs the named humans to act). Nothing in this pass touched code, migrations, or the test harness.
