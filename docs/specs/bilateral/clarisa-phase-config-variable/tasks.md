@@ -97,7 +97,7 @@ npx eslint src/domain/tools/clarisa/projects
 
 | Field | Value |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[~]` — code PASS, **human visual check owed** (D-7), blocked by X-6 |
 | **Size** | M |
 | **Package** | `client/research-indicators` |
 | **Depends on** | `T-02` (was `T-01`, `T-02` — `T-01` dropped by pivot) |
@@ -143,9 +143,9 @@ npm run build          # the client's real type gate
 
 ### Done
 
-- [ ] All eight clause-coverage rows have a passing test.
-- [ ] `npm run build` clean (the client's only real type gate).
-- [ ] The human visual check has been performed and its outcome recorded in `execution.md`.
+- [x] All eight clause-coverage rows have a passing test.
+- [x] `npm run build` clean (the client's only real type gate).
+- [ ] **The human visual check has been performed and its outcome recorded in `execution.md`.** ← blocks `[x]`; blocked by X-6
 
 ---
 
@@ -153,7 +153,7 @@ npm run build          # the client's real type gate
 
 | Field | Value |
 | --- | --- |
-| **Status** | `[ ]` |
+| **Status** | `[x]` — PASS attempt 3 of 3, 2026-08-18 (`execution.md` → T-04) |
 | **Size** | XS |
 | **Package** | `server/researchindicators` |
 | **Depends on** | none |
@@ -184,8 +184,8 @@ grep -n "ARI_CLARISA_PROJECTS_PHASE" server/researchindicators/.env.example
 
 ### Done
 
-- [ ] Line present with the tier explanation and the literal fallback named.
-- [ ] Reviewer has read the comment for accuracy, not only confirmed its presence.
+- [x] Line present with the tier explanation and the literal fallback named.
+- [x] Reviewer has read the comment for accuracy, not only confirmed its presence — **twice rejected it as inaccurate before passing**.
 
 ---
 

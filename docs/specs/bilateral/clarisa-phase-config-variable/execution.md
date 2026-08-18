@@ -164,3 +164,104 @@ The first advisory is not merely advisory *for T-03*: `R-CPC-003` scenario 2 req
 **T-03's brief MUST state that the empty-state hint branches on `phaseAbsentCount > 0`**, and must render a different message when both `phases` and `phaseAbsentCount` are empty. This is implementation of an existing requirement, not new scope.
 
 ---
+
+### T-03 — Editable year selector in the config edit modal
+
+- **Status:** `[~]` — **code PASS, task NOT closed.** The human visual check (D-7) is still owed and is blocked upstream by **X-6**
+- **Date:** 2026-08-18
+- **Implementer attempts:** 1 · **Reviewer verdict:** `STATUS: PASS`
+- **Requirements covered:** `R-CPC-004` (all clauses), `R-CPC-003` client half
+
+**Files changed:** `edit-environment-variable-modal.component.{ts,html,spec.ts}`, `bilateral-project-mapping.interface.ts`, `api.service.ts` — 397 insertions.
+
+**Verification (Implementer, from `client/research-indicators`)**
+
+```
+npm test -- --silent   → 6402/6405 passing
+npx eslint <4 touched files> → clean
+npm run build          → Application bundle generation complete
+```
+
+**Leader re-measurement of the 3 failures.** The Implementer claimed they were pre-existing. Not accepted on assertion — verified: the diff touches neither `to-promise.service.*` nor `src/environments/`, and `environment.ts` is **gitignored** (`client/.gitignore:41`), so its URL-substring assertions fail on this checkout regardless of the change. Structurally impossible for this diff to have caused them. Claim confirmed.
+
+**Forward pointer from T-02 — honoured.** `phaseEmptyHint()` branches on `phaseAbsentCount() > 0`, with three genuinely distinguishable states in both component and template: no-phase-data, no-eligible-projects, request-failed. The failed request sets a dedicated error signal rather than folding into an empty array — the swallow-into-empty pattern that made the original defect invisible is **not** repeated.
+
+**Reviewer summary.** All eight clause-coverage rows have a real, non-trivial test asserting against the actual PrimeNG `Select` instance. `DD-3`/`DD-4`/`DD-7` each implemented and asserted. The read-only clause reaches the editable input and the overlay trigger, not just the host. No hex literal introduced; both tokens have dark-mode variants.
+
+The Reviewer verified rather than assumed on three points where assuming was the easy path:
+- Read the **PrimeNG 19 source** to confirm `editable` round-trips an unpublished year (`editableInputValue` falls back to `modelValue()`), and that `[disabled]` reaches the editable `<input>` — the binding easiest to miss.
+- Checked whether `.fs-*`/`.rs-*` token classes were the required alternative to `text-[15px]`: `src/styles/responsive-size.scss` **does not exist in this tree** and no such class is defined anywhere, so the arbitrary sizing is the file-wide convention, not a violation.
+- Confirmed **KZ-001**: no `overrideComponent`/stub anywhere in the spec; `By.directive(Select)` asserts on the real instance. The green suite is over real rendering.
+
+#### ADVISORY (recorded, never gating, never a new task)
+
+| Lens | Finding |
+| --- | --- |
+| Reliability | `loadPhaseOptions()` has no `try/finally` — `phaseOptionsLoading` would latch `true` forever on a synchronous throw, leaving the select permanently disabled. The Reviewer checked the real path first: `ToPromiseService.TP` wraps every call in `catchError`, so HTTP errors cannot reject. Exposure is narrow |
+| Reliability | No request sequencing; the `effect()` refires per `editingItem()` identity and two in-flight responses could land out of order |
+| **Risk (R2)** | **`DD-7` and `DD-3` interact.** PrimeNG sets the editable input's text to the option **label**, not its value — after picking a year the field visibly reads `2025 (25)` while the model is correctly `2025`. Saving is safe, but an admin who then edits that text in place produces `simple_value = "2025 (25)"`. Not a spec violation (`R-CPC-002` guarantees a non-numeric value falls through), but it is a silent no-op → **added to the HITL visual checklist below** |
+| A11y | `inputId` is set but no `<label for>` references it; the "Value" caption is a bare `<span>`, matching the JSON branch's existing convention. A `<label for>` would be a one-line WCAG improvement here and in that branch |
+
+#### Why T-03 is `[~]` and not `[x]`
+
+`tasks.md` T-03 *Done* row 3 requires the human visual check recorded in `execution.md`, and states: *"A green suite is not a substitute for this check and must not be reported as one."* It is not done. Marking `[x]` on a green suite would be exactly the substitution the task forbids.
+
+**HITL visual checklist (owed, blocked by X-6 until ops applies the pending migration):**
+
+1. The selector renders; years and counts are readable.
+2. Typing a custom year works and persists.
+3. The empty-state hint reads "no phase data upstream", not "no projects".
+4. **After selecting a year, confirm what the editable field displays** — per advisory R2 it will read `2025 (25)`, and editing that text in place would save a non-numeric value.
+
+---
+
+### T-04 — Document the variable in `.env.example`
+
+- **Status:** ✅ **PASS** on attempt **3 of 3** — two Reviewer FAILs, both correct
+- **Date:** 2026-08-18
+- **Requirements covered:** `R-CPC-005` (scenario + `AND IT MUST` clause)
+- **Files changed:** `server/researchindicators/.env.example` only (Leader-verified via `git status --porcelain -- server/`, which the read-only Reviewer cannot run)
+
+**Why a 10-line comment consumed the full rework budget.** T-04's gate is *truth, not presence* — a grep proves the line exists, not that it is correct. Both FAILs were factual errors in the comment that a presence-check would have passed:
+
+| Attempt | Claim written | Reality | Verdict |
+| --- | --- | --- | --- |
+| 1 | A non-numeric value in this env var "falls back to 2026" | Tier 3 **throws `BadRequestException`** (`mapping-phase.resolver.ts` L108-114). A typo'd value breaks the picker on every call | FAIL |
+| 2 | 2026 is reached "**only** when BOTH this variable and the row are unset or blank" | Over-corrected. A non-numeric, inactive, missing **or unreadable** row plus an unset env var also reaches 2026. The sentence contradicted the one directly above it | FAIL |
+| 3 | 2026 whenever the env var is unset/blank **AND** the row yields no numeric value (missing, inactive, blank, non-numeric, or unreadable) — a bad row degrades, it does not fail | Verified against L71-119 | **PASS** |
+
+**Both failures are the same class:** a sentence that reads as precise but does not match the cascade — first too permissive, then too strict. The resolver deliberately gives Tier 2 and Tier 3 **opposite** failure semantics (warn-and-fall-through vs throw), and a comment that flattens them misleads exactly the operator it is written for.
+
+**Reviewer's final verification went past the brief.** It confirmed the five-path enumeration is exhaustive (nothing else sits between `getRepository` and the numeric return that isn't inside the `try`), independently re-read the `catch` at L98-104 to confirm it only logs, and checked `env.utils.ts:45` — noting that **without** its `.trim()`, a whitespace-only value would reach `Number('   ') === 0` and return `0` rather than 2026, which would have made the sentence false. It is true only because of that trim.
+
+**Leader note.** The Reviewer flagged that it could not verify file scope (no `Bash`). The Leader ran that check instead — `git status --porcelain -- server/` shows only `.env.example`. Recording the split so the gap is a division of labour, not an unverified claim.
+
+---
+
+## Summary — all tasks resolved
+
+| Task | Status | Outcome |
+| --- | --- | --- |
+| T-01 | dropped | Pivot — the migration already existed and is merged (`8431dc4b`), pending application to Dev |
+| T-02 | `[x]` | PASS, 1 attempt — phases endpoint |
+| T-03 | `[~]` | Code PASS, 1 attempt — **human visual check owed**, blocked by X-6 |
+| T-04 | `[x]` | PASS, 3 attempts — 2 factual FAILs caught |
+
+### Budget tripwire — LOC exceeded, escalated
+
+| Metric | Budgeted | Actual | Delta |
+| --- | --- | --- | --- |
+| Tasks | 3 | 3 | on target |
+| Review rounds | ~5 | 5 | on target |
+| **LOC** | **~380** | **~720** | **+90%** |
+
+**Cause: test volume, not scope creep.** No production requirement was added. The budget assumed ~220 test lines; actual is ~476 across T-02 (216) and T-03 (260). The clause-coverage tables written during `/akili-specify` demanded a test per scenario **and per `BUT`/`AND IT MUST` clause** — 13 clauses across the two tasks — and each needs its own fixture. The estimate priced the requirements, not the clause count they implied.
+
+Production code came in at ~244 lines against an implied ~160 — within noise. **The mis-estimate is in the spec-authoring step, not the execution.**
+
+### Outstanding, outside this spec
+
+1. **Ops action (X-6):** apply `SeedClarisaMappingPhase1786738949211` to the Dev database. Until then the variable does not appear on the Configuration Variables screen and T-03's visual check cannot complete.
+2. **T-03's HITL visual checklist** — four items, recorded in T-03's entry above, including advisory R2 (the editable field displays the option *label* `2025 (25)`, not the value).
+
+---
