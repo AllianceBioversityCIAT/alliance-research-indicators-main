@@ -1,6 +1,6 @@
 # Scratch-schema snapshot
 
-- **Spec:** [`docs/specs/bugfix/sp-versioning-roles-id`](../../../../../docs/specs/bugfix/sp-versioning-roles-id/) — task **T-01b**
+- **Spec:** [`docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id`](../../../../../docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id/) — task **T-01b**
 - **Source environment:** the shared dev database (`ARI_MYSQL_*`), database `alliancereportingdb`
 - **Date taken:** 2026-08-14
 - **Model:** **snapshot, not replay.** See *Why replay was abandoned* below — this is a pivot from this artifact's first version, not the original design.

@@ -21,7 +21,7 @@ Continuous-improvement record across AKILI-SPECS specs. One entry per archived s
 
 ### 2026-08-18 — `bugfix/sp-versioning-roles-id`
 
-**Outcome:** delivered and validated; **spec still active, not archived.** This retrospective ran early, on user instruction, because `/akili-archive` was blocked at its readiness gate (T-03 `[~]`, W-4 open, branch unmerged) and the Constitution Sync had found a constitutional document stating a falsehood. Steps 3 and 4 do not depend on the merge; the folder move does.
+**Outcome:** delivered and validated; **archived 2026-08-18 to `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id/` with three readiness gates unmet, on explicit user instruction** (T-03 `[~]`, both §7 sign-off rows open, branch unmerged; W-4 unowned). This retrospective ran *ahead* of the move, when `/akili-archive` was first blocked at that gate — Steps 3 and 4 do not depend on the merge, and the Constitution Sync had found a constitutional document stating a falsehood. **The fix has not run against the shared dev database**; the archive records a closed spec, not a shipped repair.
 
 **What shipped:** two append-only migrations repairing `SP_versioning` (MySQL 1054, `roles_id` dropped from under it) and its mandatory companion `SP_delete_result_version` (MySQL 1451, activated *by* the first repair — RB-5), plus the repo's first disposable-MySQL harness and a committed schema-only baseline snapshot.
 

@@ -8,7 +8,7 @@
 - **Linked design:** [`./design.md`](./design.md)
 - **Routine authority:** [`./routine-transcript.md`](./routine-transcript.md) revision 2 — **M6 is written from it, not from prose** (DD-12)
 - **Parent spec:** [`../family.md`](../family.md) — chunk 1 of 3
-- **Depends on:** [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/) — **must be merged before T-10 starts.** Verify with `SHOW CREATE PROCEDURE SP_versioning` (no `roles_id`) before that task begins. Declared here 2026-08-18 by that spec's T-03 (`design.md` §6 "Coupling"); already carried in `../family.md`'s children table
+- **Depends on:** [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) — ⚠️ **that spec is ARCHIVED but NOT MERGED. Archived ≠ shipped:** it was archived 2026-08-18 with its DevOps hand-off unsent and its §7 sign-off open, and its migrations have never run against the shared dev DB. **Must be merged before T-10 starts.** Verify with `SHOW CREATE PROCEDURE SP_versioning` (no `roles_id`) before that task begins. Declared here 2026-08-18 by that spec's T-03 (`design.md` §6 "Coupling"); already carried in `../family.md`'s children table
 - **Last updated:** 2026-08-18 (T-01/T-02/T-10 superseded/corrected/notified, dependency declared — see notes inline; by `bugfix/sp-versioning-roles-id` T-03)
 
 ---
@@ -18,12 +18,12 @@
 | Rule | Why |
 | --- | --- |
 | **Nothing SQL runs until T-01 and T-02 land.** | The repo has **no** working scratch-schema mechanism. `migration:dev:execute` / `migration:revert` hardcode the `orm.config.ts` export, which is bound to **`CORE`** — the shared, non-disposable database. Running them "to check" is the disaster RB-2 / RB-9 / FR-3 exist to prevent. |
-| **`SP_versioning` is broken in `main` today.** | Repaired by the **external** [`bugfix/sp-versioning-roles-id`](../../bugfix/sp-versioning-roles-id/) spec, which **must merge before T-10**. Until then `CALL SP_versioning` raises MySQL **1054** for every indicator, and every versioning fixture errors rather than asserts. |
+| **`SP_versioning` is broken in `main` today.** | Repaired by the **external** [`bugfix/sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) spec, which **must merge before T-10**. Until then `CALL SP_versioning` raises MySQL **1054** for every indicator, and every versioning fixture errors rather than asserts. |
 | **Never claim a routine set from memory.** | Re-run transcript §0 step 1 (call-site grep) at implementation time. Three review rounds got this wrong by naming routines instead of finding them. |
 | **Line numbers drift.** | The transcript's absolute lines were true on 2026-08-14. Re-verify before editing; the stable anchors are *"after the `result_innovation_dev` block"*, not the numbers. |
 | **Migrations are append-only** (ADR-5). | Never edit a merged migration. `git status` after every `npm run lint` — the script carries `--fix` and mutates files. |
 
-**Budget tripwire** (`design.md` §12): **13 tasks · ~2,600 LOC · 4–5 review rounds** *(revised after M0 was extracted to [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/) — that spec carries the remaining ~2,750 LOC *(corrected 2026-08-18 — that spec's T-02 Pivot added a mandatory second migration after this figure was written, growing its own budget from ~2,050 to ~2,750; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*).* If actuals exceed this — especially if any routine needs *restructuring* rather than the six transcript §6 edits — **stop and escalate**; do not continue.
+**Budget tripwire** (`design.md` §12): **13 tasks · ~2,600 LOC · 4–5 review rounds** *(revised after M0 was extracted to [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) — that spec carries the remaining ~2,750 LOC *(corrected 2026-08-18 — that spec's T-02 Pivot added a mandatory second migration after this figure was written, growing its own budget from ~2,050 to ~2,750; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*).* If actuals exceed this — especially if any routine needs *restructuring* rather than the six transcript §6 edits — **stop and escalate**; do not continue.
 
 ---
 
@@ -123,7 +123,7 @@ graph TD
 
 > **Removed from this spec on the user's ruling of 2026-08-14.** The `SP_versioning` repair is a pre-existing, cross-indicator production defect that this chunk merely discovered, so it ships on its own schedule rather than waiting on an Innovation Use feature spec.
 >
-> **It now lives at [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/)** — **5** tasks, ~2,750 LOC *(corrected 2026-08-18 from "3 tasks, ~2,050 LOC" — that spec grew by two tasks and ~700 LOC across its T-01 and T-02 Pivots after this note was written; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*, red-before-green regression fixture (formerly F19).
+> **It now lives at [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/)** — **5** tasks, ~2,750 LOC *(corrected 2026-08-18 from "3 tasks, ~2,050 LOC" — that spec grew by two tasks and ~700 LOC across its T-01 and T-02 Pivots after this note was written; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass)*, red-before-green regression fixture (formerly F19).
 >
 > **This chunk `Depends on` it.** T-10 (M6) reproduces `SP_versioning`'s body and **must inherit the repaired one**; T-13's fixtures cannot run until it lands, since `CALL SP_versioning` raises MySQL 1054 today.
 >
@@ -460,7 +460,7 @@ graph TD
 | R-IU-008 | AC.1–AC.4 | *blast radius stays clean* · BUT NOT a targeted suite · AND IT MUST NOT be made green by editing Innovation Dev specs | T-14 |
 | R-IU-009 | AC.1–AC.4 | *bad deploy recoverable* · BUT NOT drop/alter another function → **T-09** · AND IT MUST NOT run against the shared DB → **T-01, T-02** | T-01…T-07, T-09, T-10, T-14 |
 | **R-IU-011** | AC.1–AC.9 | *versioned result keeps data* · BUT NOT alter existing copies → **F16** · AND IT MUST NOT add a quantifications block → **T-10** (AC.8) · AND IT MUST be proven by execution → **F13** · *delete leaves nothing* · BUT NOT touch other versions → **F14/F15** · *soft delete deactivates* · BUT NOT leave the row active → **F18** · AND IT MUST NOT hard-delete → **F18** | T-10, T-13 |
-| ~~R-IU-012~~ | — | **Extracted** — owned by [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/) as R-SPV-001, including the red-before-green regression test | *external* |
+| ~~R-IU-012~~ | — | **Extracted** — owned by [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) as R-SPV-001, including the red-before-green regression test | *external* |
 | NFR-IU-001 | — | latency; disqualifier: no measurement while an agent runs | T-09, T-14 |
 | NFR-IU-002 | — | auditability | T-05, T-08 |
 | NFR-IU-003 | — | reproducible vocabulary | T-04 |
@@ -474,7 +474,7 @@ graph TD
 
 | PR | Tasks | ~LOC | Why it is its own PR |
 | --- | --- | --- | --- |
-| — | *(was PR 0: M0 + F19)* | — | **Extracted** to [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/) — ships first, on its own schedule |
+| — | *(was PR 0: M0 + F19)* | — | **Extracted** to [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) — ships first, on its own schedule |
 | **PR 1** | T-01, T-02 | ~130 | Infrastructure. Nothing else can be verified until it merges |
 | **PR 2** | T-04 … T-08 | ~430 | Additive schema + entities. One review pass over four small migrations |
 | **PR 3** | T-09, T-11, T-12 | ~740 | The validation function and its behavioral gate, together — the function is unreviewable without its fixtures |

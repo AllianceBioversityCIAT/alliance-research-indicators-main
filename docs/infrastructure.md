@@ -97,7 +97,7 @@ How to bring up the stack on a developer laptop. **Derived from repo evidence** 
 | Roll back the last migration | `npm run migration:revert` |
 | Generate a new migration | `npm run migration:generate --name=<name>` |
 
-**Disposable scratch schema (`ARI_TEST_MYSQL_*`) — added 2026-08-18 by `docs/specs/bugfix/sp-versioning-roles-id` (T-01b), for fixtures and migration testing only.** Run every command below from `server/researchindicators/`:
+**Disposable scratch schema (`ARI_TEST_MYSQL_*`) — added 2026-08-18 by `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id` (T-01b), for fixtures and migration testing only.** Run every command below from `server/researchindicators/`:
 
 | Action | Command |
 |---|---|
@@ -115,7 +115,7 @@ How to bring up the stack on a developer laptop. **Derived from repo evidence** 
 
 **Seed / reset, shared dev DB:** still true, unchanged by the above — **no seed or reset script exists for `ARI_MYSQL_*`, and none should be added.** It is a shared remote instance (§4 above); there is nothing an agent may safely reset there. Destructive schema or data operations against it remain a human decision (see *Boundary rule* below).
 
-**What the scratch schema is *not*:** it does not touch, seed, or reset the shared dev database. It is a separate, disposable MySQL container reachable only through `ARI_TEST_MYSQL_*`, loaded from a committed snapshot with **no business data** (its one row-level exception is the `migrations` bookkeeping table — see `server/researchindicators/src/db/baseline/README.md`). **A `TEST`-named variable is not evidence of a disposable target** — on at least one developer machine, `ARI_TEST_MYSQL_*` was found resolving to the same remote RDS instance as `ARI_MYSQL_*` (finding F-01, `docs/specs/bugfix/sp-versioning-roles-id/execution.md`). Always verify the **resolved host and port**, never the variable name, before treating a target as disposable.
+**What the scratch schema is *not*:** it does not touch, seed, or reset the shared dev database. It is a separate, disposable MySQL container reachable only through `ARI_TEST_MYSQL_*`, loaded from a committed snapshot with **no business data** (its one row-level exception is the `migrations` bookkeeping table — see `server/researchindicators/src/db/baseline/README.md`). **A `TEST`-named variable is not evidence of a disposable target** — on at least one developer machine, `ARI_TEST_MYSQL_*` was found resolving to the same remote RDS instance as `ARI_MYSQL_*` (finding F-01, `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id/execution.md`). Always verify the **resolved host and port**, never the variable name, before treating a target as disposable.
 
 ### Boundary rule: disposable vs. governed
 

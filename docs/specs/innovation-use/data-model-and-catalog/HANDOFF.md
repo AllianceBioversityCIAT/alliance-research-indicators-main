@@ -10,7 +10,7 @@
 > | [`requirements.md`](./requirements.md) | R-IU-011 re-specified (9 ACs, 3 scenarios); **R-IU-012 added**; DC-13, RB-11, D-11 added; T5/T6 wording swept |
 > | [`design.md`](./design.md) | §6.7 rewritten; **M0** added to §5; fixtures **F9b, F18, F19**; §6.5.1 gains pieces 2 and 5; DD-9 revised, **DD-13** added; ADR-11 checklist corrected; §12 re-budgeted |
 > | [`tasks.md`](./tasks.md) | **Created** — 13 tasks, clause-level coverage matrix, 5-PR strategy |
-> | [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/) | **New spec** — the `SP_versioning` repair, extracted on the user ruling of 2026-08-14; chunk 1 now `Depends on` it |
+> | [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) | **New spec** — the `SP_versioning` repair, extracted on the user ruling of 2026-08-14; chunk 1 now `Depends on` it |
 >
 > **One new finding, escalated and now resolved:** `SP_versioning` is **non-executable in `main` today** for all six indicators — two blocks reference `roles_id`, dropped by `1783022620616`. Discovered by the transcription; see transcript §2.4 and DD-13. **Routed 2026-08-14** to its own bugfix spec (`design.md` §12).
 >

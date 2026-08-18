@@ -20,7 +20,7 @@
 | --- | --- |
 | Type | Change |
 | Approval Mode | gated (inherited from `proposal.md`) |
-| Depends on | **[`bugfix/sp-versioning-roles-id`](../../bugfix/sp-versioning-roles-id/)** — must merge before T-10 (M6). No other spec dependency; family root otherwise |
+| Depends on | **[`bugfix/sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/)** — must merge before T-10 (M6). No other spec dependency; family root otherwise |
 | Blocks | `innovation-use/details-api`, then `innovation-use/details-page` |
 | Depth rationale | Creates two tables, alters two shared tables, adds a MySQL stored function, seeds a controlled vocabulary, **amends four lifecycle routines that serve all six indicators** (R-IU-011 — the chunk's largest item), and **depends on the extracted `sp-versioning-roles-id` bugfix** for a non-executable `SP_versioning` block it discovered. ADR-5 makes every migration immutable once merged. Full depth is mandatory, not stylistic. |
 | Judgment Day | 3 rounds, lineage **exhausted**, terminal `ESCALATED`. R1: 21 findings. R2: 17/21 closed, 11 new. R3: 12 new. R1–R2 applied in-lineage; **R3 applied by the 2026-08-14 fresh pass**. Ledger: [`./judgment.md`](./judgment.md). |
@@ -142,7 +142,7 @@ Therefore: writing `innovation_use_validation` and adding a matching `toContain(
 | DC-10 | **Off-by-one from comparing the catalog `id` instead of `level`** — `id = level + 1`, so `id >= 6` means `level >= 5` and makes the justification mandatory one level too early | Part of the §4.3 truth table (fixtures at level 5 and level 6 are the discriminating pair) | ❌ **substituted — §4.3** |
 | ~~DC-11~~ | ~~OpenSearch mapping breaks or drops existing fields~~ | **Withdrawn** — R-IU-010 reduced to a non-goal (D-5 revised). No OpenSearch file is touched | n/a |
 | **DC-12** | **Lifecycle data loss** — all **four** routines enumerate tables (and on the copy path columns) by name, so new schema is silently skipped on version/snapshot, orphaned on both hard deletes, and left as an **active orphan** on soft delete. **No error, no log, no metric** | **none exists** | ❌ **substituted — §4.3** |
-| **DC-13** | **A lifecycle routine that cannot execute at all** — `SP_versioning` names the dropped column `roles_id` (transcript §2.4). Distinct from DC-12: not silent-wrong, but hard-failing, and **invisible for the same reason** — nothing executes routines, so nobody has called it | **none exists** | ❌ **gated externally** by [`bugfix/sp-versioning-roles-id`](../../bugfix/sp-versioning-roles-id/) |
+| **DC-13** | **A lifecycle routine that cannot execute at all** — `SP_versioning` names the dropped column `roles_id` (transcript §2.4). Distinct from DC-12: not silent-wrong, but hard-failing, and **invisible for the same reason** — nothing executes routines, so nobody has called it | **none exists** | ❌ **gated externally** by [`bugfix/sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) |
 
 ### 4.3 Substitutions for the unguarded classes
 
@@ -557,7 +557,7 @@ Indexing Innovation Use detail fields would make it the only indicator with sear
 
 ---
 
-### ~~R-IU-012~~ — `SP_versioning` is executable · **EXTRACTED to [`../../bugfix/sp-versioning-roles-id/`](../../bugfix/sp-versioning-roles-id/)**
+### ~~R-IU-012~~ — `SP_versioning` is executable · **EXTRACTED to [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/)**
 
 > **Ruled 2026-08-14.** This is a pre-existing, cross-indicator production defect that this chunk merely discovered, so it ships on its own schedule as a Lite Bug-Mode spec (there, **R-SPV-001**). It is retained below as the **record of the discovery**; the ACs and the red-before-green regression test are owned by that spec.
 >

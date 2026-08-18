@@ -164,7 +164,7 @@ Socket.IO event names + payload shapes are **not yet documented**; capture any n
 - Global coverage threshold: 60% (branches / functions / lines / statements). Coverage excludes `*.entity.ts`, `db/migrations/**`, `*.enum.ts`, `*.spec.ts`.
 - Mock TypeORM repositories with `jest.fn()` factories. Do NOT spin up MySQL in unit tests; use the `TEST` datasource for integration coverage when needed.
 - For each new role-restricted or status-guarded handler, include both an "allowed" and "denied" test case.
-- **Fixture suite (added 2026-08-18, `docs/specs/bugfix/sp-versioning-roles-id` T-01b):** regression fixtures that need a real, disposable MySQL run under a **third** Jest config, `npm run test:fixtures` (`test/jest-fixtures.json`) — see §11 for the TEST-datasource harness commands that must bring the schema up first. **Naming trap:** that config's `testRegex` collects **only** `*.fixture-spec.ts`. Name a fixture plain `*.spec.ts` and it is collected by **neither** `npm test` nor `npm run test:fixtures` — a silent zero-tests-collected pass, not a failure you'd notice.
+- **Fixture suite (added 2026-08-18, `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id` T-01b):** regression fixtures that need a real, disposable MySQL run under a **third** Jest config, `npm run test:fixtures` (`test/jest-fixtures.json`) — see §11 for the TEST-datasource harness commands that must bring the schema up first. **Naming trap:** that config's `testRegex` collects **only** `*.fixture-spec.ts`. Name a fixture plain `*.spec.ts` and it is collected by **neither** `npm test` nor `npm run test:fixtures` — a silent zero-tests-collected pass, not a failure you'd notice.
 
 ---
 
@@ -197,7 +197,7 @@ npm run migration:execute           # apply against dist
 npm run migration:dev:execute       # apply against src (ts-node)
 npm run migration:revert
 
-# TEST-datasource harness (docs/specs/bugfix/sp-versioning-roles-id, T-01b)
+# TEST-datasource harness (docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id, T-01b)
 # — disposable scratch MySQL. NEVER point any of these at ARI_MYSQL_*.
 npm run compose:test:up             # bring up the scratch container (docker-compose.test.yml)
 npm run baseline:test:load          # load the committed snapshot (src/db/baseline/baseline.sql)
