@@ -296,3 +296,61 @@ To partially compensate, the inspection deliberately targeted items **absent fro
 **Residual, unchanged and NOT covered by this waiver:** the rendering itself. This page has **zero tests**; build-green proves compilation only. Whether the label reads correctly, and whether a 255-character name overflows the `<select>`, is **T-04's** job and remains open. The waiver covers the code read, not the pixels.
 
 **Status:** T-03 → `done (waived)`.
+
+---
+
+## 🔄 Pivot Record: R-BPF-004 — the label design rests on a feed measurement that is no longer true
+
+**Raised by the user from the running UI, 2026-08-18, after T-01…T-03 landed.** Screenshot shows every option rendering its name twice:
+
+```
+BMGF-Adaptation Atlas: Refinement and Transition — BMGF-Adaptation Atlas: Refinement and Transition
+CANADA-MEDA-The Adaptation and Valorization … _ AVENIR — CANADA-MEDA-The Adaptation and Valorization … _ AVENIR
+```
+
+### What changed underneath the spec
+
+Both CLARISA hosts re-measured at the moment of the report:
+
+| | Earlier this session | **Now** |
+| --- | --- | --- |
+| Upstream rows (test) | 1365 | **299** |
+| Bilateral + Alliance | 367 | **25** |
+| **phase 2026** | **342** | **0** |
+| `short_name == full_name` | 25 of 367 | **25 of 25 — 100%** |
+| `external_code` populated | yes | **0 of 25** |
+
+**CLARISA test now returns exactly what production returns.** The 342 phase-2026 rows the whole spec was measured against are gone.
+
+### Why the implementation is not at fault
+
+`R-BPF-004` specified two cases and the implementation, both reviewers and the T-03 waiver all handled them correctly:
+
+- `full_name` present → `<short_name> — <full_name>`
+- `full_name` absent/blank → `<short_name>`
+
+**It never specified the case `full_name === short_name`,** because at the time it was written that case was 0 of 342 in the phase-filtered feed. It is now 25 of 25. The code does exactly what the requirement says; **the requirement is what is wrong.**
+
+This is the KZ-001 family seen at the requirements tier rather than the fixture tier: a design pinned to a measurement, and the measurement moved.
+
+### Second, larger finding — flagged, not in scope here
+
+**`phase 2026` is now 0 rows on both hosts.** The archived Alliance-selector bugfix defaults the picker's phase to `2026` via `app_config`. Any environment applying that default now gets an **empty picker**. The user's screenshot shows 25 options, so their environment is not applying it — worth establishing why, because the two facts cannot both be intended.
+
+### The design problem, stated honestly
+
+The user's ask is *"código del proyecto y el título"* — the same shape the AGRESSO picker beside it already achieves (`S284 — CICERO (RCN) - System adaptation…`).
+
+**CLARISA currently has no code to show.** `external_code` — the field S1 identified as the real project code and the key S2's auto-mapper joins on — is null on all 25 rows and is blocked on PRMS. `short_name` is not a code here; it is the title. The only stable identifier present is the numeric `id`.
+
+### Options (user decision required — nothing implemented)
+
+| | Option | Result today | Result once PRMS restores codes |
+| --- | --- | --- | --- |
+| **A** | **De-duplicate**: if `full_name` equals `short_name` (normalised), render it once | `Fertilize Right Colombia` | `A1806 — Fertilize Right Colombia` |
+| **B** | **A + id prefix**, matching the admin panel's existing idiom | `[4] Fertilize Right Colombia` | `[4] A1806 — Fertilize Right Colombia` |
+| **C** | **Prefer `external_code` as the code**, falling back to `short_name`, plus de-dupe | `Fertilize Right Colombia` | `B-A1080 — Fertilize Right Colombia` |
+
+**Leader recommendation: A + C together, B optional.** De-duplication is required under every option and is the actual defect. Preferring `external_code` is what makes the label a *code + title* the day PRMS lands, without a second change — and it aligns the picker with the field S2 will key on. The `id` prefix is a product call: it guarantees an identifier today at the cost of showing an internal number to users.
+
+**Status:** spec amendment pending user approval. No code changed.
