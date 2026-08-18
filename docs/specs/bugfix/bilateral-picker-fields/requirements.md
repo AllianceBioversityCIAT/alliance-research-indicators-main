@@ -11,6 +11,15 @@
 - **Depth:** **Standard**, Bug Mode — *deviation from the proposal's `Lite`*. Lite prescribes one strictly focused task; this defect is irreducibly two packages (server projection + client picker), and per root `CLAUDE.md` §4.3 cross-package work is the one parallel shape that is safe. Re-checked against the design in `design.md` §Budget.
 - **Last updated:** 2026-08-18
 
+
+> ## ⚠ FEED CHANGE — 2026-08-18, after T-01…T-03 landed
+>
+> **Every "342 / 367" figure below is a point-in-time measurement that no longer holds.** Both CLARISA hosts now return the same 299 rows: **25** Alliance bilateral projects, **0** with `phase = 2026`, **0** with `external_code`, and `short_name == full_name` on **25 of 25**.
+>
+> The figures are kept, not rewritten — they are why the decisions were made, and deleting them would hide the reasoning. Read them as *"as measured on 2026-08-18 before the feed reset"*.
+>
+> What the change invalidated, and the amendment approved by the user (**Option A + C**), is recorded in `execution.md` → *Pivot Record* and in the amended **R-BPF-002** and **R-BPF-004** below.
+
 ---
 
 ## 1. Context
@@ -70,7 +79,8 @@ The picker is the only surface through which a human can create a bilateral mapp
 
 **Details:**
 - Inputs: `search` query param, unchanged in name and type.
-- Behavior: the in-memory match becomes case-insensitive substring over `short_name` **OR** `full_name`.
+- Behavior: the in-memory match is a case-insensitive substring over `short_name` **OR** `full_name` **OR** `external_code`.
+- **AMENDED 2026-08-18 (Pivot, Option C):** `external_code` joins the predicate because it becomes the displayed code (R-BPF-004) — a user who can see a code will type it. It is currently null on every row, so this is forward-compatible rather than immediately observable.
 - Outputs: unchanged shape, larger match set.
 
 #### Scenario: A name term matches
@@ -80,8 +90,9 @@ The picker is the only surface through which a human can create a bilateral mapp
 - THEN that project is in the response
 - AND searching `search=A1806` still returns it
 - AND searching `search=MUSASENTINEL` returns it (case-insensitive)
+- AND a project whose `external_code` matches is returned once PRMS populates that field
 - BUT it must NOT match on `description` — see OQ-1
-- AND IT MUST tolerate `full_name` being absent on an item without throwing
+- AND IT MUST tolerate `full_name` **or** `external_code` being absent on an item without throwing
 
 **Acceptance criteria:**
 - [ ] AC.1 — a controller test proves a name-only term returns the row; the same test fails on `HEAD`
@@ -122,9 +133,12 @@ The picker is the only surface through which a human can create a bilateral mapp
 - **I want** to read `A1806 — WTO-Phase 1: MusaSentinel…`
 - **So that** I can tell the options apart
 
-**Details:**
-- Behavior: the displayed label composes the code and the name. The code leads, because the mapping table and the AGRESSO side of the dialog both speak in codes.
-- Fallback: an option without `full_name` renders the code alone — never `A1806 — undefined` and never an empty label.
+**Details — AMENDED 2026-08-18 (Pivot, Option A + C):**
+
+- **The code is `external_code`, falling back to `short_name`.** `external_code` is CLARISA's real project code — the field S1 identified and the one S2's auto-mapper joins on. It is null on every row today and blocked on PRMS, so the fallback carries the label until it lands. Preferring it now means the label becomes a true *code + title* the day PRMS delivers, with no second change.
+- **When the code and the name are the same string, render it once.** This is the case the original requirement missed: it specified "both present" and "`full_name` absent" only, because `full_name == short_name` was 0 of 342 in the feed it was written against. It is now **25 of 25**, and the shipped label renders `Fertilize Right Colombia — Fertilize Right Colombia`.
+- The code leads when both are shown, matching the AGRESSO picker beside it.
+- An option with no name renders the code alone — never `A1806 — undefined`, never an empty label.
 
 #### Scenario: Label composition
 
@@ -134,6 +148,24 @@ The picker is the only surface through which a human can create a bilateral mapp
 - AND an option with no `full_name` renders exactly `A1806`
 - BUT it must NOT render the literal `undefined`, `null`, or a bare trailing separator
 - AND IT MUST use the same composition in the collapsed (selected) state as in the open list
+
+#### Scenario: The code and the name are the same string *(ADDED by the 2026-08-18 Pivot)*
+
+- GIVEN an option `{ short_name: "Fertilize Right Colombia", full_name: "Fertilize Right Colombia" }` — **25 of 25 live rows**
+- WHEN the picker renders it
+- THEN the label reads `Fertilize Right Colombia`, **once**
+- AND the comparison ignores surrounding whitespace and letter case, so `"  A1806 "` and `"a1806"` are treated as the same string
+- BUT it must NOT render the value twice separated by a dash
+- AND IT MUST still render both parts when they genuinely differ
+
+#### Scenario: `external_code` is preferred as the code *(ADDED by the 2026-08-18 Pivot)*
+
+- GIVEN an option carrying both `external_code: "B-A1080"` and `short_name: "Fertilize Right Colombia"`
+- WHEN the picker renders it
+- THEN the code shown is `B-A1080`, not `short_name`
+- AND when `external_code` is absent — every row today — the code falls back to `short_name`
+- BUT it must NOT show both codes
+- AND IT MUST apply the same de-duplication rule against whichever code won
 
 **Acceptance criteria:**
 - [ ] AC.1 — the label function is unit-tested for: both fields present, `full_name` absent, `full_name` empty string

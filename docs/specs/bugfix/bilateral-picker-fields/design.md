@@ -9,6 +9,14 @@
 
 ---
 
+> ## ⚠ AMENDED 2026-08-18 — Pivot, Option A + C
+>
+> The CLARISA feed reset mid-implementation: both hosts now return 25 Alliance bilateral rows, **0** with `phase = 2026`, **0** with `external_code`, and `short_name == full_name` on **25 of 25**. The label shipped by T-02/T-03 therefore renders every option's name twice.
+>
+> Figures below that cite 342 rows are point-in-time and kept for the reasoning trail. **DD-9** and **DD-10** carry the amendment; the budget in §11 is superseded by §11.1.
+
+---
+
 ## 1. Executive Summary
 
 Three edits in one atomic change, plus one decision the user must make.
@@ -16,7 +24,7 @@ Three edits in one atomic change, plus one decision the user must make.
 | Layer | Edit | Requirement |
 | --- | --- | --- |
 | Server projection | Add `full_name` + `description` to the picker item | R-BPF-001 |
-| Server search + order | Match `short_name` **OR** `full_name`; return sorted by name | R-BPF-002, R-BPF-006 |
+| Server search + order | Match `short_name` **OR** `full_name` **OR** `external_code`; return sorted by name | R-BPF-002, R-BPF-006 |
 | Client picker | Composed label + `filterBy` widened to mirror the server | R-BPF-003, R-BPF-004, R-BPF-005 |
 
 Nothing is invented. The target shape is the **AGRESSO picker in the same template** (`bilateral-mapping.component.html:285-318`), whose label function, `item`/`selectedItem` templates, and truncation CSS all already ship and are already reviewed.
@@ -78,6 +86,7 @@ GET /api/tools/clarisa/projects/bilateral
 | `id`, `short_name`, `source_of_funding`, `phase`, `source_center_acronym`, `has_science_programs`, `science_programs` | present | **unchanged** |
 | `full_name` | — | **added**, optional |
 | `description` | — | **added**, optional |
+| `external_code` | — | **added** by the Pivot, optional — DD-9 |
 
 The Swagger annotation for `search` must be updated: it currently claims *"substring match on `short_name`"*, which this change makes false. A stale annotation is a documented lie, and the endpoint's only other consumer reads that description to decide what the parameter does.
 
@@ -176,6 +185,24 @@ Not in the proposal — found during this design pass by enumerating **what call
 
 **APPROVED 2026-08-18** — included as **T-03**. Leaving a one-line fix undone in the second consumer of the very endpoint this spec exists to fix is how a defect gets rediscovered in three months as a new bug. The proposal scoped it out before this consumer was known; that scoping was made on incomplete information.
 
+### DD-9 — The code is `external_code`, falling back to `short_name` *(Pivot, Option C)*
+
+`external_code` is CLARISA's real project code — the field S1 measured and the key S2's auto-mapper joins on. It is **null on all 25 live rows** and blocked on PRMS.
+
+Preferring it *now*, with `short_name` as the fallback, means the label becomes a genuine *code + title* on the day PRMS delivers, with no second change and no second review cycle. It also aligns the picker with the identifier S2's review queue will show, so the two surfaces will not diverge later.
+
+Requires the server projection to carry `external_code` (additive, like `full_name` before it) and the search predicate to match it (R-BPF-002 amended) — a user who can see a code will type it.
+
+### DD-10 — De-duplicate when the code and the name are the same string *(Pivot, Option A)*
+
+**This is the actual defect the user reported.** The original R-BPF-004 specified two cases and omitted the third; `full_name == short_name` was 0 of 342 when it was written and is 25 of 25 now.
+
+Comparison is on the trimmed, case-folded values, so `"  A1806 "` and `"a1806"` count as equal. It is applied against **whichever code won under DD-9**, not against `short_name` unconditionally — otherwise the bug returns the moment `external_code` lands and happens to equal the name.
+
+De-duplication is required under every option the user was offered; it is the correction, and DD-9 is the forward-compatibility.
+
+**Rejected alongside:** prefixing the numeric `id` (the offered Option B). It guarantees a visible identifier today but shows users an internal database number; the user did not take it, and it is recorded here so the choice is not silently re-litigated later.
+
 ---
 
 ## 10. Rejected Alternatives
@@ -191,7 +218,21 @@ Not in the proposal — found during this design pass by enumerating **what call
 
 ---
 
-## 11. Budget *(Step 2.4 — the tripwire `/akili-execute` measures against)*
+## 11.1 Budget amendment — Pivot, 2026-08-18
+
+The original budget below is **superseded**. The pivot adds three tasks:
+
+| Metric | Original | Pivot delta | New total |
+| --- | --- | --- | --- |
+| Tasks | 4 | +3 (T-05 server, T-06 client, T-07 admin) | **7** |
+| LOC | ~280 | +~100 | **~380** |
+| Review rounds | 2 | +2 | **4** |
+
+Actuals against the original ran ~40% over on LOC, entirely in tests — production code came in *under*. The pivot's own tasks are small; the cost here is review cycles, not code.
+
+---
+
+## 11. Budget *(Step 2.4 — superseded by §11.1)*
 
 | Metric | Expected | Note |
 | --- | --- | --- |

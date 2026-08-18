@@ -19,6 +19,9 @@ T-01 (server: fields + search + sort)  ──┐
 T-02 (client: label + filter)  ───────────┤
                                           │
 T-01 ──> T-03 (admin SSR label) ──────────┘
+
+--- Pivot, 2026-08-18 (Option A + C) ---
+T-05 (server: external_code) ──> T-06 (client: prefer code + de-duplicate) ──> T-07 (admin: same rule) ──> T-04
 ```
 
 - **T-01 ∥ T-02** — different packages. Root `CLAUDE.md` §4.3: cross-package parallelism is safe; two tasks in the same package are not.
@@ -150,7 +153,7 @@ T-01 ──> T-03 (admin SSR label) ──────────┘
 - **Description:** **This exists because there is no automated gate for it.** The overlay does not render in this jsdom harness (probed 2026-08-18: `show()` produces no `.p-select-option` nodes) and jsdom cannot measure layout. Recording the gap without naming the substitute would leave the spec's most visible defect class uncovered.
 - **Manual check** — server pointed at CLARISA test, logged in as Center Admin:
   - [ ] Open `administration/center-admin/bilateral-mapping` → **New mapping** → open the CLARISA project dropdown
-  - [ ] The first ten options read as `code — name`, **not** `A1463, A1796, A1805…`
+  - [ ] **AMENDED by the Pivot** — the first ten options read as a human-recognisable project **name**. Against the *current* feed (25 rows, `short_name == full_name`, no `external_code`) the correct rendering is the name **once**, e.g. `Fertilize Right Colombia` — **not** `Fertilize Right Colombia — Fertilize Right Colombia`, which is the reported defect. Once PRMS populates `external_code` the same options must read `B-A1080 — Fertilize Right Colombia`; the T-04 check should be repeated then
   - [ ] With R-BPF-006 in place the list opens ordered by name, not on the numeric-code cluster
   - [ ] Type `musasentinel` → the matching project appears
   - [ ] A long name clips on one line; the dialog does not widen and the label does not wrap
@@ -166,6 +169,54 @@ T-01 ──> T-03 (admin SSR label) ──────────┘
 
 ---
 
+### T-05 — Server: project `external_code` and match it in search
+
+- **Requirements covered:** R-BPF-001 (amended), R-BPF-002 (amended), NFR-BPF-001
+- **Design references:** DD-9, §5
+- **Dependencies:** none (T-01 is `done`)
+- **Files touched (intended):** `clarisa-projects.controller.ts` + its spec
+- **Description:** Add `external_code` to the picker projection and to the search predicate. Same additive discipline as T-01.
+- **Implementation notes:**
+  - `external_code` is already declared on `ClarisaProject` (`dto/clarisa-project.types.ts:80`) and already arrives in the fetched payload. **Do not add an upstream call.**
+  - It is `null` on all 25 live rows — this is forward-compatibility for PRMS, so the tests must cover the null path as the *normal* case, not the edge case.
+  - Predicate becomes `short_name` OR `full_name` OR `external_code`, each optional-chained so an absent field never throws.
+- **Clauses owned:** R-BPF-002 *"a project whose `external_code` matches is returned"* · *"AND IT MUST tolerate `full_name` or `external_code` being absent without throwing"*; R-BPF-001 additivity.
+- **Verification:** `npm test -- --silent` and `npx eslint <paths>` from `server/researchindicators/`.
+- **Red-before-green (K-004):** a search by an `external_code` value must fail on current `HEAD` (the field is neither projected nor matched). Capture the failure verbatim.
+- **The input that would make this check FAIL:** `{ short_name: 'Fertilize Right Colombia', external_code: 'B-A1080' }` searched as `b-a1080` — returns `[]` today.
+- **Disqualifier:** a test that only asserts the field appears in the response does not prove the predicate matches it. Both assertions are required.
+- **Skills:** `nestjs-expert`, `systematic-debugging` · **Effort:** `medium` · **Size:** S (~40 LOC)
+- **Status:** todo
+
+### T-06 — Client: prefer `external_code`, and stop rendering the name twice
+
+- **Requirements covered:** R-BPF-003 (amended), R-BPF-004 (amended, both new scenarios)
+- **Design references:** DD-9, DD-10, DD-5
+- **Dependencies:** T-05 (the field must be in the payload)
+- **Files touched (intended):** `bilateral-project-mapping.interface.ts`, `bilateral-mapping.component.ts`, `bilateral-mapping.component.spec.ts`
+- **Description:** `ClarisaBilateralProjectOption` gains `external_code?`. `clarisaOptionLabel` picks the code as `external_code || short_name`, then renders it **once** when it equals the name (trimmed, case-folded), otherwise `code — name`. `filterBy` gains `external_code` to keep DD-5's coupling with the server predicate intact.
+- **Clauses owned:** R-BPF-004 scenario *"The code and the name are the same string"* (all four clauses) and *"`external_code` is preferred as the code"* (all four clauses); R-BPF-003 client-filter parity.
+- **Verification:** `npm test -- --silent`, `npm run lint -- --quiet` from `client/research-indicators/`.
+- **Red-before-green (K-004):** the de-duplication test must fail on current `HEAD`. **This red is already confirmed from the running UI** — the user's screenshot shows `BMGF-Adaptation Atlas: Refinement and Transition — BMGF-Adaptation Atlas: Refinement and Transition`. Reproduce it as a unit assertion.
+- **The input that would make this check FAIL:** `{ short_name: 'Fertilize Right Colombia', full_name: 'Fertilize Right Colombia' }` → today renders the value twice.
+- **What a presence-assertion cannot prove:** that `filterBy` contains `external_code` proves the attribute, not that a code search survives the client filter. Use the real `Select` instance and `visibleOptions()`, as T-02 did.
+- **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** `high` · **Size:** M (~70 LOC)
+- **Status:** todo
+
+### T-07 — Admin SSR panel: same label rule
+
+- **Requirements covered:** R-BPF-004 (amended), second surface
+- **Design references:** DD-8, DD-9, DD-10
+- **Dependencies:** T-05, T-06 (mirror T-06's rule exactly — a divergence between the two pickers is the defect DD-8 exists to prevent)
+- **Files touched (intended):** `src/admin/client/pages/BilateralProjectMappings.tsx`
+- **Description:** Apply the same code-source and de-duplication rule. Keep the `[{p.id}]` prefix — that was T-03's rework and the reviewer's FAIL was specifically about removing it.
+- **Verification:** `npm run build`, `npx eslint <path>`.
+- **Honest gate:** this page has **no tests**; the build proves compilation only. Rendering is T-04's job. Do not claim otherwise.
+- **Skills:** `react-doctor` · **Effort:** `low` · **Size:** S (~10 LOC)
+- **Status:** todo
+
+---
+
 ## 3. Requirement → task closure
 
 Closure is asserted at **scenario and clause** granularity, not requirement ID (a gap may never be discharged by citing a different requirement).
@@ -176,6 +227,9 @@ Closure is asserted at **scenario and clause** granularity, not requirement ID (
 | R-BPF-002 | A name term matches (5 clauses) | T-01 |
 | R-BPF-003 | A server name-match survives the client filter (4 clauses) | **T-02** |
 | R-BPF-004 | Label composition (4 clauses) | T-02 (STAR) + T-03 (admin) + T-04 (rendered) |
+| R-BPF-004 | **Code and name are the same string** (4 clauses) — *Pivot* | **T-06** (STAR) + **T-07** (admin) + T-04 (rendered) |
+| R-BPF-004 | **`external_code` preferred as the code** (4 clauses) — *Pivot* | **T-05** (payload) + **T-06** (STAR) + **T-07** (admin) |
+| R-BPF-002 | **`external_code` joins the search** — *Pivot* | **T-05** (server) + **T-06** (client filterBy parity) |
 | R-BPF-005 | 255-character name (4 clauses) | T-02 (accessible text) + **T-04 (visual clauses)** |
 | R-BPF-006 | Deterministic name order (4 clauses) | T-01 |
 | NFR-BPF-001 | Additive contract | T-01 |
@@ -204,3 +258,5 @@ Closure is asserted at **scenario and clause** granularity, not requirement ID (
 - [ ] `npx eslint` clean on server paths; `npm run lint -- --quiet` clean on client (K-001 — `npm run lint` on the server carries `--fix` and cannot gate)
 - [ ] Server and client shipped in **one** PR
 - [ ] OQ-2 (the `clarisa_project_short_name` snapshot) recorded as a follow-up, not silently closed
+- [ ] **Pivot tasks T-05…T-07 complete**, each with its own reviewer verdict
+- [ ] **The `phase = 2026` finding is resolved or explicitly carried forward** — both CLARISA hosts now return 0 rows for that phase, so any environment applying the archived Alliance-selector bugfix's default gets an empty picker (execution.md → Pivot Record)
