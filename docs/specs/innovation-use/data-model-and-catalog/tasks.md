@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04, T-05, T-06, **T-07** `[x]` (2026-08-18); next eligible **T-08**
+- **Status:** in-progress — T-01, T-02, T-04 … **T-08** `[x]` (2026-08-18); next eligible **T-09**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -240,7 +240,7 @@ graph TD
 
 - **Requirements covered:** R-IU-001 (AC.2, AC.3), R-IU-003 (AC.1, mode invariant), R-IU-004, R-IU-005 (AC.1); NFR-IU-002; DC-7
 - **Design references:** §2.1, §3.1–§3.4, §3.3's mode-invariant table
-- **Size:** M · **Dependencies:** T-05, T-06, T-07 · **Status:** todo
+- **Size:** M · **Dependencies:** T-05, T-06, T-07 · **Status:** done
 - **Skills:** `nestjs-expert`
 
 **Scope**
@@ -258,11 +258,11 @@ graph TD
 - **Disqualifier:** `tsc` clean proves compilation, not that entity metadata matches the migration.
 
 **Done**
-- [ ] Both new entities registered in the datasource; `tsc` clean
-- [ ] Metadata spec asserts type, nullability, and default for all six count columns
-- [ ] Mode invariant documented on the columns
-- [ ] Three enums each gain exactly one member; no existing value changed
-- [ ] No OpenSearch decoration added
+- [x] Both new entities registered in the datasource; `tsc` clean
+- [x] Metadata spec asserts type, nullability, and default for all six count columns
+- [x] Mode invariant documented on the columns
+- [x] Three enums each gain exactly one member; no existing value changed
+- [x] No OpenSearch decoration added
 
 ---
 

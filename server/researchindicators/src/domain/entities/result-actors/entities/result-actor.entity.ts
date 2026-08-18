@@ -72,6 +72,59 @@ export class ResultActor extends AuditableEntity {
   })
   actor_role_id!: number;
 
+  /**
+   * T-08 (R-IU-003, DD-6, DD-7, RB-5 layer 1) — Innovation Use actor counts.
+   *
+   * These five columns are additive and `int` (not `bigint` — DD-6: person
+   * counts never approach 2.1B). They implement two MUTUALLY EXCLUSIVE
+   * modes, selected by `sex_age_disaggregation_not_apply` on THIS row:
+   *
+   *   | `sex_age_disaggregation_not_apply` | Populated                | NULL           |
+   *   | ----------------------------------- | ------------------------ | -------------- |
+   *   | `FALSE` / `NULL` (disaggregated)     | the four `*_count` below  | `actors_count` |
+   *   | `TRUE` (aggregate)                   | `actors_count`            | the four above |
+   *
+   * `actors_count` is NOT a stored total of the four disaggregated columns
+   * (DD-7) — in aggregate mode the row has no parts to derive a total from,
+   * so it is never a duplicate of a value derivable elsewhere in the same
+   * row. No database constraint enforces this mutual exclusion (RB-5); it
+   * is layered instead: (1) this comment, (2) T-09's
+   * `innovation_use_validation` stored function mode-consistency check,
+   * (3) chunk 2's API edge rejecting a payload that populates both modes.
+   * The four legacy booleans above (`women_youth`, `women_not_youth`,
+   * `men_youth`, `men_not_youth`) are untouched — Innovation Dev keeps
+   * reading and writing them unchanged.
+   */
+  @Column('int', {
+    name: 'women_youth_count',
+    nullable: true,
+  })
+  women_youth_count?: number;
+
+  @Column('int', {
+    name: 'women_not_youth_count',
+    nullable: true,
+  })
+  women_not_youth_count?: number;
+
+  @Column('int', {
+    name: 'men_youth_count',
+    nullable: true,
+  })
+  men_youth_count?: number;
+
+  @Column('int', {
+    name: 'men_not_youth_count',
+    nullable: true,
+  })
+  men_not_youth_count?: number;
+
+  @Column('int', {
+    name: 'actors_count',
+    nullable: true,
+  })
+  actors_count?: number;
+
   @ManyToOne(() => Result, (result) => result.result_actors)
   @JoinColumn({
     name: 'result_id',

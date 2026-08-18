@@ -14,7 +14,7 @@
 | Branch | `AC-1679-Create-the-innovation-use-section` |
 | Approval Mode | **gated** (inherited from `proposal.md` / `family.md`) — every continue/pause gate stops for the user |
 | Budget tripwire (`design.md` §12) | **13 tasks · ~2,600 LOC · 4–5 review rounds** |
-| Budget consumed so far | **6 tasks (T-01, T-02 no-op verifications; T-04 … T-07 migrations) · ~1,270 LOC · 2 review rounds** — within tripwire; rework margin half spent |
+| Budget consumed so far | **8 tasks (T-01, T-02 no-op verifications; T-04 … T-07 migrations; T-08 entities) · ~1,680 LOC · 2 review rounds** — within tripwire; rework margin half spent |
 | Package | `server/researchindicators` (server-only; no client file touched) |
 | Model routing | Leader T1 `opus` · Implementer T2 `sonnet` · Reviewer T3 `opus` (**author ≠ auditor** satisfied on both axes: different model, read-only tools) |
 | Started | 2026-08-18 |
@@ -806,3 +806,141 @@ FP-1 … FP-13 remain live. **FP-1, FP-2, FP-6 and FP-9 were exercised in T-07 a
 | **B-6** | B / a1 | Autocommit nuance: with `migrationsTransactionMode` unset, M1–M3's DDL implicit-commits break the batch transaction, so M4's three INSERTs likely autocommit individually. A 1062 on statement 2 or 3 leaves earlier rows committed with no `migrations` row, and the retry then collides on statement 1. **Not fixable inside M4 and explicitly not to be restructured (FP-9).** Lens B could not execute anything to confirm the transaction semantics | Recorded only |
 
 **Budget after T-07:** 6 of 13 tasks · ~1,270 LOC of ~2,600 · **2 of 4–5 review rounds consumed** (T-07 consumed one rework round; T-04/T-05/T-06 each passed first attempt). Within tripwire, but the rework margin is now half spent.
+
+---
+
+### T-08 — Entities, enums, and the `Result` inverse relation · **PASS (first attempt)**
+
+- **Date:** 2026-08-18
+- **Status:** `[x]`
+- **Implementer attempts:** 1
+- **Review mode:** 2 parallel lenses (effort `xhigh`), full evidence set to both
+- **Requirements covered:** R-IU-001 **AC.2 only** (see ruling), R-IU-003 (AC.1 + mode invariant), R-IU-004, R-IU-005 (AC.1, AC.3), NFR-IU-002, DC-7
+- **First application-code task in this chunk. No migration produced — correct by design (FP-13).**
+
+**Files (9; 410 insertions, ZERO deletions):**
+
+| Created | |
+| --- | --- |
+| `src/domain/entities/result-innovation-use/entities/result-innovation-use.entity.ts` | 69 lines |
+| `src/domain/tools/clarisa/entities/clarisa-innovation-use-levels/entities/clarisa-innovation-use-level.entity.ts` | 52 lines |
+| `src/domain/entities/result-innovation-use/entity-metadata.spec.ts` | 214 lines, 19 tests (DC-7 gate) |
+
+| Edited (all strictly additive) | |
+| --- | --- |
+| `result-actors/entities/result-actor.entity.ts` | +53 — five count columns + the mode-invariant block |
+| `result-institution-types/entities/result-institution-type.entity.ts` | +12 |
+| `actor-roles`, `institution-type-roles`, `quantification-roles` enums | +1 each |
+| `results/entities/result.entity.ts` | +7 — the inverse `@OneToMany` |
+
+**Verification:**
+
+```
+npx tsc --noEmit                       -> clean
+npx jest <metadata spec>  (RED)        -> 9 failed / 19   (partial stash — see below)
+npx jest <metadata spec>  (GREEN)      -> 19 passed / 19
+falsification 1: actors_count bigint   -> Expected "int" / Received "bigint"    (1 failed / 19)
+falsification 2: level_id NOT NULL     -> Expected true  / Received false       (1 failed / 19)
+falsification 3: catalog id @Column    -> Expected true  / Received false       (1 failed / 19)
+npm test -- --silent                   -> 326 suites, 2127 tests passed (was 325/2108)
+                                          every Innovation Dev spec passed UNMODIFIED
+npm run lint -- --quiet                -> reformatted one import in the new spec; re-verified green
+git status --porcelain                 -> the 9 files, NO migration
+```
+
+**⚠️ RECORDED EVIDENCE LIMIT — what the 9/19 RED does and does not earn.** The stash was **partial**: only the five tracked pre-T-08 files were reverted; `result.entity.ts` and the two brand-new entity files were deliberately left in place to avoid an unrelated compile break. Lens A reconstructed the suite (2 registration + 5 actor counts + 1 organization + 3 detail + 5 catalog + 3 enums = 19) and showed the 9 failures are exactly 5 + 1 + 3.
+
+| Done criterion | Earned by |
+| --- | --- |
+| #2 — six count columns | **Red-proven** (6 of the 9 failures) |
+| #4 — three enum members | **Red-proven** (3 of the 9) |
+| #1 — both entities registered | **NOT red-proven.** Green before and after the stash. Rests on a sound glob-expansion argument plus `tsc`, not on an observed failure |
+| #3 — mode invariant documented | By reading; correct against §3.3 |
+| #5 — no OpenSearch decoration | Zero `@OpenSearchProperty` in the diff |
+
+The three targeted falsifications partially repair the gap for the new entities' *column* assertions, but **the registration pair has never been observed red.** Bounded weakness, not a gate breach — recorded so it is never cited as more than it is.
+
+**Reviewer verdicts — both PASS:**
+
+| Lens | Scope | Verdict |
+| --- | --- | --- |
+| **A** | Spec conformance · gate fidelity · requirement-mapping | **PASS** — metadata matches M1/M2/M3 column-for-column; mode invariant correct against §3.3; enums match M4's seeded ids; no AC belonging to T-05/T-09/T-11/T-12 claimed or foreclosed |
+| **B** | Metadata-vs-migration fidelity · TypeORM mechanics · regression surface · forward-compat | **PASS** — FK names pinned character-for-character; FP-13's window closed with no column left entity-less; six shared-file edits strictly additive; `migration:generate` should now emit nothing for M1–M4 |
+
+**The `getMetadataArgsStorage()` substitution was interrogated, not accepted.** `DataSource.buildMetadatas()` is `protected` in 0.3.20 (`tsc` caught it), so the gate reads the raw decorator-args store — which exposes arguments *as written*, not TypeORM's *resolved* metadata. Both lenses treated "is this double sound?" as the crux. It is: the three falsifications each exercise a different mechanism, proving `options.type` is populated even in the positional `@Column('int', {…})` form, that `nullable` is readable, and that `@PrimaryColumn` writes `options.primary`. Lens B confirmed from source that nothing here depends on `design:type` inference or a transformer, so **nothing can pass this spec and resolve differently at runtime**. One failure per falsification is the predicted number: type/nullable/default/primary are asserted together, once per column.
+
+**Registration proof is genuine, not a tautology** (both lenses, independently). The spec expands the **production** `entities` array from `orm.config.ts:19-24` with `globSync` — and Lens A verified the double is exact: `typeorm/util/DirectoryExportedClassesLoader.js:31` calls `glob.sync`, there is no nested `typeorm/node_modules/glob`, and the hoisted `glob@10.4.5` is the same instance. It goes red on two independent regressions: narrowing the globs, or the file living off the design-mandated path.
+
+**FP-10 discharged and verified end to end** (Lens B, from source): the pinned names match M2:58 and M2:62 **character-for-character** — no near-miss, which matters because a near-miss generates churn while looking correct. `foreignKeyConstraintName` is load-bearing in the installed 0.3.20 along the full path — `JoinColumnOptions.d.ts:16` → `JoinColumn.js:21` → `RelationJoinColumnBuilder.js:62` → `ForeignKeyMetadata.js:35,50-52`, where `givenName` short-circuits the naming strategy.
+
+**Audit columns are byte-compatible, not merely plausible** (Lens B): `AuditableEntity` supplies exactly the six columns M1/M2 create, and the `timestamp(6) … ON UPDATE CURRENT_TIMESTAMP(6)` DDL is precisely what TypeORM emits on MySQL (`MysqlDriver.js:193-202`). Discharges R-IU-001 AC.4's entity half and NFR-IU-002.
+
+**Regression surface is genuinely closed** (Lens B): the inverse `@OneToMany` carries no `eager`, no `cascade`, no `@JoinColumn`, and inverse-side one-to-many is lazy by default; nothing in `src` iterates `dataSource.entityMetadatas` (zero grep hits); the OpenSearch mapping reflects off `ResultOpensearchDto`, never an entity. **The write surface also stays closed:** `BaseServiceSimple.create()` copies only an explicit allow-list (`base-service.ts:115-156`) and `ResultActorsService.saveInnovationDev` passes a five-name list, so the new count columns are **not mass-assignable** through the existing Innovation Dev endpoint.
+
+**What the 326-suite green run does NOT prove** (Lens B, stated plainly): that any column name matches the database, that the FK pinning suppresses churn, that M1–M4 are applied anywhere, or that a single query works. Unit specs mock `DataSource` throughout. Real DB agreement is gated only by the §6.5 harness / T-12's round trip.
+
+---
+
+#### ⚠️ Correction to FP-10 — the Leader's own census was false
+
+FP-10, as filed after T-05 and as restated in T-08's brief, asserted that *"grep finds **zero** hand-named FKs across all 307 migrations."* **False.** Verified after the work landed:
+
+| | Count |
+| --- | --- |
+| sha1-style FK constraint names in migrations | **184** |
+| **Hand-named, pre-existing** — `1779190000006`–`1779190000015` pool-funding series (`fk_rpfa_result`, `fk_rrh_result`, `fk_rpfim_*`, `fk_rpfas_*`, `fk_rpfta_*`) | **9** |
+| Hand-named by this spec (M2) | 2 |
+| `foreignKeyConstraintName` in the entity layer | **only** the new T-08 entity |
+
+**FP-10's substantive guidance survives untouched** — pinning was and is correct, because the remedy depends only on M2 hand-naming its FKs (true) and the option existing in 0.3.20 (verified). Both lenses checked specifically whether the false premise contaminated the artifact: **it did not.** No global claim about the migration corpus appears anywhere in the diff; the entity's three claims are all scoped and all true.
+
+**Second Leader-supplied false negative in two tasks** (T-07's was the seed-precedent grep). Both were negative claims asserted without a search that could have falsified them. **Kaizen candidate, strengthened: the D-10 discipline must bind the Leader's briefs, and a negative claim in a brief should carry the command that established it** so a worker can re-run rather than re-trust. The Implementer's `Not Done` honestly recorded that it relied on this one without re-checking — which is the only reason it was caught here rather than shipped.
+
+---
+
+## Forward pointers — added after T-08
+
+| # | For | Pointer |
+| --- | --- | --- |
+| **FP-18** | **Rollout · DevOps hand-off — highest-severity item on this list** | **These entity edits put M3's six columns into every `SELECT` against `result_actors` and `result_institution_types`.** TypeORM builds explicit column lists from metadata, so deploying the app **ahead of M3** breaks Innovation Dev's actor and organization paths with `ER_BAD_FIELD_ERROR (1054)` — **platform-wide, not Innovation-Use-only**. Migrations before app, no exceptions. State in §13 alongside FP-7 and FP-11. |
+| **FP-19** | **T-12 / T-13 (first scratch run with a DB)** | **One FK claim cannot be verified without a database.** M2 omits `ON DELETE`/`ON UPDATE` entirely while every other FK in the repo writes them explicitly. Metadata defaults to `NO ACTION` (`ForeignKeyMetadata.js:32-33`) and MySQL reports `NO ACTION` for an omitted clause — under which nothing churns. If a target reported `RESTRICT`, these two FKs (and only these two) would churn. Settle it with one query: `SELECT DELETE_RULE, UPDATE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_NAME LIKE 'FK_result_innovation_use%'` — expect `NO ACTION` twice. |
+| **FP-20** | **T-10 (M6, `SP_versioning`)** | **`result_innovation_use.result_id` is a non-AUTO_INCREMENT PK that is *also* the FK**, so `SP_versioning`'s copy block must supply the new version's `result_id` **explicitly**. An omitted or duplicated value raises MySQL **1062** rather than silently inserting — the same property T-05 leans on as proof of correctness, now on a stored procedure's write path. Not previously recorded. |
+| **FP-21** | **chunk 2** (`innovation-use/details-api`) | **Relation property names diverge from the Innovation Dev precedent.** `ResultInnovationUse` exposes `result` / `innovation_use_level` (snake_case); `ResultInnovationDev` uses camelCase (`innovationReadiness`, `innovationNature`). A copy-pasted `relations: { innovationUseLevel: true }` fails silently against the wrong key. |
+| **FP-22** | **anyone reviewing a generated migration** | **Pre-existing, not this spec's doing:** the 9 hand-named pool-funding FKs have **no** entity pinning, so by FP-10's own mechanism `migration:generate` **already** proposes drop-and-re-add for them today. Reviewers will see churn statements unrelated to Innovation Use — and **must not "resolve" them by deleting the pinning added in T-08**, which is the one thing keeping this spec's FKs stable. |
+
+FP-1 … FP-17 remain live. **FP-10 and FP-13 are now DISCHARGED** by T-08 (window closed; no column left entity-less — Lens B enumerated all four migrations rather than assuming).
+
+---
+
+## Leader deviations & process notes — T-08
+
+| Item | Note |
+| --- | --- |
+| **Skills** | `nestjs-expert` + **`tdd`** (task lists only the former) — fifth consecutive task |
+| **Effort** | `xhigh` — first task making TypeORM's model agree with three already-irreversible migrations |
+| **Two `tasks.md` AC defects adjudicated** | **R-IU-001 AC.3 → T-12** (design §10 places the detail-row round trip in the Integration layer on the §6.5 harness; a unit metadata spec cannot populate audit columns from an acting user). **R-IU-005 AC.1 → T-08** (enum-level; T-07 declined it). **Both lenses independently confirmed both rulings.** Recorded for a user ruling; the spec files were NOT edited — reassigning an AC needs the two-direction sweep |
+| **Pattern across three tasks** | In all three AC double-assignments found so far, the **Done criteria were the honest signal and the "Requirements covered" range was the sloppy one.** Worth raising at archive as a spec-authoring lesson, not just three isolated corrections |
+| **⚠️ Leader-supplied false negative (second occurrence)** | FP-10's "zero hand-named FKs" census — see the correction block above |
+
+---
+
+## ADVISORY findings — T-08 (recorded, never gating; no task minted)
+
+| # | Lens | Finding | Disposition |
+| --- | --- | --- | --- |
+| **B-4** | risk / rollout | Deploy-ordering break, platform-wide | **Adopted as FP-18** |
+| **B (§6)** | risk | The `ON DELETE`/`ON UPDATE` link unverifiable without a DB | **Adopted as FP-19** |
+| **B (fwd)** | risk | `SP_versioning` must supply `result_id` explicitly | **Adopted as FP-20** |
+| **B (fwd)** | risk | Relation property naming divergence | **Adopted as FP-21** |
+| **B-5** | risk (pre-existing) | The 9 pool-funding FKs already churn | **Adopted as FP-22** |
+| **A-1 / B-1** | reliability (**both lenses, independently**) | **The spec looks columns up by `propertyName` and never asserts `options.name` or the `@Entity()` table name.** Renaming `actors_count` → `actor_count` *in the decorator*, or fat-fingering `@Entity('result_innovation_uses')`, **passes all 19 tests** while diverging from the migration — the same entity/migration drift family DC-7 names, just not the type axis the criterion enumerates. One line per column closes it | **Recorded only** — widening the spec to absorb an advisory is forbidden. **Surfaced to the user; jointly with B-2 the strongest promotion candidate in this spec so far** |
+| **B-2** | gate fidelity | **The two pinned FK names — the precise artifact FP-10 demanded, and the one place a near-miss is worse than nothing — are asserted by NO test.** `getMetadataArgsStorage().joinColumns` exposes them directly; two assertions would make FP-10 regression-proof rather than historically observed | **Recorded only. Surfaced to the user** |
+| **A-2** | reliability | The two registration tests have never been observed failing; a negative control (assert a deliberately-wrong path is absent) would convert the task's strongest structural claim from argued to demonstrated | Recorded only |
+| **A-3** | reliability | "Exactly one member" (R-IU-005 AC.1) is proven by the diff, not by the spec — a stray fourth member stays green. Trap for whoever adds it: numeric enums carry reverse mappings, so `Object.keys().length` is 2N | Recorded only |
+| **A-4** | readability | In the mode-invariant table the same four columns are "the four below" in row 1 and "the four above" in row 2, while nearby prose uses "above" for the legacy booleans — row 2 can be misread as "the booleans are NULL in aggregate mode", which is not the invariant. It also drops §3.3's fourth column ("Total is … derived — the sum"), leaving the disaggregated-mode total rule to survive by implication | Recorded only |
+| **A-5 / B-3** | risk (**both lenses**) | `glob` is imported by the spec but is **not** a declared dependency of `server/researchindicators` — it resolves transitively through typeorm's `glob@10.4.5`. A dependency bump that nests or majors it turns the registration test into a module-not-found error rather than a meaningful failure. Declare it in `devDependencies` | Recorded only |
+| **A-6** | readability | `clarisa-innovation-use-level.entity.ts`'s header is tagged `T-08 (R-IU-002, NFR-IU-003)`; neither is in T-08's Requirements-covered line, and NFR-IU-003 (catalog reconstructible from migrations alone) is discharged entirely by T-04. Tag over-reach, not a false claim — no AC is foreclosed | Recorded only |
+| **A-7** | risk | NFR-IU-002's stated verification is "entity metadata spec + code review", and the spec asserts nothing about the `AuditableEntity` columns. Lens A discharged the code-review half by reading; recorded so the gap is known rather than invisible | Recorded only |
+| **B-6** | reliability | The entity comment names T-09's function and chunk 2's API edge as the enforcement layers for the mode invariant. **No test binds the comment to either.** If a later chunk implements a different truth table, the comment silently becomes documentation of a rule the system does not enforce | Recorded only |
+
+**Budget after T-08:** 8 of 13 tasks · ~1,680 LOC of ~2,600 · 2 of 4–5 review rounds consumed. Within tripwire.
