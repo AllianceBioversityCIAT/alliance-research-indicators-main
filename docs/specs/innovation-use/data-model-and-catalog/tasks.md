@@ -2,14 +2,14 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** not-started
+- **Status:** in-progress — T-01, T-02 `[x]` (superseded no-op closures, 2026-08-18); next eligible **T-04**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
 - **Routine authority:** [`./routine-transcript.md`](./routine-transcript.md) revision 2 — **M6 is written from it, not from prose** (DD-12)
 - **Parent spec:** [`../family.md`](../family.md) — chunk 1 of 3
 - **Depends on:** [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) — ⚠️ **that spec is ARCHIVED but NOT MERGED. Archived ≠ shipped:** it was archived 2026-08-18 with its DevOps hand-off unsent and its §7 sign-off open, and its migrations have never run against the shared dev DB. **Must be merged before T-10 starts.** Verify with `SHOW CREATE PROCEDURE SP_versioning` (no `roles_id`) before that task begins. Declared here 2026-08-18 by that spec's T-03 (`design.md` §6 "Coupling"); already carried in `../family.md`'s children table
-- **Last updated:** 2026-08-18 (T-01/T-02/T-10 superseded/corrected/notified, dependency declared — see notes inline; by `bugfix/sp-versioning-roles-id` T-03)
+- **Last updated:** 2026-08-18 — T-01 and T-02 closed `[x]` as verified no-ops by `/akili-execute` (Reviewer PASS; evidence in [`./execution.md`](./execution.md)). Prior same-day edit: T-01/T-02/T-10 superseded/corrected/notified, dependency declared — see notes inline; by `bugfix/sp-versioning-roles-id` T-03
 
 ---
 
@@ -60,7 +60,7 @@ graph TD
 
 - **Requirements covered:** R-IU-009 (AC.4), and the precondition for DC-1/DC-2/DC-3/DC-10/DC-12
 - **Design references:** §6.5.1 pieces 1 and 3; RB-9
-- **Size:** S · **Dependencies:** none · **Status:** ~~todo~~ → **superseded — verify only.** Filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03
+- **Size:** S · **Dependencies:** none · **Status:** ~~todo~~ → ~~superseded — verify only~~ → **`[x]` DONE 2026-08-18** — verified as a no-op, zero diff, Reviewer PASS. Evidence: [`./execution.md`](./execution.md) → *T-01*
 - **Skills:** `nestjs-expert`
 
 > **Superseded, 2026-08-18.** `bugfix/sp-versioning-roles-id`'s own T-01 (`src/db/config/mysql/orm.test.config.ts`, the `TEST`-bound npm scripts) is `[x]` **done** — Reviewer PASS 2026-08-14, falsifying sentinel demonstrated. Per T-03 below's own rule ("shared with `innovation-use/data-model-and-catalog` T-01/T-02 … whichever lands first builds them"), the external spec landed first. **Do not build a second TEST datasource module.** Verify the existing one resolves to `dataSourceTarget.TEST` and close this task as a no-op.
@@ -80,9 +80,9 @@ graph TD
 - **Disqualifier:** a module that merely *compiles* proves nothing. If the options cannot be printed and read, the check is **inconclusive, not passed**.
 
 **Done**
-- [ ] `orm.test.config.ts` resolves to `dataSourceTarget.TEST`, demonstrated by the sentinel above
-- [ ] New scripts exist and reference only the test config
-- [ ] `orm.config.ts` and `orm-connection-test.module.ts` are unmodified
+- [x] `orm.test.config.ts` resolves to `dataSourceTarget.TEST`, demonstrated by the sentinel above
+- [x] New scripts exist and reference only the test config
+- [x] `orm.config.ts` and `orm-connection-test.module.ts` are unmodified
 
 ---
 
@@ -90,7 +90,7 @@ graph TD
 
 - **Requirements covered:** R-IU-009 (AC.1, AC.4); A-4
 - **Design references:** §6.5.1 pieces 2, 4, 5
-- **Size:** M · **Dependencies:** T-01 · **Status:** ~~todo~~ → **superseded — verify only.** Filed 2026-08-18 by `bugfix/sp-versioning-roles-id` T-03
+- **Size:** M · **Dependencies:** T-01 · **Status:** ~~todo~~ → ~~superseded — verify only~~ → **`[x]` DONE 2026-08-18** — verified as a no-op, zero diff, Reviewer PASS; M1–M6 clause delegated to T-04 … T-10. Evidence: [`./execution.md`](./execution.md) → *T-02*
 - **Skills:** `nestjs-expert`
 
 > **Superseded, 2026-08-18.** `bugfix/sp-versioning-roles-id`'s own T-01 (`ARI_TEST_MYSQL_PORT`, Docker MySQL, the dedicated Jest config for the fixture directory) is `[x]` **done**, and its T-01b (the baseline snapshot this task's original scope below did not anticipate — see the corrected bullet immediately below) is also `[x]` **done**, both Reviewer PASS 2026-08-14. The external spec landed first — do not provision a second Docker/Jest harness. Verify the existing one and close this task as a no-op.
@@ -112,10 +112,10 @@ graph TD
 - **Disqualifier:** if the container cannot be provisioned, record **inconclusive** in the execution note and escalate. Do **not** proceed to any SQL task; every downstream gate is unrunnable.
 
 **Done**
-- [ ] `ARI_TEST_MYSQL_PORT` is read by T-01's module and documented
-- [ ] ~~Full migration suite applies **and reverts** cleanly on the scratch schema~~ → **Corrected 2026-08-18 (T-03 of `bugfix/sp-versioning-roles-id`), same reasoning as the scope bullet above: unachievable as written** — restate as *the snapshot loads, `migration:test:execute` reports zero pending migrations, and only this chunk's own M1–M6 apply and revert cleanly on top of it* (`bugfix/sp-versioning-roles-id` `design.md` §4.1/DD-5; that spec's own T-01 retired the identical criterion as never-achievable, RB-1d)
-- [ ] The smoke fixture passes with the container up and **fails** with it down
-- [ ] Execution note records the outcome verbatim, including any inconclusive result
+- [x] `ARI_TEST_MYSQL_PORT` is read by T-01's module and documented
+- [x] ~~Full migration suite applies **and reverts** cleanly on the scratch schema~~ → **Corrected 2026-08-18 (T-03 of `bugfix/sp-versioning-roles-id`), same reasoning as the scope bullet above: unachievable as written** — restate as *the snapshot loads, `migration:test:execute` reports zero pending migrations, and only this chunk's own M1–M6 apply and revert cleanly on top of it* (`bugfix/sp-versioning-roles-id` `design.md` §4.1/DD-5; that spec's own T-01 retired the identical criterion as never-achievable, RB-1d) **· Closed 2026-08-18 for the verifiable half only** (snapshot loads; `migration:test:execute` reports `No migrations are pending`). The **M1–M6 apply-and-revert clause is delegated to T-04 … T-10**, whose own scratch-schema gates and R-IU-009 AC.1 discharge it — M1–M6 do not exist at T-02 time, and holding this `[~]` would deadlock `T-02 → T-10 → M-migrations → T-02`. Ruling + Reviewer concurrence: `execution.md` → *Decision: T-02's M1–M6 clause is delegated downstream*.
+- [x] The smoke fixture passes with the container up and **fails** with it down
+- [x] Execution note records the outcome verbatim, including any inconclusive result
 
 ---
 
