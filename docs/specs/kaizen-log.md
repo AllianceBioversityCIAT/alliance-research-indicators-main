@@ -8,30 +8,58 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 ## Active Lessons
 
-| ID | Lesson | Severity | Target | Recurrence | Status |
+> **Pruned 2026-08-18** at the `bilateral/clarisa-phase-config-variable` archive, as the previous
+> note instructed. Eight institutionalized/applied lessons were **retired** (their rule now lives in
+> a guide or template and remains in force): `K-001`, `K-002`, `K-006`, `K-009`, `K-010`, `KZ-004`,
+> `KZ-005`, `KZ-006`. Methodology lessons awaiting upstream moved to their own list below, since they
+> bind the AKILI repo rather than this project. The digest is back to the **10-row cap**.
+
+| ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
-| **K-004** | **A gate must be proven able to FAIL before it is trusted.** Newest facet: **a falsifier authored from the same frame as the design tends to name a mutation the design already excludes** — a spec cited K-004 and in the same table wrote a break that leaves the suite green. Citing a lesson is not applying it | **High** | Methodology | **6** | Proposed (upstream) |
-| **K-011** | **An empty or stale artifact does not produce a null review — it produces a confident review of the wrong thing.** A 0-byte diff yielded a `STATUS: FAIL` against the previous task's code. Validate every artifact before dispatch: non-empty, and contains the symbol under audit | **High** | Methodology | 1 | Proposed (upstream) |
-| **K-012** | **Name the concrete failing input in the brief** — K-004 alone does not make a Bug-Mode test falsifiable. Same spec, same methodology: 3 non-falsifiable tests, then 1, then 0. The variable was the brief, not the model | **High** | Methodology | 1 | Proposed (upstream) |
-| **K-013** | **A requirement derived from a live measurement needs the date and the invalidating condition.** A label rule written when a case was 0/342 shipped broken when the feed made it 25/25 mid-implementation | **High** | Methodology | 1 | Proposed (upstream) |
-| **K-009** | **A delegated worker that does not deliver is not a worker that found nothing.** A silent judge/reviewer is indistinguishable from a clean one; three subagents idled without reporting while the same brief on another transport returned 6 severe defects. Record non-delivery as runtime failure and re-dispatch | **High** | Product + Methodology | 1 | **Institutionalized** (root `CLAUDE.md` §4.3) |
-| **K-010** | **Bug-Mode red-before-green evidence belongs to the task that changes the buggy code path**, never to one that creates new code — a new unit's tests are green from first compile and could never have been red | Medium | Methodology | 1 | **Institutionalized** (`general-setup/task.md` §5) |
-| **K-008** | **Writing a coverage table does not make it exhaustive** — the same pass authored the requirements and the table, so nothing independent checked that every clause appears | **Medium** | Methodology | 1 | Proposed (upstream) |
-| **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | Product | 2 (same edit) | Proposed |
-| **K-003** | Correction-closure sweeps must grep the **literal superseded string**, then re-grep to confirm — semantic greps miss their own target | **High** | Methodology | **6** | Proposed (upstream) |
-| **KZ-001** | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion | **High** | Product | 4 | Proposed |
-| **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | Product | 3 | Proposed |
-| **KZ-003** | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean | Medium | Product | 1 | Proposed |
-| **KZ-004** | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands | Medium | Product + Methodology | 1 | Proposed |
+| **K-014** | **A filtered view of a command's output is not the output.** Truncating a discovery search makes *absent* and *excluded* indistinguishable, and counting ANSI-coloured output silently reads zero. Check the total, normalize escapes, and look for an error **before** counting | **High** | 3 (one spec) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 |
+| **K-015** | **CI/CD deploys code but does NOT apply migrations**, while the constitution claimed releases were "100% automated". A merged migration sat 4 days and several deploys unapplied, with nothing surfacing it | **High** | 1 | Product | **Applied** — root `CLAUDE.md` §4.3 |
+| **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
+| **KZ-001** | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion | **High** | 4 | Product | Proposed |
+| **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
+| **KZ-003** | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean | Medium | 1 | Product | Proposed |
+| **KZ-007** | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it | **High** | 1 | Product | Proposed |
+| **KZ-008** | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified | **High** | 1 | Product | Proposed |
+| **KZ-009** | Before trusting any measured ratio or margin, **measure the instrument's noise floor**. A rigorous harness can still measure the wrong quantity | **High** | 1 | Product | Proposed |
+| **KZ-010** | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands | Medium | 1 | Product + Methodology | Proposed |
 
-> **Retired this cycle (institutionalized and stable):** K-007 (fixer-is-not-a-gate, root `CLAUDE.md` §4.3) and K-002 (test-runner green ≠ compiles, client `CLAUDE.md`). Both remain in force; they no longer need a slot here.
+### Queued for upstream (Methodology — no local edit owed)
 
+| ID | Lesson |
+| --- | --- |
+| **K-003** | Correction-closure sweeps must grep the **literal superseded string**, then re-grep to confirm. *(Same family as K-014 — collapse when either is next revised.)* |
+| **K-004** | A gate must be proven able to FAIL before it is trusted; a falsifier authored from the design's own frame tends to name a mutation the design already excludes |
+| **K-008** | Writing a coverage table does not make it exhaustive — the same pass authored the requirements and the table |
+| **K-011** | An empty or stale artifact does not produce a null review; it produces a confident review of the wrong thing |
+| **K-012** | Name the concrete failing input in the brief — K-004 alone does not make a Bug-Mode test falsifiable |
+| **K-013** | A requirement derived from a live measurement needs the date and the invalidating condition |
+| **K-016** | An NFR that accepts user-visible latency without a paired requirement for how the UI signals it creates a trap: the user cannot distinguish "not yet" from "broken" |
 
-> **K-001 and KZ-001 are the same failure seen from two tiers** — a verification artifact that cannot report the thing it stands for. K-004 and KZ-003 likewise both say a green result only covers what its author modeled. Worth collapsing when either series is next revised; kept distinct here so no existing citation breaks.
+> **Retired this cycle (institutionalized and still in force):** `K-001`, `K-002`, `K-006`, `K-009`,
+> `K-010` (guides), `KZ-004`, `KZ-005`, `KZ-006` (templates). They no longer need a digest slot.
 
 ---
 
 ## Entries
+
+### 2026-08-18 — `bilateral/clarisa-phase-config-variable`
+
+**Metrics.** 4 tasks (1 dropped by pivot) · 2 Reviewer FAIL rework attempts (T-04 ×2) · 0 HALTs · 0 FATAL_FAILs · **1 Pivot** · 10 advisories · budget **exceeded +90% LOC** (~720 vs ~380) · no `test-report.md` / `validation-report.md` (absence explicitly accepted at archive).
+
+**K-014 — A filtered view of a command's output is not the output.** Three instances in one spec, one of which cost the whole spec its premise. During `/akili-propose`, a prior-art search ran `grep -rln "app_config" src/db/migrations/ | tail -6` against **nine** matches; the silent cap dropped exactly the migration that already implemented this spec's intent, and every downstream artifact inherited the false premise until an Implementer's blast-radius check caught it. Twice more the same day: `grep '^\[ \]'` over `migration:show` read "zero pending" because the output carries ANSI escapes before the bracket — nearly reporting an unapplied migration as applied — and a `grep -i error` matched a migration *name* and condemned clean output as unreliable. *Root cause: reading a filter's output as ground truth without confirming the filter could see what it was looking for.* Same family as K-003, different facet: K-003 is searching for the wrong string; this is a **lossy view that looks complete**. *Evidence: `execution.md` → Pivot Record: T-01, "Root cause of the specification error".* **Severity High · Product + Methodology · Applied to root `CLAUDE.md` §4.3.**
+
+**K-015 — CI/CD deploys code but does not apply migrations, and the constitution said otherwise.** Root `CLAUDE.md` claimed *"Remote releases are 100% automated via CI/CD pipelines"*. Migration `8431dc4b` (2026-08-14) sat merged in `origin/dev` **and** `origin/staging` for four days across several deploys without being applied. Measured rather than inferred: a baseline before deploy `d9b402e6` and a post-measurement after it showed **zero delta** (306 applied / 1 pending, unchanged). It had to be applied manually, under explicit user authorization, against the shared Dev database. *Root cause: the constitution declared a deployment guarantee the pipeline does not implement for migrations, so one can go unapplied indefinitely with nothing surfacing it.* **Severity High · Product · Applied to root `CLAUDE.md` §4.3.** Follow-up owed with DevOps: is this by design, who triggers it, and are other environments carrying unapplied migrations?
+
+**K-016 — An NFR that accepts user-visible latency without requiring a UI signal creates a trap.** `NFR-CPC-001` accepted the resolver's 5-minute TTL. The first real user saved `2025`, tested immediately, saw nothing, changed the value again — restarting the TTL — and reported *"no devuelve nada en ninguna phase"*. Nothing was broken; the UI simply gave no way to distinguish "not yet" from "not working", and re-trying made it permanent. *Root cause: latency NFRs are written as system tolerances, and the requirements template never prompts for the user-visible consequence.* *Evidence: `execution.md` → T-03 HITL, the TTL advisory.* **Severity Medium · Methodology — no local edit; upstream to the AKILI requirements template.**
+
+**Also worth recording (not lessons).** The mandated **reversion challenge** earned its keep: it found that removing the free-text field would block pre-setting a year CLARISA has not yet published, producing `DD-3` (an editable select) — a design change no review stage would otherwise have surfaced. And **advisory R2 was checked at the HITL pause and did not materialise**, which is the outcome an acknowledged blind spot is supposed to have.
+
+---
+
 
 ### 2026-08-18 — `bugfix/bilateral-picker-fields`
 
