@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04 … **T-11** `[x]` (2026-08-18) — **11 of 13 done**; next eligible **T-12** and **T-13** (T-13 unblocked by T-10). ⚠️ **FP-23 and FP-16 must be resolved before T-12's fixtures run**
+- **Status:** in-progress — T-01, T-02, T-04 … **T-11** `[x]`; **T-12 `[~]` ESCALATED** (2026-08-18) — 11 of 13 done. ⚠️ **T-12 awaits a user ruling** (F12: harness vs spec); **T-13 is independently eligible and does not need that ruling**. FP-23 retired, FP-16 discharged
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -369,7 +369,7 @@ graph TD
 
 - **Requirements covered:** R-IU-006 (AC.2–AC.11), R-IU-001 (AC.3), R-IU-003 (mode exclusivity), R-IU-007 (via F10); DC-2, DC-3, DC-10
 - **Design references:** §6.5 fixture table, §6.6
-- **Size:** L · **Dependencies:** T-09, T-02 · **Status:** todo
+- **Size:** L · **Dependencies:** T-09, T-02 · **Status:** ~~todo~~ → **`[~]` IN PROGRESS / ESCALATED 2026-08-18** — attempt 1: **Lens B PASS, Lens C PASS, Lens A FAIL** on F12 only (body-text assertion where AC.9 specifies a behavioral comparison). **14 of 15 fixtures accepted.** Rework NOT spawned: this FAIL is the pre-declared budget escalation (review rounds at the 4–5 ceiling). **Awaiting a user ruling on path (a) fix-the-harness vs (b) fix-the-spec** — see [`./execution.md`](./execution.md) → *T-12*
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Scope** — the fixtures under `test/fixtures/innovation-use/` that exercise `innovation_use_validation` on real MySQL: F1–F8, **F9, F9b**, F10, F11, F12, F17, plus the R-IU-001 detail-row round trip.

@@ -1400,3 +1400,174 @@ At the T-11 continue/pause gate the Leader reported to the user that FP-23 was a
 **Net effect on T-12:** no user ruling was ever required. **FP-16** — the other item the Leader flagged as "must resolve before T-12" — is likewise **not** a decision: its own text (*"Seed both roles, or the fixture proves nothing"*) is direct, actionable implementation guidance, carried into T-12's brief. **T-12 proceeds.**
 
 **User authorization of record:** at the T-11 gate the user directed *"rule on F11 and continue with T-12."* The ruling required no change — F11 was already correct — so the authorization is discharged by this verification, and T-12 starts with the F11 row as it already stands. No spec document was edited by this note.
+
+---
+
+### T-12 — Validation-function fixtures F1–F12, F9b, F17 · **ATTEMPT 1: 2 PASS / 1 FAIL → BUDGET ESCALATION, task `[~]`**
+
+- **Date:** 2026-08-18
+- **Status:** `[~]` — **NOT complete.** Attempt 1 reviewed by 3 parallel lenses: **Lens B PASS, Lens C PASS, Lens A FAIL** (F12 only). **The rework attempt was NOT spawned** — this FAIL is the escalation point pre-declared in the T-09 budget-tripwire decision, so execution stopped for a user ruling.
+- **Implementer attempts:** 1 (of a 3-attempt ceiling; **2 remain unused**)
+- **Review mode:** parallel lens reviewers (3) — `xhigh` effort, real-database surface
+- **Requirements covered (delivered):** R-IU-006 **AC.2–AC.8, AC.10, AC.11** · R-IU-001 AC.3 · R-IU-007 (F10) · DC-2, DC-3, DC-10. **AC.9 is NOT discharged** — see the FAIL.
+- **Files:** 4 new, 811 lines, **left untracked in the working tree pending the ruling** (not committed: the methodology commits on PASS). No existing file modified.
+
+| File | Fixtures | Lines |
+| --- | --- | --- |
+| `test/fixtures/innovation-use/innovation-use-validation.fixture-spec.ts` | F1–F9, F9b, F11, F17 (12 tests) | 412 |
+| `test/fixtures/innovation-use/innovation-use-detail-round-trip.fixture-spec.ts` | R-IU-001 AC.3 | 126 |
+| `test/fixtures/innovation-use/green-check-ip-rights.fixture-spec.ts` | F10 | 109 |
+| `test/fixtures/innovation-use/innovation-dev-validation-unchanged.fixture-spec.ts` | F12 | 164 |
+
+Collection verified from source by Lens C (counting `it()` blocks, not trusting the report): **6 suites / 18 tests**, of which 15 new (12 + 1 + 1 + 1) plus 1 smoke + 2 sp-versioning. Reconciles exactly. All four files end `.fixture-spec.ts`, so the §9 naming trap (a `*.spec.ts` under `test/` is collected by **neither** runner and exits 0 with zero tests) is closed.
+
+#### ⛔ Lens A FAIL — F12 (the only issue; verbatim finding)
+
+> **Discovered Issue:** F12 discharges R-IU-006 AC.9 with a body-TEXT identity assertion instead of the behavioral comparison the spec specifies. `innovation-dev-validation-unchanged.fixture-spec.ts` **never invokes `innovation_dev_validation`** — no Innovation Dev fixture is seeded, no returned value is compared. AC.9's substance does hold (verified twice: no M1–M6 migration names the function or `valid_text`; M3 is `ADD … int NULL` only; the body names every column it reads, with no `SELECT *` or positional dependence), so **there is no live defect** — the failure is that the delivered gate cannot detect two of the three ways Dev's green check can regress: a schema change under a named column, and a redefinition of a called helper (`valid_text`). Both leave the body text identical and F12 green. That matters because F12 is a **standing** gate re-run by T-14 and inherited by every future spec via ADR-11's checklist.
+>
+> **Violated Rule:** `requirements.md` **R-IU-006 AC.9** — *"returns identical **values** … for a fixed **fixture set**"* (`:383`); `design.md` **§6.5** row F12 — *"over a fixed Innovation Dev fixture"*; `design.md` §6.6 and **ADR-11** (structural evidence over SQL is not behavioral evidence); `tasks.md` T-12's Falsifying-input clause.
+
+**Leader adjudication — the FAIL is IN SCOPE.** Three independent grounds, checked before deciding:
+1. **F12 is explicitly in T-12's Scope** (`tasks.md:375`).
+2. **AC.9 is worded behaviorally and unambiguously** (`requirements.md:383` — "identical **values** … for a fixed **fixture set**").
+3. **Decisive:** `requirements.md:404` — *"AC.2 through AC.9 … are **not** provable by the repository's existing test pattern (§4.1) and require the §4.3 substitute gate, **or must be reported inconclusive**."* A body-text comparison is **neither** the substitute gate nor an inconclusive report. This is not scope creep; it is a scoped deliverable not delivered as specified.
+
+**What is NOT wrong, stated plainly so the ruling is not made on fear:** Lens A verified twice that **Innovation Dev is not broken.** No M1–M6 migration redefines `innovation_dev_validation` or `valid_text` (proven by a name grep across all migrations — the only M1–M6 hit is inside M5's docblock — and independently by enumerating every `CREATE FUNCTION|PROCEDURE` in M6, which yields only the four lifecycle routines). M3 is six `ADD … int NULL` statements with no `MODIFY`/`CHANGE`. The function names every column it reads. **Added nullable columns cannot alter its output.** The gap is in the gate's future coverage, not in today's behavior.
+
+**Why the Implementer chose this, and the part of its reasoning that survives:** it rejected reverting/re-applying M1–M6 mid-suite because that would corrupt the other three fixture files running in parallel Jest workers. **Lens A agrees and says it would have rejected a live down/up too.** The `expectedBody` constant is a verbatim copy of the defining migration, so the assertion is genuinely non-tautological, and the docblock states plainly what it compares. The error is the substitution, not carelessness.
+
+#### Lens B — PASS
+
+Re-derived **every** expected value independently from the shipped M5 SQL (`1787078283929:76-138`) rather than accepting the fixtures' own values, so no fixture is "table-conformant but wrong" and none is back-derived from observed behavior. **15/15 scope items present, every value matching §6.5 verbatim.** F1 is *stronger* than its row (it seeds a valid actor row, so the only possible cause of `0` is the missing detail row) — a strengthening, not a drift. Also confirmed `valid_text(NULL) = FALSE`, not NULL, so F4 cannot pass by NULL-propagation.
+
+**AC mapping, forward — every claimed AC gated:** AC.2→F1 · AC.3→F2 · AC.4→F3 · AC.5→F5+F6 · AC.6→F7 · AC.7→F8 · AC.8→F11 · AC.9→F12 *(the disputed one)* · **AC.10→F9 *and* F9b (both halves)** · AC.11→F17 · R-IU-001 AC.3→round trip · R-IU-007→F10. **Backward:** nothing reaches into T-13; no fixture executes `CALL`; no R-IU-011 AC named anywhere.
+
+**F9 vs F9b are genuinely distinct** — they exercise the two opposite branches of the SQL's `IF(ra.sex_age_disaggregation_not_apply = TRUE, …, …)` (`:122-125`). Either alone leaves half of AC.10 open.
+
+**FP-24 handled exactly as instructed:** no fixture asserts mode exclusivity (proven two ways — all eleven `seedActor` call sites read, plus a symbol grep: `actorsCount` appears only with `sexAgeDisaggregationNotApply: true`, the four `*_count` fields only in F9b's `false` case). No row populates both modes.
+
+#### Lens C — PASS
+
+**FP-4's teardown anti-pattern avoided**, with the failure path traced: every seed flag is set only *after* its INSERT returns and every `DELETE` is gated on that flag, so a `beforeAll` throwing midway still removes what *was* created and never passes an `undefined` parameter. Cleanup order respects the FKs (children → catalogs → `report_years`/`reporting_platforms`).
+
+**The cross-file race the Implementer found is genuinely fixed, and no other shared key exists** — Lens C enumerated *every* write target across all fixture files. The fourth file correctly needed no unique code because it issues **zero** INSERTs. `result_official_code` bases are separated by 1e11.
+
+**Two negatives proven twice each** — full read plus independent grep: **no mutation logic is committed** (the only `DROP`/`CREATE` hits are 5 in docblock prose and one read-only `SHOW CREATE FUNCTION`), and **no CORE datasource is imported** (grep for `import|orm.config|localhost|ARI_|process.env|createConnection` returns *exactly* the four TEST-config imports; the documented `orm-connection-test.module.ts` decoy is untouched). `orm.config.ts:51-52` additionally sets `synchronize: false` / `migrationsRun: false`.
+
+**Fails loudly with no database** — grep for `skip|todo(|passWithNoTests|try {|catch|process.exit|xit(|.only` returns **zero matches**, and `jest-fixtures.json` sets no `passWithNoTests`. The §6.5.1 Disqualifier ("a run that exits 0 because it skipped every fixture is not evidence") is closed at the harness layer. **KZ-004 recurrence-3 mode closed.**
+
+**F11 is load-bearing on TWO conjuncts**, verified against the shipped M5 body — stronger than the Implementer claimed: removing the role filter makes `tempActors`(1) ≠ `tempFullActors`(2) **and** fails mode-consistency.
+
+#### The 15 red/green observations — enumerated in full
+
+**This enumeration is load-bearing, not decoration.** Two fixture files assert in their own comments that the red/green demonstration "is reported in the T-12 execution note" (Lens B advisory). Were any fixture omitted here, the codebase would carry a permanent false citation.
+
+| Fixture | Mutation used for RED | Red | Green after restore | Lens A verdict on the mutation |
+| --- | --- | --- | --- | --- |
+| F1 | `commonFields` DEFAULT FALSE→TRUE | ✕ (expected 0) | ✓ | **Correct, precisely targeted** — does not redden F2 |
+| F2 | level-not-null check hardcoded `TRUE` | ✕ | ✓ | **Correct, targeted** — F1 unaffected |
+| F3 | `IF(useLevel>=6,…)` → compares the FK id directly | ✕ (expected 1) | ✓ | **Correct — this is DC-10 itself** |
+| F4 | `IF(useLevel>=6,…)` → `IF(useLevel>6,…)` | ✕ (expected 0) | ✓ | **Correct** — pins the boundary from the lenient side |
+| F5 & F6 (shared) | `valid_text(explanation)` → `explanation IS NOT NULL` | ✕ both | ✓ both | **Correct for both** — the F5/F6 distinction is input-side, so one mutation legitimately covers both |
+| F7 | actor-type `IF` branches swapped | ✕ (expected 1) | ✓ | Correct in effect, **coarse** — also reddens F3 and F11 (inherent to a happy-path fixture) |
+| F8 | actor-type `IF` → `TRUE` (DD-10 dead branch) | ✕ | ✓ | **Correct, targeted** — reddens F8 only |
+| F9 & F9b (shared) | mode-consistency `IF` → `TRUE` | ✕ both | ✓ both | Correct in effect, **coarse for F9b** — see advisory A-1 |
+| F10 | `intellectual_property_validation`'s `RETURN validation` → `RETURN TRUE` | ✕ | ✓ | Correct in effect, **coarse** — the targeted mutation is the `DEFAULT false` declaration |
+| F11 | `AND ra.actor_role_id = 2` removed from all three actor queries | ✕ (expected 1) | ✓ | **Correct and exactly DD-4** |
+| F12 | body drifted (`AND TRUE` appended) | ✕ (text mismatch) | ✓ | **Demonstrates only that a body-text check catches body-text drift — not a falsification of AC.9's behavioral claim.** This is the FAIL |
+| F17 | `(tempFullActors > 0)` conjunct removed | ✕ (expected 0) | ✓ | **Correct and exactly the single conjunct** (FP-25) |
+| Round trip | asserted a knowingly-wrong expected value (`toBe(999)` vs actual `7`) | ✕ | ✓ | **Not a system mutation** — tests the assertion wiring. Advisory, not a violation: T-12's clause says "mutate **the function**", and this fixture has none |
+
+All mutations were applied via `DROP FUNCTION`/`CREATE FUNCTION` **against the scratch container only**, never by editing a committed migration (ADR-5), and restored to the exact migration body before the next fixture ran. Lens C confirmed **no mutation logic is committed**.
+
+#### FP-19 — CLOSED, after being unverifiable since T-08
+
+```
+DELETE_RULE  UPDATE_RULE
+NO ACTION    NO ACTION
+NO ACTION    NO ACTION
+```
+Both `FK_result_innovation_use_result_id` and `FK_result_innovation_use_innovation_use_level_id` are `NO ACTION`/`NO ACTION`, exactly as `design.md` §3.1 claimed. **Nothing churns.** FP-19 required a database and now has one.
+
+#### FP-16 — CONFIRMED EMPIRICALLY, and the vacuity averted
+
+`actor_roles` contained **only id 2** (Innovation Use, from M4) on a fresh scratch schema. Had F11 been written without seeding id 1, the DD-4 role filter would have passed **vacuously** — no Innovation Dev row would have existed to exclude. F11 seeds id 1 itself (idempotent SELECT-then-INSERT on the explicit PK, removed in `afterAll` only when this file added it) and gives it a *deliberately unresolvable* actor row. **FP-16 is discharged.**
+
+#### Verification — Implementer, verbatim
+
+Provisioning followed the exact sequence (fresh container → **readiness poll** → baseline load → `migration:test:execute`); 8 migrations applied cleanly including M6. Then:
+- `npm run test:fixtures` → **6 suites / 18 tests passed**
+- `npm test -- --silent` → **328 suites / 2155 tests passed** — matches the T-11 baseline exactly, no regression
+- `npm run lint -- --quiet` → clean; `git status` re-checked after — `--fix` mutated nothing
+- `npm run compose:test:down` → container and network removed
+- Post-suite scratch check: zero leftover rows in `results`, `result_actors`, `result_innovation_use`, `report_years`, `clarisa_actor_types`, `reporting_platforms`. **Lens C additionally confirmed `actor_roles` IS cleaned** (`:205-207`) — the report's list omitted it; the code does not.
+
+**FP-27 held and was exercised:** the readiness poll was used and worked. The gap in `compose:test:up` remains real for T-13.
+
+#### ADVISORY findings — recorded, never gating
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **A-1** | A | **F9b's red used a mutation that removes BOTH halves of AC.10**, so it did not target F9b's own defect — and F9b exists *precisely* because the disaggregated half was once added with no gate. Lens A traced the body and confirmed **F9b does gate the else-branch independently** (with only the ELSE replaced, F9b reddens while F9 stays green), so the fixture is sound. Targeted one-line mutations (ELSE-only for F9b, THEN-only for F9) are ~5 minutes each |
+| **A-2** | A | F7's mutation also reddens F3 and F11; F10's is coarser than the mechanism §6.2 depends on. **Both fixtures discriminate; only the demonstrations are non-specific** |
+| **A-3** | A | F3/F4 rely on M1's seeded `id → level` mapping without asserting it inline. A one-line pre-assertion would make the DC-10 pair self-evidencing instead of requiring a trip to R-IU-002's table |
+| **A-4** | A, B | **F10 cannot distinguish indicator 6 from any other indicator** — it leaves `indicator_id` NULL. Behaviorally inert, and for a stronger reason than the docblock gives: with no `result_ip_rights` row the driving `SELECT … INTO` matches zero rows, so `indicatorId` is **never assigned** and `results.indicator_id` is never read. **Consequence to record:** the indicator-6-is-in-the-`ip_rights`-array half of §6.2 rests entirely on T-11's unit spec |
+| **A-5** | A | The round-trip's red (`toBe(999)`) tests assertion wiring, not the system. A cheap real falsifier existed: omit `created_by`/`updated_by` and confirm the audit assertions redden. Not required by T-12's wording |
+| **A-6** | B | **⚠️ A SHIPPED COMMENT IS FACTUALLY FALSE.** `innovation-use-validation.fixture-spec.ts:13-17` says `actor_roles` id 1 is *"not seeded anywhere in the baseline or in any migration on this branch"*. It **is** — `1749957832239-createEntitiesForInnovationDev.ts:45` inserts it via `${ActorRolesEnum.INNOVATION_DEV}`, **which is why a value-grep missed it**. Same family as the backtick trap: a grep that cannot match its target bytes. The operative conclusion survives (that migration predates the snapshot, and `baseline.sql` is schema-only, so the scratch schema genuinely lacks id 1 and the self-seed is required) but the stated reason is wrong. **Raised for the ruling** — T-09 spent two rework rounds on exactly this class |
+| **A-7** | B | The two files citing "the T-12 execution note" in the **past tense** — discharged by the 15-row enumeration above, which is why it is complete rather than summarized |
+| **A-8** | C | **`afterAll` is a bare `await` sequence in all four files** — the first throw aborts every remaining delete *and* `dataSource.destroy()`. The guards close FP-4's trigger but not the class. **Becomes concretely reachable when T-13 lands:** `DELETE FROM clarisa_actor_types WHERE code = 1|5` and `DELETE FROM actor_roles WHERE actor_role_id = 1` sit behind RESTRICT FKs, so a concurrent fixture holding an actor row raises **MySQL 1451 mid-teardown**. Suggest per-step `try`/`catch` (collect, rethrow after) + `destroy()` in `finally` |
+| **A-9** | C | **Check-then-insert on shared catalog rows is not atomic** — structurally the *same* pattern as the `platform_code='STAR'` race just fixed. Safe today because one file touches them; **breaks the moment T-13 copies it** |
+| **A-10** | C | **No `testTimeout` in `test/jest-fixtures.json`**, so Jest's 5 s default covers `initialize()` plus ~10 round trips. **A cold container reads as a failure rather than a slow pass.** The exemplar worked around it with explicit `30000` per test; a config-level `testTimeout: 30000` would cover all present and future fixtures |
+| **A-11** | C | `if (resultId === undefined \|\| resultId === null) continue;` (`:190-192`) is dead — harmless, and it keeps the FP-4 intent legible |
+
+#### Forward pointers
+
+| FP | Target | Content |
+| --- | --- | --- |
+| **FP-39** | **T-13 — carry into its brief, do NOT retrofit T-12's files** | **A-8 + A-9 together.** T-13 authors its own teardown and its own catalog seeds; both patterns as landed in T-12 are safe *only* while one file touches those rows. T-13 must use per-step `try`/`catch` + `destroy()` in `finally`, and either `INSERT … ON DUPLICATE KEY UPDATE` with a `ROW_COUNT()`-derived flag or its **own** catalog codes. This is guidance on work T-13 already owns — not new scope, and not a licence to widen T-12 |
+| **FP-40** | **T-13, T-14 · `src/CLAUDE.md` §9** | **A-10's missing `testTimeout`.** T-13's routine fixtures (`CALL SP_versioning` over ~30 copy blocks) are far slower than T-12's function calls, so the 5 s default is more likely to bite — and it fails in the *misleading* direction |
+| **FP-41** | **T-14** | **F12 is a STANDING gate.** Whatever the ruling below, T-14 re-runs it and ADR-11's checklist hands it to the next spec adding a table under `results`. If the structural discharge is accepted, T-14's filing must record the two blind spots (schema change under a named column; helper redefinition) so the next spec does not inherit a gate it believes is behavioral |
+| **FP-42** | **any future fixture author** | The **isolate-one-conjunct** seeding discipline in these fixtures is the reusable pattern: in each negative fixture exactly one conjunct is false and all others are deliberately satisfied (e.g. F8 sets `actors_count` so only the actor branch can fail; F1 seeds a valid actor row so it cannot pass for F17's reason). Verified by Lens A's full trace. Without it, a negative fixture goes green for a confounded reason and proves nothing |
+
+FP-1 … FP-38: **FP-19 CLOSED** (`NO ACTION` twice). **FP-16 DISCHARGED** (roles seeded; F11 non-vacuous on two conjuncts). **FP-23 remains retired.** **FP-25 confirmed** — F17 is the sole gate on `(tempFullActors > 0)`, verified by trace. **FP-27 exercised and held**, but the underlying `compose:test:up` gap persists for T-13. **FP-24 live and unresolved** — see the correction owed below. FP-35 (F10 the sole RB-10 gate) and FP-36 (the boolean unproven until T-12) are **discharged by this task's fixtures**, subject to the ruling.
+
+#### ⚠️ A SECOND CORRECTION IS OWED — KZ-005's third recurrence in this spec
+
+Lens B found `tasks.md` still carries the **R-IU-003 mode-exclusivity over-claim**, at two live sites:
+- **`tasks.md:370`** — `R-IU-003 (mode exclusivity)` in T-12's *Requirements covered*
+- **`tasks.md:461`** — `*modes exclusive* · BUT NOT populate both modes → **T-09** (F9/F9b)` — **the concrete defect: it names F9/F9b as the gate on the both-populated clause, which they demonstrably are not**
+
+Correction item 6 was actioned in `requirements.md:304` (*"The both-populated case rests entirely on chunk 2's API edge (RB-5 layer 3)"*) but **its two-direction sweep never reached `tasks.md`.** `design.md` is clean. **R-IU-003's *completeness* half is genuinely and fully gated by F9/F9b; its *exclusivity* half is not gated here and cannot be.** Suggested restatement: `R-IU-003 (mode completeness — RB-5 layer 2; exclusivity is chunk 2's API edge per requirements.md:304)`.
+
+Lens B declined to FAIL on it, on this spec's own precedent (`execution.md:511`, `:921` — two identical `tasks.md` AC-mapping defects raised for adjudication rather than edited, Reviewer PASS both times). **The Leader concurs: the diff is the wrong place to charge a spec-doc error.** Left unfixed, **T-12 would be recorded as closing a clause nothing in chunk 1 gates.**
+
+> **This is the third KZ-005 recurrence in this spec, and the pattern is now unmistakable: every correction pass here has left residue at a site its own sweep did not reach.** T-10's pre-flight found six; this found two more. The lesson is *applied* in `.agents/leader.md` and still recurs — which is itself the finding for `/akili-archive`'s Kaizen.
+
+#### 🛑 BUDGET TRIPWIRE — the pre-declared escalation, fired
+
+**The rework attempt was deliberately NOT spawned.** The T-09 tripwire decision recorded exactly this trigger:
+
+> *"**At the next Reviewer FAIL — a hard escalation.** One more rework round puts the spec at the 4–5 ceiling; the round after that is **over budget** and the Leader must stop and escalate again."*
+
+| Signal | Budgeted (§12) | Actual now | State |
+| --- | --- | --- | --- |
+| Tasks | 13 | **11 done**, T-12 `[~]`, T-13 + T-14 pending | on track |
+| LOC | ~2,600 | **~6,200** (T-10 alone is 3,184) | **exceeded — pre-declared as expected**, and §12 was internally inconsistent from the start (it budgeted ~2,600 total while measuring M6 alone at ~3,070) |
+| **Review rounds** | **4–5** | **4 consumed; this FAIL makes the 5th** | **⛔ AT THE CEILING — spending it reaches the limit exactly** |
+
+Rework attempts remaining on T-12 itself: **2 of 3** (unused). The constraint is the spec-level review-round budget, not the task-level ceiling.
+
+**Cause, honestly:** unlike T-09's rounds — two of four caused by the Leader supplying false facts — **this FAIL is a genuine specification/delivery mismatch found by review doing its job.** T-10 and T-11 both passed on attempt 1. The Leader's brief did not misstate F12; it quoted §6.5's "stored-function comparison … executes no routine" framing, which is *true* and is what the Implementer reasoned from — but that clause distinguishes F12 from **F16**, it does not license replacing a behavioral comparison with a text one. **A sharper brief would have said "call the function and compare values."** That is a Leader briefing weakness, not a false fact.
+
+**The two honest paths, both legitimate — this is a scope/insurance trade-off, which is why it is the user's call:**
+
+| | Path (a) — fix the harness | Path (b) — fix the spec |
+| --- | --- | --- |
+| **Action** | Add a behavioral fixture **alongside** the body-text one (Lens A: keep both). Seed a fixed Innovation Dev fixture on the fully-migrated schema, call `innovation_dev_validation`, assert values derived from `1758125999162`'s body — the same independent source `expectedBody` already uses. Two cases: one expected `1`, one flipped to `0` through the **actor** block (the table M3 touched) | Amend `design.md` §6.5's F12 row **and** R-IU-006 AC.9 to state the **structural** discharge and **name the two blind spots**, with the two-direction sweep |
+| **Cost** | **1 rework round → reaches the 4–5 ceiling exactly.** ~130–170 lines, one new file, no change to the other three. Lens A pre-scoped the FK surface: all `result_innovation_dev` FK columns are nullable; needs idempotent seeds in 6 catalogs, using `innovation_dev_anticipated_users` id ≠ 1 so the actor branch is reachable rather than short-circuited | **0 rework rounds.** A doc correction — foldable with the `tasks.md` R-IU-003 fix and A-6's false comment |
+| **Buys** | A gate that catches all three regression paths, for T-14 and for every future spec inheriting ADR-11's checklist | Honesty. The spec would stop claiming a behavioral gate it does not have |
+| **Costs** | The last budgeted review round | A permanently weaker standing gate, blind to schema-change-under-a-named-column and helper redefinition |
+
+**Also owed regardless of the path** (both are doc-only, neither consumes a review round): the `tasks.md` R-IU-003 over-claim (two sites), and **A-6's factually false shipped comment** — which T-09's precedent treats as FAIL-class, and which the Leader cannot convert from an advisory unilaterally.
+
+**Standing instruction:** do not spawn T-12's attempt 2, and do not mark T-12 `[x]`, without the user's ruling on (a) vs (b). T-13 is independently eligible (its dependency T-10 is `[x]`) and does **not** require this ruling.
