@@ -224,3 +224,174 @@ Run by the Leader inline **before** spawning, per `/akili-execute` Step 2.1 and 
 | `node_modules` | installed |
 
 The Docker daemon being off was surfaced to the user as a blocking decision rather than worked around, because the scratch container is the **only** gate for DC-1/DC-2/DC-3/DC-10/DC-12 and the sole alternative target is the shared, non-disposable dev database.
+
+---
+
+### T-04 — M1: catalog table `clarisa_innovation_use_levels` + the ten canonical rows · **PASS (attempt 1 of 3)**
+
+- **Date:** 2026-08-18
+- **Status:** `[x]`
+- **Implementer attempts:** 1 · **Reviewers:** 3 parallel lens-scoped (all PASS) · **Rework attempts consumed:** 0
+- **Requirements covered:** R-IU-002 AC.1–AC.5; NFR-IU-003; D-1, D-7; RB-4, RB-7
+- **Design references:** §3.2, §5 (M1), DD-2, DD-3
+- **Effort:** `xhigh` · **Skills:** `nestjs-expert` + `tdd` (Leader addition)
+
+**Files changed (both new):**
+
+| Path | What |
+| --- | --- |
+| `src/db/migrations/1787066437593-createClarisaInnovationUseLevels.ts` | M1 — `CREATE TABLE` + one ten-row `INSERT`; `down()` = `DROP TABLE` |
+| `src/db/migration-specs/1787066437593-createClarisaInnovationUseLevels.spec.ts` | Seed spec, 19 tests, TDD red(19/19)→green(19/19). **New directory** — see Constitution Impact below |
+
+**Verification:**
+
+```
+npm run migration:empty --name=createClarisaInnovationUseLevels   -> 1787066437593-...
+npx jest <spec>        (RED, stub up()/down())  -> 19 failed / 19
+npx jest <spec>        (GREEN, implemented)     -> 19 passed / 19
+npm test -- --silent                            -> 322 suites, 2061 tests passed
+compose:test:down && compose:test:up            -> fresh container (FP-1 honored)
+migration:test:bootstrap                        -> M1 applied
+migration:test:revert                           -> DROP TABLE, reverted
+migration:test:execute  (re-apply)              -> identical ten rows
+npm run lint -- --quiet                         -> reformatted line-wrapping in the new spec only;
+                                                   git status re-checked, spec still 19/19
+```
+
+**⚠️ Evidence-accuracy correction (Lens 2, ADVISORY-4).** The scratch run applied **three** migrations, not one: the committed baseline snapshot records neither `1784250000000` nor `1784300000000` (the external bugfix spec's) as executed, so `migration:test:execute` applied both of those and *then* M1. `migration:test:revert` reverts only the last applied migration, so the revert/re-apply cycle exercised M1 alone and "identical ten rows" holds. **Recorded so this is never later misread as M1 having been exercised in isolation.**
+
+**Done criteria:**
+
+1. **Exactly ten rows, ids 1–10, levels 0–9, no duplicate `level`, no ids 13–20** — ✅. Gated by the spec's tuple-set test: cardinality 10, `ids === [1..10]`, `levels === [0..9]`, `new Set(levels).size === 10`, explicit absence of ids 13–20 (D-7), and `id === level + 1` per pair. Lens 3 notes the **duplicate-row** half of DC-8 is caught *here*, not by the per-row `toContain` (a duplicated row still satisfies `toContain`) — the two tests are complementary by design.
+2. **Every `name` and `definition` matches R-IU-002 verbatim** — ✅. Lens 1 verified **mechanically, not by eyeball**: regex-extracted every name/definition from all three sources (migration, spec literal, `requirements.md`) independently; the three sets came back **byte-identical, same order, ten entries**. An ASCII-only character class was used deliberately so a Unicode lookalike (curly quote, en-dash) would truncate the match and surface as a mismatch — none did; zero non-ASCII bytes on either file's seed lines. Per-row confirmation included the `commonly`/plain pairs (4, 6, 8, 10), the `organization(s)` parenthetical, spacing around `/` in `End-user / Beneficiaries`, `in initial` (rows 3–4) vs `in the initial` (rows 5–10), and the **asymmetric absence of `some` at levels 6–7** — which looks wrong against rows 5/9 but matches the canonical table, so imposing symmetry would have been the defect. **Both copies match `requirements.md` independently, not merely each other.**
+3. **`clarisa_innovation_readiness_levels` row count and contents unchanged (AC.5)** — ✅, **but not on the evidence originally offered.** The Implementer reported `readiness_before = 0 / readiness_after = 0`. **That is rejected as the evidence for this AC:** the scratch schema is built from a *schema-only* snapshot, so that catalog is empty there, and comparing 0 → 0 is vacuously true over an empty set — precisely the **DD-11** failure shape, and silent on the two mutations AC.5's phrase "same contents" actually names (`UPDATE`, partial `DELETE`). **The evidence relied on instead** is the spec's line 226 assertion — iterating *every* captured statement from `up()` and asserting none references `clarisa_innovation_readiness_levels` (case-insensitive), with line 242 doing the same for `down()` — which forecloses INSERT/UPDATE/DELETE/ALTER/TRUNCATE/DROP against that table by name. Corroborated by Lens 1's repo-wide grep: only the two new files reference the new table, and neither statement names the readiness catalog. The 0 → 0 count is context, not proof.
+4. **Fresh container → snapshot → migrate reproduces the identical ten rows** — ✅ under the snapshot reading (see the adjudication below). Verified twice, on two separate fresh containers.
+
+**Trap compliance:**
+
+| Trap | Evidence |
+| --- | --- |
+| `id = level + 1`, both seeded explicitly | Every tuple stores `id` and `level` as independent literals; `id=6 → level=5` confirmed in the DB. Neither derived from the other at insert time (RB-4) |
+| No unique constraint/index on `name` | `SHOW CREATE TABLE` carries only `PRIMARY KEY (id)`; no `UNIQUE` token anywhere |
+| No `additional_guidance` column | DDL lists only the six `AuditableEntity` columns + `id`/`level`/`name`/`definition` |
+| `id` PK, **not** auto-increment | `` `id` bigint NOT NULL `` + `PRIMARY KEY (id)`, no `AUTO_INCREMENT`; spec asserts `not.toMatch(/AUTO_INCREMENT/i)` |
+
+**The falsification (performed, not asserted):** mutated row id=6's definition trailing `.` → `!` (one character) in the migration only.
+
+```
+● seeds id 6 / level 5 with name and definition matching R-IU-002 verbatim
+  expect(received).toContain(expected)
+  Expected substring: "(6, 5, 'Connected next-user', 'Innovation is commonly used by organizations
+                        connected to partners involved in the initial innovation development.')"
+  Received string: "...development!'),..."
+Tests: 1 failed, 18 passed, 19 total
+```
+Reverted → `19 passed`. Working tree clean of the mutation.
+
+**Lens 3 traced the falsification against the code rather than accepting the report:** the assertion builds `` `(${id}, ${level}, '${name}', '${definition}')` `` and is **anchored on both ends** (leading `(`, trailing `')`), so appended *or* truncated text also breaks the match — not only substitution. The id/level pair `(6, 5,` is unique and the tuple-count regex is insensitive to definition text, so exactly one assertion can fail. Test census reconciles: 6 DDL + 1 tuple-set + 10 `it.each` + 1 readiness-negative + 1 `down()` = **19**. `EXPECTED_ROWS` imports **only the migration class**, no data — the KZ-001 guard holds and the gate is non-tautological.
+
+#### Reviewer verdicts — 3 parallel lens-scoped reviewers, all PASS
+
+| Lens | Scope | Verdict |
+| --- | --- | --- |
+| **L1** | Spec conformance & seed correctness | **PASS** — ten rows character-exact in both copies against `requirements.md`; DDL matches §3.2 exactly; scope fence clean (repo-wide grep for `clarisa_innovation_use_levels｜ClarisaInnovationUseLevel｜innovation_use_level` returns **only the two new files**) |
+| **L2** | Migration safety, reversibility, precedent fidelity | **PASS** — strictly additive; `down()` fully and exclusively reverses `up()` with no droppable residue; append-only respected; column list **byte-identical to the named precedent** `1749604157074` |
+| **L3** | Gate fidelity & test integrity | **PASS** — the gate is real, not comfortable; clears T-04's Disqualifier decisively; none of the 19 tests is vacuous (every one has a reachable failing input) |
+
+**Four of five Leader-flagged "divergences" were false positives** — which is why they went to an independent lens instead of being guessed at. L2 established that the mixed timestamp precision (`created_at`/`updated_at` at `timestamp(6)`, `deleted_at` plain) is **required for fidelity, not sloppiness**: `AuditableEntity` renders the first two via `@CreateDateColumn`/`@UpdateDateColumn` (MySQL precision 6) and `deleted_at` via a plain `@Column`. "Correcting" `deleted_at` would hand T-08's entity a **permanent phantom schema diff**. Column order, `is_active tinyint NOT NULL DEFAULT 1`, and the `ON UPDATE CURRENT_TIMESTAMP(6)` clause are all character-identical to the precedent and to the live table in `baseline.sql:1336-1349`.
+
+**The one real divergence is an improvement.** M1 declares `DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci`; the precedent stops at bare `ENGINE=InnoDB` and inherits the schema default. `baseline.sql:1349` shows what that produced in reality: `clarisa_innovation_readiness_levels` actually shipped as **`utf8mb3`**. Being explicit matches TRD §5.1 verbatim and the newer in-repo convention, and keeps M1 off that rake.
+
+**On `CREATE TABLE IF NOT EXISTS` (Leader asked; L2 argued it down).** Plain `CREATE TABLE` is correct and `IF NOT EXISTS` would be **strictly worse**: `up()` is CREATE **plus** INSERT, so on a dirty container the CREATE would silently no-op and the INSERT would hit the pre-existing table — and if that table carried the source system's confirmed-wrong ids 13–20 (D-7), the insert could partially succeed and leave an **18-row catalog**. That converts a loud crash into exactly the DC-8 silent corruption R-IU-002 AC.1 exists to prevent. M1 therefore makes FP-1 **detectable** rather than better or worse; container hygiene belongs in the harness, not the DDL.
+
+---
+
+## Correction: the migration-timestamp ceiling was higher than the Leader's brief stated
+
+**A Leader briefing error, caught by Lens 2.** The T-04 brief instructed that the new timestamp must sort after **`1784300000000`** — the highest migration *file* on this branch. That was the wrong ceiling. `baseline.sql:8269`'s `INSERT INTO \`migrations\`` records migrations as **already executed** up to **`1786679227000`**, including nine with no file in this checkout (`1784500000000`, `1785866413438`, `1785870729889`, `1785870730889`, `1785872085723`, `1786043523207`, `1786044600000`, `1786045516418`, `1786636994078`, `1786679227000`) — the shared dev DB is **ahead of the branch**.
+
+A timestamp chosen only to beat the file ceiling could have landed **below** the executed ceiling and been silently treated as already-applied. No harm occurred: `migration:empty` stamped `1787066437593` from the real clock, which clears both. **The correct ceiling for every remaining migration in this spec is `1786679227000`** — carried as FP-6.
+
+---
+
+## Constitution Impact: T-04
+
+**A new repo-level convention was created: `server/researchindicators/src/db/migration-specs/`.**
+
+**Why it was unavoidable.** `orm.config.ts:55` sets `migrations: [`${__dirname}/../../migrations/**/*{.ts,.js}`]`, which resolves to `src/db/migrations/**`, and `orm.test.config.ts` inherits the same glob through `getDataSource(dataSourceTarget.TEST)`. TypeORM's CLI `require()`s **every** match expecting a `MigrationInterface` export, so a `.spec.ts` placed beside its migration executes its top-level `describe(...)` outside the Jest runtime and crashes with `ReferenceError: describe is not defined`. The Implementer reproduced this before moving the file; Lens 3 independently verified the glob resolution on both the ts-node path and the `dist/db/migrations/**` path used by `migration:execute`.
+
+**Why the sibling directory is the right remedy** (Lens 3 weighed all three):
+
+| Option | Verdict |
+| --- | --- |
+| **Sibling `src/db/migration-specs/`** ✅ chosen | Collected by `npm test` (`rootDir: "src"`, `testRegex: ".*\\.spec\\.ts$"`, no extra `testPathIgnorePatterns`); outside the migrations glob; excluded from `dist/` by `tsconfig.build.json`'s `"**/*spec.ts"` |
+| Narrow the TypeORM glob | ✗ Cannot be expressed cleanly — TypeORM's directory importer takes **positive** globs, and a `[0-9]*`-prefix trick fails because the spec file *is* timestamp-prefixed. Worse, it would mutate the datasource used for **CORE production** migration runs — a far larger blast radius than adding a directory |
+| Place it under `test/` | ✗ **Reproduces a trap the child guide already documents.** Jest unit `rootDir` is `src`, so a `*.spec.ts` under `test/` is collected by **neither** `npm test` nor `test:e2e` — the same silent zero-collection failure §9 warns about for `*.fixture-spec.ts` |
+
+**Guides synced in this task's commit rather than deferred to `/akili-archive`** — the deferral condition in `/akili-execute` Step 3.5 is met: `server/researchindicators/src/CLAUDE.md` §3's rule *"Specs: sibling `*.spec.ts`"* is **actively wrong for migrations specifically**, and it is the one case where following the guide **crashes the migration runner**. T-05, T-06, T-09 and T-10 each add a migration and would each hit this before archive ever runs, guaranteeing the rediscovery the guide exists to prevent. Direct precedent: §9's `*.fixture-spec.ts` naming-trap note was landed the same way on 2026-08-18.
+
+- ✅ `server/researchindicators/src/CLAUDE.md` §2 (source map) — `migration-specs/` added
+- ✅ `server/researchindicators/src/CLAUDE.md` §3 (where to put a new file) + §9 (Tests) — trap documented
+- Root `CLAUDE.md`: **no change needed** (Lens 3 concurs)
+- **CodeGraph re-index pending** (new directory) — for `/akili-archive`
+- `server/researchindicators/src/AGENTS.md` is a byte-identical mirror of the child guide and is re-synced alongside it
+
+---
+
+## Forward pointers — updated after T-04
+
+| # | For task | Pointer |
+| --- | --- | --- |
+| **FP-6** | **T-05, T-06, T-07, T-09, T-10** | **Migration timestamps must exceed `1786679227000`, not `1784300000000`.** The baseline snapshot records migrations as executed up to `1786679227000` (nine of them with no file on this branch — the shared dev DB is ahead of the checkout). A timestamp above the *file* ceiling but below the *executed* ceiling would be silently treated as already-applied. `migration:empty` stamps from the real clock and clears this naturally — **verify, don't assume**. |
+| **FP-7** | **T-05 (M2)** and the DevOps hand-off | **M1's `down()` stops being order-independent once M2 lands.** `DROP TABLE clarisa_innovation_use_levels` will fail (MySQL 1217/3730) while `result_innovation_use.innovation_use_level_id`'s FK still references it. `design.md` §13 already mandates reverse-order backout and §5 already specifies M2's `down()` as *"`DROP TABLE` (FKs first)"* — **no rule is violated**, but that documented order is now **load-bearing rather than tidy**, and the DevOps hand-off must carry it explicitly. |
+| **FP-8** | **chunk 2** (`innovation-use/details-api`) | **Collation asymmetry.** `clarisa_innovation_use_levels` is `utf8mb4_unicode_520_ci`; pre-existing tables in `baseline.sql` (`:1349`, `:2232`) shipped as **`utf8mb3`**. Nothing is exposed today — the only cross-table link is `bigint id`, and M5's validation function filters on numeric `level`. But a chunk-2 query that `UNION`s or directly compares `clarisa_innovation_use_levels.name`/`.definition` against a utf8mb3 text column can raise **MySQL 1267 "Illegal mix of collations"**. |
+| **FP-9** | **T-05 … T-10** (every migration task) | **Recovery note, structural and not to be "fixed":** MySQL forces an implicit commit on DDL, so a CREATE+INSERT migration whose `INSERT` fails after the `CREATE` succeeds leaves the table **with no `migrations` bookkeeping row**. `migration:revert` cannot clean that up (no row to revert) — recovery is a manual `DROP TABLE`. Inherent to MySQL, shared by every CREATE+INSERT migration in the repo, and `design.md` §5 specifies M1 as one migration: **do not restructure**. |
+
+FP-1 … FP-5 from the T-01/T-02 entry remain live. **FP-1 (fresh container before bootstrap) was honored in T-04 and proved necessary** — keep it standing for every remaining migration task.
+
+---
+
+## Leader deviations from the task files — T-04 (recorded per `.agents/leader.md` §3)
+
+| Deviation | Reason |
+| --- | --- |
+| **Skills:** task lists `nestjs-expert`; I added **`tdd`**. | To force spec-before-migration. Writing the expectations *before* the migration exists structurally prevents the tautological gate (importing the migration's own constant and comparing it to itself), which is the KZ-001 shape this task's Disqualifier targets. It worked: red 19/19 → green 19/19, and `EXPECTED_ROWS` is genuinely independent. |
+| **Effort:** `xhigh` (default is `medium`). | Append-only migration (ADR-5 — immutable once merged) carrying the family's most-warned-about trap (`id ≠ level`). Not `max`: the tier-vs-effort rule forbids `max` on a T2 model; escalation would have meant a higher tier, which this task's bounded blast radius did not warrant. |
+| **Review mode: 3 parallel lens-scoped Reviewers**, not the single lens-checklist Reviewer used for T-01/T-02. | Required by `/akili-execute` §2.3 on **both** triggers: effort `xhigh` **and** the task touches migrations. Lenses: spec-conformance/seed-correctness · migration-safety/reversibility · gate-fidelity/test-integrity. |
+| **Reviewers given file paths, not an inlined diff.** | The diff-inline rule exists because a diff is ephemeral working state. Here both files are new, on disk, and readable by a read-only Reviewer — so pointers satisfy it at a third of the cost, and each lens read the real file rather than my rendering of it. |
+| **`from empty` reinterpreted** for Done criterion 4 (see below). | The literal premise is known false (ADR-12 / RB-1d). |
+
+---
+
+## Documentation drift found in T-04 — the "from empty" premise (KZ-005 recurrence)
+
+**T-04's Done criterion 4 and `requirements.md` R-IU-002 AC.4 both say *"re-running the migration suite **from empty**"*, and R-IU-002's Scenario opens *"GIVEN an empty database."* That premise is false and known false.** TRD **ADR-12** and RB-1d establish that the 303-migration history is **not replayable from an empty database** — it dies around migration 139 of 303 on `sec_template` (MySQL 1146).
+
+The identical false premise was already corrected in **T-02**, **`design.md` §6.5.1 piece 4**, and **`requirements.md` §4.3** on 2026-08-18. It survived here in a **different phrasing** — a textbook **KZ-005** miss: the correction swept the *string* it had edited, not the *claim*.
+
+**Leader adjudication applied in the brief:** the achievable, equivalent reading is *fresh scratch container → `baseline:test:load` → `migration:test:execute` → assert the identical ten rows*. That is what was verified, twice. Lens 3 concurs that AC.4's determinism follows from the seed being a static literal, while its *application* must be evidenced by the scratch-schema apply.
+
+**Not silently edited.** Correcting R-IU-002 AC.4, its Scenario, and T-04's criterion 4 requires the two-direction sweep (`/akili-specify` → *Correction Closure*) across the whole spec folder, and per KZ-005 the sweep must chase the **claim in every phrasing**, not the string. **Raised for a user ruling; deliberately not absorbed into T-04.**
+
+---
+
+## ADVISORY findings — T-04 (recorded, never gating; 0 rework attempts consumed; no task minted)
+
+Per `/akili-execute` §2.4, advisories are recorded and stop here. Two were **adopted** because they are either mandatory record-accuracy or an explicitly authorized Constitution sync; the rest are **recorded only** — escalating any of them is a user decision via a proposal, not a task added to this spec.
+
+| # | Lens | Finding | Disposition |
+| --- | --- | --- | --- |
+| **L3-a** | reliability | **The `INSERT`'s column list is never asserted.** A list/tuple arity or column-name mismatch passes all 19 tests and fails only at MySQL (error 1136). Lens 3 calls this *"the one reachable hole I would close"*; one line does it: `expect(insertSql).toMatch(/\(\s*`id`\s*,\s*`level`\s*,\s*`name`\s*,\s*`definition`\s*\)\s*VALUES/i)` | **Recorded only.** Real and cheap, but adding it would widen T-04 to absorb an advisory — forbidden. **Surfaced to the user.** |
+| **L3-b** | risk | Do not cite `readiness_before = 0 / readiness_after = 0` as AC.5 evidence — vacuous over the schema-only baseline (DD-11 shape) | **Adopted** — record accuracy is mandatory. Done criterion 3 above cites the line 226/242 assertion instead |
+| **L3-c** | readability | `not.toMatch(/UNIQUE/i)` is asserted over the **whole** CREATE TABLE while the test name scopes to `name`. Fails safe (only ever over-strict) but would block a legitimate future unique index on **`level`** with a misleading message | Recorded only |
+| **L3-d** | readability | The two `expect(...)` calls in `beforeAll` are load-bearing (they guard `insertSql` from being `undefined` across the ten `it.each` tests) but surface as an unnamed hook failure. Cleaner: keep `beforeAll` derivation-only, promote the counts to their own `it` | Recorded only |
+| **L3-e** | risk / convention | Child guide §2/§3/§9 stale and actively misleading for migration specs; land the fix in this commit. Also suggested: add `"!**/db/migration-specs/**"` to `collectCoverageFrom` as forward protection against a future **non-spec** helper landing there at 0% coverage | **Guide sync adopted** (Constitution Impact above). **The `collectCoverageFrom` change is recorded only** — it protects against a file that does not exist |
+| **L2-1** | risk | utf8mb4 vs the shared DB's real utf8mb3 | **Adopted as FP-8** |
+| **L2-2** | reliability | CREATE+INSERT is not atomic on MySQL (DDL implicit commit) | **Adopted as FP-9**; explicitly *do not restructure* |
+| **L2-3** | readability | `down()`'s FK-order dependency is not mentioned in the migration's own header comment; one line would put it where the next maintainer reading `down()` will see it | **Adopted as FP-7** for the DevOps hand-off; the in-file comment is **recorded only** (editing the file would widen T-04) |
+| **L2-4** | process | Record that three migrations applied, not one | **Adopted** — see the evidence-accuracy correction above |
+| **L1-i** | readability | New `migration-specs/` convention undocumented in the child guide | **Adopted** (same as L3-e) |
+| **L1-ii** | risk (low) | Explicit collation differs from the "mirrored" precedent; an improvement, but §3.2 says "same column shape" and a future reader may misread it | Recorded only; overlaps FP-8 |
+| **L1-iii** | reliability (positive) | The `toContain` row assertion depends on the migration's exact `', '` inter-column spacing — a Prettier reflow would break it. **Fails loudly, not open** — the correct direction for a gate | Recorded only; no action |
+
+**Budget after T-04:** 3 of 13 tasks · ~317 LOC of ~2,600 · 1 of 4–5 review rounds consumed (T-04 passed first attempt). Within tripwire.

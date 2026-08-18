@@ -44,7 +44,8 @@ src/
 │   ├── config/mysql/             # TypeORM datasource (CORE / TEST targets)
 │   ├── config/dynamo/            # DynamoDB module + service
 │   ├── baseline/                 # committed schema-only snapshot bootstrapping the disposable TEST scratch schema (baseline.sql + README.md)
-│   └── migrations/               # TypeORM migrations — APPEND-ONLY
+│   ├── migrations/               # TypeORM migrations — APPEND-ONLY. Specs may NOT live here (see §3)
+│   └── migration-specs/          # unit specs FOR migrations — sibling dir, deliberately outside the migrations glob (§3)
 │
 └── domain/
     ├── routes/main.routes.ts             # RouterModule registration tree
@@ -81,7 +82,8 @@ Decision tree:
 2. **Wraps an external system?** → `domain/tools/<integration>/` exposing one Nest service. No transport leakage to other modules.
 3. **Reusable across modules (interceptor, guard, pipe, decorator, util, base DTO)?** → `domain/shared/<kind>/`. Only put it here if at least two modules will use it. Otherwise keep it module-local.
 4. **Touches the admin panel?** → server pieces under `admin/{controllers,services}/`, React under `admin/client/`. Follow `admin/README-REACT.md` for new pages.
-5. **A schema change?** → migration under `db/migrations/<timestamp>-<camelCaseAction>.ts` via `npm run migration:generate`. Never edit a merged migration.
+5. **A schema change?** → migration under `db/migrations/<timestamp>-<camelCaseAction>.ts` via `npm run migration:generate` (or `npm run migration:empty --name=<name>` when there is no entity to diff against). Never edit a merged migration.
+   - ⚠️ **Its spec does NOT go beside it.** Put migration specs in **`db/migration-specs/`**. See the naming/placement trap in §9.
 6. **Truly cross-cutting non-domain HTTP route (rare)?** → `src/controllers/`.
 
 Naming:
@@ -89,7 +91,7 @@ Naming:
 - Entities: `*.entity.ts` exporting a PascalCase class.
 - DTOs: `*.dto.ts`.
 - Enums: `*.enum.ts`.
-- Specs: sibling `*.spec.ts`.
+- Specs: sibling `*.spec.ts` — **except migration specs**, which live in `db/migration-specs/`, never in `db/migrations/` (§9).
 
 ---
 
@@ -164,6 +166,7 @@ Socket.IO event names + payload shapes are **not yet documented**; capture any n
 - Global coverage threshold: 60% (branches / functions / lines / statements). Coverage excludes `*.entity.ts`, `db/migrations/**`, `*.enum.ts`, `*.spec.ts`.
 - Mock TypeORM repositories with `jest.fn()` factories. Do NOT spin up MySQL in unit tests; use the `TEST` datasource for integration coverage when needed.
 - For each new role-restricted or status-guarded handler, include both an "allowed" and "denied" test case.
+- **Migration specs live in `db/migration-specs/`, NOT beside their migration (added 2026-08-18, `docs/specs/innovation-use/data-model-and-catalog` T-04).** `orm.config.ts:55` sets its migrations glob to ``${__dirname}/../../migrations/**/*{.ts,.js}`` (resolving to `src/db/migrations/**`), and the TypeORM CLI **`require()`s every match** expecting a `MigrationInterface` export. A `*.spec.ts` inside `db/migrations/` therefore runs its top-level `describe(...)` outside the Jest runtime and crashes the migration runner with `ReferenceError: describe is not defined` — so `migration:test:execute` / `migration:execute` break, not just the tests. `db/migration-specs/` is collected by `npm test` (`rootDir: "src"`), is outside the migrations glob, and is kept out of `dist/` by `tsconfig.build.json`'s `"**/*spec.ts"`. **Do not "fix" this by narrowing the glob** — TypeORM's importer takes positive globs only, and the same datasource file drives **CORE production** migration runs.
 - **Fixture suite (added 2026-08-18, `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id` T-01b):** regression fixtures that need a real, disposable MySQL run under a **third** Jest config, `npm run test:fixtures` (`test/jest-fixtures.json`) — see §11 for the TEST-datasource harness commands that must bring the schema up first. **Naming trap:** that config's `testRegex` collects **only** `*.fixture-spec.ts`. Name a fixture plain `*.spec.ts` and it is collected by **neither** `npm test` nor `npm run test:fixtures` — a silent zero-tests-collected pass, not a failure you'd notice.
 
 ---

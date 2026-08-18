@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02 `[x]` (superseded no-op closures, 2026-08-18); next eligible **T-04**
+- **Status:** in-progress — T-01, T-02, **T-04** `[x]` (2026-08-18); next eligible **T-05**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -141,8 +141,8 @@ graph TD
 
 - **Requirements covered:** R-IU-002 (AC.1–AC.5); NFR-IU-003; D-1, D-7
 - **Design references:** §3.2, §5 (M1), DD-2
-- **Size:** S · **Dependencies:** none · **Status:** todo
-- **Skills:** `nestjs-expert`
+- **Size:** S · **Dependencies:** none · **Status:** ~~todo~~ → **`[x]` DONE 2026-08-18** — PASS on attempt 1; 3 parallel lens Reviewers all PASS. Evidence: [`./execution.md`](./execution.md) → *T-04*
+- **Skills:** `nestjs-expert` + **`tdd`** (Leader addition — forces spec-before-migration so the seed gate cannot be tautological)
 
 **Scope** — table mirroring `clarisa_innovation_readiness_levels` (`id` PK **not** auto-increment, `level`, `name`, `definition`, `AuditableEntity` columns), seeded in-migration with R-IU-002's ten rows. Plus a seed spec.
 
@@ -157,10 +157,10 @@ graph TD
 - **Disqualifier:** a row-count-only assertion is a presence-assertion; it cannot prove content (R-IU-002 AC.2).
 
 **Done**
-- [ ] Exactly ten rows, ids 1–10, levels 0–9, no duplicate `level`, **no ids 13–20**
-- [ ] Every `name` and `definition` matches R-IU-002 verbatim
-- [ ] `clarisa_innovation_readiness_levels` row count and contents unchanged (AC.5)
-- [ ] Re-running the suite from empty reproduces the identical ten rows
+- [x] Exactly ten rows, ids 1–10, levels 0–9, no duplicate `level`, **no ids 13–20**
+- [x] Every `name` and `definition` matches R-IU-002 verbatim
+- [x] `clarisa_innovation_readiness_levels` row count and contents unchanged (AC.5)
+- [x] ~~Re-running the suite **from empty**~~ → **verified under the adjudicated reading, 2026-08-18:** *fresh scratch container → `baseline:test:load` → `migration:test:execute` → identical ten rows* (verified twice). The literal "from empty" premise is **false and known false** — TRD **ADR-12** / RB-1d: the migration history is not replayable from an empty database. Same premise already corrected in T-02, `design.md` §6.5.1 piece 4 and `requirements.md` §4.3; it survived here in a different phrasing (**KZ-005**). **R-IU-002 AC.4 and its Scenario carry the same false premise and still need the two-direction correction sweep — raised for a user ruling in [`./execution.md`](./execution.md), deliberately not absorbed into T-04.**
 
 ---
 
