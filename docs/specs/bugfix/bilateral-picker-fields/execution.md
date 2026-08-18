@@ -533,3 +533,17 @@ rendered as `[{p.id}] {clarisaOptionLabel(p)}`.
 **Reviewer transport, tallied across this run:** 11 reviewer dispatches, **5 non-deliveries**, all stalling at the same phase — after ingesting the material, at the moment of emitting the verdict. Two mitigations worked and are worth keeping: an **incremental report file** (T-01 attempt 4) and a **hard N-short-lines output contract** (T-03, T-05, T-06). Both reduce the size of any single emission. Neither is reliable enough to depend on without a fallback.
 
 **Options for the user:** re-dispatch once `claude-sonnet-4-6`'s quota returns (it delivered cleanly for T-02), review the 12-line diff directly, or record an explicit waiver as T-03 did.
+
+### ⚠ Correction — T-07's code WAS committed, contrary to the note above and to its own commit message
+
+`b233e340` states *"Code stays uncommitted"* and the Leader staged only `docs/specs/bugfix/bilateral-picker-fields`. **The commit nevertheless contains `BilateralProjectMappings.tsx` (+12/−2), and it is pushed.**
+
+`git log -S "function clarisaOptionLabel"` puts the helper's introduction in `b233e340`. `.husky/pre-commit` is empty, so no hook swept it in, and the mechanism was **not determined** — recorded as unknown rather than guessed at.
+
+**What this does and does not change:**
+
+- It does **not** confer a verdict. T-07 stays **`blocked`**: written, self-verified, **not independently audited**. A commit is not a review, and the rule that produced this record — no verdict, no `[x]` — is unaffected by where the bytes happen to live.
+- It does mean the branch now carries one unreviewed change. It is 12 lines, in an admin page with no tests, whose logic the Leader spot-checked as identical to the reviewed STAR helper — but *"the Leader checked it"* is precisely the claim T-03 proved insufficient on this same file.
+- Reverting was considered and rejected: the code is correct as far as it has been verified, this is a feature branch, and a revert-then-recommit cycle would add churn without adding the audit that is actually missing. **The gap is the review, not the commit.**
+
+Recorded here because a spec whose audit trail says *"uncommitted"* while the code sits in `origin` is exactly the kind of quiet falsehood this log exists to prevent.
