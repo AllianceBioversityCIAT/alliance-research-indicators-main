@@ -6,6 +6,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { Clarisa } from '../clarisa.connection';
 import { ClarisaProject } from './dto/clarisa-project.types';
+import { ClarisaProjectPhasesResponse } from './dto/clarisa-project-phase.types';
 import { MappingPhaseResolver } from './mapping-phase.resolver';
 import {
   ALLIANCE_CENTRE_SET,
@@ -95,6 +96,54 @@ export class ClarisaProjectsService {
     }
 
     return withFlag;
+  }
+
+  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-02 / R-CPC-003, NFR-CPC-002, DD-2, DD-5
+  //
+  // Returns the distinct phases present in the ELIGIBLE cohort (bilateral +
+  // Alliance), each with a project count, plus a separate count of projects
+  // whose phase is absent — so an admin never sees a year with zero
+  // eligible projects (design.md §6.1 / DD-2).
+  //
+  // Deliberately applies isBilateralFunding + isAllianceProject only — NOT
+  // matchesPhase. Enumerating phases from a phase-filtered cohort
+  // (e.g. listBilateralProjects()) would be circular: it would only ever
+  // surface the phase already selected. Reads getCachedAll() directly so
+  // no additional CLARISA call is made (NFR-CPC-002).
+  async getEligiblePhases(): Promise<ClarisaProjectPhasesResponse> {
+    const all = await this.getCachedAll();
+    const eligible = all.filter(
+      (p) => isBilateralFunding(p.source_of_funding) && isAllianceProject(p),
+    );
+
+    const counts = new Map<number, number>();
+    let phaseAbsentCount = 0;
+
+    for (const p of eligible) {
+      const phase = p.phase;
+      const isBlank =
+        phase === null ||
+        phase === undefined ||
+        (typeof phase === 'string' && phase.trim() === '');
+      if (isBlank) {
+        phaseAbsentCount++;
+        continue;
+      }
+
+      const numericPhase = Number(phase);
+      if (Number.isNaN(numericPhase)) {
+        phaseAbsentCount++;
+        continue;
+      }
+
+      counts.set(numericPhase, (counts.get(numericPhase) ?? 0) + 1);
+    }
+
+    const phases = Array.from(counts.entries())
+      .map(([phase, count]) => ({ phase, count }))
+      .sort((a, b) => b.phase - a.phase);
+
+    return { phases, phaseAbsentCount };
   }
 
   async findProjectById(id: number): Promise<ClarisaProject | null> {
