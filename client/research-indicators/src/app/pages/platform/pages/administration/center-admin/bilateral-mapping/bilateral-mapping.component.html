@@ -346,7 +346,7 @@
         (ngModelChange)="selectedProjectId.set($event)"
         placeholder="Select CLARISA project…"
         [filter]="true"
-        filterBy="short_name,full_name"
+        filterBy="short_name,full_name,external_code"
         [showClear]="true"
         [loading]="optionsLoading() || clarisaOptionsLoading()"
         [scrollHeight]="'240px'"

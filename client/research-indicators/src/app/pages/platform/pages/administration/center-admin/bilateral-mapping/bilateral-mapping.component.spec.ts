@@ -1250,6 +1250,12 @@ describe('BilateralMappingComponent', () => {
         id: 104,
         short_name: 'D-A200'
         // full_name absent
+      },
+      {
+        id: 105,
+        short_name: 'Fertilize Right Colombia',
+        full_name: 'Fertilize Right Colombia',
+        external_code: 'B-A1080'
       }
     ];
 
@@ -1257,7 +1263,7 @@ describe('BilateralMappingComponent', () => {
       expect(FULL_NAME_255.length).toBe(255);
     });
 
-    it('survives client-side filtering when searching by full_name and short_name (R-BPF-003 / D-2)', async () => {
+    it('survives client-side filtering when searching by full_name, short_name, and external_code (R-BPF-003 / D-2)', async () => {
       const { Select } = await import('primeng/select');
 
       mockService.list.mockResolvedValue(makePage([]));
@@ -1281,10 +1287,10 @@ describe('BilateralMappingComponent', () => {
       const visibleByName = inst!.visibleOptions();
       expect(visibleByName.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['A1806']);
 
-      // 2. Search by name term "fertilize" (case-insensitive) -> matches B-A1080
+      // 2. Search by name term "fertilize" (case-insensitive) -> matches B-A1080 and id 105
       inst!._filterValue.set('fertilize');
       const visibleByFertilize = inst!.visibleOptions();
-      expect(visibleByFertilize.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['B-A1080']);
+      expect(visibleByFertilize.map((o: ClarisaBilateralProjectOption) => o.id)).toEqual([102, 105]);
 
       // 3. Search by code term "A1806" -> matches A1806
       inst!._filterValue.set('A1806');
@@ -1300,6 +1306,16 @@ describe('BilateralMappingComponent', () => {
       inst!._filterValue.set('bioversity');
       const visibleByLongName = inst!.visibleOptions();
       expect(visibleByLongName.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['C-A480']);
+
+      // 6. Search by external_code "B-A1080" when short_name and full_name are project name -> matches id 105 (and short_name B-A1080 on 102)
+      inst!._filterValue.set('B-A1080');
+      const visibleByExternalCode = inst!.visibleOptions();
+      expect(visibleByExternalCode.map((o: ClarisaBilateralProjectOption) => o.id)).toEqual([102, 105]);
+
+      // 7. Search by external_code lowercase "b-a1080" -> matches id 102 and 105
+      inst!._filterValue.set('b-a1080');
+      const visibleByExternalCodeLower = inst!.visibleOptions();
+      expect(visibleByExternalCodeLower.map((o: ClarisaBilateralProjectOption) => o.id)).toEqual([102, 105]);
     });
   });
 
@@ -1312,14 +1328,133 @@ describe('BilateralMappingComponent', () => {
         255
       );
 
-
-    it('returns "short_name — full_name" when both are present', () => {
+    it('returns "short_name — full_name" when both are present and differ', () => {
       const opt: ClarisaBilateralProjectOption = {
         id: 101,
         short_name: 'A1806',
         full_name: 'WTO-Phase 1: MusaSentinel'
       };
       expect(component.clarisaOptionLabel(opt)).toBe('A1806 — WTO-Phase 1: MusaSentinel');
+    });
+
+    it('returns the title once when short_name equals full_name (R-BPF-004 de-duplication)', () => {
+      // Mandatory input (a) from bug report
+      const optFertilize: ClarisaBilateralProjectOption = {
+        id: 102,
+        short_name: 'Fertilize Right Colombia',
+        full_name: 'Fertilize Right Colombia'
+      };
+      expect(component.clarisaOptionLabel(optFertilize)).toBe('Fertilize Right Colombia');
+
+      const optSemillas: ClarisaBilateralProjectOption = {
+        id: 103,
+        short_name: 'Semillas del Futuro - AGROSAVIA',
+        full_name: 'Semillas del Futuro - AGROSAVIA'
+      };
+      expect(component.clarisaOptionLabel(optSemillas)).toBe('Semillas del Futuro - AGROSAVIA');
+
+      const optAtlas: ClarisaBilateralProjectOption = {
+        id: 104,
+        short_name: 'BMGF-Adaptation Atlas: Refinement and Transition',
+        full_name: 'BMGF-Adaptation Atlas: Refinement and Transition'
+      };
+      expect(component.clarisaOptionLabel(optAtlas)).toBe('BMGF-Adaptation Atlas: Refinement and Transition');
+    });
+
+    it('de-duplicates case-insensitively and ignores surrounding whitespace (R-BPF-004)', () => {
+      const optWhitespace: ClarisaBilateralProjectOption = {
+        id: 105,
+        short_name: '  fertilize right colombia  ',
+        full_name: 'Fertilize Right Colombia'
+      };
+      expect(component.clarisaOptionLabel(optWhitespace)).toBe('Fertilize Right Colombia');
+
+      const optCase: ClarisaBilateralProjectOption = {
+        id: 106,
+        short_name: 'A1806',
+        full_name: '  a1806  '
+      };
+      expect(component.clarisaOptionLabel(optCase)).toBe('a1806');
+    });
+
+    it('prefers external_code over short_name as the code (R-BPF-004)', () => {
+      // Mandatory input (b) from bug report
+      const optWithExternalCode: ClarisaBilateralProjectOption = {
+        id: 107,
+        short_name: 'Fertilize Right Colombia',
+        full_name: 'Fertilize Right Colombia',
+        external_code: 'B-A1080'
+      };
+      expect(component.clarisaOptionLabel(optWithExternalCode)).toBe('B-A1080 — Fertilize Right Colombia');
+
+      const optCustomCode: ClarisaBilateralProjectOption = {
+        id: 108,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel',
+        external_code: 'C-A480'
+      };
+      expect(component.clarisaOptionLabel(optCustomCode)).toBe('C-A480 — WTO-Phase 1: MusaSentinel');
+    });
+
+    it('de-duplicates when external_code equals full_name (R-BPF-004)', () => {
+      const optCodeEqualsName: ClarisaBilateralProjectOption = {
+        id: 109,
+        short_name: 'A1806',
+        full_name: 'Fertilize Right Colombia',
+        external_code: 'Fertilize Right Colombia'
+      };
+      expect(component.clarisaOptionLabel(optCodeEqualsName)).toBe('Fertilize Right Colombia');
+    });
+
+    it('renders external_code alone when full_name is absent or empty (R-BPF-004)', () => {
+      const optNoFullName: ClarisaBilateralProjectOption = {
+        id: 110,
+        short_name: 'Fertilize Right Colombia',
+        external_code: 'B-A1080'
+      };
+      expect(component.clarisaOptionLabel(optNoFullName)).toBe('B-A1080');
+
+      const optEmptyFullName: ClarisaBilateralProjectOption = {
+        id: 111,
+        short_name: 'Fertilize Right Colombia',
+        full_name: '',
+        external_code: 'B-A1080'
+      };
+      expect(component.clarisaOptionLabel(optEmptyFullName)).toBe('B-A1080');
+
+      const optWhitespaceFullName: ClarisaBilateralProjectOption = {
+        id: 112,
+        short_name: 'Fertilize Right Colombia',
+        full_name: '   ',
+        external_code: 'B-A1080'
+      };
+      expect(component.clarisaOptionLabel(optWhitespaceFullName)).toBe('B-A1080');
+    });
+
+    it('falls back to short_name when external_code is whitespace-only or empty (R-BPF-004)', () => {
+      const optEmptyExternal: ClarisaBilateralProjectOption = {
+        id: 113,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel',
+        external_code: ''
+      };
+      expect(component.clarisaOptionLabel(optEmptyExternal)).toBe('A1806 — WTO-Phase 1: MusaSentinel');
+
+      const optWhitespaceExternal: ClarisaBilateralProjectOption = {
+        id: 114,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel',
+        external_code: '   '
+      };
+      expect(component.clarisaOptionLabel(optWhitespaceExternal)).toBe('A1806 — WTO-Phase 1: MusaSentinel');
+
+      const optWhitespaceExternalDeDupe: ClarisaBilateralProjectOption = {
+        id: 115,
+        short_name: 'Fertilize Right Colombia',
+        full_name: 'Fertilize Right Colombia',
+        external_code: '   '
+      };
+      expect(component.clarisaOptionLabel(optWhitespaceExternalDeDupe)).toBe('Fertilize Right Colombia');
     });
 
     it('returns just "short_name" when full_name is absent / undefined', () => {
@@ -1377,5 +1512,6 @@ describe('BilateralMappingComponent', () => {
     });
   });
 });
+
 
 

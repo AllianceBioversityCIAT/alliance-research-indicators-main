@@ -201,7 +201,7 @@ T-05 (server: external_code) ──> T-06 (client: prefer code + de-duplicate) �
 - **The input that would make this check FAIL:** `{ short_name: 'Fertilize Right Colombia', full_name: 'Fertilize Right Colombia' }` → today renders the value twice.
 - **What a presence-assertion cannot prove:** that `filterBy` contains `external_code` proves the attribute, not that a code search survives the client filter. Use the real `Select` instance and `visibleOptions()`, as T-02 did.
 - **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** `high` · **Size:** M (~70 LOC)
-- **Status:** todo
+- **Status:** done
 
 ### T-07 — Admin SSR panel: same label rule
 

@@ -58,6 +58,7 @@ export interface ClarisaBilateralProjectOption {
   short_name: string;
   full_name?: string;
   description?: string;
+  external_code?: string;
   source_of_funding?: string;
   science_programs?: { code?: string; name?: string; portfolio?: string; allocation?: number }[];
 }

@@ -434,7 +434,7 @@ Raw output: `evidence/t05-RED.txt`, `evidence/t05-GREEN.txt`.
 
 ---
 
-## T-06 — implementation complete, review in flight
+## ✅ T-06 — PASS
 
 | | |
 | --- | --- |
@@ -484,3 +484,18 @@ Recorded rather than left as an unexplained *"3 failed"*, and **out of scope for
 **DD-4 spot-check by the Leader** (composing the review brief, not a verdict): `optionLabel="short_name"` is still present on the CLARISA picker, and the AGRESSO picker's own `filterBy="agreement_id,description"` is undisturbed.
 
 Raw output: `evidence/t06-RED.txt`, `evidence/t06-GREEN.txt`.
+
+### T-06 Reviewer verdict — `STATUS: PASS`
+
+Reviewer: agy `gemini-3.1-pro-high`, `ctx_19b6bb89c702`. Clean on all six axes:
+
+> **Q1 DD-10** de-duplication — yes, `clarisaOptionLabel` uses `code.toLowerCase() === title.toLowerCase()`
+> **Q2 DD-9** code source — yes, `external_code` falls back to `short_name` if absent or whitespace-only
+> **Q3 DD-4 (the trap)** — yes, `optionLabel="short_name"` is still present
+> **Q4 DD-5** coupling — yes, `filterBy` exactly matches the server predicate, AGRESSO untouched, coupling comment remains
+> **Q5** evidence integrity — yes, all seven tests failed on `HEAD`; **zero new tests passed on `HEAD`**
+> **Q6** scope + no leak — yes, only 4 client files; no input renders `undefined`/`null`/dangling separators
+
+**⚠ Same independence caveat as T-05:** `claude-sonnet-4-6` hit its agy quota again (`Resets in 2h23m`), so this ran on `gemini-3.1-pro-high` against a `gemini-3.7-flash-high` Implementer. Different model, **same family — weaker independence** than the cross-family separation T-01 and T-02 received. Recorded so nobody later reads this PASS as equivalent.
+
+**Q5 is the one worth dwelling on.** T-01 shipped three tests that passed on `HEAD`, T-05 shipped one, and both became findings. T-06 shipped **zero**. The variable was not the model — it was the brief, which named the exact failing inputs in advance (`{ short_name: 'Fertilize Right Colombia', full_name: 'Fertilize Right Colombia' }` renders twice today). Naming the red before the test is written makes a non-falsifiable assertion obvious while it is being authored rather than after a reviewer finds it.
