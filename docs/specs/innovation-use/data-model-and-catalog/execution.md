@@ -1082,3 +1082,55 @@ FP-1 … FP-22 remain live. **FP-11 is now LIVE rather than anticipated** — M5
 | **C-2** | closure a3 | The spec docblock's "same recording pattern as the M1/M3/M4 migration specs" omits M2, whose spec uses the identical helper. Incomplete enumeration, not a false claim | Recorded only |
 
 **Budget after T-09:** 9 of 13 tasks · ~2,102 LOC of ~2,600 · **4 of 4–5 review rounds consumed** (T-01/T-02: 1 · T-07: 1 · T-09: 2). **⚠️ AT THE TRIPWIRE — at most one rework round remains within budget.** Escalated to the user at this gate.
+
+---
+
+# ⚠️ BUDGET TRIPWIRE — HIT AT T-09 · USER DECISION RECORDED · REVIEW OWED
+
+**Date:** 2026-08-18 · **Decided by:** user, at the T-09 continue/pause gate · **Decision: OPTION (A) — continue execution and record the overrun.**
+
+This block is deliberately at top level, not inside a task entry, because it must be impossible to miss on the next `/akili-resume`.
+
+## The state that triggered it
+
+| `design.md` §12 budget | Consumed at end of T-09 | Remaining |
+| --- | --- | --- |
+| 13 tasks | **9** | 4 (T-10, T-11, T-12, T-13, T-14 — T-03 extracted) |
+| ~2,600 LOC | **~2,102** | ~500 |
+| **4–5 review rounds** | **4** | **0–1** |
+
+Rework rounds consumed: T-01/T-02 (1) · T-07 (1) · **T-09 (2)**.
+
+## The cause, stated honestly
+
+**Two of the four rework rounds were caused by the Leader supplying false facts in briefs, not by task difficulty.** T-04, T-05, T-06 and T-08 all passed on the first attempt. The budget was not mis-sized for the *work*; the margin was spent on avoidable Leader error — see *"Leader process failure"* in the T-09 entry for the four instances and their single mechanical root cause (backtick-bearing greps against SQL held in template literals).
+
+That cause is identified and corrective action is already in force (attempt 3's briefing method: supply no facts, require `claim | file:line | command`, prefer deleting a claim to correcting it).
+
+## What the user was told, and accepted
+
+Option (a) **records** the overrun; it does **not** resolve it. `design.md` §12 continues to state a budget that reality has already passed. The user accepted this explicitly and asked that the owed review be recorded clearly.
+
+## ⚠️ WHERE THIS COMES BACK — three points, all foreseeable
+
+1. **At the next Reviewer FAIL — a hard escalation.** One more rework round puts the spec at the 4–5 ceiling; the round after that is **over budget** and the Leader must stop and escalate again. Note this lands mid-**T-10**, which `tasks.md` itself calls *"the single highest-risk task in the chunk."*
+2. **At `/akili-archive` — the Kaizen retrospective** measures actual against budgeted and is where the overrun is formally answered for.
+3. **The LOC line will break regardless of any further rework.** ~500 LOC remain against **T-12 and T-13, both sized L and both fixture-heavy**. This is not a risk, it is an expected outcome; do not treat its arrival as a new signal.
+
+## The correction pass this decision defers — NOT optional, and partly blocking
+
+Option (a) defers a **spec-correction pass** that was already owed. Two of its items **block T-10 on correctness grounds, independent of the budget question**:
+
+| # | Correction | Status |
+| --- | --- | --- |
+| **1** | **T-10 `Dependencies:` says `bugfix/sp-versioning-roles-id` "(external, must be merged)".** **The gate is mis-worded.** Verified 2026-08-18: both repair migrations are committed on this branch (`9392c010`, `4dd884f6`), timestamped `1784250000000` / `1784300000000` — **ordered before every Innovation Use migration** — so M6 inherits the repaired body by construction. The bugfix cannot be "merged" separately because it is part of this development on this branch. What survives is (i) T-10 must reproduce the **repaired** body, and (ii) the rollout pre-flight, which is a DevOps verification, not a task gate | **⛔ BLOCKS T-10** |
+| **2** | **R-IU-011 AC.8/AC.9 are stale.** They require "the two pre-existing divergences" to survive M6, but the bugfix's own T-02b closed one of them (added the two missing `DELETE`s to `SP_delete_result_version`). T-10 would hunt for a divergence that no longer exists and fail AC.8 for a false reason | **⛔ BLOCKS T-10** |
+| **3** | `design.md` §6.5 row **F11** is unsatisfiable as written (FP-23) | ⛔ blocks T-12 |
+| **4** | R-IU-001 **AC.3** double-assigned T-08/T-12 → belongs to T-12 only | pending ruling |
+| **5** | R-IU-005 **AC.1** double-assigned T-07/T-08 → belongs to T-08 only (already implemented that way) | pending ruling |
+| **6** | FP-24 — `requirements.md:303` and T-08's shipped entity comment say the validation function enforces mode **exclusivity**; it enforces **completeness** only | pending ruling |
+| **7** | **§12 itself — the re-baseline this decision defers** | **deferred by option (a)** |
+
+**Recommended execution:** items 1–7 in **one pass with the two-direction sweep**, before T-10 starts. Items 1 and 2 are mandatory before T-10 regardless of what is decided about 7. Folding 7 into that pass costs one paragraph, and is what stops `design.md` §12 from being a document that states something false — root `CLAUDE.md` §5: *"prefer fixing the document and recording a decision. Do NOT silently let docs and code drift."*
+
+**Standing instruction for whoever resumes this spec:** do not start T-10 without first resolving items 1 and 2. A `/akili-resume` that reports T-10 as "next eligible" is reading `tasks.md` alone and has not seen this block.
