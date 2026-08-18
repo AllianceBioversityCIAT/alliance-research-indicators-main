@@ -110,7 +110,9 @@ The CLARISA picker adopts, field for field, the structure the AGRESSO picker bes
 
 **`optionLabel="short_name"` stays.** See DD-4 — this is the outcome of the reversion challenge, not an oversight.
 
-**Accessibility (NFR-BPF-002).** The `[title]` attribute carries the full string, so the name is not conveyed by visual truncation alone. This is the same treatment the AGRESSO picker ships and passed review with.
+**Accessibility (NFR-BPF-002) — and an honest limit.** `[title]` gives a mouse tooltip and puts the full string in the DOM. It does **not** reliably reach assistive technology: screen-reader support for `title` is inconsistent, and it is widely held to be insufficient as the *sole* mechanism for content the eye cannot read.
+
+So `title` is necessary here but may not be sufficient, and a task that adds `title` and asserts the attribute exists would satisfy its own gate while leaving NFR-BPF-002 unmet — the exact blindness this spec's §6 exists to prevent. The AGRESSO picker ships `title` alone; matching it buys consistency, not proven coverage. **The mechanism is OQ-4**, and the requirement stands regardless of how it is answered.
 
 ---
 

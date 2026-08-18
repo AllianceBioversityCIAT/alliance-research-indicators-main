@@ -150,7 +150,7 @@ The picker is the only surface through which a human can create a bilateral mapp
 
 **Details:**
 - `full_name` reaches **255 characters** upstream; the dialog is a fixed-width modal.
-- Behavior: the label truncates visually, and the complete string is available on hover and to assistive technology.
+- Behavior: the label truncates visually; the complete string stays available on hover and reaches assistive technology. **The mechanism is OQ-4** — `title` alone is not established to satisfy the second half.
 
 #### Scenario: 255-character name
 
@@ -205,7 +205,7 @@ The picker is the only surface through which a human can create a bilateral mapp
 
 - **Category:** a11y
 - **Target:** the composed label — and the full untruncated name — are exposed to assistive technology, not conveyed by visual truncation alone.
-- **How verified:** client spec asserts the accessible text/attribute; the visual half is the §6 D-4 gap.
+- **How verified:** the client spec asserts the attribute is present — which proves presence, **not** announcement. **No check in this repo can confirm a screen reader announces it**; that requires a real AT run. Recorded as an accepted gap pending OQ-4, never discharged by the attribute assertion alone.
 
 ### NFR-BPF-003 — Response size
 
@@ -237,7 +237,7 @@ The picker is the only surface through which a human can create a bilateral mapp
 | **D-1** | Server returns the fields but the search still ignores `full_name` | Controller spec: name-only term must return the row | **Yes — proven.** Fails on `HEAD`: the predicate reads `short_name` only |
 | **D-2** | Server search widened, client filter still drops the name matches → **user sees no change** | Client spec driving the **real** `Select` instance: set options carrying `full_name`, set the filter term, assert `visibleOptions()` | **Yes — observed red 2026-08-18.** `visibleOptions()` = `[]` for `"musasentinel"` on current code |
 | **D-3** | A field silently renamed/dropped from the response | Controller spec with strict `toEqual` on the whole item | **Yes** — an omitted or extra key fails equality |
-| **D-4** | The label renders wrong, overflows, or clips unreadably | **NO AUTOMATED GATE.** The overlay does not render in this jsdom harness (probed 2026-08-18: `show()` yields no `.p-select-option` nodes), and jsdom cannot measure layout | **Substitute: human visual check at the HITL pause** — open the dialog against CLARISA test and read the first ten options. Recorded as an accepted gap, not covered |
+| **D-4** | The label renders wrong, overflows, clips unreadably, **or is never announced by assistive tech** | **NO AUTOMATED GATE.** The overlay does not render in this jsdom harness (probed 2026-08-18: `show()` yields no `.p-select-option` nodes), and jsdom cannot measure layout | **Substitute: human visual check at the HITL pause** — open the dialog against CLARISA test and read the first ten options. Recorded as an accepted gap, not covered |
 | **D-5** | Fixtures invented as `PROJ-1` instead of the real feed spellings (**KZ-001**) | Fixtures pinned to measured values: `A1806`, `B-A1080`, `C-A480`, plus a 255-char `full_name` | **Yes** — a Reviewer diff check; a fixture not drawn from `evidence/` fails review |
 | **D-6** | A regression test that could never have been red (**K-004**) | Each regression test is run against `HEAD` **before** the fix and its failure output recorded verbatim in `execution.md` | **Yes** — a test that passes on `HEAD` is disqualified as evidence |
 
@@ -278,7 +278,8 @@ The picker is the only surface through which a human can create a bilateral mapp
 | --- | --- | --- | --- |
 | **OQ-1** | Should `description` join the server-side search? | Juan | **No, not in v1** — 18.4% populated on test; `full_name` is 100% and does the work. Return the field, do not match on it |
 | **OQ-2** | Should the `clarisa_project_short_name` **snapshot** store the name — and is STAR's omission (stored `NULL`, while the admin panel stores the code) intentional? | Juan + PRMS | **Its own change.** Touches stored data, the mapping-list search key, and a user-facing read path |
-| **OQ-3** | Adopt **R-BPF-006** (order by name)? | Juan — **needed before `tasks.md`** | **Yes.** One comparator; it is the difference between a list that reads as names and one that opens on codes |
+| **OQ-3** | Adopt **R-BPF-006** (order by name)? | Juan | **RESOLVED 2026-08-18 — yes.** Ordering placed server-side (design DD-3), the only layer with an automated gate |
+| **OQ-4** | Is `[title]` enough to satisfy NFR-BPF-002, or does the option need an explicit accessible name carrying the untruncated text? | Juan | **Ship `title` now** (consistency with the AGRESSO picker, and it is strictly better than nothing), and **do not claim AT coverage** until someone runs a real screen reader. Raise separately if the answer is no — it would apply to both pickers, not just this one |
 
 ---
 

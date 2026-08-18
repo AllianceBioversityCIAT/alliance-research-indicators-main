@@ -91,7 +91,7 @@ T-01 ──> T-03 (admin SSR label) ──────────┘
   | --- | --- |
   | R-BPF-003 | THEN name-matched option stays visible · AND code term keeps it visible · BUT NOT filtered out by a narrower client field set · AND IT MUST hold when `full_name` is absent |
   | R-BPF-004 | THEN label reads `code — name` · AND absent name renders the code alone · BUT NOT render `undefined`/`null`/trailing separator · AND IT MUST use one composition for collapsed and list states |
-  | R-BPF-005 | AND complete string reachable without selecting · AND IT MUST expose the full text to assistive tech *(the visual clipping clauses belong to T-04)* |
+  | R-BPF-005 | AND complete string reachable without selecting *(the visual clipping clauses belong to T-04; the assistive-tech announcement is an accepted gap pending **OQ-4** — see below)* |
 
 - **Tests:** `bilateral-mapping.component.spec.ts` — the filter test resolves the **real** `Select` instance from the fixture (`debugElement.queryAll(d => d.componentInstance instanceof Select)`, selected by its `filterBy`), sets options carrying `full_name`, sets the filter value, and asserts `visibleOptions()`. Plus label-method unit tests for all three input shapes, and a `title`-attribute assertion.
 
@@ -102,7 +102,7 @@ T-01 ──> T-03 (admin SSR label) ──────────┘
   ```
 - **Red-before-green (K-004, mandatory):** **already observed red on `HEAD`, 2026-08-18** — with options carrying `full_name`, `visibleOptions()` returns `[]` for the term `"musasentinel"` while returning the row for `"A1806"`. Reproduce that output and paste it verbatim into `execution.md` before editing the template.
 - **The input that would make this check FAIL:** the option `{ short_name: 'B-A1080', full_name: 'Fertilize Right Colombia' }` with the filter term `fertilize`. Current code yields `[]`.
-- **What the presence-assertions cannot prove:** asserting `filterBy="short_name,full_name"` appears in the template proves the attribute exists, **not** that a name search survives. It is not accepted as evidence for R-BPF-003 — the `visibleOptions()` assertion is. Likewise the `title` attribute proves the string is available, not that the label clips correctly (T-04).
+- **What the presence-assertions cannot prove:** asserting `filterBy="short_name,full_name"` appears in the template proves the attribute exists, **not** that a name search survives. It is not accepted as evidence for R-BPF-003 — the `visibleOptions()` assertion is. Likewise the `title` attribute proves the string is in the DOM — **not** that the label clips correctly (T-04), and **not** that a screen reader announces it. `title` support in AT is inconsistent; asserting the attribute must never be recorded as satisfying NFR-BPF-002. That half is an accepted gap pending **OQ-4** (requirements §9).
 - **Disqualifier:** if the filter test passes on `HEAD`, it is not exercising the real `Select` instance — it is asserting against the component's own option array. Delete it and rewrite; a test that cannot go red is not a gate.
 
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `systematic-debugging`
