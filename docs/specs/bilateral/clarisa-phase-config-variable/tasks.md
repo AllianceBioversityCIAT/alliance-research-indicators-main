@@ -2,7 +2,7 @@
 
 - **Spec id:** 2026-08-clarisa-phase-config-variable
 - **Depth:** Standard
-- **Budget:** 4 tasks · ~450 LOC · ~6 review rounds (`design.md` §11)
+- **Budget:** 3 tasks · ~380 LOC · ~5 review rounds (`design.md` §11) — revised by the T-01 pivot, 2026-08-18
 - **Last updated:** 2026-08-18
 
 ---
@@ -10,69 +10,37 @@
 ## Dependency graph
 
 ```
-T-01 (migration, server) ─┐
-                          ├─► T-03 (selector, client)
-T-02 (endpoint,  server) ─┘
+T-02 (endpoint, server) ─► T-03 (selector, client)
 
 T-04 (.env.example) — independent, no dependencies
+
+T-01 — DROPPED by pivot (2026-08-18); the work already exists and is merged
 ```
 
-`T-01` and `T-02` are independent of each other and both live in the server package — **do not run them concurrently** (root `CLAUDE.md` §4.3: two tasks in the same package are not parallel-safe). `T-04` is a documentation-only change with no verification conflict.
+`T-02` and `T-04` both live in the server package — **do not run them concurrently** (root `CLAUDE.md` §4.3: two tasks in the same package are not parallel-safe), though `T-04` is documentation-only and runs no verification command.
 
 ---
 
-## T-01 — Seed the `app_config` row and prove Tier 2 governs the picker
+## T-01 — ~~Seed the `app_config` row~~ **DROPPED (pivot, 2026-08-18)**
 
 | Field | Value |
 | --- | --- |
-| **Status** | `[ ]` |
-| **Size** | S |
-| **Package** | `server/researchindicators` |
-| **Depends on** | none |
-| **Requirements** | `R-CPC-001` (all clauses), `R-CPC-002` (all clauses), `NFR-CPC-001`, `NFR-CPC-004` |
-| **Design** | `design.md` §4, §6.3, `DD-1`, `DD-6` |
-| **Skills** | `nestjs-expert` |
+| **Status** | `[x]` — **satisfied by pre-existing merged work; no code owed by this spec** |
+| **Resolution** | Option A, approved by the user 2026-08-18 |
 
-### Scope
+**Why this task no longer exists.** A migration seeding this exact row already exists and is merged:
+`src/db/migrations/1786738949211-seedClarisaMappingPhase.ts`, commit `8431dc4b`
+(*"[SPEC:bugfix/bilateral-alliance-selector] feat(app-config): seed the mapping-phase row so the phase is admin-editable"*).
 
-- New migration under `src/db/migrations/` seeding one `app_config` row: `key`, `description`, `category = CLARISA`, `subcategory = PROJECTS`, `simple_value = '2026'`.
-- Fully parameterized `INSERT`; `down()` performs a scoped `DELETE` with the `key` column **backticked** (`DD-6`).
-- Exemplar to imitate: `src/db/migrations/1781879906673-AddNewEnvCl.ts` — **same shape, but do not copy its `down()`**, which leaves the reserved word `key` unescaped.
-- Tests asserting the resolver honours the seeded row (Tier 2 beats ENV and the literal default) and still falls through when the value is blank, non-numeric, or the row is inactive.
+It seeds `simple_value = '2026'`, is idempotent (`ON DUPLICATE KEY UPDATE`), and its `down()` already parameterizes **and** backticks the reserved word `key` — i.e. it already satisfies what `DD-6` was written to protect. `key` is the entity's `@PrimaryColumn`, so a second INSERT would collide.
 
-### Clause coverage
+**`R-CPC-001` and `R-CPC-002` are therefore delivered by merged code, not by this spec.** The row is absent from the Dev database only because that migration is **pending, never applied** — an ops action, not a code deliverable.
 
-| Clause | How it is covered |
-| --- | --- |
-| `R-CPC-001` scenario — row appears with the exact tuple | Unit test asserting the inserted `key`/`category`/`subcategory`/`simple_value` |
-| `R-CPC-001` **BUT NOT** change the effective phase anywhere | Test: with the row at `2026`, resolved phase equals the pre-migration resolved phase |
-| `R-CPC-001` **AND MUST** be removable | `down()` executed in verification; row absent afterwards |
-| `R-CPC-002` scenario — value `2025` governs | Resolver test: row `2025` → `targetPhase` `2025` |
-| `R-CPC-002` **BUT NOT** require deploy/restart | Covered by `NFR-CPC-001` below — resolution is a runtime DB read, asserted without process restart |
-| `R-CPC-002` **AND MUST** fall through on blank / non-numeric / inactive | Three resolver tests, one per degradation path |
+> **Ops action owed (not a task):** apply `SeedClarisaMappingPhase1786738949211` to the Dev database. Until then the variable will not appear on the Configuration Variables screen and `T-03` cannot be visually checked end to end.
 
-### Verification
+The task ID is **kept, not renumbered** — every reference already written in `execution.md`, `design.md`, and this file's coverage table resolves as written.
 
-```bash
-# from server/researchindicators
-npm run migration:dev:execute      # must apply against a scratch schema
-npm run migration:revert           # must remove the row cleanly
-npm test -- --silent
-npx eslint src/db/migrations/<file> # gate without --fix (K-001)
-```
-
-**Input that makes this FAIL:** put a bare `?` inside a SQL comment in the migration, or drop the backticks from `` `key` `` in `down()`. Either throws before MySQL parses — `namedPlaceholders: true` consumes the `?` as a bind parameter, and `KEY` is a MySQL reserved word.
-
-**K-004 — prove the gate before trusting it.** The migration gate has never been observed failing on this spec. Break it on purpose once (insert the `?` above), confirm `migration:dev:execute` reddens, then restore. A green run is not evidence until the red run has been seen. *Static gates cannot catch this class: migration `1784500000000` shipped unrunnable while passing typecheck, lint, and review (**K-006**).*
-
-**What the verification cannot prove:** that the row is correct **in the dev database**. `migration:dev:execute` runs against a scratch schema. Deployment to dev is CI/CD's job and is out of this task's reach — do not report the dev row as verified.
-
-### Done
-
-- [ ] Migration applies and reverts cleanly against a scratch schema, both observed.
-- [ ] The gate has been observed failing for the placeholder reason, then restored.
-- [ ] All six clause-coverage rows have a passing test.
-- [ ] `npx eslint` clean on the new file.
+Full analysis: `execution.md` → *Pivot Record: T-01*.
 
 ---
 
@@ -132,7 +100,7 @@ npx eslint src/domain/tools/clarisa/projects
 | **Status** | `[ ]` |
 | **Size** | M |
 | **Package** | `client/research-indicators` |
-| **Depends on** | `T-01`, `T-02` |
+| **Depends on** | `T-02` (was `T-01`, `T-02` — `T-01` dropped by pivot) |
 | **Requirements** | `R-CPC-004` (all clauses), `R-CPC-003` client half (configured-value injection, empty-state) |
 | **Design** | `design.md` §7.1–§7.4, `DD-3`, `DD-4`, `DD-7` |
 | **Skills** | `angular-developer`, `ui-ux-pro-max` |
@@ -225,15 +193,15 @@ grep -n "ARI_CLARISA_PROJECTS_PHASE" server/researchindicators/.env.example
 
 | Requirement | Scenarios / clauses | Owning task(s) |
 | --- | --- | --- |
-| `R-CPC-001` | 1 scenario + 2 clauses | T-01 |
-| `R-CPC-002` | 1 scenario + 2 clauses | T-01 |
+| `R-CPC-001` | 1 scenario + 2 clauses | **merged work** (`8431dc4b`) — see T-01 pivot |
+| `R-CPC-002` | 1 scenario + 2 clauses | **merged work** (`8431dc4b`) — see T-01 pivot |
 | `R-CPC-003` | 2 scenarios + 4 clauses | T-02 (server half), T-03 (client half) |
 | `R-CPC-004` | 1 scenario + 3 clauses | T-03 |
 | `R-CPC-005` | 1 scenario + 1 clause | T-04 |
-| `NFR-CPC-001` | — | T-01 |
+| `NFR-CPC-001` | — | **merged work** (`8431dc4b`) |
 | `NFR-CPC-002` | — | T-02 |
 | `NFR-CPC-003` | — | T-02, T-03 |
-| `NFR-CPC-004` | — | T-01 |
+| `NFR-CPC-004` | — | **merged work** (`8431dc4b`) — migration authored and reviewed under `bugfix/bilateral-alliance-selector` |
 
 Every scenario and every `BUT` / `AND IT MUST` clause is owned by a named task. **D-7 (visual correctness) is the one defect class with no automated owner** — substituted by the mandatory human check in `T-03`, not silently absorbed.
 

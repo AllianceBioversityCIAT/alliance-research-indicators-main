@@ -6,6 +6,16 @@
 
 ---
 
+> ### ⚠️ Superseded in part — T-01 pivot, 2026-08-18
+>
+> This proposal's headline claim — *"What is missing is the `app_config` row"* — is **false**. A migration
+> creating that row already exists and is merged (`1786738949211-seedClarisaMappingPhase.ts`, `8431dc4b`);
+> it has simply never been applied to the Dev database. The measured symptom analysis below stands; the
+> remedy does not. §12 R-1/R-2/R-3 (migration hazards) are moot — this spec authors no migration.
+>
+> **The proposal is kept unedited below as the point-in-time record of what was approved.** The corrected
+> plan lives in `requirements.md`, `design.md`, `tasks.md`, and `execution.md` → *Pivot Record: T-01*.
+
 ## 1. Document Control
 
 | Field | Value |

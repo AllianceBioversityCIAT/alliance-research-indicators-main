@@ -10,11 +10,11 @@
 
 ## 1. Executive Summary
 
-Three moving parts, in dependency order:
+**Two** moving parts, in dependency order (a third was dropped by the T-01 pivot — see the struck row):
 
 | # | Part | Package | Serves |
 | --- | --- | --- | --- |
-| 1 | Seed migration for one `app_config` row | server | `R-CPC-001` |
+| ~~1~~ | ~~Seed migration~~ — **dropped by the T-01 pivot (2026-08-18)**: `1786738949211-seedClarisaMappingPhase.ts` (`8431dc4b`) already does this and is merged, pending application to Dev | — | `R-CPC-001` ✅ merged |
 | 2 | Read-only endpoint returning the phases present in the cached CLARISA payload | server | `R-CPC-003`, `NFR-CPC-002` |
 | 3 | Key-aware editable year selector in the config edit modal | client | `R-CPC-004` |
 
@@ -33,7 +33,7 @@ Admin ──► Configuration Variables screen
 
 Picker ──► GET /api/tools/clarisa/projects/bilateral
              └─ MappingPhaseResolver.resolvePhase()
-                  Tier 2 ──► app_config.ARI_CLARISA_PROJECTS_PHASE   ← the row this spec seeds
+                  Tier 2 ──► app_config.ARI_CLARISA_PROJECTS_PHASE   ← seeded by merged 8431dc4b (pending on Dev)
 ```
 
 The phase endpoint and the picker endpoint read the **same cached payload**, so the years offered and the projects filtered can never come from different snapshots within a TTL window.
@@ -44,7 +44,7 @@ The phase endpoint and the picker endpoint read the **same cached payload**, so 
 
 | Path | Change |
 | --- | --- |
-| `server/…/src/db/migrations/<ts>-SeedClarisaProjectsPhase.ts` | **new** |
+| ~~`server/…/src/db/migrations/<ts>-SeedClarisaProjectsPhase.ts`~~ | ~~new~~ — **not authored**; the merged `1786738949211-seedClarisaMappingPhase.ts` already covers it |
 | `server/…/src/domain/tools/clarisa/projects/clarisa-projects.service.ts` | + one read-only method |
 | `server/…/src/domain/tools/clarisa/projects/clarisa-projects.controller.ts` | + one `@Get` handler |
 | `server/…/src/domain/tools/clarisa/projects/dto/` | + response type for the phases endpoint |
@@ -58,9 +58,7 @@ No new module, no new route node, no schema change.
 
 ## 4. Data Model
 
-One additive row in the existing `app_config` table. Column values are fixed by `R-CPC-001` §5. `json_value` stays `NULL` — this is a simple value.
-
-The migration is **INSERT-only**. It adds no column, no index, no constraint, and its `down()` is a single scoped `DELETE`.
+One additive row in the existing `app_config` table, seeded by the **already-merged** `1786738949211-seedClarisaMappingPhase.ts`. **This spec authors no migration** (T-01 pivot). That migration is idempotent (`ON DUPLICATE KEY UPDATE`), adds no column/index/constraint, and its `down()` is a single scoped `DELETE` that already parameterizes and backticks the reserved word `key`.
 
 ---
 
@@ -95,9 +93,9 @@ Reuses the existing predicates from `project-selector.util.ts` rather than re-de
 
 Thin: delegate, wrap in `ResponseUtils.format`, annotate for Swagger. No filtering logic in the controller — mirroring how `bilateral` delegates its eligibility rules to the service.
 
-### 6.3 Migration
+### 6.3 ~~Migration~~ — retired by the T-01 pivot
 
-Follows the exemplar `1781879906673-AddNewEnvCl.ts` in shape, with two deliberate departures recorded in `DD-6`.
+This spec authors no migration. `1786738949211-seedClarisaMappingPhase.ts` (`8431dc4b`) already seeds the row, idempotently, and already satisfies what `DD-6` was written to enforce. What remains is an **ops action**: apply it to Dev.
 
 ---
 
@@ -141,12 +139,12 @@ One client-side interface mirroring the endpoint's response, declared alongside 
 
 | ID | Decision | Rationale | Rejected alternative |
 | --- | --- | --- | --- |
-| **DD-1** | Seed `simple_value = '2026'` | Behaviour-neutral **by construction**: `2026` is exactly what the literal default already yielded, so deploying the row changes nothing anywhere. It converts an invisible constant into a visible, editable one | `NULL` (leaves dev broken, matches exemplar); `2025` (fixes dev but lands a semantically wrong value in production — **K-005**: a discriminator must not be collapsed to one global value) |
+| **DD-1** ⚠️ *superseded in mechanism, upheld in value* | ~~Seed~~ **Accept** `simple_value = '2026'` — the merged migration already sets exactly this | Behaviour-neutral **by construction**: `2026` is exactly what the literal default already yielded, so deploying the row changes nothing anywhere. It converts an invisible constant into a visible, editable one | `NULL` (leaves dev broken, matches exemplar); `2025` (fixes dev but lands a semantically wrong value in production — **K-005**: a discriminator must not be collapsed to one global value) |
 | **DD-2** | Derive years from the **eligible** cohort (bilateral + Alliance), not all CLARISA projects | Deriving from all 299 projects could offer a year with projects but **zero eligible** ones — which still empties the picker, i.e. the exact defect this spec prevents. Resolves `OQ-2` | Deriving from the full payload; simpler but does not satisfy `R-CPC-003` |
 | **DD-3** | The selector is **editable** (`p-select [editable]`) | **Outcome of the Step 2.3 reversion challenge — see §10.** Preserves the free-entry capability the current text field provides, while the derived list guides the common case | A closed select (loses a real capability); a toggle between select and text (two controls for one value) |
 | **DD-4** | Control-type knowledge lives as a **client-side key constant**, not in the entity's unused `field` column | There are exactly **two** keys in `AppConfigKey`. A metadata-driven registry for one typed key is speculative generality, and it would commit the team to a contract nobody has designed | Using `field` as a type hint — the natural evolution when a *third* typed key appears, deliberately deferred |
 | **DD-5** | The phases endpoint reads the existing cache | `NFR-CPC-002`. Also guarantees years and filtered projects come from one snapshot | A dedicated upstream call — extra load, and two snapshots that can disagree |
-| **DD-6** | Migration uses a fully parameterized `INSERT`, and `down()` **backticks** the `key` column | `namedPlaceholders: true` makes any bare `?` or `:word` outside parameters throw before MySQL parses — including inside comments. And `KEY` is a MySQL reserved word, so the exemplar's unescaped `WHERE key =` is a latent defect not to inherit | Copying the exemplar verbatim |
+| ~~**DD-6**~~ ⚠️ *moot after the pivot — no migration authored. Recorded because the merged migration **already satisfies it**, which is how the pivot was recognised as safe* | Migration uses a fully parameterized `INSERT`, and `down()` **backticks** the `key` column | `namedPlaceholders: true` makes any bare `?` or `:word` outside parameters throw before MySQL parses — including inside comments. And `KEY` is a MySQL reserved word, so the exemplar's unescaped `WHERE key =` is a latent defect not to inherit | Copying the exemplar verbatim |
 | **DD-7** | Options display a per-year project count | Makes a thin year visible before it is chosen; the count is already computed by `DD-2`'s grouping, so it is free. Resolves `OQ-1` | Bare year labels |
 
 ---
@@ -169,11 +167,11 @@ Without this challenge the design would have shipped a closed select and re-disc
 
 | Metric | Expected |
 | --- | --- |
-| Tasks | **4** |
-| LOC | **~450** (≈200 production, ≈250 tests) |
-| Review rounds | **~6** |
+| Tasks | **3** |
+| LOC | **~380** (≈160 production, ≈220 tests) |
+| Review rounds | **~5** |
 
-*Revised at Phase 3 (2026-08-18): the phases endpoint's service method, DTO, and controller handler are one vertical slice — splitting them would create a task that cannot be verified without its sibling. 5 → 4 tasks, 7 → 6 rounds. LOC unchanged.*
+*Revised twice on 2026-08-18. (1) Phase 3: the phases endpoint's service method, DTO, and controller handler are one vertical slice — splitting them would create a task that cannot be verified without its sibling. 5 → 4 tasks, 7 → 6 rounds. (2) T-01 pivot: the seed migration already exists and is merged, so T-01 is dropped. 4 → 3 tasks, ~450 → ~380 LOC, 6 → 5 rounds.*
 
 Depth re-checked against the finished design: **Standard holds.** Five tasks across two packages with a migration is above Lite and well below the alternatives/rollout apparatus Full exists for.
 
@@ -185,8 +183,9 @@ Depth re-checked against the finished design: **Standard holds.** Five tasks acr
 
 | # | Risk | Handling |
 | --- | --- | --- |
-| X-1 | Migration compiles, lints, and still cannot run (**K-006**) | Verification is executing it against a scratch schema **and reverting**, not `npm run build` |
-| X-2 | The gate for X-1 has never been seen failing (**K-004**) | The task must break it on purpose once — a `?` in a comment — confirm it reddens, then restore |
+| ~~X-1~~ | ~~Migration compiles, lints, and still cannot run~~ — **retired by the T-01 pivot**; no migration is authored here | — |
+| ~~X-2~~ | ~~The gate for X-1 has never been seen failing~~ — **retired with X-1** | — |
+| **X-6** | **The merged seed migration is pending, not applied, on Dev.** Until ops applies it, the variable will not appear on the screen and `T-03`'s human visual check cannot be completed end to end | Ops action, tracked in `tasks.md` → T-01 block |
 | X-3 | Production's all-`null` phases make the derived set empty (**K-013**) | `R-CPC-003` scenario 2 is a required test, not an edge case |
 | X-4 | Visual correctness of the selector has **no automated gate** (`requirements.md` D-7) | Human check at the Phase-3 HITL pause; recorded as an accepted blind spot |
 | X-5 | Two packages touched | Server and client tasks are cross-package and editable in parallel; full-suite runs are **not** — the Leader re-measures after each worker reports (root `CLAUDE.md` §4.3) |
