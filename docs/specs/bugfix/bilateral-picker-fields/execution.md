@@ -220,3 +220,54 @@ Leader note: **this is more pointed than the reviewer could know.** The live-fee
 It is still **not** in scope for T-01: no requirement mandates a locale, and per the Advisory-Never-Becomes-A-Task rule an advisory is recorded and dies there — it may not mint a task or widen one. If it is to be fixed it needs a proposal, where it gets a requirement, a design decision and a budget line like any other work.
 
 **Verification (Leader-run, in isolation):** RED `5 failed, 9 passed, 14 total` → GREEN `14 passed, 14 total`.
+
+---
+
+## ⏸ T-03 — reworked after a FAIL, re-review BLOCKED on quota
+
+| | |
+| --- | --- |
+| **Status** | **`blocked`** — implementation reworked and self-verified, **re-review not obtained**. Not `done` |
+| **Date** | 2026-08-18 |
+| **Implementer** | agy `gemini-3.7-flash-medium`, `ctx_4b2d18d5ad2d` — **2 attempts** (1 FAIL + 1 rework) |
+| **Reviewer** | agy `claude-sonnet-4-6` — attempt 1 delivered a **FAIL**; the re-review died on an agy quota limit |
+
+### Attempt 1 — Reviewer `STATUS: FAIL`
+
+The five-line output contract worked where the seven-axis report had not, and it caught a real defect:
+
+> **Q1 SCOPE:** yes — diff touches only `BilateralProjectMappings.tsx`.
+> **Q2 SNAPSHOT:** no — `clarisa_project_short_name` writes at `:215`/`:220` are untouched.
+> **Q3 LABEL SAFETY:** no — undefined/null/empty-string/whitespace-only all fall through the `?.trim()` falsy branch and render `p.short_name` cleanly; no leak.
+> **Q4 THE REMOVAL: OUT-OF-SCOPE** — T-03 says *"add the name to that label"*; it authorizes adding `full_name` **alongside** the existing `[p.id]` prefix, not removing the id; the id drop is unrequested and **silently changes visible data**.
+> **STATUS: FAIL**
+
+The Implementer had replaced `[{p.id}] {p.short_name}` with `${p.short_name} — ${p.full_name}`, **deleting** the visible id. The Leader had noticed the removal while composing the brief and deliberately passed it to the Reviewer as an adjudication question rather than ruling on it — author ≠ auditor applies to scope judgments too, not only to code.
+
+### Attempt 2 — rework
+
+Label is now purely additive to the original:
+
+```jsx
+[{p.id}] {p.short_name}
+{p.full_name?.trim() ? ` — ${p.full_name}` : ''}
+```
+
+`[123] A1806 — WTO-Phase 1: MusaSentinel` with a name; `[123] A1806` without one. The falsy guard, the optional interface fields, the untouched snapshot writes and the single-file scope are all unchanged.
+
+**Leader verification, re-run with nothing else active** (the first run overlapped a worker's `nest build`, so it was discarded and repeated — a measurement taken under concurrent load is not slow, it is wrong):
+
+```
+npx eslint src/admin/client/pages/BilateralProjectMappings.tsx   → clean
+npm run build                                                    → ✓ built in 2.02s, 47 modules
+```
+
+### ⛔ Why T-03 is not `done`
+
+`agy` returned **`Individual quota reached … Resets in 3h44m59s`** mid-audit. Environmental blocker, not a FAIL.
+
+The rework has the Implementer's self-report and the Leader's isolated build/lint — but **no independent audit of the rework**. That matters more than usual here: attempt 1's defect was a *scope* violation that compiled and linted perfectly. Build-green says nothing about whether a change is authorized, which is precisely what the Reviewer caught the first time.
+
+Per the `/akili-execute` fallback table the Leader does **not** absorb this review. Options are the user's: wait for the quota reset, route to a different transport, review the six-line diff directly, or record an explicit waiver.
+
+**Not committed.** Same rule applied to T-01: no verdict, no checkbox, no commit.
