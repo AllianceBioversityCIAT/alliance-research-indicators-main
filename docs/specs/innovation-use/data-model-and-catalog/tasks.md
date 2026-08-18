@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04 … **T-08** `[x]` (2026-08-18); next eligible **T-09**
+- **Status:** in-progress — T-01, T-02, T-04 … **T-09** `[x]` (2026-08-18); next eligible **T-10** (⚠️ blocked: see FP-3 merge gate)
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -270,7 +270,7 @@ graph TD
 
 - **Requirements covered:** R-IU-006 (AC.1–AC.11), R-IU-003 (mode invariant, layer 2), R-IU-009 (AC.3); NFR-IU-001; DC-2, DC-3, DC-10
 - **Design references:** §6.4 (six steps), DD-3, DD-4, DD-10, DD-11
-- **Size:** L · **Dependencies:** T-08 · **Status:** todo
+- **Size:** L · **Dependencies:** T-08 · **Status:** done
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Scope** — `innovation_use_validation(result_code BIGINT) RETURNS tinyint(1)`, `READS SQL DATA`, per `design.md` §6.4's six steps.
@@ -288,11 +288,11 @@ graph TD
 - **Disqualifier:** a `toContain('innovation_use_validation')` assertion is a **presence-assertion** and proves nothing about the returned boolean (§4.1, KZ-001). It may not be offered as evidence for any AC here.
 
 **Done**
-- [ ] Function exists and is callable after migration
-- [ ] The level test reads the catalog's `level` through a join, never the FK
-- [ ] Role filter present; dead branch not copied; zero-actor guard unconditional
-- [ ] No other `*_validation` function touched
-- [ ] Behavioral ACs explicitly deferred to T-12 — **not** claimed here
+- [x] Function exists and is callable after migration
+- [x] The level test reads the catalog's `level` through a join, never the FK
+- [x] Role filter present; dead branch not copied; zero-actor guard unconditional
+- [x] No other `*_validation` function touched
+- [x] Behavioral ACs explicitly deferred to T-12 — **not** claimed here
 
 ---
 

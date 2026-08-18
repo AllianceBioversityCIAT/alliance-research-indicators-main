@@ -14,7 +14,7 @@
 | Branch | `AC-1679-Create-the-innovation-use-section` |
 | Approval Mode | **gated** (inherited from `proposal.md` / `family.md`) — every continue/pause gate stops for the user |
 | Budget tripwire (`design.md` §12) | **13 tasks · ~2,600 LOC · 4–5 review rounds** |
-| Budget consumed so far | **8 tasks (T-01, T-02 no-op verifications; T-04 … T-07 migrations; T-08 entities) · ~1,680 LOC · 2 review rounds** — within tripwire; rework margin half spent |
+| Budget consumed so far | **9 tasks (T-01, T-02 no-op verifications; T-04 … T-07 migrations; T-08 entities; T-09 stored function) · ~2,102 LOC · 4 review rounds** — ⚠️ **AT the 4–5 tripwire; at most one rework round remains** |
 | Package | `server/researchindicators` (server-only; no client file touched) |
 | Model routing | Leader T1 `opus` · Implementer T2 `sonnet` · Reviewer T3 `opus` (**author ≠ auditor** satisfied on both axes: different model, read-only tools) |
 | Started | 2026-08-18 |
@@ -944,3 +944,141 @@ FP-1 … FP-17 remain live. **FP-10 and FP-13 are now DISCHARGED** by T-08 (wind
 | **B-6** | reliability | The entity comment names T-09's function and chunk 2's API edge as the enforcement layers for the mode invariant. **No test binds the comment to either.** If a later chunk implements a different truth table, the comment silently becomes documentation of a rule the system does not enforce | Recorded only |
 
 **Budget after T-08:** 8 of 13 tasks · ~1,680 LOC of ~2,600 · 2 of 4–5 review rounds consumed. Within tripwire.
+
+---
+
+### T-09 — M5: the `innovation_use_validation` stored function · **PASS (attempt 3 of 3; 2 rework rounds consumed)**
+
+- **Date:** 2026-08-18
+- **Status:** `[x]`
+- **Implementer attempts:** 3
+- **Reviews:** 4 lens-reviews (attempt 1: 2 parallel lenses · attempt 2: 1 closure lens · attempt 3: 1 closure lens)
+- **Requirements covered:** R-IU-006 **AC.1 only** · R-IU-009 (AC.1 via FP-2, AC.3) · NFR-IU-001 · DC-3. **AC.2–AC.11 explicitly NOT claimed** — see the boundary ruling below
+- **Files:** `src/db/migrations/1787078283929-createInnovationUseValidation.ts` (146) + `src/db/migration-specs/1787078283929-createInnovationUseValidation.spec.ts` (276)
+
+**The SQL was correct on attempt 1 and never changed.** Verified by checksumming every SQL-bearing line across all three attempts' diffs: `d2f513893f16225faa63750f9f3b9790`, identical. **Both rework rounds were spent entirely on comments.**
+
+---
+
+#### Attempt 1 — SQL PASS, prose FAIL
+
+**Lens B (SQL semantics) PASSed outright**, tracing every variable through every reachable state rather than reading the body:
+
+| Question | Finding |
+| --- | --- |
+| Can the function return NULL? | **No.** `commonFields` is `IS NOT NULL` (never NULL); the three INT vars are `IFNULL`-guarded or `COUNT()`. The classic tinyint-NULL silent failure is unreachable |
+| `actor_type_id = 5` with NULL custom name | `valid_text(NULL)` → **`0`, not NULL** — so it lowers the SUM and correctly fails, rather than being silently dropped from it |
+| `sex_age_disaggregation_not_apply` NULL | `NULL = TRUE` → NULL → `IF` takes the else = disaggregated test. **Matches §3.3 by design, not accident** |
+| Zero-actor path | `SUM` over empty → NULL → `IFNULL(…,0)` → `0 = 0` TRUE. **`(tempFullActors > 0)` is the SOLE gate** on the false green |
+
+**Lens A confirmed all six of §6.4's steps and all four traps**, including that the role filter is present on **all three** actor SELECTs (not just the first), and that `LEFT` is the correct join — `INNER` would return `0` for AC.3 too, but for the wrong reason, collapsing AC.2 and AC.3 into one indistinguishable path.
+
+**FAILed on two prose defects:** a wrong `valid_text` citation, and a spec header claiming *every* expected pattern was independently transcribed when four bind to identifiers (`useLevel`, `explanationValid`, `tempFullActors`, aliases `ciul.`/`ra.`) appearing in no spec document.
+
+#### Attempt 2 — FAIL: the fix introduced a new false claim
+
+The corrected citation was right, but the justification wrapped around it was false three ways: it said **three** migrations touch `valid_text` (four do — `1753460254629` creates it), that `1758054920860` changed the parameter type (it did not — `TEXT` before and after), and that neither superseded migration changed the `RETURN` expression (`1758054920860` changed **exactly** that, adding `REGEXP_REPLACE(text,'\s+','')` — a real semantic change, since MySQL `TRIM()` strips spaces only, so a tab-only string was previously "valid text"; its own `down()` restoring the old form is the proof).
+
+**That replacement text was written by the Leader and transcribed faithfully by the Implementer.**
+
+#### Attempt 3 — PASS
+
+**Method changed, not just content.** The brief supplied **no facts at all** and required every claim to be re-derived from a file opened that session, reported as `claim | file:line | command`. And the fix was to **reduce the claim surface** rather than rewrite the narrative: R-IU-006 needs only *"reuses the existing `valid_text()` helper; introduces no new helper"*, so the supersession history — decoration that had been wrong twice — was deleted, leaving a single pointer to the live definition.
+
+Three further claims the attempt-2 reviewer had classified as **advisory** were folded in deliberately: the preamble's divergence count, the `innovation_dev_validation` body range (`:8-116` → `:12-115`, since 8 is the `DROP` and 116 the closing brace), and the spec docblock's fixture attribution (`F1–F18` → `F1–F12, F9b, F17`; F13–F16 and F18 are **T-13's**). **Leader note on the rule:** advisories are normally recorded and stop there, but leaving known-false citations inside a file being corrected *for false citations* is indefensible, and these were the same defect class that was gating. Recorded as a deliberate scope call, not silent creep.
+
+**Final closure review re-derived 14 line-level citations across 6 migrations and 12 spec-document references, all holding.** It also independently corroborated the live `valid_text` against `baseline.sql:6593-6595` (the deployed MEDIUMTEXT form) — a source no prior round had used.
+
+**Verification (attempt 3):**
+
+```
+npx jest <migration spec>              -> 18 passed / 18
+npm test -- --silent                   -> 327 suites, 2145 tests passed (baseline unchanged)
+falsification: useLevel>=6 -> FK form   -> 2 failed / 16 passed / 18 (the two DD-3/DC-10 assertions)
+   revert verified by SHA-256 identical before/after -> 18/18 restored
+npm run lint -- --quiet                -> clean
+git status --porcelain                 -> exactly the 2 files
+```
+
+**Callable on the scratch schema** (fresh container → bootstrap M1–M5, no MySQL 1418): revert removed it (`information_schema.ROUTINES` empty; calling raised MySQL 1305), re-execute restored it.
+
+---
+
+#### ⚠️ THE BOUNDARY RULING — what the scratch spot-checks may and may not be cited for
+
+The Implementer ran informal manual checks on the scratch schema that in substance exercise AC.2, AC.4–AC.8, AC.10 and AC.11 (level 5 → `1`; level 6 without explanation → `0`; Innovation-Dev-role actor ignored; zero actors → `0`; both mode directions). **Lens A adjudicated the boundary and it binds:**
+
+- **May be cited for:** Done #1 / R-IU-006 **AC.1** / DC-3 — and only at the strength *"the function was created and callable in a manual scratch session; no committed check re-runs this."*
+- **May NOT be cited for:** AC.2, AC.3, AC.4, AC.5, AC.6, AC.7, AC.8, AC.10, AC.11 — **not as "covered", not as "verified", not as "informally confirmed"**, and **no AC checkbox in `requirements.md` may be ticked.** AC.9 is untouched by any evidence here.
+
+Reason: §4.3 requires a real-MySQL harness with **committed** fixtures, each *observed red against its target defect*. One-off observations in a throwaway container, with seeds committed nowhere and no re-runnable script, cannot fail in CI, cannot be re-run by anyone else, and were never observed red. **Proof is owed to T-12.**
+
+**Also recorded:** the executed falsification (text mutation of the level comparison) is a **substitute** for T-09's *named* falsifying input — the behavioral F3/F4 level-5/level-6 pair — which remains **unexecuted**. DC-10's real discriminator has not run. And nothing in the 18 tests ties `ciul.level` to the `useLevel` slot of the `SELECT … INTO` list, so a mutation binding the FK there while leaving a `ciul.level` token elsewhere would pass all 18. **DC-10 is visibly ungated until F3/F4 run.**
+
+---
+
+## Forward pointers — added after T-09
+
+| # | For | Pointer |
+| --- | --- | --- |
+| **FP-23** | **T-12 — must be resolved BEFORE the fixture runs** | **`design.md` §6.5's F11 row is unsatisfiable as literally written.** F11 says *"Actor rows under the Innovation Dev role only → ignored → `1`"*. With DD-11's unconditional guard, a result whose **only** actor rows are role 1 has `tempFullActors = 0` and correctly returns **`0`** (AC.11). The SQL is right; the fixture description is wrong. F11's fixture must **also** carry at least one valid Innovation-Use actor row, or T-12 will see red F11 and misdiagnose it as a role-filter defect. **Raised for a user ruling — amending §6.5 is a spec correction needing the two-direction sweep.** |
+| **FP-24** | **chunk 2 · and a T-08 comment that is already shipped** | **Layer 2 enforces mode COMPLETENESS, not mode EXCLUSIVITY.** A row with `sex_age_disaggregation_not_apply = TRUE`, `actors_count` set, **and** all four disaggregated counts set returns `1`. That matches §6.4 step 4 and AC.10 exactly — but `requirements.md:303` says exclusion is enforced *"by the API edge (chunk 2) **and by the validation function**"*, and T-08's **already-committed** entity comment presents layer 2 as backing a table headed "MUTUALLY EXCLUSIVE". **The both-populated case rests entirely on chunk 2's layer 3.** Either tighten those two texts or accept the gap explicitly. |
+| **FP-25** | **T-12** | **F17 is the ONLY behavioral gate on `(tempFullActors > 0)`** — the single conjunct standing between an actorless result and a false green. If F17 is dropped or weakened, nothing but a structural text assertion catches its removal. There is also deliberately **no** fixture for the both-modes-populated row (FP-24); the function returns `1` there, by design. |
+| **FP-26** | **any future amendment of this function** | This migration's `down()` is a **bare drop** — there is no prior body to fall back to. So any later change must `DROP` + `CREATE` in a **new** migration whose `down()` restores **this** body verbatim (the `1758125999162` pattern), exactly as M6 does for the lifecycle routines. |
+
+FP-1 … FP-22 remain live. **FP-11 is now LIVE rather than anticipated** — M5's body references `result_innovation_use`, and MySQL does not schema-bind routines, so reverting M2 before M5 raises nothing at DDL time and fails later at invocation. §13's reverse-order backout covers it; the hazard has simply materialized.
+
+---
+
+## ⚠️ Leader process failure — the primary finding of T-09
+
+**The Leader supplied four false factual claims across this spec**, every one a negative or historical assertion made without a search that could have falsified it:
+
+| # | Task | False claim | Consequence |
+| --- | --- | --- | --- |
+| 1 | T-07 | "no in-migration seed precedent for the three role catalogs" | Cost a rework round; the falsehood was written into a migration header |
+| 2 | T-08 | "zero hand-named FKs across all 307 migrations" | Caught before shipping — only because the Implementer declared it had relied on the claim unverified |
+| 3 | T-09 a1 | "`valid_text`'s current body is `1758054920860`" | Cost a rework round |
+| 4 | T-09 a2 | the `valid_text` supersession history (three counts, all wrong) | Cost a rework round |
+
+**Single mechanical root cause for all four:** the migrations store SQL in TypeScript template literals, so the file bytes carry a **backslash before every backtick**. A pattern containing a bare backtick — `` FUNCTION `valid_text` `` — cannot match `` FUNCTION \`valid_text\` ``. Every miss was a grep that could not have found what it claimed was absent.
+
+**This is exactly what `family.md` D-10 and `routine-transcript.md:28` already forbid** — *"a grep-derived list may not be labelled a transcription"* — a rule this spec adopted after three earlier review rounds made the same class of error. **The rule was written for worker output and did not visibly bind the Leader's own briefs.**
+
+**Corrective actions taken mid-spec** (attempt 3's brief): supply **no** facts to the worker; require every claim re-derived from a file opened that session and reported as `claim | file:line | command`; **reduce the claim surface** rather than rewrite a narrative. **Kaizen candidates for `/akili-archive`:**
+1. **D-10 must bind briefs, not just artifacts** — a negative claim in a brief should carry the command that established it, so a worker can re-run rather than re-trust.
+2. **Never put a backtick in a search pattern in this repo** — belongs in the child guide, not just this log.
+3. **Prefer deleting a claim to correcting it.** Two rounds were spent fixing a historical narrative that no requirement asked for.
+
+**What worked:** the Implementer's honest `Not Done / Assumptions` is the only reason #2 was caught before shipping, and Lens A's independent re-derivation caught #3 and #4. **`author ≠ auditor` did its job — against the Leader, which is the case the methodology does not explicitly anticipate.**
+
+---
+
+## Leader deviations & process notes — T-09
+
+| Item | Note |
+| --- | --- |
+| **Skills** | `nestjs-expert` + `systematic-debugging` (task list) + **`tdd`** (Leader addition) — sixth consecutive task |
+| **Effort** | `xhigh` on all three attempts. **Deliberately not bumped on either retry**, against the standing rework rule: both failures were traced to false Leader-supplied facts, not to worker under-thinking. Escalating depth on a wrong premise produces a better-argued wrong answer |
+| **Review shape** | 2 parallel lenses on attempt 1 (the SQL round); **1 closure lens** on attempts 2 and 3 — the SQL had already been traced variable-by-variable and re-auditing it would have paid twice for one audit |
+| **Cross-lens conflict, adjudicated** | Both attempt-1 lenses flagged the `valid_text` citation, but named **different** live migrations (Lens A `1779920000000`, Lens B `1776373605381`). Leader verified directly: all three candidates are in the executed list, `1779920000000` is highest-timestamped and therefore live. **Lens A was right.** Lens B stopped one migration short |
+| **Advisories promoted into scope (deliberate)** | Three attempt-2 advisories were folded into attempt 3 because they were false citations in a file being fixed for false citations — same defect class as the gate. Recorded rather than done silently |
+| **Leader self-correction** | A first attempt to prove SQL byte-identity across attempts produced three matching checksums **of an empty string** (the `sed` pattern matched nothing). Caught and redone properly before being reported as evidence |
+
+---
+
+## ADVISORY findings — T-09 (recorded, never gating; no task minted)
+
+| # | Source | Finding | Disposition |
+| --- | --- | --- | --- |
+| **B-2** | Lens B a1 | F11 unsatisfiable as written | **Adopted as FP-23** |
+| **B-3** | Lens B a1 | Completeness vs exclusivity gap | **Adopted as FP-24** |
+| **B (fwd)** | Lens B a1 | F17 is the sole AC.11 gate | **Adopted as FP-25** |
+| **B (fwd)** | Lens B a1 | Future amendment must restore this body | **Adopted as FP-26** |
+| **A-1** | Lens A a1 | The two R-IU-009 AC.3 identifier tests are `for` loops over `calls` with no non-empty assertion — **the `down()` one is precisely the single test that passed against the empty stub in RED**. `expect(calls.length).toBeGreaterThan(0)` in both would close it; the `down()` gate currently rests entirely on its sibling `toHaveLength(1)` | **Recorded only. Surfaced to the user** |
+| **B-4** | Lens B a1 | Three separate scans of `result_actors` where one `SELECT COUNT(…), IFNULL(SUM(…),0), IFNULL(SUM(…),0) INTO …` over the identical `WHERE` would do. All ride the `result_id` FK index and the precedent already does two scans, so within NFR-IU-001's bar. A cheap future win, not a defect | Recorded only |
+| **B-5** | Lens B a1 | Unlike the precedent, this function checks **no** `result_institution_types` completeness and no quantifications — an Innovation Use result with an empty Organizations block turns green. **Exactly what §6.4 specifies**, flagged only because the divergence reads as an omission | Recorded only |
+| **C-1** | closure a3 | `design.md` §6.4 step 5 and DD-11 state the guard as `tempActors > 0`; the implementation writes `(tempFullActors > 0)`. **Logically equivalent** given the `tempActors = tempFullActors` conjunct, and guarding the `COUNT` is the more direct expression of AC.11. Recorded so a later reader does not misread it as drift from the design text | Recorded only |
+| **C-2** | closure a3 | The spec docblock's "same recording pattern as the M1/M3/M4 migration specs" omits M2, whose spec uses the identical helper. Incomplete enumeration, not a false claim | Recorded only |
+
+**Budget after T-09:** 9 of 13 tasks · ~2,102 LOC of ~2,600 · **4 of 4–5 review rounds consumed** (T-01/T-02: 1 · T-07: 1 · T-09: 2). **⚠️ AT THE TRIPWIRE — at most one rework round remains within budget.** Escalated to the user at this gate.
