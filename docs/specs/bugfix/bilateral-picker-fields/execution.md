@@ -547,3 +547,24 @@ rendered as `[{p.id}] {clarisaOptionLabel(p)}`.
 - Reverting was considered and rejected: the code is correct as far as it has been verified, this is a feature branch, and a revert-then-recommit cycle would add churn without adding the audit that is actually missing. **The gap is the review, not the commit.**
 
 Recorded here because a spec whose audit trail says *"uncommitted"* while the code sits in `origin` is exactly the kind of quiet falsehood this log exists to prevent.
+
+### ✅ T-07 — PASS (second review attempt; the first was void)
+
+**Reviewer attempt 1 returned `STATUS: FAIL` — and the FAIL was invalid.** Its Q1 read *"admin uses a ternary instead of four branches and returns code instead of title on case-insensitive match."*
+
+That describes the **T-03** version of the label (`{p.full_name?.trim() ? … : ''}` — a ternary), not T-07's. The reviewer had audited stale code.
+
+**Cause: two compounding Leader errors, not a reviewer defect.**
+
+1. **The artifact was empty.** `t07.diff` was **0 bytes**. It was generated and handed to the reviewer without ever being checked. With nothing in the diff, the reviewer fell back to whatever it could read and described the pre-T-07 state.
+2. **The reviewer was declared stalled while it was still working.** T-07 was parked as a "fifth non-delivery" on that basis. It then delivered. The earlier tally of reviewer non-deliveries is inflated by this one and the parking note was written on a false premise.
+
+**The correction, and the rule that came out of it:** the artifact was regenerated from `git show b233e340 -- <path>` and **validated before dispatch** — `test -s` plus a `grep` for the symbol under audit. An empty or stale artifact does not produce a null review; it produces a **confident review of the wrong thing**, which is far worse than no review, because it arrives wearing a verdict.
+
+**Reviewer attempt 2 — `STATUS: PASS`,** with both files read directly rather than trusting the diff:
+
+> Q1 parity with the reviewed STAR helper — **yes** · Q2 `[{p.id}]` prefix retained — **yes** · Q3 snapshot writes unmodified — **yes** · Q4 scope + optional interface field — **yes** · Q5 any `undefined`/`null`/dangling-separator leak — **no**
+
+**Independence caveat, same as T-05 and T-06:** ran on `gemini-3.1-pro-high` against a `gemini-3.7-flash-medium` Implementer — different model, same family, weaker than the cross-family separation T-01 and T-02 received.
+
+**Verification (Leader, in isolation):** `npx eslint` clean · `npm run build` ✓ 744 ms. Rendering remains T-04's job — this page has no tests and the spec declares that gap.
