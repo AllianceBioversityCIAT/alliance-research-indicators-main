@@ -271,3 +271,28 @@ The rework has the Implementer's self-report and the Leader's isolated build/lin
 Per the `/akili-execute` fallback table the Leader does **not** absorb this review. Options are the user's: wait for the quota reset, route to a different transport, review the six-line diff directly, or record an explicit waiver.
 
 **Not committed.** Same rule applied to T-01: no verdict, no checkbox, no commit.
+
+### T-03 — closed under an explicit WAIVER (not a PASS)
+
+**The user directed the Leader to inspect the diff and close, after the agy quota blocked the re-review.** That is the third option in the `/akili-execute` runtime-failure fallback table — *"an explicit recorded waiver"* — and it is the user's call to take. The Leader raised the independence objection twice before proceeding.
+
+**This is recorded as `WAIVED`, never as `PASS`.** A Leader inspection of work the Leader supervised is not an independent audit, and labelling it one would corrupt the only record anyone will read later.
+
+**The named blind spot:** the checks a Leader would run are the same list the Leader wrote into the brief. Whatever I failed to think of specifying, I also fail to check for. An independent reviewer's value is precisely the checks nobody asked for — and attempt 1 proves that is not theoretical here: its defect was a **scope** violation that compiled and linted perfectly, invisible to every automated gate.
+
+To partially compensate, the inspection deliberately targeted items **absent from the brief**:
+
+| Check (not in the brief) | Finding |
+| --- | --- |
+| Does the label change leave a sibling render inconsistent? | Line 380 still renders `{row.clarisa_project_short_name ?? '—'}` — the **mappings table remains code-or-dash**. Confirmed as the already-declared **OQ-2** gap, not a new inconsistency introduced here |
+| Is `description` actually consumed? | **No — dead weight.** The only `.description` in the file (line 516) belongs to the *AGRESSO contract*, not the CLARISA project. `ClarisaProjectPickerItem.description` is declared and never read. Per-spec (the brief asked for both fields, mirroring the server projection and the STAR interface, which also declares it unused) but worth naming |
+| Is the option still selectable? | `key={p.id} value={p.id}` unchanged — selection unaffected |
+| **JSX whitespace across the line break** | Resolved by reading the sibling. The AGRESSO picker at 514-517 needs an explicit `{' '}` because its JSX *text* ends in `—` and the newline strips the trailing space. The CLARISA label needs no `{' '}` because its space lives **inside the template literal** (` — ${…}`), which is expression content, not JSX text. Renders `[123] A1806 — Name`, single space. Two different idioms for the same job in one file — minor consistency advisory |
+
+**Diff verified as purely additive:** three lines. `full_name?` + `description?` on the interface; one appended conditional on the label. The `[{p.id}]` prefix is restored, so the change adds the name beside the id rather than replacing it — which is exactly what attempt 1's FAIL demanded.
+
+**Leader verification, re-measured with nothing else running:** `npx eslint` clean · `npm run build` ✓ 47 modules, 2.02s.
+
+**Residual, unchanged and NOT covered by this waiver:** the rendering itself. This page has **zero tests**; build-green proves compilation only. Whether the label reads correctly, and whether a 255-character name overflows the `<select>`, is **T-04's** job and remains open. The waiver covers the code read, not the pixels.
+
+**Status:** T-03 → `done (waived)`.

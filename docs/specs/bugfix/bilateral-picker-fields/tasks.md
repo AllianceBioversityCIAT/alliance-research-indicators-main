@@ -138,7 +138,7 @@ T-01 ──> T-03 (admin SSR label) ──────────┘
 - **Skills:** `react-doctor`
 - **Effort:** `low`
 - **Estimated effort:** S · **~15 LOC**
-- **Status:** blocked
+- **Status:** done (WAIVED — Leader inspection, not an independent audit; see execution.md)
 
 ---
 
