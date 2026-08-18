@@ -499,3 +499,37 @@ Reviewer: agy `gemini-3.1-pro-high`, `ctx_19b6bb89c702`. Clean on all six axes:
 **⚠ Same independence caveat as T-05:** `claude-sonnet-4-6` hit its agy quota again (`Resets in 2h23m`), so this ran on `gemini-3.1-pro-high` against a `gemini-3.7-flash-high` Implementer. Different model, **same family — weaker independence** than the cross-family separation T-01 and T-02 received. Recorded so nobody later reads this PASS as equivalent.
 
 **Q5 is the one worth dwelling on.** T-01 shipped three tests that passed on `HEAD`, T-05 shipped one, and both became findings. T-06 shipped **zero**. The variable was not the model — it was the brief, which named the exact failing inputs in advance (`{ short_name: 'Fertilize Right Colombia', full_name: 'Fertilize Right Colombia' }` renders twice today). Naming the red before the test is written makes a non-falsifiable assertion obvious while it is being authored rather than after a reviewer finds it.
+
+---
+
+## ⏸ T-07 — implementation complete, review NOT obtained
+
+| | |
+| --- | --- |
+| **Status** | **`blocked`** — code written and self-verified, **no reviewer verdict**. Not `done`, not committed |
+| **Implementer** | agy `gemini-3.7-flash-medium`, `ctx_26e689d22f0f` — 1 attempt |
+| **Reviewer** | agy `gemini-3.1-pro-high`, `ctx_d638dd15cc18` — **non-delivery**. Read the diff, grepped the STAR reference for parity, read `tasks.md`, then stopped producing. No verdict, no escalation |
+
+**What was written** (12 lines, one file):
+
+```ts
+function clarisaOptionLabel(p: ClarisaProjectPickerItem): string {
+  const code  = p.external_code?.trim() || p.short_name?.trim() || '';
+  const title = p.full_name?.trim() || '';
+  if (!title) return code;
+  if (!code)  return title;
+  if (code.toLowerCase() === title.toLowerCase()) return title;
+  return `${code} — ${title}`;
+}
+```
+rendered as `[{p.id}] {clarisaOptionLabel(p)}`.
+
+**Leader verification, run in isolation** — `npx eslint` clean · `npm run build` ✓ 744 ms.
+
+**Leader spot-checks** (composing the brief, *not* a verdict): the helper is logically identical to the STAR client's reviewed `clarisaOptionLabel`; the `[{p.id}]` prefix is retained — the thing an earlier reviewer FAILed this same file for removing; and `git diff` confirms the `clarisa_project_short_name` snapshot writes are untouched.
+
+**Why it is still not `done`:** none of that is an audit. T-03 on this same file proved the point — its defect was a **scope** violation that compiled and linted perfectly, and only an independent reviewer caught it. Build-green cannot substitute for a verdict, and the `/akili-execute` fallback table forbids the Leader absorbing a Reviewer role regardless of runtime failure.
+
+**Reviewer transport, tallied across this run:** 11 reviewer dispatches, **5 non-deliveries**, all stalling at the same phase — after ingesting the material, at the moment of emitting the verdict. Two mitigations worked and are worth keeping: an **incremental report file** (T-01 attempt 4) and a **hard N-short-lines output contract** (T-03, T-05, T-06). Both reduce the size of any single emission. Neither is reliable enough to depend on without a fallback.
+
+**Options for the user:** re-dispatch once `claude-sonnet-4-6`'s quota returns (it delivered cleanly for T-02), review the 12-line diff directly, or record an explicit waiver as T-03 did.

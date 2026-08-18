@@ -35,6 +35,7 @@ interface ClarisaProjectPickerItem {
   short_name: string;
   full_name?: string;
   description?: string;
+  external_code?: string;
   source_of_funding: string;
   science_programs: {
     code?: string;
@@ -42,6 +43,16 @@ interface ClarisaProjectPickerItem {
     portfolio?: string;
     allocation?: number;
   }[];
+}
+
+function clarisaOptionLabel(p: ClarisaProjectPickerItem): string {
+  const code = p.external_code?.trim() || p.short_name?.trim() || '';
+  const title = p.full_name?.trim() || '';
+
+  if (!title) return code;
+  if (!code) return title;
+  if (code.toLowerCase() === title.toLowerCase()) return title;
+  return `${code} — ${title}`;
 }
 
 interface AgressoContractPickerItem {
@@ -542,8 +553,7 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
                       <option value="">— pick a CLARISA project —</option>
                       {clarisaProjects.map((p) => (
                         <option key={p.id} value={p.id}>
-                          [{p.id}] {p.short_name}
-                          {p.full_name?.trim() ? ` — ${p.full_name}` : ''}
+                          [{p.id}] {clarisaOptionLabel(p)}
                         </option>
                       ))}
                     </select>

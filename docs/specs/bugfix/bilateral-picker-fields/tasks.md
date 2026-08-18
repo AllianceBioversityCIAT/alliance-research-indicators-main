@@ -213,7 +213,7 @@ T-05 (server: external_code) ──> T-06 (client: prefer code + de-duplicate) �
 - **Verification:** `npm run build`, `npx eslint <path>`.
 - **Honest gate:** this page has **no tests**; the build proves compilation only. Rendering is T-04's job. Do not claim otherwise.
 - **Skills:** `react-doctor` · **Effort:** `low` · **Size:** S (~10 LOC)
-- **Status:** todo
+- **Status:** blocked (implementation complete, review not obtained — see execution.md)
 
 ---
 
