@@ -1219,4 +1219,163 @@ describe('BilateralMappingComponent', () => {
 
     expect(component.selectedProject()).toBeNull();
   });
+
+  // ── R-BPF-003: CLARISA picker filterBy client-side search (K-004 / KZ-001) ──
+
+  describe('R-BPF-003: CLARISA picker filterBy client-side search', () => {
+    // 255-character full_name fixture pinned to measured maximum (KZ-001)
+    const FULL_NAME_255 =
+      'Alliance Bioversity-CIAT Global Research Program on Sustainable Agriculture and Climate Resilient Crops with Integrated Pest Management, Advanced Genomic Breeding, Multi-Location Yield Trials, and Smallholder Farmer Technology Transfer Packages across Africa'.slice(
+        0,
+        255
+      );
+
+    const testClarisaOptions: ClarisaBilateralProjectOption[] = [
+      {
+        id: 101,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel'
+      },
+      {
+        id: 102,
+        short_name: 'B-A1080',
+        full_name: 'Fertilize Right Colombia'
+      },
+      {
+        id: 103,
+        short_name: 'C-A480',
+        full_name: FULL_NAME_255
+      },
+      {
+        id: 104,
+        short_name: 'D-A200'
+        // full_name absent
+      }
+    ];
+
+    it('asserts FULL_NAME_255 fixture is exactly 255 characters (KZ-001)', () => {
+      expect(FULL_NAME_255.length).toBe(255);
+    });
+
+    it('survives client-side filtering when searching by full_name and short_name (R-BPF-003 / D-2)', async () => {
+      const { Select } = await import('primeng/select');
+
+      mockService.list.mockResolvedValue(makePage([]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      component.openCreateDialog();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      const selects = fixture.debugElement.queryAll(d => d.componentInstance instanceof Select);
+      const inst = selects.map(s => s.componentInstance as Select).find(i => i.inputId === 'bilMapClarisaPicker');
+      expect(inst).toBeDefined();
+
+      inst!.options = testClarisaOptions;
+
+      // 1. Search by name term "musasentinel" -> matches A1806
+      inst!._filterValue.set('musasentinel');
+      const visibleByName = inst!.visibleOptions();
+      expect(visibleByName.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['A1806']);
+
+      // 2. Search by name term "fertilize" (case-insensitive) -> matches B-A1080
+      inst!._filterValue.set('fertilize');
+      const visibleByFertilize = inst!.visibleOptions();
+      expect(visibleByFertilize.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['B-A1080']);
+
+      // 3. Search by code term "A1806" -> matches A1806
+      inst!._filterValue.set('A1806');
+      const visibleByCode = inst!.visibleOptions();
+      expect(visibleByCode.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['A1806']);
+
+      // 4. Search by code term "D-A200" on option without full_name -> does not throw, matches
+      inst!._filterValue.set('D-A200');
+      const visibleWithoutFullName = inst!.visibleOptions();
+      expect(visibleWithoutFullName.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['D-A200']);
+
+      // 5. Search by term from 255-character name -> matches C-A480
+      inst!._filterValue.set('bioversity');
+      const visibleByLongName = inst!.visibleOptions();
+      expect(visibleByLongName.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['C-A480']);
+    });
+  });
+
+  // ── R-BPF-004 / R-BPF-005: clarisaOptionLabel helper ────────────────────────
+
+  describe('clarisaOptionLabel helper (R-BPF-004 / R-BPF-005)', () => {
+    const FULL_NAME_255 =
+      'Alliance Bioversity-CIAT Global Research Program on Sustainable Agriculture and Climate Resilient Crops with Integrated Pest Management, Advanced Genomic Breeding, Multi-Location Yield Trials, and Smallholder Farmer Technology Transfer Packages across Africa'.slice(
+        0,
+        255
+      );
+
+
+    it('returns "short_name — full_name" when both are present', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 101,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel'
+      };
+      expect(component.clarisaOptionLabel(opt)).toBe('A1806 — WTO-Phase 1: MusaSentinel');
+    });
+
+    it('returns just "short_name" when full_name is absent / undefined', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 104,
+        short_name: 'D-A200'
+      };
+      expect(component.clarisaOptionLabel(opt)).toBe('D-A200');
+    });
+
+    it('returns just "short_name" when full_name is an empty string', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 105,
+        short_name: 'B-A1080',
+        full_name: ''
+      };
+      expect(component.clarisaOptionLabel(opt)).toBe('B-A1080');
+    });
+
+    it('returns just "short_name" when full_name is whitespace only', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 106,
+        short_name: 'B-A1080',
+        full_name: '   '
+      };
+      expect(component.clarisaOptionLabel(opt)).toBe('B-A1080');
+    });
+
+    it('handles a 255-character full_name correctly (KZ-001 / R-BPF-005)', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 103,
+        short_name: 'C-A480',
+        full_name: FULL_NAME_255
+      };
+      const label = component.clarisaOptionLabel(opt);
+      expect(label).toBe(`C-A480 — ${FULL_NAME_255}`);
+      expect(label.startsWith('C-A480 — ')).toBe(true);
+    });
+
+    it('never renders the literal "undefined", "null", or a bare trailing separator', () => {
+      const optWithoutName: ClarisaBilateralProjectOption = { id: 107, short_name: 'A1806' };
+      const label = component.clarisaOptionLabel(optWithoutName);
+
+      expect(label).not.toContain('undefined');
+      expect(label).not.toContain('null');
+      expect(label.endsWith(' — ')).toBe(false);
+      expect(label.endsWith('—')).toBe(false);
+    });
+
+    it('returns empty string when opt is nullish', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(component.clarisaOptionLabel(null as any)).toBe('');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(component.clarisaOptionLabel(undefined as any)).toBe('');
+    });
+  });
 });
+
+

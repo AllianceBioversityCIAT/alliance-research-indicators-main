@@ -1,0 +1,175 @@
+# Execution Log — Clarisa / Bilateral Project Picker Fields
+
+## Document Control
+
+| Field | Value |
+| --- | --- |
+| **Spec** | `docs/specs/bugfix/bilateral-picker-fields/` |
+| **Approval Mode** | `gated` |
+| **Leader** | Claude Opus 5 (T1), this session |
+| **Implementers** | **agy** — `gemini-3.7-flash-medium` (T-01), `gemini-3.7-flash-high` (T-02) |
+| **Reviewers** | **agy** — `claude-opus-4-6-thinking` (T3). `author ≠ auditor` holds on both axes: different host, different weights |
+| **Orchestration** | Orca run `run_7124f4ffa64d`, coordinator pane `a0be4570…:026feb6e…` |
+| **Budget (design.md §11)** | 4 tasks · ~280 LOC · 2 review rounds |
+| **Started** | 2026-08-18 |
+
+### Runtime notes (recorded, not improvised)
+
+| # | Event | Resolution |
+| --- | --- | --- |
+| RT-1 | `orca orchestration run-create` failed `no_active_sender_terminal`, then `stable_pane_required`. This session is a **background job**; its `ORCA_TERMINAL_HANDLE` has no pane identity | Bound the run to the session's real coordinator pane (`term_cb37cb6e…`, `tabId`+`leafId` present, `connected: true`). Not impersonation — it is this session's own terminal |
+| RT-2 | `worker-start --agent gemini` → `agent_unconfigured` | Confirms the root `CLAUDE.md` Model Routing note. Fell back to the documented path: `terminal create --command "agy …"` + `dispatch --inject`, which preserves full Run/Task/Dispatch provenance |
+| RT-3 | **Leader error, corrected mid-run.** I assumed the agy workers could not load the `tasks.md` skills (`nestjs-expert`, `angular-developer`, `systematic-debugging`, …) because `skill` is a Claude Code tool, so the briefs substituted the package child `CLAUDE.md` plus a named in-repo exemplar and omitted the explicit skill instruction | **The assumption was false.** Terminal output shows T-02 reading `~/.gemini/config/skills/angular-developer/SKILL.md` and `.../systematic-debugging/SKILL.md` unprompted — agy carries its own skill registry. The briefs were therefore weaker than they should have been: the exemplar substitution was sound, but the explicit *"load these skills first"* instruction was dropped for no reason. **No rework triggered** — the workers found the skills anyway. Future agy briefs MUST name the skills explicitly. Logged rather than quietly fixed, because a brief defect that produced no failure is exactly the kind that repeats |
+
+| RT-4 | **`check --wait` never delivered.** Ten consecutive coordinator waits returned `COUNT: 0` while `orca orchestration inbox` showed the messages sitting unread, addressed to `run:run_7124f4ffa64d`. T-01's `worker_done` had been waiting **over an hour** before I found it | Switched the landing loop to the non-consuming `inbox` poll, which delivers reliably here. **Recorded as my transport error, not a silent worker** — K-009 says a non-delivering worker must never be read as a clean one, and the mirror of that lesson is that a coordinator who cannot receive must not read the silence as absence of work |
+| RT-5 | **Reviewer spawn #1 died on arrival.** I dispatched 1 second after `terminal create`; the preamble was pasted as bracketed-paste text into a still-booting shell and the agy startup swallowed it. agy had also auto-updated 1.1.13 → 1.1.14 mid-run, whose banner reads *"not signed in"* (cosmetic — a probe prompt returned a normal response) | **My orchestration error, not an environment failure.** The implementer terminals survived only because minutes elapsed between their create and dispatch. Fixed by `terminal wait --for tui-idle` plus a liveness probe **before** injecting. Reviewer relaunched as `ctx_9bdc42c9b006` (`failure_count: 1` preserves the failed attempt). Per the `/akili-execute` fallback table a Reviewer is **never** absorbed inline — a runtime failure does not suspend `author ≠ auditor` |
+| RT-6 | Both implementers ran full test suites concurrently. T-01 began chasing failures in `excel-workbook.builder.spec.ts` — a suite outside its two-file scope, and the same one that produced 3 phantom failures under concurrent load in a prior run | Sent coordinator guidance over the dispatch channel telling it the failures were concurrency artifacts, to verify its own scope only, and to declare the full-suite run inconclusive. **The Leader re-measures in isolation after all workers report** — that is the only measurement that counts (root `CLAUDE.md` §4.3). Note for the next run: §4.3 calls cross-package parallelism safe, which holds for *editing* but is optimistic for two concurrent **full-suite** runs |
+
+---
+
+## Task Execution History
+
+_(appended per task, on Reviewer PASS or HALT — evidence is always written before the `tasks.md` checkbox)_
+
+### T-01 — Server: return the name, search it, and order by it
+
+- **Status:** implementation complete, **awaiting Reviewer** — `tasks.md` stays `[ ]`
+- **Date:** 2026-08-18
+- **Implementer:** agy `gemini-3.7-flash-medium`, dispatch `ctx_8156fc4b42b6`, attempts: 1
+- **Files changed:** `clarisa-projects.controller.ts` (+25/−8), `clarisa-projects.controller.spec.ts` (+177/−12)
+- **Implementer report:** additive `full_name`/`description` projection; search predicate widened to `short_name` OR `full_name`; deterministic sort added; `@ApiQuery('search')` description corrected. 14 unit tests. `npx eslint` clean. `NOT DONE / ASSUMPTIONS: None`.
+- **Leader observation on the diff** (composing the review brief, not a verdict): the comparator keys on `full_name || short_name`, then `short_name`, then `id`, and operates on `[...filtered]` rather than mutating. That satisfies R-BPF-006's *"absent-name items sort by `short_name` in the same sequence, not clustered"* clause, which was the clause most likely to be missed.
+- **✅ K-004 EVIDENCE — obtained by the Leader, 2026-08-18.** The Implementer never supplied it, so the Leader reproduced it directly (evidence collection, not review — the Leader did not author this code):
+
+  | Run | Controller | Result |
+  | --- | --- | --- |
+  | **RED** | reverted to `HEAD`, new spec kept | **`Tests: 5 failed, 9 passed, 14 total`** |
+  | **GREEN** | fix applied | **`Tests: 14 passed, 14 total`** |
+
+  The five that failed, each naming its requirement:
+  - `returns trimmed picker shape with additive fields including full_name and description (R-BPF-001, NFR-BPF-001)`
+  - `matches by full_name case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input)`
+  - `matches uppercase full_name term case-insensitively`
+  - `orders case-insensitively by full_name with absent full_name falling back to short_name in sequence (R-BPF-006 / DD-3)`
+  - `supports full_name of exactly 255 characters (KZ-001 / R-BPF-005)`
+
+  Sample verbatim failure — the search gate, which is the defect itself:
+  ```
+  ● search filtering (R-BPF-002) › matches uppercase full_name term case-insensitively
+    expect(received).toEqual(expected) // deep equality
+    - Expected  - 3        - Array [
+    + Received  + 1        -   1,
+                           - ]
+                           + Array []
+  ```
+  And the ordering gate: expected `[2, 3, 1]`, received `[1, 2, 3]` — upstream order, unsorted.
+
+  The 9 that passed pre-fix are the **pre-existing T-04 tests** from the archived Alliance-selector bugfix. They are regression protection for *that* fix and are correctly green in both runs; none of them is offered as evidence for this one.
+
+  Raw output: `evidence/t01-RED.txt`, `evidence/t01-GREEN.txt`.
+
+- **Leader error during evidence collection — recorded because it nearly cost the task.** To capture the red I backed the controller up with `cp`, overwrote it with `git show HEAD:`, ran the spec, then restored with `mv`. **The restore returned the HEAD version, silently destroying the Implementer's fix** — `git status` showed the file unmodified and the working tree looked clean, which is the failure mode that hides itself. Recovered in full by re-applying the controller hunks from `t01.diff`, which had been saved before the swap, then verifying `full_name` was present at lines 43/74/79/80/104. **Lesson: file-swap-and-restore is not a safe primitive for uncommitted worker output.** The correct primitive is `git diff > patch` → `git checkout --` → run → `git apply patch`, because every step is verifiable and the patch is a durable artifact. Used for T-02.
+
+- **⚠ Original evidence gap (now closed):** the report claims *"14 unit tests adhering to KZ-001/K-004 red-to-green gates"* — an **assertion that the gate went red, not the red output**. K-004 exists because exactly that claim cannot be checked. A follow-up demanding the verbatim red/green output was sent over the dispatch channel and **was not answered**. The Reviewer brief therefore makes falsifiability its axis 4, with an independent `git stash push/pop` reproduction — a stronger check than the Implementer's self-report.
+
+### T-02 — Client: label with the name, stop discarding server matches
+
+- **Status:** implementation complete, **Reviewer not yet dispatched** — `tasks.md` stays `[ ]`
+- **Date:** 2026-08-18
+- **Implementer:** agy `gemini-3.7-flash-high`, dispatch `ctx_6a6a92db97a4`, attempts: 1
+- **Files changed:** `bilateral-project-mapping.interface.ts` (+3), `bilateral-mapping.component.ts` (+6), `bilateral-mapping.component.html` (+16/−1), `bilateral-mapping.component.spec.ts` (+153)
+- **Implementer report:** optional `full_name`/`description`; `clarisaOptionLabel` composition; template tooltips; `filterBy` synchronised. Lint and component tests pass.
+- **✅ K-004 EVIDENCE — obtained by the Leader with the safe primitive** (`git diff > patch` → `git checkout --` → run → `git apply patch`, each step verified; this is the primitive that replaced the one that destroyed T-01's fix):
+
+  | Run | Production files | Result |
+  | --- | --- | --- |
+  | **RED** | `component.ts`, `component.html`, `interface.ts` reverted to `HEAD`; new spec kept | **`Tests: 8 failed, 63 passed, 71 total`** |
+  | **GREEN** | fix re-applied | **`Tests: 71 passed, 71 total`** |
+
+  The failure that matters, over the buggy path itself (**K-010**):
+  - `R-BPF-003: CLARISA picker filterBy client-side search › survives client-side filtering when searching by full_name and short_name (R-BPF-003 / D-2)`
+
+  The other 7 are `clarisaOptionLabel` helper cases, red only because the method does not yet exist. **That is a weaker form of red** — a test over new code, which K-010 says can never have been red for the reason Bug Mode cares about. They are recorded as coverage, **not** as the regression evidence. The `filterBy` test is the evidence, and it is red for the right reason.
+
+  Raw output: `evidence/t02-RED.txt`, `evidence/t02-GREEN.txt`.
+
+- **✅ Red-before-green corroborated by three independent observations:** the report states it *"observed pre-fix red regression test failure where `visibleOptions` returned empty for project name queries"*. **This matches the Leader's own independent measurement taken before the spec was written** (`visibleOptions()` = `[]` for `"musasentinel"`, the row returned for `"A1806"`). Two independent observations of the same red, one of them predating the brief — this is the strongest evidence in the run.
+
+### ⛔ Reviewer non-delivery — HALT for user decision
+
+- **Dispatch:** `ctx_9bdc42c9b006` (agy `claude-opus-4-6-thinking`), second attempt after RT-5
+- **Behaviour:** read `.agents/reviewer.md`, the diff, and all three spec documents, then **stopped producing** for ~25 minutes. No test process, no further tool calls, terminal output visibly garbled. No `worker_done`, no escalation.
+- **Classification:** **runtime non-delivery (K-009)** — *"a delegated worker that does not deliver is not a worker that found nothing."* It is **not** recorded as a clean review and **must not** be.
+- **Why the Leader did not absorb it:** the `/akili-execute` fallback table forbids an inline Reviewer without exception — *"the Leader reviewing work it supervised breaks `author ≠ auditor`, and a runtime failure does not suspend a correctness constraint."* Escalated to the user instead.
+- **Working tree verified intact** at the moment of the halt: 6 modified files, no reviewer-created stash, no partial `git stash push` left unpopped.
+
+### Budget tripwire
+
+| Metric | Budgeted (design.md §11) | Actual so far | Delta |
+| --- | --- | --- | --- |
+| Tasks | 4 | 2 of 4 implemented | — |
+| LOC | ~280 total | **365 insertions** for T-01 + T-02 alone (budgeted ~260) | **+40%**, with T-03 still to come |
+| Review rounds | 2 | 0 completed, 2 spawn failures | — |
+
+**Cause:** test volume, not production code — 330 of the 365 insertions are spec files (T-01 +177, T-02 +153) against ~175 budgeted. Production code came in at ~35 lines versus ~85 estimated, i.e. **under** budget. The overage is the Bug-Mode evidence itself, which `design.md §11` already anticipated in direction (*"the tests are the bulk, and that is correct for Bug Mode"*) but under-sized in magnitude. Raised here rather than absorbed silently, per the budget-tripwire rule.
+
+---
+
+## ✅ T-02 — PASS
+
+| | |
+| --- | --- |
+| **Status** | **PASS** — Reviewer verdict received, `tasks.md` T-02 → `done` |
+| **Date** | 2026-08-18 |
+| **Implementer** | agy `gemini-3.7-flash-high`, dispatch `ctx_6a6a92db97a4` — **1 attempt, no rework** |
+| **Reviewer** | agy `claude-sonnet-4-6`, dispatch `ctx_cdca4f2e2caa` (`author ≠ auditor`: gemini wrote, sonnet audited) |
+| **Requirements** | R-BPF-003, R-BPF-004, R-BPF-005, NFR-BPF-002 |
+
+**Reviewer verdict — `STATUS: PASS`, clean on all 7 axes:**
+
+> Audited T-02 (client bilateral picker) against requirements R-BPF-003/004/005, NFR-BPF-002, and design DD-4/DD-5/DD-6: all seven axes pass — `optionLabel="short_name"` preserved, `filterBy="short_name,full_name"` with coupling comment, shared label method handles absent/blank/whitespace `full_name` without undefined/null/trailing-separator, `[title]` on both templates, no new CSS, exactly 4 client files, KZ-001 fixtures confirmed at exactly 255 chars. Evidence integrity confirmed: the D-2 behavioural test was genuinely red (`visibleOptions()=[]` for `'musasentinel'` on HEAD) and genuinely green (71/71) after the fix.
+
+**Axes that mattered most, and what they found:**
+
+| Axis | Result |
+| --- | --- |
+| **DD-4** — `optionLabel` must survive | **Preserved.** This was the single most likely violation: dropping it once templates render the label is the obvious move and it breaks PrimeNG's `searchFields()` fallback and the a11y label path |
+| **DD-5** — `filterBy` mirrors the server predicate, with the coupling stated | Satisfied, comment present. AGRESSO's own `filterBy` undisturbed |
+| **Evidence integrity (D-2)** | The behavioural test exercises the **real** `Select` instance via `visibleOptions()`, not component state and not a template-string presence-assertion |
+| **KZ-001 fixture fidelity** | 255-char `full_name` verified as **exactly** 255, not approximately |
+
+**ADVISORY (non-gating, recorded and closed here — an advisory never becomes a task):**
+
+> RELIABILITY: the label method has no guard against a non-optional `short_name` going undefined — safe by the type contract today, fragile if the interface ever relaxes.
+
+Leader adjudication: **not in scope for this task.** `short_name` is non-optional in `ClarisaBilateralProjectOption` and the server returns it 342/342. Recorded per the Advisory-Never-Becomes-A-Task rule; if it ever matters it needs a proposal, not a widened task.
+
+**Verification (Leader-run, in isolation):** `Tests: 71 passed, 71 total` — `evidence/t02-GREEN.txt`.
+
+---
+
+## ⛔ T-01 — implementation complete, REVIEW BLOCKED (3 reviewer non-deliveries)
+
+**Task stays `[ ]`. It is not done, and the absence of a verdict is not a PASS.**
+
+| Attempt | Transport | Outcome |
+| --- | --- | --- |
+| 1 | agy `claude-opus-4-6-thinking`, `ctx_9bdc42c9b006` | Read the contract, diff and all three specs, then **stopped producing** for ~25 min. No verdict, no escalation |
+| 2 | agy `claude-sonnet-4-6`, `ctx_3074d615ee36` | Hung retrying `python3 -c "…"` — seven identical calls, shell quoting failure. **Could not receive coordinator guidance**: reading mail requires running a command, and it was blocked inside one |
+| 3 | agy `claude-sonnet-4-6`, `ctx_7f16800db664`, brief corrected to forbid scripting | Read everything including the working-tree controller, then stalled at the same point as attempt 1 — *"Now I have all the information I need"* → no output |
+
+**Leader's contribution to the failure, stated plainly:** attempt 2's hang was **caused by my brief**. Axis 5 read *"count the characters — 'approximately 255' is a FAIL"*, which pushed the worker into shell scripting on a task that only ever needed reading. Attempt 3's brief was corrected to *"verify by reading the expression"* plus an explicit permission to mark a sub-check `UNVERIFIED` rather than stall. That fix was right and attempt 3 got further, but it stalled elsewhere.
+
+**Pattern worth recording:** all three stalls happened at the *same phase* — after ingesting the material, at the point of emitting a long structured verdict. The one reviewer that succeeded (REV-T02, same model as attempts 2–3) streamed its verdict incrementally, axis by axis. This suggests the failure is in producing a large single output, not in the audit itself. **A future reviewer brief should ask for the verdict in parts, or ask for a written report file plus a short `worker_done`.**
+
+**Classification: runtime non-delivery (K-009), three times.** Recorded as failure, never as a clean review.
+
+**Why the Leader did not review it instead:** the `/akili-execute` fallback table is absolute — *"Reviewer: never inline. The Leader reviewing work it supervised breaks `author ≠ auditor`, and a runtime failure does not suspend a correctness constraint."* Three runtime failures do not change that; they change who the user should send it to.
+
+**What T-01 does have, independent of any reviewer:**
+
+- Complete K-004 evidence, captured by the Leader: **RED 5 failed / 9 passed / 14** → **GREEN 14 / 14** (`evidence/t01-RED.txt`, `evidence/t01-GREEN.txt`)
+- The five failures each name their requirement, and the search failure is the defect itself (`Array []` where `[1]` was expected)
+- Scope confirmed by `git status`: exactly the two intended files
+
+**What T-01 does NOT have:** an independent audit of clause coverage, additivity, determinism, or fixture fidelity. **That is exactly what a Reviewer exists to provide, and it is missing.**

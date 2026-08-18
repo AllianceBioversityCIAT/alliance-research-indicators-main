@@ -336,6 +336,7 @@
       </label>
       <!-- AC-05.2 / AC-06.1: CLARISA project picker — lazy server-side search via (onFilter).
            Same scrollHeight + resetFilterOnHide treatment as the AGRESSO picker. -->
+      <!-- filterBy MUST mirror the server-side search predicate in clarisa-projects.controller.ts (coupled invariant: Kaizen K-005). -->
       <p-select
         inputId="bilMapClarisaPicker"
         [options]="clarisaOptions()"
@@ -345,7 +346,7 @@
         (ngModelChange)="selectedProjectId.set($event)"
         placeholder="Select CLARISA project…"
         [filter]="true"
-        filterBy="short_name"
+        filterBy="short_name,full_name"
         [showClear]="true"
         [loading]="optionsLoading() || clarisaOptionsLoading()"
         [scrollHeight]="'240px'"
@@ -357,7 +358,20 @@
         panelStyleClass="bil-mapping-picker-panel"
         aria-required="true"
         data-testid="clarisa-picker">
+        <ng-template pTemplate="selectedItem" let-opt>
+          @if (opt) {
+            <span class="bil-picker-selected-label" [title]="clarisaOptionLabel(opt)">{{ clarisaOptionLabel(opt) }}</span>
+          }
+        </ng-template>
+        <ng-template pTemplate="item" let-opt>
+          <span
+            class="bil-picker-option-label"
+            [title]="clarisaOptionLabel(opt)">
+            {{ clarisaOptionLabel(opt) }}
+          </span>
+        </ng-template>
       </p-select>
+
 
       <!-- Science-Program allocation preview (AC-05.2) — shown when a project is selected -->
       @if (selectedProject(); as project) {

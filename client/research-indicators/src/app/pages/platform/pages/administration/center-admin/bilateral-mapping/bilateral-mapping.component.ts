@@ -345,6 +345,12 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     return opt.description ? `${opt.agreement_id} — ${opt.description}` : opt.agreement_id;
   }
 
+  /** Human-readable label for a CLARISA project option (shown in the picker). */
+  clarisaOptionLabel(opt: ClarisaBilateralProjectOption): string {
+    return opt?.full_name?.trim() ? `${opt.short_name} — ${opt.full_name}` : (opt?.short_name ?? '');
+  }
+
+
   /** Dispatches create or update depending on the current dialog mode. */
   async onSave(): Promise<void> {
     if (!this.canSave()) return;

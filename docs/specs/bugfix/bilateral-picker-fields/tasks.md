@@ -108,7 +108,7 @@ T-01 ──> T-03 (admin SSR label) ──────────┘
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `systematic-debugging`
 - **Effort:** `high` — the PrimeNG coupling is the crux of the defect and the test harness route is subtle
 - **Estimated effort:** M · **~150 LOC** (~50 production, ~100 tests)
-- **Status:** todo
+- **Status:** done
 
 ---
 

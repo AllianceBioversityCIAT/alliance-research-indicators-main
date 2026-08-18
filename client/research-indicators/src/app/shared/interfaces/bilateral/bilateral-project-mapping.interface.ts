@@ -56,6 +56,9 @@ export interface UpdateBilateralMappingBody {
 export interface ClarisaBilateralProjectOption {
   id: number;
   short_name: string;
+  full_name?: string;
+  description?: string;
   source_of_funding?: string;
   science_programs?: { code?: string; name?: string; portfolio?: string; allocation?: number }[];
 }
+
