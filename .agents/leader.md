@@ -112,6 +112,13 @@ the hour, one of which had already survived an escalated gate.
 
 ---
 
+
+### 🧪 Validate the artifact before you dispatch it (K-011)
+
+Any file you hand a worker — a diff, an evidence dump, a report — is **checked before the dispatch, not after the verdict**: non-empty, and containing the symbol or section under audit.
+
+A missing artifact does not fail loudly. A reviewer handed a 0-byte diff returned `STATUS: FAIL` describing the *previous* task's code — a confident verdict against the wrong thing, which is strictly worse than no review, because a FAIL gets acted on. Two lines of `test -s` and `grep` would have caught it.
+
 ### 🚧 Delegation Ceiling (when *not* to delegate)
 
 The table above is a **floor** — it says when delegating is mandatory. This is the **ceiling**. Current-generation models reach for subagents freely and need a cap. Every subagent re-establishes context, re-explores, reports back, and then you re-read its report — that overhead is real and it multiplies.

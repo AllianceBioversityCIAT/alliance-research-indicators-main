@@ -11,6 +11,9 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 | ID | Lesson | Severity | Target | Recurrence | Status |
 | --- | --- | --- | --- | --- | --- |
 | **K-004** | **A gate must be proven able to FAIL before it is trusted.** Newest facet: **a falsifier authored from the same frame as the design tends to name a mutation the design already excludes** — a spec cited K-004 and in the same table wrote a break that leaves the suite green. Citing a lesson is not applying it | **High** | Methodology | **6** | Proposed (upstream) |
+| **K-011** | **An empty or stale artifact does not produce a null review — it produces a confident review of the wrong thing.** A 0-byte diff yielded a `STATUS: FAIL` against the previous task's code. Validate every artifact before dispatch: non-empty, and contains the symbol under audit | **High** | Methodology | 1 | Proposed (upstream) |
+| **K-012** | **Name the concrete failing input in the brief** — K-004 alone does not make a Bug-Mode test falsifiable. Same spec, same methodology: 3 non-falsifiable tests, then 1, then 0. The variable was the brief, not the model | **High** | Methodology | 1 | Proposed (upstream) |
+| **K-013** | **A requirement derived from a live measurement needs the date and the invalidating condition.** A label rule written when a case was 0/342 shipped broken when the feed made it 25/25 mid-implementation | **High** | Methodology | 1 | Proposed (upstream) |
 | **K-009** | **A delegated worker that does not deliver is not a worker that found nothing.** A silent judge/reviewer is indistinguishable from a clean one; three subagents idled without reporting while the same brief on another transport returned 6 severe defects. Record non-delivery as runtime failure and re-dispatch | **High** | Product + Methodology | 1 | **Institutionalized** (root `CLAUDE.md` §4.3) |
 | **K-010** | **Bug-Mode red-before-green evidence belongs to the task that changes the buggy code path**, never to one that creates new code — a new unit's tests are green from first compile and could never have been red | Medium | Methodology | 1 | **Institutionalized** (`general-setup/task.md` §5) |
 | **K-008** | **Writing a coverage table does not make it exhaustive** — the same pass authored the requirements and the table, so nothing independent checked that every clause appears | **Medium** | Methodology | 1 | Proposed (upstream) |
@@ -29,6 +32,26 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-18 — `bugfix/bilateral-picker-fields`
+
+**Metrics.** 7 tasks · 12 reviewer dispatches · **4 reviewer non-deliveries** · 3 Reviewer FAILs (2 valid + 1 void) · 2 Implementer reworks · **1 Pivot** · 0 HALTs · 0 PRODUCT_BUGs · budget 4 tasks/~280 LOC → actual 7 tasks/~615 LOC (the Pivot accounts for the delta) · 4 recorded Leader errors.
+
+**K-011 — An empty or stale artifact does not produce a null review; it produces a confident review of the wrong thing.** `t07.diff` was handed to a reviewer at **0 bytes**. The reviewer did not report "nothing to audit" — it returned `STATUS: FAIL` describing a ternary and three branches, which was the *previous* task's code. A missing artifact fails **silently and with a verdict attached**, which is strictly worse than no review, because a FAIL is acted on. Compounded by a second error: that same reviewer had earlier been declared *stalled* and its task parked, while it was still working and later delivered. *Evidence: `archive/2026-08-18-bugfix--bilateral-picker-fields/execution.md` → "T-07 — PASS (second review attempt; the first was void)".* **Severity High · Target Methodology.**
+
+**K-012 — Naming the concrete failing input in the brief is what makes a Bug-Mode test falsifiable; K-004 alone does not.** Three tasks on the same spec, same methodology, same K-004 citation: T-01 shipped **3** new tests that passed on `HEAD`, T-05 shipped **1**, T-06 shipped **0**. The variable was not the model or the effort — T-06's brief stated the input verbatim (`{ short_name: 'Fertilize Right Colombia', full_name: 'Fertilize Right Colombia' }` renders twice today). K-004 asks for red-before-green *after* the test exists; naming the input makes a non-falsifiable assertion obvious *while it is being written*. Corollary observed: the identical defect class drew an **advisory** from T-01's reviewer and a **FAIL** from T-05's — both defensible under the current wording, so the wording is what needs fixing. *Evidence: same `execution.md`, T-01/T-05/T-06 entries.* **Severity High · Target Methodology.**
+
+**K-013 — A requirement derived from a live measurement needs the measurement's date and the condition that invalidates it.** R-BPF-004 specified two label cases and omitted `full_name == short_name` because that case was **0 of 342** when the spec was written. Mid-implementation the CLARISA feed reset and it became **25 of 25**; the shipped label rendered every project name twice and the user found it in the running UI. The spec recorded the measurement but not its volatility, so nothing prompted a re-check before the requirement was implemented. *Evidence: same `execution.md` → "Pivot Record: R-BPF-004".* **Severity High · Target Methodology.**
+
+**K-009 recurrence (4 → 5).** Reviewer non-delivery recurred four times, always at the same phase — after ingesting the material, at the moment of emitting the verdict. **Two mitigations worked and are now known:** an *incremental report file* (which also makes the verdict durable independent of the message — T-01's `STATUS: PASS` was on disk before any `worker_done` arrived) and a *hard N-short-lines output contract*. Neither is reliable enough to use without a fallback.
+
+**Standardization applied (user-approved).**
+- Root `CLAUDE.md` §4.3 — the cross-package-parallelism claim **narrowed**: safe for editing, **not** for two concurrent full-suite runs. Two workers running `npm test` in different packages reproduced the 2026-08-14 phantom-failure artifact and cost a worker an hour.
+- Root `CLAUDE.md` Model Routing — recorded that **agy quota is per-model, not per-account**, and that `author ≠ auditor` degrades to same-family separation when the Claude tier exhausts.
+- `docs/specs/general-setup/task.md` §5 — Bug-Mode tasks must name the concrete input that makes the gate red (K-012).
+- `.agents/leader.md` — validate any artifact before dispatch (K-011).
+
+---
 
 ### 2026-08-14 — `bugfix/bilateral-alliance-selector`
 

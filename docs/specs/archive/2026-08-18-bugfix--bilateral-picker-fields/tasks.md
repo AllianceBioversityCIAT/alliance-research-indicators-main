@@ -2,7 +2,7 @@
 
 - **Module:** clarisa (server) + center-admin bilateral-mapping (client) + admin-panel
 - **Spec id:** 2026-08-bilateral-picker-fields
-- **Status:** not-started
+- **Status:** completed (T-04 partial; follow-ups carried forward)
 - **Owner:** Juan Cadavid
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -165,7 +165,7 @@ T-05 (server: external_code) ──> T-06 (client: prefer code + de-duplicate) �
 - **Known limit:** **production returns 0 rows for this picker** (phase 2026 = 0 of 299). This check is valid against CLARISA test only and must not be reported as production coverage.
 - **Skills:** none — human
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** partial (2 of 6 checks confirmed from the running UI; 4 unverified — see execution.md)
 
 ---
 

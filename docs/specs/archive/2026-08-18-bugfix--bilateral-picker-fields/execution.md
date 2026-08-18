@@ -568,3 +568,22 @@ That describes the **T-03** version of the label (`{p.full_name?.trim() ? … : 
 **Independence caveat, same as T-05 and T-06:** ran on `gemini-3.1-pro-high` against a `gemini-3.7-flash-medium` Implementer — different model, same family, weaker than the cross-family separation T-01 and T-02 received.
 
 **Verification (Leader, in isolation):** `npx eslint` clean · `npm run build` ✓ 744 ms. Rendering remains T-04's job — this page has no tests and the spec declares that gap.
+
+---
+
+## ◐ T-04 — PARTIAL (closed at archive, by user decision)
+
+The human visual check was never run as a deliberate pass. **Two of its six items were nonetheless confirmed — by the user, from the running UI, during this session.** Recorded honestly rather than credited or dismissed wholesale.
+
+| Check | Status | Evidence |
+| --- | --- | --- |
+| Options read as a human-recognisable name, **rendered once** | ✅ **CONFIRMED** | User screenshot after T-06. Options render `CANADA -GAC - Beans For Women…` once — the duplication the spec's Pivot existed to fix is gone |
+| Typing a name narrows the list | ✅ **CONFIRMED** | User typed `CANA` and got exactly the two matching projects |
+| A long name clips on one line; the dialog does not widen or wrap | ❌ **NOT VERIFIED** | jsdom cannot measure layout — this is the D-4 gap and it remains open |
+| The collapsed (selected) state uses the same composition | ❌ **NOT VERIFIED** | |
+| Hovering a clipped option reveals the full name | ❌ **NOT VERIFIED** | `[title]` is asserted present by test; that it *reveals* is unproven, and per **OQ-4** `title` is not established to reach assistive tech at all |
+| The admin SSR panel's dropdown shows the same label | ❌ **NOT VERIFIED** | T-07 shipped with a build-only gate by design |
+
+**What this means, stated plainly:** the defect the spec was written for is confirmed fixed by direct observation. What is **not** confirmed is the layout and accessibility behaviour around it — which is exactly the class `requirements.md` §6 **D-4** declared unautomatable, and which therefore ships unverified.
+
+**Environment limit unchanged:** verified against CLARISA **test**. Production returns 0 rows for this picker (`phase 2026` = 0 of 299), so none of this is production coverage.
