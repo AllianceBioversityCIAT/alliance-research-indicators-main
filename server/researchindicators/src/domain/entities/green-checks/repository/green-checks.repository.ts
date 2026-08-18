@@ -55,6 +55,10 @@ export class GreenCheckRepository {
     return `innovation_dev_validation(${result_key}) as innovation_dev`;
   }
 
+  innovationUseValidation(result_key: string) {
+    return `innovation_use_validation(${result_key}) as innovation_use`;
+  }
+
   oicrValidation(result_key: string) {
     return `oicr_validation(${result_key}) as oicr`;
   }
@@ -90,6 +94,9 @@ export class GreenCheckRepository {
       case IndicatorsEnum.INNOVATION_DEV:
         spesificQuery += `,${this.innovationDevValidation(result_key)}`;
         break;
+      case IndicatorsEnum.INNOVATION_USE:
+        spesificQuery += `,${this.innovationUseValidation(result_key)}`;
+        break;
       case IndicatorsEnum.OICR:
         spesificQuery += `,${this.oicrValidation(result_key)}
         ,${this.link_resultValidation(result_key)}`;
@@ -100,6 +107,7 @@ export class GreenCheckRepository {
       [
         IndicatorsEnum.INNOVATION_DEV,
         IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+        IndicatorsEnum.INNOVATION_USE,
       ].includes(indicator)
     ) {
       spesificQuery += `,${this.capSharingIpValidation(result_key)}`;

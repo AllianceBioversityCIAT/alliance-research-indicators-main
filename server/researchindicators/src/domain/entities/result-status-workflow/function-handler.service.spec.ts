@@ -507,6 +507,38 @@ describe('StatusWorkflowFunctionHandlerService', () => {
         service.completenessValidation(generalData, null as any),
       ).resolves.not.toThrow();
     });
+
+    // T-11 / R-IU-007 AC.4 — completenessValidation is UNMODIFIED; these
+    // two cases only prove the pre-existing AND-gate reacts to a key
+    // literally named `innovation_use` the same way it reacts to any other
+    // non-visual-only key. They do NOT assert what
+    // innovation_use_validation(...) itself returns from the database —
+    // that behavioral claim is T-12's, proven against a real fixture.
+    it('should throw BadRequestException when innovation_use green check fails', async () => {
+      mockGreenCheckRepository.calculateGreenChecks.mockResolvedValue({
+        general_information: true,
+        innovation_use: false,
+        ip_rights: true,
+      });
+      const generalData = makeGeneralData();
+
+      await expect(
+        service.completenessValidation(generalData, null as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should not throw when innovation_use and ip_rights both pass', async () => {
+      mockGreenCheckRepository.calculateGreenChecks.mockResolvedValue({
+        general_information: true,
+        innovation_use: true,
+        ip_rights: true,
+      });
+      const generalData = makeGeneralData();
+
+      await expect(
+        service.completenessValidation(generalData, null as any),
+      ).resolves.not.toThrow();
+    });
   });
 
   // [CLAUDE/DONE] 114

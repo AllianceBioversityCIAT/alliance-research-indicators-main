@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04 … **T-10** `[x]` (2026-08-18); next eligible **T-11** (and **T-13**, unblocked by T-10)
+- **Status:** in-progress — T-01, T-02, T-04 … **T-11** `[x]` (2026-08-18) — **11 of 13 done**; next eligible **T-12** and **T-13** (T-13 unblocked by T-10). ⚠️ **FP-23 and FP-16 must be resolved before T-12's fixtures run**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -342,7 +342,7 @@ graph TD
 
 - **Requirements covered:** R-IU-007 (AC.1–AC.4); DC-5, DC-6, DC-9; RB-10
 - **Design references:** §6.1, §6.2, §6.3, DD-5
-- **Size:** S · **Dependencies:** T-09 · **Status:** todo
+- **Size:** S · **Dependencies:** T-09 · **Status:** ~~todo~~ → **`[x]` DONE 2026-08-18** — PASS on attempt 1; single Reviewer, full 4R sweep; zero rework rounds. Evidence: [`./execution.md`](./execution.md) → *T-11*
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 **Scope** — `case IndicatorsEnum.INNOVATION_USE` in `calculateGreenChecks`; add `INNOVATION_USE` to the `ip_rights` inclusion array; optional `innovation_use?: boolean` on `FindGreenChecksDto`; unit specs.
@@ -358,10 +358,10 @@ graph TD
 - **Disqualifier:** a spec that mocks `DataSource.query` proves assembly only. It cannot speak to whether the function returns the right boolean — that is T-12's job, and this task may not claim it.
 
 **Done**
-- [ ] Indicator-6 key set = six common keys + `innovation_use` + `ip_rights`
-- [ ] Indicators 1, 2, 4, 5 key sets **unchanged**
-- [ ] `innovation_use` absent from `VISUAL_ONLY_GREEN_CHECKS`
-- [ ] `completenessValidation` throws when `innovation_use` is false, passes when all true — with the method itself unmodified
+- [x] Indicator-6 key set = six common keys + `innovation_use` + `ip_rights` — asserted by a **two-sided exact-set** spec (sorted `toEqual`), which fails on a dropped fragment *and* on an unintended extra one
+- [x] Indicators 1, 2, 4, 5 key sets **unchanged** — proven **structurally**, not assumed: the new `case` sits between `INNOVATION_DEV`'s `break` and `case OICR`, and every pre-existing case terminates with `break`, so no fall-through path was created. Falsifying input confirmed it: with the case deleted, only indicator 6 went red
+- [x] `innovation_use` absent from `VISUAL_ONLY_GREEN_CHECKS` — Set literal has **zero diff**; proven twice (direct read + repo-wide grep). Gated by a **new** spec that uses **no test double at all**, so it is structurally immune to KZ-001
+- [x] `completenessValidation` throws when `innovation_use` is false, passes when all true — with the method itself unmodified. Unmodified proven twice: absent from `git diff --name-only`, **and** zero `innovation_use` hits in `function-handler.service.ts` (a DD-5-violating key-specific branch would necessarily have produced one)
 
 ---
 

@@ -1297,3 +1297,86 @@ No module created or reshaped; no public surface changed. **But two child-guide 
 2. The same file — a ruling on the `@akili-spec` marker (A-4), whichever way the user decides.
 
 CodeGraph re-index pending (new migration file).
+
+---
+
+### T-11 — Green-check assembly, `ip_rights` inclusion, and the DTO · **PASS**
+
+- **Date:** 2026-08-18
+- **Status:** `[x]` — PASS on **attempt 1**. Zero rework rounds.
+- **Implementer attempts:** 1
+- **Review mode:** **lens checklist** (single Reviewer, full 4R sweep). Proportionate: size S, 110 insertions / 0 deletions, purely additive. **Leader escalation tripwire set in advance and not fired** — had the diff touched `completenessValidation`, `VISUAL_ONLY_GREEN_CHECKS`'s membership, or `intellectual_property_validation`, the change would not have been additive and parallel lenses would have been spawned. Verified before choosing the mode: `git diff --name-only` contains none of them.
+- **Requirements covered:** **R-IU-007 (AC.1–AC.4)** · DC-5 (for this key only — see FP-37), DC-6, DC-9 · RB-10 (preserved deliberately, not mitigated)
+- **Design references:** §6.1, §6.2, §6.3, DD-5
+- **Effort:** `medium` (size S, well-specified, additive). No tier↔effort conflict, unlike T-10.
+- **Files changed:** 5 — 2 production, 3 spec.
+
+| File | Change |
+| --- | --- |
+| `green-checks/repository/green-checks.repository.ts` | `innovationUseValidation` helper `:58-60`; `case INNOVATION_USE` `:97-99`; `INNOVATION_USE` added to the `ip_rights` array `:106-111` |
+| `green-checks/dto/find-green-checks.dto.ts` | `innovation_use?: boolean` `:17` (one line; the `VISUAL_ONLY_GREEN_CHECKS` Set literal has **zero diff**) |
+| `green-checks/dto/find-green-checks.dto.spec.ts` | **NEW** — asserts `innovation_use` absent from the Set (no prior spec covered this constant) |
+| `green-checks/repository/green-checks.repository.spec.ts` | helper fragment assertion + an `it.each` exact-key-set spec across indicators 1/2/4/5/6 |
+| `result-status-workflow/function-handler.service.spec.ts` | two cases keyed on `innovation_use` against the **unmodified** AND-gate |
+
+`IndicatorsEnum.INNOVATION_USE = 6` confirmed at `indicators/enum/indicators.enum.ts:7`.
+
+#### Reviewer verdict: **PASS**
+
+**Done item 2 was proven structurally, not assumed** — the load-bearing check on this task. The new `case` is inserted at `:97` **between `INNOVATION_DEV`'s `break` (`:96`) and `case OICR` (`:100`)**, and every pre-existing case terminates with `break`, so **no fall-through path was created** and no other indicator's `spesificQuery` is reachable. The `includes` edit appends a sixth-indicator element to a membership test whose truth value for 1/2/4/5 is unaffected.
+
+**Done items 3 and 4 each proven twice, by two different methods** (the standing rule after this spec's three false-absence findings): the Set literal read directly **and** a repo-wide grep for `innovation_use` across `domain/entities/**/*.ts`; `completenessValidation` absent from `git diff --name-only` **and** zero `innovation_use` hits in `function-handler.service.ts` — a key-specific branch (the DD-5 anti-pattern) would necessarily have produced one.
+
+**The forbidden set held, all four.** `completenessValidation` untouched (DD-5). Set membership untouched. `intellectual_property_validation` untouched — its only definition remains the pre-existing `1753460254629-createFunctions.ts:95`, its only call site the unchanged `capSharingIpValidation` at `:47`. **RB-10 was correctly left alone:** no mitigating branch, no `ip_rights` moved to the visual-only set. The unsubmittable-until-IP-Rights consequence ships **intact and intended**; F10 remains T-12's.
+
+#### KZ-001 adjudication — the gate this task actually turns on
+
+KZ-001 is High severity at **recurrence 4**, and T-11's own disqualifier forbids claiming behavior from a mocked spec. The Reviewer was asked to judge the specs' honesty *and* the regex they depend on. Verdict: **the specs are honest and the regex is correct.**
+
+- **`extractAliasKeys`'s `/\bas\s+(\w+)/gi` faithfully extracts the assembled key set.** Verified against the query template's exact bytes (`:116-129`): the only non-alias tokens are `SELECT`, `FROM results r`, `WHERE`, `r.result_id = ?`, `AND r.is_active = TRUE`, `LIMIT 1;` — none is `as` at a word boundary followed by whitespace; no `CAST(… AS …)`, no `AS`-form table alias, no uppercase `AS`. `\s+` correctly spans the newline+indent in the OICR two-fragment case.
+- **It is a two-sided gate, not a presence assertion.** Exact-set `toEqual` after `.sort()` fails on a *dropped* fragment **and** on an *accidental extra* alias. `.sort()` correctly discards ordering, which is not part of the contract (`for..in` over the row is order-insensitive).
+- **The strongest AC.3 gate uses no test double at all.** `find-green-checks.dto.spec.ts` reads the real exported Set, so it is **structurally immune** to KZ-001 rather than merely careful.
+- **The non-vacuity guard does real work.** Without the second assertion (`pool_funding_alignment` still present), an accidentally-emptied Set would still satisfy `has('innovation_use') === false`.
+- **Boundary honesty is written into the code, not only the report.** Both new spec blocks carry in-file comments stating they prove assembly / key-name reactivity only and that the boolean belongs to T-12. No test *name* claims behavior. This survives into the codebase for the next reader.
+
+#### Verification
+
+**Falsifying input, run both ways** (`npx jest … -t "assembles the exact key set"`). With the `INNOVATION_USE` case deleted: indicator 6 **red** on the missing `innovation_use` key while **indicators 1, 2, 4, 5 stayed green** — the precise discrimination T-11 demands. File then restored from a pre-deletion backup and confirmed **byte-identical by `diff`** before re-running; all five pass.
+
+**Full suite:** `328 suites / 2155 tests` passing, run twice (pre- and post-lint, identical). Baseline before T-11 was `327 / 2145` → **+1 suite, +10 tests**, which reconciles exactly against the diff (2 DTO + 1 presence + 5 `it.each` + 2 function-handler = 10) — independent corroboration that the reported run covers this diff and no other. Lint clean; `--fix` reformatted one `toEqual(...)` onto a single line (cosmetic). `git status` after lint shows only the 5 expected files.
+
+#### Boundary ruling: what T-11 does and does not prove
+
+Every spec here mocks `DataSource.query` or `calculateGreenChecks`. **T-11 proves the assembled key set and the gate's reaction to a key named `innovation_use`. It does NOT prove what `innovation_use_validation(...)` computes against real data** — join logic, the `level >= 6` threshold, the actor-count guard. That is T-12's fixture harness. Consistent with `design.md` §4.2, which designates mock-level unit specs as the gates for DC-5/DC-6/DC-9 and reserves DC-2/DC-3/DC-10 for §4.3's real-MySQL harness. **No behavioral AC belonging to T-12 is claimed anywhere.**
+
+#### ADVISORY findings — recorded, never gating
+
+Per the Advisory rules these are recorded here and **die here**: none may become a task in this spec, and none widened T-11.
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **A-1** | READABILITY | `repository.spec.ts:131` passes `calculateGreenChecks(3)` in the INNOVATION_USE presence test — copy-pasted from the INNOVATION_DEV test above, where `3` reads as an indicator hint but is a **`result_id`**. Harmless (`findOne` is mocked); `6` or `1` would not mislead. The `it.each` rows correctly use `1` |
+| **A-2** | READABILITY | The presence test at `:126-135` is fully subsumed by the `it.each` INNOVATION_USE row. Keeping it matches the file's existing per-indicator pattern, but **in isolation it is exactly the `toContain` shape T-09/T-10's disqualifier named** — the exact-set spec is what actually carries AC.1 |
+| **A-3** | RELIABILITY | `extractAliasKeys` is sound **only because** this query contains no `CAST(x AS type)` and no `AS`-form table alias. With the `i` flag, a future `CAST(… AS SIGNED)` would inject `SIGNED` into the extracted set. **Failure direction is fail-safe** (false FAIL, never false PASS). Tightening to `/\)\s+as\s+(\w+)/gi`, or one comment naming the assumption, would make it robust to unrelated future edits |
+| **A-4** | RESILIENCE | `KNOWLEDGE_PRODUCT` (indicator 3) has no `it.each` row. **Nothing is owed** — AC.2 enumerates only 1/2/4/5 — but indicator 3 is the sole indicator whose key set is the bare six commons, making it the case that would silently change if a fragment were later moved between the `switch` and the common block. One extra row would close the whole enum |
+| **A-5** | PROCESS | The verification report did not state its package root explicitly. Unambiguous on the evidence (328/2155 matches only the server config; all paths are server paths; the `--fix`-mutates-files caveat is server-specific), but future reports should say `server/researchindicators/` outright rather than leave a reviewer to infer it |
+| **A-6** | PROCESS | `test:cov` was not run. **Correct** — that is R-IU-008 AC.3, owned by **T-14**; T-11's Verification asks only for `npm test -- --silent` |
+
+#### Forward pointers
+
+| FP | Target | Content |
+| --- | --- | --- |
+| **FP-35** | **T-12** | **F10 is the only gate on RB-10.** T-11 deliberately ships the consequence that every Innovation Use result is **unsubmittable until IP Rights is filled**, with no mitigation and no test of its own. `intellectual_property_validation` declares `validation BOOLEAN DEFAULT false`, so with no active `result_ip_rights` row the `SELECT … INTO` leaves the default and returns `FALSE`. If F10 is dropped, nothing in the repository demonstrates this intended-but-surprising product behavior, and a future reader may "fix" it as a bug. |
+| **FP-36** | **T-12** | **T-11 proves assembly only — the boolean is entirely unproven.** The `innovation_use` key is now wired into the submit gate for indicator 6, so from this task onward a wrong boolean from `innovation_use_validation` **blocks or wrongly permits real submissions**. T-12's F1–F12/F9b/F17 are the first and only evidence the function computes correctly. Note **FP-23** (F11 unsatisfiable as literally written) and **FP-16** (empty role catalogs make a role-filter fixture vacuous) are still open and must be resolved before those fixtures run. |
+| **FP-37** | **T-14 — for consideration at the TRD/ADR filing; adds no scope** | **DC-5 is closed for `innovation_use` only, not in general.** `FindGreenChecksDto` remains a **partial subset** of what `calculateGreenChecks` returns: `innovation_dev`, `oicr`, `link_result`, and `ip_rights` are still absent. Adding `innovation_use?` was correct as specified (Scope item 4; it follows the existing `cap_sharing?` / `policy_change?` precedent) but deepens a **pre-existing** inconsistency this spec did not create. **Consequence is confined to typing fidelity** — both `completness` computations (`green-checks.service.ts:62-69`, `function-handler.service.ts:320-327`) iterate `for..in` over the **runtime row**, so no missing DTO field can change gating. It matters because **ADR-6's amendment declares the DTO the mapping source**, which makes the four missing keys a live documentation inconsistency. Recorded for T-14's filing; **no rule requires closing it in this spec, and T-11 was not widened to absorb it.** |
+| **FP-38** | **any future spec adding an indicator to the green-check assembly** | The **two-sided exact-set assertion** pattern introduced here (`extractAliasKeys` + sorted `toEqual`, driven by an `it.each` table over indicators) is the reusable shape: it catches a dropped fragment *and* an unintended extra one, where the pre-existing `toContain` style catches neither. Subject to A-3's `CAST`/`AS`-alias caveat. |
+
+FP-1 … FP-34 status: **FP-2 remains fully discharged.** **FP-23, FP-24, FP-16, FP-19 remain live and unresolved for T-12** — FP-23 and FP-16 in particular **must be resolved before T-12's fixtures run**. FP-27 (the `compose:test:up` readiness gap) and FP-28 (never filter a verification log) were **not exercised** by T-11, which needed no database — they remain live for T-12 and T-13.
+
+#### Budget
+
+**Zero rework rounds. Review rounds remain at 4 of the 4–5 ceiling** — unchanged since T-09; neither T-10 nor T-11 consumed one. Tasks: **11 of 13** done; T-12, T-13, T-14 remain. LOC: T-11 adds ~110, so cumulative is now well past the ~2,600 line — **pre-declared as expected in the §12 re-baseline**, and note §12 was internally inconsistent from the start (it budgeted ~2,600 total while its own table measures M6 alone at ~3,070). Not a new signal.
+
+#### Constitution Impact: T-11
+
+No module created or reshaped. `GreenCheckRepository`'s public surface gained one method (`innovationUseValidation`), consistent with the eleven existing per-check helpers — **no module boundary moved, no child guide made stale.** Nothing owed beyond the two items already recorded at T-10. CodeGraph re-index pending.
