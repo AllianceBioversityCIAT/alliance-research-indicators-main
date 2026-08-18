@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04 … **T-09** `[x]` (2026-08-18); next eligible **T-10**
+- **Status:** in-progress — T-01, T-02, T-04 … **T-10** `[x]` (2026-08-18); next eligible **T-11** (and **T-13**, unblocked by T-10)
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -304,7 +304,7 @@ graph TD
 
 - **Requirements covered:** **R-IU-011 (AC.1–AC.9)**; R-IU-009 (AC.1); DC-12
 - **Design references:** §6.7; **transcript §6** (the authoritative edit set); DD-9, DD-12
-- **Size:** L · **Dependencies:** **the two `sp-versioning-roles-id` repair migrations present and ordered before M6 — SATISFIED BY CONSTRUCTION** (same branch; verified 2026-08-18), T-05, T-06 · **Status:** todo
+- **Size:** L · **Dependencies:** **the two `sp-versioning-roles-id` repair migrations present and ordered before M6 — SATISFIED BY CONSTRUCTION** (same branch; verified 2026-08-18), T-05, T-06 · **Status:** ~~todo~~ → **`[x]` DONE 2026-08-18** — PASS on attempt 1; **3 parallel lens Reviewers all PASS**; zero rework rounds. Apply→revert→re-apply verified twice (Implementer + independent Leader run) against a live scratch MySQL. Evidence: [`./execution.md`](./execution.md) → *T-10*
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 > **The single highest-risk task in the chunk.** Four routines, all six indicators, on an append-only migration. **Ships as its own PR.**
@@ -325,12 +325,12 @@ graph TD
 - **Disqualifier:** "the migration ran without error" proves the SQL parses, not that data survives. A routine can be syntactically perfect and silently drop a column; that is the entire DC-12 class. Do not report this task green on a clean apply alone.
 
 **Done**
-- [ ] Routine set re-derived by call site and confirmed as four
-- [ ] Exactly six edits applied; body diffs reviewed statement by statement
-- [ ] No `result_quantifications` block added; **the divergences that remain pre-M6** intact — `SIGNAL` vs `RETURN FALSE` (§4.1) and `delete_result`'s six soft-delete gaps (§5.1) (AC.8, AC.9) *(amended 2026-08-18: the §4.1 table-enumeration divergence was closed by the bugfix's T-02b and must NOT be restored)*
-- [ ] `down()` restores all four prior bodies exactly (AC.7)
-- [ ] Applies and reverts cleanly on the scratch schema
-- [ ] Behavioral ACs deferred to T-13 — **not** claimed here
+- [x] Routine set re-derived by call site and confirmed as four — 8 non-spec call sites, four routines; re-derived independently by the Implementer **and** by Lens A
+- [x] Exactly six edits applied; body diffs reviewed statement by statement — deltas +37/+4/+4/+6 lines reconcile exactly against 5+5+1+1+25 / 4 / 4 / 6, leaving no room for an unshown hunk; all four "removed" lines are comma-gains, verified individually
+- [x] No `result_quantifications` block added; **the divergences that remain pre-M6** intact — `SIGNAL` vs `RETURN FALSE` (§4.1) and `delete_result`'s six soft-delete gaps (§5.1) (AC.8, AC.9) *(amended 2026-08-18: the §4.1 table-enumeration divergence was closed by the bugfix's T-02b and must NOT be restored)*
+- [x] `down()` restores all four prior bodies exactly (AC.7) — byte-identical to source including trailing-whitespace quirks; **and confirmed live: the post-revert query returned FOUR rows, not three**, so `SP_delete_result_version`'s historical bare-`DROP` pattern was not copied
+- [x] Applies and reverts cleanly on the scratch schema — **adjudicated DISCHARGED by Lens A** (the Leader did not self-certify): `has_riu` 1→0→1 across apply/revert/re-apply is a closed three-state cycle only M6 can produce, since `baseline.sql` contains zero occurrences of `result_innovation_use`. **Closes FP-2 / R-IU-009 AC.1 for M6 — the last of M1–M6**
+- [x] Behavioral ACs deferred to T-13 — **not** claimed here. **DC-12 is discharged structurally only; F16 remains the sole gate on a positional swap** (FP-31)
 
 > **✅ RESOLVED 2026-08-18 — actioned by the spec-correction pass; AC.8/AC.9 and the row above are now restated. Original notice retained as the record.**
 >

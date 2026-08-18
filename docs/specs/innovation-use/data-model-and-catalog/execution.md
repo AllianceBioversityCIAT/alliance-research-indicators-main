@@ -1134,3 +1134,166 @@ Option (a) defers a **spec-correction pass** that was already owed. Two of its i
 **Recommended execution:** items 1–7 in **one pass with the two-direction sweep**, before T-10 starts. Items 1 and 2 are mandatory before T-10 regardless of what is decided about 7. Folding 7 into that pass costs one paragraph, and is what stops `design.md` §12 from being a document that states something false — root `CLAUDE.md` §5: *"prefer fixing the document and recording a decision. Do NOT silently let docs and code drift."*
 
 **Standing instruction for whoever resumes this spec:** do not start T-10 without first resolving items 1 and 2. A `/akili-resume` that reports T-10 as "next eligible" is reading `tasks.md` alone and has not seen this block.
+
+---
+
+### T-10 — M6: amend all four lifecycle routines · **PASS**
+
+- **Date:** 2026-08-18
+- **Status:** `[x]` — PASS on **attempt 1**. Three parallel lens Reviewers, all PASS. Zero rework rounds consumed.
+- **Implementer attempts:** 1
+- **Review mode:** **parallel lens reviewers** (3) — mandated by the review-mode table for a task at `xhigh` effort touching migrations and a data-loss surface. *Parallel lenses cost **one** review round, not three; this was a deliberate choice at the budget ceiling.*
+- **Requirements covered:** **R-IU-011 AC.7, AC.8, AC.9** · R-IU-009 (AC.1 via FP-2) · DC-12 (structurally only — see the boundary ruling). **AC.1–AC.6 explicitly NOT claimed** — deferred to T-13.
+- **Design references:** §6.7, DD-9, DD-12, **transcript §6** (the authoritative edit set)
+- **Files changed:** ONE new file — `server/researchindicators/src/db/migrations/1787083305648-AmendLifecycleRoutinesForInnovationUse.ts` (3,184 lines). No other file in the repo touched.
+
+#### Effort / model routing — a recorded deviation
+
+The effort dial calls for **`max`** (correctness-critical: migration + data loss). The tier↔effort rule forbids `max` on a T2 model, and its remedy — escalate the tier — would have put the Implementer on `opus`, colliding with **author ≠ auditor** (the Reviewer tier is T3 `opus`). **Resolution: Implementer `sonnet` @ `xhigh`, and the additional rigor moved to the audit side** as three parallel lens Reviewers rather than one. Recorded because the two rules genuinely conflict at this cell of the matrix, and the resolution is a judgment, not a lookup.
+
+#### Attempt 1 — Implementer
+
+**Method (the part that mattered).** The routine set was re-derived **by call site**, not by name — the method whose absence made this spec's routine claims wrong in three consecutive review rounds (2 → 3 → 4). Result: 8 non-spec call sites, **four** routines. No fifth routine appeared. Each edit was then constructed by **cloning the surrounding statement's exact bytes** via a script rather than hand-typing, specifically to avoid a whitespace mismatch that would fail AC.8.
+
+**Source bodies — the designated silent-failure mode.** Verified by all three lenses independently:
+
+| Routine | Transcribed from | Correct? |
+| --- | --- | --- |
+| `SP_versioning` | `1784300000000-RepairSpVersioningObjectiveBlocks.ts:30-1004` | ✅ the **repaired** body, not `1783029013035` |
+| `SP_delete_result_version` | `1784250000000-RepairSpDeleteResultVersionObjectiveTables.ts:42-211` | ✅ the **post-T-02b** body |
+| `full_delete_result_version` | `1783029013035-UpdateDeleteAndVersionSp.ts:993-1163` | ✅ latest on branch |
+| `delete_result` | `1764275660631-updateDeleteFunctions.ts:312-511` | ✅ latest on branch |
+
+**The six edits** (transcript §6), each located: (1) five count columns → `result_actors` column list **and** `SELECT` list, `:703-707`/`:725-729`; (2) `organization_count` → both `result_institution_types` lists, `:748`/`:764`; (3) new `result_innovation_use` copy block `:846-869`, between the `result_innovation_dev` block and `result_innovation_tool_function`; (4) `DELETE` in `SP_delete_result_version` `:1202-1204`; (5) same `DELETE` in `full_delete_result_version` `:1387-1389`; (6) soft-delete `UPDATE` in `delete_result` `:1608-1612`.
+
+#### Reviewer verdicts — 3 parallel lenses
+
+| Lens | Scope | Verdict |
+| --- | --- | --- |
+| **A** | Spec conformance · gate fidelity · requirement mapping | **PASS** |
+| **B** | SQL semantics · data loss · migration safety | **PASS** |
+| **C** | The forbidden set · cross-indicator blast radius | **PASS** |
+
+**All three reviewers refused to trust the Leader's audit artifacts and re-derived from source.** This was instructed, and it was the right instruction: two of this spec's four rework rounds were caused by the Leader supplying false facts.
+
+**The findings that carry the task:**
+
+- **Positional alignment (Lens B) — the silent-corruption gate.** `result_actors`: **20 column names vs 20 `SELECT` expressions**, paired element by element, the five counts appended last in transcript §2.1's exact order in **both** lists. `result_institution_types`: **14 vs 14**. A column appended to one list at a different position than the other writes the wrong column's value with **no error, ever**. It is aligned.
+- **Six appended columns exist as specified (Lens B):** all `int NULL` per `1787070034303:53-69`, so copying pre-existing rows with `NULL` counts is safe.
+- **FP-20 discharged (Lens B):** edit 3 supplies `new_result_id AS result_id` explicitly — identical in form and position to the `result_innovation_dev` sibling — so the PK/FK collision (MySQL 1062) cannot arise. All **nine** of the table's columns are copied; nothing `NOT NULL` omitted.
+- **Edit 6 sets BOTH fields (Lens B):** `is_active = FALSE` **and** `deleted_at = deleteDate`, using the same variable the neighbouring statements use, scoped `WHERE riu.result_id = resultId AND riu.is_active = TRUE`. The *active orphan* — the defect R-IU-011 AC.5 exists to prevent, and the worst of the four consequences — cannot survive.
+- **Routine characteristics preserved (Lens B).** DROP+CREATE replaces a routine wholesale, so anything not restated is lost. No source carries `DEFINER`, `SQL SECURITY`, or `COMMENT`; all eight headers reproduce their source byte-for-byte including `RETURNS tinyint(1)` + `READS SQL DATA` / `DETERMINISTIC` and the exact parameter lists.
+- **AC.8 arithmetic closes exactly (Lens A + C).** Body deltas are +37/+4/+4/+6 lines; the six edits account for 5+5+1+1+25 = 37, 4, 4, 6. `975 + 37 = 1012` reconciles the diff's five hunks against the full body — **leaving no room for an unshown hunk.** All four "removed" lines are comma-gains, verified individually in the `.ts`.
+- **The other 28 copy blocks (Lens C).** Every one maps to a block at a relative offset explained purely by the cumulative size of edits 1–3: identical for blocks 1–19, +10 at block 20, +12 at block 21, +37 for blocks 22–29. No reordering, no deletion, no whitespace-only reformat.
+- **Statement counts each rise by exactly one (Lens C):** `SP_versioning` INSERT blocks 29→30 · `SP_delete_result_version` DELETEs 35→36 · `full_delete_result_version` DELETEs 35→36 · `delete_result` UPDATEs 29→30.
+- **The forbidden set is untouched (Lens C, proven ≥2 ways each).** No `result_quantifications` copy block added (token count symmetric 5-up/5-down). AC.9 holds: `result_actors`/`result_institution_types` appear exactly once per delete routine before and after. `SIGNAL` vs `RETURN FALSE` divergence intact and not harmonized. `delete_result`'s six soft-delete gaps untouched.
+- **Blast radius is empty by construction, not by luck (Lens C).** Every one of the six new statements is row-filtered (`WHERE … result_id = temp_result_id` / `= resultId`), so for indicators 1–5 they copy, delete and update **zero rows**. `result_innovation_dev`'s copy block is byte-identical in both directions (read in full: up `:769-844`, down `:2338-2413`).
+
+#### ⚠️ The directional trap — landed correctly
+
+`tasks.md`/`requirements.md` AC.8 requires "the divergences that remain pre-M6" to survive. **T-02b already closed the `result_impact_outcomes` / `result_strategic_objectives` half**, so the transcript §4/§4.1 rows saying *"absent"* and *"table count 33"* are **stale on this branch**. A reviewer working from the stale table would have demanded those two `DELETE`s be **removed** — which would have been the regression, not the fix.
+
+All three lenses confirmed they are **PRESENT** in both `up()` (`:1253`/`:1257`) and `down()` (`:2793`/`:2797`), table count **35 not 33**. Confirmed again live: `keeps_rio=1, keeps_rso=1`.
+
+*This is the direct payoff of the pre-flight correction described below — the stale text was corrected before the Implementer read it.*
+
+#### Verification — two independent runs
+
+**Run 1 — Implementer.** Fresh container → baseline → apply → revert → re-apply, plus `information_schema` checks at each stage. `npm test -- --silent` → **327 suites / 2145 tests passed** (identical to T-09's baseline: M6 adds no TypeScript test, which Lens A judged correct — see the boundary ruling). `npm run lint -- --quiet` clean, `git status` after showed no mutation. It additionally built a **mock-`queryRunner` harness**: loaded the migration under `ts-node/register/transpile-only`, captured the emitted SQL, and byte-compared it against the four source migrations' own `up()` bodies.
+
+**Run 2 — Leader, independent.** Full log: `scratchpad/t10/leader-reverify2.log`.
+
+```
+AFTER APPLY    delete_result / full_delete_result_version /
+               SP_delete_result_version / SP_versioning
+               -> has_riu=1  has_roles_id=0   (all four)
+AC.8 LIVE      SP_delete_result_version -> keeps_rio=1  keeps_rso=1
+AFTER REVERT   "Migration AmendLifecycleRoutinesForInnovationUse1787083305648
+                has been  reverted successfully."
+               all four still EXIST -> has_riu=0
+AFTER RE-APPLY all four -> has_riu=1
+```
+
+**Three things only a live database could establish:**
+1. **`has_roles_id=0` on all four** — M6 inherited the *repaired* `SP_versioning`. Had the Implementer transcribed `1783029013035`, this cell would read `1`. That is the falsifying input for the task's designated silent-failure mode, and it came back clean. **Adjudicated limit (Lens A):** this covers only the **first** of the repair's three defects; the column-count mismatch and the AUTO_INCREMENT PK copy are runtime errors (1136/1062) that `CREATE PROCEDURE` accepts, so live apply cannot see them — those were verified statically (`:184-230`, 9 columns / 9 expressions, no `rio.id`/`rso.id`). The two evidence lines are **complementary**, not redundant.
+2. **The revert returned FOUR rows, not three** — so `down()` did **not** copy `SP_delete_result_version`'s historical bare-`DROP` pattern (`1778510205765:337`), which would have left the routine absent. AC.7 confirmed at the database level; body *equality* is established statically byte-for-byte including trailing-whitespace quirks.
+3. **`keeps_rio` / `keeps_rso` = 1** — the T-02b closure survives in the live body.
+
+#### Decision: Done item 5 adjudicated by the Reviewer, not by the Leader
+
+The Leader's brief to Lenses A and B **omitted the Implementer's verification evidence** — a Leader defect. Both lenses correctly recorded *"applies and reverts cleanly"* as outside their evidence set rather than inferring it. Rather than the Leader self-certifying (which would break `author ≠ auditor`), both runs were forwarded to Lens A for a scoped adjudication.
+
+**Verdict: item 5 DISCHARGED**, on a proof stronger than the missing console line:
+
+> `baseline.sql` contains **zero** occurrences of `result_innovation_use`; exactly three migration files mention it, and only M6 touches those four routines. Therefore `has_riu` 1 → 0 → 1 is a closed three-state cycle **that only M6's `up()`/`down()`/`up()` can produce.**
+
+**FP-2 / R-IU-009 AC.1 — DELEGATION FULLY CLOSED.** T-02's delegated "M1–M6 apply-and-revert" clause is now discharged for **M6**, the last of the six. M1…M6 all closed task by task.
+
+#### Boundary ruling: no migration spec was written, and that is correct
+
+No `*.spec.ts` accompanies M6. Lens A ruled this the right call and the Leader concurs: a text-grep spec over 3,184 lines of SQL is exactly the **KZ-001** shape (`§4.1`) — a presence-assertion that stays green over broken behavior. No spec rule mandates a migration spec (`tasks.md` contains zero occurrences of the phrase), and behavioral proof is T-13's F13–F16/F18. **DC-12 is discharged structurally only; F16 remains the only thing that would catch a positional swap in practice.**
+
+#### ⚠️ Leader process failures — two, both recorded
+
+**1. Under-briefed the Reviewers.** The Implementer's verification evidence was not forwarded, so two of three lenses could not settle Done item 5. Caught by the reviewers, closed by adjudication. **Corrective:** the Reviewer brief must always carry the Implementer's verification evidence — it is transient worker output that lives in no file and can never become a pointer.
+
+**2. Destroyed evidence at capture time.** Run 2 filtered the apply steps through `grep -E "has been executed|…"`. **TypeORM emits a double space** — `has been  executed successfully` — so the pattern matched nothing and the apply confirmations are **absent from the log entirely**. The state transitions survived and were sufficient, but the loss was unrecoverable.
+
+> **This is the third occurrence in this spec of one root cause: a grep pattern that cannot match the bytes it is aimed at, producing silence that reads as absence.** The first two were the backtick-vs-template-literal trap (four false Leader claims, then a closure reviewer falling into the same trap). **Corrective, now standing: never filter a verification log through a match pattern — `tee` the full log and grep the copy.** A noisy log is recoverable; a filtered one is not.
+
+#### ADVISORY findings — recorded, never gating
+
+Per the Advisory rules these are recorded here and **die here**: none may become a task in this spec, and none widened T-10.
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **A-1** | A, B | **DDL is not atomic.** MySQL implicit-commits DDL, so the eight `DROP`/`CREATE` statements are not transactional. A failure between any `DROP` and its `CREATE` leaves a routine **absent for all six indicators** — a 4× wider window than a single-routine migration, in both directions. Inherent to the precedent, not introduced here. Belongs in `design.md` §13's rollout row as a post-apply **and** post-revert existence check (`SHOW CREATE PROCEDURE`/`FUNCTION` ×4) |
+| **A-2** | B, C | **FP-11 has materialized for the routines.** MySQL does not schema-bind routine bodies, so after M6 the four routines name `result_innovation_use` with no DDL-time dependency. Sequential revert is safe (verified: `down()` names no new object), but a partial/manual revert dropping the table while M6's bodies are live fails at **invocation** (1146), not at revert time |
+| **A-3** | A, B, C | **A clean apply proves parse, not survival.** Convergent across all three lenses: **F16 remains the only gate that would catch a positional swap in practice.** T-13 is load-bearing for DC-12 |
+| **A-4** | A, B | `// @akili-spec` at line 1 is **unprecedented repo-wide** (`grep -rl "@akili-spec" src` → no hits) and absent from the five sibling IU migrations. Migrations are immutable once merged, so it **cannot be retro-applied** — merging permanently creates a one-off convention. **Raised for a user ruling** at the gate |
+| **A-5** | A, B, C | `DROP PROCEDURE IF EXISTS SP_delete_result_version` (`:1090`, `:2634`) omits the backtick quoting the other six use. Lens B ruled it **cosmetic, not a defect** — not a reserved word, `lower_case_table_names` does not govern routine names, `ANSI_QUOTES` affects double quotes only — and it faithfully mirrors its own source (`1784250000000:40`, `:216`) |
+| **A-6** | A | Filename/class is PascalCase where R-IU-009's Details bullet says `<timestamp>-<camelCaseAction>.ts`. Repo precedent is mixed (`1783029013035-UpdateDeleteAndVersionSp.ts`); no AC covers it |
+| **A-7** | A | Step 6 of Run 2 re-queried only `has_riu`; `keeps_rio`/`keeps_rso` were checked post-apply but not post-revert. One extra column would have confirmed the T-02b closure survives reversion **live** rather than by inference from the byte-exact `down()` body |
+| **A-8** | A | Log line 16 shows an **ignored** `ERROR 1045 'root'@'localhost'` *inside* the readiness gate (socket login; the loader correctly uses `127.0.0.1` TCP). Benign, but an ignored `ERROR` inside a readiness gate is attempt 1's exact silhouette. Make the gate fail loudly or drop the redundant probe |
+
+#### Forward pointers
+
+| FP | Target | Content |
+| --- | --- | --- |
+| **FP-27** | **T-12, T-13 · and `server/.../src/CLAUDE.md` §11** | **`compose:test:up` has NO readiness gate** — it is a bare `docker-compose up -d`, so `compose:test:up && baseline:test:load` **races mysqld**. Proven by a real failure (Leader Run 2 attempt 1, `scratchpad/t10/leader-reverify.log`): the baseline never loaded and every downstream step ran against an empty schema, ending in `ER_NO_SUCH_TABLE 'ari_scratch_test.sec_template'` and a routine query returning `[]`. **The failure mode is the danger — `[]` reads as "nothing found", not "nothing was ever built".** This is **KZ-004** (already at recurrence 2) at a new layer. Fix at source: `healthcheck` in `docker-compose.test.yml` + `--wait`, or fold a ping poll into the script. **Every fixture task that brings the container up is exposed until then.** |
+| **FP-28** | **T-12, T-13, T-14 · any future verification log** | **TypeORM emits a DOUBLE SPACE** in its success lines — `has been  executed successfully`, `has been  reverted successfully` (observed, log line 69). Any assertion or filter on that text must be whitespace-tolerant. And the standing rule this produced: **never filter a verification log through a match pattern — `tee` the whole log and grep the copy.** |
+| **FP-29** | **Rollout · DevOps hand-off · `design.md` §13** | The DDL-non-atomicity window of A-1, stated for all four routines and **both** directions, with the post-apply *and* post-revert existence check. |
+| **FP-30** | **Rollout · any backout plan** | A-2: a partial revert that drops `result_innovation_use` while M6's bodies are live fails at **invocation (1146)**, not at revert time. §13's reverse-order backout covers it; the hazard is now real rather than anticipated. |
+| **FP-31** | **T-13 — load-bearing** | **F16 is the ONLY gate that catches a positional swap in the two amended copy lists.** All three lenses converged on this independently. If F16 is dropped or weakened, nothing catches the highest-severity defect class in M6. |
+| **FP-32** | **Any future author shaping a copy block from the transcript** | **`routine-transcript.md` §2.3 says the `result_innovation_dev` block carries "26 domain columns"; it carries 28.** Harmless here only because the Implementer reproduced from the source migration, not from the transcript — the same stale-artifact class that has already cost this spec rounds. **Raised for a user ruling** (a transcript correction needs the two-direction sweep). |
+| **FP-33** | **Any future M6-class migration · ADR-11's standing checklist** | Run 1's **mock-`queryRunner` harness** (load under `ts-node/register/transpile-only`, capture emitted SQL, byte-compare against the source migrations' `up()` bodies) is a **real gate, not a presence-assertion**. ADR-11 makes "amend all four routines" a standing item for every future spec adding a table under `results`; promoting this to a committed helper would make the next one cheap to verify. |
+| **FP-34** | **Anyone reusing `scratchpad/t10/extract.py`** | **Not safe to reuse blindly** — two latent bugs, both inert here and both found by reviewers, not by the Leader who wrote it: (a) `bodies()` walks back to the nearest preceding backtick, so a file placing `DROP` and `CREATE` in **one** template literal yields a silently truncated body and a **falsely clean diff** (Lens C — anchor to `queryRunner.query(` instead); (b) its `CREATE\s+(PROCEDURE|FUNCTION)` regex would skip a `CREATE DEFINER=… PROCEDURE` header (Lens B). |
+
+FP-1 … FP-26 status: **FP-2 now fully DISCHARGED** (M1–M6 complete). **FP-1, FP-5, FP-6, FP-9 were exercised in T-10 and held** — FP-1 by a real failure that proved its necessity (see FP-27); FP-6 confirmed live (`1787083305648` > baseline ceiling `1786679227000` > branch file ceiling `1787078283929`). **FP-3 retired** (see the pre-flight correction below). **FP-11 materialized** (see FP-30). FP-23, FP-24 remain live and unresolved for T-12.
+
+#### Pre-flight spec correction — a blocker found before the Implementer was spawned
+
+`tasks.md` §0's *"Read this before starting"* table — **the first thing the Implementer reads** — still said the bugfix *"must merge before T-10"*. Six live sites survived the 2026-08-18 correction pass because its own residual sweep grepped the string it had edited rather than the **claim in every phrasing**: `tasks.md:11`, `:21`, `:36` (mermaid node), `:500` (RB-A), `requirements.md:23`, `routine-transcript.md:179`. **This is KZ-005 recurring — the lesson's own second occurrence, at the site the lesson was written about.**
+
+The backward sweep then found two genuine correctness hazards nobody had flagged:
+
+| Site | Hazard |
+| --- | --- |
+| `design.md:426` | Framed a **rollout** check as a T-10 task gate |
+| `design.md:422` | Listed the **already-closed** table-enumeration divergence as live, inside the *"What M6 must NOT do"* table. **Read literally, an Implementer transcribing the current body could have DELETED the two `DELETE`s T-02b added, believing it was avoiding harmonization.** Now states the direction explicitly |
+
+Closed in commit `ebf343e1`, two-direction sweep run and clean. `execution.md:150` and **FP-3** (`:180`) carry the same stale gate but are **append-only audit history — retired here, never edited.**
+
+*Assessment: this pre-flight is what made attempt 1 pass. The `design.md:422` hazard in particular pointed the Implementer at the exact wrong action, and all three lenses were specifically briefed on the direction.*
+
+#### Budget
+
+**Zero rework rounds consumed.** Review rounds remain at **4** of the 4–5 ceiling — the tripwire was **not** crossed by T-10. Three parallel lenses were one round. LOC: M6 is ~3,070 by `design.md` §12's own measurement, so the ~2,600 LOC line is now exceeded — **pre-declared as expected in the §12 re-baseline** ("treat its arrival as expected, not as a new signal"), not a new signal.
+
+#### Constitution Impact: T-10
+
+No module created or reshaped; no public surface changed. **But two child-guide updates are now owed** (both repo-level, deferred to `/akili-archive`'s Constitution & Graph Sync, neither leaving the guides actively misleading today):
+1. `server/researchindicators/src/CLAUDE.md` §11 — the `compose:test:up` readiness gap (FP-27) belongs beside the TEST-harness commands.
+2. The same file — a ruling on the `@akili-spec` marker (A-4), whichever way the user decides.
+
+CodeGraph re-index pending (new migration file).
