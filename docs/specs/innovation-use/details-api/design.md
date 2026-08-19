@@ -21,7 +21,7 @@
 | Migrations shipped | **zero** (DD-4) |
 | New Nest modules | 2 — `ResultInnovationUseModule`, `ClarisaInnovationUseLevelsModule` |
 | Existing files modified | 4 — `results.service.ts`, `main.routes.ts`, `clarisa.routes.ts`, `result-actors.service.ts` + `result-institution-types.service.ts` (additive methods) |
-| Budget | see §12 — **13 tasks · ~2,400 LOC · 6–8 review rounds** |
+| Budget | see §12 — **13 tasks · ~2,400 LOC · ~24 review rounds** *(re-baselined from 6–8 at execution time, 2026-08-19, user ruling — see §12)* |
 | Reversion challenge run | 1 (DD-12, the C-4 cleanup) — **found a concrete breakage; design narrowed** (§11.1) |
 
 ---
@@ -471,7 +471,7 @@ The Phase 0 depth guess was **Full**, made before this design existed. Checked a
 | --- | --- | --- |
 | **Tasks** | **13** | 2 modules, 2 shared-service methods, 1 creation-path edit, 5 fixtures + 1 harness, 1 cleanup, 1 gate |
 | **LOC** | **~2,400** (±20%) | DTOs ~180 · IU service + spec ~530 · controller + spec ~210 · actors method + spec ~200 · orgs method + spec ~180 · catalog module + spec ~120 · creation edits + spec ~90 · harness ~120 · F-A…F-E ~800 · cleanup ~−30 |
-| **Review rounds** | **6–8** | Chunk 1 budgeted 4–5 and burned **13** (2.6×). This is 13 tasks with three High risks; 4–5 would repeat that mis-estimate |
+| **Review rounds** | ~~6–8~~ → **~24** | *Original specify-time estimate 6–8, with this reasoning: "Chunk 1 budgeted 4–5 and burned **13** (2.6×). This is 13 tasks with three High risks; 4–5 would repeat that mis-estimate."* **Re-baselined to ~24 at execution time (2026-08-19, user ruling)** after 6 rounds were consumed by 3 of 13 tasks. The correction applied at specify time was itself ~3× low — the second consecutive chunk in this family to under-estimate rounds by roughly a third. Review depth was **not** reduced: the rounds were buying real defects (a permanently-failing green check found twice on two code paths, a test that could not fail, three defect-bearing mutations surviving a green 2169-test suite). Cutting review to meet a number that has been wrong twice would optimise the metric against the goal. See `execution.md` § *Budget Escalation* |
 
 **Verdict: the estimate matches Full.** No depth change. It is far above `/akili-quick` territory and far above Lite or Standard — a Standard spec would put the creation-path edit and the role-isolation fixture behind the same gate as the DTOs.
 

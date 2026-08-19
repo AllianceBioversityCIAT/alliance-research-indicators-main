@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01, T-02, T-03 `[x]` done (2026-08-19); T-04 … T-13 todo. **Review-round budget escalated to the user after T-03** (6 of 6–8 consumed at 3 of 13 tasks)
+- **Status:** in-progress — T-01, T-02, T-03 `[x]` done (2026-08-19); T-04 … T-13 todo. Review-round budget was escalated after T-03 and **resolved 2026-08-19 by user ruling: re-baselined to ~24, review depth unchanged**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -28,7 +28,9 @@
 - `npm run lint` reported as read-only. The script carries `--fix` and **mutates files** — re-check `git status` after.
 - Any claim of "unchanged" backed by a hand-enumerated column list rather than a whole-row `SELECT *` diff (ADR-11).
 
-**Budget tripwire** (`design.md` §12): **13 tasks · ~2,400 LOC · 6–8 review rounds.** Exceeding any one is an escalation to the user, not a reason to keep going.
+**Budget tripwire** (`design.md` §12): **13 tasks · ~2,400 LOC · ~24 review rounds.** Exceeding any one is an escalation to the user, not a reason to keep going.
+
+> **Rounds re-baselined 2026-08-19 (user ruling), from the specify-time 6–8.** Six were consumed by the first three tasks; the projection for all thirteen is 21–28. Review depth is unchanged — see `design.md` §12 and `execution.md` § *Budget Escalation*.
 
 ---
 
@@ -726,4 +728,4 @@ A task is **not** done until: its verification command ran and is reported with 
 - [ ] `/swagger` human check recorded verbatim
 - [ ] No migration was added (DD-4) — `git diff --stat src/db/migrations/` is empty
 - [ ] OQ-IUA-2 resolved by T-13; OQ-IUA-1 already resolved by DD-9
-- [ ] Budget variance recorded against **13 tasks / ~2,400 LOC / 6–8 rounds**, and any overrun escalated rather than absorbed
+- [ ] Budget variance recorded against **13 tasks / ~2,400 LOC / ~24 rounds** *(rounds re-baselined from 6–8 on 2026-08-19 by user ruling)*, and any overrun escalated rather than absorbed

@@ -17,7 +17,7 @@
 | Approval Mode | **gated** (from `proposal.md` Document Control) — every continue/pause gate stops for the user |
 | Branch | `AC-1679-Create-the-innovation-use-section` |
 | Package | `server/researchindicators` (server-only chunk) |
-| Budget (`design.md` §12) | 13 tasks · ~2,400 LOC · 6–8 review rounds |
+| Budget (`design.md` §12) | 13 tasks · ~2,400 LOC · **~24 review rounds** (re-baselined from 6–8, 2026-08-19, user ruling — see § *Budget Escalation*) |
 | Rework ceiling | 3 attempts per task |
 | Leader model tier | T1 · Implementer T2 · Reviewer T3 (`author ≠ auditor` enforced by the `.claude/agents/akili-*` wrappers) |
 | Log opened | 2026-08-19 |
@@ -600,5 +600,80 @@ All six Done criteria **MET**. Two findings worth preserving:
 | T-10 / T-09 | A fixture that always re-sends `sex_age_disaggregation_not_apply` will **not** exercise the flag-desync class this task fixed. Include an edit that omits the flag on a previously-aggregate row |
 
 **Budget status:** 3 of 13 tasks complete. **6 of 6–8 review rounds consumed.** Escalated to the user at this gate — see below.
+
+---
+
+## Budget Escalation — 2026-08-19, after T-03
+
+Raised under `/akili-execute`'s **Budget Tripwire**: *"When actual execution exceeds it, stop and escalate to the user with the delta and the cause — do not continue on the assumption that finishing is what was wanted."*
+
+### Actuals against `design.md` §12
+
+| Metric | Budget | Actual (3 of 13 tasks) | Consumed |
+| --- | --- | --- | --- |
+| Tasks | 13 | 3 | 23% |
+| LOC | ~2,400 (±20%) | ~1,016 | 42% |
+| **Review rounds** | **6–8** | **6** | **75–100%** |
+
+LOC is tracking **ahead** of plan (42% of the budget for 23% of the tasks) — but that is not a warning here: T-01–T-03 are three of the four smallest production tasks, and the LOC estimate loaded ~800 lines into the five fixtures (T-09–T-12) that have not started. Rounds are the metric in trouble.
+
+### Where the six rounds went, by cause
+
+| Task | Rounds | Cause |
+| --- | --- | --- |
+| T-01 | 2 | **Spec defect** — an instruction that was technically unachievable (`@ApiOperation` at class level), resolved by user ruling as DD-13 / D-IUA-10. Not an implementation failure |
+| T-02 | 1 | Clean pass |
+| T-03 | 3 | One genuine test-fidelity FAIL (vacuous assertion; three defect-bearing mutations surviving a green suite) **+ one round caused by a defective Leader brief** that wrongly asserted the insert path was already correct |
+
+**Two of the six rounds were spent on defects in the specification and the orchestration, not in the code.** That distinction matters for the projection: those two are not evidence that the *implementation* work is running hot.
+
+### Projection
+
+Ten tasks remain, and they are **harder on average** than the three completed. T-04 is a near-twin of T-03 and should run faster now that its patterns and forward pointers are established. But T-06 (L, `xhigh`, the transactional write path carrying the off-by-one trap), T-09 (L, `xhigh`, a Nest-in-fixture harness **no fixture in this repo has ever built** — RB-4), and T-10/T-11/T-12 (all `xhigh` fixtures against a live scratch MySQL) are the spec's declared risk concentration.
+
+Realistic range: **15–22 further rounds, for a total of 21–28** against a budget of 6–8. Roughly **3×**.
+
+### The pattern worth naming
+
+`design.md` §12 set 6–8 rounds with this reasoning, recorded at specify time:
+
+> Chunk 1 budgeted 4–5 and burned **13** (2.6×). This is 13 tasks with three High risks; 4–5 would repeat that mis-estimate.
+
+So the estimate was **already corrected upward** for exactly this failure, and is still tracking ~3× low. **This is the second consecutive chunk in this family whose review-round budget was set about a third of what it needed.** That is a methodology signal, not a chunk-2 accident, and it is carried to `/akili-archive`'s Kaizen step rather than absorbed here.
+
+### What the rounds bought
+
+Recorded so the cost is judged against the return rather than in isolation. The review process has so far caught:
+
+- an instruction that could not be implemented at all, before it consumed three attempts;
+- a **permanently-failing green check** — twice, on two different code paths, each traced to the exact SQL in chunk 1's migration that would have read the inconsistent row;
+- a test asserting a property of its own fixture, which could not fail under any production change;
+- three defect-bearing mutations surviving a fully green 2169-test suite, one of which would have silently blanked the section on every save;
+- a Leader verification instruction (`grep '^-'`) that could not fail, caught by the worker.
+
+Every one of those is a defect this spec's §5 verification strategy exists to catch, and none would have been caught by the suite alone.
+
+**Status: awaiting the user's ruling. Execution is paused at the T-03 gate.**
+
+---
+
+### Budget Escalation — resolved 2026-08-19 (user ruling)
+
+**Ruling: re-baseline the review-round budget to ~24 and continue. Review depth is unchanged.**
+
+The user declined the two options that would have bought rounds back by reducing scrutiny (lighter review on low-risk tasks; deferring the fixture suite to a follow-up spec). The reasoning recorded at the gate: the rounds have been buying defects the suite alone did not catch, so cutting review to meet a number that has now been wrong twice running would optimise the metric against the goal it exists to serve.
+
+**Amended sites (5 live + this log's Document Control header):**
+
+| File | Site |
+| --- | --- |
+| `design.md` | Document Control budget row · §12 *Budget* table row, with the original estimate and its reasoning preserved struck-through rather than deleted |
+| `tasks.md` | §0 *Budget tripwire* · §7 *Done definition* · header Status line |
+| `family.md` | chunk 2 row |
+| `execution.md` | Document Control header only — the per-task *Budget status* lines and the § *Budget Escalation* tables are point-in-time history and were deliberately **not** rewritten |
+
+**Correction closure — two-direction sweep run (KZ-005).** Forward: every surviving occurrence of `6–8` across `docs/specs/innovation-use/**` was inspected and is either explicitly framed as the superseded value (*"re-baselined from 6–8"*) or is append-only history in this log. Backward: every occurrence of the new value `~24` carries its provenance; no orphan. The new term the correction introduced (`re-baselin*`) was re-grepped and resolves consistently in all four documents. One false positive excluded: `requirements.md:94` matches `6-8` inside the line citation `result-institution-type.entity.ts:76-81`.
+
+**Carried to `/akili-archive`'s Kaizen step**, as a methodology signal rather than a chunk-2 accident: *two consecutive chunks in this family set their review-round budget at roughly a third of the actual, and the second did so **after** explicitly correcting for the first.* A per-chunk estimate that is corrected upward and still lands 3× low suggests the estimator is missing a structural cost, not being unlucky — candidate causes worth testing at the retrospective: rework rounds triggered by spec defects rather than code defects (2 of the 6 here), and parallel lens reviews being counted as one round when they cost three.
 
 ---
