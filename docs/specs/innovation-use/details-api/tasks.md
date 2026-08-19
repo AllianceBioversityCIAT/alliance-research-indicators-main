@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 `[x]` done (2026-08-19); T-02 … T-13 todo
+- **Status:** in-progress — T-01, T-02 `[x]` done (2026-08-19); T-03 … T-13 todo
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -110,7 +110,7 @@ Mirror `clarisa-innovation-readiness-levels/` exactly — `ControlListBaseServic
 - **Requirements covered:** R-IUA-004 AC.1, AC.2, AC.3, AC.4, AC.6, AC.7 · R-IUA-007 AC.2 · R-IUA-008 AC.5 · R-IUA-013 AC.3 (partial)
 - **Depends on:** none
 - **Size:** M (~180 LOC) · **Effort:** `medium`
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — PASS on attempt 1, zero rework. No `.spec.ts` written, per this task's own *Verification & its limits*; R-IUA-004 AC.1–AC.8 are discharged at **T-07**, not here. Two prettier errors found and autofixed post-review (proved whitespace-only). Evidence: [`./execution.md`](./execution.md) → *T-02*
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
 **Files touched**

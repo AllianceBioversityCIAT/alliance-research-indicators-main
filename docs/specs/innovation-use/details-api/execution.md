@@ -22,7 +22,7 @@
 | Leader model tier | T1 · Implementer T2 · Reviewer T3 (`author ≠ auditor` enforced by the `.claude/agents/akili-*` wrappers) |
 | Log opened | 2026-08-19 |
 
-**Review-round tally:** 2 of 6–8 consumed (T-01 attempts 1 and 2).
+**Review-round tally:** 3 of 6–8 consumed (T-01 attempts 1–2, T-02 attempt 1). See § *Budget Tripwire*.
 
 ---
 
@@ -277,5 +277,144 @@ Neither touches source code or any acceptance criterion; both are confined to te
 - **Child guide:** none needed. `server/researchindicators/src/CLAUDE.md` already describes the control-list module pattern generically; this module adds no convention it does not cover, and the root guide's `## Module Guides` index needs no new entry.
 - **CodeGraph re-index: PENDING.** Five new source files are not in the index. Consumed by `/akili-archive` (Constitution & Graph Sync). Not urgent mid-spec — the graph's staleness rule already tells later tasks that the working tree wins for files this spec has touched.
 - **Code traceability:** `// @akili-spec` markers were **not** added. The one non-obvious addition — the `findAll()` order override — already carries a block comment citing T-01, R-IUA-010 AC.3/AC.4, DD-6 and §5.6 by name, which discharges the intent of the traceability rule more usefully than a bare path marker. Recorded as a deliberate Leader judgment, not an omission.
+
+---
+
+### T-02 — Section DTOs
+
+- **Final status:** `[x]` **DONE 2026-08-19** — PASS on attempt 1.
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1
+- **Requirements covered:** R-IUA-004 AC.1–AC.4, AC.6–AC.8 · R-IUA-007 AC.2, AC.5 · R-IUA-008 AC.4, AC.5 · R-IUA-013 AC.3 (partial — feeds the human check)
+- **Skills assigned:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns` (task defaults, unchanged) · **Effort:** `medium`
+
+#### Attempt 1
+
+**Files changed** (2 files, +232 lines, both new):
+
+| File | State |
+| --- | --- |
+| `src/domain/entities/result-innovation-use/dto/create-result-innovation-use.dto.ts` | new — 5 classes + 1 custom constraint |
+| `…/dto/update-result-innovation-use.dto.ts` | new — `PartialType`, mirroring the reference |
+
+**No `.spec.ts` was written, and that is the instruction, not an omission.** T-02's *Verification & its limits* forbids one: a decorator-presence assertion would prove the decorator exists and nothing about whether any rule executes, because this repo has no global `ValidationPipe` (trap 1 / DD-8). The behavioral gate is T-07. KZ-001 was copied into the brief as the governing lesson, since a presence-assertion spec is exactly "a test double that doesn't evaluate what it stands in for."
+
+**Implementer verification.** `npm test -- --silent` from `server/researchindicators/` → 330/330 suites, 2161/2161 tests — a compile and regression gate only, reported as such rather than as proof of the DTO rules.
+
+In place of a committed spec, the Implementer ran a **throwaway** `ValidationPipe({ whitelist: true, transform: true })` over `pipe.transform(payload, { type: 'body', metatype: CreateResultInnovationUseDto })` and reported observed messages, deleting the scratch file before reporting. Observations (local check, **not** committed evidence):
+
+| Criterion | Observed |
+| --- | --- |
+| AC.1 negative | `"actors.0.actors_count must not be less than 0"` |
+| AC.2 fractional | `"actors.0.actors_count must be an integer number"`; same for `organization_count`, `quantification_number` |
+| AC.3 mode conflict | `"actors.0.women_youth_count: sex_age_disaggregation_not_apply is true, so a disaggregated count must not be supplied"` |
+| AC.4 aggregate without flag | `"actors.0.actors_count: sex_age_disaggregation_not_apply is not true, so actors_count must not be supplied"` |
+| AC.6 / AC.7 | missing `actor_type_id` rejected; OTHER + whitespace-only and OTHER + empty both rejected; OTHER + real name accepted |
+| AC.8 / R-IUA-007 AC.5 | disaggregated with all four counts absent — accepted; `organization_count` absent — accepted |
+| **AC.5 `total`** | `total: 999` **accepted**, and absent from the transformed object — stripped, not rejected, exactly as the scenario's `BUT it must NOT reject the request merely because total was present` requires |
+| Row identification | two-row payload, row 0 valid: only `"actors.1.women_youth_count: …"` reported |
+
+**Implementer `Not Done / Assumptions`** (verbatim): three declared judgment calls — no `@IsBoolean()` on `sex_age_disaggregation_not_apply`; `unit`/`quantification_number` left independently optional; and `innovation_use_level_id` / `innovation_use_level_explanation` added at the top level though absent from the task's stated field list. All three were referred to the Reviewer and adjudicated below. None is outstanding scope.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+The Reviewer read the installed **class-validator source** (`node_modules/class-validator/cjs/…`) rather than reasoning from memory, because this diff's correctness is purely a question of decorator composition. The three findings that decide the task:
+
+- `ValidationExecutor.js:126-135` — conditional metadata is evaluated first and returns **before any validator on that property runs**. So `@IsOptional()` does suppress `IsExclusiveOfActorMode` — **but only when the count is absent, which is exactly when there is nothing to conflict with.** The gating is correct, not a hole.
+- `ValidationExecutor.js:66-67, 84-90` — `whitelist` runs before the property loop and strips only keys with **zero** metadata. `total` (undeclared) is stripped; `sex_age_disaggregation_not_apply` and `actor_type_custom_name` are **retained** even when their validators are skipped — which is load-bearing, because the constraint reads the mode flag off `args.object` and the service still receives the custom name.
+- `Matches.js:10-12` — `matches()` is `typeof value === 'string' && …`, returning `false` for a non-string rather than throwing. So OTHER with a numeric custom name yields `400`, not `500`.
+
+**Per-criterion verdicts — all eight, including those with no finding (KZ-007):**
+
+| # | Criterion | Verdict |
+| --- | --- | --- |
+| 1 | Negative/fractional rejected across the five counts + `organization_count` + `quantification_number` | PASS — all seven carry `@IsInt() @Min(0)`; Nest's default `exceptionFactory` flattens to `actors.0.actors_count`, satisfying AC.1's "`errors` names that field" |
+| 2 | `not_apply = true` + any disaggregated count → rejected | PASS (AC.3) |
+| 3 | `not_apply` false/absent + `actors_count` → rejected | PASS for **all three** shapes — `false`, `null`, absent. `actors_count: 0` is also rejected, correctly: AC.4 keys on *supplied*, not on truthiness |
+| 4 | Row missing `actor_type_id` → rejected | PASS — no `@IsOptional()`, so `@IsNotEmpty()` fires on `undefined`/`null` (AC.6) |
+| 5 | `actor_type_id = 5` + whitespace-only custom name → rejected | PASS — `ClarisaActorTypesEnum.OTHER = 5` confirmed; `/\S/` fails on `"   "`, `""`, and `undefined` (AC.7) |
+| 6 | Disaggregated, all four counts absent → accepted | PASS (AC.8 draft-save) |
+| 7 | `organization_count` absent → accepted | PASS (R-IUA-007 AC.5) |
+| 8 | Every field carries `@ApiProperty` | PASS — all **25** properties across the five classes; only `actor_type_id` omits `required: false`, matching its `@IsNotEmpty()` |
+
+**Additional checks the Reviewer ran unprompted or on request:**
+
+- **Field-name fidelity vs `design.md` §3** — every property checked against the entities on disk (`result-actor.entity.ts`, `result-institution-type.entity.ts`, `result-quantification.entity.ts`, `result-innovation-use.entity.ts`). **No misspellings**, and the four legacy booleans on `result_actors` are correctly absent. This matters because a misspelled DTO field silently drops data at save time and nothing in this task would catch it.
+- **`PartialType` source** — from `@nestjs/swagger`, matching the exemplar. The `@nestjs/mapped-types` variant would inherit validation metadata but drop the `@ApiProperty` schema, breaking Swagger rendering.
+- **T-06 leakage** — none. No whole-array duplicate rule, no `level >= 6` rule.
+
+**Adjudication of the three judgment calls:**
+
+1. **No `@IsBoolean()` on the mode flag — sound conclusion, over-stated rationale, in scope.** The Implementer's general claim (that `@IsOptional()` would skip the whole property group) is true of class-validator but **cannot bite here**, because no exclusivity decorator sits on the flag — they sit on the five counts. `@IsBoolean() @IsOptional()` would have cost nothing and defeated nothing. No AC requires it, so it does not gate. Carried forward as an advisory.
+2. **`unit` / `quantification_number` independently optional — sound and in scope.** T-02 owns only the negative/fractional rejection; R-IUA-008 AC.1's round-trip belongs to T-05/T-09. Correctly avoids validating `unit` against any list (AC.4: free text, no catalog).
+3. **Top-level level fields — required, not widening.** `design.md` §4 names `CreateResultInnovationUseDto` as the PATCH Body DTO and §5.1 step 6 is `UPDATE result_innovation_use SET level_id, explanation`. Under `whitelist: true` an undeclared property is deleted before the service sees it, so **omitting these two would have made the level silently unsettable.** Keeping them at plain optional type checks is also right — the `level >= 6` rule is a catalog-join rule (§5.1 step 4a), explicitly T-06's, and writing an FK-based `>= 6` here would have walked into trap 2.
+
+**`ADVISORY` findings (4R lens — recorded, non-gating, and they do not become tasks):**
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| Reliability | `sex_age_disaggregation_not_apply` has no `@IsBoolean()`. `1` or `"true"` passes, and the constraint's `=== true` classifies it as *disaggregated* — so `{ sex_age_disaggregation_not_apply: 1, women_youth_count: 5 }` is accepted, then reaches T-03, where a **truthiness-based** mode check would null the four counts the client just sent | **Forward pointer → T-03:** the mode check must compare `=== true`, never truthiness. Recorded; the DTO is not changed, as no AC requires it |
+| Reliability | `actor_type_custom_name` has no `@IsString()`. Safe today, but when `actor_type_id !== OTHER` the `@ValidateIf` skip lets any type reach the service | **Forward pointer → T-03:** harmless only because T-03 is specified to null it for non-OTHER rows. T-03 must not relax that |
+| Readability | The constraint's `if (value === undefined \|\| value === null) return true;` guard is unreachable while every count carries `@IsOptional()` | Recorded. Keep as defensive code |
+| Risk | `npm test` is weak evidence of *compilation* here — nothing imports these files yet, so ts-jest never transformed them. First real type check arrives with T-07 or `npm run build` | Recorded — the honest limit of this task's green run |
+| Risk | `actor_type_id: 0` satisfies `@IsNotEmpty()` + `@IsNumber()` and would surface as an FK violation (`500`) rather than a `400`. No AC requires `@Min(1)` | **Forward pointer → T-03 / T-06** |
+| Risk (lint) | Inferred, not measured (the Reviewer is read-only): the diff looked un-prettier-formatted, and `.husky/pre-commit` is **empty**, so nothing would auto-fix at commit | **Confirmed and resolved by the Leader — see below** |
+
+#### Leader-run lint verification (post-PASS)
+
+The lint advisory was the one finding that concerned code about to be committed, so it was checked rather than deferred. Evidence:
+
+```
+$ npx eslint --no-fix src/domain/entities/result-innovation-use/dto/
+  43:35  error  Insert `⏎·····`  prettier/prettier
+  89:13  error  Delete `⏎·····`  prettier/prettier
+✖ 2 problems (2 errors, 0 warnings)
+```
+
+`.husky/pre-commit` confirmed **empty** — the Reviewer's inference was correct on both halves, and the errors would have been committed silently.
+
+Resolved by running the repo's own autofix **scoped to the two files** (`npx eslint --fix src/…/dto/`), not the package-wide `npm run lint` script. Because this mutated an artifact the Reviewer had already PASSed, the change was proved semantically inert rather than asserted to be:
+
+```diff
+-    const disaggregationNotApply = row.sex_age_disaggregation_not_apply === true;
++    const disaggregationNotApply =
++      row.sex_age_disaggregation_not_apply === true;
+-    message:
+-      'actor_type_custom_name is required when actor_type_id is OTHER',
++    message: 'actor_type_custom_name is required when actor_type_id is OTHER',
+```
+
+Two line-wrap changes, identical token sequences. `npx eslint --no-fix` then reported clean, `npm test -- --silent` re-run green at 330/330 suites / 2161/2161 tests, and `git status` confirmed **no collateral mutation** — `--fix` touched only the two intended files.
+
+> **Why this was not treated as advisory scope-creep.** The rule that an advisory never becomes a task stops advisories from *growing the spec*. This did not add scope: it confirmed that the task's own deliverable failed the repo's lint gate, which `CLAUDE.md` §4.3 makes non-negotiable. `tasks.md` §4 schedules lint at T-13, so deferring would have been defensible — but it would have handed T-13 a `--fix` mutation on code nobody was reviewing any more. Running a formatter is tool output, not authorship, so the Leader's no-production-code rule is not engaged.
+
+**Final verification:** `npm test -- --silent` → 330/330 suites, 2161/2161 tests · `npx eslint --no-fix` on the two files → clean · `git status` → only the two intended files.
+
+**Declared limits, restated so they are not mistaken for proven:** this task's green run proves **nothing** about the DTO rules. Nothing committed executes them, and nothing even imports these files yet. The pipe observations above are a Leader-directed local check, deliberately uncommitted. **R-IUA-004 AC.1–AC.8 are discharged at T-07**, by the behavioral pipe spec, and not before.
+
+**Forward pointers created by T-02:**
+
+| → Task | Pointer |
+| --- | --- |
+| T-03 | Mode check must be `=== true`, **never truthiness** — the DTO permits `1` / `"true"` through the untyped flag, and a truthy check would null counts the client actually sent |
+| T-03 | `actor_type_custom_name` may arrive as a non-string when `actor_type_id !== OTHER`. T-03 is specified to null it for non-OTHER rows; that behavior is now load-bearing, not incidental |
+| T-03, T-06 | `actor_type_id: 0` passes DTO validation and would surface as an FK violation (`500`) rather than a `400` |
+| T-07 | T-07's behavioral pipe spec is the **first and only** committed gate for R-IUA-004 AC.1–AC.8. The eight rows in the observation table above are the cases it must cover |
+
+**Budget status:** 2 of 13 tasks complete. **3 of 6–8 review rounds consumed.** See the tripwire note below.
+
+---
+
+## Budget Tripwire — watch, not yet an escalation (2026-08-19)
+
+| Metric | Budget (`design.md` §12) | Actual after T-02 | Trajectory |
+| --- | --- | --- | --- |
+| Tasks | 13 | 2 done | on track |
+| LOC | ~2,400 (±20%) | ~468 | on track |
+| **Review rounds** | **6–8** | **3** | **at 13 tasks this trends to ~19** |
+
+Rounds are the metric at risk. Two of the three went to T-01, and both were spent on a **spec defect** rather than on implementation quality — a cost that does not obviously recur. But the budget assumed roughly one round for every two tasks, and the eleven remaining tasks include three rated `xhigh` and one `max`, plus a fixture harness the repo has never built (RB-4).
+
+**Not escalated yet** — the tripwire fires on *exceeding* the budget, and 3 of 6–8 is inside it. Recorded here so the overrun, if it comes, is visible in advance rather than discovered at T-13. Raised with the user at the T-02 gate.
 
 ---
