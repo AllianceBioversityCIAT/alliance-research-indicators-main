@@ -2027,3 +2027,29 @@ That is the finding, and it is more useful than the two comment lines: **KZ-005 
 | **E-5** | B | **No red-demonstration exists for F12b-1 individually** — the applied mutation was a weakening, which cannot red it by construction. An inverting mutation (forcing `tempActors := 0`) would produce one and is cheap |
 | **E-6** | A, B | `:106-107` cites `:71`/`:83` for the `AND ra.is_active = TRUE` predicate, which is on `:72`/`:84` (`:71`/`:83` are the `WHERE ra.result_id = result_code` lines). Off by one against the exact-single-line citation pattern used elsewhere in the file |
 
+
+#### ⚠️ Leader process failure — a commit message that misdescribes 489 of its 510 lines
+
+**Found 2026-08-18 while extracting T-12 attempt 3's diff. Recorded rather than rewritten; the correction is this entry.**
+
+Commit **`964a7d76`** is titled *"docs(fixtures): D-2 — cite same-file targets by anchor, not line number"*. Its actual contents:
+
+| File | Lines | Belongs to |
+| --- | --- | --- |
+| `execution.md` | +20 | ✅ D-2's record |
+| `innovation-dev-lifecycle-routines-unchanged.fixture-spec.ts` | +8 / −7 | ✅ the D-2 anchor fix |
+| **`innovation-dev-validation-behavioral.fixture-spec.ts`** | **+460** | ❌ **T-12 attempt 2's entire deliverable** |
+| **`innovation-use-validation.fixture-spec.ts`** | **+29 / −5** | ❌ **T-12's A-6 comment edit** |
+
+**Cause:** the Leader ran `git add -A` to commit the D-2 fix while T-12 attempt 2's work was sitting in the working tree awaiting its own review verdict. `-A` stages everything, including another task's uncommitted deliverable.
+
+**Why it matters, precisely.** `.agents/leader.md` → *Concurrency protocol*: *"a reasoning-text commit message becomes unrecoverable: with several sessions committing to one branch, the message is the only surviving record of which session did what."* The same holds across **tasks** in one session. As it stands, `git log` attributes T-12's behavioral fixture — the deliverable of a user ruling, carrying its own review history — to a T-13 comment-citation fix. Anyone reconstructing which task produced that 460-line file from history alone gets the wrong answer.
+
+**What it did NOT cause:** no false completion. `tasks.md` was never flipped; **T-12 remains `[~]`** and its `[x]` still depends on a Reviewer PASS that had not been issued at commit time. The evidence-before-checkbox ordering is intact. The defect is attribution, not traceability of state.
+
+**Disposition: recorded, not rewritten.** History rewriting is destructive, was not requested, and the branch is shared work in flight. This entry is the durable correction — `execution.md` is the audit trail of record, and it now states plainly what `964a7d76` contains. **Offered to the user as a choice** rather than taken unilaterally.
+
+**Standing correction to Leader practice for the remainder of this spec:** never `git add -A` while another task's work is uncommitted in the tree. Stage explicitly by path. The Delegation Ceiling already warns against parallelism whose cost lands in one place; this is the same lesson at the commit boundary — **concurrent tasks in one checkout require explicit staging, because `-A` cannot tell whose work it is picking up.**
+
+**Kaizen candidate (a third from this spec, and the only one about the Leader's own mechanics rather than a worker's):** *when two tasks are in flight in one checkout, `git add -A` silently merges them into whichever commits first.* Neither the AKILI commit standard nor `.agents/leader.md` currently says to stage by path, and the failure is invisible at commit time — `git commit` reports a clean success, and only a later `git show --stat` reveals it.
+
